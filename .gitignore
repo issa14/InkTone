@@ -1,0 +1,60 @@
+# ============================================
+# ReadFlow — .gitignore
+# Android / Kotlin / Gradle / IntelliJ
+# ============================================
+
+# ---- Android ----
+*.apk
+*.aab
+*.ap_
+*.dex
+*.class
+*.log
+*.jks
+*.keystore
+
+# ---- Gradle ----
+.gradle/
+build/
+!gradle/wrapper/gradle-wrapper.jar
+gradle-app.setting
+!gradle-wrapper.properties
+local.properties
+
+# ---- IDE (Android Studio / IntelliJ) ----
+.idea/
+*.iml
+*.iws
+*.ipr
+.vscode/
+*.swp
+*.swo
+*~
+
+# ---- OS ----
+.DS_Store
+Thumbs.db
+
+# ---- Secrets & Config ----
+secrets.properties
+keystore.properties
+*.env
+google-services.json
+GoogleService-Info.plist
+
+# ---- Model files (large binaries) ----
+# Models are downloaded at runtime, not stored in repo
+app/src/main/assets/models/*.onnx
+*.onnx
+
+# ---- Test outputs ----
+app/build/
+captures/
+.externalNativeBuild/
+.cxx/
+
+# ---- Misc ----
+*.log
+*.tmp
+*.bak
+node_modules/
