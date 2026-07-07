@@ -162,5 +162,5 @@ Voir [`architecture.md`](./architecture.md) section 7 pour l'arborescence complÃ
 
 ## ðŸ“ž Contact
 
-- **Issues** : [github.com/<user>/ReadFlow/issues](https://github.com/<user>/ReadFlow/issues)
-- **Discussions** : [github.com/<user>/ReadFlow/discussions](https://github.com/<user>/ReadFlow/discussions)
+- **Issues** : [github.com/issa14/ReadFlow/issues](https://github.com/issa14/ReadFlow/issues)
+- **Discussions** : [github.com/issa14/ReadFlow/discussions](https://github.com/issa14/ReadFlow/discussions)

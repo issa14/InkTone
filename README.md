@@ -67,7 +67,7 @@ Voir le document complet : **[📄 ARCHITECTURE.md](./architecture.md)**
 
 ```bash
 # Cloner le repo
-git clone https://github.com/<user>/ReadFlow.git
+git clone https://github.com/issa14/ReadFlow.git
 cd ReadFlow
 
 # Ouvrir dans Android Studio
