@@ -25,6 +25,14 @@ et ce projet adhère au [Semantic Versioning](https://semver.org/spec/v2.0.0.htm
 - Corrections : downgrade `compileSdk` 35 → 34 (compatibilité AGP 8.5.2), ONNX Runtime 1.18.1 → 1.19.2
 - `local.properties` créé avec chemin SDK
 
+### 2026-07-08 — Phase 0 terminée ✅
+- **Prototype Sherpa-ONNX validé** sur Snapdragon 680 : synthèse FR fonctionnelle
+- **Modèle VITS Piper** `fr_FR-upmc-medium` intégré (2 voix : Jessica ♀, Pierre ♂)
+- **RTF ~0.8** sur Snapdragon 680 (toutes longueurs de texte < 1.0)
+- **Phonémisation FR** : 7/10 phrases OK, 3 imperfections mineures (eSpeak)
+- **Écran de test** avec synthèse + lecture AudioTrack
+- **Décision finale** : GO Sherpa-ONNX (pas de fallback Piper nécessaire)
+
 ---
 
 ## Versions futures

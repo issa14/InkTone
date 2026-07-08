@@ -49,6 +49,20 @@ fun TtsTestScreen() {
     var playing by remember { mutableStateOf(false) }
     val scope = rememberCoroutineScope()
 
+    // Phrases de test pour la phonémisation française
+    val phrasesTest = listOf(
+        "Les amis arrivent dans une heure." to "liaison (les‿amis)",
+        "Ils parlent souvent entre eux." to "muet (parlent, souvent)",
+        "Un bon vin blanc." to "nasale (un, bon, vin, blanc)",
+        "Je m'appelle François." to "élision (m'appelle)",
+        "Le petit enfant a mangé un gâteau." to "liaison (petit‿enfant)",
+        "Nous avons été très contents." to "liaison (nous‿avons, très‿contents)",
+        "Il faut que j'y aille maintenant." to "élision + muet (j'y, aille)",
+        "Prends-en un peu plus." to "liaison (prends-en, un)",
+        "C'est incroyable ce qu'ils ont fait." to "élision (c'est, qu'ils)",
+        "Les sciences et les arts sont magnifiques." to "muet final (sciences, arts, magnifiques)"
+    )
+
     Column(
         modifier = Modifier
             .fillMaxSize()
@@ -143,7 +157,98 @@ fun TtsTestScreen() {
                 Text(if (playing) "🔊 Lecture..." else if (loading) "Synthèse..." else "2. Parler")
             }
 
-            // Résultat
+            // Bouton test phonémisation (10 phrases)
+            var testResults by remember { mutableStateOf<List<Pair<String, SynthesisResult>>>(emptyList()) }
+            var testRunning by remember { mutableStateOf(false) }
+
+            Button(
+                onClick = {
+                    scope.launch {
+                        testRunning = true
+                        testResults = emptyList()
+                        val results = mutableListOf<Pair<String, SynthesisResult>>()
+                        for ((phrase, _) in phrasesTest) {
+                            val r = withContext(Dispatchers.IO) {
+                                inferenceService.synthesize(phrase, OnnxInferenceService.Voice.entries[voixIndex], vitesse)
+                            }
+                            results.add(phrase to r)
+                            // Jouer la phrase
+                            withContext(Dispatchers.IO) { playPcm(r.samples, r.sampleRate) }
+                            // Petite pause entre les phrases
+                            withContext(Dispatchers.IO) { Thread.sleep(300) }
+                        }
+                        testResults = results
+                        testRunning = false
+                    }
+                },
+                enabled = !testRunning,
+                colors = ButtonDefaults.buttonColors(containerColor = MaterialTheme.colorScheme.secondary)
+            ) {
+                Text(if (testRunning) "⏳ Test en cours..." else "3. Test phonémisation (10 phrases)")
+            }
+
+            // Benchmark RTF (phrases courtes à longues)
+            var benchResults by remember { mutableStateOf<List<Triple<String, Long, Float>>>(emptyList()) }
+            var benchRunning by remember { mutableStateOf(false) }
+
+            val benchPhrases = listOf(
+                "Bonjour." to "très courte",
+                "Il fait beau aujourd'hui." to "courte",
+                "Les enfants jouent dans le jardin pendant que leurs parents préparent le dîner." to "moyenne",
+                "La lecture est une activité merveilleuse qui permet de s'évader, d'apprendre et de découvrir des mondes inconnus sans quitter son fauteuil." to "longue",
+                "L'intelligence artificielle transforme profondément notre rapport au savoir et à la connaissance, ouvrant des perspectives inédites dans des domaines aussi variés que la médecine, l'éducation ou encore la création artistique." to "très longue"
+            )
+
+            Button(
+                onClick = {
+                    scope.launch {
+                        benchRunning = true
+                        benchResults = emptyList()
+                        val results = mutableListOf<Triple<String, Long, Float>>()
+                        for ((phrase, label) in benchPhrases) {
+                            val r = withContext(Dispatchers.IO) {
+                                inferenceService.synthesize(phrase, OnnxInferenceService.Voice.entries[voixIndex], vitesse)
+                            }
+                            results.add(Triple(label, r.synthesisTimeMs, r.realTimeFactor))
+                        }
+                        benchResults = results
+                        benchRunning = false
+                    }
+                },
+                enabled = !benchRunning,
+                colors = ButtonDefaults.buttonColors(containerColor = MaterialTheme.colorScheme.tertiary)
+            ) {
+                Text(if (benchRunning) "⏳ Benchmark..." else "4. Benchmark RTF (5 longueurs)")
+            }
+
+            if (benchResults.isNotEmpty()) {
+                Text("📊 RTF par longueur :", style = MaterialTheme.typography.titleSmall)
+                benchResults.forEach { (label, time, rtf) ->
+                    Text(
+                        "• $label : ${time}ms, RTF=${"%.2f".format(rtf)} ${if (rtf < 1f) "✅" else "⚠️"}",
+                        style = MaterialTheme.typography.bodySmall
+                    )
+                }
+            }
+            // Résultats du test phonémisation
+            if (testResults.isNotEmpty()) {
+                Text("📋 Résultats (${testResults.size} phrases) :", style = MaterialTheme.typography.titleSmall)
+                var totalMs = 0L
+                testResults.forEachIndexed { i, (phrase, r) ->
+                    totalMs += r.synthesisTimeMs
+                    Text(
+                        "${i + 1}. RTF=${"%.2f".format(r.realTimeFactor)} | ${r.audioDurationMs}ms — \"${phrase.take(50)}...\"",
+                        style = MaterialTheme.typography.bodySmall,
+                        color = if (r.realTimeFactor < 1f) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.error
+                    )
+                }
+                val avgRtf = testResults.map { it.second.realTimeFactor }.average()
+                Text(
+                    "📊 RTF moyen : ${"%.2f".format(avgRtf)} (${if (avgRtf < 1f) "✅" else "⚠️"}) | Temps total : ${totalMs}ms",
+                    style = MaterialTheme.typography.bodyMedium
+                )
+            }
+            // Résultat individuel
             result?.let { r ->
                 Card(modifier = Modifier.fillMaxWidth()) {
                     Column(modifier = Modifier.padding(12.dp)) {
