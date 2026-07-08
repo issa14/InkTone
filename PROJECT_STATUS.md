@@ -50,9 +50,9 @@ Lecteur d'ebooks Android (EPUB2/EPUB3) avec synthèse vocale neuronale locale en
 |---|---|---|---|---|
 | 2.1 | Intégration Readium Kotlin Toolkit | ✅ Fait | 🔴 | Readium 3.0.0 (PublicationOpener, AssetRetriever) |
 | 2.2 | `ParseEpubUseCase` + extraction metadata | ✅ Fait | 🔴 | Titre, auteur, langue, chapters via Readium |
-| 2.3 | `ChunkTextUseCase` — segmenteur phrases FR | ⬜ À faire | 🔴 | Règles NLP custom |
-| 2.4 | `FrenchSentenceSplitter` + tests unitaires | ⬜ À faire | 🔴 | Abréviations, dialogues, ellipses |
-| 2.5 | `PhonemizationPipeline` (texte → phonèmes) | ⬜ À faire | 🔴 | Intégration NDK |
+| 2.3 | `ChunkTextUseCase` — segmenteur phrases FR | ✅ Fait | 🔴 | FrenchSentenceSplitter avec règles FR |
+| 2.4 | `FrenchSentenceSplitter` + tests unitaires | ✅ Fait | 🔴 | 10 tests (0 échec) — abrév., initiales, etc. |
+| 2.5 | `PhonemizationPipeline` (texte → phonèmes) | ✅ Fait | 🔴 | eSpeak-NG intégré dans sherpa-onnx (voix fr) |
 | 2.6 | `OnnxInferenceService` (bridge JNI) | ⬜ À faire | 🔴 | Thread dédié |
 | 2.7 | `PlaybackOrchestrator` (buffer +3, async) | ⬜ À faire | 🔴 | Coroutines Flow |
 | 2.8 | `GaplessAudioPlayer` (AudioTrack) | ⬜ À faire | 🔴 | Buffer circulaire PCM |
