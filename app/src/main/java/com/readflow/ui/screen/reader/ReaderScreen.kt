@@ -1,8 +1,6 @@
 package com.readflow.ui.screen.reader
 
-import android.Manifest
 import android.app.Activity
-import android.content.pm.PackageManager
 import androidx.compose.animation.*
 import androidx.compose.animation.core.tween
 import androidx.compose.foundation.background
@@ -24,13 +22,11 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.input.pointer.pointerInput
-import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalView
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
-import androidx.core.content.ContextCompat
 import androidx.core.view.WindowCompat
 import androidx.core.view.WindowInsetsCompat
 import androidx.core.view.WindowInsetsControllerCompat
@@ -49,42 +45,35 @@ fun ReaderScreen(
     viewModel: ReaderViewModel = hiltViewModel()
 ) {
     val state by viewModel.uiState.collectAsState()
-    val book = state.book
     val chapter = state.currentChapter
+    val book = state.book
 
-    var showHud by remember { mutableStateOf(false) }
-    var showTtsPanel by remember { mutableStateOf(false) }
-    var showToc by remember { mutableStateOf(false) }
-
-    // Mode immersif : masquer barres système
+    // Mode immersif
     val view = LocalView.current
     DisposableEffect(Unit) {
         val window = (view.context as Activity).window
         val controller = WindowCompat.getInsetsController(window, view)
         controller.hide(WindowInsetsCompat.Type.systemBars())
-        controller.systemBarsBehavior =
-            WindowInsetsControllerCompat.BEHAVIOR_SHOW_TRANSIENT_BARS_BY_SWIPE
-        onDispose {
-            controller.show(WindowInsetsCompat.Type.systemBars())
-        }
+        controller.systemBarsBehavior = WindowInsetsControllerCompat.BEHAVIOR_SHOW_TRANSIENT_BARS_BY_SWIPE
+        onDispose { controller.show(WindowInsetsCompat.Type.systemBars()) }
     }
 
     LaunchedEffect(bookId) { viewModel.loadBook(bookId) }
 
-    // Auto-hide du HUD après 4 secondes
-    LaunchedEffect(showHud) {
-        if (showHud) {
+    // Auto-hide du HUD
+    LaunchedEffect(state.isHudVisible) {
+        if (state.isHudVisible) {
             kotlinx.coroutines.delay(4000)
-            showHud = false
+            viewModel.hideHud()
         }
     }
 
     Box(
         modifier = Modifier
             .fillMaxSize()
-            .background(Color(0xFF0D0D0D)) // fond lecture sombre
+            .background(Color(0xFF0D0D0D))
     ) {
-        // ── ZONE 0 : TEXTE IMMERSIF ──────────────────
+        // ── COUCHE 0 : Texte immersif ─────────────────
         when {
             state.isLoading -> LoadingIndicator()
             state.error != null -> ErrorMessage(state.error!!)
@@ -92,46 +81,46 @@ fun ReaderScreen(
                 chapter = chapter,
                 currentSentenceIndex = state.currentSentenceIndex,
                 isPlaying = state.isPlaying,
-                onTap = { showHud = !showHud }
+                onTap = { viewModel.toggleHud() }
             )
         }
 
-        // ── ZONE 1 : TOP BAR (overlay animé) ──────────
+        // ── COUCHE 1 : TopBar (HUD) ───────────────────
         AnimatedVisibility(
-            visible = showHud,
+            visible = state.isHudVisible,
             enter = fadeIn(tween(200)) + slideInVertically(tween(200)) { -it },
             exit = fadeOut(tween(200)) + slideOutVertically(tween(200)) { -it },
             modifier = Modifier.align(Alignment.TopCenter)
         ) {
             ReaderTopBar(
                 title = book?.title ?: "",
-                chapterLabel = if (book != null) "Ch. ${state.currentChapterIndex + 1}/${book.totalChapters}" else "",
+                subtitle = "Ch. ${state.currentChapterIndex + 1}/${book?.totalChapters ?: 0}",
                 onBack = onBack,
-                onToc = { showToc = true }
+                onToc = { viewModel.showTocSheet() }
             )
         }
 
-        // ── ZONE 1 : BOTTOM BAR (overlay animé) ───────
+        // ── COUCHE 1 : BottomBar (HUD) ────────────────
         AnimatedVisibility(
-            visible = showHud,
+            visible = state.isHudVisible,
             enter = fadeIn(tween(200)) + slideInVertically(tween(200)) { it },
             exit = fadeOut(tween(200)) + slideOutVertically(tween(200)) { it },
             modifier = Modifier.align(Alignment.BottomCenter)
         ) {
             ReaderBottomBar(
-                progress = if (chapter != null && chapter.sentences.isNotEmpty())
-                    state.currentSentenceIndex.toFloat() / chapter.sentences.size else 0f,
-                percentage = if (chapter != null && chapter.sentences.isNotEmpty())
-                    (state.currentSentenceIndex * 100 / chapter.sentences.size) else 0,
-                onTtsClick = { showTtsPanel = true }
+                progress = if (state.totalSentences > 0)
+                    state.currentSentenceIndex.toFloat() / state.totalSentences else 0f,
+                percentage = if (state.totalSentences > 0)
+                    (state.currentSentenceIndex * 100 / state.totalSentences) else 0,
+                onTtsClick = { viewModel.showTtsSheet() }
             )
         }
     }
 
-    // ── ZONE 2 : MODAL BOTTOM SHEET TTS ──────────────
-    if (showTtsPanel) {
+    // ── COUCHE 2 : Panneau TTS ───────────────────────
+    if (state.isTtsSheetVisible) {
         ModalBottomSheet(
-            onDismissRequest = { showTtsPanel = false },
+            onDismissRequest = { viewModel.hideTtsSheet() },
             containerColor = Color(0xFF1E1E1E),
             shape = RoundedCornerShape(topStart = 24.dp, topEnd = 24.dp),
             dragHandle = { BottomSheetDefaults.DragHandle(color = Color.White.copy(alpha = 0.3f)) }
@@ -139,7 +128,7 @@ fun ReaderScreen(
             TtsPanel(
                 chapterTitle = chapter?.title ?: "",
                 sentenceIndex = state.currentSentenceIndex,
-                totalSentences = chapter?.sentences?.size ?: 0,
+                totalSentences = state.totalSentences,
                 isPlaying = state.isPlaying,
                 onPlay = { viewModel.play() },
                 onPause = { viewModel.pause() },
@@ -148,28 +137,27 @@ fun ReaderScreen(
                 onNext = { /* TODO */ },
                 onSpeedChange = { viewModel.setSpeed(it) },
                 onVoiceChange = { viewModel.setVoice(it) },
-                currentSpeed = viewModel.currentSpeed,
-                currentVoice = viewModel.currentVoice
+                currentSpeed = state.speed,
+                currentVoice = state.voice
             )
         }
     }
 
-    // ── ZONE 3 : TABLE DES MATIÈRES ─────────────────
-    if (showToc && book != null) {
+    // ── COUCHE 2 : Table des matières ────────────────
+    if (state.isTocSheetVisible && book != null) {
         ModalBottomSheet(
-            onDismissRequest = { showToc = false },
+            onDismissRequest = { viewModel.hideTocSheet() },
             containerColor = Color(0xFF1E1E1E),
             shape = RoundedCornerShape(topStart = 24.dp, topEnd = 24.dp),
             dragHandle = { BottomSheetDefaults.DragHandle(color = Color.White.copy(alpha = 0.3f)) }
         ) {
             ChapterPicker(
-                totalChapters = book.totalChapters,
+                totalChapters = book?.totalChapters ?: 0,
                 currentChapter = state.currentChapterIndex,
-                chapterTitle = chapter?.title ?: "",
                 onSelect = { idx ->
                     viewModel.goToChapter(idx)
-                    showToc = false
-                    showHud = false
+                    viewModel.hideTocSheet()
+                    viewModel.hideHud()
                 }
             )
         }
@@ -184,7 +172,6 @@ fun ReaderScreen(
 private fun ChapterPicker(
     totalChapters: Int,
     currentChapter: Int,
-    chapterTitle: String,
     onSelect: (Int) -> Unit
 ) {
     Column(modifier = Modifier.padding(horizontal = 16.dp, vertical = 8.dp)) {
@@ -224,7 +211,7 @@ private fun ChapterPicker(
 @Composable
 private fun ReaderTopBar(
     title: String,
-    chapterLabel: String,
+    subtitle: String,
     onBack: () -> Unit,
     onToc: () -> Unit
 ) {
@@ -250,7 +237,7 @@ private fun ReaderTopBar(
                 Text(title, color = Color.White.copy(alpha = 0.9f),
                     style = MaterialTheme.typography.titleSmall,
                     maxLines = 1, overflow = TextOverflow.Ellipsis)
-                Text(chapterLabel, color = Color.White.copy(alpha = 0.45f),
+                Text(subtitle, color = Color.White.copy(alpha = 0.45f),
                     style = MaterialTheme.typography.labelSmall)
             }
             @Suppress("DEPRECATION")

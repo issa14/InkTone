@@ -25,9 +25,16 @@ data class ReaderUiState(
     val currentChapterIndex: Int = 0,
     val currentChapter: Chapter? = null,
     val currentSentenceIndex: Int = 0,
+    val totalSentences: Int = 0,
     val isPlaying: Boolean = false,
     val isLoading: Boolean = false,
-    val error: String? = null
+    val error: String? = null,
+    // ── UI state (HUD, sheets) ──
+    val isHudVisible: Boolean = false,
+    val isTtsSheetVisible: Boolean = false,
+    val isTocSheetVisible: Boolean = false,
+    val speed: Float = 1.0f,
+    val voice: Int = 0
 )
 
 @HiltViewModel
@@ -42,18 +49,18 @@ class ReaderViewModel @Inject constructor(
     val uiState: StateFlow<ReaderUiState> = _uiState.asStateFlow()
 
     private var currentBook: Book? = null
-    private var isPausedForResume = false  // P2: true si on a fait Pause (pas Stop)
+    private var isPausedForResume = false
 
-    /** Vitesse TTS courante (0.5..2.0). Exposée pour le slider. */
-    var currentSpeed: Float = 1.0f
-        private set
+    // ── UI actions ───────────────────────────────────
 
-    /** Voix TTS courante (0=Jessica, 1=Pierre). */
-    var currentVoice: Int = 0
-        private set
-
-    fun setSpeed(speed: Float) { currentSpeed = speed.coerceIn(0.5f, 2.0f) }
-    fun setVoice(voice: Int) { currentVoice = voice.coerceIn(0, 1) }
+    fun toggleHud() { _uiState.update { it.copy(isHudVisible = !it.isHudVisible) } }
+    fun hideHud() { _uiState.update { it.copy(isHudVisible = false) } }
+    fun showTtsSheet() { _uiState.update { it.copy(isTtsSheetVisible = true) } }
+    fun hideTtsSheet() { _uiState.update { it.copy(isTtsSheetVisible = false) } }
+    fun showTocSheet() { _uiState.update { it.copy(isTocSheetVisible = true) } }
+    fun hideTocSheet() { _uiState.update { it.copy(isTocSheetVisible = false) } }
+    fun setSpeed(s: Float) { _uiState.update { it.copy(speed = s.coerceIn(0.5f, 2.0f)) } }
+    fun setVoice(v: Int) { _uiState.update { it.copy(voice = v.coerceIn(0, 1)) } }
 
     init {
         // P1: Initialiser le moteur TTS silencieusement dès l'ouverture du lecteur
@@ -110,6 +117,7 @@ class ReaderViewModel @Inject constructor(
                     it.copy(
                         currentChapterIndex = index,
                         currentChapter = chapter,
+                        totalSentences = chapter.sentences.size,
                         isLoading = false
                     )
                 }
@@ -155,10 +163,11 @@ class ReaderViewModel @Inject constructor(
         val startFrom = if (isPausedForResume) _uiState.value.currentSentenceIndex else 0
         isPausedForResume = false
 
+        val s = _uiState.value
         orchestrator.play(
             chapter.sentences,
-            voice = currentVoice,
-            speed = currentSpeed,
+            voice = s.voice,
+            speed = s.speed,
             startFrom = startFrom,
             bookTitle = book.title,
             chapterTitle = chapter.title
