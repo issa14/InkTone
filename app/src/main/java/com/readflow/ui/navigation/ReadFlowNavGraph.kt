@@ -33,16 +33,8 @@ fun ReadFlowNavGraph() {
         startDestination = Routes.LIBRARY
     ) {
         composable(Routes.LIBRARY) {
-            // TODO: Phase 3 — Remplacer par LibraryScreen
-            Box(
-                modifier = Modifier.fillMaxSize(),
-                contentAlignment = Alignment.Center
-            ) {
-                Text(
-                    text = "ReadFlow",
-                    style = MaterialTheme.typography.displayLarge
-                )
-            }
+            // Phase 0.6 — Écran de test TTS temporaire
+            com.readflow.ui.screen.TtsTestScreen()
         }
 
         composable(Routes.READER) {
