@@ -49,6 +49,10 @@ class GaplessAudioPlayer @Inject constructor() {
     @Volatile var completedCount = 0
         private set
 
+    /** Volume actuel (0.0 à 1.0). */
+    @Volatile var currentVolume: Float = 1.0f
+        private set
+
     /** Ajoute un segment audio à la file de lecture. */
     fun enqueue(samples: FloatArray) {
         queue.add(samples)
@@ -56,6 +60,12 @@ class GaplessAudioPlayer @Inject constructor() {
 
     /** Nombre de segments en attente. */
     val pendingCount: Int get() = queue.size
+
+    /** Règle le volume de la piste audio (0.0 = silence, 1.0 = max). */
+    fun setVolume(volume: Float) {
+        currentVolume = volume.coerceIn(0f, 1f)
+        track?.setVolume(currentVolume)
+    }
 
     /** Démarre la lecture de la file d'attente. */
     fun play() {

@@ -57,7 +57,7 @@ Lecteur d'ebooks Android (EPUB2/EPUB3) avec synthèse vocale neuronale locale en
 | 2.7 | `PlaybackOrchestrator` (buffer +3, async) | ✅ Fait | 🔴 | 321 phrases, channel-based, fill coroutine |
 | 2.8 | `GaplessAudioPlayer` (AudioTrack) | ✅ Fait | 🔴 | PCM float, ConcurrentLinkedQueue, gapless |
 | 2.9 | `AudioPlaybackService` (MediaSessionService) | ✅ Fait | 🔴 | ReadFlowPlayer + MediaSession + notif foreground |
-| 2.10 | `MediaSessionConnector` + `AudioFocusManager` | ⬜ À faire | 🔴 | Notif, lockscreen, BT |
+| 2.10 | `MediaSessionConnector` + `AudioFocusManager` | ✅ Fait | 🔴 | AudioFocus: appels → pause, notifs → ducking |
 | 2.11 | `AudioCacheManager` (LRU, eviction, purge) | ⬜ À faire | 🟡 | 30 Mo / 10 min |
 | 2.12 | `SynthesisResult` sealed class + error handling | ✅ Fait | 🟡 | Fait avec OnnxInferenceService |
 | 2.13 | Test intégration : lecture TTS chapitre complet | ⬜ À faire | 🔴 | Livrable clé |

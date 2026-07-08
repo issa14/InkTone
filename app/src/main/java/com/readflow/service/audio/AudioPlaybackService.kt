@@ -4,7 +4,6 @@ import android.app.Notification
 import android.app.NotificationChannel
 import android.app.NotificationManager
 import android.app.PendingIntent
-import android.content.Context
 import android.content.Intent
 import android.os.Build
 import android.util.Log
@@ -32,6 +31,7 @@ class AudioPlaybackService : MediaSessionService() {
     }
 
     @Inject lateinit var orchestrator: PlaybackOrchestrator
+    @Inject lateinit var audioFocusManager: AudioFocusManager
 
     private var mediaSession: MediaSession? = null
     private var readFlowPlayer: ReadFlowPlayer? = null
@@ -86,6 +86,7 @@ class AudioPlaybackService : MediaSessionService() {
     override fun onDestroy() {
         stopObserving()
         serviceScope.cancel()
+        audioFocusManager.abandonFocus()
         mediaSession?.release()
         mediaSession = null
         readFlowPlayer = null
@@ -101,13 +102,15 @@ class AudioPlaybackService : MediaSessionService() {
                 when (state) {
                     is State.Idle -> {
                         player.setIdle()
+                        audioFocusManager.abandonFocus()
                         updateNotification("Prêt", "Lecture TTS", isPlaying = false)
                     }
                     is State.Playing -> {
+                        // Demander le focus audio (gère appels, notifs, ducking)
+                        audioFocusManager.requestFocus()
                         val title = orchestrator.currentChapterTitle.ifEmpty {
                             orchestrator.currentBookTitle.ifEmpty { "ReadFlow" }
                         }
-                        // IMPORTANT: setContent AVANT setReady (playlist non vide)
                         player.setContent(title, orchestrator.currentBookTitle)
                         player.setReady(true)
                         player.setPlayWhenReady(true)
@@ -124,6 +127,7 @@ class AudioPlaybackService : MediaSessionService() {
                     }
                     is State.Error -> {
                         player.setIdle()
+                        audioFocusManager.abandonFocus()
                         updateNotification("Erreur", state.message, isPlaying = false)
                     }
                 }
