@@ -11,6 +11,7 @@ import androidx.compose.foundation.layout.WindowInsetsSides
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.foundation.text.selection.SelectionContainer
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
@@ -20,21 +21,24 @@ import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.input.pointer.pointerInput
+import androidx.compose.ui.layout.onSizeChanged
+import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.platform.LocalView
+import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextOverflow
+import androidx.compose.ui.unit.IntSize
 import androidx.compose.ui.unit.dp
+import androidx.compose.ui.unit.em
 import androidx.compose.ui.unit.sp
 import androidx.core.view.WindowCompat
 import androidx.core.view.WindowInsetsCompat
 import androidx.core.view.WindowInsetsControllerCompat
 import androidx.hilt.navigation.compose.hiltViewModel
-import androidx.compose.foundation.text.selection.SelectionContainer
-import androidx.compose.ui.text.font.FontFamily
-import androidx.compose.ui.text.style.TextAlign
-import androidx.compose.ui.unit.em
 import com.readflow.domain.model.Chapter
 
 // ─────────────────────────────────────────────────────
@@ -79,12 +83,16 @@ fun ReaderScreen(
         ReaderTheme.SEPIA -> Triple(Color(0xFFF4ECD8), Color(0xFF3C2F2F), Color(0xFFB65D30))
     }
 
+    // Taille de l'écran pour le tiers central
+    var screenSize by remember { mutableStateOf(IntSize.Zero) }
+
     Box(
         modifier = Modifier
             .fillMaxSize()
             .background(bgColor)
+            .onSizeChanged { screenSize = it }
     ) {
-        // ── COUCHE 0 : Texte immersif ─────────────────
+        // ── COUCHE 0 : Texte (100% espace, jamais ne bouge) ─
         when {
             state.isLoading -> LoadingIndicator()
             state.error != null -> ErrorMessage(state.error!!)
@@ -92,13 +100,37 @@ fun ReaderScreen(
                 chapter = chapter,
                 currentSentenceIndex = state.currentSentenceIndex,
                 isPlaying = state.isPlaying,
-                onTap = { viewModel.toggleHud() },
                 textColor = textColor,
-                accentColor = accentColor
+                accentColor = accentColor,
+                onTap = { offset ->
+                    // Tiers central uniquement
+                    if (screenSize.width > 0) {
+                        val left = screenSize.width / 3f
+                        val right = 2f * screenSize.width / 3f
+                        if (offset.x in left..right) {
+                            viewModel.toggleHud()
+                        }
+                    }
+                }
             )
         }
 
-        // ── COUCHE 1 : TopBar (HUD) ───────────────────
+        // ── COUCHE 5 : Micro-indicateur (HUD masqué) ────
+        if (!state.isHudVisible && chapter != null) {
+            val pct = if (state.totalSentences > 0)
+                (state.currentSentenceIndex * 100 / state.totalSentences) else 0
+            Text(
+                "Ch. ${state.currentChapterIndex + 1} • $pct%",
+                color = textColor.copy(alpha = 0.25f),
+                fontSize = 11.sp,
+                modifier = Modifier
+                    .align(Alignment.BottomCenter)
+                    .windowInsetsPadding(WindowInsets.systemBars.only(WindowInsetsSides.Bottom))
+                    .padding(bottom = 8.dp)
+            )
+        }
+
+        // ── COUCHE 1 : TopBar (overlay, animé) ──────────
         AnimatedVisibility(
             visible = state.isHudVisible,
             enter = fadeIn(tween(200)) + slideInVertically(tween(200)) { -it },
@@ -114,19 +146,27 @@ fun ReaderScreen(
             )
         }
 
-        // ── COUCHE 1 : BottomBar (HUD) ────────────────
+        // ── COUCHE 1 : UnifiedControlPanel (overlay, animé) ─
         AnimatedVisibility(
             visible = state.isHudVisible,
             enter = fadeIn(tween(200)) + slideInVertically(tween(200)) { it },
             exit = fadeOut(tween(200)) + slideOutVertically(tween(200)) { it },
             modifier = Modifier.align(Alignment.BottomCenter)
         ) {
-            ReaderBottomBar(
+            UnifiedControlPanel(
                 progress = if (state.totalSentences > 0)
                     state.currentSentenceIndex.toFloat() / state.totalSentences else 0f,
                 percentage = if (state.totalSentences > 0)
                     (state.currentSentenceIndex * 100 / state.totalSentences) else 0,
-                onTtsClick = { viewModel.showTtsSheet() }
+                isPlaying = state.isPlaying,
+                accentColor = accentColor,
+                onTtsClick = {
+                    if (state.isPlaying) viewModel.pause() else viewModel.play()
+                },
+                onTtsSettings = { viewModel.showTtsSheet() },
+                onThemeCycle = { viewModel.cycleTheme() },
+                onPrevChapter = { viewModel.previousChapter() },
+                onNextChapter = { viewModel.nextChapter() }
             )
         }
     }
@@ -269,53 +309,106 @@ private fun ReaderTopBar(
 }
 
 // ─────────────────────────────────────────────────────
-//  BOTTOM BAR — Progression + bouton TTS
+//  UNIFIED CONTROL PANEL — 3 rangées
 // ─────────────────────────────────────────────────────
 
 @Composable
-private fun ReaderBottomBar(
+private fun UnifiedControlPanel(
     progress: Float,
     percentage: Int,
-    onTtsClick: () -> Unit
+    isPlaying: Boolean,
+    accentColor: Color,
+    onTtsClick: () -> Unit,
+    onTtsSettings: () -> Unit,
+    onThemeCycle: () -> Unit,
+    onPrevChapter: () -> Unit,
+    onNextChapter: () -> Unit
 ) {
     Surface(
         modifier = Modifier.fillMaxWidth(),
-        color = Color(0xFF0A0A0A).copy(alpha = 0.94f)
+        color = Color(0xFF0A0A0A).copy(alpha = 0.94f),
+        shape = RoundedCornerShape(topStart = 16.dp, topEnd = 16.dp)
     ) {
-        Row(
+        Column(
             modifier = Modifier
                 .fillMaxWidth()
                 .windowInsetsPadding(WindowInsets.systemBars.only(WindowInsetsSides.Bottom + WindowInsetsSides.Horizontal))
-                .padding(horizontal = 16.dp, vertical = 10.dp),
-            verticalAlignment = Alignment.CenterVertically
+                .padding(horizontal = 16.dp, vertical = 8.dp)
         ) {
-            // Slider de progression
-            Slider(
-                value = progress,
-                onValueChange = {},
-                modifier = Modifier.weight(1f),
-                colors = SliderDefaults.colors(
-                    thumbColor = Color(0xFFFFB74D),
-                    activeTrackColor = Color(0xFFFFB74D),
-                    inactiveTrackColor = Color.White.copy(alpha = 0.15f)
-                )
-            )
-            Spacer(Modifier.width(10.dp))
-            Text("$percentage%", color = Color.White.copy(alpha = 0.55f),
-                style = MaterialTheme.typography.labelSmall)
-
-            Spacer(Modifier.width(12.dp))
-
-            // Bouton TTS (FAB)
-            FloatingActionButton(
-                onClick = onTtsClick,
-                modifier = Modifier.size(42.dp),
-                containerColor = Color(0xFFFFB74D),
-                shape = CircleShape,
-                elevation = FloatingActionButtonDefaults.elevation(0.dp, 0.dp, 0.dp, 0.dp)
+            // ── Rangée 1 : Contrôles TTS et Outils ────
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.SpaceEvenly,
+                verticalAlignment = Alignment.CenterVertically
             ) {
-                Icon(Icons.Outlined.Headphones, "Audio",
-                    tint = Color(0xFF0D0D0D), modifier = Modifier.size(22.dp))
+                // Play/Pause TTS
+                IconButton(onClick = onTtsClick) {
+                    Icon(
+                        if (isPlaying) Icons.Default.Pause else Icons.Default.PlayArrow,
+                        "TTS",
+                        tint = accentColor,
+                        modifier = Modifier.size(26.dp)
+                    )
+                }
+                // Réglages TTS (vitesse/voix)
+                IconButton(onClick = onTtsSettings) {
+                    Icon(Icons.Outlined.Headphones, "Audio",
+                        tint = Color.White.copy(alpha = 0.6f),
+                        modifier = Modifier.size(22.dp))
+                }
+                // Taille texte (placeholder visuel)
+                IconButton(onClick = { /* future: fontSize */ }) {
+                    Text("AA", color = Color.White.copy(alpha = 0.6f),
+                        fontSize = 14.sp, fontWeight = FontWeight.Bold)
+                }
+                // Thème
+                IconButton(onClick = onThemeCycle) {
+                    Icon(Icons.Default.Palette, "Thème",
+                        tint = Color.White.copy(alpha = 0.6f))
+                }
+            }
+
+            // ── Rangée 2 : Progression ────────────────
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                Text("$percentage%", color = Color.White.copy(alpha = 0.55f),
+                    fontSize = 12.sp, modifier = Modifier.width(36.dp))
+                Slider(
+                    value = progress,
+                    onValueChange = {},
+                    modifier = Modifier.weight(1f).padding(horizontal = 8.dp),
+                    colors = SliderDefaults.colors(
+                        thumbColor = accentColor,
+                        activeTrackColor = accentColor,
+                        inactiveTrackColor = Color.White.copy(alpha = 0.12f)
+                    )
+                )
+                Text("${100 - percentage}%", color = Color.White.copy(alpha = 0.35f),
+                    fontSize = 12.sp, modifier = Modifier.width(36.dp))
+            }
+
+            // ── Rangée 3 : Navigation chapitres ────────
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.Center
+            ) {
+                TextButton(onClick = onPrevChapter) {
+                    Icon(Icons.Default.SkipPrevious, null,
+                        tint = Color.White.copy(alpha = 0.45f), modifier = Modifier.size(16.dp))
+                    Spacer(Modifier.width(4.dp))
+                    Text("Chapitre précédent", color = Color.White.copy(alpha = 0.45f),
+                        fontSize = 12.sp)
+                }
+                Spacer(Modifier.width(16.dp))
+                TextButton(onClick = onNextChapter) {
+                    Text("Chapitre suivant", color = Color.White.copy(alpha = 0.45f),
+                        fontSize = 12.sp)
+                    Spacer(Modifier.width(4.dp))
+                    Icon(Icons.Default.SkipNext, null,
+                        tint = Color.White.copy(alpha = 0.45f), modifier = Modifier.size(16.dp))
+                }
             }
         }
     }
@@ -330,15 +423,15 @@ private fun ImmersiveText(
     chapter: Chapter,
     currentSentenceIndex: Int,
     isPlaying: Boolean,
-    onTap: () -> Unit,
     textColor: Color,
-    accentColor: Color
+    accentColor: Color,
+    onTap: (Offset) -> Unit
 ) {
     SelectionContainer {
         Column(
             modifier = Modifier
                 .fillMaxSize()
-                .pointerInput(Unit) { detectTapGestures { onTap() } }
+                .pointerInput(Unit) { detectTapGestures { onTap(it) } }
                 .verticalScroll(rememberScrollState())
                 .windowInsetsPadding(WindowInsets.systemBars)
                 .padding(horizontal = 24.dp, vertical = 16.dp)
