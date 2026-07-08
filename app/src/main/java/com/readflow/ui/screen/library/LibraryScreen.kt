@@ -9,8 +9,10 @@ import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.grid.GridCells
 import androidx.compose.foundation.lazy.grid.LazyVerticalGrid
 import androidx.compose.foundation.lazy.grid.items
+import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.*
 import androidx.compose.material.icons.outlined.Headphones
@@ -24,8 +26,11 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
+import androidx.compose.ui.unit.IntOffset
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import androidx.compose.ui.window.Popup
+import androidx.compose.ui.window.PopupProperties
 import androidx.hilt.navigation.compose.hiltViewModel
 import com.readflow.domain.model.Book
 import com.readflow.ui.theme.*
@@ -40,7 +45,8 @@ fun LibraryScreen(
     val state by viewModel.uiState.collectAsState()
     var showDrawer by remember { mutableStateOf(false) }
     var showOverflow by remember { mutableStateOf(false) }
-    var showFilter by remember { mutableStateOf(false) }
+    var showNavPopup by remember { mutableStateOf(false) }
+    var showFilterMode by remember { mutableStateOf(false) }
     var showSearch by remember { mutableStateOf(false) }
     var searchText by remember { mutableStateOf("") }
 
@@ -65,7 +71,8 @@ fun LibraryScreen(
                     } else {
                         TopBar(
                             onMenu = { showDrawer = true },
-                            onFilterToggle = { showFilter = !showFilter },
+                            onNavPopup = { showNavPopup = true },
+                            onFilterMode = { showFilterMode = !showFilterMode },
                             onSearch = { showSearch = true },
                             onOverflow = { showOverflow = true }
                         )
@@ -87,17 +94,26 @@ fun LibraryScreen(
             }
         }
 
-        // ── FILTER DROPDOWN ──────────────────────────
+        // ── POPUP NAVIGATION (titre TopBar) ──────────
+        if (showNavPopup) {
+            LibraryNavigationPopup(
+                onDismiss = { showNavPopup = false },
+                onFilterSelect = { viewModel.setFilterMode(it) },
+                currentFilter = state.filterMode
+            )
+        }
+
+        // ── FILTER MODE POPUP (icône entonnoir) ──────
         AnimatedVisibility(
-            visible = showFilter,
+            visible = showFilterMode,
             enter = fadeIn() + slideInVertically { -it },
             exit = fadeOut() + slideOutVertically { -it },
             modifier = Modifier.align(Alignment.TopCenter).padding(top = 55.dp)
         ) {
-            FilterDropdown(
+            FilterModeDropdown(
                 current = state.filterMode,
-                onSelect = { viewModel.setFilterMode(it) },
-                onDismiss = { showFilter = false }
+                onSelect = { viewModel.setFilterMode(it); showFilterMode = false },
+                onDismiss = { showFilterMode = false }
             )
         }
 
@@ -137,18 +153,20 @@ fun LibraryScreen(
 @Composable
 private fun TopBar(
     onMenu: () -> Unit,
-    onFilterToggle: () -> Unit,
+    onNavPopup: () -> Unit,
+    onFilterMode: () -> Unit,
     onSearch: () -> Unit,
     onOverflow: () -> Unit
 ) {
     TopAppBar(
         title = {
-            Row(verticalAlignment = Alignment.CenterVertically) {
+            Row(
+                verticalAlignment = Alignment.CenterVertically,
+                modifier = Modifier.clickable(onClick = onNavPopup)
+            ) {
                 Text("Tous les livres", fontWeight = FontWeight.Medium, fontSize = 17.sp)
                 Spacer(Modifier.width(4.dp))
-                IconButton(onClick = onFilterToggle, modifier = Modifier.size(18.dp)) {
-                    Icon(Icons.Default.ArrowDropDown, null, tint = Color.White, modifier = Modifier.size(18.dp))
-                }
+                Icon(Icons.Default.ArrowDropDown, null, tint = Color.White, modifier = Modifier.size(18.dp))
             }
         },
         navigationIcon = {
@@ -160,7 +178,7 @@ private fun TopBar(
             IconButton(onClick = onSearch) {
                 Icon(Icons.Default.Search, "Rechercher", tint = Color.White)
             }
-            IconButton(onClick = onFilterToggle) {
+            IconButton(onClick = onFilterMode) {
                 Icon(Icons.Default.FilterList, "Filtrer", tint = Color.White)
             }
             IconButton(onClick = onOverflow) {
@@ -328,11 +346,160 @@ private fun BookCover(
 }
 
 // ─────────────────────────────────────────────────────
-//  FILTER DROPDOWN — 2 colonnes
+//  POPUP NAVIGATION — Double colonne (prototype Moon+)
 // ─────────────────────────────────────────────────────
 
 @Composable
-private fun FilterDropdown(
+private fun LibraryNavigationPopup(
+    onDismiss: () -> Unit,
+    onFilterSelect: (FilterMode) -> Unit,
+    currentFilter: FilterMode
+) {
+    var selectedCategory by remember { mutableStateOf("Séries") }
+
+    val categories = listOf(
+        "Tous les livres" to FilterMode.ALL,
+        "Favoris" to FilterMode.ALL,
+        "Séries" to FilterMode.ALL,
+        "Auteur" to FilterMode.BY_AUTHOR,
+        "Tags" to FilterMode.ALL,
+        "Dossiers" to FilterMode.ALL
+    )
+
+    // Sous-éléments mockés (à terme depuis le ViewModel)
+    val subItems = remember(selectedCategory) {
+        when (selectedCategory) {
+            "Séries" -> listOf("Black Wings" to 1, "Contes et nouvelles" to 5, "Epub commercial" to 1)
+            "Auteur" -> listOf("Tous" to 12)
+            else -> emptyList()
+        }
+    }
+
+    Popup(
+        alignment = Alignment.TopStart,
+        offset = IntOffset(8, 55),
+        onDismissRequest = onDismiss,
+        properties = PopupProperties(focusable = true)
+    ) {
+        Card(
+            modifier = Modifier
+                .fillMaxWidth(0.95f)
+                .heightIn(max = 400.dp),
+            shape = RoundedCornerShape(8.dp),
+            colors = CardDefaults.cardColors(containerColor = SurfaceRaised),
+            elevation = CardDefaults.cardElevation(defaultElevation = 8.dp)
+        ) {
+            Row(modifier = Modifier.fillMaxSize()) {
+                // ── COLONNE GAUCHE : Catégories ────────
+                Column(
+                    modifier = Modifier
+                        .weight(1f)
+                        .fillMaxHeight()
+                        .background(Color.Black.copy(alpha = 0.2f))
+                ) {
+                    categories.forEach { (label, mode) ->
+                        val isActive = label == selectedCategory
+
+                        Surface(
+                            color = if (isActive) SurfaceDark else Color.Transparent,
+                            onClick = {
+                                selectedCategory = label
+                                onFilterSelect(mode)
+                            }
+                        ) {
+                            Row(
+                                modifier = Modifier.padding(horizontal = 14.dp, vertical = 12.dp),
+                                horizontalArrangement = Arrangement.SpaceBetween,
+                                verticalAlignment = Alignment.CenterVertically
+                            ) {
+                                Text(
+                                    label,
+                                    fontSize = 13.sp,
+                                    fontWeight = if (isActive) FontWeight.SemiBold else FontWeight.Normal,
+                                    color = if (isActive) AccentBlue else TextMain,
+                                    modifier = Modifier.weight(1f),
+                                    maxLines = 1,
+                                    overflow = TextOverflow.Ellipsis
+                                )
+                                if (isActive) {
+                                    Icon(
+                                        Icons.Default.ChevronRight, null,
+                                        tint = TextMuted,
+                                        modifier = Modifier.size(14.dp)
+                                    )
+                                }
+                            }
+                        }
+                    }
+                }
+
+                // ── COLONNE DROITE : Sous-éléments ─────
+                Column(
+                    modifier = Modifier
+                        .weight(1.2f)
+                        .fillMaxHeight()
+                        .verticalScroll(rememberScrollState())
+                ) {
+                    if (subItems.isEmpty()) {
+                        Box(
+                            modifier = Modifier.fillMaxSize().padding(16.dp),
+                            contentAlignment = Alignment.Center
+                        ) {
+                            Text(
+                                "Aucun élément",
+                                fontSize = 13.sp,
+                                color = TextMuted
+                            )
+                        }
+                    } else {
+                        subItems.forEach { (name, count) ->
+                            Surface(
+                                color = SurfaceRaised,
+                                onClick = onDismiss
+                            ) {
+                                Row(
+                                    modifier = Modifier
+                                        .padding(horizontal = 16.dp, vertical = 11.dp)
+                                        .fillMaxWidth(),
+                                    horizontalArrangement = Arrangement.SpaceBetween,
+                                    verticalAlignment = Alignment.CenterVertically
+                                ) {
+                                    Text(
+                                        name,
+                                        fontSize = 13.sp,
+                                        color = TextMain,
+                                        modifier = Modifier.weight(1f),
+                                        maxLines = 1,
+                                        overflow = TextOverflow.Ellipsis
+                                    )
+                                    Text(
+                                        "$count",
+                                        fontSize = 11.sp,
+                                        fontWeight = FontWeight.SemiBold,
+                                        color = TextMuted,
+                                        modifier = Modifier
+                                            .background(
+                                                ShelfOverlay,
+                                                RoundedCornerShape(10.dp)
+                                            )
+                                            .padding(horizontal = 8.dp, vertical = 2.dp)
+                                    )
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+        }
+    }
+}
+
+// ─────────────────────────────────────────────────────
+//  FILTER MODE — Simple liste (icône entonnoir)
+// ─────────────────────────────────────────────────────
+
+@Composable
+private fun FilterModeDropdown(
     current: FilterMode,
     onSelect: (FilterMode) -> Unit,
     onDismiss: () -> Unit
@@ -344,26 +511,26 @@ private fun FilterDropdown(
     ) {
         Surface(
             modifier = Modifier
-                .align(Alignment.TopCenter)
-                .padding(top = 55.dp, start = 8.dp, end = 8.dp)
-                .fillMaxWidth()
+                .align(Alignment.TopEnd)
+                .padding(top = 55.dp, end = 8.dp)
+                .width(220.dp)
                 .clip(RoundedCornerShape(8.dp)),
             color = SurfaceRaised,
             tonalElevation = 8.dp
         ) {
             Column {
                 val items = listOf(
-                    FilterMode.ALL to "Tous les livres",
+                    FilterMode.ALL to "Tous",
                     FilterMode.BY_AUTHOR to "Par Auteur",
                     FilterMode.BY_TITLE to "Par Titre",
-                    FilterMode.IN_PROGRESS to "En cours de lecture",
+                    FilterMode.IN_PROGRESS to "En cours",
                     FilterMode.READ to "Lus",
                     FilterMode.UNREAD to "Non lus"
                 )
                 items.forEach { (mode, label) ->
                     Surface(
                         color = if (mode == current) AccentBlue.copy(alpha = 0.15f) else Color.Transparent,
-                        onClick = { onSelect(mode); onDismiss() }
+                        onClick = { onSelect(mode) }
                     ) {
                         Row(
                             modifier = Modifier.padding(horizontal = 16.dp, vertical = 14.dp),
@@ -373,10 +540,8 @@ private fun FilterDropdown(
                                 color = if (mode == current) AccentBlue else TextMain,
                                 fontWeight = if (mode == current) FontWeight.SemiBold else FontWeight.Normal,
                                 modifier = Modifier.weight(1f))
-                            if (mode == current) {
-                                Icon(Icons.Default.Check, null,
-                                    tint = AccentBlue, modifier = Modifier.size(18.dp))
-                            }
+                            if (mode == current)
+                                Icon(Icons.Default.Check, null, tint = AccentBlue, modifier = Modifier.size(18.dp))
                         }
                     }
                 }
@@ -384,9 +549,6 @@ private fun FilterDropdown(
         }
     }
 }
-
-// ─────────────────────────────────────────────────────
-//  OVERFLOW MENU
 // ─────────────────────────────────────────────────────
 
 @Composable
