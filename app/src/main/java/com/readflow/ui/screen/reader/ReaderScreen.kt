@@ -1,28 +1,41 @@
 package com.readflow.ui.screen.reader
 
+import android.app.Activity
 import androidx.compose.animation.*
+import androidx.compose.animation.core.tween
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
+import androidx.compose.foundation.interaction.MutableInteractionSource
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.filled.*
+import androidx.compose.material.icons.outlined.Headphones
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.platform.LocalView
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import androidx.core.view.WindowCompat
+import androidx.core.view.WindowInsetsCompat
+import androidx.core.view.WindowInsetsControllerCompat
 import androidx.hilt.navigation.compose.hiltViewModel
 import com.readflow.domain.model.Chapter
-import kotlinx.coroutines.delay
 
+// ─────────────────────────────────────────────────────
+//  READER SCREEN — Immersif, style Moon+ Reader
+// ─────────────────────────────────────────────────────
+
+@OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun ReaderScreen(
     bookId: String,
@@ -33,234 +46,416 @@ fun ReaderScreen(
     val book = state.book
     val chapter = state.currentChapter
 
-    // Contrôles visibles (toggle au tap)
-    var showControls by remember { mutableStateOf(false) }
-    var ttsSpeed by remember { mutableFloatStateOf(1.0f) }
-    var ttsVoice by remember { mutableIntStateOf(0) }
+    var showHud by remember { mutableStateOf(false) }
+    var showTtsPanel by remember { mutableStateOf(false) }
 
-    LaunchedEffect(bookId) { viewModel.loadBook(bookId) }
-
-    // Auto-hide des contrôles après 5s
-    LaunchedEffect(showControls) {
-        if (showControls) {
-            delay(5000)
-            showControls = false
+    // Mode immersif : masquer barres système
+    val view = LocalView.current
+    DisposableEffect(Unit) {
+        val window = (view.context as Activity).window
+        val controller = WindowCompat.getInsetsController(window, view)
+        controller.hide(WindowInsetsCompat.Type.systemBars())
+        controller.systemBarsBehavior =
+            WindowInsetsControllerCompat.BEHAVIOR_SHOW_TRANSIENT_BARS_BY_SWIPE
+        onDispose {
+            controller.show(WindowInsetsCompat.Type.systemBars())
         }
     }
 
-    Box(modifier = Modifier.fillMaxSize()) {
-        // ── Fond sombre (style lecture Moon+) ──────────
-        Surface(
-            modifier = Modifier.fillMaxSize(),
-            color = Color(0xFF1A1A1A)
-        ) {
-            when {
-                state.isLoading -> {
-                    Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
-                        CircularProgressIndicator(color = Color.White.copy(alpha = 0.7f))
-                    }
-                }
-                state.error != null -> {
-                    Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
-                        Text("❌ ${state.error}", color = Color(0xFFFF6B6B))
-                    }
-                }
-                chapter != null -> {
-                    // Texte scrollable (plein écran)
-                    Column(
-                        modifier = Modifier
-                            .fillMaxSize()
-                            .verticalScroll(rememberScrollState())
-                            .clickable { showControls = !showControls }
-                            .padding(horizontal = 16.dp, vertical = 48.dp)
-                    ) {
-                        Spacer(Modifier.height(16.dp))
-                        Text(
-                            chapter.title,
-                            style = MaterialTheme.typography.titleLarge.copy(
-                                color = Color.White.copy(alpha = 0.8f),
-                                fontWeight = FontWeight.Bold,
-                                fontSize = 22.sp
-                            )
-                        )
-                        Spacer(Modifier.height(16.dp))
+    LaunchedEffect(bookId) { viewModel.loadBook(bookId) }
 
-                        chapter.sentences.forEachIndexed { index, sentence ->
-                            val isCurrent = index == state.currentSentenceIndex && state.isPlaying
-                            Text(
-                                text = sentence.text + " ",
-                                style = MaterialTheme.typography.bodyLarge.copy(
-                                    color = when {
-                                        isCurrent -> Color(0xFFFFB74D) // orange Moon+ highlight
-                                        else -> Color.White.copy(alpha = 0.85f)
-                                    },
-                                    fontSize = 17.sp,
-                                    lineHeight = 28.sp
-                                )
-                            )
-                        }
+    // Auto-hide du HUD après 4 secondes
+    LaunchedEffect(showHud) {
+        if (showHud) {
+            kotlinx.coroutines.delay(4000)
+            showHud = false
+        }
+    }
 
-                        Spacer(Modifier.height(80.dp)) // espace pour la barre du bas
-                    }
-                }
-            }
+    Box(
+        modifier = Modifier
+            .fillMaxSize()
+            .background(Color(0xFF0D0D0D)) // fond lecture sombre
+    ) {
+        // ── ZONE 0 : TEXTE IMMERSIF ──────────────────
+        when {
+            state.isLoading -> LoadingIndicator()
+            state.error != null -> ErrorMessage(state.error!!)
+            chapter != null -> ImmersiveText(
+                chapter = chapter,
+                currentSentenceIndex = state.currentSentenceIndex,
+                isPlaying = state.isPlaying,
+                onTap = { showHud = !showHud }
+            )
         }
 
-        // ── Top bar minimaliste ────────────────────────
-        if (book != null) {
-            Row(
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .background(Color.Black.copy(alpha = 0.6f))
-                    .padding(horizontal = 4.dp, vertical = 8.dp)
-                    .statusBarsPadding(),
-                verticalAlignment = Alignment.CenterVertically
-            ) {
-                IconButton(onClick = onBack) {
-                    Icon(Icons.AutoMirrored.Filled.ArrowBack, "Retour", tint = Color.White.copy(alpha = 0.8f))
-                }
-                Column(modifier = Modifier.weight(1f)) {
-                    Text(book.title, color = Color.White.copy(alpha = 0.9f),
-                        style = MaterialTheme.typography.titleSmall, maxLines = 1)
-                    Text("Ch. ${state.currentChapterIndex + 1}/${book.totalChapters}",
-                        color = Color.White.copy(alpha = 0.5f), style = MaterialTheme.typography.labelSmall)
-                }
-            }
-        }
-
-        // ── Overlay contrôles (animé) ──────────────────
+        // ── ZONE 1 : TOP BAR (overlay animé) ──────────
         AnimatedVisibility(
-            visible = showControls,
-            enter = fadeIn() + slideInVertically { it },
-            exit = fadeOut() + slideOutVertically { it },
+            visible = showHud,
+            enter = fadeIn(tween(200)) + slideInVertically(tween(200)) { -it },
+            exit = fadeOut(tween(200)) + slideOutVertically(tween(200)) { -it },
+            modifier = Modifier.align(Alignment.TopCenter)
+        ) {
+            ReaderTopBar(
+                title = book?.title ?: "",
+                chapterLabel = if (book != null) "Ch. ${state.currentChapterIndex + 1}/${book.totalChapters}" else "",
+                onBack = onBack,
+                onToc = { /* TODO: table des matières */ }
+            )
+        }
+
+        // ── ZONE 1 : BOTTOM BAR (overlay animé) ───────
+        AnimatedVisibility(
+            visible = showHud,
+            enter = fadeIn(tween(200)) + slideInVertically(tween(200)) { it },
+            exit = fadeOut(tween(200)) + slideOutVertically(tween(200)) { it },
             modifier = Modifier.align(Alignment.BottomCenter)
         ) {
-            Surface(
-                modifier = Modifier.fillMaxWidth(),
-                color = Color(0xFF2A2A2A).copy(alpha = 0.95f),
-                shape = RoundedCornerShape(topStart = 20.dp, topEnd = 20.dp)
+            ReaderBottomBar(
+                progress = if (chapter != null && chapter.sentences.isNotEmpty())
+                    state.currentSentenceIndex.toFloat() / chapter.sentences.size else 0f,
+                percentage = if (chapter != null && chapter.sentences.isNotEmpty())
+                    (state.currentSentenceIndex * 100 / chapter.sentences.size) else 0,
+                onTtsClick = { showTtsPanel = true }
+            )
+        }
+    }
+
+    // ── ZONE 2 : MODAL BOTTOM SHEET TTS ──────────────
+    if (showTtsPanel) {
+        ModalBottomSheet(
+            onDismissRequest = { showTtsPanel = false },
+            containerColor = Color(0xFF1E1E1E),
+            shape = RoundedCornerShape(topStart = 24.dp, topEnd = 24.dp),
+            dragHandle = { BottomSheetDefaults.DragHandle(color = Color.White.copy(alpha = 0.3f)) }
+        ) {
+            TtsPanel(
+                chapterTitle = chapter?.title ?: "",
+                sentenceIndex = state.currentSentenceIndex,
+                totalSentences = chapter?.sentences?.size ?: 0,
+                isPlaying = state.isPlaying,
+                onPlay = { viewModel.play() },
+                onPause = { viewModel.pause() },
+                onStop = { viewModel.stop() },
+                onPrevious = { /* TODO */ },
+                onNext = { /* TODO */ },
+                onSpeedChange = { viewModel.setSpeed(it) },
+                onVoiceChange = { viewModel.setVoice(it) },
+                currentSpeed = viewModel.currentSpeed,
+                currentVoice = viewModel.currentVoice
+            )
+        }
+    }
+}
+
+// ─────────────────────────────────────────────────────
+//  TOP BAR — Semi-transparente, titre centré
+// ─────────────────────────────────────────────────────
+
+@Composable
+private fun ReaderTopBar(
+    title: String,
+    chapterLabel: String,
+    onBack: () -> Unit,
+    onToc: () -> Unit
+) {
+    Surface(
+        modifier = Modifier.fillMaxWidth(),
+        color = Color.Black.copy(alpha = 0.75f)
+    ) {
+        Row(
+            modifier = Modifier
+                .fillMaxWidth()
+                .statusBarsPadding()
+                .padding(horizontal = 4.dp, vertical = 6.dp),
+            verticalAlignment = Alignment.CenterVertically
+        ) {
+            IconButton(onClick = onBack) {
+                Icon(Icons.AutoMirrored.Filled.ArrowBack, "Retour",
+                    tint = Color.White.copy(alpha = 0.85f))
+            }
+            Column(
+                modifier = Modifier.weight(1f),
+                horizontalAlignment = Alignment.CenterHorizontally
             ) {
-                Column(modifier = Modifier.padding(16.dp)) {
-                    // ── Progression chapitre ───────────
-                    Row(verticalAlignment = Alignment.CenterVertically) {
-                        Icon(Icons.Default.MenuBook, null, tint = Color.White.copy(alpha = 0.5f), modifier = Modifier.size(14.dp))
-                        Spacer(Modifier.width(6.dp))
-                        Text("Phrase ${state.currentSentenceIndex + 1}/${chapter?.sentences?.size ?: 0}",
-                            color = Color.White.copy(alpha = 0.5f), style = MaterialTheme.typography.labelSmall)
-                        Spacer(Modifier.weight(1f))
-                        TextButton(onClick = { showControls = false }) {
-                            Text("✕", color = Color.White.copy(alpha = 0.6f))
-                        }
-                    }
-
-                    Spacer(Modifier.height(8.dp))
-
-                    // ── Vitesse TTS ───────────────────
-                    Row(verticalAlignment = Alignment.CenterVertically) {
-                        Icon(Icons.Default.Speed, null, tint = Color.White.copy(alpha = 0.5f), modifier = Modifier.size(18.dp))
-                        Spacer(Modifier.width(8.dp))
-                        Text("${"%.1f".format(ttsSpeed)}x", color = Color.White, style = MaterialTheme.typography.labelSmall)
-                        Slider(
-                            value = ttsSpeed,
-                            onValueChange = { ttsSpeed = it },
-                            valueRange = 0.5f..2.0f,
-                            modifier = Modifier.weight(1f),
-                            colors = SliderDefaults.colors(
-                                thumbColor = Color(0xFFFFB74D),
-                                activeTrackColor = Color(0xFFFFB74D)
-                            )
-                        )
-                    }
-
-                    // ── Voix TTS ──────────────────────
-                    Row(verticalAlignment = Alignment.CenterVertically) {
-                        Icon(Icons.Default.Person, null, tint = Color.White.copy(alpha = 0.5f), modifier = Modifier.size(18.dp))
-                        Spacer(Modifier.width(8.dp))
-                        FilterChip(
-                            selected = ttsVoice == 0,
-                            onClick = { ttsVoice = 0 },
-                            label = { Text("♀ Jessica", style = MaterialTheme.typography.labelSmall) },
-                            colors = FilterChipDefaults.filterChipColors(
-                                selectedContainerColor = Color(0xFFFFB74D).copy(alpha = 0.3f),
-                                selectedLabelColor = Color.White
-                            )
-                        )
-                        Spacer(Modifier.width(8.dp))
-                        FilterChip(
-                            selected = ttsVoice == 1,
-                            onClick = { ttsVoice = 1 },
-                            label = { Text("♂ Pierre", style = MaterialTheme.typography.labelSmall) },
-                            colors = FilterChipDefaults.filterChipColors(
-                                selectedContainerColor = Color(0xFFFFB74D).copy(alpha = 0.3f),
-                                selectedLabelColor = Color.White
-                            )
-                        )
-                    }
-
-                    Spacer(Modifier.height(12.dp))
-
-                    // ── Boutons Play/Pause/Stop ────────
-                    Row(
-                        modifier = Modifier.fillMaxWidth(),
-                        horizontalArrangement = Arrangement.Center,
-                        verticalAlignment = Alignment.CenterVertically
-                    ) {
-                        // Précédent
-                        IconButton(onClick = { /* TODO: prev sentence */ },
-                            modifier = Modifier.size(40.dp)) {
-                            Icon(Icons.Default.SkipPrevious, "Précédent",
-                                tint = Color.White.copy(alpha = 0.6f))
-                        }
-
-                        Spacer(Modifier.width(16.dp))
-
-                        // Play/Pause
-                        FilledIconButton(
-                            onClick = {
-                                if (state.isPlaying) viewModel.pause()
-                                else viewModel.play(ttsVoice, ttsSpeed)
-                            },
-                            modifier = Modifier.size(56.dp),
-                            colors = IconButtonDefaults.filledIconButtonColors(
-                                containerColor = Color(0xFFFFB74D)
-                            )
-                        ) {
-                            Icon(
-                                if (state.isPlaying) Icons.Default.Pause else Icons.Default.PlayArrow,
-                                contentDescription = if (state.isPlaying) "Pause" else "Lire",
-                                modifier = Modifier.size(28.dp),
-                                tint = Color(0xFF1A1A1A)
-                            )
-                        }
-
-                        Spacer(Modifier.width(16.dp))
-
-                        // Stop
-                        IconButton(onClick = { viewModel.stop(); showControls = false },
-                            modifier = Modifier.size(40.dp)) {
-                            Icon(Icons.Default.Stop, "Stop",
-                                tint = Color.White.copy(alpha = 0.6f))
-                        }
-                    }
-
-                    // ── Navigation chapitres ───────────
-                    Row(
-                        modifier = Modifier.fillMaxWidth(),
-                        horizontalArrangement = Arrangement.Center
-                    ) {
-                        TextButton(onClick = viewModel::previousChapter) {
-                            Text("◀ Chap. précédent", color = Color.White.copy(alpha = 0.5f),
-                                style = MaterialTheme.typography.labelSmall)
-                        }
-                        Spacer(Modifier.width(16.dp))
-                        TextButton(onClick = viewModel::nextChapter) {
-                            Text("Chap. suivant ▶", color = Color.White.copy(alpha = 0.5f),
-                                style = MaterialTheme.typography.labelSmall)
-                        }
-                    }
-                }
+                Text(title, color = Color.White.copy(alpha = 0.9f),
+                    style = MaterialTheme.typography.titleSmall,
+                    maxLines = 1, overflow = TextOverflow.Ellipsis)
+                Text(chapterLabel, color = Color.White.copy(alpha = 0.45f),
+                    style = MaterialTheme.typography.labelSmall)
+            }
+            IconButton(onClick = onToc) {
+                Icon(Icons.Default.List, "TOC",
+                    tint = Color.White.copy(alpha = 0.6f))
             }
         }
     }
 }
+
+// ─────────────────────────────────────────────────────
+//  BOTTOM BAR — Progression + bouton TTS
+// ─────────────────────────────────────────────────────
+
+@Composable
+private fun ReaderBottomBar(
+    progress: Float,
+    percentage: Int,
+    onTtsClick: () -> Unit
+) {
+    Surface(
+        modifier = Modifier.fillMaxWidth(),
+        color = Color.Black.copy(alpha = 0.75f)
+    ) {
+        Row(
+            modifier = Modifier
+                .fillMaxWidth()
+                .navigationBarsPadding()
+                .padding(horizontal = 16.dp, vertical = 10.dp),
+            verticalAlignment = Alignment.CenterVertically
+        ) {
+            // Slider de progression
+            Slider(
+                value = progress,
+                onValueChange = {},
+                modifier = Modifier.weight(1f),
+                colors = SliderDefaults.colors(
+                    thumbColor = Color(0xFFFFB74D),
+                    activeTrackColor = Color(0xFFFFB74D),
+                    inactiveTrackColor = Color.White.copy(alpha = 0.15f)
+                )
+            )
+            Spacer(Modifier.width(10.dp))
+            Text("$percentage%", color = Color.White.copy(alpha = 0.55f),
+                style = MaterialTheme.typography.labelSmall)
+
+            Spacer(Modifier.width(12.dp))
+
+            // Bouton TTS (FAB)
+            FloatingActionButton(
+                onClick = onTtsClick,
+                modifier = Modifier.size(42.dp),
+                containerColor = Color(0xFFFFB74D),
+                shape = CircleShape,
+                elevation = FloatingActionButtonDefaults.elevation(0.dp, 0.dp, 0.dp, 0.dp)
+            ) {
+                Icon(Icons.Outlined.Headphones, "Audio",
+                    tint = Color(0xFF0D0D0D), modifier = Modifier.size(22.dp))
+            }
+        }
+    }
+}
+
+// ─────────────────────────────────────────────────────
+//  TEXTE IMMERSIF — Plein écran, scrollable
+// ─────────────────────────────────────────────────────
+
+@Composable
+private fun ImmersiveText(
+    chapter: Chapter,
+    currentSentenceIndex: Int,
+    isPlaying: Boolean,
+    onTap: () -> Unit
+) {
+    Column(
+        modifier = Modifier
+            .fillMaxSize()
+            .verticalScroll(rememberScrollState())
+            .clickable(
+                indication = null,
+                interactionSource = remember { MutableInteractionSource() }
+            ) { onTap() }
+            .padding(horizontal = 20.dp, vertical = 56.dp)
+    ) {
+        Spacer(Modifier.height(16.dp))
+
+        // Titre du chapitre
+        Text(
+            chapter.title,
+            style = MaterialTheme.typography.headlineSmall.copy(
+                color = Color.White.copy(alpha = 0.7f),
+                fontWeight = FontWeight.Bold,
+                fontSize = 21.sp
+            )
+        )
+        Spacer(Modifier.height(24.dp))
+
+        // Phrases
+        chapter.sentences.forEachIndexed { index, sentence ->
+            val highlighted = index == currentSentenceIndex && isPlaying
+            Text(
+                text = sentence.text,
+                style = MaterialTheme.typography.bodyLarge.copy(
+                    color = when {
+                        highlighted -> Color(0xFFFFB74D)
+                        else -> Color.White.copy(alpha = 0.82f)
+                    },
+                    fontSize = 17.sp,
+                    lineHeight = 28.sp,
+                    fontWeight = if (highlighted) FontWeight.Medium else FontWeight.Normal
+                ),
+                modifier = Modifier.padding(vertical = 1.dp)
+            )
+        }
+
+        Spacer(Modifier.height(120.dp))
+    }
+}
+
+// ─────────────────────────────────────────────────────
+//  PANNEAU TTS — Modal Bottom Sheet
+// ─────────────────────────────────────────────────────
+
+@Composable
+private fun TtsPanel(
+    chapterTitle: String,
+    sentenceIndex: Int,
+    totalSentences: Int,
+    isPlaying: Boolean,
+    onPlay: () -> Unit,
+    onPause: () -> Unit,
+    onStop: () -> Unit,
+    onPrevious: () -> Unit,
+    onNext: () -> Unit,
+    onSpeedChange: (Float) -> Unit,
+    onVoiceChange: (Int) -> Unit,
+    currentSpeed: Float,
+    currentVoice: Int
+) {
+    Column(
+        modifier = Modifier
+            .fillMaxWidth()
+            .padding(horizontal = 24.dp)
+            .padding(bottom = 32.dp),
+        horizontalAlignment = Alignment.CenterHorizontally
+    ) {
+        // Titre
+        Text(chapterTitle, color = Color.White.copy(alpha = 0.7f),
+            style = MaterialTheme.typography.titleSmall)
+        Spacer(Modifier.height(4.dp))
+        Text("Phrase ${sentenceIndex + 1} / $totalSentences",
+            color = Color.White.copy(alpha = 0.35f),
+            style = MaterialTheme.typography.labelSmall)
+
+        Spacer(Modifier.height(24.dp))
+
+        // Contrôles lecture
+        Row(
+            verticalAlignment = Alignment.CenterVertically,
+            horizontalArrangement = Arrangement.Center
+        ) {
+            IconButton(onClick = onPrevious, modifier = Modifier.size(44.dp)) {
+                Icon(Icons.Default.SkipPrevious, "Précédent",
+                    tint = Color.White.copy(alpha = 0.5f))
+            }
+
+            Spacer(Modifier.width(24.dp))
+
+            FilledIconButton(
+                onClick = { if (isPlaying) onPause() else onPlay() },
+                modifier = Modifier.size(64.dp),
+                colors = IconButtonDefaults.filledIconButtonColors(
+                    containerColor = Color(0xFFFFB74D)
+                )
+            ) {
+                Icon(
+                    if (isPlaying) Icons.Default.Pause else Icons.Default.PlayArrow,
+                    contentDescription = if (isPlaying) "Pause" else "Lire",
+                    modifier = Modifier.size(32.dp),
+                    tint = Color(0xFF0D0D0D)
+                )
+            }
+
+            Spacer(Modifier.width(24.dp))
+
+            IconButton(onClick = onNext, modifier = Modifier.size(44.dp)) {
+                Icon(Icons.Default.SkipNext, "Suivant",
+                    tint = Color.White.copy(alpha = 0.5f))
+            }
+        }
+
+        Spacer(Modifier.height(8.dp))
+
+        // Stop discret
+        TextButton(onClick = onStop) {
+            Text("⏹ Arrêter", color = Color.White.copy(alpha = 0.35f),
+                style = MaterialTheme.typography.labelSmall)
+        }
+
+        Spacer(Modifier.height(20.dp))
+
+        // Vitesse
+        Row(
+            modifier = Modifier.fillMaxWidth(),
+            verticalAlignment = Alignment.CenterVertically
+        ) {
+            Text("Vitesse", color = Color.White.copy(alpha = 0.5f),
+                style = MaterialTheme.typography.labelSmall)
+            Slider(
+                value = currentSpeed,
+                onValueChange = onSpeedChange,
+                valueRange = 0.5f..2.0f,
+                modifier = Modifier.weight(1f).padding(horizontal = 12.dp),
+                colors = SliderDefaults.colors(
+                    thumbColor = Color(0xFFFFB74D),
+                    activeTrackColor = Color(0xFFFFB74D)
+                )
+            )
+            Text("${"%.1f".format(currentSpeed)}x",
+                color = Color.White.copy(alpha = 0.7f),
+                style = MaterialTheme.typography.labelSmall)
+        }
+
+        Spacer(Modifier.height(12.dp))
+
+        // Voix
+        Row(
+            modifier = Modifier.fillMaxWidth(),
+            verticalAlignment = Alignment.CenterVertically
+        ) {
+            Text("Voix", color = Color.White.copy(alpha = 0.5f),
+                style = MaterialTheme.typography.labelSmall)
+            Spacer(Modifier.width(12.dp))
+            FilterChip(
+                selected = currentVoice == 0,
+                onClick = { onVoiceChange(0) },
+                label = { Text("♀ Jessica", style = MaterialTheme.typography.labelSmall) },
+                colors = FilterChipDefaults.filterChipColors(
+                    selectedContainerColor = Color(0xFFFFB74D).copy(alpha = 0.25f),
+                    selectedLabelColor = Color.White
+                )
+            )
+            Spacer(Modifier.width(8.dp))
+            FilterChip(
+                selected = currentVoice == 1,
+                onClick = { onVoiceChange(1) },
+                label = { Text("♂ Pierre", style = MaterialTheme.typography.labelSmall) },
+                colors = FilterChipDefaults.filterChipColors(
+                    selectedContainerColor = Color(0xFFFFB74D).copy(alpha = 0.25f),
+                    selectedLabelColor = Color.White
+                )
+            )
+        }
+    }
+}
+
+// ─────────────────────────────────────────────────────
+//  ÉTATS : chargement, erreur
+// ─────────────────────────────────────────────────────
+
+@Composable
+private fun LoadingIndicator() {
+    Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
+        CircularProgressIndicator(color = Color.White.copy(alpha = 0.5f))
+    }
+}
+
+@Composable
+private fun ErrorMessage(msg: String) {
+    Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
+        Text("❌ $msg", color = Color(0xFFFF6B6B),
+            style = MaterialTheme.typography.bodyMedium,
+            modifier = Modifier.padding(24.dp))
+    }
+}
+
 

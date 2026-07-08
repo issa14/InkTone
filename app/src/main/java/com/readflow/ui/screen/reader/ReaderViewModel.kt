@@ -38,6 +38,17 @@ class ReaderViewModel @Inject constructor(
 
     private var currentBook: Book? = null
 
+    /** Vitesse TTS courante (0.5..2.0). Exposée pour le slider. */
+    var currentSpeed: Float = 1.0f
+        private set
+
+    /** Voix TTS courante (0=Jessica, 1=Pierre). */
+    var currentVoice: Int = 0
+        private set
+
+    fun setSpeed(speed: Float) { currentSpeed = speed.coerceIn(0.5f, 2.0f) }
+    fun setVoice(voice: Int) { currentVoice = voice.coerceIn(0, 1) }
+
     init {
         // Observer l'orchestrateur pour synchroniser l'UI
         viewModelScope.launch {
@@ -103,7 +114,7 @@ class ReaderViewModel @Inject constructor(
         if (idx < book.totalChapters) loadChapter(idx)
     }
 
-    fun play(voice: Int = 0, speed: Float = 1.0f) {
+    fun play() {
         val chapter = _uiState.value.currentChapter ?: return
         val book = currentBook ?: return
 
@@ -112,8 +123,8 @@ class ReaderViewModel @Inject constructor(
 
         orchestrator.play(
             chapter.sentences,
-            voice = voice,
-            speed = speed,
+            voice = currentVoice,
+            speed = currentSpeed,
             bookTitle = book.title,
             chapterTitle = chapter.title
         )
