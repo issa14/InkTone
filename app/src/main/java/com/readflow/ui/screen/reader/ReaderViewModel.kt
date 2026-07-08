@@ -117,6 +117,11 @@ class ReaderViewModel @Inject constructor(
         if (idx < book.totalChapters) loadChapter(idx)
     }
 
+    fun goToChapter(index: Int) {
+        val book = currentBook ?: return
+        if (index in 0 until book.totalChapters) loadChapter(index)
+    }
+
     fun play() {
         val chapter = _uiState.value.currentChapter ?: return
         val book = currentBook ?: return

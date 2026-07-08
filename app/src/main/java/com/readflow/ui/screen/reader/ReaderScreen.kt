@@ -9,6 +9,7 @@ import androidx.compose.foundation.background
 import androidx.compose.foundation.gestures.detectTapGestures
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.layout.WindowInsets
+import androidx.compose.foundation.layout.WindowInsetsSides
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
@@ -53,6 +54,7 @@ fun ReaderScreen(
 
     var showHud by remember { mutableStateOf(false) }
     var showTtsPanel by remember { mutableStateOf(false) }
+    var showToc by remember { mutableStateOf(false) }
 
     // Mode immersif : masquer barres système
     val view = LocalView.current
@@ -105,7 +107,7 @@ fun ReaderScreen(
                 title = book?.title ?: "",
                 chapterLabel = if (book != null) "Ch. ${state.currentChapterIndex + 1}/${book.totalChapters}" else "",
                 onBack = onBack,
-                onToc = { /* TODO: table des matières */ }
+                onToc = { showToc = true }
             )
         }
 
@@ -151,6 +153,68 @@ fun ReaderScreen(
             )
         }
     }
+
+    // ── ZONE 3 : TABLE DES MATIÈRES ─────────────────
+    if (showToc && book != null) {
+        ModalBottomSheet(
+            onDismissRequest = { showToc = false },
+            containerColor = Color(0xFF1E1E1E),
+            shape = RoundedCornerShape(topStart = 24.dp, topEnd = 24.dp),
+            dragHandle = { BottomSheetDefaults.DragHandle(color = Color.White.copy(alpha = 0.3f)) }
+        ) {
+            ChapterPicker(
+                totalChapters = book.totalChapters,
+                currentChapter = state.currentChapterIndex,
+                chapterTitle = chapter?.title ?: "",
+                onSelect = { idx ->
+                    viewModel.goToChapter(idx)
+                    showToc = false
+                    showHud = false
+                }
+            )
+        }
+    }
+}
+
+// ─────────────────────────────────────────────────────
+//  CHAPTER PICKER — Liste des chapitres
+// ─────────────────────────────────────────────────────
+
+@Composable
+private fun ChapterPicker(
+    totalChapters: Int,
+    currentChapter: Int,
+    chapterTitle: String,
+    onSelect: (Int) -> Unit
+) {
+    Column(modifier = Modifier.padding(horizontal = 16.dp, vertical = 8.dp)) {
+        Text("Table des matières",
+            color = Color.White.copy(alpha = 0.8f),
+            style = MaterialTheme.typography.titleSmall,
+            modifier = Modifier.padding(bottom = 12.dp))
+        for (i in 0 until totalChapters) {
+            val isCurrent = i == currentChapter
+            Surface(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(vertical = 2.dp),
+                color = if (isCurrent) Color(0xFFFFB74D).copy(alpha = 0.15f)
+                        else Color.Transparent,
+                shape = RoundedCornerShape(8.dp),
+                onClick = { onSelect(i) }
+            ) {
+                Text(
+                    "Chapitre ${i + 1}",
+                    color = if (isCurrent) Color(0xFFFFB74D)
+                            else Color.White.copy(alpha = 0.65f),
+                    style = MaterialTheme.typography.bodyMedium,
+                    fontWeight = if (isCurrent) FontWeight.SemiBold else FontWeight.Normal,
+                    modifier = Modifier.padding(horizontal = 12.dp, vertical = 12.dp)
+                )
+            }
+        }
+        Spacer(Modifier.height(24.dp))
+    }
 }
 
 // ─────────────────────────────────────────────────────
@@ -166,12 +230,12 @@ private fun ReaderTopBar(
 ) {
     Surface(
         modifier = Modifier.fillMaxWidth(),
-        color = Color.Black.copy(alpha = 0.75f)
+        color = Color(0xFF0A0A0A).copy(alpha = 0.94f)
     ) {
         Row(
             modifier = Modifier
                 .fillMaxWidth()
-                .statusBarsPadding()
+                .windowInsetsPadding(WindowInsets.systemBars.only(WindowInsetsSides.Top + WindowInsetsSides.Horizontal))
                 .padding(horizontal = 4.dp, vertical = 6.dp),
             verticalAlignment = Alignment.CenterVertically
         ) {
@@ -210,12 +274,12 @@ private fun ReaderBottomBar(
 ) {
     Surface(
         modifier = Modifier.fillMaxWidth(),
-        color = Color.Black.copy(alpha = 0.75f)
+        color = Color(0xFF0A0A0A).copy(alpha = 0.94f)
     ) {
         Row(
             modifier = Modifier
                 .fillMaxWidth()
-                .navigationBarsPadding()
+                .windowInsetsPadding(WindowInsets.systemBars.only(WindowInsetsSides.Bottom + WindowInsetsSides.Horizontal))
                 .padding(horizontal = 16.dp, vertical = 10.dp),
             verticalAlignment = Alignment.CenterVertically
         ) {
@@ -265,11 +329,12 @@ private fun ImmersiveText(
     Column(
         modifier = Modifier
             .fillMaxSize()
-            .verticalScroll(rememberScrollState())
+            // pointerInput en PREMIER (inner), verticalScroll en DERNIER (outer)
+            // → scroll reçoit les événements en priorité, tap détecté sans bloquer
             .pointerInput(Unit) {
                 detectTapGestures { onTap() }
             }
-            // Respecter les insets système pour ne pas passer sous les barres
+            .verticalScroll(rememberScrollState())
             .windowInsetsPadding(WindowInsets.systemBars)
             .padding(horizontal = 20.dp)
     ) {
