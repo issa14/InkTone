@@ -45,6 +45,10 @@ class GaplessAudioPlayer @Inject constructor() {
     private val _state = MutableStateFlow<State>(State.Idle)
     val state: StateFlow<State> = _state
 
+    /** Compteur de segments joués — réinitialisé à chaque play(). */
+    @Volatile var completedCount = 0
+        private set
+
     /** Ajoute un segment audio à la file de lecture. */
     fun enqueue(samples: FloatArray) {
         queue.add(samples)
@@ -65,15 +69,11 @@ class GaplessAudioPlayer @Inject constructor() {
                 val samples = queue.poll()
                 if (samples != null) {
                     writeBlocking(samples)
+                    completedCount++
+                    Log.d(TAG, "completed=$completedCount, pending=${queue.size}")
                 } else {
-                    // File vide — attendre ou arrêter
-                    if (queue.isEmpty()) {
-                        delay(100)
-                        if (queue.isEmpty()) {
-                            _state.value = State.Idle
-                            break
-                        }
-                    }
+                    // File vide — attend sans s'arrêter
+                    delay(50)
                 }
             }
         }
@@ -97,11 +97,17 @@ class GaplessAudioPlayer @Inject constructor() {
         _state.value = State.Stopped
         job?.cancel()
         queue.clear()
-        track?.let {
-            it.pause()
-            it.flush()
-            it.stop()
-            it.release()
+        track?.let { t ->
+            try {
+                if (t.state == AudioTrack.STATE_INITIALIZED) {
+                    t.pause()
+                    t.flush()
+                    t.stop()
+                }
+                t.release()
+            } catch (_: Exception) {
+                // déjà libéré, ignorer
+            }
         }
         track = null
     }

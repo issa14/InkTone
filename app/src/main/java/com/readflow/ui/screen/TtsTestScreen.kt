@@ -1,5 +1,8 @@
 package com.readflow.ui.screen
 
+import android.Manifest
+import android.content.Intent
+import android.content.pm.PackageManager
 import android.media.AudioAttributes
 import android.media.AudioFormat
 import android.media.AudioTrack
@@ -16,10 +19,12 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.unit.dp
+import androidx.core.content.ContextCompat
 import com.readflow.domain.model.Book
 import com.readflow.domain.model.Chapter
 import com.readflow.domain.model.SynthesisResult
 import com.readflow.domain.repository.BookRepository
+import com.readflow.service.audio.AudioPlaybackService
 import com.readflow.service.audio.PlaybackOrchestrator
 import com.readflow.service.onnx.OnnxInferenceService
 import dagger.hilt.EntryPoint
@@ -58,6 +63,11 @@ fun TtsTestScreen() {
     var error by remember { mutableStateOf<String?>(null) }
     var playing by remember { mutableStateOf(false) }
     val scope = rememberCoroutineScope()
+
+    // Permission notification (Android 13+)
+    val notificationPermissionLauncher = rememberLauncherForActivityResult(
+        ActivityResultContracts.RequestPermission()
+    ) { /* peu importe, on lance après */ }
 
     // Phrases de test pour la phonémisation française
     val phrasesTest = listOf(
@@ -141,27 +151,61 @@ fun TtsTestScreen() {
         }
 
         importedBook?.let { book ->
+            var selectedChapter by remember { mutableIntStateOf(0) }
             Card(modifier = Modifier.fillMaxWidth()) {
                 Column(modifier = Modifier.padding(12.dp)) {
                     Text("📕 ${book.title}", style = MaterialTheme.typography.titleSmall)
                     Text("Auteur : ${book.author}")
                     Text("Chapitres : ${book.totalChapters}")
                     Text("Langue : ${book.language}")
+
+                    Row(verticalAlignment = Alignment.CenterVertically) {
+                        Text("Chapitre : ")
+                        Button(onClick = { if (selectedChapter > 0) selectedChapter-- }) { Text("◀") }
+                        Text(" ${selectedChapter + 1}/${book.totalChapters} ",
+                            modifier = Modifier.padding(horizontal = 8.dp))
+                        Button(onClick = { if (selectedChapter < book.totalChapters - 1) selectedChapter++ }) { Text("▶") }
+                        Button(onClick = {
+                            scope.launch {
+                                chapter = withContext(Dispatchers.IO) {
+                                    bookRepository.getChapter(book.id, selectedChapter)
+                                }
+                            }
+                        }, modifier = Modifier.padding(start = 8.dp)) { Text("Charger") }
+                    }
+
                     chapter?.let { ch ->
-                        Text("Phrases extraites : ${ch.sentences.size}", color = MaterialTheme.colorScheme.primary)
+                        Text("Phrases : ${ch.sentences.size}", color = MaterialTheme.colorScheme.primary)
                         if (ch.sentences.isNotEmpty()) {
-                            Text("1ère phrase : \"${ch.sentences.first().text.take(80)}...\"",
+                            Text("\"${ch.sentences.first().text.take(80)}...\"",
                                 style = MaterialTheme.typography.bodySmall)
                             Button(
                                 onClick = {
+                                    // Demander la permission de notification (Android 13+)
+                                    if (android.os.Build.VERSION.SDK_INT >= 33) {
+                                        if (ContextCompat.checkSelfPermission(
+                                                context, Manifest.permission.POST_NOTIFICATIONS
+                                            ) != PackageManager.PERMISSION_GRANTED
+                                        ) {
+                                            notificationPermissionLauncher.launch(
+                                                Manifest.permission.POST_NOTIFICATIONS
+                                            )
+                                        }
+                                    }
                                     scope.launch {
                                         inferenceService.initialize()
-                                        orchestrator.play(ch.sentences, voixIndex, vitesse)
+                                        val intent = Intent(context, AudioPlaybackService::class.java)
+                                        ContextCompat.startForegroundService(context, intent)
+                                        orchestrator.play(
+                                            ch.sentences, voixIndex, vitesse,
+                                            bookTitle = book.title,
+                                            chapterTitle = "Chapitre ${selectedChapter + 1}"
+                                        )
                                     }
                                 },
                                 colors = ButtonDefaults.buttonColors(containerColor = MaterialTheme.colorScheme.primary)
                             ) {
-                                Text("▶ Lire le chapitre")
+                                Text("▶ Lire le chapitre ${selectedChapter + 1}")
                             }
                         }
                     }

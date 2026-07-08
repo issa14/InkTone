@@ -5,18 +5,12 @@ import com.readflow.domain.model.Sentence
 import com.readflow.domain.model.SynthesisResult
 import com.readflow.domain.repository.TtsRepository
 import kotlinx.coroutines.*
+import kotlinx.coroutines.channels.Channel
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import javax.inject.Inject
 import javax.inject.Singleton
 
-/**
- * Chef d'orchestre de la lecture audio.
- *
- * Maintient un buffer de 3 phrases d'avance (N+1, N+2, N+3).
- * Pipeline 100% asynchrone — si une phrase n'est pas prête :
- * silence court (50ms) + skip propre.
- */
 @Singleton
 class PlaybackOrchestrator @Inject constructor(
     private val ttsRepository: TtsRepository,
@@ -25,7 +19,6 @@ class PlaybackOrchestrator @Inject constructor(
     companion object {
         private const val TAG = "Orchestrator"
         private const val LOOKAHEAD = 3
-        private const val SKIP_SILENCE_MS = 50L
     }
 
     sealed class State {
@@ -42,30 +35,34 @@ class PlaybackOrchestrator @Inject constructor(
     )
 
     private val scope = CoroutineScope(Dispatchers.IO + SupervisorJob())
-
     private val _state = MutableStateFlow<State>(State.Idle)
     val state: StateFlow<State> = _state
-
     private val _progress = MutableStateFlow(Progress(0, 0, null))
     val progress: StateFlow<Progress> = _progress
 
+    /** Métadonnées pour la notification / MediaSession. */
+    @Volatile var currentBookTitle: String = ""
+    @Volatile var currentChapterTitle: String = ""
+    @Volatile var currentVoice: Int = 0
+    @Volatile var currentSpeed: Float = 1.0f
+
     private var currentJob: Job? = null
 
-    /**
-     * Lance la lecture d'une liste de phrases.
-     * @param sentences Phrases à lire
-     * @param voice Voix TTS (0 = Jessica, 1 = Pierre)
-     * @param speed Vitesse (0.5–2.0)
-     * @param startFrom Index de départ (reprise de lecture)
-     */
     fun play(
         sentences: List<Sentence>,
         voice: Int = 0,
         speed: Float = 1.0f,
-        startFrom: Int = 0
+        startFrom: Int = 0,
+        bookTitle: String = "",
+        chapterTitle: String = ""
     ) {
         if (sentences.isEmpty()) return
         stop()
+
+        currentBookTitle = bookTitle
+        currentChapterTitle = chapterTitle
+        currentVoice = voice
+        currentSpeed = speed
 
         val total = sentences.size
         _progress.value = Progress(startFrom, total, sentences.getOrNull(startFrom))
@@ -73,72 +70,65 @@ class PlaybackOrchestrator @Inject constructor(
 
         currentJob = scope.launch {
             try {
-                var index = startFrom
-                val buffer = ArrayDeque<SynthesisResult>(LOOKAHEAD)
+                // Channel pour recevoir les résultats de synthèse
+                val buffer = Channel<SynthesisResult>(Channel.UNLIMITED)
 
-                // Pré-remplir le buffer
-                for (i in 0 until minOf(LOOKAHEAD, total - index)) {
-                    launch {
-                        val result = ttsRepository.synthesize(
-                            sentences[index + i].text, voice, speed
-                        )
-                        synchronized(buffer) { buffer.add(result) }
+                // Synthétiser la première phrase en priorité (bloquant)
+                val first = ttsRepository.synthesize(sentences[startFrom].text, voice, speed)
+                buffer.send(first)
+
+                // Lancer le pré-remplissage asynchrone (N+1, N+2, ...)
+                val fillJob = launch {
+                    for (i in 1 until sentences.size) {
+                        if (!isActive) break
+                        val idx = startFrom + i
+                        if (idx >= total) break
+                        try {
+                            val result = ttsRepository.synthesize(sentences[idx].text, voice, speed)
+                            buffer.send(result)
+                        } catch (e: CancellationException) { break }
+                        catch (e: Exception) {
+                            Log.e(TAG, "Synthesis error sentence $idx: ${e.message}", e)
+                            // Continue — ne pas bloquer tout le pipeline
+                        }
                     }
+                    buffer.close()
                 }
 
-                while (isActive && index < total && _state.value == State.Playing) {
-                    // Attendre que le buffer ait au moins 1 élément
-                    var result: SynthesisResult?
-                    var waited = 0
-                    do {
-                        result = synchronized(buffer) { buffer.removeFirstOrNull() }
-                        if (result == null) {
-                            delay(SKIP_SILENCE_MS)
-                            waited++
-                        }
-                    } while (result == null && waited < 10)
+                // Boucle de lecture — démarrer le player après le 1er enqueue
+                var index = startFrom
+                var started = false
 
-                    if (result == null) {
-                        // Skip : phrase non prête
-                        Log.w(TAG, "Skip sentence $index (timeout)")
-                        index++
-                        _progress.value = Progress(index, total, sentences.getOrNull(index))
-                        continue
-                    }
+                for (result in buffer) {
+                    if (!isActive || _state.value != State.Playing) break
 
-                    // Enqueue l'audio dans le player
                     player.enqueue(result.samples)
-                    player.play()
-
-                    // Lancer la synthèse de la phrase LOOKAHEAD en avance
-                    val nextIdx = index + LOOKAHEAD
-                    if (nextIdx < total) {
-                        launch {
-                            val next = ttsRepository.synthesize(
-                                sentences[nextIdx].text, voice, speed
-                            )
-                            synchronized(buffer) { buffer.add(next) }
-                        }
+                    if (!started) {
+                        player.play()
+                        started = true
                     }
 
                     index++
                     _progress.value = Progress(index, total, sentences.getOrNull(index))
+                    Log.d(TAG, "Playing sentence $index/${total}")
                 }
 
-                // Attendre que le player finisse
-                while (player.pendingCount > 0 && isActive) {
+                // Attendre que le player ait fini TOUS les segments
+                val totalSentences = total - startFrom
+                while (player.completedCount < totalSentences && isActive && _state.value == State.Playing) {
                     delay(200)
                 }
-                delay(500) // laisser le dernier segment finir
+                delay(300)
                 _state.value = State.Idle
                 player.stop()
+                fillJob.cancel()
 
             } catch (e: CancellationException) {
                 player.stop()
                 _state.value = State.Idle
             } catch (e: Exception) {
                 Log.e(TAG, "Playback error", e)
-                _state.value = State.Error(e.message ?: "Erreur inconnue")
+                _state.value = State.Error(e.message ?: "Erreur")
                 player.stop()
             }
         }
