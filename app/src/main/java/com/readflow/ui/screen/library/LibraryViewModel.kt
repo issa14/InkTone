@@ -19,10 +19,17 @@ data class LibraryUiState(
     val isLoading: Boolean = true,
     val error: String? = null,
     val searchQuery: String = "",
-    val filterMode: FilterMode = FilterMode.ALL
+    val filterMode: FilterMode = FilterMode.ALL,
+    val sortOrder: SortOrder = SortOrder.TITLE,
+    val filterType: FilterType = FilterType.ALL,
+    val layoutMode: LayoutMode = LayoutMode.GRID_COVERS,
+    val isFilterDialogVisible: Boolean = false
 )
 
 enum class FilterMode { ALL, BY_AUTHOR, BY_TITLE, IN_PROGRESS, READ, UNREAD }
+enum class SortOrder(val label: String) { TITLE("Nom de livre"), AUTHOR("Auteur"), DATE("Date d'import"), FOLDERS("Dossiers"), RECENT("Liste des récents") }
+enum class FilterType(val label: String) { ALL("Tous"), UNREAD("Non lu"), IN_PROGRESS("En cours"), READ("Lu") }
+enum class LayoutMode { LIST, GRID, GRID_COVERS }
 
 @HiltViewModel
 class LibraryViewModel @Inject constructor(
@@ -58,6 +65,23 @@ class LibraryViewModel @Inject constructor(
         applyFilters()
     }
 
+    fun showFilterDialog() { _uiState.update { it.copy(isFilterDialogVisible = true) } }
+    fun hideFilterDialog() { _uiState.update { it.copy(isFilterDialogVisible = false) } }
+
+    fun setSortOrder(order: SortOrder) {
+        _uiState.update { it.copy(sortOrder = order) }
+        applyFilters()
+    }
+
+    fun setFilterType(type: FilterType) {
+        _uiState.update { it.copy(filterType = type) }
+        applyFilters()
+    }
+
+    fun setLayoutMode(mode: LayoutMode) {
+        _uiState.update { it.copy(layoutMode = mode) }
+    }
+
     private fun applyFilters() {
         val s = _uiState.value
         var filtered = s.allBooks
@@ -70,14 +94,21 @@ class LibraryViewModel @Inject constructor(
             }
         }
 
-        // Filtre mode
-        filtered = when (s.filterMode) {
-            FilterMode.ALL -> filtered
-            FilterMode.BY_AUTHOR -> filtered.sortedBy { it.author.lowercase() }
-            FilterMode.BY_TITLE -> filtered.sortedBy { it.title.lowercase() }
-            FilterMode.IN_PROGRESS -> filtered  // TODO: progression réelle
-            FilterMode.READ -> emptyList()       // TODO
-            FilterMode.UNREAD -> filtered        // TODO
+        // Tri
+        filtered = when (s.sortOrder) {
+            SortOrder.TITLE -> filtered.sortedBy { it.title.lowercase() }
+            SortOrder.AUTHOR -> filtered.sortedBy { it.author.lowercase() }
+            SortOrder.DATE -> filtered.sortedByDescending { it.addedAt }
+            SortOrder.FOLDERS -> filtered  // TODO
+            SortOrder.RECENT -> filtered.sortedByDescending { it.addedAt }
+        }
+
+        // Filtre type (TODO: progression réelle depuis Room)
+        filtered = when (s.filterType) {
+            FilterType.ALL -> filtered
+            FilterType.UNREAD -> filtered
+            FilterType.IN_PROGRESS -> filtered
+            FilterType.READ -> emptyList()
         }
 
         _uiState.update { it.copy(books = filtered) }

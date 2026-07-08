@@ -34,6 +34,10 @@ import androidx.compose.ui.window.PopupProperties
 import androidx.hilt.navigation.compose.hiltViewModel
 import com.readflow.domain.model.Book
 import com.readflow.ui.theme.*
+import com.readflow.ui.screen.library.FilterMode
+import com.readflow.ui.screen.library.SortOrder
+import com.readflow.ui.screen.library.FilterType
+import com.readflow.ui.screen.library.LayoutMode
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -46,7 +50,6 @@ fun LibraryScreen(
     var showDrawer by remember { mutableStateOf(false) }
     var showOverflow by remember { mutableStateOf(false) }
     var showNavPopup by remember { mutableStateOf(false) }
-    var showFilterMode by remember { mutableStateOf(false) }
     var showSearch by remember { mutableStateOf(false) }
     var searchText by remember { mutableStateOf("") }
 
@@ -72,7 +75,7 @@ fun LibraryScreen(
                         TopBar(
                             onMenu = { showDrawer = true },
                             onNavPopup = { showNavPopup = true },
-                            onFilterMode = { showFilterMode = !showFilterMode },
+                            onFilterMode = { viewModel.showFilterDialog() },
                             onSearch = { showSearch = true },
                             onOverflow = { showOverflow = true }
                         )
@@ -104,16 +107,15 @@ fun LibraryScreen(
         }
 
         // ── FILTER MODE POPUP (icône entonnoir) ──────
-        AnimatedVisibility(
-            visible = showFilterMode,
-            enter = fadeIn() + slideInVertically { -it },
-            exit = fadeOut() + slideOutVertically { -it },
-            modifier = Modifier.align(Alignment.TopCenter).padding(top = 55.dp)
-        ) {
-            FilterModeDropdown(
-                current = state.filterMode,
-                onSelect = { viewModel.setFilterMode(it); showFilterMode = false },
-                onDismiss = { showFilterMode = false }
+        if (state.isFilterDialogVisible) {
+            FilterAndSortDialog(
+                sortOrder = state.sortOrder,
+                filterType = state.filterType,
+                layoutMode = state.layoutMode,
+                onSortChange = { viewModel.setSortOrder(it) },
+                onFilterChange = { viewModel.setFilterType(it) },
+                onLayoutChange = { viewModel.setLayoutMode(it) },
+                onDismiss = { viewModel.hideFilterDialog() }
             )
         }
 
@@ -495,59 +497,157 @@ private fun LibraryNavigationPopup(
 }
 
 // ─────────────────────────────────────────────────────
-//  FILTER MODE — Simple liste (icône entonnoir)
+//  FILTER & SORT DIALOG — Material 3 AlertDialog
 // ─────────────────────────────────────────────────────
 
 @Composable
-private fun FilterModeDropdown(
-    current: FilterMode,
-    onSelect: (FilterMode) -> Unit,
+private fun FilterAndSortDialog(
+    sortOrder: SortOrder,
+    filterType: FilterType,
+    layoutMode: LayoutMode,
+    onSortChange: (SortOrder) -> Unit,
+    onFilterChange: (FilterType) -> Unit,
+    onLayoutChange: (LayoutMode) -> Unit,
     onDismiss: () -> Unit
 ) {
-    Box(
-        modifier = Modifier
-            .fillMaxSize()
-            .clickable(onClick = onDismiss)
-    ) {
-        Surface(
-            modifier = Modifier
-                .align(Alignment.TopEnd)
-                .padding(top = 55.dp, end = 8.dp)
-                .width(220.dp)
-                .clip(RoundedCornerShape(8.dp)),
-            color = SurfaceRaised,
-            tonalElevation = 8.dp
-        ) {
+    AlertDialog(
+        onDismissRequest = onDismiss,
+        containerColor = SurfaceDark,
+        titleContentColor = TextMain,
+        textContentColor = TextMain,
+        icon = {
+            Icon(Icons.Default.Tune, null, tint = AccentBlue, modifier = Modifier.size(24.dp))
+        },
+        title = {
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.SpaceBetween,
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                Text("Trier par", fontWeight = FontWeight.SemiBold, fontSize = 16.sp)
+                Text("Filtrage", fontWeight = FontWeight.SemiBold, fontSize = 16.sp,
+                    modifier = Modifier.padding(end = 12.dp))
+            }
+        },
+        text = {
             Column {
-                val items = listOf(
-                    FilterMode.ALL to "Tous",
-                    FilterMode.BY_AUTHOR to "Par Auteur",
-                    FilterMode.BY_TITLE to "Par Titre",
-                    FilterMode.IN_PROGRESS to "En cours",
-                    FilterMode.READ to "Lus",
-                    FilterMode.UNREAD to "Non lus"
-                )
-                items.forEach { (mode, label) ->
-                    Surface(
-                        color = if (mode == current) AccentBlue.copy(alpha = 0.15f) else Color.Transparent,
-                        onClick = { onSelect(mode) }
-                    ) {
-                        Row(
-                            modifier = Modifier.padding(horizontal = 16.dp, vertical = 14.dp),
-                            verticalAlignment = Alignment.CenterVertically
-                        ) {
-                            Text(label, fontSize = 14.sp,
-                                color = if (mode == current) AccentBlue else TextMain,
-                                fontWeight = if (mode == current) FontWeight.SemiBold else FontWeight.Normal,
-                                modifier = Modifier.weight(1f))
-                            if (mode == current)
-                                Icon(Icons.Default.Check, null, tint = AccentBlue, modifier = Modifier.size(18.dp))
+                Row(modifier = Modifier.fillMaxWidth()) {
+                    // ── Colonne TRI (RadioButton) ─────
+                    Column(modifier = Modifier.weight(1f)) {
+                        SortOrder.entries.forEach { order ->
+                            Row(
+                                modifier = Modifier
+                                    .fillMaxWidth()
+                                    .clickable { onSortChange(order) }
+                                    .padding(vertical = 4.dp),
+                                verticalAlignment = Alignment.CenterVertically
+                            ) {
+                                RadioButton(
+                                    selected = sortOrder == order,
+                                    onClick = { onSortChange(order) },
+                                    colors = RadioButtonDefaults.colors(
+                                        selectedColor = AccentBlue,
+                                        unselectedColor = TextMuted
+                                    ),
+                                    modifier = Modifier.size(20.dp)
+                                )
+                                Spacer(Modifier.width(4.dp))
+                                Text(order.label, fontSize = 13.sp,
+                                    color = if (sortOrder == order) AccentBlue else TextMain)
+                            }
+                        }
+                    }
+
+                    // ── Colonne FILTRE (Checkbox) ──────
+                    Column(modifier = Modifier.weight(1.2f)) {
+                        FilterType.entries.forEach { type ->
+                            Row(
+                                modifier = Modifier
+                                    .fillMaxWidth()
+                                    .clickable { onFilterChange(type) }
+                                    .padding(vertical = 4.dp),
+                                verticalAlignment = Alignment.CenterVertically
+                            ) {
+                                Checkbox(
+                                    checked = filterType == type,
+                                    onCheckedChange = { onFilterChange(type) },
+                                    colors = CheckboxDefaults.colors(
+                                        checkedColor = AccentBlue,
+                                        uncheckedColor = TextMuted
+                                    ),
+                                    modifier = Modifier.size(20.dp)
+                                )
+                                Spacer(Modifier.width(4.dp))
+                                Text(type.label, fontSize = 13.sp,
+                                    color = if (filterType == type) AccentBlue else TextMain)
+                            }
                         }
                     }
                 }
+
+                HorizontalDivider(
+                    modifier = Modifier.padding(vertical = 12.dp),
+                    color = BorderDark
+                )
+
+                // ── MISE EN PAGE ──────────────────────
+                Text("Mise en page", fontWeight = FontWeight.SemiBold,
+                    fontSize = 14.sp, color = TextMain)
+                Spacer(Modifier.height(8.dp))
+
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.spacedBy(8.dp)
+                ) {
+                    listOf(
+                        LayoutMode.LIST to Icons.Default.List,
+                        LayoutMode.GRID to Icons.Default.GridView,
+                        LayoutMode.GRID_COVERS to Icons.Default.ViewModule
+                    ).forEach { (mode, icon) ->
+                        FilterChip(
+                            selected = layoutMode == mode,
+                            onClick = { onLayoutChange(mode) },
+                            label = { Text(
+                                when (mode) {
+                                    LayoutMode.LIST -> "Liste"
+                                    LayoutMode.GRID -> "Grille"
+                                    LayoutMode.GRID_COVERS -> "Couv."
+                                },
+                                fontSize = 12.sp
+                            ) },
+                            leadingIcon = {
+                                Icon(icon, null, modifier = Modifier.size(16.dp),
+                                    tint = if (layoutMode == mode) AccentBlue else TextMuted)
+                            },
+                            colors = FilterChipDefaults.filterChipColors(
+                                selectedContainerColor = AccentBlue.copy(alpha = 0.15f),
+                                selectedLabelColor = AccentBlue
+                            )
+                        )
+                    }
+                }
+
+                HorizontalDivider(
+                    modifier = Modifier.padding(vertical = 12.dp),
+                    color = BorderDark
+                )
+
+                // ── BAS : Type de fichier + Fermer ────
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.SpaceBetween,
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    Text("Type de fichier : Tous", fontSize = 12.sp, color = TextMuted)
+                    TextButton(onClick = onDismiss) {
+                        Text("Fermer", color = AccentBlue)
+                    }
+                }
             }
-        }
-    }
+        },
+        confirmButton = {},
+        shape = RoundedCornerShape(16.dp)
+    )
 }
 // ─────────────────────────────────────────────────────
 
