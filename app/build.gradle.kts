@@ -50,6 +50,7 @@ android {
     compileOptions {
         sourceCompatibility = JavaVersion.VERSION_17
         targetCompatibility = JavaVersion.VERSION_17
+        isCoreLibraryDesugaringEnabled = true
     }
 
     kotlinOptions {
@@ -112,6 +113,11 @@ dependencies {
 
     // --- DataStore ---
     implementation(libs.datastore.preferences)
+
+    // --- Readium (EPUB parsing) ---
+    implementation(libs.readium.shared)
+    implementation(libs.readium.streamer)
+    coreLibraryDesugaring(libs.desugar.jdk.libs)
 
     // --- Testing ---
     testImplementation(libs.junit.jupiter.api)

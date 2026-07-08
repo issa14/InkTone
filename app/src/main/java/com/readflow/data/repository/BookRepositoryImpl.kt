@@ -5,14 +5,22 @@ import com.readflow.data.database.BookDao
 import com.readflow.data.database.ProgressDao
 import com.readflow.data.mapper.toDomain
 import com.readflow.data.mapper.toEntity
-import com.readflow.data.source.EpubParser
 import com.readflow.domain.model.Book
 import com.readflow.domain.model.Chapter
 import com.readflow.domain.model.Progress
 import com.readflow.domain.repository.BookRepository
 import com.readflow.domain.usecase.ChunkTextUseCase
 import dagger.hilt.android.qualifiers.ApplicationContext
+import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.flow.first
+import kotlinx.coroutines.withContext
+import kotlin.time.Duration.Companion.INFINITE
+import org.readium.r2.shared.util.asset.AssetRetriever
+import org.readium.r2.shared.util.format.FormatHints
+import org.readium.r2.shared.util.http.DefaultHttpClient
+import org.readium.r2.shared.util.logging.WarningLogger
+import org.readium.r2.streamer.PublicationOpener
+import org.readium.r2.streamer.parser.epub.EpubParser
 import java.io.File
 import java.io.InputStream
 import java.util.UUID
@@ -28,53 +36,62 @@ class BookRepositoryImpl @Inject constructor(
     private val chunkText: ChunkTextUseCase
 ) : BookRepository {
 
-    override suspend fun importEpub(inputStream: InputStream, fileName: String): Book {
-        val bookId = UUID.randomUUID().toString()
-        val epubDir = File(context.filesDir, "epubs/$bookId")
-        epubDir.mkdirs()
+    private val httpClient = DefaultHttpClient(
+        userAgent = "ReadFlow/0.1.0",
+        connectTimeout = INFINITE,
+        readTimeout = INFINITE
+    )
+    private val retriever: AssetRetriever get() = AssetRetriever(context.contentResolver, httpClient)
+    private val opener = PublicationOpener(EpubParser(), emptyList()) {}
 
-        val epubFile = File(epubDir, fileName)
-        epubFile.outputStream().use { inputStream.copyTo(it) }
+    override suspend fun importEpub(inputStream: InputStream, fileName: String): Book =
+        withContext(Dispatchers.IO) {
+            val bookId = UUID.randomUUID().toString()
+            val epubDir = File(context.filesDir, "epubs/$bookId")
+            epubDir.mkdirs()
+            val epubFile = File(epubDir, fileName)
+            epubFile.outputStream().use { inputStream.copyTo(it) }
 
-        val meta = EpubParser.parseMetadata(epubFile)
+            val publication = openPublication(epubFile)
 
-        val book = Book(
-            id = bookId,
-            title = meta.title,
-            author = meta.author,
-            description = meta.description,
-            totalChapters = meta.chapters.size.coerceAtLeast(1),
-            language = meta.language ?: "fr",
-            addedAt = System.currentTimeMillis()
-        )
+            val title = publication.metadata.localizedTitle.toString()
+                .takeIf { it.isNotBlank() } ?: fileName.removeSuffix(".epub")
+            val author = publication.metadata.authors.joinToString(", ") { it.name.toString() }
+                .takeIf { it.isNotBlank() } ?: "Auteur inconnu"
 
-        bookDao.insert(book.toEntity(epubFile.absolutePath))
-        return book
-    }
+            val book = Book(
+                id = bookId,
+                title = title,
+                author = author,
+                description = publication.metadata.description,
+                totalChapters = publication.readingOrder.size,
+                language = publication.metadata.languages.firstOrNull() ?: "fr",
+                addedAt = System.currentTimeMillis()
+            )
+            bookDao.insert(book.toEntity(epubFile.absolutePath))
+            book
+        }
 
-    override suspend fun getChapter(bookId: String, chapterIndex: Int): Chapter {
-        val book = bookDao.getById(bookId)
-            ?: throw IllegalStateException("Livre introuvable : $bookId")
+    override suspend fun getChapter(bookId: String, chapterIndex: Int): Chapter =
+        withContext(Dispatchers.IO) {
+            val book = bookDao.getById(bookId)
+                ?: throw IllegalStateException("Livre introuvable : $bookId")
+            val epubFile = File(book.filePath)
+            require(epubFile.exists()) { "Fichier EPUB introuvable" }
 
-        val epubFile = File(book.filePath)
-        require(epubFile.exists()) { "EPUB introuvable" }
+            val publication = openPublication(epubFile)
+            val link = publication.readingOrder.getOrNull(chapterIndex)
+                ?: throw IllegalStateException("Chapitre $chapterIndex introuvable")
 
-        val meta = EpubParser.parseMetadata(epubFile)
-        val chapterRef = meta.chapters.getOrNull(chapterIndex)
+            val text = extractHtml(epubFile, link.href.toString())
+            val sentences = chunkText(text)
 
-        val opfPath = findOpfPath(epubFile)
-        val text = if (chapterRef != null) {
-            EpubParser.extractChapterText(epubFile, chapterRef.href, opfPath)
-        } else ""
-
-        val sentences = chunkText(text)
-
-        return Chapter(
-            index = chapterIndex,
-            title = chapterRef?.title ?: "Chapitre ${chapterIndex + 1}",
-            sentences = sentences
-        )
-    }
+            Chapter(
+                index = chapterIndex,
+                title = link.title?.takeIf { it.isNotBlank() } ?: "Chapitre ${chapterIndex + 1}",
+                sentences = sentences
+            )
+        }
 
     override suspend fun getAllBooks(): List<Book> =
         bookDao.getAll().first().map { it.toDomain() }
@@ -85,11 +102,44 @@ class BookRepositoryImpl @Inject constructor(
     override suspend fun getProgress(bookId: String): Progress? =
         progressDao.getByBookId(bookId)?.toDomain()
 
-    private fun findOpfPath(epubFile: File): String {
-        ZipFile(epubFile).use { zip ->
-            val entry = zip.getEntry("META-INF/container.xml") ?: return ""
-            val xml = zip.getInputStream(entry).bufferedReader().readText()
-            return Regex("""full-path="([^"]+)"""").find(xml)?.groupValues?.get(1) ?: ""
-        }
+    // ── Helpers ──────────────────────────────────────────
+
+    private suspend fun openPublication(epubFile: File) =
+        retriever
+            .retrieve(epubFile, FormatHints())
+            .getOrNull()
+            ?.let { asset ->
+                opener.open(
+                    asset,
+                    "",
+                    false,
+                    {},
+                    object : WarningLogger {
+                        override fun log(warning: org.readium.r2.shared.util.logging.Warning) {}
+                    }
+                ).getOrNull()
+            }
+            ?: throw IllegalStateException("Impossible d'ouvrir l'EPUB")
+
+    private fun extractHtml(epubFile: File, href: String): String {
+        return try {
+            ZipFile(epubFile).use { zip ->
+                val entry = zip.entries().asSequence()
+                    .find { it.name.endsWith(href) || it.name == href }
+                if (entry != null) {
+                    val html = zip.getInputStream(entry).bufferedReader().readText()
+                    stripHtml(html)
+                } else ""
+            }
+        } catch (e: Exception) { "" }
     }
+
+    private fun stripHtml(html: String) = html
+        .replace(Regex("<head[^>]*>.*?</head>", RegexOption.DOT_MATCHES_ALL), "")
+        .replace(Regex("<style[^>]*>.*?</style>", RegexOption.DOT_MATCHES_ALL), "")
+        .replace(Regex("<script[^>]*>.*?</script>", RegexOption.DOT_MATCHES_ALL), "")
+        .replace(Regex("<[^>]+>"), " ")
+        .replace(Regex("&nbsp;|&amp;|&lt;|&gt;|&quot;|&#?[a-z0-9]+;"), " ")
+        .replace(Regex("\\s+"), " ")
+        .trim()
 }
