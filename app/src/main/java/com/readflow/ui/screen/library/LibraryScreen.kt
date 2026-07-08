@@ -9,10 +9,8 @@ import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.grid.GridCells
 import androidx.compose.foundation.lazy.grid.LazyVerticalGrid
 import androidx.compose.foundation.lazy.grid.items
-import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
-import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.*
 import androidx.compose.material.icons.outlined.Headphones
@@ -43,6 +41,8 @@ fun LibraryScreen(
     var showDrawer by remember { mutableStateOf(false) }
     var showOverflow by remember { mutableStateOf(false) }
     var showFilter by remember { mutableStateOf(false) }
+    var showSearch by remember { mutableStateOf(false) }
+    var searchText by remember { mutableStateOf("") }
 
     val epubPicker = rememberLauncherForActivityResult(
         ActivityResultContracts.OpenDocument()
@@ -56,11 +56,20 @@ fun LibraryScreen(
         ) {
             Scaffold(
                 topBar = {
-                    TopBar(
-                        onMenu = { showDrawer = true },
-                        onFilterToggle = { showFilter = !showFilter },
-                        onOverflow = { showOverflow = true }
-                    )
+                    if (showSearch) {
+                        SearchBar(
+                            query = searchText,
+                            onQueryChange = { searchText = it; viewModel.setSearchQuery(it) },
+                            onClose = { showSearch = false; searchText = ""; viewModel.setSearchQuery("") }
+                        )
+                    } else {
+                        TopBar(
+                            onMenu = { showDrawer = true },
+                            onFilterToggle = { showFilter = !showFilter },
+                            onSearch = { showSearch = true },
+                            onOverflow = { showOverflow = true }
+                        )
+                    }
                 },
                 containerColor = AppBackground
             ) { padding ->
@@ -85,7 +94,11 @@ fun LibraryScreen(
             exit = fadeOut() + slideOutVertically { -it },
             modifier = Modifier.align(Alignment.TopCenter).padding(top = 55.dp)
         ) {
-            FilterDropdown(onDismiss = { showFilter = false })
+            FilterDropdown(
+                current = state.filterMode,
+                onSelect = { viewModel.setFilterMode(it) },
+                onDismiss = { showFilter = false }
+            )
         }
 
         // ── OVERFLOW MENU ────────────────────────────
@@ -125,6 +138,7 @@ fun LibraryScreen(
 private fun TopBar(
     onMenu: () -> Unit,
     onFilterToggle: () -> Unit,
+    onSearch: () -> Unit,
     onOverflow: () -> Unit
 ) {
     TopAppBar(
@@ -143,7 +157,7 @@ private fun TopBar(
             }
         },
         actions = {
-            IconButton(onClick = { /* search */ }) {
+            IconButton(onClick = onSearch) {
                 Icon(Icons.Default.Search, "Rechercher", tint = Color.White)
             }
             IconButton(onClick = onFilterToggle) {
@@ -156,6 +170,41 @@ private fun TopBar(
         colors = TopAppBarDefaults.topAppBarColors(
             containerColor = AccentBlue
         )
+    )
+}
+
+@OptIn(ExperimentalMaterial3Api::class)
+@Composable
+private fun SearchBar(
+    query: String,
+    onQueryChange: (String) -> Unit,
+    onClose: () -> Unit
+) {
+    TopAppBar(
+        title = {
+            TextField(
+                value = query,
+                onValueChange = onQueryChange,
+                placeholder = { Text("Rechercher un livre...", color = Color.White.copy(alpha = 0.5f)) },
+                colors = TextFieldDefaults.colors(
+                    focusedContainerColor = Color.Transparent,
+                    unfocusedContainerColor = Color.Transparent,
+                    focusedTextColor = Color.White,
+                    unfocusedTextColor = Color.White,
+                    cursorColor = Color.White,
+                    focusedIndicatorColor = Color.White.copy(alpha = 0.5f),
+                    unfocusedIndicatorColor = Color.White.copy(alpha = 0.3f)
+                ),
+                singleLine = true,
+                modifier = Modifier.fillMaxWidth()
+            )
+        },
+        navigationIcon = {
+            IconButton(onClick = onClose) {
+                Icon(Icons.Default.ArrowBack, "Fermer", tint = Color.White)
+            }
+        },
+        colors = TopAppBarDefaults.topAppBarColors(containerColor = AccentBlue)
     )
 }
 
@@ -283,73 +332,51 @@ private fun BookCover(
 // ─────────────────────────────────────────────────────
 
 @Composable
-private fun FilterDropdown(onDismiss: () -> Unit) {
-    var selectedFilter by remember { mutableIntStateOf(0) }
-    val categories = listOf(
-        "Tous les livres", "Favoris", "Séries", "Auteur", "Tags", "Dossiers", "Classements"
-    )
-    val subItems = listOf(
-        listOf(), listOf(),
-        listOf("Black Wings" to 1, "Contes et nouvelles" to 5, "Epub commercial" to 1),
-        listOf(), listOf(), listOf(), listOf()
-    )
-
-    Surface(
+private fun FilterDropdown(
+    current: FilterMode,
+    onSelect: (FilterMode) -> Unit,
+    onDismiss: () -> Unit
+) {
+    Box(
         modifier = Modifier
-            .fillMaxWidth()
-            .padding(horizontal = 8.dp)
-            .clip(RoundedCornerShape(8.dp)),
-        color = SurfaceRaised,
-        tonalElevation = 8.dp
+            .fillMaxSize()
+            .clickable(onClick = onDismiss)
     ) {
-        Row(modifier = Modifier.height(340.dp)) {
-            // Colonne gauche
-            Column(
-                modifier = Modifier
-                    .weight(0.42f)
-                    .fillMaxHeight()
-                    .background(Color.Black.copy(alpha = 0.2f))
-                    .verticalScroll(rememberScrollState())
-            ) {
-                categories.forEachIndexed { i, cat ->
+        Surface(
+            modifier = Modifier
+                .align(Alignment.TopCenter)
+                .padding(top = 55.dp, start = 8.dp, end = 8.dp)
+                .fillMaxWidth()
+                .clip(RoundedCornerShape(8.dp)),
+            color = SurfaceRaised,
+            tonalElevation = 8.dp
+        ) {
+            Column {
+                val items = listOf(
+                    FilterMode.ALL to "Tous les livres",
+                    FilterMode.BY_AUTHOR to "Par Auteur",
+                    FilterMode.BY_TITLE to "Par Titre",
+                    FilterMode.IN_PROGRESS to "En cours de lecture",
+                    FilterMode.READ to "Lus",
+                    FilterMode.UNREAD to "Non lus"
+                )
+                items.forEach { (mode, label) ->
                     Surface(
-                        color = if (i == selectedFilter) SurfaceDark else Color.Transparent,
-                        onClick = { selectedFilter = i }
+                        color = if (mode == current) AccentBlue.copy(alpha = 0.15f) else Color.Transparent,
+                        onClick = { onSelect(mode); onDismiss() }
                     ) {
                         Row(
-                            modifier = Modifier.padding(horizontal = 14.dp, vertical = 12.dp),
-                            horizontalArrangement = Arrangement.SpaceBetween
+                            modifier = Modifier.padding(horizontal = 16.dp, vertical = 14.dp),
+                            verticalAlignment = Alignment.CenterVertically
                         ) {
-                            Text(cat, fontSize = 13.sp, fontWeight = FontWeight.Medium,
-                                color = if (i == selectedFilter) AccentBlue else TextMain)
-                            if (i == selectedFilter) {
-                                Text("›", color = TextMuted, fontSize = 11.sp)
+                            Text(label, fontSize = 14.sp,
+                                color = if (mode == current) AccentBlue else TextMain,
+                                fontWeight = if (mode == current) FontWeight.SemiBold else FontWeight.Normal,
+                                modifier = Modifier.weight(1f))
+                            if (mode == current) {
+                                Icon(Icons.Default.Check, null,
+                                    tint = AccentBlue, modifier = Modifier.size(18.dp))
                             }
-                        }
-                    }
-                }
-            }
-
-            // Colonne droite
-            Column(
-                modifier = Modifier
-                    .weight(0.58f)
-                    .fillMaxHeight()
-                    .verticalScroll(rememberScrollState())
-            ) {
-                subItems.getOrNull(selectedFilter)?.forEach { (name, count) ->
-                    Surface(
-                        color = SurfaceRaised,
-                        onClick = onDismiss
-                    ) {
-                        Row(
-                            modifier = Modifier.padding(horizontal = 16.dp, vertical = 11.dp),
-                            horizontalArrangement = Arrangement.SpaceBetween
-                        ) {
-                            Text(name, fontSize = 13.sp, color = TextMain,
-                                modifier = Modifier.weight(1f), maxLines = 1, overflow = TextOverflow.Ellipsis)
-                            Text("$count", fontSize = 11.sp, color = TextMuted,
-                                modifier = Modifier.background(ShelfOverlay, CircleShape).padding(horizontal = 6.dp, vertical = 2.dp))
                         }
                     }
                 }
@@ -525,22 +552,16 @@ private fun FloatingControls(
     onReadResume: () -> Unit
 ) {
     Row(modifier = modifier, verticalAlignment = Alignment.CenterVertically) {
-        // Pill TTS
+        // Pill audio discret
         Surface(
             shape = RoundedCornerShape(20.dp),
             color = SurfaceRaised,
             border = ButtonDefaults.outlinedButtonBorder(enabled = true),
             tonalElevation = 4.dp
         ) {
-            Row(
-                modifier = Modifier.padding(horizontal = 14.dp, vertical = 6.dp),
-                verticalAlignment = Alignment.CenterVertically
-            ) {
-                Text("Piper TTS", fontSize = 11.sp,
-                    fontWeight = FontWeight.SemiBold, color = TextMuted)
-                Spacer(Modifier.width(8.dp))
-                Icon(Icons.Outlined.Headphones, "TTS",
-                    tint = AccentTts, modifier = Modifier.size(14.dp))
+            IconButton(onClick = { /* TODO: quick TTS */ }) {
+                Icon(Icons.Outlined.Headphones, "Audio",
+                    tint = AccentTts, modifier = Modifier.size(18.dp))
             }
         }
 
