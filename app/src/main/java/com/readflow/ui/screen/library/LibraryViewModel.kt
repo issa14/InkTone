@@ -12,8 +12,10 @@ import com.readflow.domain.model.Book
 import com.readflow.domain.repository.BookRepository
 import dagger.hilt.android.lifecycle.HiltViewModel
 import dagger.hilt.android.qualifiers.ApplicationContext
+import kotlinx.coroutines.*
 import kotlinx.coroutines.flow.*
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.Dispatchers
 import javax.inject.Inject
 
 data class LibraryUiState(
@@ -162,6 +164,26 @@ class LibraryViewModel @Inject constructor(
                 loadBooks()
             } catch (e: Exception) {
                 _uiState.update { it.copy(error = e.message, isLoading = false) }
+            }
+        }
+    }
+
+    /** Import par lot depuis des URIs (multi-sélection SAF). */
+    fun importBooks(uris: List<Uri>) {
+        viewModelScope.launch(Dispatchers.IO) {
+            _uiState.update { it.copy(isLoading = true, error = null) }
+            try {
+                uris.forEach { uri ->
+                    val fileName = resolveFileName(uri) ?: "inconnu.epub"
+                    context.contentResolver.openInputStream(uri)?.use { stream ->
+                        bookRepository.importEpub(stream, fileName)
+                    }
+                }
+                withContext(Dispatchers.Main) { loadBooks() }
+            } catch (e: Exception) {
+                withContext(Dispatchers.Main) {
+                    _uiState.update { it.copy(error = e.message, isLoading = false) }
+                }
             }
         }
     }

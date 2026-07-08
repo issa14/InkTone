@@ -55,8 +55,10 @@ fun LibraryScreen(
     var searchText by remember { mutableStateOf("") }
 
     val epubPicker = rememberLauncherForActivityResult(
-        ActivityResultContracts.OpenDocument()
-    ) { uri -> uri?.let { viewModel.importEpub(it) } }
+        ActivityResultContracts.OpenMultipleDocuments()
+    ) { uris ->
+        if (uris.isNotEmpty()) viewModel.importBooks(uris)
+    }
 
     Box(modifier = Modifier.fillMaxSize()) {
         // ── FOND ─────────────────────────────────────
@@ -89,7 +91,17 @@ fun LibraryScreen(
                         ErrorBanner(err, viewModel::clearError)
                     }
 
-                    when (state.currentDestination) {
+                    // Loading overlay pendant import
+                    if (state.isLoading) {
+                        Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
+                            Column(horizontalAlignment = Alignment.CenterHorizontally) {
+                                CircularProgressIndicator(color = AccentBlue)
+                                Spacer(Modifier.height(12.dp))
+                                Text("Importation en cours...", color = TextMuted, fontSize = 14.sp)
+                            }
+                        }
+                    } else {
+                        when (state.currentDestination) {
                         NavigationDestination.LIBRARY -> {
                             when {
                                 state.isLoading && state.books.isEmpty() -> LoadingView()
@@ -118,6 +130,7 @@ fun LibraryScreen(
                             ComingSoonPlaceholder(state.currentDestination.label)
                         }
                     }
+                    } // end else (isLoading)
                 }
             }
         }

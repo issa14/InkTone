@@ -10,6 +10,7 @@ fun BookEntity.toDomain() = Book(
     title = title,
     author = author,
     description = description,
+    coverPath = coverPath,
     totalChapters = totalChapters,
     language = language,
     addedAt = addedAt

@@ -60,16 +60,20 @@ class BookRepositoryImpl @Inject constructor(
             val author = publication.metadata.authors.joinToString(", ") { it.name }
                 .takeIf { it.isNotBlank() } ?: "Auteur inconnu"
 
+            // Extraction couverture (TODO: Readium 3.0 coverLink deprecated, adapter)
+            val coverPath: String? = null
+
             val book = Book(
                 id = bookId,
                 title = title,
                 author = author,
                 description = publication.metadata.description,
+                coverPath = coverPath,
                 totalChapters = publication.readingOrder.size,
                 language = publication.metadata.languages.firstOrNull() ?: "fr",
                 addedAt = System.currentTimeMillis()
             )
-            bookDao.insert(book.toEntity(epubFile.absolutePath))
+            bookDao.insert(book.toEntity(epubFile.absolutePath, coverPath))
             book
         }
 
