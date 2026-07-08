@@ -36,13 +36,13 @@ Lecteur d'ebooks Android (EPUB2/EPUB3) avec synthèse vocale neuronale locale en
 
 | # | Tâche | Statut | Priorité | Notes |
 |---|---|---|---|---|
-| 1.1 | Projet Android : Hilt, Room, Compose Navigation | ⬜ À faire | 🔴 | Setup complet |
-| 1.2 | Intégration ONNX Runtime Android | ⬜ À faire | 🔴 | Via JNI/NDK |
-| 1.3 | Intégration Sherpa-ONNX modèle VITS français | ⬜ À faire | 🔴 | ~60 Mo |
-| 1.4 | Compilation `piper-phonemize` pour NDK (fallback) | ⬜ À faire | 🟡 | Si tokenizer Sherpa insuffisant |
-| 1.5 | Test RTF sur 3 chipsets | ⬜ À faire | 🔴 | Snapdragon, MediaTek, Tensor |
-| 1.6 | Test de bout en bout : texte → phonèmes → audio + timestamps | ⬜ À faire | 🔴 | Livrable critique |
-| 1.7 | Rédiger `docs/prototype-report.md` | ⬜ À faire | 🟡 | Résultats des tests |
+| 1.1 | Projet Android : Hilt, Room, Compose Navigation | ✅ Fait | 🔴 | Fait en Phase 0.4 |
+| 1.2 | Intégration ONNX Runtime Android | ✅ Fait | 🔴 | Inclus dans sherpa-onnx AAR |
+| 1.3 | Intégration Sherpa-ONNX modèle VITS français | ✅ Fait | 🔴 | Modèle fr_FR-upmc-medium intégré |
+| 1.4 | Compilation `piper-phonemize` pour NDK (fallback) | ⏭️ Sautée | 🟡 | eSpeak-NG intégré suffisant (7/10 phono OK) |
+| 1.5 | Test RTF sur 3 chipsets | 🔄 Partiel | 🔴 | Snapdragon 680 ✅ ; MediaTek/Tensor à tester |
+| 1.6 | Test de bout en bout : texte → phonèmes → audio + timestamps | ✅ Fait | 🔴 | Alignement phrase par phrase fonctionnel |
+| 1.7 | Rédiger `docs/prototype-report.md` | ✅ Fait | 🟡 | Rapport complet (RTF, phono, timestamps) |
 
 ### Phase 2 — Parsing EPUB & Pipeline Audio (Objectif : Semaines 5-10)
 

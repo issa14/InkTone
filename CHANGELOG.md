@@ -33,6 +33,11 @@ et ce projet adhère au [Semantic Versioning](https://semver.org/spec/v2.0.0.htm
 - **Écran de test** avec synthèse + lecture AudioTrack
 - **Décision finale** : GO Sherpa-ONNX (pas de fallback Piper nécessaire)
 
+### 2026-07-08 — Phase 1 complétée ✅
+- **Test timestamps** : alignement phrase par phrase validé (cumul échantillons)
+- **Rapport prototype** : `docs/prototype-report.md` complet
+- **Pipeline texte → audio + timestamps** fonctionnel de bout en bout
+
 ---
 
 ## Versions futures

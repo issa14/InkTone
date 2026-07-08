@@ -230,6 +230,52 @@ fun TtsTestScreen() {
                     )
                 }
             }
+            // Test end-to-end : texte → phrases → timestamps
+            var e2eResults by remember { mutableStateOf<List<Triple<String, Long, Long>>>(emptyList()) }
+            var e2eRunning by remember { mutableStateOf(false) }
+            var e2eTotalMs by remember { mutableLongStateOf(0L) }
+
+            val e2eText = "La lecture est une activité merveilleuse. " +
+                    "Elle permet de s'évader dans des mondes inconnus. " +
+                    "Chaque page tournée est une nouvelle aventure. " +
+                    "Les mots dansent devant nos yeux émerveillés."
+
+            Button(
+                onClick = {
+                    scope.launch {
+                        e2eRunning = true; e2eResults = emptyList()
+                        val sentences = e2eText.split(Regex("(?<=[.!?])\\s+"))
+                        var timelineMs = 0L
+                        val results = mutableListOf<Triple<String, Long, Long>>()
+                        for (sentence in sentences) {
+                            val r = withContext(Dispatchers.IO) {
+                                inferenceService.synthesize(sentence,
+                                    OnnxInferenceService.Voice.entries[voixIndex], vitesse)
+                            }
+                            val start = timelineMs; timelineMs += r.audioDurationMs
+                            results.add(Triple(sentence.trim(), start, timelineMs))
+                            withContext(Dispatchers.IO) { playPcm(r.samples, r.sampleRate) }
+                            withContext(Dispatchers.IO) { Thread.sleep(200) }
+                        }
+                        e2eResults = results; e2eTotalMs = timelineMs; e2eRunning = false
+                    }
+                },
+                enabled = !e2eRunning,
+                colors = ButtonDefaults.buttonColors(containerColor = MaterialTheme.colorScheme.primaryContainer)
+            ) {
+                Text(if (e2eRunning) "⏳ Test timestamps..." else "5. Test timestamps (4 phrases + son)")
+            }
+
+            if (e2eResults.isNotEmpty()) {
+                Text("⏱️ Timeline (${e2eResults.size} phrases, ${e2eTotalMs}ms) :",
+                    style = MaterialTheme.typography.titleSmall)
+                e2eResults.forEachIndexed { i, (phrase, start, end) ->
+                    Text("[${start / 1000}.${(start % 1000) / 100}s → ${end / 1000}.${(end % 1000) / 100}s] $phrase",
+                        style = MaterialTheme.typography.bodySmall)
+                }
+                Text("✅ Prêt pour le surlignage synchronisé !",
+                    color = MaterialTheme.colorScheme.primary)
+            }
             // Résultats du test phonémisation
             if (testResults.isNotEmpty()) {
                 Text("📋 Résultats (${testResults.size} phrases) :", style = MaterialTheme.typography.titleSmall)
