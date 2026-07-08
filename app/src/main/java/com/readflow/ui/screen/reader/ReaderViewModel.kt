@@ -1,7 +1,10 @@
 package com.readflow.ui.screen.reader
 
+import android.Manifest
 import android.content.Context
 import android.content.Intent
+import android.content.pm.PackageManager
+import android.os.Build
 import androidx.core.content.ContextCompat
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
@@ -117,6 +120,16 @@ class ReaderViewModel @Inject constructor(
     fun play() {
         val chapter = _uiState.value.currentChapter ?: return
         val book = currentBook ?: return
+
+        // Vérifier la permission notification (Android 13+)
+        if (Build.VERSION.SDK_INT >= 33) {
+            if (ContextCompat.checkSelfPermission(context, Manifest.permission.POST_NOTIFICATIONS)
+                != PackageManager.PERMISSION_GRANTED
+            ) {
+                _uiState.update { it.copy(error = "Permission notification requise.") }
+                return
+            }
+        }
 
         val intent = Intent(context, AudioPlaybackService::class.java)
         ContextCompat.startForegroundService(context, intent)

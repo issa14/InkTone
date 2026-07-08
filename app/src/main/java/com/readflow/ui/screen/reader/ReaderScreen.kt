@@ -1,12 +1,14 @@
 package com.readflow.ui.screen.reader
 
+import android.Manifest
 import android.app.Activity
+import android.content.pm.PackageManager
 import androidx.compose.animation.*
 import androidx.compose.animation.core.tween
 import androidx.compose.foundation.background
-import androidx.compose.foundation.clickable
-import androidx.compose.foundation.interaction.MutableInteractionSource
+import androidx.compose.foundation.gestures.detectTapGestures
 import androidx.compose.foundation.layout.*
+import androidx.compose.foundation.layout.WindowInsets
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
@@ -20,11 +22,14 @@ import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.input.pointer.pointerInput
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalView
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import androidx.core.content.ContextCompat
 import androidx.core.view.WindowCompat
 import androidx.core.view.WindowInsetsCompat
 import androidx.core.view.WindowInsetsControllerCompat
@@ -184,6 +189,7 @@ private fun ReaderTopBar(
                 Text(chapterLabel, color = Color.White.copy(alpha = 0.45f),
                     style = MaterialTheme.typography.labelSmall)
             }
+            @Suppress("DEPRECATION")
             IconButton(onClick = onToc) {
                 Icon(Icons.Default.List, "TOC",
                     tint = Color.White.copy(alpha = 0.6f))
@@ -260,11 +266,12 @@ private fun ImmersiveText(
         modifier = Modifier
             .fillMaxSize()
             .verticalScroll(rememberScrollState())
-            .clickable(
-                indication = null,
-                interactionSource = remember { MutableInteractionSource() }
-            ) { onTap() }
-            .padding(horizontal = 20.dp, vertical = 56.dp)
+            .pointerInput(Unit) {
+                detectTapGestures { onTap() }
+            }
+            // Respecter les insets système pour ne pas passer sous les barres
+            .windowInsetsPadding(WindowInsets.systemBars)
+            .padding(horizontal = 20.dp)
     ) {
         Spacer(Modifier.height(16.dp))
 
