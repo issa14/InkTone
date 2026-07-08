@@ -55,9 +55,9 @@ class BookRepositoryImpl @Inject constructor(
 
             val publication = openPublication(epubFile)
 
-            val title = publication.metadata.localizedTitle.toString()
-                .takeIf { it.isNotBlank() } ?: fileName.removeSuffix(".epub")
-            val author = publication.metadata.authors.joinToString(", ") { it.name.toString() }
+            val title = publication.metadata.localizedTitle?.string
+                ?.takeIf { it.isNotBlank() } ?: fileName.removeSuffix(".epub")
+            val author = publication.metadata.authors.joinToString(", ") { it.name }
                 .takeIf { it.isNotBlank() } ?: "Auteur inconnu"
 
             val book = Book(
@@ -140,8 +140,14 @@ class BookRepositoryImpl @Inject constructor(
                     .find { it.name.endsWith(href) || it.name == href }
                 if (entry != null) {
                     val html = zip.getInputStream(entry).bufferedReader().readText()
-                    stripHtml(html)
-                } else ""
+                    Log.d("BookRepo", "Chapter HTML: ${html.length}B, href=$href, entry=${entry.name}")
+                    val stripped = stripHtml(html)
+                    Log.d("BookRepo", "Stripped: ${stripped.length} chars, preview=\"${stripped.take(100)}...\"")
+                    stripped
+                } else {
+                    Log.w("BookRepo", "Entry not found for href=$href")
+                    ""
+                }
             }
         } catch (e: Exception) { "" }
     }
