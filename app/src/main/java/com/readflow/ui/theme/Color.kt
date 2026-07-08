@@ -2,47 +2,59 @@ package com.readflow.ui.theme
 
 import androidx.compose.ui.graphics.Color
 
-// ---- Thème Clair ----
-val LightPrimary = Color(0xFF1A6B52)
-val LightOnPrimary = Color(0xFFFFFFFF)
-val LightPrimaryContainer = Color(0xFFA7F2D2)
-val LightOnPrimaryContainer = Color(0xFF002117)
+// ── Palette prototype ReadFlow Pro (inspirée RF.html) ──
 
-val LightSecondary = Color(0xFF4C6359)
-val LightOnSecondary = Color(0xFFFFFFFF)
-val LightSecondaryContainer = Color(0xFFCEE9DB)
-val LightOnSecondaryContainer = Color(0xFF092017)
+// Fond sombre principal
+val AppBackground = Color(0xFF0D0E15)
+val SurfaceDark = Color(0xFF161722)
+val SurfaceRaised = Color(0xFF202232)
 
-val LightBackground = Color(0xFFFBFDF9)
-val LightOnBackground = Color(0xFF191C1A)
-val LightSurface = Color(0xFFFBFDF9)
-val LightOnSurface = Color(0xFF191C1A)
-val LightSurfaceVariant = Color(0xFFDBE5DD)
-val LightOnSurfaceVariant = Color(0xFF404943)
+// Texte
+val TextMain = Color(0xFFE2E4ED)
+val TextMuted = Color(0xFF7A7E9D)
 
-val LightError = Color(0xFFBA1A1A)
+// Accents
+val AccentBlue = Color(0xFF0091EA)
+val AccentTts = Color(0xFFFF79C6)
 
-// ---- Thème Sombre ----
-val DarkPrimary = Color(0xFF8CD6B7)
-val DarkOnPrimary = Color(0xFF003828)
-val DarkPrimaryContainer = Color(0xFF00513D)
-val DarkOnPrimaryContainer = Color(0xFFA7F2D2)
+// Bordures
+val BorderDark = Color(0xFF222538)
+val BorderSoft = Color(0xFF2E324C)
 
-val DarkSecondary = Color(0xFFB3CDC0)
-val DarkOnSecondary = Color(0xFF1E352C)
-val DarkSecondaryContainer = Color(0xFF354B42)
-val DarkOnSecondaryContainer = Color(0xFFCEE9DB)
+// Shelf / étagère
+val ShelfOverlay = Color(0x12FFFFFF)
 
-val DarkBackground = Color(0xFF191C1A)
-val DarkOnBackground = Color(0xFFE1E3DF)
-val DarkSurface = Color(0xFF191C1A)
-val DarkOnSurface = Color(0xFFE1E3DF)
-val DarkSurfaceVariant = Color(0xFF404943)
-val DarkOnSurfaceVariant = Color(0xFFBFC9C2)
+// ── Couvertures (gradients prédéfinis) ──
+val CoverGradients = listOf(
+    listOf(Color(0xFF0F2027), Color(0xFF203A43), Color(0xFF2C5364)),
+    listOf(Color(0xFF373B44), Color(0xFF4286F4)),
+    listOf(Color(0xFF870000), Color(0xFF190019)),
+    listOf(Color(0xFF134E5E), Color(0xFF71B280)),
+)
 
-val DarkError = Color(0xFFFFB4AB)
+// ── Material 3 ColorScheme ──
 
-// ---- Thème Sépia (Lecture) ----
-val SepiaBackground = Color(0xFFF5ECD7)
-val SepiaOnBackground = Color(0xFF3D2E1A)
-val SepiaSurface = Color(0xFFF5ECD7)
+// Dark theme (principal)
+val DarkBackground = AppBackground
+val DarkOnBackground = TextMain
+val DarkSurface = SurfaceDark
+val DarkOnSurface = TextMain
+val DarkSurfaceVariant = SurfaceRaised
+val DarkOnSurfaceVariant = TextMuted
+val DarkPrimary = AccentBlue
+val DarkOnPrimary = Color.White
+val DarkPrimaryContainer = AccentBlue.copy(alpha = 0.15f)
+val DarkOnPrimaryContainer = AccentBlue
+val DarkSecondary = AccentTts
+val DarkOnSecondary = Color(0xFF1A1A2E)
+val DarkSecondaryContainer = AccentTts.copy(alpha = 0.15f)
+val DarkOnSecondaryContainer = AccentTts
+val DarkError = Color(0xFFFF6B6B)
+
+// Light theme (nav drawer)
+val LightBackground = Color.White
+val LightOnBackground = Color(0xFF333333)
+val LightSurface = Color(0xFFF5F5F5)
+val LightOnSurface = Color(0xFF444444)
+val LightPrimary = AccentBlue
+val LightOnPrimary = Color.White
