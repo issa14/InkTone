@@ -1,6 +1,5 @@
 package com.readflow.service.audio
 
-import android.util.Log
 import com.readflow.domain.model.SynthesisResult
 import java.util.*
 import javax.inject.Inject
@@ -20,7 +19,6 @@ import javax.inject.Singleton
 class AudioCacheManager @Inject constructor() {
 
     companion object {
-        private const val TAG = "AudioCache"
         private const val MAX_SIZE_BYTES = 30L * 1024 * 1024  // 30 Mo
         private const val TTL_MS = 10L * 60 * 1000             // 10 minutes
 
@@ -28,6 +26,10 @@ class AudioCacheManager @Inject constructor() {
         fun sizeOf(result: SynthesisResult): Long {
             // FloatArray = 4 octets par float + overhead tableau (~24 bytes)
             return result.samples.size.toLong() * 4 + 24
+        }
+
+        private fun debug(msg: String) {
+            try { android.util.Log.d("AudioCache", msg) } catch (_: Exception) {}
         }
     }
 
@@ -72,7 +74,7 @@ class AudioCacheManager @Inject constructor() {
             return null
         }
         hitCount++
-        Log.d(TAG, "HIT — \"${key.take(50)}\" (${entry.sizeBytes / 1024} Ko)")
+        debug("HIT — \"${key.take(50)}\" (${entry.sizeBytes / 1024} Ko)")
         return entry.result
     }
 
@@ -87,7 +89,7 @@ class AudioCacheManager @Inject constructor() {
 
         // Si une seule entrée dépasse la capacité, ne pas la stocker
         if (size > MAX_SIZE_BYTES) {
-            Log.w(TAG, "Entrée trop grande (${size / 1024} Ko), ignorée")
+            debug("Entrée trop grande (${size / 1024} Ko), ignorée")
             return
         }
 
@@ -99,7 +101,7 @@ class AudioCacheManager @Inject constructor() {
 
         cache[key] = Entry(result)
         currentSizeBytes += size
-        Log.d(TAG, "PUT — \"${key.take(50)}\" (${size / 1024} Ko, total=${currentSizeBytes / 1024}/${MAX_SIZE_BYTES / 1024} Ko)")
+        debug("PUT — \"${key.take(50)}\" (${size / 1024} Ko, total=${currentSizeBytes / 1024}/${MAX_SIZE_BYTES / 1024} Ko)")
     }
 
     /** Vide complètement le cache. */
@@ -108,7 +110,7 @@ class AudioCacheManager @Inject constructor() {
         val count = cache.size
         cache.clear()
         currentSizeBytes = 0
-        Log.d(TAG, "CLEAR — $count entrées supprimées")
+        debug("CLEAR — $count entrées supprimées")
     }
 
     /** Nombre d'entrées actuellement dans le cache. */
@@ -131,7 +133,7 @@ class AudioCacheManager @Inject constructor() {
             val (key, entry) = iter.next()
             iter.remove()
             currentSizeBytes -= entry.sizeBytes
-            Log.d(TAG, "EVICT — \"${key.take(50)}\" (${entry.sizeBytes / 1024} Ko)")
+            debug("EVICT — \"${key.take(50)}\" (${entry.sizeBytes / 1024} Ko)")
         }
         // Supprimer aussi les entrées expirées
         cache.entries.removeAll { (_, entry) -> entry.isExpired() }
