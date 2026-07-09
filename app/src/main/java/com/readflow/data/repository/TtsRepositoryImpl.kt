@@ -4,6 +4,8 @@ import com.readflow.domain.model.SynthesisResult
 import com.readflow.domain.repository.TtsRepository
 import com.readflow.service.audio.AudioCacheManager
 import com.readflow.service.onnx.OnnxInferenceService
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.withContext
 import javax.inject.Inject
 import javax.inject.Singleton
 
@@ -17,19 +19,16 @@ class TtsRepositoryImpl @Inject constructor(
         text: String,
         voice: Int,
         speed: Float
-    ): SynthesisResult {
+    ): SynthesisResult = withContext(Dispatchers.Default) {
         val voiceEnum = OnnxInferenceService.Voice.entries
             .find { it.sid == voice } ?: OnnxInferenceService.Voice.AF_HEART
 
-        // Clé de cache : texte normalisé + voix + vitesse
         val key = "${text.trim()}|${voiceEnum.sid}|${"%.2f".format(speed)}"
 
-        // Vérifier le cache
-        cache.get(key)?.let { return it }
+        cache.get(key)?.let { return@withContext it }
 
-        // Synthétiser et mettre en cache
         val result = inferenceService.synthesize(text, voiceEnum, speed)
         cache.put(key, result)
-        return result
+        result
     }
 }

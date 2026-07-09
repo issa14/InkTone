@@ -12,90 +12,120 @@ import java.io.File
 import javax.inject.Inject
 import javax.inject.Singleton
 
+/**
+ * Service d'inférence TTS via Sherpa-ONNX / Kokoro int8 multilingue.
+ *
+ * Threading : l'instance [OfflineTts] est créée une seule fois (singleton Hilt).
+ * La synthèse est appelée depuis [TtsRepositoryImpl] sur [Dispatchers.Default].
+ *
+ * Modèle : kokoro-int8-multi-lang-v1_0 (110 Mo quantifié, 53 locuteurs, 24 kHz).
+ * Phonémisation : KokoroMultiLangLexicon + espeak-ng avec lang="fr" pour le français.
+ */
 @Singleton
 class OnnxInferenceService @Inject constructor(
     @ApplicationContext private val context: Context
 ) {
     companion object {
         private const val TAG = "OnnxInference"
-        // Modèle Kokoro multilingue 82M (français, anglais, etc.)
-        private const val ASSET_DIR = "models/kokoro-multi-lang-v1_0"
-        private const val ONNX_FILE = "model.onnx"
-        private const val VOICES_FILE = "voices.bin"
-        private const val TOKENS_FILE = "tokens.txt"
+
+        // ── Chemins dans assets ──────────────────────
+        private const val ASSET_DIR  = "models/kokoro-multi-lang-v1_0"
+        private const val ONNX_FILE  = "model.onnx"
+        private const val VOICES_BIN = "voices.bin"
+        private const val TOKENS_TXT = "tokens.txt"
+        private const val LEXICON_EN = "lexicon-us-en.txt"
     }
 
-    private var tts: OfflineTts? = null
+    // ── Singleton OfflineTts ───────────────────────────────────────
+    @Volatile private var tts: OfflineTts? = null
 
-    /** Voix Kokoro disponibles (dépendent du pack voices.bin utilisé). */
+    // ── Voix Kokoro (SIDs documentés par sherpa-onnx) ──────────────
+    // 0=af_heart, 1=af_bella, 2=af_nicole, 3=af_sarah, 4=af_sky, 5=am_adam, …
+    // Avec lang="fr", espeak-ng phonétise en français donc le résultat
+    // est du français avec un accent américain (compréhensible).
     enum class Voice(val sid: Int, val label: String) {
-        AF_HEART(0, "❤️ Heart (fr)"),
-        AF_BELLA(1, "🔔 Bella (fr)"),
-        AF_NICOLE(2, "🎙️ Nicole (fr)"),
-        AF_AOEDE(3, "🎵 Aoede (en)"),
-        AF_KORE(4, "🎶 Kore (en)"),
+        AF_HEART (0, "af_heart"),
+        AF_BELLA (3, "af_bella"),
+        AF_NICOLE(6, "af_nicole"),
     }
 
+    // ── API publique ───────────────────────────────────────────────
+
+    /** Initialise le moteur Kokoro UNE SEULE FOIS (idempotent). */
     fun initialize() {
         if (tts != null) return
 
         val dataDir = copyEspeakDataToInternal()
 
+        // Positional args: model, voices, tokens, dataDir, lexicon, lang, dictDir, lengthScale
         val kokoroConfig = OfflineTtsKokoroModelConfig(
-            model = "$ASSET_DIR/$ONNX_FILE",
-            voices = "$ASSET_DIR/$VOICES_FILE",
-            tokens = "$ASSET_DIR/$TOKENS_FILE",
-            dataDir = dataDir,
-            lexicon = "",
-            lang = "",
-            dictDir = "",
-            lengthScale = 1.0f
+            "$ASSET_DIR/$ONNX_FILE",
+            "$ASSET_DIR/$VOICES_BIN",
+            "$ASSET_DIR/$TOKENS_TXT",
+            dataDir,
+            "$ASSET_DIR/$LEXICON_EN",
+            "fr",
+            "",
+            1.0f
         )
 
         val modelConfig = OfflineTtsModelConfig().apply {
             kokoro = kokoroConfig
             numThreads = 4
             provider = "cpu"
+            debug = true
         }
         val config = OfflineTtsConfig(modelConfig, "", "", 1, 1.0f)
 
         tts = OfflineTts(context.assets, config)
-        Log.i(TAG, "Kokoro OK — ${tts!!.numSpeakers()} locuteurs, ${tts!!.sampleRate()} Hz")
+        Log.i(TAG, "Kokoro initialisé — ${tts!!.numSpeakers()} locuteurs, " +
+                "${tts!!.sampleRate()} Hz, modèle int8")
     }
 
-    fun synthesize(text: String, voice: Voice = Voice.AF_HEART, speed: Float = 1.0f): SynthesisResult {
-        val engine = tts ?: throw IllegalStateException("TTS non initialisé. Appeler initialize() d'abord.")
+    /**
+     * Synthèse vocale BLOQUANTE — doit être appelée sur [Dispatchers.Default].
+     */
+    fun synthesize(
+        text: String,
+        voice: Voice = Voice.AF_HEART,
+        speed: Float = 1.0f
+    ): SynthesisResult {
+        val engine = tts
+            ?: throw IllegalStateException("TTS non initialisé. Appeler initialize() d'abord.")
+
+        val cleaned = text.trim()
         val startMs = System.currentTimeMillis()
-        val audio = engine.generate(text.trim(), voice.sid, speed.coerceIn(0.5f, 2.0f))
+        val audio = engine.generate(cleaned, voice.sid, speed.coerceIn(0.5f, 2.0f))
         val elapsedMs = System.currentTimeMillis() - startMs
         val durationMs = ((audio.samples.size.toFloat() / audio.sampleRate) * 1000).toLong()
-        Log.i(TAG, "\"${text.take(60)}\" → ${audio.samples.size} éch., " +
-                "${durationMs}ms, RTF=${"%.2f".format(elapsedMs / durationMs.coerceAtLeast(1).toFloat())}")
-        return SynthesisResult(audio.samples, audio.sampleRate, text, voice.label, elapsedMs, durationMs)
-    }
+        val rtf = elapsedMs / durationMs.coerceAtLeast(1).toFloat()
 
-    /** Change la voix par défaut utilisée pour les prochaines synthèses. */
-    fun setVoice(voice: Voice) {
-        // La voix est passée à chaque appel synthesize(), pas besoin de reconfig
+        if (rtf > 3.0f) {
+            Log.w(TAG, "RTF élevé: %.2f (\"%s\")".format(rtf, cleaned.take(50)))
+        } else {
+            Log.i(TAG, "\"${cleaned.take(60)}\" → ${audio.samples.size} éch., " +
+                    "${durationMs}ms, RTF=%.2f".format(rtf))
+        }
+        return SynthesisResult(audio.samples, audio.sampleRate, cleaned,
+            voice.label, elapsedMs, durationMs)
     }
 
     fun release() { tts?.release(); tts = null }
 
-    /** Vérifie si le modèle Kokoro est présent dans les assets. */
     fun isModelAvailable(): Boolean {
         return try {
-            context.assets.open("$ASSET_DIR/$ONNX_FILE").close()
-            true
+            context.assets.open("$ASSET_DIR/$ONNX_FILE").use { true }
         } catch (_: Exception) { false }
     }
 
-    // ── Private ──────────────────────────────────────
+    // ── Private ───────────────────────────────────────────────────
 
+    /** Copie espeak-ng-data des assets → stockage interne (une seule fois). */
     private fun copyEspeakDataToInternal(): String {
         val target = File(context.filesDir, "espeak-ng-data")
-        if (target.exists() && target.isDirectory && target.listFiles()?.isNotEmpty() == true)
+        if (target.isDirectory && target.listFiles()?.isNotEmpty() == true)
             return target.absolutePath
-        Log.i(TAG, "Copie espeak-ng-data depuis les assets...")
+        Log.i(TAG, "Copie espeak-ng-data → ${target.absolutePath}")
         target.mkdirs()
         copyAssetDir("$ASSET_DIR/espeak-ng-data", target)
         return target.absolutePath
@@ -110,7 +140,7 @@ class OnnxInferenceService @Inject constructor(
                     childFile.parentFile?.mkdirs()
                     childFile.outputStream().use { output -> input.copyTo(output) }
                 }
-            } catch (_: Exception) {
+            } catch (_: java.io.FileNotFoundException) {
                 copyAssetDir(childPath, File(targetDir, child))
             }
         }

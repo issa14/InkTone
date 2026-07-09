@@ -546,17 +546,27 @@ private fun TtsPanel(
             FilterChip(
                 selected = currentVoice == 0,
                 onClick = { onVoiceChange(0) },
-                label = { Text("❤️ Heart", style = MaterialTheme.typography.labelSmall) },
+                label = { Text("af_heart", style = MaterialTheme.typography.labelSmall) },
                 colors = FilterChipDefaults.filterChipColors(
                     selectedContainerColor = Color(0xFFFFB74D).copy(alpha = 0.25f),
                     selectedLabelColor = Color.White
                 )
             )
-            Spacer(Modifier.width(8.dp))
+            Spacer(Modifier.width(6.dp))
             FilterChip(
-                selected = currentVoice == 1,
-                onClick = { onVoiceChange(1) },
-                label = { Text("🔔 Bella", style = MaterialTheme.typography.labelSmall) },
+                selected = currentVoice == 3,
+                onClick = { onVoiceChange(3) },
+                label = { Text("af_bella", style = MaterialTheme.typography.labelSmall) },
+                colors = FilterChipDefaults.filterChipColors(
+                    selectedContainerColor = Color(0xFFFFB74D).copy(alpha = 0.25f),
+                    selectedLabelColor = Color.White
+                )
+            )
+            Spacer(Modifier.width(6.dp))
+            FilterChip(
+                selected = currentVoice == 6,
+                onClick = { onVoiceChange(6) },
+                label = { Text("af_nicole", style = MaterialTheme.typography.labelSmall) },
                 colors = FilterChipDefaults.filterChipColors(
                     selectedContainerColor = Color(0xFFFFB74D).copy(alpha = 0.25f),
                     selectedLabelColor = Color.White
