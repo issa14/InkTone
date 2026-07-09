@@ -5,11 +5,13 @@ import android.content.Context
 import android.util.Log
 import com.readflow.data.database.BookDao
 import com.readflow.data.database.ProgressDao
+import com.readflow.data.database.SentenceCacheDao
 import com.readflow.data.mapper.toDomain
 import com.readflow.data.mapper.toEntity
 import com.readflow.domain.model.Book
 import com.readflow.domain.model.Chapter
 import com.readflow.domain.model.Progress
+import com.readflow.domain.model.Sentence
 import com.readflow.domain.repository.BookRepository
 import com.readflow.domain.usecase.ChunkTextUseCase
 import dagger.hilt.android.qualifiers.ApplicationContext
@@ -35,6 +37,7 @@ class BookRepositoryImpl @Inject constructor(
     @ApplicationContext private val context: Context,
     private val bookDao: BookDao,
     private val progressDao: ProgressDao,
+    private val sentenceCacheDao: SentenceCacheDao,
     private val chunkText: ChunkTextUseCase
 ) : BookRepository {
 
@@ -85,6 +88,29 @@ class BookRepositoryImpl @Inject constructor(
             val epubFile = File(book.filePath)
             require(epubFile.exists()) { "Fichier EPUB introuvable" }
 
+            // 1. Vérifier le cache Room avant de ré-extraire l'EPUB
+            val cachedSentences = sentenceCacheDao.getSentences(bookId, chapterIndex)
+            if (cachedSentences.isNotEmpty()) {
+                Log.d("BookRepo", "Cache HIT — bookId=$bookId ch=$chapterIndex (${cachedSentences.size} phrases)")
+                val publication = openPublication(epubFile)
+                val link = publication.readingOrder.getOrNull(chapterIndex)
+                    ?: throw IllegalStateException("Chapitre $chapterIndex introuvable")
+                return@withContext Chapter(
+                    index = chapterIndex,
+                    title = link.title?.takeIf { it.isNotBlank() } ?: "Chapitre ${chapterIndex + 1}",
+                    sentences = cachedSentences.map { entity ->
+                        Sentence(
+                            index = entity.sentenceIndex,
+                            text = entity.text,
+                            startOffset = entity.startOffset,
+                            endOffset = entity.endOffset
+                        )
+                    }
+                )
+            }
+
+            // 2. Cache froid : extraction + segmentation classiques
+            Log.d("BookRepo", "Cache MISS — segmentation pour bookId=$bookId ch=$chapterIndex")
             val publication = openPublication(epubFile)
             val link = publication.readingOrder.getOrNull(chapterIndex)
                 ?: throw IllegalStateException("Chapitre $chapterIndex introuvable")

@@ -47,26 +47,6 @@ val MIGRATION_3_4 = object : Migration(3, 4) {
     }
 }
 
-val MIGRATION_4_5 = object : Migration(4, 5) {
-    override fun migrate(db: SupportSQLiteDatabase) {
-        db.execSQL("""
-            CREATE TABLE IF NOT EXISTS sentence_cache (
-                bookId TEXT NOT NULL,
-                chapterIndex INTEGER NOT NULL,
-                sentenceIndex INTEGER NOT NULL,
-                text TEXT NOT NULL,
-                startOffset INTEGER NOT NULL,
-                endOffset INTEGER NOT NULL,
-                PRIMARY KEY (bookId, chapterIndex, sentenceIndex)
-            )
-        """)
-        db.execSQL("""
-            CREATE INDEX IF NOT EXISTS idx_sentence_cache_book_chapter
-            ON sentence_cache (bookId, chapterIndex)
-        """)
-    }
-}
-
 @Database(
     entities = [
         BookEntity::class,
