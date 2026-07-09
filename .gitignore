@@ -63,3 +63,6 @@ captures/
 *.bak
 node_modules/
 .kotlin/
+*.jks
+keystore.properties
+readflow-release.jks

@@ -41,6 +41,7 @@ import androidx.core.view.WindowInsetsCompat
 import androidx.core.view.WindowInsetsControllerCompat
 import androidx.hilt.navigation.compose.hiltViewModel
 import com.readflow.domain.model.Chapter
+import com.readflow.ui.theme.OpenDyslexicFamily
 
 // ─────────────────────────────────────────────────────
 //  READER SCREEN — Immersif, style Moon+ Reader
@@ -103,6 +104,7 @@ fun ReaderScreen(
                 isPlaying = state.isPlaying,
                 textColor = textColor,
                 accentColor = accentColor,
+                useOpenDyslexic = state.useOpenDyslexic,
                 onTap = { offset ->
                     // Tiers central uniquement
                     if (screenSize.width > 0) {
@@ -161,8 +163,10 @@ fun ReaderScreen(
                 isPlaying = state.isPlaying,
                 accentColor = accentColor,
                 panelBg = panelBg,
+                useOpenDyslexic = state.useOpenDyslexic,
                 onTtsClick = { if (state.isPlaying) viewModel.pause() else viewModel.play() },
                 onThemeCycle = { viewModel.cycleTheme() },
+                onFontToggle = { viewModel.toggleOpenDyslexic() },
                 onPrevChapter = { viewModel.previousChapter() },
                 onNextChapter = { viewModel.nextChapter() }
             )
@@ -310,8 +314,10 @@ private fun UnifiedControlPanel(
     isPlaying: Boolean,
     accentColor: Color,
     panelBg: Color,
+    useOpenDyslexic: Boolean = false,
     onTtsClick: () -> Unit,
     onThemeCycle: () -> Unit,
+    onFontToggle: () -> Unit,
     onPrevChapter: () -> Unit,
     onNextChapter: () -> Unit
 ) {
@@ -349,6 +355,12 @@ private fun UnifiedControlPanel(
                     Icon(Icons.Default.Palette, "Thème",
                         tint = Color.White.copy(alpha = 0.6f))
                 }
+                // OpenDyslexic
+                IconButton(onClick = onFontToggle) {
+                    Text("D",
+                        color = if (useOpenDyslexic) Color(0xFFFFB74D) else Color.White.copy(alpha = 0.6f),
+                        fontSize = 16.sp, fontWeight = FontWeight.Bold)
+                }
             }
 
             Spacer(Modifier.height(4.dp))
@@ -382,8 +394,10 @@ private fun ImmersiveText(
     isPlaying: Boolean,
     textColor: Color,
     accentColor: Color,
+    useOpenDyslexic: Boolean = false,
     onTap: (Offset) -> Unit
 ) {
+    val bodyFont = if (useOpenDyslexic) OpenDyslexicFamily else FontFamily.Serif
     SelectionContainer {
         Column(
             modifier = Modifier
@@ -398,7 +412,7 @@ private fun ImmersiveText(
             // Titre
             Text(
                 chapter.title,
-                fontFamily = FontFamily.Serif,
+                fontFamily = bodyFont,
                 fontWeight = FontWeight.Bold,
                 fontSize = 22.sp,
                 color = textColor.copy(alpha = 0.75f),
@@ -411,7 +425,7 @@ private fun ImmersiveText(
                 val highlighted = index == currentSentenceIndex && isPlaying
                 Text(
                     text = sentence.text,
-                    fontFamily = FontFamily.Serif,
+                    fontFamily = bodyFont,
                     fontWeight = if (highlighted) FontWeight.Medium else FontWeight.Normal,
                     fontSize = 17.sp,
                     lineHeight = 1.6.em,

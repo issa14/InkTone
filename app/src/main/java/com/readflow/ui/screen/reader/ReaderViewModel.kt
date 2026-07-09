@@ -35,7 +35,8 @@ data class ReaderUiState(
     val isTocSheetVisible: Boolean = false,
     val speed: Float = 1.0f,
     val voice: Int = 0,  // MIRO — voix française Piper VITS
-    val readerTheme: ReaderTheme = ReaderTheme.NIGHT
+    val readerTheme: ReaderTheme = ReaderTheme.NIGHT,
+    val useOpenDyslexic: Boolean = false
 )
 
 enum class ReaderTheme { DAY, NIGHT, SEPIA }
@@ -74,6 +75,7 @@ class ReaderViewModel @Inject constructor(
         _uiState.update { it.copy(readerTheme = next) }
     }
     fun setTheme(theme: ReaderTheme) { _uiState.update { it.copy(readerTheme = theme) } }
+    fun toggleOpenDyslexic() { _uiState.update { it.copy(useOpenDyslexic = !it.useOpenDyslexic) } }
 
     init {
         // P1: Initialiser le moteur TTS silencieusement dès l'ouverture du lecteur
