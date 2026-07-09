@@ -46,6 +46,20 @@ class AudioPlaybackService : MediaSessionService() {
         private const val CHANNEL_NAME = "Lecture TTS"
         private const val NOTIFICATION_ID = 1001
 
+        /**
+         * Délai avant sortie du mode foreground après mise en pause (ms).
+         *
+         * Après 5 minutes de pause, on retire la notification persistante
+         * ([stopForeground(STOP_FOREGROUND_DETACH)]) tout en gardant le
+         * service vivant. Si l'utilisateur reprend la lecture avant ce délai,
+         * le foreground est immédiatement rétabli.
+         *
+         * Choix : 5 minutes = compromis entre économie de batterie
+         * (notification persistante = wakelock implicite) et UX
+         * (reprise rapide sans redémarrage complet du pipeline ONNX).
+         */
+        private const val PAUSE_FOREGROUND_TIMEOUT_MS = 5L * 60 * 1000
+
         // Actions des boutons MediaStyle de la notification
         private const val ACTION_PAUSE = "com.readflow.action.PAUSE"
         private const val ACTION_PLAY  = "com.readflow.action.PLAY"
@@ -62,6 +76,10 @@ class AudioPlaybackService : MediaSessionService() {
     private val serviceScope = CoroutineScope(Dispatchers.Main + SupervisorJob())
     private var observationJob: Job? = null
     private var progressJob: Job? = null
+    private var pauseTimeoutJob: Job? = null
+
+    /** true si le service est actuellement en mode foreground (notification active). */
+    @Volatile private var isInForeground = true
 
     // ── Lifecycle ────────────────────────────────────
 
@@ -127,6 +145,7 @@ class AudioPlaybackService : MediaSessionService() {
     override fun onDestroy() {
         Log.d(TAG, "onDestroy — libération des ressources")
         stopObserving()
+        cancelPauseTimeout()
         serviceScope.cancel()
 
         // Libération ordonnée : SimpleBasePlayer.release() (final) → cleanup → MediaSession → AudioFocus
@@ -162,9 +181,13 @@ class AudioPlaybackService : MediaSessionService() {
                 when (state) {
                     is State.Idle -> {
                         player.setIdle()
+                        cancelPauseTimeout()
                         updateNotification("ReadFlow", "Prêt", isPlaying = false)
                     }
                     is State.Playing -> {
+                        cancelPauseTimeout()
+                        ensureForeground()
+
                         val title = orchestrator.currentChapterTitle.ifEmpty {
                             orchestrator.currentBookTitle.ifEmpty { "ReadFlow" }
                         }
@@ -187,9 +210,13 @@ class AudioPlaybackService : MediaSessionService() {
                             subtitle = "⏸ En pause",
                             isPlaying = false
                         )
+
+                        // Programmer la sortie du mode foreground après le timeout
+                        schedulePauseTimeout()
                     }
                     is State.Error -> {
                         player.setIdle()
+                        cancelPauseTimeout()
                         updateNotification("Erreur", state.message, isPlaying = false)
                     }
                 }
@@ -212,6 +239,68 @@ class AudioPlaybackService : MediaSessionService() {
         observationJob = null
         progressJob?.cancel()
         progressJob = null
+        cancelPauseTimeout()
+    }
+
+    // ── Gestion du cycle foreground / pause prolongée ─
+
+    /**
+     * Programme la sortie du mode foreground après [PAUSE_FOREGROUND_TIMEOUT_MS].
+     *
+     * Objectif : ne pas maintenir indéfiniment une notification persistante
+     * (et donc un wakelock implicite) quand la lecture est en pause prolongée.
+     * Le service reste vivant en arrière-plan pour une reprise rapide, mais
+     * la notification est retirée via [stopForeground] avec le flag
+     * [STOP_FOREGROUND_DETACH] (Android 8+) pour éviter le crash
+     * "android.app.ForegroundServiceDidNotStartInTimeException".
+     */
+    private fun schedulePauseTimeout() {
+        cancelPauseTimeout()
+        pauseTimeoutJob = serviceScope.launch {
+            delay(PAUSE_FOREGROUND_TIMEOUT_MS)
+            Log.d(TAG, "Pause prolongée → sortie du mode foreground")
+            try {
+                if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.N) {
+                    stopForeground(STOP_FOREGROUND_DETACH)
+                } else {
+                    @Suppress("DEPRECATION")
+                    stopForeground(false)
+                }
+                isInForeground = false
+            } catch (e: Exception) {
+                Log.e(TAG, "Erreur stopForeground: ${e.message}", e)
+            }
+        }
+    }
+
+    private fun cancelPauseTimeout() {
+        pauseTimeoutJob?.cancel()
+        pauseTimeoutJob = null
+    }
+
+    /**
+     * Replace le service en mode foreground si nécessaire.
+     *
+     * Appelé quand la lecture reprend après une pause prolongée
+     * (où [stopForeground] a été appelé). La notification est
+     * recréée et le service repasse en foreground.
+     */
+    private fun ensureForeground() {
+        if (isInForeground) return
+        val title = orchestrator.currentChapterTitle.ifEmpty {
+            orchestrator.currentBookTitle.ifEmpty { "ReadFlow" }
+        }
+        try {
+            startForeground(NOTIFICATION_ID, buildNotification(
+                title = title,
+                subtitle = orchestrator.currentBookTitle,
+                isPlaying = true
+            ))
+            isInForeground = true
+            Log.d(TAG, "Retour en mode foreground")
+        } catch (e: Exception) {
+            Log.e(TAG, "Échec retour foreground: ${e.message}", e)
+        }
     }
 
     // ── Construction de la notification ──────────────

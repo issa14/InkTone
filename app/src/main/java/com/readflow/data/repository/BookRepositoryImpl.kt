@@ -90,7 +90,7 @@ class BookRepositoryImpl @Inject constructor(
                 ?: throw IllegalStateException("Chapitre $chapterIndex introuvable")
 
             val text = extractHtml(epubFile, link.href.toString())
-            val sentences = chunkText(text)
+            val sentences = chunkText(bookId, chapterIndex, text)
 
             Chapter(
                 index = chapterIndex,

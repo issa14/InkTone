@@ -2,7 +2,7 @@
 # Toutes les dépendances versionnées dans un fichier unique.
 
 [versions]
-agp = "8.5.2"
+agp = "8.7.3"
 kotlin = "2.0.21"
 ksp = "2.0.21-1.0.27"
 
@@ -24,7 +24,7 @@ hilt-navigation-compose = "1.2.0"
 room = "2.6.1"
 
 # Media3
-media3 = "1.4.1"
+media3 = "1.5.1"
 
 # ONNX Runtime
 onnxruntime = "1.19.2"

@@ -8,6 +8,7 @@ import com.readflow.data.database.entity.BookEntity
 import com.readflow.data.database.entity.BookmarkEntity
 import com.readflow.data.database.entity.ProgressEntity
 import com.readflow.data.database.entity.ReadingProgress
+import com.readflow.data.database.entity.SentenceCacheEntity
 import com.readflow.data.database.entity.SentenceFts
 
 val MIGRATION_1_2 = object : Migration(1, 2) {
@@ -46,15 +47,36 @@ val MIGRATION_3_4 = object : Migration(3, 4) {
     }
 }
 
+val MIGRATION_4_5 = object : Migration(4, 5) {
+    override fun migrate(db: SupportSQLiteDatabase) {
+        db.execSQL("""
+            CREATE TABLE IF NOT EXISTS sentence_cache (
+                bookId TEXT NOT NULL,
+                chapterIndex INTEGER NOT NULL,
+                sentenceIndex INTEGER NOT NULL,
+                text TEXT NOT NULL,
+                startOffset INTEGER NOT NULL,
+                endOffset INTEGER NOT NULL,
+                PRIMARY KEY (bookId, chapterIndex, sentenceIndex)
+            )
+        """)
+        db.execSQL("""
+            CREATE INDEX IF NOT EXISTS idx_sentence_cache_book_chapter
+            ON sentence_cache (bookId, chapterIndex)
+        """)
+    }
+}
+
 @Database(
     entities = [
         BookEntity::class,
         ProgressEntity::class,
         BookmarkEntity::class,
         SentenceFts::class,
-        ReadingProgress::class
+        ReadingProgress::class,
+        SentenceCacheEntity::class
     ],
-    version = 4,
+    version = 5,
     exportSchema = false
 )
 abstract class ReadFlowDatabase : RoomDatabase() {
@@ -63,4 +85,5 @@ abstract class ReadFlowDatabase : RoomDatabase() {
     abstract fun bookmarkDao(): BookmarkDao
     abstract fun searchDao(): SearchDao
     abstract fun readingProgressDao(): ReadingProgressDao
+    abstract fun sentenceCacheDao(): SentenceCacheDao
 }

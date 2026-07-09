@@ -200,6 +200,18 @@ class ReadFlowPlayer(
         positionMs: Long,
         seekCommand: Int
     ): ListenableFuture<*> {
+        if (released) return Futures.immediateFuture(Unit)
+
+        // Détection de COMMAND_SEEK_TO_PREVIOUS_MEDIA_ITEM :
+        // SimpleBasePlayer route SEEK_TO_PREVIOUS vers handleSeek(positionMs=0)
+        // quand il n'y a qu'un seul media item dans la playlist (notre cas).
+        // On intercepte cet appel pour router vers notre orchestrateur.
+        if (seekCommand == Player.COMMAND_SEEK_TO_PREVIOUS_MEDIA_ITEM) {
+            orchestrator.seekToPrevious()
+            invalidateState()
+            return Futures.immediateFuture(Unit)
+        }
+
         // Le TTS phrase par phrase ne supporte pas le seek précis.
         // On accepte silencieusement la position et on met à jour l'état.
         this.positionMs = positionMs

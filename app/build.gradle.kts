@@ -18,12 +18,12 @@ if (keystorePropertiesFile.exists()) {
 
 android {
     namespace = "com.readflow"
-    compileSdk = 34
+    compileSdk = 35
 
     defaultConfig {
         applicationId = "com.readflow"
         minSdk = 26
-        targetSdk = 34
+        targetSdk = 35
         versionCode = 1
         versionName = "0.1.0"
 
