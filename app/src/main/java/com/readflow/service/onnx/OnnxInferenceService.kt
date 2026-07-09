@@ -39,14 +39,14 @@ class OnnxInferenceService @Inject constructor(
     // ── Singleton OfflineTts ───────────────────────────────────────
     @Volatile private var tts: OfflineTts? = null
 
-    // ── Voix Kokoro (SIDs documentés par sherpa-onnx) ──────────────
-    // 0=af_heart, 1=af_bella, 2=af_nicole, 3=af_sarah, 4=af_sky, 5=am_adam, …
-    // Avec lang="fr", espeak-ng phonétise en français donc le résultat
-    // est du français avec un accent américain (compréhensible).
+    // ── Voix Kokoro ────────────────────────────────────────────────
+    // sid=30 → ff_siwis, la voix française native du modèle Kokoro multi-langue.
+    // Les autres SIDs (0, 3, 6) sont des voix américaines.
     enum class Voice(val sid: Int, val label: String) {
-        AF_HEART (0, "af_heart"),
-        AF_BELLA (3, "af_bella"),
-        AF_NICOLE(6, "af_nicole"),
+        FF_SIWIS (30, "ff_siwis (fr)"),
+        AF_HEART ( 0, "af_heart"),
+        AF_BELLA ( 3, "af_bella"),
+        AF_NICOLE( 6, "af_nicole"),
     }
 
     // ── API publique ───────────────────────────────────────────────
@@ -84,10 +84,11 @@ class OnnxInferenceService @Inject constructor(
 
     /**
      * Synthèse vocale BLOQUANTE — doit être appelée sur [Dispatchers.Default].
+     * Utilise [GenerationConfig] avec silenceScale=0.2f pour des pauses naturelles.
      */
     fun synthesize(
         text: String,
-        voice: Voice = Voice.AF_HEART,
+        voice: Voice = Voice.FF_SIWIS,
         speed: Float = 1.0f
     ): SynthesisResult {
         val engine = tts

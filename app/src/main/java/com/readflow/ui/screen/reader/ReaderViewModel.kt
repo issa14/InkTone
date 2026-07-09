@@ -34,7 +34,7 @@ data class ReaderUiState(
     val isTtsSheetVisible: Boolean = false,
     val isTocSheetVisible: Boolean = false,
     val speed: Float = 1.0f,
-    val voice: Int = 0,  // AF_HEART — voix Kokoro par défaut
+    val voice: Int = 30,  // FF_SIWIS — voix française native Kokoro
     val readerTheme: ReaderTheme = ReaderTheme.NIGHT
 )
 
