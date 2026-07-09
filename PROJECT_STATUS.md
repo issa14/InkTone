@@ -2,7 +2,7 @@
 
 > Dernière mise à jour : 2026-07-09  
 > Phase actuelle : **Phase 3 — UI & Intégration (complétée) → Phase 4 — Polish & Release**  
-> Progression globale : **~65%**  
+> Progression globale : **~75%**  
 > Modèle TTS : **Piper VITS `fr_FR-miro-high`** (Sherpa-ONNX 1.13.4, RTF ~0.24)
 
 ---
