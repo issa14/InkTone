@@ -21,6 +21,8 @@ class PlaybackOrchestrator @Inject constructor(
     companion object {
         private const val TAG = "Orchestrator"
         private const val LOOKAHEAD = 3
+        /** Silence inter-phrases en ms (évite le débit précipité). */
+        private const val INTER_SENTENCE_SILENCE_MS = 300
     }
 
     sealed class State {
@@ -62,7 +64,7 @@ class PlaybackOrchestrator @Inject constructor(
         if (sentences.isEmpty()) return
         stop()
 
-        // Synchroniser le sample rate du player avec le modèle Kokoro (24000 Hz)
+        // Synchroniser le sample rate du player avec le modèle Piper (22050 Hz)
         player.sampleRate = onnxService.getSampleRate()
 
         currentBookTitle = bookTitle
@@ -103,26 +105,42 @@ class PlaybackOrchestrator @Inject constructor(
                 }
 
                 // Boucle de lecture — démarrer le player après le 1er enqueue
-                var index = startFrom
                 var started = false
 
                 for (result in buffer) {
                     if (!isActive || _state.value != State.Playing) break
 
                     player.enqueue(result.samples)
+                    // Silence inter-phrases pour respiration naturelle
+                    val silenceLen = (result.sampleRate * INTER_SENTENCE_SILENCE_MS / 1000)
+                    player.enqueue(FloatArray(silenceLen) { 0f })
+
                     if (!started) {
                         player.play()
                         started = true
+                        // Surveiller completedCount pour le surlignage synchronisé
+                        launch {
+                            var lastCompleted = 0
+                            while (isActive && _state.value == State.Playing &&
+                                   player.completedCount < (total - startFrom) * 2) {
+                                val c = player.completedCount
+                                if (c != lastCompleted && c % 2 == 0) {
+                                    // Segment audio terminé (pair = fin de phrase, impair = fin de silence)
+                                    val sentenceIdx = startFrom + c / 2
+                                    _progress.value = Progress(
+                                        sentenceIdx, total, sentences.getOrNull(sentenceIdx - 1))
+                                }
+                                lastCompleted = c
+                                delay(100)
+                            }
+                        }
                     }
-
-                    index++
-                    _progress.value = Progress(index, total, sentences.getOrNull(index))
-                    Log.d(TAG, "Playing sentence $index/${total}")
                 }
 
-                // Attendre que le player ait fini TOUS les segments
-                val totalSentences = total - startFrom
-                while (player.completedCount < totalSentences && isActive && _state.value == State.Playing) {
+                // Attendre que le player ait fini TOUTES les phrases
+                // (chaque phrase = 1 segment audio + 1 silence → 2 entrées dans la queue)
+                val expectedSegments = (total - startFrom) * 2
+                while (player.completedCount < expectedSegments && isActive && _state.value == State.Playing) {
                     delay(200)
                 }
                 delay(300)

@@ -20,7 +20,7 @@ import javax.inject.Singleton
  * sans silence entre eux. Chaque segment est ajouté à une file d'attente
  * et lu dès que le précédent est terminé.
  *
- * Format : PCM float mono. Sample rate dynamique (24000 Hz pour Kokoro).
+ * Format : PCM float mono. Sample rate dynamique (22050 Hz pour Piper).
  */
 @Singleton
 class GaplessAudioPlayer @Inject constructor() {
@@ -31,9 +31,9 @@ class GaplessAudioPlayer @Inject constructor() {
 
     /**
      * Fréquence d'échantillonnage — doit correspondre au modèle TTS.
-     * Kokoro multi-langue = 24000 Hz. Modifiable avant play().
+     * Piper VITS standard = 22050 Hz. Surchargé par PlaybackOrchestrator.
      */
-    @Volatile var sampleRate: Int = 24000
+    @Volatile var sampleRate: Int = 22050
 
     sealed class State {
         data object Idle : State()
@@ -175,19 +175,19 @@ class GaplessAudioPlayer @Inject constructor() {
         track?.play()
     }
 
-    private fun writeBlocking(samples: FloatArray) {
+    private fun writeBlocking(original: FloatArray) {
         val t = track ?: return
         val gain = volumeGain
+        // Cloner pour ne pas altérer l'original (utilisé par le cache)
+        val samples = if (gain != 1.0f) {
+            FloatArray(original.size) { i -> (original[i] * gain).coerceIn(-1f, 1f) }
+        } else {
+            original
+        }
         val chunkSize = 4096
         var offset = 0
         while (offset < samples.size && _state.value == State.Playing) {
             val len = minOf(chunkSize, samples.size - offset)
-            // Appliquer le gain logiciel avant écriture
-            if (gain != 1.0f) {
-                for (i in offset until offset + len) {
-                    samples[i] = (samples[i] * gain).coerceIn(-1f, 1f)
-                }
-            }
             val written = t.write(samples, offset, len, AudioTrack.WRITE_BLOCKING)
             if (written < 0) {
                 Log.e(TAG, "AudioTrack write error: $written")
