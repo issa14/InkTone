@@ -6,6 +6,7 @@ import android.content.Intent
 import android.content.pm.PackageManager
 import android.os.Build
 import androidx.core.content.ContextCompat
+import androidx.lifecycle.SavedStateHandle
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.readflow.domain.model.Book
@@ -43,6 +44,7 @@ enum class ReaderTheme { DAY, NIGHT, SEPIA }
 
 @HiltViewModel
 class ReaderViewModel @Inject constructor(
+    private val savedState: SavedStateHandle,
     private val bookRepository: BookRepository,
     private val orchestrator: PlaybackOrchestrator,
     private val onnxService: OnnxInferenceService,
@@ -101,11 +103,28 @@ class ReaderViewModel @Inject constructor(
                 _uiState.update {
                     it.copy(currentSentenceIndex = progress.sentenceIndex)
                 }
+                // Persister la position pour Process Death
+                savedState["sentenceIndex"] = progress.sentenceIndex
             }
         }
     }
 
     fun loadBook(bookId: String) {
+        // Restaurer l'état après Process Death
+        val savedChapter = savedState.get<Int>("chapterIndex") ?: 0
+        val savedSentence = savedState.get<Int>("sentenceIndex") ?: 0
+        val savedSpeed = savedState.get<Float>("speed") ?: 1.0f
+        val savedVoice = savedState.get<Int>("voice") ?: 0
+        val savedTheme = savedState.get<String>("theme")?.let { 
+            try { ReaderTheme.valueOf(it) } catch (_: Exception) { null } 
+        } ?: ReaderTheme.NIGHT
+        val savedDyslexic = savedState.get<Boolean>("openDyslexic") ?: false
+
+        _uiState.update { it.copy(
+            speed = savedSpeed, voice = savedVoice,
+            readerTheme = savedTheme, useOpenDyslexic = savedDyslexic
+        )}
+
         viewModelScope.launch {
             _uiState.update { it.copy(isLoading = true, error = null) }
             try {
@@ -114,16 +133,23 @@ class ReaderViewModel @Inject constructor(
                     ?: throw IllegalStateException("Livre introuvable")
                 currentBook = book
                 _uiState.update { it.copy(book = book, isLoading = false) }
-                loadChapter(0)
+                loadChapter(savedChapter, savedSentence)
             } catch (e: Exception) {
                 _uiState.update { it.copy(error = e.message, isLoading = false) }
             }
         }
     }
 
-    private fun loadChapter(index: Int) {
+    private fun loadChapter(index: Int, sentenceIndex: Int = 0) {
         val book = currentBook ?: return
         if (index < 0 || index >= book.totalChapters) return
+        // Persister l'état pour Process Death
+        savedState["chapterIndex"] = index
+        savedState["sentenceIndex"] = sentenceIndex
+        savedState["speed"] = _uiState.value.speed
+        savedState["voice"] = _uiState.value.voice
+        savedState["theme"] = _uiState.value.readerTheme.name
+        savedState["openDyslexic"] = _uiState.value.useOpenDyslexic
         viewModelScope.launch {
             _uiState.update { it.copy(isLoading = true, error = null) }
             try {
