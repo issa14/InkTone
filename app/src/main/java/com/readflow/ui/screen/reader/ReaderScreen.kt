@@ -158,10 +158,6 @@ fun ReaderScreen(
             modifier = Modifier.align(Alignment.BottomCenter)
         ) {
             UnifiedControlPanel(
-                progress = if (state.totalSentences > 0)
-                    state.currentSentenceIndex.toFloat() / state.totalSentences else 0f,
-                percentage = if (state.totalSentences > 0)
-                    (state.currentSentenceIndex * 100 / state.totalSentences) else 0,
                 isPlaying = state.isPlaying,
                 accentColor = accentColor,
                 panelBg = panelBg,
@@ -311,8 +307,6 @@ private fun ReaderTopBar(
 
 @Composable
 private fun UnifiedControlPanel(
-    progress: Float,
-    percentage: Int,
     isPlaying: Boolean,
     accentColor: Color,
     panelBg: Color,
@@ -359,28 +353,18 @@ private fun UnifiedControlPanel(
 
             Spacer(Modifier.height(4.dp))
 
-            // ── Rangée 2 : Progression + Navigation ──
+            // ── Rangée 2 : Navigation chapitres ──────
             Row(
                 modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.Center,
                 verticalAlignment = Alignment.CenterVertically
             ) {
-                TextButton(onClick = onPrevChapter, modifier = Modifier.width(100.dp)) {
-                    Text("◀ Précédent", color = Color.White.copy(alpha = 0.45f), fontSize = 11.sp)
+                TextButton(onClick = onPrevChapter) {
+                    Text("◀ Chapitre précédent", color = Color.White.copy(alpha = 0.45f), fontSize = 12.sp)
                 }
-                Text("$percentage%", color = Color.White.copy(alpha = 0.55f),
-                    fontSize = 12.sp, modifier = Modifier.width(36.dp), textAlign = TextAlign.Center)
-                Slider(
-                    value = progress,
-                    onValueChange = {},
-                    modifier = Modifier.weight(1f).padding(horizontal = 4.dp),
-                    colors = SliderDefaults.colors(
-                        thumbColor = accentColor,
-                        activeTrackColor = accentColor,
-                        inactiveTrackColor = Color.White.copy(alpha = 0.12f)
-                    )
-                )
-                TextButton(onClick = onNextChapter, modifier = Modifier.width(100.dp)) {
-                    Text("Suivant ▶", color = Color.White.copy(alpha = 0.45f), fontSize = 11.sp)
+                Spacer(Modifier.width(24.dp))
+                TextButton(onClick = onNextChapter) {
+                    Text("Chapitre suivant ▶", color = Color.White.copy(alpha = 0.45f), fontSize = 12.sp)
                 }
             }
         }
