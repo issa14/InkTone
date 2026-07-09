@@ -3,6 +3,8 @@ package com.readflow.di
 import android.content.Context
 import androidx.room.Room
 import com.readflow.data.database.BookDao
+import com.readflow.data.database.BookmarkDao
+import com.readflow.data.database.MIGRATION_1_2
 import com.readflow.data.database.ProgressDao
 import com.readflow.data.database.ReadFlowDatabase
 import com.readflow.data.repository.BookRepositoryImpl
@@ -27,11 +29,15 @@ object AppModule {
             context,
             ReadFlowDatabase::class.java,
             "readflow.db"
-        ).build()
+        ).addMigrations(MIGRATION_1_2)
+         .build()
     }
 
     @Provides
     fun provideBookDao(db: ReadFlowDatabase): BookDao = db.bookDao()
+
+    @Provides
+    fun provideBookmarkDao(db: ReadFlowDatabase): BookmarkDao = db.bookmarkDao()
 
     @Provides
     fun provideProgressDao(db: ReadFlowDatabase): ProgressDao = db.progressDao()

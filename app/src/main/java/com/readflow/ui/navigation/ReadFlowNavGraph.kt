@@ -10,9 +10,11 @@ import androidx.navigation.navArgument
 object Routes {
     const val LIBRARY = "library"
     const val READER = "reader/{bookId}"
+    const val BOOKMARKS = "bookmarks/{bookId}/{bookTitle}"
     const val DEBUG = "debug"
 
     fun readerRoute(bookId: String) = "reader/$bookId"
+    fun bookmarksRoute(bookId: String, bookTitle: String) = "bookmarks/$bookId/$bookTitle"
 }
 
 @Composable
@@ -43,7 +45,31 @@ fun ReadFlowNavGraph() {
             val bookId = backStackEntry.arguments?.getString("bookId") ?: return@composable
             com.readflow.ui.screen.reader.ReaderScreen(
                 bookId = bookId,
-                onBack = { navController.popBackStack() }
+                onBack = { navController.popBackStack() },
+                onBookmarksClick = { title ->
+                    navController.navigate(Routes.bookmarksRoute(bookId, title))
+                }
+            )
+        }
+
+        // ── Signets ────────────────────────────────
+        composable(
+            route = Routes.BOOKMARKS,
+            arguments = listOf(
+                navArgument("bookId") { type = NavType.StringType },
+                navArgument("bookTitle") { type = NavType.StringType }
+            )
+        ) { backStackEntry ->
+            val bookId = backStackEntry.arguments?.getString("bookId") ?: return@composable
+            val bookTitle = backStackEntry.arguments?.getString("bookTitle") ?: ""
+            com.readflow.ui.screen.bookmark.BookmarkScreen(
+                bookId = bookId,
+                bookTitle = bookTitle,
+                onBack = { navController.popBackStack() },
+                onNavigate = { chapter, sentence ->
+                    navController.popBackStack()
+                    // TODO: navigate back to reader with chapter/sentence params
+                }
             )
         }
 
