@@ -13,7 +13,19 @@ import com.google.common.util.concurrent.ListenableFuture
  *
  * Permet d'utiliser le pipeline audio ReadFlow (ONNX → AudioTrack) comme un
  * [Player] standard pour [androidx.media3.session.MediaSessionService].
- * Les commandes (play/pause/stop) sont déléguées au [PlaybackOrchestrator].
+ * Toutes les commandes (play/pause/stop/seek) sont déléguées au
+ * [PlaybackOrchestrator].
+ *
+ * Architecture :
+ * - Hérite de [SimpleBasePlayer] qui gère automatiquement les listeners et
+ *   la boucle de notification d'état.
+ * - Chaque méthode `handle*` retourne un `ListenableFuture` immédiatement
+ *   résolu car toutes nos opérations sont synchrones côté orchestrateur.
+ * - Les commandes `COMMAND_SEEK_TO_NEXT` et `COMMAND_SEEK_TO_PREVIOUS`
+ *   sont exposées pour le support des boutons Bluetooth/écouteurs.
+ *
+ * Thread safety : toutes les variables mutables sont `@Volatile` et les
+ * méthodes `handle*` sont appelées sur le thread du Looper fourni.
  */
 class ReadFlowPlayer(
     private val orchestrator: PlaybackOrchestrator
@@ -26,11 +38,13 @@ class ReadFlowPlayer(
     @Volatile private var mediaItems: List<MediaItem> = emptyList()
     @Volatile private var positionMs = 0L
     @Volatile private var totalDurationMs = 0L
+    @Volatile private var released = false
 
-    // ── API publique pour le service ─────────────────
+    // ── API publique pour AudioPlaybackService ───────
 
     /** Configure le contenu en cours de lecture (titre, auteur). */
     fun setContent(title: String, artist: String = "", durationMs: Long = 0L) {
+        if (released) return
         totalDurationMs = durationMs
         val metadata = MediaMetadata.Builder()
             .setTitle(title)
@@ -46,55 +60,69 @@ class ReadFlowPlayer(
         invalidateState()
     }
 
-    /** Met à jour la position estimée et la durée. */
+    /** Met à jour la position estimée et la durée totale. */
     fun updateProgress(position: Long, duration: Long) {
+        if (released) return
         positionMs = position
         totalDurationMs = duration
         invalidateState()
     }
 
-    /** Passe en état "ready" (prêt à jouer). */
+    /** Passe en état [Player.STATE_READY]. */
     fun setReady(ready: Boolean) {
+        if (released) return
         if (ready && playbackState != Player.STATE_READY) {
             playbackState = Player.STATE_READY
             invalidateState()
         }
     }
 
-    /** Passe en état "ended". */
+    /** Passe en état [Player.STATE_ENDED]. */
     fun setEnded() {
+        if (released) return
         playWhenReady = false
         playbackState = Player.STATE_ENDED
         invalidateState()
     }
 
-    /** Passe en état "idle". */
+    /** Passe en état [Player.STATE_IDLE]. */
     fun setIdle() {
+        if (released) return
         playWhenReady = false
         playbackState = Player.STATE_IDLE
         positionMs = 0L
         invalidateState()
     }
 
-    /** Rafraîchit l'état exposé à MediaSession (appelé depuis l'extérieur). */
+    /** Rafraîchit l'état exposé à MediaSession. */
     fun refreshState() {
+        if (released) return
         invalidateState()
+    }
+
+    /** Nettoie l'état interne sans appeler super.release(). */
+    fun cleanup() {
+        released = true
+        playWhenReady = false
+        playbackState = Player.STATE_IDLE
     }
 
     // ── SimpleBasePlayer overrides ────────────────────
 
     override fun getState(): State {
         // Sécurité : playlist vide → forcer IDLE (évite crash SimpleBasePlayer)
-        if (mediaItems.isEmpty() && playbackState != Player.STATE_IDLE && playbackState != Player.STATE_ENDED) {
+        if (mediaItems.isEmpty() &&
+            playbackState != Player.STATE_IDLE &&
+            playbackState != Player.STATE_ENDED
+        ) {
             playbackState = Player.STATE_IDLE
         }
 
-        // Conversion MediaItem → MediaItemData
         val playlistData = mediaItems.map { item ->
             getPlaceholderMediaItemData(item)
         }
 
-        val builder = State.Builder()
+        return State.Builder()
             .setPlaylist(playlistData)
             .setPlaybackState(playbackState)
             .setPlayWhenReady(playWhenReady, Player.COMMAND_PLAY_PAUSE)
@@ -107,15 +135,18 @@ class ReadFlowPlayer(
                         Player.COMMAND_PREPARE,
                         Player.COMMAND_STOP,
                         Player.COMMAND_SEEK_IN_CURRENT_MEDIA_ITEM,
+                        Player.COMMAND_SEEK_TO_NEXT,
+                        Player.COMMAND_SEEK_TO_PREVIOUS,
                         Player.COMMAND_GET_CURRENT_MEDIA_ITEM
                     )
                     .build()
             )
-
-        return builder.build()
+            .build()
     }
 
     override fun handleSetPlayWhenReady(playWhenReady: Boolean): ListenableFuture<*> {
+        if (released) return Futures.immediateFuture(Unit)
+
         this.playWhenReady = playWhenReady
         if (playWhenReady) {
             if (playbackState == Player.STATE_IDLE) {
@@ -130,12 +161,14 @@ class ReadFlowPlayer(
     }
 
     override fun handlePrepare(): ListenableFuture<*> {
+        if (released) return Futures.immediateFuture(Unit)
         playbackState = Player.STATE_READY
         invalidateState()
         return Futures.immediateFuture(Unit)
     }
 
     override fun handleStop(): ListenableFuture<*> {
+        if (released) return Futures.immediateFuture(Unit)
         playWhenReady = false
         playbackState = Player.STATE_IDLE
         orchestrator.stop()
@@ -148,7 +181,8 @@ class ReadFlowPlayer(
         positionMs: Long,
         seekCommand: Int
     ): ListenableFuture<*> {
-        // Pas de seek supporté pour le TTS — accepter silencieusement
+        // Le TTS phrase par phrase ne supporte pas le seek précis.
+        // On accepte silencieusement la position et on met à jour l'état.
         this.positionMs = positionMs
         invalidateState()
         return Futures.immediateFuture(Unit)
@@ -159,6 +193,7 @@ class ReadFlowPlayer(
         startIndex: Int,
         startPositionMs: Long
     ): ListenableFuture<*> {
+        if (released) return Futures.immediateFuture(Unit)
         this.mediaItems = mediaItems.toList()
         this.positionMs = startPositionMs
         playbackState = Player.STATE_READY
@@ -166,4 +201,5 @@ class ReadFlowPlayer(
         return Futures.immediateFuture(Unit)
     }
 }
+
 

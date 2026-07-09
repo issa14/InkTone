@@ -4,15 +4,17 @@ import android.app.Activity
 import androidx.compose.animation.*
 import androidx.compose.animation.core.tween
 import androidx.compose.foundation.background
+import androidx.compose.foundation.background
 import androidx.compose.foundation.gestures.detectTapGestures
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.layout.WindowInsets
 import androidx.compose.foundation.layout.WindowInsetsSides
-import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.lazy.LazyColumn
+import androidx.compose.foundation.lazy.itemsIndexed
+import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.text.selection.SelectionContainer
-import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.filled.*
@@ -41,6 +43,8 @@ import androidx.core.view.WindowInsetsCompat
 import androidx.core.view.WindowInsetsControllerCompat
 import androidx.hilt.navigation.compose.hiltViewModel
 import com.readflow.domain.model.Chapter
+import com.readflow.service.audio.PlaybackState
+import com.readflow.service.audio.PlaybackStatus
 import com.readflow.ui.theme.OpenDyslexicFamily
 
 // ─────────────────────────────────────────────────────
@@ -57,6 +61,7 @@ fun ReaderScreen(
     viewModel: ReaderViewModel = hiltViewModel()
 ) {
     val state by viewModel.uiState.collectAsState()
+    val playbackState by viewModel.playbackState.collectAsState()
     val chapter = state.currentChapter
     val book = state.book
 
@@ -102,8 +107,7 @@ fun ReaderScreen(
             state.error != null -> ErrorMessage(state.error!!)
             chapter != null -> ImmersiveText(
                 chapter = chapter,
-                currentSentenceIndex = state.currentSentenceIndex,
-                isPlaying = state.isPlaying,
+                playbackState = playbackState,
                 textColor = textColor,
                 accentColor = accentColor,
                 useOpenDyslexic = state.useOpenDyslexic,
@@ -400,61 +404,131 @@ private fun UnifiedControlPanel(
 }
 
 // ─────────────────────────────────────────────────────
-//  TEXTE IMMERSIF — Plein écran, scrollable
+//  TEXTE IMMERSIF — LazyColumn + Surlignage + Autoscroll
 // ─────────────────────────────────────────────────────
 
+/**
+ * Délai de compensation Bluetooth (ms) pour la synchronisation audio/visuelle.
+ *
+ * Sur les appareils Bluetooth, le décalage audio peut atteindre 150-250 ms.
+ * On retarde légèrement l'avancement du surlignage pour que l'affichage
+ * corresponde au son perçu par l'utilisateur.
+ */
+private const val BLUETOOTH_LATENCY_COMPENSATION_MS = 180L
+
+/**
+ * Rendu immersif du texte d'un chapitre avec :
+ * - Défilement lazy pour les grands chapitres (2000+ phrases).
+ * - Surlignage de la phrase active avec fond coloré.
+ * - Autoscroll fluide ([LazyListState.animateScrollToItem]) centrant
+ *   la phrase active au premier tiers de l'écran.
+ * - Compensation de latence Bluetooth pour synchroniser l'affichage
+ *   avec le retour audio perçu.
+ */
 @Composable
 private fun ImmersiveText(
     chapter: Chapter,
-    currentSentenceIndex: Int,
-    isPlaying: Boolean,
+    playbackState: PlaybackState,
     textColor: Color,
     accentColor: Color,
     useOpenDyslexic: Boolean = false,
     onTap: (Offset) -> Unit
 ) {
     val bodyFont = if (useOpenDyslexic) OpenDyslexicFamily else FontFamily.Serif
+    val listState = rememberLazyListState()
+    val sentences = chapter.sentences
+
+    val activeIdx = playbackState.activeSentenceIndex
+    val isSpeaking = playbackState.status == PlaybackStatus.PLAYING
+
+    // ── Autoscroll automatique vers la phrase active ──
+    // Utilise une clé composite pour déclencher le scroll uniquement
+    // quand l'index de phrase change (et pas à chaque recomposition).
+    LaunchedEffect(activeIdx, isSpeaking) {
+        if (isSpeaking && activeIdx in sentences.indices) {
+            // Compensation Bluetooth : attendre que l'audio arrive aux oreilles
+            // avant de déplacer le surlignage visuel.
+            kotlinx.coroutines.delay(BLUETOOTH_LATENCY_COMPENSATION_MS)
+
+            // +1 pour sauter la ligne de titre (index 0 = titre du chapitre)
+            val targetIndex = activeIdx + 1
+            if (targetIndex < listState.layoutInfo.totalItemsCount) {
+                listState.animateScrollToItem(
+                    index = targetIndex,
+                    // Centrer au premier tiers de l'écran pour donner du contexte
+                    // (l'utilisateur voit ce qui précède ET ce qui suit).
+                    scrollOffset = -(listState.layoutInfo.viewportSize.height / 3)
+                )
+            }
+        }
+    }
+
+    // ── Couleur de fond pour le surlignage ──
+    // Ambre doux pour le thème nuit, bleu pour le thème jour
+    val highlightBg = accentColor.copy(alpha = 0.12f)
+
     SelectionContainer {
-        Column(
+        LazyColumn(
+            state = listState,
             modifier = Modifier
                 .fillMaxSize()
                 .pointerInput(Unit) { detectTapGestures { onTap(it) } }
-                .verticalScroll(rememberScrollState())
                 .windowInsetsPadding(WindowInsets.systemBars)
-                .padding(horizontal = 24.dp, vertical = 16.dp)
+                .padding(horizontal = 24.dp, vertical = 16.dp),
+            userScrollEnabled = true
         ) {
-            Spacer(Modifier.height(24.dp))
+            // ── Titre du chapitre ──
+            item(key = "title") {
+                Spacer(Modifier.height(24.dp))
+                Text(
+                    chapter.title,
+                    fontFamily = bodyFont,
+                    fontWeight = FontWeight.Bold,
+                    fontSize = 22.sp,
+                    color = textColor.copy(alpha = 0.75f),
+                    lineHeight = 1.6.em
+                )
+                Spacer(Modifier.height(28.dp))
+            }
 
-            // Titre
-            Text(
-                chapter.title,
-                fontFamily = bodyFont,
-                fontWeight = FontWeight.Bold,
-                fontSize = 22.sp,
-                color = textColor.copy(alpha = 0.75f),
-                lineHeight = 1.6.em
-            )
-            Spacer(Modifier.height(28.dp))
+            // ── Phrases avec surlignage ──
+            itemsIndexed(
+                items = sentences,
+                key = { index, _ -> "sent_$index" }
+            ) { index, sentence ->
+                val isActive = index == activeIdx && isSpeaking
 
-            // Phrases
-            chapter.sentences.forEachIndexed { index, sentence ->
-                val highlighted = index == currentSentenceIndex && isPlaying
+                // Surlignage : fond légèrement coloré + texte accentué
+                val bgModifier = if (isActive) {
+                    Modifier
+                        .background(
+                            color = highlightBg,
+                            shape = RoundedCornerShape(4.dp)
+                        )
+                        .padding(horizontal = 4.dp, vertical = 2.dp)
+                } else {
+                    Modifier.padding(vertical = 2.dp)
+                }
+
                 Text(
                     text = sentence.text,
                     fontFamily = bodyFont,
-                    fontWeight = if (highlighted) FontWeight.Medium else FontWeight.Normal,
+                    fontWeight = if (isActive) FontWeight.Medium else FontWeight.Normal,
                     fontSize = 17.sp,
                     lineHeight = 1.6.em,
                     textAlign = TextAlign.Justify,
                     color = when {
-                        highlighted -> accentColor
+                        isActive -> accentColor
                         else -> textColor.copy(alpha = 0.88f)
                     },
-                    modifier = Modifier.padding(vertical = 2.dp)
+                    modifier = bgModifier
                 )
             }
 
-            Spacer(Modifier.height(120.dp))
+            // ── Espace de respiration en bas ──
+            item(key = "bottom_spacer") {
+                Spacer(Modifier.height(120.dp))
+            }
         }
     }
 }

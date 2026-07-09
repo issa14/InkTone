@@ -15,6 +15,8 @@ import com.readflow.domain.model.Chapter
 import com.readflow.domain.repository.BookRepository
 import com.readflow.service.audio.AudioPlaybackService
 import com.readflow.service.audio.PlaybackOrchestrator
+import com.readflow.service.audio.PlaybackState
+import com.readflow.service.audio.PlaybackStatus
 import com.readflow.service.onnx.OnnxInferenceService
 import dagger.hilt.android.lifecycle.HiltViewModel
 import dagger.hilt.android.qualifiers.ApplicationContext
@@ -55,6 +57,20 @@ class ReaderViewModel @Inject constructor(
     private val _uiState = MutableStateFlow(ReaderUiState())
     val uiState: StateFlow<ReaderUiState> = _uiState.asStateFlow()
 
+    /**
+     * État de lecture détaillé pour la synchronisation visuelle (Phase 2).
+     *
+     * Exposé directement depuis [PlaybackOrchestrator.playbackState]
+     * pour que l'UI observe :
+     * - L'index de la phrase active (surlignage)
+     * - Le texte de la phrase active
+     * - Le statut (PLAYING / PAUSED / BUFFERING)
+     *
+     * Le déclenchement de l'autoscroll se fait dans [ReaderScreen]
+     * via un `LaunchedEffect` sur `playbackState.activeSentenceIndex`.
+     */
+    val playbackState: StateFlow<PlaybackState> = orchestrator.playbackState
+
     private var currentBook: Book? = null
     private var isPausedForResume = false
 
@@ -83,7 +99,12 @@ class ReaderViewModel @Inject constructor(
     init {
         // P1: Initialiser le moteur TTS silencieusement dès l'ouverture du lecteur
         viewModelScope.launch {
-            onnxService.initialize()
+            try {
+                onnxService.initialize()
+            } catch (e: Exception) {
+                Log.e("ReaderVM", "Échec initialisation ONNX: ${e.message}", e)
+                _uiState.update { it.copy(error = "Échec du moteur TTS : ${e.message}") }
+            }
         }
 
         // Observer l'orchestrateur pour synchroniser l'UI
@@ -99,13 +120,18 @@ class ReaderViewModel @Inject constructor(
                 }
             }
         }
+
+        // Observer le PlaybackState pour la synchronisation d'index de phrase
         viewModelScope.launch {
-            orchestrator.progress.collect { progress ->
+            orchestrator.playbackState.collect { pbs ->
                 _uiState.update {
-                    it.copy(currentSentenceIndex = progress.sentenceIndex)
+                    it.copy(
+                        currentSentenceIndex = pbs.activeSentenceIndex,
+                        totalSentences = pbs.totalSentences
+                    )
                 }
                 // Persister la position pour Process Death
-                savedState["sentenceIndex"] = progress.sentenceIndex
+                savedState["sentenceIndex"] = pbs.activeSentenceIndex
             }
         }
     }
@@ -179,6 +205,7 @@ class ReaderViewModel @Inject constructor(
                         currentChapterIndex = index,
                         currentChapter = chapter,
                         totalSentences = chapter.sentences.size,
+                        currentSentenceIndex = sentenceIndex,
                         isLoading = false
                     )
                 }
@@ -269,3 +296,4 @@ class ReaderViewModel @Inject constructor(
         _uiState.update { it.copy(error = null) }
     }
 }
+
