@@ -20,15 +20,20 @@ import javax.inject.Singleton
  * sans silence entre eux. Chaque segment est ajouté à une file d'attente
  * et lu dès que le précédent est terminé.
  *
- * Format : PCM float 22050 Hz mono.
+ * Format : PCM float mono. Sample rate dynamique (24000 Hz pour Kokoro).
  */
 @Singleton
 class GaplessAudioPlayer @Inject constructor() {
 
     companion object {
         private const val TAG = "GaplessPlayer"
-        private const val SAMPLE_RATE = 22050
     }
+
+    /**
+     * Fréquence d'échantillonnage — doit correspondre au modèle TTS.
+     * Kokoro multi-langue = 24000 Hz. Modifiable avant play().
+     */
+    @Volatile var sampleRate: Int = 24000
 
     sealed class State {
         data object Idle : State()
@@ -138,7 +143,7 @@ class GaplessAudioPlayer @Inject constructor() {
         if (track != null && track?.state == AudioTrack.STATE_INITIALIZED) return
 
         val bufferSize = AudioTrack.getMinBufferSize(
-            SAMPLE_RATE,
+            sampleRate,
             AudioFormat.CHANNEL_OUT_MONO,
             AudioFormat.ENCODING_PCM_FLOAT
         ).coerceAtLeast(4096 * 4)
@@ -152,7 +157,7 @@ class GaplessAudioPlayer @Inject constructor() {
             )
             .setAudioFormat(
                 AudioFormat.Builder()
-                    .setSampleRate(SAMPLE_RATE)
+                    .setSampleRate(sampleRate)
                     .setEncoding(AudioFormat.ENCODING_PCM_FLOAT)
                     .setChannelMask(AudioFormat.CHANNEL_OUT_MONO)
                     .build()

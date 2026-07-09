@@ -72,7 +72,7 @@ class OnnxInferenceService @Inject constructor(
         val modelConfig = OfflineTtsModelConfig().apply {
             kokoro = kokoroConfig
             numThreads = 4
-            provider = "cpu"
+            provider = "nnapi"
             debug = true
         }
         val config = OfflineTtsConfig(modelConfig, "", "", 1, 1.0f)
@@ -112,6 +112,9 @@ class OnnxInferenceService @Inject constructor(
     }
 
     fun release() { tts?.release(); tts = null }
+
+    /** Fréquence d'échantillonnage native du modèle (24000 Hz pour Kokoro). */
+    fun getSampleRate(): Int = tts?.sampleRate() ?: 24000
 
     fun isModelAvailable(): Boolean {
         return try {

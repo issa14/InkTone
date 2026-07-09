@@ -4,6 +4,7 @@ import android.util.Log
 import com.readflow.domain.model.Sentence
 import com.readflow.domain.model.SynthesisResult
 import com.readflow.domain.repository.TtsRepository
+import com.readflow.service.onnx.OnnxInferenceService
 import kotlinx.coroutines.*
 import kotlinx.coroutines.channels.Channel
 import kotlinx.coroutines.flow.MutableStateFlow
@@ -14,7 +15,8 @@ import javax.inject.Singleton
 @Singleton
 class PlaybackOrchestrator @Inject constructor(
     private val ttsRepository: TtsRepository,
-    private val player: GaplessAudioPlayer
+    private val player: GaplessAudioPlayer,
+    private val onnxService: OnnxInferenceService
 ) {
     companion object {
         private const val TAG = "Orchestrator"
@@ -59,6 +61,9 @@ class PlaybackOrchestrator @Inject constructor(
     ) {
         if (sentences.isEmpty()) return
         stop()
+
+        // Synchroniser le sample rate du player avec le modèle Kokoro (24000 Hz)
+        player.sampleRate = onnxService.getSampleRate()
 
         currentBookTitle = bookTitle
         currentChapterTitle = chapterTitle
