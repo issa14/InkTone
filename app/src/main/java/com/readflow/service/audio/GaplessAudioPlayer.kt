@@ -58,6 +58,12 @@ class GaplessAudioPlayer @Inject constructor() {
     @Volatile var currentVolume: Float = 1.0f
         private set
 
+    /**
+     * Multiplicateur de gain logiciel (1.0 = volume natif du modèle).
+     * Ajustable pour compenser un modèle qui produit un signal trop faible.
+     */
+    @Volatile var volumeGain: Float = 1.8f
+
     /** Ajoute un segment audio à la file de lecture. */
     fun enqueue(samples: FloatArray) {
         queue.add(samples)
@@ -171,10 +177,17 @@ class GaplessAudioPlayer @Inject constructor() {
 
     private fun writeBlocking(samples: FloatArray) {
         val t = track ?: return
+        val gain = volumeGain
         val chunkSize = 4096
         var offset = 0
         while (offset < samples.size && _state.value == State.Playing) {
             val len = minOf(chunkSize, samples.size - offset)
+            // Appliquer le gain logiciel avant écriture
+            if (gain != 1.0f) {
+                for (i in offset until offset + len) {
+                    samples[i] = (samples[i] * gain).coerceIn(-1f, 1f)
+                }
+            }
             val written = t.write(samples, offset, len, AudioTrack.WRITE_BLOCKING)
             if (written < 0) {
                 Log.e(TAG, "AudioTrack write error: $written")

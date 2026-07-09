@@ -74,7 +74,7 @@ class OnnxInferenceService @Inject constructor(
         val engine = tts
             ?: throw IllegalStateException("TTS non initialisé.")
 
-        val cleaned = text.trim()
+        val cleaned = text.trim().replace(Regex("\\.{3,}"), ".")
         val startMs = System.currentTimeMillis()
         val audio = engine.generate(cleaned, voice.sid, speed.coerceIn(0.5f, 2.0f))
         val elapsedMs = System.currentTimeMillis() - startMs
