@@ -53,6 +53,7 @@ fun ReaderScreen(
     bookId: String,
     onBack: () -> Unit,
     onBookmarksClick: (String) -> Unit = {},
+    onSearchClick: (String) -> Unit = {},
     viewModel: ReaderViewModel = hiltViewModel()
 ) {
     val state by viewModel.uiState.collectAsState()
@@ -146,7 +147,8 @@ fun ReaderScreen(
                 subtitle = "Ch. ${state.currentChapterIndex + 1}/${book?.totalChapters ?: 0}",
                 onBack = onBack,
                 onToc = { viewModel.showTocSheet() },
-                onBookmarks = { book?.title?.let { onBookmarksClick(it) } }
+                onBookmarks = { book?.title?.let { onBookmarksClick(it) } },
+                onSearch = { book?.title?.let { onSearchClick(it) } }
             )
         }
 
@@ -272,7 +274,8 @@ private fun ReaderTopBar(
     subtitle: String,
     onBack: () -> Unit,
     onToc: () -> Unit,
-    onBookmarks: () -> Unit = {}
+    onBookmarks: () -> Unit = {},
+    onSearch: () -> Unit = {}
 ) {
     Surface(
         modifier = Modifier.fillMaxWidth(),
@@ -298,6 +301,11 @@ private fun ReaderTopBar(
                     maxLines = 1, overflow = TextOverflow.Ellipsis)
                 Text(subtitle, color = Color.White.copy(alpha = 0.45f),
                     style = MaterialTheme.typography.labelSmall)
+            }
+            @Suppress("DEPRECATION")
+            IconButton(onClick = onSearch) {
+                Icon(Icons.Default.Search, "Rechercher",
+                    tint = Color.White.copy(alpha = 0.6f))
             }
             @Suppress("DEPRECATION")
             IconButton(onClick = onBookmarks) {
