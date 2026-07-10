@@ -114,49 +114,24 @@ fun ReaderScreen(
             .fillMaxSize()
             .background(bgColor)
             .onSizeChanged { screenSize = it }
-            .pointerInput(Unit) {
-                awaitPointerEventScope {
-                    while (true) {
-                        val event = awaitPointerEvent(PointerEventPass.Final)
-                        val change = event.changes.firstOrNull() ?: continue
-                        // Ne traiter que les taps non consommés (scroll et sélection passent avant)
-                        if (!change.isConsumed && change.pressed.not()) {
-                            change.consume()
-                            val offset = change.position
-                            if (screenSize.width > 0) {
-                                val left = screenSize.width / 3f
-                                val right = 2f * screenSize.width / 3f
-                                if (offset.x in left..right) {
-                                    viewModel.toggleHud()
-                                }
-                            }
-                        }
-                    }
-                }
-            }
     ) {
         // ── COUCHE 0 : Texte (100% espace, jamais ne bouge) ─
         when {
             state.isLoading -> LoadingIndicator()
             state.error != null -> ErrorMessage(state.error!!)
-            chapter != null -> ImmersiveText(
+            chapter != null -> ReaderContent(
                 chapter = chapter,
                 playbackState = playbackState,
                 textColor = textColor,
                 accentColor = accentColor,
                 useOpenDyslexic = state.useOpenDyslexic,
-                chapterHighlights = chapterHighlights,
-                currentChapterIndex = state.currentChapterIndex,
-                onSaveHighlight = { sentIdx, start, end, text, color ->
-                    viewModel.saveHighlight(sentIdx, start, end, text, color)
-                },
-                onDeleteHighlight = { viewModel.deleteHighlight(it) },
-                onSaveNote = { id, note -> viewModel.saveNoteForHighlight(id, note) },
-                onPronounceSelection = { text ->
-                    viewModel.pronounceSelectedText(text)
-                },
-                scrollTarget = scrollTarget,
-                onConsumeScrollTarget = { viewModel.consumeScrollTarget() }
+                onTap = { offset ->
+                    if (screenSize.width > 0) {
+                        val left = screenSize.width / 3f
+                        val right = 2f * screenSize.width / 3f
+                        if (offset.x in left..right) viewModel.toggleHud()
+                    }
+                }
             )
         }
 
