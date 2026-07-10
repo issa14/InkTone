@@ -24,16 +24,22 @@ import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.geometry.Offset
+import androidx.compose.ui.geometry.Rect
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.input.pointer.PointerEventPass
 import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.layout.onSizeChanged
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.platform.LocalView
+import androidx.compose.ui.text.SpanStyle
+import androidx.compose.ui.text.buildAnnotatedString
 import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.Hyphens
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextOverflow
+import androidx.compose.ui.unit.IntOffset
 import androidx.compose.ui.unit.IntSize
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.em
@@ -42,11 +48,15 @@ import androidx.core.view.WindowCompat
 import androidx.core.view.WindowInsetsCompat
 import androidx.core.view.WindowInsetsControllerCompat
 import androidx.hilt.navigation.compose.hiltViewModel
+import com.readflow.data.database.entity.AnnotationEntity
+import com.readflow.data.database.entity.HighlightEntity
 import com.readflow.data.database.entity.PronunciationRule
 import com.readflow.domain.model.Chapter
 import com.readflow.service.audio.PlaybackState
 import com.readflow.service.audio.PlaybackStatus
 import com.readflow.ui.theme.OpenDyslexicFamily
+import kotlinx.coroutines.delay
+import kotlinx.coroutines.launch
 
 // ─────────────────────────────────────────────────────
 //  READER SCREEN — Immersif, style Moon+ Reader
@@ -63,6 +73,9 @@ fun ReaderScreen(
 ) {
     val state by viewModel.uiState.collectAsState()
     val playbackState by viewModel.playbackState.collectAsState()
+    val highlights by viewModel.highlights.collectAsState()
+    val chapterHighlights by viewModel.chapterHighlights.collectAsState()
+    val scrollTarget by viewModel.scrollTarget.collectAsState()
     val chapter = state.currentChapter
     val book = state.book
 
@@ -101,6 +114,26 @@ fun ReaderScreen(
             .fillMaxSize()
             .background(bgColor)
             .onSizeChanged { screenSize = it }
+            .pointerInput(Unit) {
+                awaitPointerEventScope {
+                    while (true) {
+                        val event = awaitPointerEvent(PointerEventPass.Final)
+                        val change = event.changes.firstOrNull() ?: continue
+                        // Ne traiter que les taps non consommés (scroll et sélection passent avant)
+                        if (!change.isConsumed && change.pressed.not()) {
+                            change.consume()
+                            val offset = change.position
+                            if (screenSize.width > 0) {
+                                val left = screenSize.width / 3f
+                                val right = 2f * screenSize.width / 3f
+                                if (offset.x in left..right) {
+                                    viewModel.toggleHud()
+                                }
+                            }
+                        }
+                    }
+                }
+            }
     ) {
         // ── COUCHE 0 : Texte (100% espace, jamais ne bouge) ─
         when {
@@ -112,16 +145,15 @@ fun ReaderScreen(
                 textColor = textColor,
                 accentColor = accentColor,
                 useOpenDyslexic = state.useOpenDyslexic,
-                onTap = { offset ->
-                    // Tiers central uniquement
-                    if (screenSize.width > 0) {
-                        val left = screenSize.width / 3f
-                        val right = 2f * screenSize.width / 3f
-                        if (offset.x in left..right) {
-                            viewModel.toggleHud()
-                        }
-                    }
-                }
+                chapterHighlights = chapterHighlights,
+                currentChapterIndex = state.currentChapterIndex,
+                onSaveHighlight = { sentIdx, start, end, text, color ->
+                    viewModel.saveHighlight(sentIdx, start, end, text, color)
+                },
+                onDeleteHighlight = { viewModel.deleteHighlight(it) },
+                onSaveNote = { id, note -> viewModel.saveNoteForHighlight(id, note) },
+                scrollTarget = scrollTarget,
+                onConsumeScrollTarget = { viewModel.consumeScrollTarget() }
             )
         }
 
@@ -153,7 +185,8 @@ fun ReaderScreen(
                 onBack = onBack,
                 onToc = { viewModel.showTocSheet() },
                 onBookmarks = { book?.title?.let { onBookmarksClick(it) } },
-                onSearch = { book?.title?.let { onSearchClick(it) } }
+                onSearch = { book?.title?.let { onSearchClick(it) } },
+                onAnnotations = { viewModel.showAnnotationsSheet() }
             )
         }
 
@@ -239,6 +272,29 @@ fun ReaderScreen(
             )
         }
     }
+
+    // ── COUCHE 3 : Annotations & Surlignages ────────
+    if (state.isAnnotationsSheetVisible) {
+        ModalBottomSheet(
+            onDismissRequest = { viewModel.hideAnnotationsSheet() },
+            containerColor = Color(0xFF1E1E1E),
+            shape = RoundedCornerShape(topStart = 24.dp, topEnd = 24.dp),
+            dragHandle = { BottomSheetDefaults.DragHandle(color = Color.White.copy(alpha = 0.3f)) }
+        ) {
+            AnnotationsDrawer(
+                highlights = highlights,
+                onHighlightClick = { hl ->
+                    viewModel.scrollToSentence(hl.chapterIndex, hl.sentenceIndex)
+                    viewModel.hideAnnotationsSheet()
+                    viewModel.hideHud()
+                },
+                onDeleteHighlight = { viewModel.deleteHighlight(it) },
+                onUpdateNote = { hl, note ->
+                    viewModel.saveNoteForHighlight(hl.id, note)
+                }
+            )
+        }
+    }
 }
 
 // ─────────────────────────────────────────────────────
@@ -292,7 +348,8 @@ private fun ReaderTopBar(
     onBack: () -> Unit,
     onToc: () -> Unit,
     onBookmarks: () -> Unit = {},
-    onSearch: () -> Unit = {}
+    onSearch: () -> Unit = {},
+    onAnnotations: () -> Unit = {}
 ) {
     Surface(
         modifier = Modifier.fillMaxWidth(),
@@ -322,6 +379,11 @@ private fun ReaderTopBar(
             @Suppress("DEPRECATION")
             IconButton(onClick = onSearch) {
                 Icon(Icons.Default.Search, "Rechercher",
+                    tint = Color.White.copy(alpha = 0.6f))
+            }
+            @Suppress("DEPRECATION")
+            IconButton(onClick = onAnnotations) {
+                Icon(Icons.Default.Edit, "Annotations",
                     tint = Color.White.copy(alpha = 0.6f))
             }
             @Suppress("DEPRECATION")
@@ -425,27 +487,18 @@ private fun UnifiedControlPanel(
 }
 
 // ─────────────────────────────────────────────────────
-//  TEXTE IMMERSIF — LazyColumn + Surlignage + Autoscroll
+//  TEXTE IMMERSIF — LazyColumn + AnnotatedString + Surlignages
 // ─────────────────────────────────────────────────────
 
-/**
- * Délai de compensation Bluetooth (ms) pour la synchronisation audio/visuelle.
- *
- * Sur les appareils Bluetooth, le décalage audio peut atteindre 150-250 ms.
- * On retarde légèrement l'avancement du surlignage pour que l'affichage
- * corresponde au son perçu par l'utilisateur.
- */
 private const val BLUETOOTH_LATENCY_COMPENSATION_MS = 180L
 
-/**
- * Rendu immersif du texte d'un chapitre avec :
- * - Défilement lazy pour les grands chapitres (2000+ phrases).
- * - Surlignage de la phrase active avec fond coloré.
- * - Autoscroll fluide ([LazyListState.animateScrollToItem]) centrant
- *   la phrase active au premier tiers de l'écran.
- * - Compensation de latence Bluetooth pour synchroniser l'affichage
- *   avec le retour audio perçu.
- */
+private val HIGHLIGHT_COLORS = listOf(
+    "#FFF59D" to "Jaune",
+    "#C8E6C9" to "Vert",
+    "#B3E5FC" to "Bleu",
+    "#F8BBD0" to "Rose"
+)
+
 @Composable
 private fun ImmersiveText(
     chapter: Chapter,
@@ -453,7 +506,13 @@ private fun ImmersiveText(
     textColor: Color,
     accentColor: Color,
     useOpenDyslexic: Boolean = false,
-    onTap: (Offset) -> Unit
+    chapterHighlights: List<HighlightEntity> = emptyList(),
+    currentChapterIndex: Int = 0,
+    onSaveHighlight: (sentIdx: Int, start: Int, end: Int, text: String, color: String) -> Unit = { _, _, _, _, _ -> },
+    onDeleteHighlight: (HighlightEntity) -> Unit = {},
+    onSaveNote: (highlightId: Long, note: String) -> Unit = { _, _ -> },
+    scrollTarget: Pair<Int, Int>? = null,
+    onConsumeScrollTarget: () -> Unit = {}
 ) {
     val bodyFont = if (useOpenDyslexic) OpenDyslexicFamily else FontFamily.Serif
     val listState = rememberLazyListState()
@@ -462,94 +521,188 @@ private fun ImmersiveText(
     val activeIdx = playbackState.activeSentenceIndex
     val isSpeaking = playbackState.status == PlaybackStatus.PLAYING
 
-    // ── Autoscroll automatique vers la phrase active ──
-    // Utilise une clé composite pour déclencher le scroll uniquement
-    // quand l'index de phrase change (et pas à chaque recomposition).
+    // ── État de la barre flottante de surlignage ──
+    var selectionRect by remember { mutableStateOf<Rect?>(null) }
+    var showToolbar by remember { mutableStateOf(false) }
+    var onCopyCallback by remember { mutableStateOf<(() -> Unit)?>(null) }
+    var showNoteDialog by remember { mutableStateOf(false) }
+    var noteText by remember { mutableStateOf("") }
+
+    // Capturer le contexte pour l'accès au clipboard
+    val context = androidx.compose.ui.platform.LocalContext.current
+    val coroutineScope = rememberCoroutineScope()
+
+    // ── Index des highlights par phrase pour lookup rapide ──
+    val highlightMap = remember(chapterHighlights) {
+        chapterHighlights.groupBy { it.sentenceIndex }
+    }
+
+    // ── Autoscroll TTS ──
     LaunchedEffect(activeIdx, isSpeaking) {
         if (isSpeaking && activeIdx in sentences.indices) {
-            // Compensation Bluetooth : attendre que l'audio arrive aux oreilles
-            // avant de déplacer le surlignage visuel.
             kotlinx.coroutines.delay(BLUETOOTH_LATENCY_COMPENSATION_MS)
-
-            // +1 pour sauter la ligne de titre (index 0 = titre du chapitre)
             val targetIndex = activeIdx + 1
             if (targetIndex < listState.layoutInfo.totalItemsCount) {
                 listState.animateScrollToItem(
                     index = targetIndex,
-                    // Centrer au premier tiers de l'écran pour donner du contexte
-                    // (l'utilisateur voit ce qui précède ET ce qui suit).
                     scrollOffset = -(listState.layoutInfo.viewportSize.height / 3)
                 )
             }
         }
     }
 
-    // ── Couleur de fond pour le surlignage ──
-    // Ambre doux pour le thème nuit, bleu pour le thème jour
+    // ── Scroll ciblé (depuis le tiroir) ──
+    LaunchedEffect(scrollTarget) {
+        val target = scrollTarget ?: return@LaunchedEffect
+        val targetIdx = target.second + 1
+        if (targetIdx < listState.layoutInfo.totalItemsCount) {
+            listState.animateScrollToItem(
+                index = targetIdx.coerceAtLeast(0),
+                scrollOffset = -(listState.layoutInfo.viewportSize.height / 4)
+            )
+        }
+        onConsumeScrollTarget()
+    }
+
     val highlightBg = accentColor.copy(alpha = 0.12f)
 
-    SelectionContainer {
-        LazyColumn(
-            state = listState,
-            modifier = Modifier
-                .fillMaxSize()
-                .pointerInput(Unit) { detectTapGestures { onTap(it) } }
-                .windowInsetsPadding(WindowInsets.systemBars)
-                .padding(horizontal = 24.dp, vertical = 16.dp),
-            userScrollEnabled = true
-        ) {
-            // ── Titre du chapitre ──
-            item(key = "title") {
-                Spacer(Modifier.height(24.dp))
-                Text(
-                    chapter.title,
-                    fontFamily = bodyFont,
-                    fontWeight = FontWeight.Bold,
-                    fontSize = 22.sp,
-                    color = textColor.copy(alpha = 0.75f),
-                    lineHeight = 1.6.em
-                )
-                Spacer(Modifier.height(28.dp))
-            }
+    fun dismissToolbar() {
+        showToolbar = false
+        selectionRect = null
+        onCopyCallback = null
+    }
 
-            // ── Phrases avec surlignage ──
-            itemsIndexed(
-                items = sentences,
-                key = { index, _ -> "sent_$index" }
-            ) { index, sentence ->
-                val isActive = index == activeIdx && isSpeaking
-
-                // Surlignage : fond légèrement coloré + texte accentué
-                val bgModifier = if (isActive) {
-                    Modifier
-                        .background(
-                            color = highlightBg,
-                            shape = RoundedCornerShape(4.dp)
-                        )
-                        .padding(horizontal = 4.dp, vertical = 2.dp)
+    Box(modifier = Modifier.fillMaxSize()) {
+        HighlightSelectionWrapper(
+            onSelection = { rect, onCopy ->
+                if (rect != null) {
+                    selectionRect = rect
+                    onCopyCallback = onCopy
+                    showToolbar = true
                 } else {
-                    Modifier.padding(vertical = 2.dp)
+                    dismissToolbar()
                 }
-
-                Text(
-                    text = sentence.text,
-                    fontFamily = bodyFont,
-                    fontWeight = if (isActive) FontWeight.Medium else FontWeight.Normal,
-                    fontSize = 17.sp,
-                    lineHeight = 1.6.em,
-                    textAlign = TextAlign.Justify,
-                    color = when {
-                        isActive -> accentColor
-                        else -> textColor.copy(alpha = 0.88f)
-                    },
-                    modifier = bgModifier
-                )
             }
+        ) {
+            SelectionContainer {
+                LazyColumn(
+                    state = listState,
+                    modifier = Modifier
+                        .fillMaxSize()
+                        .windowInsetsPadding(WindowInsets.systemBars)
+                        .padding(horizontal = 24.dp, vertical = 16.dp),
+                    userScrollEnabled = true
+                ) {
+                    item(key = "title") {
+                        Spacer(Modifier.height(24.dp))
+                        Text(
+                            chapter.title,
+                            fontFamily = bodyFont,
+                            fontWeight = FontWeight.Bold,
+                            fontSize = 22.sp,
+                            color = textColor.copy(alpha = 0.75f),
+                            lineHeight = 1.6.em
+                        )
+                        Spacer(Modifier.height(28.dp))
+                    }
 
-            // ── Espace de respiration en bas ──
-            item(key = "bottom_spacer") {
-                Spacer(Modifier.height(120.dp))
+                    itemsIndexed(
+                        items = sentences,
+                        key = { index, _ -> "sent_$index" }
+                    ) { index, sentence ->
+                        val isActive = index == activeIdx && isSpeaking
+                        val sentenceHighlights = highlightMap[index]
+
+                        val annotated = buildAnnotatedString {
+                            append(sentence.text)
+                            sentenceHighlights?.forEach { hl ->
+                                val start = hl.startOffset.coerceIn(0, sentence.text.length)
+                                val end = hl.endOffset.coerceIn(start, sentence.text.length)
+                                if (start < end) {
+                                    val bgColor = try {
+                                        Color(android.graphics.Color.parseColor(hl.colorHex))
+                                    } catch (_: Exception) { Color(0xFFFFF59D) }
+                                    addStyle(
+                                        SpanStyle(background = bgColor.copy(alpha = 0.35f)),
+                                        start, end
+                                    )
+                                }
+                            }
+                            if (isActive && sentenceHighlights.isNullOrEmpty()) {
+                                addStyle(SpanStyle(background = highlightBg), 0, sentence.text.length)
+                            }
+                        }
+
+                        val bgModifier = if (isActive && sentenceHighlights.isNullOrEmpty()) {
+                            Modifier
+                                .background(color = highlightBg, shape = RoundedCornerShape(4.dp))
+                                .padding(horizontal = 4.dp, vertical = 2.dp)
+                        } else {
+                            Modifier.padding(vertical = 2.dp)
+                        }
+
+                        Text(
+                            text = annotated,
+                            fontFamily = bodyFont,
+                            fontWeight = if (isActive) FontWeight.Medium else FontWeight.Normal,
+                            fontSize = 17.sp,
+                            lineHeight = 1.6.em,
+                            textAlign = TextAlign.Justify,
+                            color = if (isActive) accentColor else textColor.copy(alpha = 0.88f),
+                            modifier = bgModifier
+                        )
+                    }
+
+                    item(key = "bottom_spacer") {
+                        Spacer(Modifier.height(120.dp))
+                    }
+                }
             }
+        }
+
+        // ── Barre flottante de surlignage ──
+        if (showToolbar) {
+            FloatingHighlightToolbar(
+                rect = selectionRect!!,
+                onColorSelected = { colorHex ->
+                    // Copier le texte sélectionné puis sauvegarder
+                    onCopyCallback?.invoke()
+                    coroutineScope.launch {
+                        kotlinx.coroutines.delay(100)
+                        val clip = context.getSystemService(
+                            android.content.Context.CLIPBOARD_SERVICE
+                        ) as? android.content.ClipboardManager
+                        val text = clip?.primaryClip?.getItemAt(0)?.text?.toString() ?: ""
+                        if (text.isNotBlank()) {
+                            val sentIdx = sentences.indexOfFirst { it.text.contains(text) }
+                            if (sentIdx >= 0) {
+                                val sent = sentences[sentIdx]
+                                val start = sent.text.indexOf(text).coerceAtLeast(0)
+                                val end = (start + text.length).coerceAtMost(sent.text.length)
+                                onSaveHighlight(sentIdx, start, end, text, colorHex)
+                            }
+                        }
+                    }
+                    dismissToolbar()
+                },
+                onAddNote = {
+                    showNoteDialog = true
+                    noteText = ""
+                },
+                onCopy = { onCopyCallback?.invoke() },
+                onDismiss = { dismissToolbar() }
+            )
+        }
+
+        // ── Dialogue note ──
+        if (showNoteDialog) {
+            NoteEditDialog(
+                currentNote = noteText,
+                onDismiss = { showNoteDialog = false },
+                onSave = { newNote ->
+                    showNoteDialog = false
+                }
+            )
         }
     }
 }
@@ -999,6 +1152,304 @@ private fun darkTextFieldColors() = OutlinedTextFieldDefaults.colors(
     errorLabelColor = Color(0xFFFF6B6B),
     errorSupportingTextColor = Color(0xFFFF6B6B)
 )
+
+// ─────────────────────────────────────────────────────
+//  BARRE FLOTTANTE DE SURLIGNAGE — Apparaît sur sélection
+// ─────────────────────────────────────────────────────
+
+@Composable
+private fun FloatingHighlightToolbar(
+    rect: Rect,
+    onColorSelected: (String) -> Unit,
+    onAddNote: () -> Unit,
+    onCopy: () -> Unit,
+    onDismiss: () -> Unit
+) {
+    var showColorPicker by remember { mutableStateOf(false) }
+
+    androidx.compose.ui.window.Popup(
+        alignment = Alignment.TopStart,
+        offset = IntOffset(
+            rect.left.toInt().coerceAtLeast(0),
+            (rect.top - 56).toInt().coerceAtLeast(0)
+        ),
+        onDismissRequest = onDismiss
+    ) {
+        Surface(
+            shape = RoundedCornerShape(12.dp),
+            color = Color(0xFF2A2A2A),
+            shadowElevation = 8.dp
+        ) {
+            Row(
+                modifier = Modifier.padding(horizontal = 8.dp, vertical = 6.dp),
+                verticalAlignment = Alignment.CenterVertically,
+                horizontalArrangement = Arrangement.spacedBy(2.dp)
+            ) {
+                HIGHLIGHT_COLORS.forEach { (hex, _) ->
+                    val color = try {
+                        Color(android.graphics.Color.parseColor(hex))
+                    } catch (_: Exception) { Color.Yellow }
+                    IconButton(
+                        onClick = { onColorSelected(hex) },
+                        modifier = Modifier.size(36.dp)
+                    ) {
+                        Box(
+                            modifier = Modifier
+                                .size(24.dp)
+                                .background(color, CircleShape)
+                        )
+                    }
+                }
+                // Séparateur
+                Box(
+                    modifier = Modifier
+                        .width(1.dp)
+                        .height(24.dp)
+                        .background(Color.White.copy(alpha = 0.15f))
+                )
+                // Bouton Note
+                IconButton(onClick = onAddNote, modifier = Modifier.size(36.dp)) {
+                    Icon(
+                        Icons.Default.Edit, "Note",
+                        tint = Color.White.copy(alpha = 0.7f),
+                        modifier = Modifier.size(18.dp)
+                    )
+                }
+                // Bouton Copier
+                IconButton(onClick = {
+                    val clipboard = android.content.ClipboardManager::class.java.let { null }
+                    onCopy()
+                }, modifier = Modifier.size(36.dp)) {
+                    Icon(
+                        Icons.Default.ContentCopy, "Copier",
+                        tint = Color.White.copy(alpha = 0.7f),
+                        modifier = Modifier.size(18.dp)
+                    )
+                }
+                // Fermer
+                IconButton(onClick = onDismiss, modifier = Modifier.size(36.dp)) {
+                    Icon(
+                        Icons.Default.Close, "Fermer",
+                        tint = Color.White.copy(alpha = 0.4f),
+                        modifier = Modifier.size(16.dp)
+                    )
+                }
+            }
+        }
+    }
+}
+
+// ─────────────────────────────────────────────────────
+//  TIROIR DES ANNOTATIONS — ModalBottomSheet
+// ─────────────────────────────────────────────────────
+
+@Composable
+private fun AnnotationsDrawer(
+    highlights: List<HighlightEntity>,
+    onHighlightClick: (HighlightEntity) -> Unit,
+    onDeleteHighlight: (HighlightEntity) -> Unit,
+    onUpdateNote: (HighlightEntity, String) -> Unit
+) {
+    var searchQuery by remember { mutableStateOf("") }
+    var editingNoteFor by remember { mutableStateOf<HighlightEntity?>(null) }
+
+    val filtered = remember(highlights, searchQuery) {
+        if (searchQuery.isBlank()) highlights
+        else highlights.filter {
+            it.selectedText.contains(searchQuery, ignoreCase = true) ||
+            it.note?.contains(searchQuery, ignoreCase = true) == true
+        }
+    }
+
+    Column(
+        modifier = Modifier
+            .fillMaxWidth()
+            .padding(horizontal = 20.dp)
+            .padding(bottom = 32.dp)
+    ) {
+        Text("Annotations & Notes",
+            color = Color.White.copy(alpha = 0.85f),
+            style = MaterialTheme.typography.titleSmall)
+        Spacer(Modifier.height(12.dp))
+
+        OutlinedTextField(
+            value = searchQuery,
+            onValueChange = { searchQuery = it },
+            placeholder = { Text("Rechercher...", color = Color.White.copy(alpha = 0.3f)) },
+            leadingIcon = {
+                Icon(Icons.Default.Search, "Rechercher",
+                    tint = Color.White.copy(alpha = 0.4f), modifier = Modifier.size(20.dp))
+            },
+            singleLine = true,
+            colors = darkTextFieldColors(),
+            modifier = Modifier.fillMaxWidth()
+        )
+        Spacer(Modifier.height(12.dp))
+
+        if (filtered.isEmpty()) {
+            Text(
+                if (highlights.isEmpty()) "Aucune annotation. Sélectionnez du texte pour le surligner."
+                else "Aucun résultat.",
+                color = Color.White.copy(alpha = 0.3f),
+                style = MaterialTheme.typography.labelMedium,
+                modifier = Modifier.padding(vertical = 16.dp)
+            )
+        } else {
+            LazyColumn(modifier = Modifier.heightIn(max = 400.dp)) {
+                itemsIndexed(
+                    items = filtered,
+                    key = { _, hl -> hl.id }
+                ) { _, highlight ->
+                    HighlightCard(
+                        highlight = highlight,
+                        onClick = { onHighlightClick(highlight) },
+                        onDelete = { onDeleteHighlight(highlight) },
+                        onEditNote = { editingNoteFor = highlight }
+                    )
+                }
+                item { Spacer(Modifier.height(16.dp)) }
+            }
+        }
+    }
+
+    if (editingNoteFor != null) {
+        var editText by remember(editingNoteFor) { mutableStateOf(editingNoteFor!!.note ?: "") }
+        AlertDialog(
+            onDismissRequest = { editingNoteFor = null },
+            containerColor = Color(0xFF252525),
+            title = { Text("Modifier la note", color = Color.White, style = MaterialTheme.typography.titleSmall) },
+            text = {
+                OutlinedTextField(
+                    value = editText,
+                    onValueChange = { editText = it },
+                    minLines = 3, maxLines = 6,
+                    colors = darkTextFieldColors(),
+                    modifier = Modifier.fillMaxWidth()
+                )
+            },
+            confirmButton = {
+                TextButton(onClick = {
+                    editingNoteFor?.let { onUpdateNote(it, editText) }
+                    editingNoteFor = null
+                }) { Text("Enregistrer", color = Color(0xFFFFB74D)) }
+            },
+            dismissButton = {
+                TextButton(onClick = { editingNoteFor = null }) {
+                    Text("Annuler", color = Color.White.copy(alpha = 0.5f))
+                }
+            }
+        )
+    }
+}
+
+@Composable
+private fun HighlightCard(
+    highlight: HighlightEntity,
+    onClick: () -> Unit,
+    onDelete: () -> Unit,
+    onEditNote: () -> Unit
+) {
+    val color = try {
+        Color(android.graphics.Color.parseColor(highlight.colorHex))
+    } catch (_: Exception) { Color(0xFFFFF59D) }
+
+    Surface(
+        modifier = Modifier
+            .fillMaxWidth()
+            .padding(vertical = 3.dp)
+            .clickable { onClick() },
+        color = Color.White.copy(alpha = 0.04f),
+        shape = RoundedCornerShape(10.dp)
+    ) {
+        Row(
+            modifier = Modifier.padding(12.dp),
+            verticalAlignment = Alignment.Top
+        ) {
+            Box(
+                modifier = Modifier
+                    .width(4.dp)
+                    .height(48.dp)
+                    .background(color, RoundedCornerShape(2.dp))
+            )
+            Spacer(Modifier.width(10.dp))
+            Column(modifier = Modifier.weight(1f)) {
+                Text(
+                    highlight.selectedText,
+                    color = Color.White.copy(alpha = 0.75f),
+                    style = MaterialTheme.typography.bodySmall,
+                    maxLines = 2, overflow = TextOverflow.Ellipsis
+                )
+                if (!highlight.note.isNullOrBlank()) {
+                    Spacer(Modifier.height(4.dp))
+                    Text(
+                        highlight.note,
+                        color = Color.White.copy(alpha = 0.4f),
+                        style = MaterialTheme.typography.labelSmall,
+                        maxLines = 2, overflow = TextOverflow.Ellipsis
+                    )
+                }
+                Spacer(Modifier.height(4.dp))
+                Text(
+                    "Ch. ${highlight.chapterIndex + 1} · Phrase ${highlight.sentenceIndex + 1}",
+                    color = Color.White.copy(alpha = 0.25f),
+                    style = MaterialTheme.typography.labelSmall
+                )
+            }
+            IconButton(onClick = onEditNote, modifier = Modifier.size(28.dp)) {
+                Icon(Icons.Default.Edit, "Note",
+                    tint = Color.White.copy(alpha = 0.35f), modifier = Modifier.size(16.dp))
+            }
+            IconButton(onClick = onDelete, modifier = Modifier.size(28.dp)) {
+                Icon(Icons.Default.Delete, "Supprimer",
+                    tint = Color.White.copy(alpha = 0.35f), modifier = Modifier.size(16.dp))
+            }
+        }
+    }
+}
+
+// ─────────────────────────────────────────────────────
+//  DIALOGUE : Édition de note
+// ─────────────────────────────────────────────────────
+
+@Composable
+private fun NoteEditDialog(
+    currentNote: String,
+    onDismiss: () -> Unit,
+    onSave: (String) -> Unit
+) {
+    var text by remember { mutableStateOf(currentNote) }
+
+    AlertDialog(
+        onDismissRequest = onDismiss,
+        containerColor = Color(0xFF252525),
+        title = {
+            Text("Note de lecture",
+                color = Color.White,
+                style = MaterialTheme.typography.titleSmall)
+        },
+        text = {
+            OutlinedTextField(
+                value = text,
+                onValueChange = { text = it },
+                placeholder = { Text("Votre commentaire...", color = Color.White.copy(alpha = 0.3f)) },
+                minLines = 3,
+                maxLines = 6,
+                colors = darkTextFieldColors(),
+                modifier = Modifier.fillMaxWidth()
+            )
+        },
+        confirmButton = {
+            TextButton(onClick = { onSave(text) }) {
+                Text("Enregistrer", color = Color(0xFFFFB74D))
+            }
+        },
+        dismissButton = {
+            TextButton(onClick = onDismiss) {
+                Text("Annuler", color = Color.White.copy(alpha = 0.5f))
+            }
+        }
+    )
+}
 
 // ─────────────────────────────────────────────────────
 //  ÉTATS : chargement, erreur

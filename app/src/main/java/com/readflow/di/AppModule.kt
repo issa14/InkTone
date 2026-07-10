@@ -2,8 +2,10 @@ package com.readflow.di
 
 import android.content.Context
 import androidx.room.Room
+import com.readflow.data.database.AnnotationDao
 import com.readflow.data.database.BookDao
 import com.readflow.data.database.BookmarkDao
+import com.readflow.data.database.HighlightDao
 import com.readflow.data.database.MIGRATION_1_2
 import com.readflow.data.database.MIGRATION_2_3
 import com.readflow.data.database.MIGRATION_3_4
@@ -60,6 +62,12 @@ object AppModule {
 
     @Provides
     fun providePronunciationRuleDao(db: ReadFlowDatabase): PronunciationRuleDao = db.pronunciationRuleDao()
+
+    @Provides
+    fun provideAnnotationDao(db: ReadFlowDatabase): AnnotationDao = db.annotationDao()
+
+    @Provides
+    fun provideHighlightDao(db: ReadFlowDatabase): HighlightDao = db.highlightDao()
 
     @Provides
     @Singleton

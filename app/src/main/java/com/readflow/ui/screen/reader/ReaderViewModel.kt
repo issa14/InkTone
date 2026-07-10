@@ -10,7 +10,11 @@ import androidx.core.content.ContextCompat
 import androidx.lifecycle.SavedStateHandle
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
+import com.readflow.data.database.AnnotationDao
+import com.readflow.data.database.HighlightDao
 import com.readflow.data.database.PronunciationRuleDao
+import com.readflow.data.database.entity.AnnotationEntity
+import com.readflow.data.database.entity.HighlightEntity
 import com.readflow.data.database.entity.PronunciationRule
 import com.readflow.domain.model.Book
 import com.readflow.domain.model.Chapter
@@ -39,6 +43,7 @@ data class ReaderUiState(
     val isHudVisible: Boolean = false,
     val isTtsSheetVisible: Boolean = false,
     val isTocSheetVisible: Boolean = false,
+    val isAnnotationsSheetVisible: Boolean = false,
     val speed: Float = 1.0f,
     val voice: Int = 0,  // MIRO — voix française Piper VITS
     val readerTheme: ReaderTheme = ReaderTheme.NIGHT,
@@ -54,6 +59,8 @@ class ReaderViewModel @Inject constructor(
     private val orchestrator: PlaybackOrchestrator,
     private val onnxService: OnnxInferenceService,
     private val pronunciationRuleDao: PronunciationRuleDao,
+    private val annotationDao: AnnotationDao,
+    private val highlightDao: HighlightDao,
     @ApplicationContext private val context: Context
 ) : ViewModel() {
 
@@ -82,6 +89,33 @@ class ReaderViewModel @Inject constructor(
     // ── Minuteur de mise en veille ──
     val sleepTimerRemaining: StateFlow<Long?> = orchestrator.sleepTimerRemaining
 
+    // ── Surlignages (HighlightEntity) ──
+    private val _bookIdFlow = MutableStateFlow<String?>(null)
+
+    /** Surlignages du livre courant (tous chapitres, pour le tiroir). */
+    @OptIn(kotlinx.coroutines.ExperimentalCoroutinesApi::class)
+    val highlights: StateFlow<List<HighlightEntity>> = _bookIdFlow
+        .flatMapLatest { id ->
+            if (id != null) highlightDao.getHighlightsForBook(id)
+            else flowOf(emptyList())
+        }.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), emptyList())
+
+    /** Surlignages du chapitre courant (pour le rendu AnnotatedString). */
+    @OptIn(kotlinx.coroutines.ExperimentalCoroutinesApi::class)
+    val chapterHighlights: StateFlow<List<HighlightEntity>> = combine(
+        _bookIdFlow,
+        _uiState.map { it.currentChapterIndex }
+    ) { bookId, chapterIdx ->
+        Pair(bookId, chapterIdx)
+    }.flatMapLatest { (bookId, chapterIdx) ->
+        if (bookId != null) highlightDao.getHighlightsForChapter(bookId, chapterIdx)
+        else flowOf(emptyList())
+    }.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), emptyList())
+
+    /** Cible de scroll utilisée par l'UI pour sauter vers une phrase précise. */
+    private val _scrollTarget = MutableStateFlow<Pair<Int, Int>?>(null)
+    val scrollTarget: StateFlow<Pair<Int, Int>?> = _scrollTarget.asStateFlow()
+
     private var currentBook: Book? = null
     private var isPausedForResume = false
 
@@ -93,6 +127,8 @@ class ReaderViewModel @Inject constructor(
     fun hideTtsSheet() { _uiState.update { it.copy(isTtsSheetVisible = false) } }
     fun showTocSheet() { _uiState.update { it.copy(isTocSheetVisible = true) } }
     fun hideTocSheet() { _uiState.update { it.copy(isTocSheetVisible = false) } }
+    fun showAnnotationsSheet() { _uiState.update { it.copy(isAnnotationsSheetVisible = true) } }
+    fun hideAnnotationsSheet() { _uiState.update { it.copy(isAnnotationsSheetVisible = false) } }
     fun setSpeed(s: Float) { _uiState.update { it.copy(speed = s.coerceIn(0.5f, 2.0f)) } }
     fun setVoice(v: Int) { _uiState.update { it.copy(voice = v) } }
 
@@ -170,6 +206,7 @@ class ReaderViewModel @Inject constructor(
                 val book = books.find { it.id == bookId }
                     ?: throw IllegalStateException("Livre introuvable")
                 currentBook = book
+                _bookIdFlow.value = bookId
                 _uiState.update { it.copy(book = book, isLoading = false) }
 
                 // Charger la progression persistée depuis Room (survit aux redémarrages)
@@ -360,6 +397,63 @@ class ReaderViewModel @Inject constructor(
         viewModelScope.launch {
             pronunciationRuleDao.toggleRuleActive(rule.id, !rule.isActive)
         }
+    }
+
+    // ── Surlignages ────────────────────────────────
+
+    fun saveHighlight(
+        sentenceIndex: Int,
+        startOffset: Int,
+        endOffset: Int,
+        text: String,
+        colorHex: String
+    ) {
+        val bookId = _bookIdFlow.value ?: return
+        val chapterIdx = _uiState.value.currentChapterIndex
+        viewModelScope.launch {
+            highlightDao.insertHighlight(
+                HighlightEntity(
+                    bookId = bookId,
+                    chapterIndex = chapterIdx,
+                    sentenceIndex = sentenceIndex,
+                    startOffset = startOffset,
+                    endOffset = endOffset,
+                    selectedText = text,
+                    colorHex = colorHex
+                )
+            )
+        }
+    }
+
+    fun saveNoteForHighlight(highlightId: Long, noteText: String) {
+        viewModelScope.launch {
+            val current = highlights.value.find { it.id == highlightId } ?: return@launch
+            highlightDao.updateHighlight(current.copy(note = noteText.ifBlank { null }))
+        }
+    }
+
+    fun deleteHighlight(highlight: HighlightEntity) {
+        viewModelScope.launch {
+            highlightDao.deleteHighlight(highlight)
+        }
+    }
+
+    /**
+     * Navigue vers une phrase précise (chapitre + index) et consomme
+     * l'événement pour éviter les doubles déclenchements.
+     */
+    fun scrollToSentence(chapterIndex: Int, sentenceIndex: Int) {
+        if (chapterIndex != _uiState.value.currentChapterIndex) {
+            loadChapter(chapterIndex, sentenceIndex)
+        } else {
+            _uiState.update { it.copy(currentSentenceIndex = sentenceIndex) }
+        }
+        _scrollTarget.value = Pair(chapterIndex, sentenceIndex)
+    }
+
+    /** Consomme la cible de scroll après que l'UI l'a traitée. */
+    fun consumeScrollTarget() {
+        _scrollTarget.value = null
     }
 }
 

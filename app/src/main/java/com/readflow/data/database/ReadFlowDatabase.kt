@@ -4,8 +4,10 @@ import androidx.room.Database
 import androidx.room.RoomDatabase
 import androidx.room.migration.Migration
 import androidx.sqlite.db.SupportSQLiteDatabase
+import com.readflow.data.database.entity.AnnotationEntity
 import com.readflow.data.database.entity.BookEntity
 import com.readflow.data.database.entity.BookmarkEntity
+import com.readflow.data.database.entity.HighlightEntity
 import com.readflow.data.database.entity.ProgressEntity
 import com.readflow.data.database.entity.PronunciationRule
 import com.readflow.data.database.entity.ReadingProgress
@@ -56,9 +58,11 @@ val MIGRATION_3_4 = object : Migration(3, 4) {
         SentenceFts::class,
         ReadingProgress::class,
         SentenceCacheEntity::class,
-        PronunciationRule::class
+        PronunciationRule::class,
+        AnnotationEntity::class,
+        HighlightEntity::class
     ],
-    version = 6,
+    version = 8,
     exportSchema = false
 )
 abstract class ReadFlowDatabase : RoomDatabase() {
@@ -69,4 +73,6 @@ abstract class ReadFlowDatabase : RoomDatabase() {
     abstract fun readingProgressDao(): ReadingProgressDao
     abstract fun sentenceCacheDao(): SentenceCacheDao
     abstract fun pronunciationRuleDao(): PronunciationRuleDao
+    abstract fun annotationDao(): AnnotationDao
+    abstract fun highlightDao(): HighlightDao
 }
