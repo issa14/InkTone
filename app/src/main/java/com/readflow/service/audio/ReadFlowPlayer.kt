@@ -144,7 +144,7 @@ class ReadFlowPlayer(
         return State.Builder()
             .setPlaylist(playlistData)
             .setPlaybackState(playbackState)
-            .setPlayWhenReady(playWhenReady, Player.COMMAND_PLAY_PAUSE)
+            .setPlayWhenReady(playWhenReady, Player.PLAY_WHEN_READY_CHANGE_REASON_USER_REQUEST)
             .setContentPositionMs(positionMs)
             .setTotalBufferedDurationMs { totalDurationMs }
             .setAvailableCommands(

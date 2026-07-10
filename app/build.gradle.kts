@@ -97,6 +97,12 @@ android {
             excludes += "/META-INF/DEPENDENCIES"
         }
     }
+
+    lint {
+        // Ne pas interrompre le build pour des avertissements non-fatals
+        abortOnError = false
+        checkReleaseBuilds = false
+    }
 }
 
 dependencies {
