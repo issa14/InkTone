@@ -155,6 +155,9 @@ fun LibraryScreen(
                         NavigationDestination.ABOUT -> {
                             com.readflow.ui.screen.about.AboutScreen()
                         }
+                        NavigationDestination.SETTINGS -> {
+                            com.readflow.ui.screen.settings.SettingsScreen()
+                        }
                     }
                     } // end else (isLoading)
                 }
@@ -826,7 +829,7 @@ private fun NavDrawer(
                 // Menu items dynamiques
                 Column(modifier = Modifier.weight(1f)) {
                     NavigationDestination.entries
-                        .filter { it != NavigationDestination.ABOUT }
+                        .filter { it != NavigationDestination.ABOUT && it != NavigationDestination.SETTINGS }
                         .forEach { dest ->
                         val isActive = dest == currentDest
                         Surface(
@@ -865,7 +868,10 @@ private fun NavDrawer(
                         horizontalArrangement = Arrangement.SpaceEvenly,
                         verticalAlignment = Alignment.CenterVertically
                     ) {
-                        DrawerFooterBtn("Options", Icons.Default.Settings) { onDismiss() }
+                        DrawerFooterBtn("Options", Icons.Default.Settings) {
+                            onNavigate(NavigationDestination.SETTINGS)
+                            onDismiss()
+                        }
                         DrawerFooterBtn("À propos", Icons.Default.Info) {
                             onNavigate(NavigationDestination.ABOUT)
                             onDismiss()
