@@ -9,6 +9,7 @@ import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.readflow.data.repository.RecentBooksRepository
+import com.readflow.data.database.ProgressDao
 import com.readflow.data.database.entity.RecentBookEntity
 import com.readflow.domain.model.Book
 import com.readflow.domain.repository.BookRepository
@@ -33,7 +34,8 @@ data class LibraryUiState(
     val isFilterDialogVisible: Boolean = false,
     val currentDestination: NavigationDestination = NavigationDestination.LIBRARY,
     val isDarkTheme: Boolean = true,
-    val recentBooks: List<RecentBookEntity> = emptyList()
+    val recentBooks: List<RecentBookEntity> = emptyList(),
+    val bookProgress: Map<String, Int> = emptyMap()
 )
 
 enum class FilterMode { ALL, BY_AUTHOR, BY_TITLE, IN_PROGRESS, READ, UNREAD }
@@ -60,6 +62,7 @@ enum class NavigationDestination(
 class LibraryViewModel @Inject constructor(
     private val bookRepository: BookRepository,
     private val recentBooksRepo: RecentBooksRepository,
+    private val progressDao: ProgressDao,
     @ApplicationContext private val context: Context
 ) : ViewModel() {
 
@@ -83,6 +86,7 @@ class LibraryViewModel @Inject constructor(
                 val books = bookRepository.getAllBooks()
                 _uiState.update { it.copy(allBooks = books, isLoading = false) }
                 applyFilters()
+                loadProgress()
             } catch (e: Exception) {
                 _uiState.update { it.copy(error = e.message, isLoading = false) }
             }
@@ -227,6 +231,18 @@ class LibraryViewModel @Inject constructor(
 
     fun refresh() = loadBooks()
     fun clearError() { _uiState.update { it.copy(error = null) } }
+
+    private suspend fun loadProgress() {
+        val books = _uiState.value.allBooks
+        val map = mutableMapOf<String, Int>()
+        books.forEach { book ->
+            val progress = progressDao.getByBookId(book.id)
+            if (progress != null && progress.totalProgressFraction > 0f) {
+                map[book.id] = (progress.totalProgressFraction * 100).toInt()
+            }
+        }
+        _uiState.update { it.copy(bookProgress = map) }
+    }
 
     private fun resolveFileName(uri: Uri): String? {
         val cursor = context.contentResolver.query(uri, null, null, null, null)

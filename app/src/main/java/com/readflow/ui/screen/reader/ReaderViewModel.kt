@@ -360,9 +360,14 @@ class ReaderViewModel @Inject constructor(
     }
 
     fun stop() {
-        isPausedForResume = false  // P2: stop = réinitialisation complète
+        isPausedForResume = false
         orchestrator.stop()
         _uiState.update { it.copy(isPlaying = false, currentSentenceIndex = 0) }
+    }
+
+    override fun onCleared() {
+        super.onCleared()
+        orchestrator.stop()
     }
 
     // P3: Avancer automatiquement au chapitre suivant si on est à la dernière phrase

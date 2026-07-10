@@ -114,14 +114,14 @@ fun LibraryScreen(
                             when {
                                 state.isLoading && state.books.isEmpty() -> LoadingView()
                                 state.books.isEmpty() && !state.isLoading -> EmptyView()
-                                else -> ShelfGrid(state.books, handleBookClick)
+                                else -> ShelfGrid(state.books, handleBookClick, state.bookProgress)
                             }
                         }
                         NavigationDestination.RECENTS -> {
                             val recent = state.recentBooks.mapNotNull { entity ->
                                 state.allBooks.find { it.id == entity.bookId }
                             }
-                            if (recent.isEmpty()) EmptyView() else ShelfGrid(recent, handleBookClick)
+                            if (recent.isEmpty()) EmptyView() else ShelfGrid(recent, handleBookClick, state.bookProgress)
                         }
                         NavigationDestination.FILES -> {
                             FilesScreen(
@@ -320,7 +320,7 @@ private fun SearchBar(
 // ─────────────────────────────────────────────────────
 
 @Composable
-private fun ShelfGrid(books: List<Book>, onBookClick: (String) -> Unit) {
+private fun ShelfGrid(books: List<Book>, onBookClick: (String) -> Unit, bookProgress: Map<String, Int> = emptyMap()) {
     LazyVerticalGrid(
         columns = GridCells.Fixed(3),
         contentPadding = PaddingValues(12.dp),
@@ -332,6 +332,7 @@ private fun ShelfGrid(books: List<Book>, onBookClick: (String) -> Unit) {
             BookCover(
                 book = book,
                 gradientIndex = book.title.hashCode().mod(CoverGradients.size),
+                progress = bookProgress[book.id] ?: 0,
                 onClick = { onBookClick(book.id) }
             )
         }
@@ -342,6 +343,7 @@ private fun ShelfGrid(books: List<Book>, onBookClick: (String) -> Unit) {
 private fun BookCover(
     book: Book,
     gradientIndex: Int,
+    progress: Int = 0,
     onClick: () -> Unit
 ) {
     val gradient = CoverGradients[gradientIndex.coerceIn(0, CoverGradients.lastIndex)]
@@ -385,7 +387,7 @@ private fun BookCover(
             ) {
                 Box(contentAlignment = Alignment.Center) {
                     Text(
-                        "0%",
+                        "$progress%",
                         fontSize = 8.sp,
                         fontWeight = FontWeight.Bold,
                         color = Color.White
