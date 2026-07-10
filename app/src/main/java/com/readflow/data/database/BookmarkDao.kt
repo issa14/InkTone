@@ -28,4 +28,7 @@ interface BookmarkDao {
     /** Recherche dans le texte des marque-pages. */
     @Query("SELECT * FROM bookmarks WHERE text LIKE '%' || :query || '%' ORDER BY createdAt DESC")
     fun searchBookmarks(query: String): Flow<List<BookmarkEntity>>
+
+    @Query("SELECT * FROM bookmarks")
+    suspend fun getAllSync(): List<BookmarkEntity>
 }

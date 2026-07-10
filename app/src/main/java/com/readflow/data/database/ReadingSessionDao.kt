@@ -24,4 +24,7 @@ interface ReadingSessionDao {
 
     @Query("SELECT SUM(durationSeconds) FROM reading_sessions WHERE date = :date")
     suspend fun getReadingSecondsForDate(date: String): Long?
+
+    @Query("SELECT * FROM reading_sessions")
+    suspend fun getAllSync(): List<ReadingSessionEntity>
 }

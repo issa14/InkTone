@@ -13,4 +13,7 @@ interface ProgressDao {
 
     @Query("SELECT * FROM progress WHERE bookId = :bookId")
     suspend fun getByBookId(bookId: String): ProgressEntity?
+
+    @Query("SELECT * FROM progress")
+    suspend fun getAllSync(): List<ProgressEntity>
 }

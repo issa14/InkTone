@@ -28,4 +28,7 @@ interface PronunciationRuleDao {
 
     @Query("SELECT * FROM pronunciation_rules WHERE isActive = 1")
     suspend fun getActiveRules(): List<PronunciationRule>
+
+    @Query("SELECT * FROM pronunciation_rules")
+    suspend fun getAllSync(): List<PronunciationRule>
 }

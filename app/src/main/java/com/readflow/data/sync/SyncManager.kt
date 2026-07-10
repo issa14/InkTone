@@ -150,36 +150,36 @@ class SyncManager @Inject constructor(
     // ── Private ──────────────────────────────────────
 
     private suspend fun buildPayload(): BackupPayload {
-        val bookmarks = withContext(Dispatchers.IO) {
-            // Lecture directe via une query custom simplifiée
-            emptyList<BookmarkEntity>() // DAO flow-based, simplifié ici
-        }
-        // Note: les DAOs exposent des Flow, on utilise une approche simplifiée
-        // Dans une implémentation réelle, on aurait des queries synchrones supplémentaires
+        val bookmarks = bookmarkDao.getAllSync()
+        val rules = pronunciationRuleDao.getAllSync()
+        val progress = progressDao.getAllSync()
+        val readingProgress = readingProgressDao.getAllSync()
+        val sessions = sessionDao.getAllSync()
+
+        val totalWords = sessions.sumOf { it.wordsRead.toLong() }
+        val totalSeconds = sessions.sumOf { it.durationSeconds }
+        val avgWpm = if (totalSeconds > 60) ((totalWords * 60) / totalSeconds).toInt() else 0
+
         return BackupPayload(
+            version = 1,
             appVersion = "0.1.0",
-            createdAt = System.currentTimeMillis()
+            createdAt = System.currentTimeMillis(),
+            averageWpm = avgWpm,
+            bookmarks = bookmarks,
+            pronunciationRules = rules,
+            progressEntries = progress,
+            readingProgressList = readingProgress,
+            readingSessions = sessions
         )
     }
 
     private suspend fun mergePayload(payload: BackupPayload) {
         withContext(Dispatchers.IO) {
-            // Fusionner les signets (la version la plus récente l'emporte)
-            payload.bookmarks.forEach { remote ->
-                // Insérer ou mettre à jour selon l'ID
-            }
-            payload.pronunciationRules.forEach { remote ->
-                pronunciationRuleDao.insertRule(remote)
-            }
-            payload.readingProgressList.forEach { remote ->
-                readingProgressDao.saveProgress(remote)
-            }
-            payload.readingSessions.forEach { remote ->
-                sessionDao.insertSession(remote)
-            }
-            payload.progressEntries.forEach { remote ->
-                progressDao.upsert(remote)
-            }
+            payload.bookmarks.forEach { bookmarkDao.insert(it) }
+            payload.pronunciationRules.forEach { pronunciationRuleDao.insertRule(it) }
+            payload.readingProgressList.forEach { readingProgressDao.saveProgress(it) }
+            payload.readingSessions.forEach { sessionDao.insertSession(it) }
+            payload.progressEntries.forEach { progressDao.upsert(it) }
         }
     }
 }

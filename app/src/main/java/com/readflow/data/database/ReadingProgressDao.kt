@@ -15,6 +15,9 @@ import com.readflow.data.database.entity.ReadingProgress
 @Dao
 interface ReadingProgressDao {
 
+    @Query("SELECT * FROM reading_progress")
+    suspend fun getAllSync(): List<ReadingProgress>
+
     /**
      * Récupère la dernière progression enregistrée pour un livre.
      * @return [ReadingProgress] ou null si aucune progression sauvegardée.
