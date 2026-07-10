@@ -6,6 +6,7 @@ import androidx.room.migration.Migration
 import androidx.sqlite.db.SupportSQLiteDatabase
 import com.readflow.data.database.entity.AnnotationEntity
 import com.readflow.data.database.entity.BookEntity
+import com.readflow.data.database.entity.BookProgressEntity
 import com.readflow.data.database.entity.BookmarkEntity
 import com.readflow.data.database.entity.HighlightEntity
 import com.readflow.data.database.entity.ProgressEntity
@@ -64,9 +65,10 @@ val MIGRATION_3_4 = object : Migration(3, 4) {
         AnnotationEntity::class,
         HighlightEntity::class,
         ReadingSessionEntity::class,
-        RecentBookEntity::class
+        RecentBookEntity::class,
+        BookProgressEntity::class
     ],
-    version = 10,
+    version = 11,
     exportSchema = false
 )
 abstract class ReadFlowDatabase : RoomDatabase() {
@@ -81,4 +83,5 @@ abstract class ReadFlowDatabase : RoomDatabase() {
     abstract fun highlightDao(): HighlightDao
     abstract fun readingSessionDao(): ReadingSessionDao
     abstract fun recentBookDao(): RecentBookDao
+    abstract fun bookProgressDao(): BookProgressDao
 }

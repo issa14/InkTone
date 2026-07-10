@@ -4,6 +4,7 @@ import android.content.Context
 import androidx.room.Room
 import com.readflow.data.database.AnnotationDao
 import com.readflow.data.database.BookDao
+import com.readflow.data.database.BookProgressDao
 import com.readflow.data.database.BookmarkDao
 import com.readflow.data.database.HighlightDao
 import com.readflow.data.database.MIGRATION_1_2
@@ -76,6 +77,9 @@ object AppModule {
 
     @Provides
     fun provideRecentBookDao(db: ReadFlowDatabase): RecentBookDao = db.recentBookDao()
+
+    @Provides
+    fun provideBookProgressDao(db: ReadFlowDatabase): BookProgressDao = db.bookProgressDao()
 
     @Provides
     @Singleton

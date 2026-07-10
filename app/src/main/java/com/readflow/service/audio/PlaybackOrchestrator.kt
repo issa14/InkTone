@@ -1,8 +1,10 @@
 package com.readflow.service.audio
 
 import android.util.Log
+import com.readflow.data.database.BookProgressDao
 import com.readflow.data.database.ReadingProgressDao
 import com.readflow.data.database.ReadingSessionDao
+import com.readflow.data.database.entity.BookProgressEntity
 import com.readflow.data.database.entity.ReadingProgress
 import com.readflow.data.database.entity.ReadingSessionEntity
 import com.readflow.domain.model.Sentence
@@ -73,7 +75,8 @@ class PlaybackOrchestrator @Inject constructor(
     private val onnxService: OnnxInferenceService,
     private val audioFocusManager: AudioFocusManager,
     private val progressDao: ReadingProgressDao,
-    private val sessionDao: ReadingSessionDao
+    private val sessionDao: ReadingSessionDao,
+    private val bookProgressDao: BookProgressDao
 ) : AudioFocusListener {
 
     companion object {
@@ -133,6 +136,9 @@ class PlaybackOrchestrator @Inject constructor(
     // ── Session de lecture (Phase 7: Stats) ────────
     @Volatile private var sessionStartTimeMs: Long = 0L
     @Volatile private var sessionWordsRead: Int = 0
+
+    // ── Progression unifiée (Phase: SSOT) ──────────
+    @Volatile private var totalChaptersForBook: Int = 0
 
     // Identité du livre/chapitre en cours, pour la persistance de progression
     @Volatile private var currentBookId: String? = null
@@ -246,7 +252,8 @@ class PlaybackOrchestrator @Inject constructor(
         bookTitle: String = "",
         chapterTitle: String = "",
         bookId: String = "",
-        chapterIndex: Int = 0
+        chapterIndex: Int = 0,
+        totalChapters: Int = 0
     ) {
         if (sentences.isEmpty()) return
         stop()
@@ -272,9 +279,10 @@ class PlaybackOrchestrator @Inject constructor(
         currentTotalSentences = sentences.size
         currentSentences = sentences
 
-        // ── Initialiser la session de lecture (Phase 7: Stats) ──
+        // ── Initialiser la session (Phase 7) + progression unifiée ──
         sessionStartTimeMs = System.currentTimeMillis()
         sessionWordsRead = 0
+        totalChaptersForBook = totalChapters
 
         val total = sentences.size
         _progress.value = Progress(startFrom, total, sentences.getOrNull(startFrom))
@@ -576,7 +584,25 @@ class PlaybackOrchestrator @Inject constructor(
                         updatedAt = System.currentTimeMillis()
                     )
                 )
-                Log.d(TAG, "Progression sauvegardée: book=$bookId ch=$chapterIdx sent=$sentenceIdx")
+                // Progression unifiée SSOT (badge couverture)
+                val fraction = if (totalChaptersForBook > 0) {
+                    val chapterWeight = 1f / totalChaptersForBook
+                    val intra = if (currentTotalSentences > 0)
+                        sentenceIdx.toFloat() / currentTotalSentences else 0f
+                    (chapterIdx.toFloat() / totalChaptersForBook + intra * chapterWeight).coerceIn(0f, 1f)
+                } else 0f
+                bookProgressDao.upsert(
+                    BookProgressEntity(
+                        bookId = bookId,
+                        currentChapterIndex = chapterIdx,
+                        totalChapters = totalChaptersForBook,
+                        currentSentenceIndex = sentenceIdx,
+                        totalSentencesInChapter = currentTotalSentences,
+                        globalProgressFraction = fraction,
+                        lastReadTimestamp = System.currentTimeMillis()
+                    )
+                )
+                Log.d(TAG, "Progression sauvegardée: book=$bookId ch=$chapterIdx sent=$sentenceIdx (${(fraction*100).toInt()}%)")
             } catch (e: Exception) {
                 Log.e(TAG, "Échec sauvegarde progression: ${e.message}", e)
             }
