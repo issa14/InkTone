@@ -47,7 +47,8 @@ enum class NavigationDestination(
     FILES("Fichiers", Icons.Default.Folder),
     OPDS("Catalogues OPDS", Icons.Default.Language),
     BOOKMARKS("Marque-pages et notes", Icons.Default.Bookmark),
-    STATS("Statistiques de lecture", Icons.Default.BarChart)
+    STATS("Statistiques de lecture", Icons.Default.BarChart),
+    SYNC("Synchronisation & Sauvegarde", Icons.Default.Sync)
 }
 
 @HiltViewModel

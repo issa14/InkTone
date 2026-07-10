@@ -155,6 +155,13 @@ dependencies {
     implementation(libs.readium.streamer)
     coreLibraryDesugaring(libs.desugar.jdk.libs)
 
+    // --- Sync & Security (Phase 8) ---
+    implementation("androidx.security:security-crypto:1.1.0-alpha06")
+    implementation("androidx.work:work-runtime-ktx:2.9.0")
+    implementation("com.google.android.gms:play-services-auth:21.1.1")
+    implementation("com.google.code.gson:gson:2.10.1")
+    implementation("com.squareup.okhttp3:okhttp:4.12.0")
+
     // --- Testing ---
     testImplementation(libs.junit.jupiter.api)
     testRuntimeOnly(libs.junit.jupiter.engine)

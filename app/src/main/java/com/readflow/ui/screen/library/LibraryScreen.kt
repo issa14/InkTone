@@ -46,6 +46,7 @@ fun LibraryScreen(
     onBookClick: (String) -> Unit,
     onDebugClick: () -> Unit,
     onStatsClick: () -> Unit = {},
+    onSyncClick: () -> Unit = {},
     viewModel: LibraryViewModel = hiltViewModel()
 ) {
     val state by viewModel.uiState.collectAsState()
@@ -132,6 +133,9 @@ fun LibraryScreen(
                         }
                         NavigationDestination.STATS -> {
                             LaunchedEffect(Unit) { onStatsClick() }
+                        }
+                        NavigationDestination.SYNC -> {
+                            LaunchedEffect(Unit) { onSyncClick() }
                         }
                     }
                     } // end else (isLoading)
