@@ -348,7 +348,8 @@ class ReaderViewModel @Inject constructor(
             bookTitle = book.title,
             chapterTitle = chapter.title,
             bookId = book.id,
-            chapterIndex = s.currentChapterIndex
+            chapterIndex = s.currentChapterIndex,
+            totalChapters = book.totalChapters
         )
         _uiState.update { it.copy(isPlaying = true) }
     }
