@@ -55,6 +55,7 @@ fun LibraryScreen(
     var showNavPopup by remember { mutableStateOf(false) }
     var showSearch by remember { mutableStateOf(false) }
     var searchText by remember { mutableStateOf("") }
+    var fontSizeScale by remember { mutableStateOf(1) } // 0=small, 1=medium, 2=large
 
     val epubPicker = rememberLauncherForActivityResult(
         ActivityResultContracts.OpenMultipleDocuments()
@@ -190,7 +191,8 @@ fun LibraryScreen(
         if (showOverflow) {
             OverflowMenu(
                 onDismiss = { showOverflow = false },
-                onImport = { epubPicker.launch(arrayOf("application/epub+zip")) }
+                onImport = { epubPicker.launch(arrayOf("application/epub+zip")) },
+                onSync = { viewModel.navigateTo(NavigationDestination.SYNC); showOverflow = false }
             )
         }
 
@@ -215,7 +217,12 @@ fun LibraryScreen(
             modifier = Modifier
                 .align(Alignment.BottomEnd)
                 .padding(end = 16.dp, bottom = 20.dp),
-            onReadResume = { /* TODO: reprendre dernier livre */ }
+            onReadResume = {
+                val latest = state.recentBooks.firstOrNull()
+                if (latest != null) {
+                    onBookClick(latest.bookId)
+                }
+            }
         )
     }
 }
@@ -732,7 +739,7 @@ private fun FilterAndSortDialog(
 // ─────────────────────────────────────────────────────
 
 @Composable
-private fun OverflowMenu(onDismiss: () -> Unit, onImport: () -> Unit) {
+private fun OverflowMenu(onDismiss: () -> Unit, onImport: () -> Unit, onSync: () -> Unit = {}) {
     // Overlay pour fermer au tap extérieur
     Box(
         modifier = Modifier
@@ -756,7 +763,7 @@ private fun OverflowMenu(onDismiss: () -> Unit, onImport: () -> Unit) {
                 OverflowMenuItem("Reconstruire les couvertures", Icons.Default.Refresh) { onDismiss() }
                 HorizontalDivider(modifier = Modifier.padding(vertical = 4.dp))
                 OverflowMenuItem("Synchroniser avec le cloud", Icons.Default.CloudUpload,
-                    color = AccentBlue) { onDismiss() }
+                    color = AccentBlue) { onDismiss(); onSync() }
             }
         }
     }
