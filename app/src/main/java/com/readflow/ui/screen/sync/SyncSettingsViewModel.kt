@@ -1,11 +1,14 @@
 package com.readflow.ui.screen.sync
 
 import android.content.Context
+import android.content.Intent
 import android.net.Uri
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
+import com.google.android.gms.auth.api.signin.GoogleSignIn
 import com.readflow.data.sync.SyncManager
 import dagger.hilt.android.lifecycle.HiltViewModel
+import dagger.hilt.android.qualifiers.ApplicationContext
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
@@ -30,7 +33,8 @@ data class SyncSettingsUiState(
 
 @HiltViewModel
 class SyncSettingsViewModel @Inject constructor(
-    private val syncManager: SyncManager
+    private val syncManager: SyncManager,
+    @ApplicationContext private val appContext: Context
 ) : ViewModel() {
 
     private val _uiState = MutableStateFlow(SyncSettingsUiState())
@@ -42,8 +46,50 @@ class SyncSettingsViewModel @Inject constructor(
     fun updatePassword(pass: String) = _uiState.update { it.copy(encryptionPassword = pass) }
 
     fun connectGoogleDrive() {
-        // Connexion Google Drive via Play Services Auth (à implémenter avec Activity Result)
-        _uiState.update { it.copy(statusMessage = "Connexion Google Drive à implémenter", isError = false) }
+        _uiState.update { it.copy(statusMessage = "Lancement connexion Google...", isError = false) }
+    }
+
+    fun handleGoogleSignInResult(data: Intent?) {
+        viewModelScope.launch {
+            try {
+                _uiState.update { it.copy(isLoading = true) }
+                val account = GoogleSignIn.getSignedInAccountFromIntent(data).result
+                    ?: throw Exception("Compte Google non récupéré")
+
+                val token = withContext(Dispatchers.IO) {
+                    com.google.android.gms.auth.GoogleAuthUtil.getToken(
+                        appContext,
+                        account.account!!,
+                        "oauth2:https://www.googleapis.com/auth/drive.appdata"
+                    )
+                }
+
+                syncManager.configure(
+                    SyncManager.SyncConfig(
+                        provider = SyncManager.Provider.GOOGLE_DRIVE,
+                        driveAccessToken = token
+                    )
+                )
+
+                _uiState.update {
+                    it.copy(
+                        isLoading = false,
+                        driveConnected = true,
+                        statusMessage = "✓ Connecté : ${account.email}",
+                        isError = false
+                    )
+                }
+            } catch (e: Exception) {
+                _uiState.update {
+                    it.copy(
+                        isLoading = false,
+                        driveConnected = false,
+                        statusMessage = "Échec connexion Drive: ${e.message}",
+                        isError = true
+                    )
+                }
+            }
+        }
     }
 
     suspend fun testWebdav() {

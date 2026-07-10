@@ -21,6 +21,9 @@ import androidx.compose.ui.text.input.PasswordVisualTransformation
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.hilt.navigation.compose.hiltViewModel
+import com.google.android.gms.auth.api.signin.GoogleSignIn
+import com.google.android.gms.auth.api.signin.GoogleSignInOptions
+import com.google.android.gms.common.api.Scope
 import kotlinx.coroutines.launch
 import java.io.BufferedReader
 import java.io.InputStreamReader
@@ -51,6 +54,20 @@ fun SyncSettingsScreen(
         ActivityResultContracts.OpenDocument()
     ) { uri ->
         uri?.let { viewModel.importFromUri(context, it) }
+    }
+
+    // ── Google Sign-In ──
+    val googleSignInClient = remember {
+        val gso = GoogleSignInOptions.Builder(GoogleSignInOptions.DEFAULT_SIGN_IN)
+            .requestEmail()
+            .requestScopes(Scope("https://www.googleapis.com/auth/drive.appdata"))
+            .build()
+        GoogleSignIn.getClient(context, gso)
+    }
+    val googleSignInLauncher = rememberLauncherForActivityResult(
+        ActivityResultContracts.StartActivityForResult()
+    ) { result ->
+        viewModel.handleGoogleSignInResult(result.data)
     }
 
     Column(
@@ -117,8 +134,9 @@ fun SyncSettingsScreen(
             SectionTitle("Google Drive")
             Spacer(Modifier.height(8.dp))
             OutlinedButton(
-                onClick = { viewModel.connectGoogleDrive() },
-                modifier = Modifier.fillMaxWidth()
+                onClick = { googleSignInLauncher.launch(googleSignInClient.signInIntent) },
+                modifier = Modifier.fillMaxWidth(),
+                enabled = !state.isLoading
             ) {
                 Icon(Icons.Default.Cloud, null, modifier = Modifier.size(20.dp))
                 Spacer(Modifier.width(8.dp))
