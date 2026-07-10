@@ -63,7 +63,11 @@ fun LibraryScreen(
     }
 
     Box(modifier = Modifier.fillMaxSize()) {
-        // ── FOND ─────────────────────────────────────
+        // Wrapper qui enregistre l'ouverture avant de naviguer
+    val handleBookClick: (String) -> Unit = { bookId ->
+        state.allBooks.find { it.id == bookId }?.let { viewModel.recordBookOpen(it) }
+        onBookClick(bookId)
+    }
         Surface(
             modifier = Modifier.fillMaxSize(),
             color = AppBackground
@@ -108,13 +112,14 @@ fun LibraryScreen(
                             when {
                                 state.isLoading && state.books.isEmpty() -> LoadingView()
                                 state.books.isEmpty() && !state.isLoading -> EmptyView()
-                                else -> ShelfGrid(state.books, onBookClick)
+                                else -> ShelfGrid(state.books, handleBookClick)
                             }
                         }
                         NavigationDestination.RECENTS -> {
-                            // Livres récents (triés par date)
-                            val recent = state.allBooks.sortedByDescending { it.addedAt }
-                            if (recent.isEmpty()) EmptyView() else ShelfGrid(recent, onBookClick)
+                            val recent = state.recentBooks.mapNotNull { entity ->
+                                state.allBooks.find { it.id == entity.bookId }
+                            }
+                            if (recent.isEmpty()) EmptyView() else ShelfGrid(recent, handleBookClick)
                         }
                         NavigationDestination.FILES -> {
                             FilesScreen(

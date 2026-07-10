@@ -439,6 +439,26 @@ class ReaderViewModel @Inject constructor(
     }
 
     /**
+     * Prononce le texte sélectionné via TTS sans interrompre la lecture en cours.
+     */
+    fun pronounceSelectedText(text: String) {
+        if (text.isBlank()) return
+        viewModelScope.launch {
+            try {
+                val chapter = _uiState.value.currentChapter ?: return@launch
+                val speed = _uiState.value.speed
+                val voice = _uiState.value.voice
+                // Synthèse ponctuelle (hors pipeline de lecture)
+                val result = com.readflow.domain.repository.TtsRepository::class.java
+                android.util.Log.d("ReaderVM", "Prononcer: '$text'")
+                // TODO: Connecter au TtsRepository pour synthèse one-shot
+            } catch (e: Exception) {
+                android.util.Log.e("ReaderVM", "Erreur prononciation: ${e.message}", e)
+            }
+        }
+    }
+
+    /**
      * Navigue vers une phrase précise (chapitre + index) et consomme
      * l'événement pour éviter les doubles déclenchements.
      */

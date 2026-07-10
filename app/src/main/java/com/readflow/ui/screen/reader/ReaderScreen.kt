@@ -152,6 +152,9 @@ fun ReaderScreen(
                 },
                 onDeleteHighlight = { viewModel.deleteHighlight(it) },
                 onSaveNote = { id, note -> viewModel.saveNoteForHighlight(id, note) },
+                onPronounceSelection = { text ->
+                    viewModel.pronounceSelectedText(text)
+                },
                 scrollTarget = scrollTarget,
                 onConsumeScrollTarget = { viewModel.consumeScrollTarget() }
             )
@@ -511,6 +514,7 @@ private fun ImmersiveText(
     onSaveHighlight: (sentIdx: Int, start: Int, end: Int, text: String, color: String) -> Unit = { _, _, _, _, _ -> },
     onDeleteHighlight: (HighlightEntity) -> Unit = {},
     onSaveNote: (highlightId: Long, note: String) -> Unit = { _, _ -> },
+    onPronounceSelection: (text: String) -> Unit = {},
     scrollTarget: Pair<Int, Int>? = null,
     onConsumeScrollTarget: () -> Unit = {}
 ) {
@@ -690,6 +694,18 @@ private fun ImmersiveText(
                     noteText = ""
                 },
                 onCopy = { onCopyCallback?.invoke() },
+                onPronounce = {
+                    onCopyCallback?.invoke()
+                    coroutineScope.launch {
+                        kotlinx.coroutines.delay(100)
+                        val clip = context.getSystemService(
+                            android.content.Context.CLIPBOARD_SERVICE
+                        ) as? android.content.ClipboardManager
+                        val text = clip?.primaryClip?.getItemAt(0)?.text?.toString() ?: ""
+                        clip?.clearPrimaryClip()
+                        if (text.isNotBlank()) onPronounceSelection(text)
+                    }
+                },
                 onDismiss = { dismissToolbar() }
             )
         }
@@ -1163,6 +1179,7 @@ private fun FloatingHighlightToolbar(
     onColorSelected: (String) -> Unit,
     onAddNote: () -> Unit,
     onCopy: () -> Unit,
+    onPronounce: () -> Unit,
     onDismiss: () -> Unit
 ) {
     var showColorPicker by remember { mutableStateOf(false) }
@@ -1223,6 +1240,14 @@ private fun FloatingHighlightToolbar(
                     Icon(
                         Icons.Default.ContentCopy, "Copier",
                         tint = Color.White.copy(alpha = 0.7f),
+                        modifier = Modifier.size(18.dp)
+                    )
+                }
+                // Bouton Prononcer (TTS)
+                IconButton(onClick = onPronounce, modifier = Modifier.size(36.dp)) {
+                    Icon(
+                        Icons.Default.VolumeUp, "Prononcer",
+                        tint = Color(0xFF4FC3F7),
                         modifier = Modifier.size(18.dp)
                     )
                 }

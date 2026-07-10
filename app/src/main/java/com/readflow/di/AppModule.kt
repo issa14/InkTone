@@ -14,6 +14,7 @@ import com.readflow.data.database.PronunciationRuleDao
 import com.readflow.data.database.ReadFlowDatabase
 import com.readflow.data.database.ReadingProgressDao
 import com.readflow.data.database.ReadingSessionDao
+import com.readflow.data.database.RecentBookDao
 import com.readflow.data.database.SearchDao
 import com.readflow.data.database.SentenceCacheDao
 import com.readflow.data.repository.BookRepositoryImpl
@@ -72,6 +73,9 @@ object AppModule {
 
     @Provides
     fun provideReadingSessionDao(db: ReadFlowDatabase): ReadingSessionDao = db.readingSessionDao()
+
+    @Provides
+    fun provideRecentBookDao(db: ReadFlowDatabase): RecentBookDao = db.recentBookDao()
 
     @Provides
     @Singleton

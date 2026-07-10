@@ -8,6 +8,8 @@ import androidx.compose.material.icons.filled.*
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
+import com.readflow.data.repository.RecentBooksRepository
+import com.readflow.data.database.entity.RecentBookEntity
 import com.readflow.domain.model.Book
 import com.readflow.domain.repository.BookRepository
 import dagger.hilt.android.lifecycle.HiltViewModel
@@ -30,7 +32,8 @@ data class LibraryUiState(
     val layoutMode: LayoutMode = LayoutMode.GRID_COVERS,
     val isFilterDialogVisible: Boolean = false,
     val currentDestination: NavigationDestination = NavigationDestination.LIBRARY,
-    val isDarkTheme: Boolean = true
+    val isDarkTheme: Boolean = true,
+    val recentBooks: List<RecentBookEntity> = emptyList()
 )
 
 enum class FilterMode { ALL, BY_AUTHOR, BY_TITLE, IN_PROGRESS, READ, UNREAD }
@@ -54,13 +57,22 @@ enum class NavigationDestination(
 @HiltViewModel
 class LibraryViewModel @Inject constructor(
     private val bookRepository: BookRepository,
+    private val recentBooksRepo: RecentBooksRepository,
     @ApplicationContext private val context: Context
 ) : ViewModel() {
 
     private val _uiState = MutableStateFlow(LibraryUiState())
     val uiState: StateFlow<LibraryUiState> = _uiState.asStateFlow()
 
-    init { loadBooks() }
+    init {
+        loadBooks()
+        // Observer les livres récents
+        viewModelScope.launch {
+            recentBooksRepo.recentBooks.collect { recents ->
+                _uiState.update { it.copy(recentBooks = recents) }
+            }
+        }
+    }
 
     private fun loadBooks() {
         viewModelScope.launch {
@@ -104,6 +116,27 @@ class LibraryViewModel @Inject constructor(
 
     fun navigateTo(dest: NavigationDestination) {
         _uiState.update { it.copy(currentDestination = dest) }
+    }
+
+    /**
+     * Enregistre l'ouverture d'un livre dans l'historique des récents.
+     * Appelé depuis [LibraryScreen] quand l'utilisateur ouvre un livre.
+     */
+    fun recordBookOpen(book: Book) {
+        viewModelScope.launch {
+            try {
+                recentBooksRepo.openBook(
+                    RecentBookEntity(
+                        bookId = book.id,
+                        title = book.title,
+                        author = book.author,
+                        coverPath = book.coverPath ?: ""
+                    )
+                )
+            } catch (e: Exception) {
+                // Non-bloquant : un échec d'enregistrement n'empêche pas la lecture
+            }
+        }
     }
 
     fun toggleTheme() {
