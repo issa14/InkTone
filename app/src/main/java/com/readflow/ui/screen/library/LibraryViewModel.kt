@@ -51,7 +51,8 @@ enum class NavigationDestination(
     OPDS("Catalogues OPDS", Icons.Default.Language),
     BOOKMARKS("Marque-pages et notes", Icons.Default.Bookmark),
     STATS("Statistiques de lecture", Icons.Default.BarChart),
-    SYNC("Synchronisation & Sauvegarde", Icons.Default.Sync)
+    SYNC("Synchronisation & Sauvegarde", Icons.Default.Sync),
+    ABOUT("À propos", Icons.Default.Info)
 }
 
 @HiltViewModel
