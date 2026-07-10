@@ -84,6 +84,7 @@ fun LibraryScreen(
                         )
                     } else {
                         TopBar(
+                            currentDest = state.currentDestination,
                             onMenu = { showDrawer = true },
                             onNavPopup = { showNavPopup = true },
                             onFilterMode = { viewModel.showFilterDialog() },
@@ -218,21 +219,26 @@ fun LibraryScreen(
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 private fun TopBar(
+    currentDest: NavigationDestination,
     onMenu: () -> Unit,
     onNavPopup: () -> Unit,
     onFilterMode: () -> Unit,
     onSearch: () -> Unit,
     onOverflow: () -> Unit
 ) {
+    val isLibrary = currentDest == NavigationDestination.LIBRARY
+
     TopAppBar(
         title = {
             Row(
                 verticalAlignment = Alignment.CenterVertically,
                 modifier = Modifier.clickable(onClick = onNavPopup)
             ) {
-                Text("Tous les livres", fontWeight = FontWeight.Medium, fontSize = 17.sp)
-                Spacer(Modifier.width(4.dp))
-                Icon(Icons.Default.ArrowDropDown, null, tint = Color.White, modifier = Modifier.size(18.dp))
+                Text(currentDest.label, fontWeight = FontWeight.Medium, fontSize = 17.sp)
+                if (isLibrary) {
+                    Spacer(Modifier.width(4.dp))
+                    Icon(Icons.Default.ArrowDropDown, null, tint = Color.White, modifier = Modifier.size(18.dp))
+                }
             }
         },
         navigationIcon = {
@@ -241,14 +247,16 @@ private fun TopBar(
             }
         },
         actions = {
-            IconButton(onClick = onSearch) {
-                Icon(Icons.Default.Search, "Rechercher", tint = Color.White)
-            }
-            IconButton(onClick = onFilterMode) {
-                Icon(Icons.Default.FilterList, "Filtrer", tint = Color.White)
-            }
-            IconButton(onClick = onOverflow) {
-                Icon(Icons.Default.MoreVert, "Plus", tint = Color.White)
+            if (isLibrary) {
+                IconButton(onClick = onSearch) {
+                    Icon(Icons.Default.Search, "Rechercher", tint = Color.White)
+                }
+                IconButton(onClick = onFilterMode) {
+                    Icon(Icons.Default.FilterList, "Filtrer", tint = Color.White)
+                }
+                IconButton(onClick = onOverflow) {
+                    Icon(Icons.Default.MoreVert, "Plus", tint = Color.White)
+                }
             }
         },
         colors = TopAppBarDefaults.topAppBarColors(
