@@ -39,6 +39,7 @@ import com.readflow.ui.screen.library.SortOrder
 import com.readflow.ui.screen.library.FilterType
 import com.readflow.ui.screen.library.LayoutMode
 import com.readflow.ui.screen.library.NavigationDestination
+import com.readflow.ui.screen.opds.OpdsScreen
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -47,6 +48,7 @@ fun LibraryScreen(
     onDebugClick: () -> Unit,
     onStatsClick: () -> Unit = {},
     onSyncClick: () -> Unit = {},
+    onOpdsClick: () -> Unit = {},
     viewModel: LibraryViewModel = hiltViewModel()
 ) {
     val state by viewModel.uiState.collectAsState()
@@ -132,7 +134,9 @@ fun LibraryScreen(
                                 onBack = { viewModel.navigateTo(NavigationDestination.LIBRARY) }
                             )
                         }
-                        NavigationDestination.OPDS,
+                        NavigationDestination.OPDS -> {
+                            OpdsScreen(onBack = { viewModel.navigateTo(NavigationDestination.LIBRARY) })
+                        }
                         NavigationDestination.BOOKMARKS -> {
                             ComingSoonPlaceholder(state.currentDestination.label)
                         }
