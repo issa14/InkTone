@@ -915,14 +915,14 @@ private fun FloatingControls(
     onReadResume: () -> Unit
 ) {
     Row(modifier = modifier, verticalAlignment = Alignment.CenterVertically) {
-        // Pill audio discret
+        // Pill audio — reprend la lecture TTS du dernier livre
         Surface(
             shape = RoundedCornerShape(20.dp),
             color = SurfaceRaised,
             border = ButtonDefaults.outlinedButtonBorder(enabled = true),
             tonalElevation = 4.dp
         ) {
-            IconButton(onClick = { /* TODO: quick TTS */ }) {
+            IconButton(onClick = onReadResume) {
                 Icon(Icons.Outlined.Headphones, "Audio",
                     tint = AccentTts, modifier = Modifier.size(18.dp))
             }
