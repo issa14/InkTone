@@ -136,6 +136,22 @@ fun LibraryScreen(
                                 onBack = { viewModel.navigateTo(NavigationDestination.LIBRARY) }
                             )
                         }
+                        NavigationDestination.STATS -> {
+                            com.readflow.ui.screen.stats.StatsScreen(
+                                onBack = { viewModel.navigateTo(NavigationDestination.LIBRARY) }
+                            )
+                        }
+                        NavigationDestination.SYNC -> {
+                            com.readflow.ui.screen.sync.SyncSettingsScreen(
+                                onBack = { viewModel.navigateTo(NavigationDestination.LIBRARY) }
+                            )
+                        }
+                        NavigationDestination.SETTINGS -> {
+                            com.readflow.ui.screen.settings.SettingsScreen()
+                        }
+                        NavigationDestination.ABOUT -> {
+                            com.readflow.ui.screen.about.AboutScreen()
+                        }
                     }
                     } // end else (isLoading)
                 }
@@ -811,7 +827,9 @@ private fun NavDrawer(
 
                 // Menu items dynamiques
                 Column(modifier = Modifier.weight(1f)) {
-                    NavigationDestination.entries.forEach { dest ->
+                    NavigationDestination.entries
+                        .filter { it != NavigationDestination.SETTINGS && it != NavigationDestination.ABOUT }
+                        .forEach { dest ->
                         val isActive = dest == currentDest
                         Surface(
                             color = if (isActive) Color(0xFFE8F0FE) else Color.Transparent,
@@ -849,6 +867,14 @@ private fun NavDrawer(
                         horizontalArrangement = Arrangement.SpaceEvenly,
                         verticalAlignment = Alignment.CenterVertically
                     ) {
+                        DrawerFooterBtn("Options", Icons.Default.Settings) {
+                            onNavigate(NavigationDestination.SETTINGS)
+                            onDismiss()
+                        }
+                        DrawerFooterBtn("À propos", Icons.Default.Info) {
+                            onNavigate(NavigationDestination.ABOUT)
+                            onDismiss()
+                        }
                         DrawerFooterBtn("Thème", Icons.Default.DarkMode) { onThemeToggle() }
                         DrawerFooterBtn("Debug", Icons.Default.Build) { onDismiss(); onDebug() }
                     }
