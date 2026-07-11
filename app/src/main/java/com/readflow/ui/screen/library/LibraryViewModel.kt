@@ -32,7 +32,9 @@ data class LibraryUiState(
     val layoutMode: LayoutMode = LayoutMode.GRID_COVERS,
     val isFilterDialogVisible: Boolean = false,
     val currentDestination: NavigationDestination = NavigationDestination.LIBRARY,
-    val isDarkTheme: Boolean = true
+    val isDarkTheme: Boolean = true,
+    val importProgress: Float? = null,
+    val importStatus: String? = null
 )
 
 enum class FilterMode { ALL, BY_AUTHOR, BY_TITLE, IN_PROGRESS, READ, UNREAD }
@@ -161,15 +163,18 @@ class LibraryViewModel @Inject constructor(
 
     fun importEpub(uri: Uri) {
         viewModelScope.launch {
-            _uiState.update { it.copy(isLoading = true, error = null) }
+            _uiState.update { it.copy(isLoading = true, error = null, importProgress = 0f, importStatus = "Préparation de l'import...") }
             try {
                 val fileName = resolveFileName(uri) ?: "inconnu.epub"
                 context.contentResolver.openInputStream(uri)?.use { stream ->
-                    bookRepository.importEpub(stream, fileName)
+                    bookRepository.importEpub(stream, fileName) { progress, status ->
+                        _uiState.update { it.copy(importProgress = progress, importStatus = status) }
+                    }
                 } ?: throw IllegalStateException("Impossible de lire le fichier")
+                _uiState.update { it.copy(importProgress = null, importStatus = null) }
                 loadBooks()
             } catch (e: Exception) {
-                _uiState.update { it.copy(error = e.message, isLoading = false) }
+                _uiState.update { it.copy(error = e.message, isLoading = false, importProgress = null, importStatus = null) }
             }
         }
     }
@@ -177,12 +182,15 @@ class LibraryViewModel @Inject constructor(
     /** Import depuis un fichier local (explorateur FilesScreen). */
     fun importFile(inputStream: java.io.InputStream, fileName: String) {
         viewModelScope.launch {
-            _uiState.update { it.copy(isLoading = true, error = null) }
+            _uiState.update { it.copy(isLoading = true, error = null, importProgress = 0f, importStatus = "Préparation de l'import...") }
             try {
-                bookRepository.importEpub(inputStream, fileName)
+                bookRepository.importEpub(inputStream, fileName) { progress, status ->
+                    _uiState.update { it.copy(importProgress = progress, importStatus = status) }
+                }
+                _uiState.update { it.copy(importProgress = null, importStatus = null) }
                 loadBooks()
             } catch (e: Exception) {
-                _uiState.update { it.copy(error = e.message, isLoading = false) }
+                _uiState.update { it.copy(error = e.message, isLoading = false, importProgress = null, importStatus = null) }
             }
         }
     }
@@ -190,18 +198,30 @@ class LibraryViewModel @Inject constructor(
     /** Import par lot depuis des URIs (multi-sélection SAF). */
     fun importBooks(uris: List<Uri>) {
         viewModelScope.launch(Dispatchers.IO) {
-            _uiState.update { it.copy(isLoading = true, error = null) }
+            _uiState.update { it.copy(isLoading = true, error = null, importProgress = 0f, importStatus = "Préparation de l'import...") }
             try {
-                uris.forEach { uri ->
+                val total = uris.size
+                uris.forEachIndexed { index, uri ->
                     val fileName = resolveFileName(uri) ?: "inconnu.epub"
                     context.contentResolver.openInputStream(uri)?.use { stream ->
-                        bookRepository.importEpub(stream, fileName)
+                        bookRepository.importEpub(stream, fileName) { progress, status ->
+                            val batchProgress = (index.toFloat() + progress) / total
+                            _uiState.update {
+                                it.copy(
+                                    importProgress = batchProgress,
+                                    importStatus = "[Livre ${index + 1}/$total] $status"
+                                )
+                            }
+                        }
                     }
                 }
-                withContext(Dispatchers.Main) { loadBooks() }
+                withContext(Dispatchers.Main) {
+                    _uiState.update { it.copy(importProgress = null, importStatus = null) }
+                    loadBooks()
+                }
             } catch (e: Exception) {
                 withContext(Dispatchers.Main) {
-                    _uiState.update { it.copy(error = e.message, isLoading = false) }
+                    _uiState.update { it.copy(error = e.message, isLoading = false, importProgress = null, importStatus = null) }
                 }
             }
         }

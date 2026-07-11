@@ -49,16 +49,23 @@ class BookRepositoryImpl @Inject constructor(
     private val retriever: AssetRetriever get() = AssetRetriever(context.contentResolver, httpClient)
     private val opener = PublicationOpener(EpubParser(), emptyList()) {}
 
-    override suspend fun importEpub(inputStream: InputStream, fileName: String): Book =
+    override suspend fun importEpub(
+        inputStream: InputStream,
+        fileName: String,
+        onProgress: (progress: Float, status: String) -> Unit
+    ): Book =
         withContext(Dispatchers.IO) {
+            onProgress(0.05f, "Copie du fichier EPUB...")
             val bookId = UUID.randomUUID().toString()
             val epubDir = File(context.filesDir, "epubs/$bookId")
             epubDir.mkdirs()
             val epubFile = File(epubDir, fileName)
             epubFile.outputStream().use { inputStream.copyTo(it) }
 
+            onProgress(0.12f, "Analyse de la structure de l'EPUB...")
             val publication = openPublication(epubFile)
 
+            onProgress(0.20f, "Lecture des métadonnées...")
             val title = publication.metadata.localizedTitle?.string
                 ?.takeIf { it.isNotBlank() } ?: fileName.removeSuffix(".epub")
             val author = publication.metadata.authors.joinToString(", ") { it.name }
@@ -67,17 +74,42 @@ class BookRepositoryImpl @Inject constructor(
             // Extraction couverture (TODO: Readium 3.0 coverLink deprecated, adapter)
             val coverPath: String? = null
 
+            val totalChapters = publication.readingOrder.size
             val book = Book(
                 id = bookId,
                 title = title,
                 author = author,
                 description = publication.metadata.description,
                 coverPath = coverPath,
-                totalChapters = publication.readingOrder.size,
+                totalChapters = totalChapters,
                 language = publication.metadata.languages.firstOrNull() ?: "fr",
                 addedAt = System.currentTimeMillis()
             )
+            
+            onProgress(0.25f, "Enregistrement du livre...")
             bookDao.insert(book.toEntity(epubFile.absolutePath, coverPath))
+
+            // Pré-chargement et segmentation de tous les chapitres pour un rendu instantané
+            val startCacheProgress = 0.25f
+            val endCacheProgress = 1.00f
+            val range = endCacheProgress - startCacheProgress
+
+            for (i in 0 until totalChapters) {
+                val progressFraction = startCacheProgress + range * (i.toFloat() / totalChapters)
+                val displayIndex = i + 1
+                onProgress(progressFraction, "Optimisation du chapitre $displayIndex sur $totalChapters...")
+
+                try {
+                    val link = publication.readingOrder[i]
+                    val text = extractHtml(epubFile, link.href.toString())
+                    // Segmente et stocke directement en cache Room via ChunkTextUseCase
+                    chunkText(bookId, i, text)
+                } catch (e: Exception) {
+                    Log.e("BookRepo", "Erreur lors de la pré-segmentation du chapitre $i", e)
+                }
+            }
+
+            onProgress(1.00f, "Livre optimisé et prêt !")
             book
         }
 

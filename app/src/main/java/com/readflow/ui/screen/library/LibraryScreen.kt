@@ -96,11 +96,61 @@ fun LibraryScreen(
 
                     // Loading overlay pendant import
                     if (state.isLoading) {
-                        Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
-                            Column(horizontalAlignment = Alignment.CenterHorizontally) {
-                                CircularProgressIndicator(color = AccentBlue)
-                                Spacer(Modifier.height(12.dp))
-                                Text("Importation en cours...", color = TextMuted, fontSize = 14.sp)
+                        Box(
+                            Modifier.fillMaxSize(),
+                            contentAlignment = Alignment.Center
+                        ) {
+                            Column(
+                                modifier = Modifier
+                                    .padding(24.dp)
+                                    .fillMaxWidth(),
+                                horizontalAlignment = Alignment.CenterHorizontally
+                            ) {
+                                val progress = state.importProgress
+                                val status = state.importStatus ?: "Importation en cours..."
+
+                                if (progress != null) {
+                                    CircularProgressIndicator(
+                                        progress = { progress },
+                                        color = AccentBlue,
+                                        strokeWidth = 4.dp,
+                                        modifier = Modifier.size(56.dp)
+                                    )
+                                    Spacer(Modifier.height(16.dp))
+                                    Text(
+                                        text = "${(progress * 100).toInt()}%",
+                                        color = Color.White,
+                                        fontWeight = FontWeight.Bold,
+                                        fontSize = 18.sp
+                                    )
+                                    Spacer(Modifier.height(8.dp))
+                                    Text(
+                                        text = status,
+                                        color = TextMuted,
+                                        fontSize = 14.sp,
+                                        textAlign = androidx.compose.ui.text.style.TextAlign.Center,
+                                        modifier = Modifier.padding(horizontal = 16.dp)
+                                    )
+                                    Spacer(Modifier.height(16.dp))
+                                    LinearProgressIndicator(
+                                        progress = { progress },
+                                        color = AccentBlue,
+                                        trackColor = Color.White.copy(alpha = 0.1f),
+                                        modifier = Modifier
+                                            .fillMaxWidth(0.8f)
+                                            .height(4.dp)
+                                            .clip(RoundedCornerShape(2.dp))
+                                    )
+                                } else {
+                                    CircularProgressIndicator(color = AccentBlue)
+                                    Spacer(Modifier.height(12.dp))
+                                    Text(
+                                        text = status,
+                                        color = TextMuted,
+                                        fontSize = 14.sp,
+                                        textAlign = androidx.compose.ui.text.style.TextAlign.Center
+                                    )
+                                }
                             }
                         }
                     } else {
