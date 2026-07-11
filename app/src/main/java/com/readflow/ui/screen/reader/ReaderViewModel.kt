@@ -64,10 +64,14 @@ data class ReaderUiState(
     val isTtsSheetVisible: Boolean = false,
     val isTocSheetVisible: Boolean = false,
     val isAnnotationsSheetVisible: Boolean = false,
+    val isReaderSettingsSheetVisible: Boolean = false,
     val speed: Float = 1.0f,
     val voice: Int = 0,  // MIRO — voix française Piper VITS
     val readerTheme: ReaderTheme = ReaderTheme.NIGHT,
-    val useOpenDyslexic: Boolean = false
+    val readerFont: ReaderFont = ReaderFont.SERIF,
+    val fontSizeSp: Float = 17f,
+    val lineHeightEm: Float = 1.8f,
+    val horizontalMarginDp: Int = 24
 )
 
 enum class ReaderTheme { DAY, NIGHT, SEPIA }
@@ -156,6 +160,8 @@ class ReaderViewModel @Inject constructor(
     fun hideTocSheet() { _uiState.update { it.copy(isTocSheetVisible = false) } }
     fun showAnnotationsSheet() { _uiState.update { it.copy(isAnnotationsSheetVisible = true) } }
     fun hideAnnotationsSheet() { _uiState.update { it.copy(isAnnotationsSheetVisible = false) } }
+    fun showReaderSettingsSheet() { _uiState.update { it.copy(isReaderSettingsSheetVisible = true) } }
+    fun hideReaderSettingsSheet() { _uiState.update { it.copy(isReaderSettingsSheetVisible = false) } }
     fun setSpeed(s: Float) { _uiState.update { it.copy(speed = s.coerceIn(0.5f, 2.0f)) } }
     fun setVoice(v: Int) { _uiState.update { it.copy(voice = v) } }
 
@@ -168,7 +174,10 @@ class ReaderViewModel @Inject constructor(
         _uiState.update { it.copy(readerTheme = next) }
     }
     fun setTheme(theme: ReaderTheme) { _uiState.update { it.copy(readerTheme = theme) } }
-    fun toggleOpenDyslexic() { _uiState.update { it.copy(useOpenDyslexic = !it.useOpenDyslexic) } }
+    fun setReaderFont(font: ReaderFont) { _uiState.update { it.copy(readerFont = font) } }
+    fun setFontSize(sp: Float) { _uiState.update { it.copy(fontSizeSp = sp.coerceIn(12f, 32f)) } }
+    fun setLineHeight(em: Float) { _uiState.update { it.copy(lineHeightEm = em.coerceIn(1.2f, 2.4f)) } }
+    fun setHorizontalMargin(dp: Int) { _uiState.update { it.copy(horizontalMarginDp = dp.coerceIn(8, 48)) } }
 
     /**
      * Relance l'initialisation du modèle TTS après un échec.
@@ -274,10 +283,18 @@ class ReaderViewModel @Inject constructor(
             try { ReaderTheme.valueOf(it) } catch (_: Exception) { null }
         } ?: ReaderTheme.NIGHT
         val savedDyslexic = savedState.get<Boolean>("openDyslexic") ?: false
+        val savedFont = savedState.get<String>("readerFont")?.let {
+            try { ReaderFont.valueOf(it) } catch (_: Exception) { null }
+        } ?: if (savedDyslexic) ReaderFont.OPEN_DYSLEXIC else ReaderFont.SERIF
+        val savedFontSize = savedState.get<Float>("fontSizeSp") ?: 17f
+        val savedLineHeight = savedState.get<Float>("lineHeightEm") ?: 1.8f
+        val savedMargin = savedState.get<Int>("horizontalMarginDp") ?: 24
 
         _uiState.update { it.copy(
             speed = savedSpeed, voice = savedVoice,
-            readerTheme = savedTheme, useOpenDyslexic = savedDyslexic
+            readerTheme = savedTheme, readerFont = savedFont,
+            fontSizeSp = savedFontSize, lineHeightEm = savedLineHeight,
+            horizontalMarginDp = savedMargin
         )}
 
         viewModelScope.launch {
@@ -324,7 +341,10 @@ class ReaderViewModel @Inject constructor(
         savedState["speed"] = _uiState.value.speed
         savedState["voice"] = _uiState.value.voice
         savedState["theme"] = _uiState.value.readerTheme.name
-        savedState["openDyslexic"] = _uiState.value.useOpenDyslexic
+        savedState["readerFont"] = _uiState.value.readerFont.name
+        savedState["fontSizeSp"] = _uiState.value.fontSizeSp
+        savedState["lineHeightEm"] = _uiState.value.lineHeightEm
+        savedState["horizontalMarginDp"] = _uiState.value.horizontalMarginDp
         viewModelScope.launch {
             _uiState.update { it.copy(isLoading = true, error = null) }
             try {

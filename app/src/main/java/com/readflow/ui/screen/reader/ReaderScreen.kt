@@ -18,7 +18,6 @@ import androidx.core.view.WindowCompat
 import androidx.core.view.WindowInsetsCompat
 import androidx.core.view.WindowInsetsControllerCompat
 import androidx.hilt.navigation.compose.hiltViewModel
-import com.readflow.ui.theme.OpenDyslexicFamily
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -76,7 +75,10 @@ fun ReaderScreen(
                 playbackState = playbackState,
                 textColor = textColor,
                 accentColor = accentColor,
-                useOpenDyslexic = state.useOpenDyslexic,
+                readerFont = state.readerFont,
+                fontSizeSp = state.fontSizeSp,
+                lineHeightEm = state.lineHeightEm,
+                horizontalMarginDp = state.horizontalMarginDp,
                 onPageTurned = { viewModel.hideHud() },
                 onTap = { viewModel.toggleHud() }
             )
@@ -201,11 +203,11 @@ fun ReaderScreen(
                 isPlaying = state.isPlaying,
                 accentColor = accentColor,
                 panelBg = panelBg,
-                useOpenDyslexic = state.useOpenDyslexic,
+                readerFont = state.readerFont,
                 onTtsClick = { if (state.isPlaying) viewModel.pause() else viewModel.play() },
                 onTtsSettingsClick = { viewModel.showTtsSheet() },
+                onReaderSettingsClick = { viewModel.showReaderSettingsSheet() },
                 onThemeCycle = { viewModel.cycleTheme() },
-                onFontToggle = { viewModel.toggleOpenDyslexic() },
                 onPrevChapter = { viewModel.previousChapter() },
                 onNextChapter = { viewModel.nextChapter() }
             )
@@ -244,6 +246,36 @@ fun ReaderScreen(
                 onAddPronunciationRule = { orig, rep, reg -> viewModel.addPronunciationRule(orig, rep, reg) },
                 onDeletePronunciationRule = { viewModel.deletePronunciationRule(it) },
                 onTogglePronunciationRule = { viewModel.togglePronunciationRule(it) }
+            )
+        }
+    }
+
+    // ── Panneau Paramètres d'affichage ────────────────
+    if (state.isReaderSettingsSheetVisible) {
+        val settingsPanelBg = when (state.readerTheme) {
+            ReaderTheme.SEPIA -> Color(0xFFE8DCC8)
+            else -> Color(0xFF0A0A0A)
+        }
+        ModalBottomSheet(
+            onDismissRequest = { viewModel.hideReaderSettingsSheet() },
+            containerColor = Color(0xFF1E1E1E),
+            shape = RoundedCornerShape(topStart = 24.dp, topEnd = 24.dp),
+            dragHandle = { BottomSheetDefaults.DragHandle(color = Color.White.copy(alpha = 0.3f)) }
+        ) {
+            ReaderSettingsPanel(
+                currentTheme = state.readerTheme,
+                currentFont = state.readerFont,
+                fontSizeSp = state.fontSizeSp,
+                lineHeightEm = state.lineHeightEm,
+                horizontalMarginDp = state.horizontalMarginDp,
+                onThemeChange = { viewModel.setTheme(it) },
+                onFontChange = { viewModel.setReaderFont(it) },
+                onFontSizeChange = { viewModel.setFontSize(it) },
+                onLineHeightChange = { viewModel.setLineHeight(it) },
+                onHorizontalMarginChange = { viewModel.setHorizontalMargin(it) },
+                accentColor = accentColor,
+                panelBg = settingsPanelBg,
+                textColor = textColor
             )
         }
     }

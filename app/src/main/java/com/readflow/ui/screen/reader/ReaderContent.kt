@@ -41,28 +41,35 @@ fun ReaderContent(
     playbackState: PlaybackState,
     textColor: Color,
     accentColor: Color,
-    useOpenDyslexic: Boolean = false,
+    readerFont: ReaderFont = ReaderFont.SERIF,
+    fontSizeSp: Float = 17f,
+    lineHeightEm: Float = 1.8f,
+    horizontalMarginDp: Int = 24,
     onTap: (Offset) -> Unit,
     onPageTurned: () -> Unit
 ) {
-    val bodyFont = remember(useOpenDyslexic) {
-        if (useOpenDyslexic) OpenDyslexicFamily else FontFamily.Serif
+    val bodyFont = remember(readerFont) {
+        when (readerFont) {
+            ReaderFont.SERIF -> FontFamily.Serif
+            ReaderFont.SANS_SERIF -> FontFamily.SansSerif
+            ReaderFont.OPEN_DYSLEXIC -> OpenDyslexicFamily
+        }
     }
-    val textStyle = remember(bodyFont) {
+    val textStyle = remember(bodyFont, fontSizeSp, lineHeightEm) {
         TextStyle(
             fontFamily = bodyFont,
             fontWeight = FontWeight.Normal,
-            fontSize = 17.sp,
-            lineHeight = 1.8.em,
+            fontSize = fontSizeSp.sp,
+            lineHeight = lineHeightEm.em,
             textAlign = TextAlign.Justify
         )
     }
-    val titleStyle = remember(bodyFont) {
+    val titleStyle = remember(bodyFont, fontSizeSp, lineHeightEm) {
         TextStyle(
             fontFamily = bodyFont,
             fontWeight = FontWeight.Bold,
-            fontSize = 22.sp,
-            lineHeight = 1.8.em
+            fontSize = (fontSizeSp + 5f).sp,
+            lineHeight = lineHeightEm.em
         )
     }
 
@@ -140,7 +147,7 @@ fun ReaderContent(
         modifier = Modifier
             .fillMaxSize()
             .windowInsetsPadding(WindowInsets.systemBars)
-            .padding(horizontal = 24.dp, vertical = 16.dp)
+            .padding(horizontal = horizontalMarginDp.dp, vertical = 16.dp)
             .onSizeChanged { containerSize = it }
             .pointerInput(Unit) {
                 detectTapGestures { offset ->

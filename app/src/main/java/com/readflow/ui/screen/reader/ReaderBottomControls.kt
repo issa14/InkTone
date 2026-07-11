@@ -6,6 +6,7 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Palette
 import androidx.compose.material.icons.filled.Pause
 import androidx.compose.material.icons.filled.PlayArrow
+import androidx.compose.material.icons.filled.Settings
 import androidx.compose.material.icons.outlined.Headphones
 import androidx.compose.material3.*
 import androidx.compose.runtime.Composable
@@ -21,11 +22,11 @@ fun UnifiedControlPanel(
     isPlaying: Boolean,
     accentColor: Color,
     panelBg: Color,
-    useOpenDyslexic: Boolean = false,
+    readerFont: ReaderFont = ReaderFont.SERIF,
     onTtsClick: () -> Unit,
     onTtsSettingsClick: () -> Unit,
+    onReaderSettingsClick: () -> Unit,
     onThemeCycle: () -> Unit,
-    onFontToggle: () -> Unit,
     onPrevChapter: () -> Unit,
     onNextChapter: () -> Unit
 ) {
@@ -61,16 +62,18 @@ fun UnifiedControlPanel(
                         modifier = Modifier.size(24.dp)
                     )
                 }
-                // Thème
+                // Thème (cycle rapide)
                 IconButton(onClick = onThemeCycle) {
                     Icon(Icons.Default.Palette, "Thème",
                         tint = Color.White.copy(alpha = 0.6f))
                 }
-                // OpenDyslexic
-                IconButton(onClick = onFontToggle) {
-                    Text("D",
-                        color = if (useOpenDyslexic) Color(0xFFFFB74D) else Color.White.copy(alpha = 0.6f),
-                        fontSize = 16.sp, fontWeight = FontWeight.Bold)
+                // Paramètres d'affichage (police, taille, marges)
+                IconButton(onClick = onReaderSettingsClick) {
+                    Icon(
+                        Icons.Default.Settings,
+                        "Affichage", tint = Color.White.copy(alpha = 0.6f),
+                        modifier = Modifier.size(24.dp)
+                    )
                 }
             }
 
