@@ -5,8 +5,10 @@ import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.filled.Bookmark
+import androidx.compose.material.icons.filled.ImportContacts
 import androidx.compose.material.icons.filled.List
 import androidx.compose.material.icons.filled.Search
+import androidx.compose.material.icons.filled.ViewDay
 import androidx.compose.material3.*
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
@@ -20,6 +22,8 @@ import androidx.compose.ui.unit.dp
 fun ReaderTopBar(
     title: String,
     subtitle: String,
+    readingMode: ReadingMode = ReadingMode.PAGED,
+    onToggleMode: () -> Unit = {},
     onBack: () -> Unit,
     onToc: () -> Unit,
     onBookmarks: () -> Unit = {},
@@ -42,6 +46,13 @@ fun ReaderTopBar(
             Column(modifier = Modifier.weight(1f), horizontalAlignment = Alignment.CenterHorizontally) {
                 Text(title, color = Color.White.copy(alpha = 0.9f), style = MaterialTheme.typography.titleSmall, maxLines = 1, overflow = TextOverflow.Ellipsis)
                 Text(subtitle, color = Color.White.copy(alpha = 0.45f), style = MaterialTheme.typography.labelSmall)
+            }
+            IconButton(onClick = onToggleMode) {
+                Icon(
+                    if (readingMode == ReadingMode.PAGED) Icons.Default.ViewDay else Icons.Default.ImportContacts,
+                    contentDescription = if (readingMode == ReadingMode.PAGED) "Mode défilement" else "Mode paginé",
+                    tint = Color.White.copy(alpha = 0.6f)
+                )
             }
             @Suppress("DEPRECATION")
             IconButton(onClick = onSearch) { Icon(Icons.Default.Search, "Rechercher", tint = Color.White.copy(alpha = 0.6f)) }

@@ -65,6 +65,7 @@ fun ReaderScreen(
 
     // Taille de l'écran pour le tiers central
     var screenSize by remember { mutableStateOf(IntSize.Zero) }
+    var readingMode by remember { mutableStateOf(ReadingMode.PAGED) }
 
     Box(
         modifier = Modifier
@@ -85,6 +86,8 @@ fun ReaderScreen(
                 fontSizeSp = state.fontSizeSp,
                 lineHeightEm = state.lineHeightEm,
                 horizontalMarginDp = state.horizontalMarginDp,
+                readingMode = readingMode,
+                onToggleMode = { readingMode = if (readingMode == ReadingMode.PAGED) ReadingMode.SCROLL else ReadingMode.PAGED },
                 onPageTurned = { viewModel.hideHud() },
                 onTap = { offset ->
                     // Tiers central uniquement
@@ -124,6 +127,8 @@ fun ReaderScreen(
             ReaderTopBar(
                 title = book?.title ?: "",
                 subtitle = "Ch. ${state.currentChapterIndex + 1}/${book?.totalChapters ?: 0}",
+                readingMode = readingMode,
+                onToggleMode = { readingMode = if (readingMode == ReadingMode.PAGED) ReadingMode.SCROLL else ReadingMode.PAGED },
                 onBack = onBack,
                 onToc = { viewModel.showTocSheet() },
                 onBookmarks = { book?.title?.let { onBookmarksClick(it) } },

@@ -3,13 +3,15 @@ package com.readflow.ui.screen.reader
 import androidx.compose.foundation.background
 import androidx.compose.foundation.gestures.detectTapGestures
 import androidx.compose.foundation.layout.*
+import androidx.compose.foundation.lazy.LazyColumn
+import androidx.compose.foundation.lazy.itemsIndexed
+import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.foundation.pager.HorizontalPager
 import androidx.compose.foundation.pager.rememberPagerState
-import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.RoundedCornerShape
-import androidx.compose.foundation.verticalScroll
 import androidx.compose.material3.Text
 import androidx.compose.runtime.*
+import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.graphics.Color
@@ -34,6 +36,8 @@ import com.readflow.service.audio.PlaybackStatus
 import com.readflow.ui.theme.OpenDyslexicFamily
 import kotlinx.coroutines.launch
 
+enum class ReadingMode { PAGED, SCROLL }
+
 @Composable
 fun ReaderContent(
     chapter: Chapter,
@@ -44,6 +48,8 @@ fun ReaderContent(
     fontSizeSp: Float,
     lineHeightEm: Float,
     horizontalMarginDp: Int,
+    readingMode: ReadingMode,
+    onToggleMode: () -> Unit,
     onTap: (Offset) -> Unit,
     onPageTurned: () -> Unit
 ) {
@@ -67,11 +73,62 @@ fun ReaderContent(
         lineHeight = lineHeightEm.em
     )
 
+    val activeIdx = playbackState.activeSentenceIndex
+    val isSpeaking = playbackState.status == PlaybackStatus.PLAYING
+    val sentences = chapter.sentences
+
+    when (readingMode) {
+        ReadingMode.PAGED -> PagedContent(
+            chapter = chapter,
+            sentences = sentences,
+            activeIdx = activeIdx,
+            isSpeaking = isSpeaking,
+            textColor = textColor,
+            accentColor = accentColor,
+            textStyle = textStyle,
+            titleStyle = titleStyle,
+            horizontalMarginDp = horizontalMarginDp,
+            playbackState = playbackState,
+            onTap = onTap,
+            onPageTurned = onPageTurned
+        )
+        ReadingMode.SCROLL -> ScrollContent(
+            chapter = chapter,
+            sentences = sentences,
+            activeIdx = activeIdx,
+            isSpeaking = isSpeaking,
+            textColor = textColor,
+            accentColor = accentColor,
+            textStyle = textStyle,
+            titleStyle = titleStyle,
+            horizontalMarginDp = horizontalMarginDp,
+            playbackState = playbackState,
+            readingMode = readingMode,
+            onToggleMode = onToggleMode,
+            onTap = onTap
+        )
+    }
+}
+
+@Composable
+private fun PagedContent(
+    chapter: Chapter,
+    sentences: List<Sentence>,
+    activeIdx: Int,
+    isSpeaking: Boolean,
+    textColor: Color,
+    accentColor: Color,
+    textStyle: TextStyle,
+    titleStyle: TextStyle,
+    horizontalMarginDp: Int,
+    playbackState: PlaybackState,
+    onTap: (Offset) -> Unit,
+    onPageTurned: () -> Unit
+) {
     var containerSize by remember { mutableStateOf(IntSize.Zero) }
     val measurer = rememberTextMeasurer()
     val density = LocalDensity.current
 
-    val sentences = chapter.sentences
     val pages = remember(sentences, containerSize, textStyle, titleStyle, density) {
         if (containerSize.width == 0 || containerSize.height == 0 || sentences.isEmpty()) {
             return@remember emptyList<List<Pair<Int, Sentence>>>()
@@ -85,7 +142,6 @@ fun ReaderContent(
         val titleBottomPaddingPx = with(density) { 28.dp.roundToPx() }
         val topPaddingPx = with(density) { 24.dp.roundToPx() }
 
-        // Hauteur du titre sur la première page
         val titleLayout = measurer.measure(
             text = AnnotatedString(chapter.title),
             style = titleStyle,
@@ -123,9 +179,6 @@ fun ReaderContent(
             onPageTurned()
         }
     }
-
-    val activeIdx = playbackState.activeSentenceIndex
-    val isSpeaking = playbackState.status == PlaybackStatus.PLAYING
 
     LaunchedEffect(activeIdx, pages) {
         if (activeIdx in sentences.indices && pages.isNotEmpty()) {
@@ -175,58 +228,149 @@ fun ReaderContent(
                 state = pagerState,
                 modifier = Modifier.fillMaxSize()
             ) { pageIndex ->
-                Column(
-                    modifier = Modifier
-                        .fillMaxSize()
-                        .verticalScroll(rememberScrollState())
-                ) {
-                        if (pageIndex == 0) {
-                            Spacer(Modifier.height(24.dp))
-                            Text(
-                                text = chapter.title,
-                                style = titleStyle,
-                                color = textColor.copy(alpha = 0.75f)
-                            )
-                            Spacer(Modifier.height(28.dp))
-                        }
-
-                        pages[pageIndex].forEach { (index, sentence) ->
-                            val isActive = index == activeIdx && isSpeaking
-                            val bgModifier = if (isActive) {
-                                Modifier
-                                    .background(
-                                        color = accentColor.copy(alpha = 0.12f),
-                                        shape = RoundedCornerShape(4.dp)
-                                    )
-                                    .padding(horizontal = 4.dp, vertical = 2.dp)
-                            } else {
-                                Modifier.padding(vertical = 2.dp)
-                            }
-                            
-                            if (isActive) {
-                                ActiveSentenceText(
-                                    text = sentence.text,
-                                    style = textStyle,
-                                    accentColor = accentColor,
-                                    textColor = textColor,
-                                    durationMs = playbackState.sentenceDurationMs,
-                                    startTimestamp = playbackState.sentenceStartTimestamp,
-                                    modifier = bgModifier
-                                )
-                            } else {
-                                Text(
-                                    text = sentence.text,
-                                    style = textStyle.copy(
-                                        fontWeight = FontWeight.Normal,
-                                        color = textColor.copy(alpha = 0.88f)
-                                    ),
-                                    modifier = bgModifier
-                                )
-                            }
-                        }
+                Column(modifier = Modifier.fillMaxSize()) {
+                    if (pageIndex == 0) {
+                        Spacer(Modifier.height(24.dp))
+                        Text(
+                            text = chapter.title,
+                            style = titleStyle,
+                            color = textColor.copy(alpha = 0.75f)
+                        )
+                        Spacer(Modifier.height(28.dp))
                     }
+
+                    pages[pageIndex].forEach { (index, sentence) ->
+                        SentenceRenderer(
+                            index = index,
+                            sentence = sentence,
+                            activeIdx = activeIdx,
+                            isSpeaking = isSpeaking,
+                            textStyle = textStyle,
+                            textColor = textColor,
+                            accentColor = accentColor,
+                            playbackState = playbackState
+                        )
+                    }
+                }
             }
         }
+    }
+}
+
+@Composable
+private fun ScrollContent(
+    chapter: Chapter,
+    sentences: List<Sentence>,
+    activeIdx: Int,
+    isSpeaking: Boolean,
+    textColor: Color,
+    accentColor: Color,
+    textStyle: TextStyle,
+    titleStyle: TextStyle,
+    horizontalMarginDp: Int,
+    playbackState: PlaybackState,
+    readingMode: ReadingMode,
+    onToggleMode: () -> Unit,
+    onTap: (Offset) -> Unit
+) {
+    val lazyListState = rememberLazyListState()
+
+    LaunchedEffect(activeIdx) {
+        if (activeIdx in sentences.indices) {
+            lazyListState.animateScrollToItem(
+                index = activeIdx + 1, // +1 pour le titre en position 0
+                scrollOffset = 0
+            )
+        }
+    }
+
+    Box(
+        modifier = Modifier
+            .fillMaxSize()
+            .windowInsetsPadding(WindowInsets.systemBars)
+            .padding(horizontal = horizontalMarginDp.dp, vertical = 16.dp)
+            .pointerInput(Unit) {
+                detectTapGestures { offset ->
+                    onTap(offset)
+                }
+            }
+    ) {
+        LazyColumn(
+            state = lazyListState,
+            modifier = Modifier.fillMaxSize()
+        ) {
+            // Titre du chapitre en item 0
+            item(key = "chapter_title") {
+                Spacer(Modifier.height(24.dp))
+                Text(
+                    text = chapter.title,
+                    style = titleStyle,
+                    color = textColor.copy(alpha = 0.75f)
+                )
+                Spacer(Modifier.height(28.dp))
+            }
+
+            itemsIndexed(
+                items = sentences,
+                key = { index, _ -> index }
+            ) { index, sentence ->
+                SentenceRenderer(
+                    index = index,
+                    sentence = sentence,
+                    activeIdx = activeIdx,
+                    isSpeaking = isSpeaking,
+                    textStyle = textStyle,
+                    textColor = textColor,
+                    accentColor = accentColor,
+                    playbackState = playbackState
+                )
+            }
+        }
+    }
+}
+
+@Composable
+private fun SentenceRenderer(
+    index: Int,
+    sentence: Sentence,
+    activeIdx: Int,
+    isSpeaking: Boolean,
+    textStyle: TextStyle,
+    textColor: Color,
+    accentColor: Color,
+    playbackState: PlaybackState
+) {
+    val isActive = index == activeIdx && isSpeaking
+    val bgModifier = if (isActive) {
+        Modifier
+            .background(
+                color = accentColor.copy(alpha = 0.12f),
+                shape = RoundedCornerShape(4.dp)
+            )
+            .padding(horizontal = 4.dp, vertical = 2.dp)
+    } else {
+        Modifier.padding(vertical = 2.dp)
+    }
+
+    if (isActive) {
+        ActiveSentenceText(
+            text = sentence.text,
+            style = textStyle,
+            accentColor = accentColor,
+            textColor = textColor,
+            durationMs = playbackState.sentenceDurationMs,
+            startTimestamp = playbackState.sentenceStartTimestamp,
+            modifier = bgModifier
+        )
+    } else {
+        Text(
+            text = sentence.text,
+            style = textStyle.copy(
+                fontWeight = FontWeight.Normal,
+                color = textColor.copy(alpha = 0.88f)
+            ),
+            modifier = bgModifier
+        )
     }
 }
 
