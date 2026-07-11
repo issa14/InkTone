@@ -45,20 +45,26 @@ fun ReaderContent(
     onTap: (Offset) -> Unit,
     onPageTurned: () -> Unit
 ) {
-    val bodyFont = if (useOpenDyslexic) OpenDyslexicFamily else FontFamily.Serif
-    val textStyle = TextStyle(
-        fontFamily = bodyFont,
-        fontWeight = FontWeight.Normal,
-        fontSize = 17.sp,
-        lineHeight = 1.8.em,
-        textAlign = TextAlign.Justify
-    )
-    val titleStyle = TextStyle(
-        fontFamily = bodyFont,
-        fontWeight = FontWeight.Bold,
-        fontSize = 22.sp,
-        lineHeight = 1.8.em
-    )
+    val bodyFont = remember(useOpenDyslexic) {
+        if (useOpenDyslexic) OpenDyslexicFamily else FontFamily.Serif
+    }
+    val textStyle = remember(bodyFont) {
+        TextStyle(
+            fontFamily = bodyFont,
+            fontWeight = FontWeight.Normal,
+            fontSize = 17.sp,
+            lineHeight = 1.8.em,
+            textAlign = TextAlign.Justify
+        )
+    }
+    val titleStyle = remember(bodyFont) {
+        TextStyle(
+            fontFamily = bodyFont,
+            fontWeight = FontWeight.Bold,
+            fontSize = 22.sp,
+            lineHeight = 1.8.em
+        )
+    }
 
     var containerSize by remember { mutableStateOf(IntSize.Zero) }
     val measurer = rememberTextMeasurer()
