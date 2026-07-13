@@ -38,6 +38,7 @@ data class ReaderUiState(
     val totalSentences: Int = 0,
     val isPlaying: Boolean = false,
     val isLoading: Boolean = false,
+    val isLoadingChapter: Boolean = false,
     val error: String? = null,
     val isHudVisible: Boolean = false,
     val isTtsSheetVisible: Boolean = false,
@@ -278,6 +279,8 @@ class ReaderViewModel @Inject constructor(
     private fun loadChapter(index: Int, sentenceIndex: Int = 0) {
         val book = currentBook ?: return
         if (index < 0 || index >= book.totalChapters) return
+        // Empêche les appels concurrents qui causent la boucle infinie
+        if (_uiState.value.isLoadingChapter && index == _uiState.value.currentChapterIndex) return
         savedState["chapterIndex"] = index
         savedState["sentenceIndex"] = sentenceIndex
         savedState["speed"] = _uiState.value.speed
@@ -285,7 +288,7 @@ class ReaderViewModel @Inject constructor(
         savedState["theme"] = _uiState.value.readerTheme.name
         savedState["openDyslexic"] = (_uiState.value.readerFont == ReaderFont.OPEN_DYSLEXIC)
         viewModelScope.launch {
-            _uiState.update { it.copy(isLoading = true, error = null) }
+            _uiState.update { it.copy(isLoading = true, isLoadingChapter = true, error = null) }
             try {
                 val chapter = bookRepository.getChapter(book.id, index)
                 val highlights = highlightDao.getHighlightsForChapter(book.id, index).first()
@@ -295,21 +298,23 @@ class ReaderViewModel @Inject constructor(
                         currentChapterIndex = index, currentChapter = chapter,
                         totalSentences = chapter.sentences.size, currentSentenceIndex = sentenceIndex,
                         highlights = highlights, bookmarks = bookmarks,
-                        isLoading = false
+                        isLoading = false, isLoadingChapter = false
                     )
                 }
             } catch (e: Exception) {
-                _uiState.update { it.copy(error = e.message, isLoading = false) }
+                _uiState.update { it.copy(error = e.message, isLoading = false, isLoadingChapter = false) }
             }
         }
     }
 
     fun previousChapter() {
+        if (_uiState.value.isLoadingChapter) return
         val idx = _uiState.value.currentChapterIndex - 1
         if (idx >= 0) loadChapter(idx)
     }
 
     fun nextChapter() {
+        if (_uiState.value.isLoadingChapter) return
         val book = currentBook ?: return
         val idx = _uiState.value.currentChapterIndex + 1
         if (idx < book.totalChapters) loadChapter(idx)
@@ -333,6 +338,7 @@ class ReaderViewModel @Inject constructor(
     }
 
     fun goToChapter(index: Int) {
+        if (_uiState.value.isLoadingChapter) return
         val book = currentBook ?: return
         if (index in 0 until book.totalChapters) loadChapter(index)
     }

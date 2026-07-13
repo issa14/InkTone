@@ -111,6 +111,7 @@ fun ReaderScreen(
                 readingMode = readingMode,
                 currentChapterIndex = state.currentChapterIndex,
                 totalChapters = book?.totalChapters ?: 1,
+                isLoadingChapter = state.isLoadingChapter,
                 onToggleMode = { readingMode = if (readingMode == ReadingMode.PAGED) ReadingMode.SCROLL else ReadingMode.PAGED },
                 onPageTurned = { viewModel.hideHud() },
                 onNextChapter = { viewModel.nextChapter() },

@@ -62,6 +62,7 @@ fun ReaderContent(
     readingMode: ReadingMode,
     currentChapterIndex: Int,
     totalChapters: Int,
+    isLoadingChapter: Boolean = false,
     onToggleMode: () -> Unit,
     onTap: (Offset) -> Unit,
     onPageTurned: () -> Unit,
@@ -109,6 +110,7 @@ fun ReaderContent(
             playbackState = playbackState,
             currentChapterIndex = currentChapterIndex,
             totalChapters = totalChapters,
+            isLoadingChapter = isLoadingChapter,
             onTap = onTap,
             onPageTurned = onPageTurned,
             onNextChapter = onNextChapter,
@@ -130,6 +132,7 @@ fun ReaderContent(
             playbackState = playbackState,
             currentChapterIndex = currentChapterIndex,
             totalChapters = totalChapters,
+            isLoadingChapter = isLoadingChapter,
             readingMode = readingMode,
             onToggleMode = onToggleMode,
             onTap = onTap,
@@ -156,6 +159,7 @@ private fun PagedContent(
     playbackState: PlaybackState,
     currentChapterIndex: Int,
     totalChapters: Int,
+    isLoadingChapter: Boolean = false,
     onTap: (Offset) -> Unit,
     onPageTurned: () -> Unit,
     onNextChapter: () -> Unit,
@@ -225,9 +229,14 @@ private fun PagedContent(
     val scope = rememberCoroutineScope()
     val isLastChapter = currentChapterIndex >= totalChapters - 1
 
-    // Auto-chargement du chapitre suivant quand on atteint la page virtuelle
-    LaunchedEffect(pagerState.currentPage) {
-        if (pagerState.currentPage == pages.size && !isLastChapter) {
+    // Auto-chargement du chapitre suivant quand on atteint la page virtuelle.
+    // Gardes critiques :
+    // 1. pages.isNotEmpty() — évite le déclenchement quand les données ne sont pas encore chargées
+    //    (sinon pages.size == 0 et currentPage == 0 → 0 == 0 → boucle infinie)
+    // 2. !isLoadingChapter — évite les appels concurrents pendant un chargement en cours
+    LaunchedEffect(pagerState.currentPage, pages.size) {
+        if (pages.isNotEmpty() && !isLoadingChapter &&
+            pagerState.currentPage == pages.size && !isLastChapter) {
             onNextChapter()
         }
     }
@@ -238,8 +247,8 @@ private fun PagedContent(
         }
     }
 
-    LaunchedEffect(activeIdx, pages) {
-        if (activeIdx in sentences.indices && pages.isNotEmpty()) {
+    LaunchedEffect(activeIdx, pages.size) {
+        if (pages.isNotEmpty() && activeIdx in sentences.indices) {
             val targetPage = pages.indexOfFirst { page -> page.any { it.first == activeIdx } }
             if (targetPage != -1 && targetPage != pagerState.currentPage) {
                 pagerState.animateScrollToPage(targetPage)
@@ -366,6 +375,7 @@ private fun ScrollContent(
     playbackState: PlaybackState,
     currentChapterIndex: Int,
     totalChapters: Int,
+    isLoadingChapter: Boolean = false,
     readingMode: ReadingMode,
     onToggleMode: () -> Unit,
     onTap: (Offset) -> Unit,
@@ -435,6 +445,8 @@ private fun ScrollContent(
             // Déclencheur automatique inter-chapitres
             item(key = "next_chapter_trigger") {
                 NextChapterTrigger(
+                    sentences = sentences,
+                    isLoadingChapter = isLoadingChapter,
                     isLastChapter = currentChapterIndex >= totalChapters - 1,
                     textColor = textColor,
                     onNextChapter = onNextChapter
@@ -446,12 +458,20 @@ private fun ScrollContent(
 
 @Composable
 private fun NextChapterTrigger(
+    sentences: List<Sentence>,
+    isLoadingChapter: Boolean,
     isLastChapter: Boolean,
     textColor: Color,
     onNextChapter: () -> Unit
 ) {
-    LaunchedEffect(Unit) {
-        if (!isLastChapter) {
+    // Ne déclenche le chargement automatique que si :
+    // 1. Les phrases sont chargées (sentences.isNotEmpty())
+    // 2. Le chapitre n'est pas déjà en cours de chargement
+    // 3. Ce n'est pas le dernier chapitre
+    // Le LaunchedEffect utilise sentences.size comme clé pour ne se déclencher
+    // qu'une fois les données réellement disponibles, pas à la composition initiale.
+    LaunchedEffect(sentences.size) {
+        if (sentences.isNotEmpty() && !isLoadingChapter && !isLastChapter) {
             onNextChapter()
         }
     }
