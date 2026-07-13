@@ -4,6 +4,7 @@ import androidx.compose.foundation.background
 import androidx.compose.foundation.gestures.detectTapGestures
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
+import androidx.compose.foundation.text.selection.SelectionContainer
 import androidx.compose.foundation.lazy.itemsIndexed
 import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.foundation.pager.HorizontalPager
@@ -15,10 +16,14 @@ import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.geometry.Offset
+import androidx.compose.ui.geometry.Rect
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.layout.onSizeChanged
 import androidx.compose.ui.platform.LocalDensity
+import androidx.compose.ui.platform.LocalTextToolbar
+import androidx.compose.ui.platform.TextToolbar
+import androidx.compose.ui.platform.TextToolbarStatus
 import androidx.compose.ui.text.AnnotatedString
 import androidx.compose.ui.text.TextStyle
 import androidx.compose.ui.text.font.FontFamily
@@ -30,12 +35,17 @@ import androidx.compose.ui.unit.IntSize
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.em
 import androidx.compose.ui.unit.sp
+import com.readflow.data.database.entity.BookmarkEntity
+import com.readflow.data.database.entity.HighlightEntity
 import com.readflow.domain.model.Chapter
 import com.readflow.domain.model.Sentence
 import com.readflow.service.audio.PlaybackState
 import com.readflow.service.audio.PlaybackStatus
 import com.readflow.ui.theme.OpenDyslexicFamily
+import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.withContext
+import kotlinx.coroutines.yield
 
 enum class ReadingMode { PAGED, SCROLL }
 
@@ -55,7 +65,11 @@ fun ReaderContent(
     onToggleMode: () -> Unit,
     onTap: (Offset) -> Unit,
     onPageTurned: () -> Unit,
-    onNextChapter: () -> Unit
+    onNextChapter: () -> Unit,
+    onTextSelected: (sentenceIndex: Int, selectedText: String) -> Unit,
+    onSelectionDismissed: () -> Unit,
+    highlights: List<HighlightEntity> = emptyList(),
+    bookmarks: List<BookmarkEntity> = emptyList()
 ) {
     val bodyFont = when (readerFont) {
         ReaderFont.SERIF -> FontFamily.Serif
@@ -97,7 +111,11 @@ fun ReaderContent(
             totalChapters = totalChapters,
             onTap = onTap,
             onPageTurned = onPageTurned,
-            onNextChapter = onNextChapter
+            onNextChapter = onNextChapter,
+            onTextSelected = onTextSelected,
+            onSelectionDismissed = onSelectionDismissed,
+            highlights = highlights,
+            bookmarks = bookmarks
         )
         ReadingMode.SCROLL -> ScrollContent(
             chapter = chapter,
@@ -115,7 +133,11 @@ fun ReaderContent(
             readingMode = readingMode,
             onToggleMode = onToggleMode,
             onTap = onTap,
-            onNextChapter = onNextChapter
+            onNextChapter = onNextChapter,
+            onTextSelected = onTextSelected,
+            onSelectionDismissed = onSelectionDismissed,
+            highlights = highlights,
+            bookmarks = bookmarks
         )
     }
 }
@@ -136,52 +158,67 @@ private fun PagedContent(
     totalChapters: Int,
     onTap: (Offset) -> Unit,
     onPageTurned: () -> Unit,
-    onNextChapter: () -> Unit
+    onNextChapter: () -> Unit,
+    onTextSelected: (sentenceIndex: Int, selectedText: String) -> Unit,
+    onSelectionDismissed: () -> Unit,
+    highlights: List<HighlightEntity>,
+    bookmarks: List<BookmarkEntity>
 ) {
     var containerSize by remember { mutableStateOf(IntSize.Zero) }
     val measurer = rememberTextMeasurer()
     val density = LocalDensity.current
 
-    val pages = remember(sentences, containerSize, textStyle, titleStyle, density) {
+    // Pagination asynchrone via produceState : la mesure de texte (coûteuse)
+    // s'exécute sur Dispatchers.Default pour ne pas bloquer le thread UI.
+    // yield() périodique garantit que la coroutine reste coopérative.
+    val pages by produceState(emptyList<List<Pair<Int, Sentence>>>(),
+        sentences, containerSize, textStyle, titleStyle, chapter.title
+    ) {
         if (containerSize.width == 0 || containerSize.height == 0 || sentences.isEmpty()) {
-            return@remember emptyList<List<Pair<Int, Sentence>>>()
+            value = emptyList()
+            return@produceState
         }
-        val result = mutableListOf<List<Pair<Int, Sentence>>>()
-        var currentPage = mutableListOf<Pair<Int, Sentence>>()
-        var currentHeight = 0
-        val constraints = Constraints(maxWidth = containerSize.width)
 
-        val paddingPx = with(density) { 4.dp.roundToPx() }
-        val titleBottomPaddingPx = with(density) { 28.dp.roundToPx() }
-        val topPaddingPx = with(density) { 24.dp.roundToPx() }
+        withContext(Dispatchers.Default) {
+            val result = mutableListOf<List<Pair<Int, Sentence>>>()
+            var currentPage = mutableListOf<Pair<Int, Sentence>>()
+            var currentHeight = 0
+            val constraints = Constraints(maxWidth = containerSize.width)
 
-        val titleLayout = measurer.measure(
-            text = AnnotatedString(chapter.title),
-            style = titleStyle,
-            constraints = constraints
-        )
-        currentHeight += titleLayout.size.height + titleBottomPaddingPx + topPaddingPx
+            val paddingPx = with(density) { 4.dp.roundToPx() }
+            val titleBottomPaddingPx = with(density) { 28.dp.roundToPx() }
+            val topPaddingPx = with(density) { 24.dp.roundToPx() }
 
-        for ((index, sentence) in sentences.withIndex()) {
-            val layoutResult = measurer.measure(
-                text = AnnotatedString(sentence.text),
-                style = textStyle,
+            val titleLayout = measurer.measure(
+                text = AnnotatedString(chapter.title),
+                style = titleStyle,
                 constraints = constraints
             )
-            val itemHeight = layoutResult.size.height + paddingPx
+            currentHeight += titleLayout.size.height + titleBottomPaddingPx + topPaddingPx
 
-            if (currentHeight + itemHeight > containerSize.height && currentPage.isNotEmpty()) {
-                result.add(currentPage)
-                currentPage = mutableListOf()
-                currentHeight = 0
+            for ((index, sentence) in sentences.withIndex()) {
+                if (index % 100 == 0) yield()
+
+                val layoutResult = measurer.measure(
+                    text = AnnotatedString(sentence.text),
+                    style = textStyle,
+                    constraints = constraints
+                )
+                val itemHeight = layoutResult.size.height + paddingPx
+
+                if (currentHeight + itemHeight > containerSize.height && currentPage.isNotEmpty()) {
+                    result.add(currentPage.toList())
+                    currentPage = mutableListOf()
+                    currentHeight = 0
+                }
+                currentPage.add(index to sentence)
+                currentHeight += itemHeight
             }
-            currentPage.add(index to sentence)
-            currentHeight += itemHeight
+            if (currentPage.isNotEmpty()) {
+                result.add(currentPage.toList())
+            }
+            value = result
         }
-        if (currentPage.isNotEmpty()) {
-            result.add(currentPage)
-        }
-        result
     }
 
     val pagerState = rememberPagerState(pageCount = { pages.size + 1 }) // +1 pour la page virtuelle "suite"
@@ -261,7 +298,7 @@ private fun PagedContent(
                     }
 
                     pages[pageIndex].forEach { (index, sentence) ->
-                        SentenceRenderer(
+                        SelectableSentence(
                             index = index,
                             sentence = sentence,
                             activeIdx = activeIdx,
@@ -269,7 +306,11 @@ private fun PagedContent(
                             textStyle = textStyle,
                             textColor = textColor,
                             accentColor = accentColor,
-                            playbackState = playbackState
+                            playbackState = playbackState,
+                            onTextSelected = onTextSelected,
+                            onDismiss = onSelectionDismissed,
+                            highlights = highlights,
+                            bookmarks = bookmarks
                         )
                     }
                 }
@@ -328,7 +369,11 @@ private fun ScrollContent(
     readingMode: ReadingMode,
     onToggleMode: () -> Unit,
     onTap: (Offset) -> Unit,
-    onNextChapter: () -> Unit
+    onNextChapter: () -> Unit,
+    onTextSelected: (sentenceIndex: Int, selectedText: String) -> Unit,
+    onSelectionDismissed: () -> Unit,
+    highlights: List<HighlightEntity>,
+    bookmarks: List<BookmarkEntity>
 ) {
     val lazyListState = rememberLazyListState()
 
@@ -371,7 +416,7 @@ private fun ScrollContent(
                 items = sentences,
                 key = { index, _ -> index }
             ) { index, sentence ->
-                SentenceRenderer(
+                SelectableSentence(
                     index = index,
                     sentence = sentence,
                     activeIdx = activeIdx,
@@ -379,7 +424,11 @@ private fun ScrollContent(
                     textStyle = textStyle,
                     textColor = textColor,
                     accentColor = accentColor,
-                    playbackState = playbackState
+                    playbackState = playbackState,
+                    onTextSelected = onTextSelected,
+                    onDismiss = onSelectionDismissed,
+                    highlights = highlights,
+                    bookmarks = bookmarks
                 )
             }
 
@@ -447,6 +496,63 @@ private fun NextChapterTrigger(
 }
 
 @Composable
+private fun SelectableSentence(
+    index: Int,
+    sentence: Sentence,
+    activeIdx: Int,
+    isSpeaking: Boolean,
+    textStyle: TextStyle,
+    textColor: Color,
+    accentColor: Color,
+    playbackState: PlaybackState,
+    onTextSelected: (sentenceIndex: Int, selectedText: String) -> Unit,
+    onDismiss: () -> Unit,
+    highlights: List<HighlightEntity>,
+    bookmarks: List<BookmarkEntity>
+) {
+    val defaultToolbar = LocalTextToolbar.current
+
+    val toolbar = remember(index, sentence) {
+        object : TextToolbar {
+            override val status: TextToolbarStatus
+                get() = defaultToolbar.status
+
+            override fun showMenu(
+                rect: Rect,
+                onCopyRequested: (() -> Unit)?,
+                onPasteRequested: (() -> Unit)?,
+                onCutRequested: (() -> Unit)?,
+                onSelectAllRequested: (() -> Unit)?
+            ) {
+                onTextSelected(index, sentence.text)
+            }
+
+            override fun hide() {
+                defaultToolbar.hide()
+                onDismiss()
+            }
+        }
+    }
+
+    CompositionLocalProvider(LocalTextToolbar provides toolbar) {
+        SelectionContainer {
+            SentenceRenderer(
+                index = index,
+                sentence = sentence,
+                activeIdx = activeIdx,
+                isSpeaking = isSpeaking,
+                textStyle = textStyle,
+                textColor = textColor,
+                accentColor = accentColor,
+                playbackState = playbackState,
+                highlights = highlights,
+                bookmarks = bookmarks
+            )
+        }
+    }
+}
+
+@Composable
 private fun SentenceRenderer(
     index: Int,
     sentence: Sentence,
@@ -455,39 +561,65 @@ private fun SentenceRenderer(
     textStyle: TextStyle,
     textColor: Color,
     accentColor: Color,
-    playbackState: PlaybackState
+    playbackState: PlaybackState,
+    highlights: List<HighlightEntity> = emptyList(),
+    bookmarks: List<BookmarkEntity> = emptyList()
 ) {
     val isActive = index == activeIdx && isSpeaking
-    val bgModifier = if (isActive) {
-        Modifier
+    val highlight = highlights.find { it.sentenceIndex == index }
+    val hasBookmark = bookmarks.any { it.sentenceIndex == index }
+
+    val highlightColor = highlight?.let {
+        try {
+            Color(android.graphics.Color.parseColor(it.colorHex))
+        } catch (_: Exception) {
+            Color(0xFFFFEB3D)
+        }
+    }
+
+    val bgModifier = when {
+        isActive -> Modifier
             .background(
                 color = accentColor.copy(alpha = 0.12f),
                 shape = RoundedCornerShape(4.dp)
             )
             .padding(horizontal = 4.dp, vertical = 2.dp)
-    } else {
-        Modifier.padding(vertical = 2.dp)
+        highlightColor != null -> Modifier
+            .background(
+                color = highlightColor.copy(alpha = 0.3f),
+                shape = RoundedCornerShape(4.dp)
+            )
+            .padding(horizontal = 4.dp, vertical = 2.dp)
+        else -> Modifier.padding(vertical = 2.dp)
     }
 
-    if (isActive) {
-        ActiveSentenceText(
-            text = sentence.text,
-            style = textStyle,
-            accentColor = accentColor,
-            textColor = textColor,
-            durationMs = playbackState.sentenceDurationMs,
-            startTimestamp = playbackState.sentenceStartTimestamp,
-            modifier = bgModifier
-        )
-    } else {
-        Text(
-            text = sentence.text,
-            style = textStyle.copy(
-                fontWeight = FontWeight.Normal,
-                color = textColor.copy(alpha = 0.88f)
-            ),
-            modifier = bgModifier
-        )
+    Row(modifier = bgModifier, verticalAlignment = Alignment.CenterVertically) {
+        if (hasBookmark) {
+            Text(
+                "🔖",
+                fontSize = 12.sp,
+                modifier = Modifier.padding(end = 4.dp)
+            )
+        }
+
+        if (isActive) {
+            ActiveSentenceText(
+                text = sentence.text,
+                style = textStyle,
+                accentColor = accentColor,
+                textColor = textColor,
+                durationMs = playbackState.sentenceDurationMs,
+                startTimestamp = playbackState.sentenceStartTimestamp
+            )
+        } else {
+            Text(
+                text = sentence.text,
+                style = textStyle.copy(
+                    fontWeight = FontWeight.Normal,
+                    color = textColor.copy(alpha = 0.88f)
+                )
+            )
+        }
     }
 }
 

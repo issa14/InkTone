@@ -128,35 +128,34 @@ class LibraryViewModel @Inject constructor(
 
     private fun applyFilters() {
         val s = _uiState.value
-        var filtered = s.allBooks
+        val progressMap = s.bookProgress
 
-        // Filtre texte
-        if (s.searchQuery.isNotBlank()) {
-            val q = s.searchQuery.lowercase()
-            filtered = filtered.filter {
-                it.title.lowercase().contains(q) || it.author.lowercase().contains(q)
+        val filtered = s.allBooks.asSequence()
+            .filter { book ->
+                s.searchQuery.isBlank() ||
+                book.title.contains(s.searchQuery, ignoreCase = true) ||
+                book.author.contains(s.searchQuery, ignoreCase = true)
             }
-        }
-
-        // Tri
-        filtered = when (s.sortOrder) {
-            SortOrder.TITLE -> filtered.sortedBy { it.title.lowercase() }
-            SortOrder.AUTHOR -> filtered.sortedBy { it.author.lowercase() }
-            SortOrder.DATE -> filtered.sortedByDescending { it.addedAt }
-            SortOrder.FOLDERS -> filtered  // TODO
-            SortOrder.RECENT -> filtered.sortedByDescending { it.addedAt }
-        }
-
-        // Filtre type (progression réelle depuis Room)
-        filtered = when (s.filterType) {
-            FilterType.ALL -> filtered
-            FilterType.UNREAD -> filtered.filter { (s.bookProgress[it.id] ?: 0f) <= 0.01f }
-            FilterType.IN_PROGRESS -> filtered.filter {
-                val p = s.bookProgress[it.id] ?: 0f
-                p > 0.01f && p < 0.99f
+            .let { seq ->
+                when (s.sortOrder) {
+                    SortOrder.TITLE -> seq.sortedBy { it.title.lowercase() }
+                    SortOrder.AUTHOR -> seq.sortedBy { it.author.lowercase() }
+                    SortOrder.DATE, SortOrder.RECENT -> seq.sortedByDescending { it.addedAt }
+                    SortOrder.FOLDERS -> seq
+                }
             }
-            FilterType.READ -> filtered.filter { (s.bookProgress[it.id] ?: 0f) >= 0.99f }
-        }
+            .filter { book ->
+                when (s.filterType) {
+                    FilterType.ALL -> true
+                    FilterType.UNREAD -> (progressMap[book.id] ?: 0f) <= 0.01f
+                    FilterType.IN_PROGRESS -> {
+                        val p = progressMap[book.id] ?: 0f
+                        p > 0.01f && p < 0.99f
+                    }
+                    FilterType.READ -> (progressMap[book.id] ?: 0f) >= 0.99f
+                }
+            }
+            .toList()
 
         _uiState.update { it.copy(books = filtered) }
     }

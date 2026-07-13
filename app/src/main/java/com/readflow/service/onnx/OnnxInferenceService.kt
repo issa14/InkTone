@@ -31,6 +31,12 @@ class OnnxInferenceService @Inject constructor(
         private const val ASSET_DIR = "models/vits-piper-fr_FR-miro-high"
         private const val ONNX_FILE  = "fr_FR-miro-high.onnx"
         private const val TOKENS_TXT = "tokens.txt"
+
+        // Patterns compilés une seule fois (thread-safe, immuables)
+        // Évite la compilation coûteuse de Regex à chaque appel synthesize()
+        private val MULTIPLE_PUNCT_SPACES = Regex("([.!?])\\s+\\1\\s+\\1")
+        private val REPEATED_PUNCT = Regex("([.!?])\\1{2,}")
+        private val MULTIPLE_SPACES = Regex("\\s+")
     }
 
     @Volatile private var tts: OfflineTts? = null
@@ -141,11 +147,11 @@ class OnnxInferenceService @Inject constructor(
 
         val cleaned = text
             .trim()
-            .replace(Regex("([.!?])\\s+\\1\\s+\\1"), "$1$1$1") // "! ! !" → "!!!"
-            .replace(Regex("([.!?])\\1{2,}"), "$1")              // "......" → "."
-            .replace("\u200B", "")                                // zero-width space
-            .replace("\u00a0", " ")                               // non-breaking space → espace
-            .replace(Regex("\\s+"), " ")                          // normalise espaces
+            .replace(MULTIPLE_PUNCT_SPACES, "$1$1$1")
+            .replace(REPEATED_PUNCT, "$1")
+            .replace("\u200B", "")
+            .replace("\u00a0", " ")
+            .replace(MULTIPLE_SPACES, " ")
         Log.d(TAG, "synth: \"$cleaned\"")
         val startMs = System.currentTimeMillis()
         val audio = engine.generate(cleaned, voice.sid, speed.coerceIn(0.5f, 2.0f))

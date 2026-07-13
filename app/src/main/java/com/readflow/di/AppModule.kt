@@ -10,6 +10,7 @@ import com.readflow.data.database.HighlightDao
 import com.readflow.data.database.MIGRATION_1_2
 import com.readflow.data.database.MIGRATION_2_3
 import com.readflow.data.database.MIGRATION_3_4
+import com.readflow.data.database.MIGRATION_4_5
 import com.readflow.data.database.ProgressDao
 import com.readflow.data.database.PronunciationRuleDao
 import com.readflow.data.database.ReadFlowDatabase
@@ -40,7 +41,7 @@ object AppModule {
             context,
             ReadFlowDatabase::class.java,
             "readflow.db"
-        ).addMigrations(MIGRATION_1_2, MIGRATION_2_3, MIGRATION_3_4)
+        ).addMigrations(MIGRATION_1_2, MIGRATION_2_3, MIGRATION_3_4, MIGRATION_4_5)
          .fallbackToDestructiveMigration()
          .build()
     }

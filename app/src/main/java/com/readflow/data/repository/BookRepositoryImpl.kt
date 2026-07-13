@@ -41,6 +41,23 @@ class BookRepositoryImpl @Inject constructor(
     private val chunkText: ChunkTextUseCase
 ) : BookRepository {
 
+    companion object {
+        // Patterns HTML compilés une seule fois
+        private val BODY_PATTERN = java.util.regex.Pattern.compile(
+            "<body[^>]*>(.*?)</body>",
+            java.util.regex.Pattern.DOTALL or java.util.regex.Pattern.CASE_INSENSITIVE
+        )
+        private val STYLE_PATTERN = Regex("<style[^>]*>.*?</style>",
+            setOf(RegexOption.DOT_MATCHES_ALL, RegexOption.IGNORE_CASE))
+        private val SCRIPT_PATTERN = Regex("<script[^>]*>.*?</script>",
+            setOf(RegexOption.DOT_MATCHES_ALL, RegexOption.IGNORE_CASE))
+        private val HEAD_PATTERN = Regex("<head[^>]*>.*?</head>",
+            setOf(RegexOption.DOT_MATCHES_ALL, RegexOption.IGNORE_CASE))
+        private val CR_TAB_PATTERN = Regex("[\\r\\t]")
+        private val DOUBLE_SPACES_PATTERN = Regex(" {2,}")
+        private val TRIPLE_NEWLINE_PATTERN = Regex("\\n{3,}")
+    }
+
     private val httpClient = DefaultHttpClient(
         userAgent = "ReadFlow/0.1.0",
         connectTimeout = INFINITE,
@@ -129,6 +146,9 @@ class BookRepositoryImpl @Inject constructor(
                     val text = extractHtml(epubFile, link.href.toString())
                     // Segmente et stocke directement en cache Room via ChunkTextUseCase
                     chunkText(bookId, i, text)
+                    // Stocke aussi le titre du chapitre pour éviter de rouvrir l'EPUB plus tard
+                    val chapterTitle = link.title?.takeIf { it.isNotBlank() } ?: "Chapitre ${i + 1}"
+                    sentenceCacheDao.updateChapterTitle(bookId, i, chapterTitle)
                 } catch (e: Exception) {
                     Log.e("BookRepo", "Erreur lors de la pré-segmentation du chapitre $i", e)
                 }
@@ -149,12 +169,12 @@ class BookRepositoryImpl @Inject constructor(
             val cachedSentences = sentenceCacheDao.getSentences(bookId, chapterIndex)
             if (cachedSentences.isNotEmpty()) {
                 Log.d("BookRepo", "Cache HIT — bookId=$bookId ch=$chapterIndex (${cachedSentences.size} phrases)")
-                val publication = openPublication(epubFile)
-                val link = publication.readingOrder.getOrNull(chapterIndex)
-                    ?: throw IllegalStateException("Chapitre $chapterIndex introuvable")
+                // Titre du chapitre stocké dans le cache — pas besoin de rouvrir l'EPUB
+                val chapterTitle = cachedSentences.first().chapterTitle
+                    .takeIf { it.isNotBlank() } ?: "Chapitre ${chapterIndex + 1}"
                 return@withContext Chapter(
                     index = chapterIndex,
-                    title = link.title?.takeIf { it.isNotBlank() } ?: "Chapitre ${chapterIndex + 1}",
+                    title = chapterTitle,
                     sentences = cachedSentences.map { entity ->
                         Sentence(
                             index = entity.sentenceIndex,
@@ -247,29 +267,23 @@ class BookRepositoryImpl @Inject constructor(
     private fun stripHtml(html: String): String {
         if (html.isEmpty()) return ""
 
-        // 1. Ne garder que le contenu du <body> si présent pour éviter d'extraire le titre du head
         var processedHtml = html
-        val bodyMatcher = java.util.regex.Pattern.compile("<body[^>]*>(.*?)</body>", java.util.regex.Pattern.DOTALL or java.util.regex.Pattern.CASE_INSENSITIVE).matcher(html)
+        val bodyMatcher = BODY_PATTERN.matcher(html)
         if (bodyMatcher.find()) {
             processedHtml = bodyMatcher.group(1) ?: html
         } else {
-            // Fallback : supprimer la balise <head> entière
-            processedHtml = processedHtml.replace(Regex("<head[^>]*>.*?</head>", setOf(RegexOption.DOT_MATCHES_ALL, RegexOption.IGNORE_CASE)), "")
+            processedHtml = processedHtml.replace(HEAD_PATTERN, "")
         }
 
-        // Supprimer les balises <style> et <script> qui pourraient se trouver dans le body
-        processedHtml = processedHtml.replace(Regex("<style[^>]*>.*?</style>", setOf(RegexOption.DOT_MATCHES_ALL, RegexOption.IGNORE_CASE)), "")
-        processedHtml = processedHtml.replace(Regex("<script[^>]*>.*?</script>", setOf(RegexOption.DOT_MATCHES_ALL, RegexOption.IGNORE_CASE)), "")
+        processedHtml = processedHtml.replace(STYLE_PATTERN, "")
+        processedHtml = processedHtml.replace(SCRIPT_PATTERN, "")
 
-        // 2. Décode toutes les entités HTML (&#8217; -> ', &rsquo; -> ', etc.)
-        // et extrait le texte brut en éliminant les balises structurelles
         val decodedText = Html.fromHtml(processedHtml, Html.FROM_HTML_MODE_LEGACY).toString()
 
-        // 3. Nettoyage de la mise en forme sans détruire les sauts de ligne (\n)
         return decodedText
-            .replace(Regex("[\\r\\t]"), "")        // Supprime les retours chariot et tabulations parasites
-            .replace(Regex(" {2,}"), " ")          // Fusionne les espaces doubles ou plus en un seul espace
-            .replace(Regex("\\n{3,}"), "\n\n")     // Limite les sauts de ligne consécutifs à 2 maximum
+            .replace(CR_TAB_PATTERN, "")
+            .replace(DOUBLE_SPACES_PATTERN, " ")
+            .replace(TRIPLE_NEWLINE_PATTERN, "\n\n")
             .trim()
     }
 }

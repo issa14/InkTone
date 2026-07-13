@@ -109,7 +109,7 @@ class PlaybackOrchestrator @Inject constructor(
     @Volatile private var currentTotalSentences: Int = 0
     @Volatile private var currentSentences: List<Sentence> = emptyList()
 
-    private val sentenceDurations = java.util.concurrent.ConcurrentHashMap<Int, Long>()
+    private lateinit var sentenceDurations: LongArray // alloué dans play()
 
     private var currentJob: Job? = null
     @Volatile private var playGeneration: Long = 0L
@@ -221,8 +221,6 @@ class PlaybackOrchestrator @Inject constructor(
         if (sentences.isEmpty()) return
         stop()
 
-        sentenceDurations.clear()
-
         // Demander le focus audio — ne pas lancer sans accord
         val focusGranted = audioFocusManager.requestFocus()
         if (!focusGranted) {
@@ -244,6 +242,7 @@ class PlaybackOrchestrator @Inject constructor(
         currentSentences = sentences
 
         val total = sentences.size
+        sentenceDurations = LongArray(total)
         _progress.value = Progress(startFrom, total, sentences.getOrNull(startFrom))
         _state.value = State.Loading
         wasPausedByFocusLoss = false
@@ -261,115 +260,117 @@ class PlaybackOrchestrator @Inject constructor(
                 val buffer = Channel<SynthesisResult>(LOOKAHEAD)
 
                 val fillJob = launch {
-                    for (i in 0 until sentences.size) {
-                        if (!isActive) break
-                        val idx = startFrom + i
-                        if (idx >= total) break
-                        try {
-                            val result = ttsRepository.synthesize(sentences[idx].text, voice, speed)
-                            sentenceDurations[idx] = result.audioDurationMs
-                            buffer.send(result)
-                        } catch (e: CancellationException) { break }
-                        catch (e: Exception) {
-                            Log.e(TAG, "Synthesis error sentence $idx: ${e.message}", e)
+                    try {
+                        for (i in 0 until sentences.size) {
+                            if (!isActive) break
+                            val idx = startFrom + i
+                            if (idx >= total) break
+                            try {
+                                val result = ttsRepository.synthesize(sentences[idx].text, voice, speed)
+                                sentenceDurations[idx] = result.audioDurationMs
+                                buffer.send(result)
+                            } catch (e: CancellationException) { break }
+                            catch (e: Exception) {
+                                Log.e(TAG, "Synthesis error sentence $idx: ${e.message}", e)
+                            }
                         }
+                    } finally {
+                        buffer.close()
                     }
-                    buffer.close()
                 }
 
                 var started = false
                 var currentReadIdx = startFrom
 
-                for (result in buffer) {
-                    if (!isActive || (_state.value != State.Playing && _state.value != State.Loading)) break
+                try {
+                    for (result in buffer) {
+                        if (!isActive || (_state.value != State.Playing && _state.value != State.Loading)) break
 
-                    player.enqueue(result.samples)
-                    val silenceLen = (result.sampleRate * INTER_SENTENCE_SILENCE_MS / 1000)
-                    player.enqueue(FloatArray(silenceLen) { 0f })
+                        player.enqueue(result.samples)
+                        val silenceLen = (result.sampleRate * INTER_SENTENCE_SILENCE_MS / 1000)
+                            .coerceAtMost(GaplessAudioPlayer.SILENCE_BUFFER.size)
+                        player.enqueue(GaplessAudioPlayer.SILENCE_BUFFER.copyOf(silenceLen))
 
-                    if (!started) {
-                        _state.value = State.Playing
-                        player.play()
-                        started = true
+                        if (!started) {
+                            _state.value = State.Playing
+                            player.play()
+                            started = true
 
-                        // Émettre l'état de lecture de démarrage immédiatement
-                        val firstDuration = sentenceDurations[startFrom] ?: 0L
-                        val firstStartTime = System.currentTimeMillis()
-                        updatePlaybackState(
-                            index = startFrom,
-                            text = sentences.getOrNull(startFrom)?.text ?: "",
-                            total = total,
-                            status = PlaybackStatus.PLAYING,
-                            durationMs = firstDuration,
-                            startTimestamp = firstStartTime
-                        )
+                            val firstDuration = sentenceDurations.getOrElse(startFrom) { 0L }
+                            val firstStartTime = System.currentTimeMillis()
+                            updatePlaybackState(
+                                index = startFrom,
+                                text = sentences.getOrNull(startFrom)?.text ?: "",
+                                total = total,
+                                status = PlaybackStatus.PLAYING,
+                                durationMs = firstDuration,
+                                startTimestamp = firstStartTime
+                            )
 
-                        // Surveiller completedCount pour le surlignage + persistance
-                        launch {
-                            var lastSentenceIdx = startFrom
-                            while (isActive && _state.value == State.Playing &&
-                                   player.completedCount < (total - startFrom) * 2) {
-                                val c = player.completedCount
-                                val sentenceIdx = startFrom + c / 2
-                                if (sentenceIdx != lastSentenceIdx) {
-                                    val currentSentence = sentences.getOrNull(sentenceIdx)
-                                    currentReadIdx = sentenceIdx
-                                    currentSentenceIdx = sentenceIdx
-                                    _progress.value = Progress(
-                                        sentenceIdx, total, currentSentence)
+                            launch {
+                                var lastSentenceIdx = startFrom
+                                while (isActive && _state.value == State.Playing &&
+                                       player.completedCount < (total - startFrom) * 2) {
+                                    val c = player.completedCount
+                                    val sentenceIdx = startFrom + c / 2
+                                    if (sentenceIdx != lastSentenceIdx) {
+                                        val currentSentence = sentences.getOrNull(sentenceIdx)
+                                        currentReadIdx = sentenceIdx
+                                        currentSentenceIdx = sentenceIdx
+                                        _progress.value = Progress(
+                                            sentenceIdx, total, currentSentence)
 
-                                    val duration = sentenceDurations[sentenceIdx] ?: 0L
-                                    val startTime = System.currentTimeMillis()
+                                        val duration = sentenceDurations.getOrElse(sentenceIdx) { 0L }
+                                        val startTime = System.currentTimeMillis()
 
-                                    // ── Mise à jour du PlaybackState pour l'UI ──
-                                    updatePlaybackState(
-                                        index = sentenceIdx,
-                                        text = currentSentence?.text ?: "",
-                                        total = total,
-                                        status = PlaybackStatus.PLAYING,
-                                        durationMs = duration,
-                                        startTimestamp = startTime
-                                    )
+                                        updatePlaybackState(
+                                            index = sentenceIdx,
+                                            text = currentSentence?.text ?: "",
+                                            total = total,
+                                            status = PlaybackStatus.PLAYING,
+                                            durationMs = duration,
+                                            startTimestamp = startTime
+                                        )
 
-                                    // ── Persistance atomique à chaque transition de phrase ──
-                                    saveProgressAsync(
-                                        bookId = bookId,
-                                        chapterIdx = chapterIndex,
-                                        sentenceIdx = sentenceIdx,
-                                        charOffset = currentSentence?.startOffset ?: 0
-                                    )
-                                    lastSentenceIdx = sentenceIdx
+                                        saveProgressAsync(
+                                            bookId = bookId,
+                                            chapterIdx = chapterIndex,
+                                            sentenceIdx = sentenceIdx,
+                                            charOffset = currentSentence?.startOffset ?: 0
+                                        )
+                                        lastSentenceIdx = sentenceIdx
+                                    }
+                                    delay(50)
                                 }
-                                delay(50)
                             }
                         }
                     }
-                }
 
-                val expectedSegments = (total - startFrom) * 2
-                while (player.completedCount < expectedSegments && isActive && _state.value == State.Playing) {
-                    delay(200)
+                    val expectedSegments = (total - startFrom) * 2
+                    while (player.completedCount < expectedSegments && isActive && _state.value == State.Playing) {
+                        delay(200)
+                    }
+                    delay(300)
+                    if (playGeneration == myGeneration) {
+                        _state.value = State.Idle
+                        updatePlaybackState(
+                            index = currentReadIdx,
+                            text = "",
+                            total = total,
+                            status = PlaybackStatus.IDLE
+                        )
+                        saveProgressAsync(
+                            bookId = bookId,
+                            chapterIdx = chapterIndex,
+                            sentenceIdx = total,
+                            charOffset = 0
+                        )
+                    }
+                } finally {
+                    fillJob.cancel()
+                    player.stop()
+                    audioFocusManager.abandonFocus()
                 }
-                delay(300)
-                if (playGeneration == myGeneration) {
-                    _state.value = State.Idle
-                    updatePlaybackState(
-                        index = currentReadIdx,
-                        text = "",
-                        total = total,
-                        status = PlaybackStatus.IDLE
-                    )
-                    saveProgressAsync(
-                        bookId = bookId,
-                        chapterIdx = chapterIndex,
-                        sentenceIdx = total,
-                        charOffset = 0
-                    )
-                }
-                player.stop()
-                audioFocusManager.abandonFocus()
-                fillJob.cancel()
-
             } catch (e: CancellationException) {
                 player.stop()
                 audioFocusManager.abandonFocus()

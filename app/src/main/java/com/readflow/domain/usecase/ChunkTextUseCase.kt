@@ -195,7 +195,8 @@ class ChunkTextUseCase @Inject constructor(
             sentenceIndex = index,
             text = text,
             startOffset = startOffset,
-            endOffset = endOffset
+            endOffset = endOffset,
+            chapterTitle = ""
         )
     }
 }

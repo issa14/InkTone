@@ -13,6 +13,12 @@ import androidx.lifecycle.viewModelScope
 import com.readflow.domain.model.Book
 import com.readflow.domain.model.Chapter
 import com.readflow.domain.repository.BookRepository
+import com.readflow.data.database.AnnotationDao
+import com.readflow.data.database.BookmarkDao
+import com.readflow.data.database.HighlightDao
+import com.readflow.data.database.entity.AnnotationEntity
+import com.readflow.data.database.entity.BookmarkEntity
+import com.readflow.data.database.entity.HighlightEntity
 import com.readflow.service.audio.AudioPlaybackService
 import com.readflow.service.audio.PlaybackOrchestrator
 import com.readflow.service.audio.PlaybackState
@@ -44,7 +50,10 @@ data class ReaderUiState(
     val fontSizeSp: Float = 18f,
     val lineHeightEm: Float = 1.8f,
     val horizontalMarginDp: Int = 24,
-    val useOpenDyslexic: Boolean = false
+    val useOpenDyslexic: Boolean = false,
+    val lastAction: String? = null,
+    val highlights: List<HighlightEntity> = emptyList(),
+    val bookmarks: List<BookmarkEntity> = emptyList()
 )
 
 enum class ReaderTheme { DAY, NIGHT, SEPIA }
@@ -57,6 +66,9 @@ class ReaderViewModel @Inject constructor(
     private val orchestrator: PlaybackOrchestrator,
     private val onnxService: OnnxInferenceService,
     private val pronunciationRuleDao: com.readflow.data.database.PronunciationRuleDao,
+    private val bookmarkDao: BookmarkDao,
+    private val highlightDao: HighlightDao,
+    private val annotationDao: AnnotationDao,
     @ApplicationContext private val context: Context
 ) : ViewModel() {
 
@@ -276,10 +288,13 @@ class ReaderViewModel @Inject constructor(
             _uiState.update { it.copy(isLoading = true, error = null) }
             try {
                 val chapter = bookRepository.getChapter(book.id, index)
+                val highlights = highlightDao.getHighlightsForChapter(book.id, index).first()
+                val bookmarks = bookmarkDao.getBookmarks(book.id).first()
                 _uiState.update {
                     it.copy(
                         currentChapterIndex = index, currentChapter = chapter,
                         totalSentences = chapter.sentences.size, currentSentenceIndex = sentenceIndex,
+                        highlights = highlights, bookmarks = bookmarks,
                         isLoading = false
                     )
                 }
@@ -367,4 +382,93 @@ class ReaderViewModel @Inject constructor(
     }
 
     fun clearError() { _uiState.update { it.copy(error = null) } }
+
+    // ── Marque-pages, surlignages, annotations ─
+
+    fun addBookmark(sentenceIndex: Int, text: String) {
+        val book = currentBook ?: return
+        viewModelScope.launch {
+            try {
+                val chapterIdx = _uiState.value.currentChapterIndex
+                val existing = bookmarkDao.findByPosition(book.id, chapterIdx, sentenceIndex)
+                if (existing != null) {
+                    bookmarkDao.delete(existing)
+                    _uiState.update { it.copy(lastAction = "Marque-page retiré") }
+                } else {
+                    bookmarkDao.insert(
+                        BookmarkEntity(
+                            bookId = book.id,
+                            chapterIndex = chapterIdx,
+                            sentenceIndex = sentenceIndex,
+                            text = text.take(120)
+                        )
+                    )
+                    _uiState.update { it.copy(lastAction = "Marque-page ajouté") }
+                }
+                reloadAnnotations(book.id, chapterIdx)
+            } catch (e: Exception) {
+                Log.e("ReaderVM", "Error bookmark: ${e.message}", e)
+            }
+        }
+    }
+
+    fun addHighlight(sentenceIndex: Int, selectedText: String, startOffset: Int, endOffset: Int) {
+        val book = currentBook ?: return
+        viewModelScope.launch {
+            try {
+                val chapterIdx = _uiState.value.currentChapterIndex
+                highlightDao.insertHighlight(
+                    HighlightEntity(
+                        bookId = book.id,
+                        chapterIndex = chapterIdx,
+                        sentenceIndex = sentenceIndex,
+                        startOffset = startOffset,
+                        endOffset = endOffset,
+                        selectedText = selectedText,
+                        colorHex = "#FFEB3D"
+                    )
+                )
+                _uiState.update { it.copy(lastAction = "Surlignage ajouté") }
+                reloadAnnotations(book.id, chapterIdx)
+            } catch (e: Exception) {
+                Log.e("ReaderVM", "Error highlight: ${e.message}", e)
+            }
+        }
+    }
+
+    fun addAnnotation(sentenceIndex: Int, selectedText: String) {
+        val book = currentBook ?: return
+        viewModelScope.launch {
+            try {
+                val chapterIdx = _uiState.value.currentChapterIndex
+                annotationDao.insertAnnotation(
+                    AnnotationEntity(
+                        bookId = book.id,
+                        chapterIndex = chapterIdx,
+                        sentenceIndex = sentenceIndex,
+                        selectedText = selectedText,
+                        colorHex = "#FFF9C4"
+                    )
+                )
+                _uiState.update { it.copy(lastAction = "Annotation ajoutée") }
+                reloadAnnotations(book.id, chapterIdx)
+            } catch (e: Exception) {
+                Log.e("ReaderVM", "Error annotation: ${e.message}", e)
+            }
+        }
+    }
+
+    private suspend fun reloadAnnotations(bookId: String, chapterIdx: Int) {
+        try {
+            val highlights = highlightDao.getHighlightsForChapter(bookId, chapterIdx).first()
+            val bookmarks = bookmarkDao.getBookmarks(bookId).first()
+            _uiState.update { it.copy(highlights = highlights, bookmarks = bookmarks) }
+        } catch (e: Exception) {
+            Log.e("ReaderVM", "Error reloading annotations: ${e.message}", e)
+        }
+    }
+
+    fun clearAction() {
+        _uiState.update { it.copy(lastAction = null) }
+    }
 }
