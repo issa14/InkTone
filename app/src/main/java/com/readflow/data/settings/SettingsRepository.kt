@@ -12,7 +12,17 @@ import javax.inject.Singleton
 
 private val Context.settingsDataStore: DataStore<Preferences> by preferencesDataStore(name = "readflow_settings")
 
-enum class AppTheme { LIGHT, DARK, SYSTEM }
+enum class AppTheme(val label: String) {
+    PAPIER_ART("Papier d'Art"),
+    OBSIDIAN("Obsidian Noir"),
+    NORDIC_FOG("Brouillard Nordique"),
+    SYSTEM("Système");
+
+    companion object {
+        fun fromName(name: String?): AppTheme =
+            entries.find { it.name == name } ?: PAPIER_ART
+    }
+}
 
 /**
  * Repository global des préférences utilisateur via Jetpack DataStore.
@@ -50,11 +60,7 @@ class SettingsRepository @Inject constructor(
     val speed: Flow<Float> = dataStore.data.map { it[Keys.SPEED] ?: 1.0f }
     val gain: Flow<Float> = dataStore.data.map { it[Keys.GAIN] ?: 3.0f }
     val theme: Flow<AppTheme> = dataStore.data.map {
-        when (it[Keys.THEME]) {
-            "LIGHT" -> AppTheme.LIGHT
-            "DARK" -> AppTheme.DARK
-            else -> AppTheme.SYSTEM
-        }
+        AppTheme.fromName(it[Keys.THEME])
     }
     val dynamicColors: Flow<Boolean> = dataStore.data.map { it[Keys.DYNAMIC_COLORS] ?: false }
     val modelPath: Flow<String> = dataStore.data.map { it[Keys.MODEL_PATH] ?: "" }

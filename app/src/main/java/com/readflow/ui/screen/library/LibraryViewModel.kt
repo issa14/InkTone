@@ -11,6 +11,7 @@ import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.readflow.domain.model.Book
 import com.readflow.domain.repository.BookRepository
+import com.readflow.data.settings.AppTheme
 import dagger.hilt.android.lifecycle.HiltViewModel
 import dagger.hilt.android.qualifiers.ApplicationContext
 import kotlinx.coroutines.*
@@ -32,7 +33,7 @@ data class LibraryUiState(
     val layoutMode: LayoutMode = LayoutMode.GRID_COVERS,
     val isFilterDialogVisible: Boolean = false,
     val currentDestination: NavigationDestination = NavigationDestination.LIBRARY,
-    val isDarkTheme: Boolean = true,
+    val appTheme: AppTheme = AppTheme.PAPIER_ART,
     val importProgress: Float? = null,
     val importStatus: String? = null
 )
@@ -123,7 +124,13 @@ class LibraryViewModel @Inject constructor(
     }
 
     fun toggleTheme() {
-        _uiState.update { it.copy(isDarkTheme = !it.isDarkTheme) }
+        val next = when (_uiState.value.appTheme) {
+            AppTheme.PAPIER_ART -> AppTheme.OBSIDIAN
+            AppTheme.OBSIDIAN   -> AppTheme.NORDIC_FOG
+            AppTheme.NORDIC_FOG -> AppTheme.PAPIER_ART
+            AppTheme.SYSTEM     -> AppTheme.PAPIER_ART
+        }
+        _uiState.update { it.copy(appTheme = next) }
     }
 
     private fun applyFilters() {

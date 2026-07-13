@@ -1,70 +1,39 @@
 package com.readflow.ui.theme
 
 import android.app.Activity
-import androidx.compose.material3.*
-import androidx.compose.runtime.*
+import androidx.compose.foundation.isSystemInDarkTheme
+import androidx.compose.material3.MaterialTheme
+import androidx.compose.runtime.Composable
+import androidx.compose.runtime.SideEffect
 import androidx.compose.ui.graphics.toArgb
 import androidx.compose.ui.platform.LocalView
 import androidx.core.view.WindowCompat
-import androidx.hilt.navigation.compose.hiltViewModel
 import com.readflow.data.settings.AppTheme
-import com.readflow.ui.screen.settings.SettingsViewModel
-
-private val DarkColors by lazy {
-    darkColorScheme(
-    primary = DarkPrimary,
-    onPrimary = DarkOnPrimary,
-    primaryContainer = DarkPrimaryContainer,
-    onPrimaryContainer = DarkOnPrimaryContainer,
-    secondary = DarkSecondary,
-    onSecondary = DarkOnSecondary,
-    secondaryContainer = DarkSecondaryContainer,
-    onSecondaryContainer = DarkOnSecondaryContainer,
-    background = DarkBackground,
-    onBackground = DarkOnBackground,
-    surface = DarkSurface,
-    onSurface = DarkOnSurface,
-    surfaceVariant = DarkSurfaceVariant,
-    onSurfaceVariant = DarkOnSurfaceVariant,
-    error = DarkError,
-    )
-}
-
-private val LightColors by lazy {
-    lightColorScheme(
-    primary = LightPrimary,
-    onPrimary = LightOnPrimary,
-    secondary = DarkSecondary,
-    onSecondary = DarkOnSecondary,
-    background = LightBackground,
-    onBackground = LightOnBackground,
-    surface = LightSurface,
-    onSurface = LightOnSurface,
-    error = DarkError,
-    )
-}
 
 @Composable
 fun ReadFlowTheme(
+    theme: AppTheme = AppTheme.PAPIER_ART,
     content: @Composable () -> Unit
 ) {
-    val settingsVM: SettingsViewModel = hiltViewModel()
-    val themeState by settingsVM.uiState.collectAsState()
-
-    val darkTheme = when (themeState.theme) {
-        AppTheme.LIGHT -> false
-        AppTheme.DARK -> true
-        AppTheme.SYSTEM -> androidx.compose.foundation.isSystemInDarkTheme()
+    val (scheme, isLightBars) = when (theme) {
+        AppTheme.PAPIER_ART -> PapierArtColors   to true
+        AppTheme.OBSIDIAN   -> ObsidianColors    to false
+        AppTheme.NORDIC_FOG -> NordicFogColors   to true
+        AppTheme.SYSTEM     -> {
+            if (isSystemInDarkTheme())
+                ObsidianColors to false
+            else
+                PapierArtColors to true
+        }
     }
 
-    val scheme = if (darkTheme) DarkColors else LightColors
     val view = LocalView.current
     if (!view.isInEditMode) {
         SideEffect {
-            (view.context as Activity).window.statusBarColor = scheme.background.toArgb()
-            WindowCompat.getInsetsController(
-                (view.context as Activity).window, view
-            ).isAppearanceLightStatusBars = !darkTheme
+            val window = (view.context as Activity).window
+            window.statusBarColor = scheme.background.toArgb()
+            WindowCompat.getInsetsController(window, view)
+                .isAppearanceLightStatusBars = isLightBars
         }
     }
     MaterialTheme(colorScheme = scheme, content = content)

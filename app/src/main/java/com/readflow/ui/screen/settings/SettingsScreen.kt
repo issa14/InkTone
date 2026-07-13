@@ -86,11 +86,7 @@ fun SettingsScreen(
                 SettingRow(
                     icon = Icons.Default.Palette,
                     title = "Thème",
-                    subtitle = when (state.theme) {
-                        AppTheme.LIGHT -> "Clair"
-                        AppTheme.DARK -> "Sombre"
-                        AppTheme.SYSTEM -> "Système"
-                    },
+                    subtitle = state.theme.label,
                     onClick = { showThemePicker = true }
                 )
 
@@ -250,11 +246,7 @@ private fun VoicePickerDialog(voices: List<String>, selected: String, onSelect: 
 
 @Composable
 private fun ThemePickerDialog(selected: AppTheme, onSelect: (AppTheme) -> Unit) {
-    val options = listOf(
-        AppTheme.SYSTEM to "Système (par défaut)",
-        AppTheme.LIGHT to "Clair",
-        AppTheme.DARK to "Sombre"
-    )
+    val options = AppTheme.entries.map { it to it.label }
     AlertDialog(
         onDismissRequest = { onSelect(selected) },
         containerColor = Color(0xFF252525),

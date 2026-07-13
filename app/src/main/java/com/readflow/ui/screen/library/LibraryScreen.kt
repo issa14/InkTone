@@ -64,10 +64,11 @@ fun LibraryScreen(
         if (uris.isNotEmpty()) viewModel.importBooks(uris)
     }
 
+    ReadFlowTheme(theme = state.appTheme) {
     Box(modifier = Modifier.fillMaxSize()) {
         Surface(
             modifier = Modifier.fillMaxSize(),
-            color = AppBackground
+            color = MaterialTheme.colorScheme.background
         ) {
             Scaffold(
                 topBar = {
@@ -88,7 +89,7 @@ fun LibraryScreen(
                         )
                     }
                 },
-                containerColor = AppBackground
+                containerColor = MaterialTheme.colorScheme.background
             ) { padding ->
                 Column(modifier = Modifier.padding(padding)) {
                     state.error?.let { err ->
@@ -265,6 +266,7 @@ fun LibraryScreen(
                 if (latest != null) onBookClick(latest.id)
             }
         )
+    }
     }
 }
 
@@ -952,7 +954,7 @@ private fun NavDrawer(
                             onNavigate(NavigationDestination.ABOUT)
                             onDismiss()
                         }
-                        DrawerFooterBtn("Thème", Icons.Default.DarkMode) { onThemeToggle() }
+                        DrawerFooterBtn("Thème", Icons.Default.Palette) { onThemeToggle() }
                         DrawerFooterBtn("Debug", Icons.Default.Build) { onDismiss(); onDebug() }
                     }
                 }
@@ -987,7 +989,7 @@ private fun FloatingControls(
         // Pill audio — reprend la lecture TTS du dernier livre
         Surface(
             shape = RoundedCornerShape(20.dp),
-            color = SurfaceRaised,
+            color = MaterialTheme.colorScheme.surfaceVariant,
             border = ButtonDefaults.outlinedButtonBorder(enabled = true),
             tonalElevation = 4.dp
         ) {
