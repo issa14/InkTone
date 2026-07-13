@@ -66,14 +66,13 @@ class ReaderViewModel @Inject constructor(
     private val bookRepository: BookRepository,
     private val orchestrator: PlaybackOrchestrator,
     private val onnxService: OnnxInferenceService,
+    private val settingsRepository: com.readflow.data.settings.SettingsRepository,
     private val pronunciationRuleDao: com.readflow.data.database.PronunciationRuleDao,
     private val bookmarkDao: BookmarkDao,
     private val highlightDao: HighlightDao,
     private val annotationDao: AnnotationDao,
     @ApplicationContext private val context: Context
 ) : ViewModel() {
-
-    private val prefs = context.getSharedPreferences("reader_settings", Context.MODE_PRIVATE)
 
     private val _uiState = MutableStateFlow(ReaderUiState())
     val uiState: StateFlow<ReaderUiState> = _uiState.asStateFlow()
@@ -131,29 +130,29 @@ class ReaderViewModel @Inject constructor(
 
     fun setReaderTheme(theme: ReaderTheme) {
         _uiState.update { it.copy(readerTheme = theme) }
-        prefs.edit().putString("reader_theme", theme.name).apply()
         savedState["theme"] = theme.name
+        viewModelScope.launch { settingsRepository.setReaderTheme(theme.name) }
     }
 
     fun setReaderFont(font: ReaderFont) {
         _uiState.update { it.copy(readerFont = font, useOpenDyslexic = (font == ReaderFont.OPEN_DYSLEXIC)) }
-        prefs.edit().putString("reader_font", font.name).apply()
         savedState["openDyslexic"] = (font == ReaderFont.OPEN_DYSLEXIC)
+        viewModelScope.launch { settingsRepository.setReaderFont(font.name) }
     }
 
     fun setFontSize(size: Float) {
         _uiState.update { it.copy(fontSizeSp = size.coerceIn(12f, 32f)) }
-        prefs.edit().putFloat("font_size", size).apply()
+        viewModelScope.launch { settingsRepository.setFontSize(size) }
     }
 
     fun setLineHeight(height: Float) {
         _uiState.update { it.copy(lineHeightEm = height.coerceIn(1.2f, 2.4f)) }
-        prefs.edit().putFloat("line_height", height).apply()
+        viewModelScope.launch { settingsRepository.setLineHeight(height) }
     }
 
     fun setHorizontalMargin(margin: Int) {
         _uiState.update { it.copy(horizontalMarginDp = margin.coerceIn(8, 48)) }
-        prefs.edit().putInt("horizontal_margin", margin).apply()
+        viewModelScope.launch { settingsRepository.setHorizontalMargin(margin) }
     }
 
     fun cycleTheme() {
@@ -173,21 +172,26 @@ class ReaderViewModel @Inject constructor(
     }
 
     init {
-        val themeStr = prefs.getString("reader_theme", ReaderTheme.NIGHT.name) ?: ReaderTheme.NIGHT.name
-        val fontStr = prefs.getString("reader_font", ReaderFont.SERIF.name) ?: ReaderFont.SERIF.name
-        val fontSize = prefs.getFloat("font_size", 18f)
-        val lineHeight = prefs.getFloat("line_height", 1.8f)
-        val margin = prefs.getInt("horizontal_margin", 24)
-
-        val initialTheme = try { ReaderTheme.valueOf(themeStr) } catch (_: Exception) { ReaderTheme.NIGHT }
-        val initialFont = try { ReaderFont.valueOf(fontStr) } catch (_: Exception) { ReaderFont.SERIF }
-
-        _uiState.update {
-            it.copy(
-                readerTheme = initialTheme, readerFont = initialFont,
-                fontSizeSp = fontSize, lineHeightEm = lineHeight, horizontalMarginDp = margin,
-                useOpenDyslexic = (initialFont == ReaderFont.OPEN_DYSLEXIC)
-            )
+        // Charger les préférences de lecture depuis DataStore (remplace SharedPreferences)
+        viewModelScope.launch {
+            combine(
+                settingsRepository.readerTheme,
+                settingsRepository.readerFont,
+                settingsRepository.fontSize,
+                settingsRepository.lineHeight,
+                settingsRepository.horizontalMargin
+            ) { theme, font, size, lh, margin ->
+                val initialTheme = try { ReaderTheme.valueOf(theme) } catch (_: Exception) { ReaderTheme.NIGHT }
+                val initialFont = try { ReaderFont.valueOf(font) } catch (_: Exception) { ReaderFont.SERIF }
+                _uiState.update {
+                    it.copy(
+                        readerTheme = initialTheme, readerFont = initialFont,
+                        fontSizeSp = size, lineHeightEm = lh,
+                        horizontalMarginDp = margin,
+                        useOpenDyslexic = (initialFont == ReaderFont.OPEN_DYSLEXIC)
+                    )
+                }
+            }.collect()
         }
 
         viewModelScope.launch {
