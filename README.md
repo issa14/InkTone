@@ -51,7 +51,7 @@ Voir le document complet : **[📄 ARCHITECTURE.md](./architecture.md)**
 | **Parser EPUB** | Readium Kotlin Toolkit 3.0.0 |
 | **Moteurs TTS** | Sherpa-ONNX 1.13.4 / Piper VITS (local) + Microsoft Edge TTS (cloud) |
 | **Audio** | AudioTrack PCM 16-bit, gapless, pause/reprise <50ms |
-| **Background** | MediaSessionService (Media3 1.4.1) |
+| **Background** | MediaSessionService (Media3 1.5.1) |
 
 ---
 

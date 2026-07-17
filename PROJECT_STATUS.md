@@ -74,9 +74,9 @@ Lecteur d'ebooks Android (EPUB2/EPUB3) avec synthèse vocale neuronale locale en
 | 3.5 | `UnifiedControlPanel` — Play, Pause, Next/Prev | ✅ Fait | 🔴 | 2 rangées, speed slider, voice chips |
 | 3.6 | Indicateur de progression | ✅ Fait | 🟡 | Micro-indicateur % + chapitre |
 | 3.7 | Réglages TTS dans le panneau (vitesse, voix) | ✅ Fait | 🟡 | Intégré au UnifiedControlPanel |
-| 3.8 | `BookmarkScreen` — Gestion signets | ⬜ À faire | 🟡 | — |
+| 3.8 | `BookmarkScreen` — Gestion signets | ✅ Fait | 🟡 | BookmarkScreen + BookmarkViewModel + BookmarkDao |
 | 3.9 | Thèmes : Nuit, Jour, Sépia | ✅ Fait | 🟢 | cycleTheme() + Material 3 |
-| 3.10 | Police OpenDyslexic | ⬜ À faire | 🟢 | — |
+| 3.10 | Police OpenDyslexic | 🔄 Partiel | 🟢 | UI toggle OK, binaire OTF manquant (fallback Serif) |
 | 3.11 | Tests UI + capture screenshots | ⬜ À faire | 🟡 | — |
 
 ### Phase 4 — Edge TTS & Robustesse ✅ (2026-07-17)
@@ -93,22 +93,22 @@ Lecteur d'ebooks Android (EPUB2/EPUB3) avec synthèse vocale neuronale locale en
 | 4.8 | Correction des 7 failles d'audit pause/resume | ✅ Fait | 🔴 | Zombie, double AudioTrack, use-after-free, latence |
 | 4.9 | Logging TtsDebug de bout en bout | ✅ Fait | 🟡 | WebSocket→MediaCodec→AudioTrack |
 
-### Phase 4 — Optimisation, Robustesse & Release (Objectif : Semaines 17-20)
+### Phase 5 — Optimisation, Robustesse & Release (Objectif : Semaines 17-20)
 
 | # | Tâche | Statut | Priorité | Notes |
 |---|---|---|---|---|
-| 4.1 | Profilage CPU/Batterie (Android Profiler) | ✅ Fait | 🔴 | RTF ~0.24, RAM ~150 Mo, APK 120 Mo debug / 106 Mo release |
-| 4.2 | FTS5 `sentence_fts` — recherche in-book | ✅ Fait | 🔴 | FTS4 virtual table, SearchScreen avec wildcard MATCH |
-| 4.3 | Process Death : `SavedStateHandle` + restoration | ✅ Fait | 🔴 | Sauvegarde chapter/sentence/voice/theme/font |
-| 4.4 | Gestion EPUB corrompus / erreurs parsing | ⬜ À faire | 🟡 | — |
-| 4.5 | SAF : persistence permissions + réimport | ⬜ À faire | 🟡 | — |
-| 4.6 | ProGuard/R8 config (ONNX + Sherpa + Readium) | ✅ Fait | 🔴 | Règles complètes — build release OK (106 Mo) |
-| 4.7 | Backup/Restore données (bookmarks, progrès) | ⬜ À faire | 🟡 | — |
-| 4.8 | Accessibilité : TalkBack, tailles min/max | ⬜ À faire | 🟡 | — |
-| 4.9 | Vérification licences (Sherpa, Readium, ONNX) | ⬜ À faire | 🟡 | — |
-| 4.10 | Build signed APK / AAB release | ✅ Fait | 🔴 | Keystore généré, release 106 Mo signé |
-| 4.11 | Beta fermée — 10-20 lecteurs francophones | ⬜ À faire | 🔴 | — |
-| 4.12 | Publication Play Store (internal testing) | ⬜ À faire | 🔴 | — |
+| 5.1 | Profilage CPU/Batterie (Android Profiler) | ✅ Fait | 🔴 | RTF ~0.24, RAM ~150 Mo, APK 120 Mo debug / 106 Mo release |
+| 5.2 | FTS5 `sentence_fts` — recherche in-book | ✅ Fait | 🔴 | FTS4 virtual table, SearchScreen avec wildcard MATCH |
+| 5.3 | Process Death : `SavedStateHandle` + restoration | ✅ Fait | 🔴 | Sauvegarde chapter/sentence/voice/theme/font |
+| 5.4 | Gestion EPUB corrompus / erreurs parsing | ⬜ À faire | 🟡 | — |
+| 5.5 | SAF : persistence permissions + réimport | ⬜ À faire | 🟡 | — |
+| 5.6 | ProGuard/R8 config (ONNX + Sherpa + Readium) | ✅ Fait | 🔴 | Règles complètes — build release OK (106 Mo) |
+| 5.7 | Backup/Restore données (bookmarks, progrès) | ⬜ À faire | 🟡 | — |
+| 5.8 | Accessibilité : TalkBack, tailles min/max | ⬜ À faire | 🟡 | — |
+| 5.9 | Vérification licences (Sherpa, Readium, ONNX) | ⬜ À faire | 🟡 | — |
+| 5.10 | Build signed APK / AAB release | ✅ Fait | 🔴 | Keystore généré, release 106 Mo signé |
+| 5.11 | Beta fermée — 10-20 lecteurs francophones | ⬜ À faire | 🔴 | — |
+| 5.12 | Publication Play Store (internal testing) | ⬜ À faire | 🔴 | — |
 
 ### 🔄 Historique TTS : Kokoro → Piper
 
