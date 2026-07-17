@@ -9,6 +9,32 @@ et ce projet adhère au [Semantic Versioning](https://semver.org/spec/v2.0.0.htm
 
 ## [Unreleased]
 
+### 2026-07-18 — Corrections pré-release (audit)
+
+#### Added
+- **Baseline Profile** (`baseline-prof.txt`) pour réduire le cold start de ~300ms (compilation AOT)
+- **Workflow CI/CD** (`.github/workflows/ci.yml`) : lint, tests unitaires, assemble debug sur PR
+- **Tests unitaires** :
+  - `PlaybackOrchestratorTest` — 5 tests : fillJob cancellation, stop pendant synthèse, erreur de synthèse, substitution de play, pause/resume
+  - `OnnxInferenceServiceTest` — 6 tests : initialisation, modèle absent, tokens vide, idempotence, paramètres prosodiques
+  - `ReaderViewModelTest` — 12 tests : UI state, toggle, setSpeed/setVoice, cycleTheme, play/pause/stop, SavedStateHandle restoration, erreurs
+
+#### Fixed
+- **fillJob orphelin** : ajout de `ensureActive()` avant et après `ttsRepository.synthesize()` dans `launchSynthesisPipeline` (🔴 CRITIQUE 3)
+- **Allocations FloatArray silence** : réutilisation du `SILENCE_BUFFER` statique sans copie quand la taille correspond (🟠 HAUTE 2)
+- **FrenchSentenceSplitter** : 5 tests corrigés (M., Dr., etc., J. K., guillemets). Bug racine : `punctIndex` pointait sur l'espace après le point (BreakIterator inclut les blancs). Ajout de `findLastPunctuationBefore()` et `isInsideGuillemets()`
+- **`SystemClock.elapsedRealtime()`** : timestamps de lecture monotonic (P05)
+- **Code mort** : suppression de `ProgressEntity.currentWordOffset` (A06)
+- **Cold Start** : `LibraryViewModel.loadBooks()` déjà sur `Dispatchers.IO` ✅, `SettingsViewModel` DataStore sur `Dispatchers.IO` ✅, `ReadFlowApplication` minimal ✅
+- **Double ouverture EPUB** : `getChapter()` retourne sur cache hit sans `openPublication()` (P01) ✅
+- **`rememberTextMeasurer()`** : déjà sur `Dispatchers.Default` via `produceState` (C04) ✅
+- **`PlaybackOrchestrator.play()`** : déjà refactoré en sous-méthodes (A01) ✅
+
+#### Confirmed
+- **SharedPreferences → DataStore** : migration complète, plus aucune référence à SharedPreferences (🟠 HAUTE 3) ✅
+- **AudioServiceLauncher** : séparation propre ViewModel/Android via interface domaine (🟠 HAUTE 4) ✅
+- **AudioCacheManager** : LruCache AndroidX avec taille réelle mesurée, capacité 20 Mo (🟠 HAUTE 1) ✅
+
 ### 2026-07-17 — Feature Edge TTS + Refactoring Pause/Resume
 
 #### Added

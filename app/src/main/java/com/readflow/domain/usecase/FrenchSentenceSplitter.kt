@@ -125,17 +125,31 @@ object FrenchSentenceSplitter {
      * être mal interprétées car ICU ne possède pas de dictionnaire exhaustif
      * pour toutes les locales.
      *
+     * Note importante : BreakIterator inclut les espaces de fin dans ses
+     * frontières (ex: "M. " → boundary après l'espace). On doit donc chercher
+     * le dernier caractère non-blanc avant la frontière pour trouver la
+     * ponctuation réelle.
+     *
      * @return true si la frontière doit être ignorée (faux positif).
      */
     private fun isFalseBoundary(text: String, segmentStart: Int, boundary: Int): Boolean {
         if (boundary <= 0 || boundary >= text.length) return false
 
-        // 1. Incises de dialogue ou continuations de phrase (valable pour TOUTE ponctuation : . ! ? …)
+        // 1. Incises de dialogue ou continuations de phrase
         if (isDialogueInciseOrContinuation(text, boundary)) {
             return true
         }
 
-        val punctIndex = boundary - 1
+        // 1b. Si on est à l'intérieur de guillemets français (« … »),
+        //     les points ne terminent pas la phrase englobante.
+        if (isInsideGuillemets(text, boundary)) {
+            return true
+        }
+
+        // Trouver la ponctuation réelle avant la frontière (en sautant les espaces)
+        val punctIndex = findLastPunctuationBefore(text, boundary)
+        if (punctIndex < 0) return false
+
         val punctChar = text[punctIndex]
 
         // Seuls les points sont ambigus pour la suite des contrôles (. vs !/?)
@@ -180,6 +194,22 @@ object FrenchSentenceSplitter {
     }
 
     /**
+     * Trouve l'index du dernier caractère de ponctuation (. ! ? …) avant [boundary],
+     * en ignorant les espaces blancs.
+     *
+     * @return L'index du caractère de ponctuation, ou -1 si aucun trouvé.
+     */
+    private fun findLastPunctuationBefore(text: String, boundary: Int): Int {
+        var i = boundary - 1
+        while (i >= 0 && text[i].isWhitespace()) {
+            i--
+        }
+        if (i < 0) return -1
+        val c = text[i]
+        return if (c == '.' || c == '!' || c == '?' || c == '\u2026') i else -1
+    }
+
+    /**
      * Détermine si la frontière est immédiatement suivie d'une incise de dialogue
      * ou d'une continuation commençant par une minuscule (ex: « dit-il », « s'exclama-t-elle »).
      */
@@ -199,6 +229,27 @@ object FrenchSentenceSplitter {
             return firstChar.isLowerCase()
         }
         return false
+    }
+
+    /**
+     * Vérifie si la frontière [boundary] se trouve à l'intérieur de guillemets
+     * français (« … »), auquel cas les points ne terminent pas la phrase principale.
+     *
+     * Détecte un déséquilibre entre « et » avant la frontière.
+     */
+    private fun isInsideGuillemets(text: String, boundary: Int): Boolean {
+        var openCount = 0
+        var closeCount = 0
+        // Inclure le caractère à la position boundary car BreakIterator
+        // place ses frontières après les espaces de fin, donc un guillemet
+        // fermant peut se trouver exactement à l'index boundary.
+        for (i in 0..minOf(boundary, text.length - 1)) {
+            when (text[i]) {
+                '\u00AB' -> openCount++  // «
+                '\u00BB' -> closeCount++ // »
+            }
+        }
+        return openCount > closeCount
     }
 
     /**

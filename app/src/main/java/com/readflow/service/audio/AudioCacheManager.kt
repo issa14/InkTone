@@ -63,6 +63,9 @@ class AudioCacheManager @Inject constructor() {
      *
      * [LruCache] est thread-safe et utilise [sizeOf] pour le calcul
      * exact de la mémoire occupée. L'éviction est automatique.
+     *
+     * Note : [LruCache.size] retourne la taille totale en octets (unités de [sizeOf]),
+     * pas le nombre d'entrées. Utiliser [entryCount] pour le nombre d'entrées.
      */
     private val cache = object : LruCache<String, Entry>(MAX_SIZE_BYTES.toInt()) {
         override fun sizeOf(key: String, value: Entry): Int {
@@ -102,18 +105,21 @@ class AudioCacheManager @Inject constructor() {
         }
 
         cache.put(key, entry)
-        debug("PUT — \"${key.take(50)}\" (${size / 1024} Ko, cache=${cache.size()} entrées)")
+        debug("PUT — \"${key.take(50)}\" (${size / 1024} Ko, cache=${entryCount} entrées)")
     }
 
     @Synchronized
     fun clear() {
-        val count = cache.size()
+        val count = entryCount
         cache.evictAll()
         debug("CLEAR — $count entrées supprimées")
     }
 
+    /** Nombre d'entrées dans le cache. */
     @Synchronized
-    fun size(): Int = cache.size()
+    fun size(): Int = cache.snapshot().size
+
+    private val entryCount: Int get() = cache.snapshot().size
 
     val hitRatio: Float
         get() {

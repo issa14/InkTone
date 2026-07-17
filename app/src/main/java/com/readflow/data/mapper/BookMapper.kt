@@ -39,7 +39,6 @@ fun Progress.toEntity() = ProgressEntity(
     bookId = bookId,
     currentChapterIndex = currentChapterIndex,
     currentSentenceIndex = currentSentenceIndex,
-    currentWordOffset = 0,
     totalProgressFraction = totalProgressFraction,
     updatedAt = System.currentTimeMillis()
 )

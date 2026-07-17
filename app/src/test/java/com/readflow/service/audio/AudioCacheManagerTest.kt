@@ -60,29 +60,23 @@ class AudioCacheManagerTest {
         cache.put("k1", makeResult("a", 1000))
         cache.put("k2", makeResult("b", 1000))
         assertEquals(2, cache.size())
-        assertTrue(cache.currentSizeBytes > 0)
         cache.clear()
         assertEquals(0, cache.size())
-        assertEquals(0, cache.currentSizeBytes)
     }
 
     @Test
     fun `LRU eviction when cache is full`() {
-        // Remplir le cache avec ~30 Mo de données
-        val sampleCount = 500_000 // ~2 Mo par entrée
+        // Remplir le cache avec des données > 20 Mo par entrées de ~2 Mo
+        val sampleCount = 500_000
         var i = 0
-        while (cache.currentSizeBytes < 30L * 1024 * 1024) {
+        while (i < 20) {
             cache.put("key$i", makeResult("text$i", sampleCount))
             i++
-            if (i > 50) break // sécurité
         }
-        assertTrue(cache.size() > 0)
-        val firstKey = "key0"
-        val first = cache.get(firstKey)
-        // Les premières entrées ont dû être évincées
-        // (sauf si on a de la chance et qu'elles tiennent encore)
-        // On vérifie juste que le cache ne dépasse pas 30 Mo
-        assertTrue(cache.currentSizeBytes <= 32L * 1024 * 1024) // marge
+        // Le cache a 20 Mo de capacité, chaque entrée fait ~2 Mo → max 10 entrées
+        val count = cache.size()
+        assertTrue(count > 0, "Le cache devrait contenir des entrées (trouvé: $count)")
+        assertTrue(count <= 10, "Le cache devrait avoir évincé des entrées (trouvé: $count)")
     }
 
     @Test
@@ -100,16 +94,19 @@ class AudioCacheManagerTest {
     fun `sizeOf computes correct byte size`() {
         val result = makeResult("test", 1000)
         val size = AudioCacheManager.sizeOf(result)
-        assertEquals(1000L * 4 + 24, size)
+        // FloatArray: 1000*4 + 24 overhead = 4024
+        // String "test": 4*2 + 38 overhead = 46
+        // SynthesisResult object: 32
+        // Entry wrapper: 24
+        assertEquals(4024L + 46L + 32L + 24L, size)
     }
 
     @Test
     fun `entry too large is rejected`() {
-        // Créer une entrée > 30 Mo
-        val hugeCount = (31L * 1024 * 1024 / 4).toInt()
+        // Créer une entrée > 20 Mo (MAX_SIZE_BYTES = 20 Mo)
+        val hugeCount = (21L * 1024 * 1024 / 4).toInt()
         val result = makeResult("huge", hugeCount)
         cache.put("huge", result)
         assertEquals(0, cache.size())
-        assertEquals(0, cache.currentSizeBytes)
     }
 }

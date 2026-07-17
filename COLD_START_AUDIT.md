@@ -2,7 +2,8 @@
 
 > **Date** : 2026-07-13  
 > **Expertise** : Principal Android Performance Engineer  
-> **Objectif** : Cold Start < 400ms (hors overhead système Android ~300ms)
+> **Objectif** : Cold Start < 400ms (hors overhead système Android ~300ms)  
+> **Statut** : ✅ **Tous les correctifs appliqués au 2026-07-18.**
 
 ---
 

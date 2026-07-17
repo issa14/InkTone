@@ -3,7 +3,8 @@
 > **Date** : 2026-07-13  
 > **Auditeur** : Principal Software Engineer / Lead Architect / Expert Performance  
 > **Périmètre** : Ensemble du code source (`app/src/main/` + `app/src/test/`)  
-> **Sévérités** : 🔴 [CRITIQUE] · 🟠 [WARNING] · 🟢 [OPTIMISATION]
+> **Sévérités** : 🔴 [CRITIQUE] · 🟠 [WARNING] · 🟢 [OPTIMISATION]  
+> **Statut** : ✅ **Tous les items corrigés au 2026-07-18** — voir [CHANGELOG.md](./CHANGELOG.md) et [PROJECT_STATUS.md](./PROJECT_STATUS.md) pour le détail des corrections.
 
 ---
 

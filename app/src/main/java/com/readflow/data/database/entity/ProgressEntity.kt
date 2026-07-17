@@ -19,7 +19,6 @@ data class ProgressEntity(
     @PrimaryKey val bookId: String,
     val currentChapterIndex: Int,
     val currentSentenceIndex: Int,
-    val currentWordOffset: Int,
     val totalProgressFraction: Float,
     val updatedAt: Long
 )

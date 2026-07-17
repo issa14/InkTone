@@ -1,5 +1,6 @@
 package com.readflow.service.audio
 
+import android.os.SystemClock
 import android.util.Log
 import com.readflow.data.database.ReadingProgressDao
 import com.readflow.data.database.entity.ReadingProgress
@@ -450,6 +451,8 @@ class PlaybackOrchestrator @Inject constructor(
     ) = launch {
         try {
             for (i in 0 until sentences.size) {
+                // Vérification proactive d'annulation avant chaque itération
+                ensureActive()
                 if (currentJob?.isActive != true) break
                 val idx = startFrom + i
                 if (idx >= total) break
@@ -459,9 +462,14 @@ class PlaybackOrchestrator @Inject constructor(
                     Log.d(TAG, "TtsDebug | synthèse OK: sentence $idx, engine=${result.engineId}, " +
                         "voice=${result.voiceLabel}, samples=${result.samples.size}, " +
                         "sr=${result.sampleRate}, dur=${result.audioDurationMs}ms, rtf=${result.realTimeFactor}")
+                    // Vérification post-synthèse : le job a pu être annulé pendant l'appel JNI bloquant
+                    ensureActive()
+                    if (currentJob?.isActive != true) break
                     buffer.send(result)
-                } catch (e: CancellationException) { break }
-                catch (e: Exception) {
+                } catch (e: CancellationException) {
+                    Log.d(TAG, "Pipeline de synthèse annulé à la phrase $idx")
+                    break
+                } catch (e: Exception) {
                     Log.e(TAG, "Synthesis error sentence $idx: ${e.message}", e)
                     // Erreur réseau persistante (après retry Edge + fallback Piper) → arrêter
                     if (EdgeTtsClient.isNetworkError(e)) {
@@ -500,7 +508,12 @@ class PlaybackOrchestrator @Inject constructor(
             val silenceMs = silenceDurationFor(result.text)
             val silenceLen = (result.sampleRate * silenceMs / 1000)
                 .coerceAtMost(GaplessAudioPlayer.SILENCE_BUFFER.size)
-            player.enqueue(GaplessAudioPlayer.SILENCE_BUFFER.copyOf(silenceLen))
+            val silence = if (silenceLen == GaplessAudioPlayer.SILENCE_BUFFER.size) {
+                GaplessAudioPlayer.SILENCE_BUFFER // Réutilisation directe, pas de copie
+            } else {
+                GaplessAudioPlayer.SILENCE_BUFFER.copyOf(silenceLen)
+            }
+            player.enqueue(silence)
 
             if (!started) {
                 _state.value = State.Playing
@@ -509,7 +522,7 @@ class PlaybackOrchestrator @Inject constructor(
                 updatePlaybackState(startFrom, sentences.getOrNull(startFrom)?.text ?: "", total,
                     PlaybackStatus.PLAYING,
                     if (startFrom >= 0 && startFrom < sentenceDurations.size) sentenceDurations[startFrom] else 0L,
-                    System.currentTimeMillis())
+                    SystemClock.elapsedRealtime())
                 scope.launch {
                     var lastIdx = startFrom
                     while (currentJob?.isActive == true &&
@@ -528,7 +541,7 @@ class PlaybackOrchestrator @Inject constructor(
                             _progress.value = Progress(sIdx, total, sent)
                             val dur = if (sIdx >= 0 && sIdx < sentenceDurations.size) sentenceDurations[sIdx] else 0L
                             updatePlaybackState(sIdx, sent?.text ?: "", total,
-                                PlaybackStatus.PLAYING, dur, System.currentTimeMillis())
+                                PlaybackStatus.PLAYING, dur, SystemClock.elapsedRealtime())
                             saveProgressAsync(bookId, chapterIndex, sIdx, sent?.startOffset ?: 0)
                             lastIdx = sIdx
                         }
@@ -548,7 +561,12 @@ class PlaybackOrchestrator @Inject constructor(
             val silenceMs = silenceDurationFor(preWarmed.text)
             val silenceLen = (preWarmed.sampleRate * silenceMs / 1000)
                 .coerceAtMost(GaplessAudioPlayer.SILENCE_BUFFER.size)
-            player.enqueue(GaplessAudioPlayer.SILENCE_BUFFER.copyOf(silenceLen))
+            val silence = if (silenceLen == GaplessAudioPlayer.SILENCE_BUFFER.size) {
+                GaplessAudioPlayer.SILENCE_BUFFER // Réutilisation, pas de copie
+            } else {
+                GaplessAudioPlayer.SILENCE_BUFFER.copyOf(silenceLen)
+            }
+            player.enqueue(silence)
         }
 
         val expectedSegments = (total - startFrom) * 2
