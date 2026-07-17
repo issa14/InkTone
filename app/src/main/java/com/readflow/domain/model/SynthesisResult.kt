@@ -10,7 +10,9 @@ data class SynthesisResult(
     val text: String,
     val voiceLabel: String,
     val synthesisTimeMs: Long,
-    val audioDurationMs: Long
+    val audioDurationMs: Long,
+    /** Identifiant du moteur TTS ayant produit ce résultat (ex: "piper", "edge"). */
+    val engineId: String = "piper"
 ) {
     val realTimeFactor: Float
         get() = synthesisTimeMs.toFloat() / audioDurationMs.coerceAtLeast(1)
@@ -23,9 +25,10 @@ data class SynthesisResult(
      * [samples] est traité comme immuable après construction.
      */
     private val _hashCode: Int =
-        31 * (31 * (31 * (31 * (31 * samples.contentHashCode() + sampleRate) +
+        31 * (31 * (31 * (31 * (31 * (31 * samples.contentHashCode() + sampleRate) +
                 text.hashCode()) + voiceLabel.hashCode()) +
-                synthesisTimeMs.hashCode()) + audioDurationMs.hashCode()
+                synthesisTimeMs.hashCode()) + audioDurationMs.hashCode()) +
+                engineId.hashCode()
 
     override fun equals(other: Any?): Boolean {
         if (this === other) return true

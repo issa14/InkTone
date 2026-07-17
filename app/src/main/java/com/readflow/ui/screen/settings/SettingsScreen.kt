@@ -27,6 +27,8 @@ fun SettingsScreen(
 ) {
     val state by viewModel.uiState.collectAsState()
     var showVoicePicker by remember { mutableStateOf(false) }
+    var showEnginePicker by remember { mutableStateOf(false) }
+    var showEdgeVoicePicker by remember { mutableStateOf(false) }
     var showThemePicker by remember { mutableStateOf(false) }
     var showPathEditor by remember { mutableStateOf(false) }
 
@@ -72,6 +74,41 @@ fun SettingsScreen(
                     format = { "${"%.1f".format(it)}x" },
                     onValueChange = { viewModel.setGain(it) }
                 )
+            }
+        }
+
+        Spacer(Modifier.height(16.dp))
+
+        // ── SECTION MOTEUR TTS ──
+        SectionHeader("⚙️ Moteur TTS")
+        Card(colors = CardDefaults.cardColors(containerColor = CardBg), shape = RoundedCornerShape(14.dp), modifier = Modifier.fillMaxWidth()) {
+            Column(modifier = Modifier.padding(16.dp)) {
+
+                // Sélecteur de moteur
+                val currentEngine = state.availableEngines.find { it.id == state.selectedEngine }
+                SettingRow(
+                    icon = Icons.Default.Memory,
+                    title = "Moteur de synthèse",
+                    subtitle = currentEngine?.label ?: state.selectedEngine,
+                    onClick = { showEnginePicker = true }
+                )
+
+                // Si Edge sélectionné → sélecteur de voix
+                if (state.selectedEngine == "edge") {
+                    HorizontalDivider(color = Color.White.copy(alpha = 0.06f), modifier = Modifier.padding(vertical = 4.dp))
+
+                    val edgeVoiceLabel = when (state.selectedEdgeVoice) {
+                        "fr-FR-VivienneNeural" -> "Vivienne (FR)"
+                        "fr-FR-HenriNeural"    -> "Henri (FR)"
+                        else                   -> state.selectedEdgeVoice
+                    }
+                    SettingRow(
+                        icon = Icons.Default.RecordVoiceOver,
+                        title = "Voix Edge",
+                        subtitle = edgeVoiceLabel,
+                        onClick = { showEdgeVoicePicker = true }
+                    )
+                }
             }
         }
 
@@ -123,6 +160,12 @@ fun SettingsScreen(
         // ── Dialogues ──
         if (showVoicePicker) {
             VoicePickerDialog(state.availableVoices, state.voice) { viewModel.setVoice(it); showVoicePicker = false }
+        }
+        if (showEnginePicker) {
+            EnginePickerDialog(state.availableEngines, state.selectedEngine) { viewModel.setEngine(it); showEnginePicker = false }
+        }
+        if (showEdgeVoicePicker) {
+            VoicePickerDialog(state.availableEdgeVoices, state.selectedEdgeVoice) { viewModel.setEdgeVoice(it); showEdgeVoicePicker = false }
         }
         if (showThemePicker) {
             ThemePickerDialog(state.theme) { viewModel.setTheme(it); showThemePicker = false }
@@ -237,6 +280,36 @@ private fun VoicePickerDialog(voices: List<String>, selected: String, onSelect: 
                         colors = RadioButtonDefaults.colors(selectedColor = AccentBlue))
                     Spacer(Modifier.width(8.dp))
                     Text(voice, color = Color.White)
+                }
+            }}
+        },
+        confirmButton = { TextButton(onClick = { onSelect(selected) }) { Text("Fermer", color = AccentBlue) } }
+    )
+}
+
+@Composable
+private fun EnginePickerDialog(engines: List<EngineInfo>, selected: String, onSelect: (String) -> Unit) {
+    AlertDialog(
+        onDismissRequest = { onSelect(selected) },
+        containerColor = Color(0xFF252525),
+        title = { Text("Moteur TTS", color = Color.White) },
+        text = {
+            Column { engines.forEach { engine ->
+                Row(
+                    modifier = Modifier.fillMaxWidth().clickable { onSelect(engine.id) }.padding(vertical = 10.dp),
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    RadioButton(selected = engine.id == selected, onClick = { onSelect(engine.id) },
+                        colors = RadioButtonDefaults.colors(selectedColor = AccentBlue))
+                    Spacer(Modifier.width(8.dp))
+                    Column {
+                        Text(engine.label, color = Color.White)
+                        Text(
+                            if (engine.isAvailable) "✅ Disponible" else "⚠️ Indisponible",
+                            color = Color.White.copy(alpha = 0.4f),
+                            fontSize = 11.sp
+                        )
+                    }
                 }
             }}
         },
