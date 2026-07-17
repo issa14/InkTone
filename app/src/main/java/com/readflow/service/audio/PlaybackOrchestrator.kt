@@ -411,6 +411,18 @@ class PlaybackOrchestrator @Inject constructor(
                 } catch (e: CancellationException) { break }
                 catch (e: Exception) {
                     Log.e(TAG, "Synthesis error sentence $idx: ${e.message}", e)
+                    // Erreur réseau fatale : arrêter le pipeline, ne pas spammer
+                    val msg = e.message ?: ""
+                    if (msg.contains("Unable to resolve host") ||
+                        msg.contains("No address associated") ||
+                        msg.contains("timeout") ||
+                        msg.contains("connect timed out") ||
+                        msg.contains("Réseau indisponible")) {
+                        Log.w(TAG, "Erreur réseau fatale → arrêt du pipeline de synthèse")
+                        _state.value = State.Error("Réseau perdu — la lecture s'est interrompue")
+                        _playbackState.update { it.copy(status = PlaybackStatus.IDLE) }
+                        break
+                    }
                 }
             }
         } finally {
@@ -472,7 +484,8 @@ class PlaybackOrchestrator @Inject constructor(
             delay(200)
         }
         delay(300)
-        if (playGeneration.get() == myGeneration) {
+        // Ne pas écraser un état d'erreur (ex: perte réseau)
+        if (playGeneration.get() == myGeneration && _state.value !is State.Error) {
             _state.value = State.Idle
             updatePlaybackState(currentReadIdx, "", total, PlaybackStatus.IDLE)
             saveProgressAsync(bookId, chapterIndex, total, 0)
