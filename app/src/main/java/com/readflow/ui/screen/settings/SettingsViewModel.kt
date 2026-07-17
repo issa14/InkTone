@@ -1,7 +1,10 @@
 package com.readflow.ui.screen.settings
 
+import android.net.Uri
+import android.util.Log
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
+import com.readflow.data.backup.BackupManager
 import com.readflow.data.settings.AppTheme
 import com.readflow.data.settings.SettingsRepository
 import com.readflow.domain.repository.TtsRepository
@@ -26,7 +29,9 @@ data class SettingsUiState(
         EngineInfo("piper", "Piper ONNX (local)", true),
         EngineInfo("edge", "Microsoft Edge (cloud)", false)
     ),
-    val availableEdgeVoices: List<String> = listOf("fr-FR-VivienneNeural", "fr-FR-HenriNeural")
+    val availableEdgeVoices: List<String> = listOf("fr-FR-VivienneNeural", "fr-FR-HenriNeural"),
+    // Backup
+    val backupMessage: String? = null
 )
 
 data class EngineInfo(
@@ -38,8 +43,13 @@ data class EngineInfo(
 @HiltViewModel
 class SettingsViewModel @Inject constructor(
     private val repository: SettingsRepository,
-    private val ttsRepository: TtsRepository
+    private val ttsRepository: TtsRepository,
+    private val backupManager: BackupManager
 ) : ViewModel() {
+
+    companion object {
+        private const val TAG = "SettingsVM"
+    }
 
     private val _uiState = MutableStateFlow(SettingsUiState())
     val uiState: StateFlow<SettingsUiState> = _uiState.asStateFlow()
@@ -84,5 +94,33 @@ class SettingsViewModel @Inject constructor(
         viewModelScope.launch {
             repository.setEdgeVoice(voiceId)
         }
+    }
+
+    fun exportBackup(uri: Uri) {
+        viewModelScope.launch {
+            try {
+                backupManager.exportTo(uri)
+                _uiState.update { it.copy(backupMessage = "✅ Sauvegarde exportée avec succès") }
+            } catch (e: Exception) {
+                Log.e(TAG, "Export failed", e)
+                _uiState.update { it.copy(backupMessage = "❌ Échec : ${e.message}") }
+            }
+        }
+    }
+
+    fun importBackup(uri: Uri) {
+        viewModelScope.launch {
+            try {
+                val count = backupManager.importFrom(uri)
+                _uiState.update { it.copy(backupMessage = "✅ $count éléments restaurés") }
+            } catch (e: Exception) {
+                Log.e(TAG, "Import failed", e)
+                _uiState.update { it.copy(backupMessage = "❌ Échec : ${e.message}") }
+            }
+        }
+    }
+
+    fun clearBackupMessage() {
+        _uiState.update { it.copy(backupMessage = null) }
     }
 }

@@ -1,5 +1,8 @@
 package com.readflow.ui.screen.settings
 
+import android.net.Uri
+import androidx.activity.compose.rememberLauncherForActivityResult
+import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.rememberScrollState
@@ -32,9 +35,37 @@ fun SettingsScreen(
     var showThemePicker by remember { mutableStateOf(false) }
     var showPathEditor by remember { mutableStateOf(false) }
 
+    val snackbarHostState = remember { SnackbarHostState() }
+
+    // SAF launcher pour l'export (créer un fichier)
+    val exportLauncher = rememberLauncherForActivityResult(
+        contract = ActivityResultContracts.CreateDocument("application/json")
+    ) { uri: Uri? ->
+        uri?.let { viewModel.exportBackup(it) }
+    }
+
+    // SAF launcher pour l'import (ouvrir un fichier)
+    val importLauncher = rememberLauncherForActivityResult(
+        contract = ActivityResultContracts.OpenDocument()
+    ) { uri: Uri? ->
+        uri?.let { viewModel.importBackup(it) }
+    }
+
+    // Afficher le message de backup dans un snackbar
+    LaunchedEffect(state.backupMessage) {
+        state.backupMessage?.let { msg ->
+            snackbarHostState.showSnackbar(msg)
+            viewModel.clearBackupMessage()
+        }
+    }
+
+    Scaffold(
+        snackbarHost = { SnackbarHost(snackbarHostState) }
+    ) { padding ->
     Column(
         modifier = Modifier
             .fillMaxSize()
+            .padding(padding)
             .verticalScroll(rememberScrollState())
             .padding(horizontal = 20.dp, vertical = 16.dp)
     ) {
@@ -155,6 +186,28 @@ fun SettingsScreen(
             }
         }
 
+        Spacer(Modifier.height(16.dp))
+
+        // ── SECTION SAUVEGARDE ──
+        SectionHeader("💾 Sauvegarde & Restauration")
+        Card(colors = CardDefaults.cardColors(containerColor = CardBg), shape = RoundedCornerShape(14.dp), modifier = Modifier.fillMaxWidth()) {
+            Column(modifier = Modifier.padding(16.dp)) {
+                SettingRow(
+                    icon = Icons.Default.SaveAlt,
+                    title = "Exporter les données",
+                    subtitle = "Sauvegarder progression, signets et réglages",
+                    onClick = { exportLauncher.launch("readflow_backup_${System.currentTimeMillis()}.json") }
+                )
+                HorizontalDivider(color = Color.White.copy(alpha = 0.06f), modifier = Modifier.padding(vertical = 4.dp))
+                SettingRow(
+                    icon = Icons.Default.FileOpen,
+                    title = "Importer une sauvegarde",
+                    subtitle = "Restaurer depuis un fichier .json",
+                    onClick = { importLauncher.launch(arrayOf("application/json")) }
+                )
+            }
+        }
+
         Spacer(Modifier.height(32.dp))
 
         // ── Dialogues ──
@@ -174,6 +227,7 @@ fun SettingsScreen(
             PathEditDialog(state.modelPath, { showPathEditor = false }) { viewModel.setModelPath(it); showPathEditor = false }
         }
     }
+    } // Close Column + Scaffold
 }
 
 // ─────────────────────────────────────────────────────

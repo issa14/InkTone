@@ -103,7 +103,7 @@ Lecteur d'ebooks Android (EPUB2/EPUB3) avec synthèse vocale neuronale locale en
 | 5.4 | Gestion EPUB corrompus / erreurs parsing | ✅ Fait | 🟡 | try/catch avec messages explicites + nettoyage fichiers |
 | 5.5 | SAF : persistence permissions + réimport | ✅ Fait | 🟡 | takePersistableUriPermission() dans importEpub() |
 | 5.6 | ProGuard/R8 config (ONNX + Sherpa + Readium) | ✅ Fait | 🔴 | Règles complètes — build release OK (106 Mo) |
-| 5.7 | Backup/Restore données (bookmarks, progrès) | ⬜ À faire | 🟡 | — |
+| 5.7 | Backup/Restore données (bookmarks, progrès) | ✅ Fait | 🟡 | Export JSON via SAF, import avec restauration complète |
 | 5.8 | Accessibilité : TalkBack, tailles min/max | ✅ Fait | 🟡 | contentDescription sur contrôles critiques + OpenDyslexic |
 | 5.9 | Vérification licences (Sherpa, Readium, ONNX) | ✅ Fait | 🟡 | THIRD_PARTY_NOTICES.md (Apache 2.0, MIT, BSD, SIL OFL, EPL) |
 | 5.10 | Build signed APK / AAB release | ✅ Fait | 🔴 | Keystore généré, release 106 Mo signé |
