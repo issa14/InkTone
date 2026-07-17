@@ -22,13 +22,20 @@ import com.readflow.data.database.SearchDao
 import com.readflow.data.database.SentenceCacheDao
 import com.readflow.data.repository.BookRepositoryImpl
 import com.readflow.data.repository.TtsRepositoryImpl
+import com.readflow.data.settings.SettingsRepository
+import com.readflow.domain.provider.EdgeTtsProvider
+import com.readflow.domain.provider.PiperTtsProvider
+import com.readflow.domain.provider.TtsProvider
 import com.readflow.domain.repository.BookRepository
 import com.readflow.domain.repository.TtsRepository
 import com.readflow.domain.service.AudioServiceLauncher
 import com.readflow.service.audio.AudioServiceLauncherImpl
+import com.readflow.service.edge.EdgeTtsClient
+import com.readflow.service.edge.Mp3Decoder
 import dagger.Module
 import dagger.Provides
 import dagger.hilt.InstallIn
+import dagger.multibindings.IntoSet
 import dagger.hilt.android.qualifiers.ApplicationContext
 import dagger.hilt.components.SingletonComponent
 import javax.inject.Singleton
@@ -90,9 +97,23 @@ object AppModule {
     @Singleton
     fun provideBookRepository(impl: BookRepositoryImpl): BookRepository = impl
 
+    // ── TTS Providers ──────────────────────────────────────
+
     @Provides
     @Singleton
-    fun provideTtsRepository(impl: TtsRepositoryImpl): TtsRepository = impl
+    @IntoSet
+    fun providePiperTtsProvider(impl: PiperTtsProvider): TtsProvider = impl
+
+    @Provides
+    @Singleton
+    @IntoSet
+    fun provideEdgeTtsProvider(impl: EdgeTtsProvider): TtsProvider = impl
+
+    @Provides
+    @Singleton
+    fun provideTtsRepository(
+        impl: TtsRepositoryImpl
+    ): TtsRepository = impl
 
     @Provides
     @Singleton

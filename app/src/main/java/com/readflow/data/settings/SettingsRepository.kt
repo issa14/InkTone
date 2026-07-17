@@ -46,6 +46,10 @@ class SettingsRepository @Inject constructor(
         val DYNAMIC_COLORS = booleanPreferencesKey("dynamic_colors")
         val MODEL_PATH = stringPreferencesKey("model_path")
 
+        // Moteur TTS
+        val TTS_ENGINE = stringPreferencesKey("tts_engine")
+        val EDGE_VOICE = stringPreferencesKey("edge_voice")
+
         // Clés de lecture (ReaderScreen) — anciennement SharedPreferences
         val READER_THEME = stringPreferencesKey("reader_theme")
         val READER_FONT = stringPreferencesKey("reader_font")
@@ -64,6 +68,11 @@ class SettingsRepository @Inject constructor(
     }
     val dynamicColors: Flow<Boolean> = dataStore.data.map { it[Keys.DYNAMIC_COLORS] ?: false }
     val modelPath: Flow<String> = dataStore.data.map { it[Keys.MODEL_PATH] ?: "" }
+
+    // ── Moteur TTS ──────────────────────────────────
+
+    val ttsEngine: Flow<String> = dataStore.data.map { it[Keys.TTS_ENGINE] ?: "piper" }
+    val edgeVoice: Flow<String> = dataStore.data.map { it[Keys.EDGE_VOICE] ?: "fr-FR-VivienneNeural" }
 
     // ── Écritures (suspend) ──────────────────────────
 
@@ -89,6 +98,14 @@ class SettingsRepository @Inject constructor(
 
     suspend fun setModelPath(path: String) {
         dataStore.edit { it[Keys.MODEL_PATH] = path }
+    }
+
+    suspend fun setTtsEngine(engine: String) {
+        dataStore.edit { it[Keys.TTS_ENGINE] = engine }
+    }
+
+    suspend fun setEdgeVoice(voice: String) {
+        dataStore.edit { it[Keys.EDGE_VOICE] = voice }
     }
 
     // ── Réglages de lecture (ReaderScreen) ───────────

@@ -6,11 +6,14 @@ import com.readflow.data.database.entity.ReadingProgress
 import com.readflow.domain.model.Sentence
 import com.readflow.domain.model.SynthesisResult
 import com.readflow.domain.repository.TtsRepository
+import com.readflow.service.edge.EdgeTtsClient
 import com.readflow.service.onnx.OnnxInferenceService
 import kotlinx.coroutines.*
 import kotlinx.coroutines.channels.Channel
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
+import kotlinx.coroutines.flow.update
+import java.util.concurrent.locks.ReentrantLock
 import javax.inject.Inject
 import javax.inject.Singleton
 
@@ -136,6 +139,14 @@ class PlaybackOrchestrator @Inject constructor(
     private var currentJob: Job? = null
     private val playGeneration = java.util.concurrent.atomic.AtomicLong(0L)
     @Volatile private var wasPausedByFocusLoss: Boolean = false
+
+    /**
+     * Verrou de sérialisation pour pause/resume/stop.
+     *
+     * Garantit l'atomicité des transitions d'état appelées depuis
+     * des threads différents (UI, AudioFocus, notification MediaSession).
+     */
+    private val stateLock = ReentrantLock()
 
     init {
         audioFocusManager.setListener(this)
@@ -272,25 +283,37 @@ class PlaybackOrchestrator @Inject constructor(
     }
 
     fun pause() {
-        _state.value = State.Paused
-        player.pause()
-        updatePlaybackState(
-            index = currentSentenceIdx.get(),
-            text = currentSentences.getOrNull(currentSentenceIdx.get())?.text ?: "",
-            total = currentTotalSentences,
-            status = PlaybackStatus.PAUSED
-        )
+        stateLock.lock()
+        try {
+            if (_state.value !is State.Playing && _state.value !is State.Loading) return
+            _state.value = State.Paused
+            player.pause()
+            updatePlaybackState(
+                index = currentSentenceIdx.get(),
+                text = currentSentences.getOrNull(currentSentenceIdx.get())?.text ?: "",
+                total = currentTotalSentences,
+                status = PlaybackStatus.PAUSED
+            )
+        } finally {
+            stateLock.unlock()
+        }
     }
 
     fun resume() {
-        _state.value = State.Playing
-        player.resume()
-        updatePlaybackState(
-            index = currentSentenceIdx.get(),
-            text = currentSentences.getOrNull(currentSentenceIdx.get())?.text ?: "",
-            total = currentTotalSentences,
-            status = PlaybackStatus.PLAYING
-        )
+        stateLock.lock()
+        try {
+            if (_state.value !is State.Paused) return
+            _state.value = State.Playing
+            player.resume()
+            updatePlaybackState(
+                index = currentSentenceIdx.get(),
+                text = currentSentences.getOrNull(currentSentenceIdx.get())?.text ?: "",
+                total = currentTotalSentences,
+                status = PlaybackStatus.PLAYING
+            )
+        } finally {
+            stateLock.unlock()
+        }
     }
 
     fun startSleepTimer(minutes: Int) {
@@ -332,17 +355,23 @@ class PlaybackOrchestrator @Inject constructor(
     }
 
     fun stop() {
-        currentJob?.cancel()
-        player.stop()
-        audioFocusManager.abandonFocus()
-        _state.value = State.Idle
-        wasPausedByFocusLoss = false
-        updatePlaybackState(
-            index = 0,
-            text = "",
-            total = currentTotalSentences,
-            status = PlaybackStatus.IDLE
-        )
+        stateLock.lock()
+        try {
+            currentJob?.cancel()
+            currentJob = null
+            player.stop()
+            audioFocusManager.abandonFocus()
+            _state.value = State.Idle
+            wasPausedByFocusLoss = false
+            updatePlaybackState(
+                index = 0,
+                text = "",
+                total = currentTotalSentences,
+                status = PlaybackStatus.IDLE
+            )
+        } finally {
+            stateLock.unlock()
+        }
     }
 
     fun release() {
@@ -404,10 +433,21 @@ class PlaybackOrchestrator @Inject constructor(
                 try {
                     val result = ttsRepository.synthesize(sentences[idx].text, voice, speed)
                     sentenceDurations[idx] = result.audioDurationMs
+                    Log.d(TAG, "TtsDebug | synthèse OK: sentence $idx, engine=${result.engineId}, " +
+                        "voice=${result.voiceLabel}, samples=${result.samples.size}, " +
+                        "sr=${result.sampleRate}, dur=${result.audioDurationMs}ms, rtf=${result.realTimeFactor}")
                     buffer.send(result)
                 } catch (e: CancellationException) { break }
                 catch (e: Exception) {
                     Log.e(TAG, "Synthesis error sentence $idx: ${e.message}", e)
+                    // Erreur réseau persistante (après retry Edge + fallback Piper) → arrêter
+                    if (EdgeTtsClient.isNetworkError(e)) {
+                        Log.w(TAG, "Erreur réseau persistante → arrêt du pipeline de synthèse")
+                        _state.value = State.Error("Réseau perdu — la lecture s'est interrompue")
+                        _playbackState.update { it.copy(status = PlaybackStatus.IDLE) }
+                        break
+                    }
+                    // Autres erreurs (ex: échec décodage) → passer à la phrase suivante
                 }
             }
         } finally {
@@ -425,9 +465,15 @@ class PlaybackOrchestrator @Inject constructor(
         var currentReadIdx = startFrom
 
         for (result in buffer) {
-            if (currentJob?.isActive != true || (_state.value != State.Playing && _state.value != State.Loading)) break
+            // Attendre la fin de la pause (ne pas casser la pipeline !)
+            while (_state.value == State.Paused && currentJob?.isActive == true) {
+                delay(100)
+            }
+            // Sortir si arrêt définitif ou erreur
+            if (currentJob?.isActive != true || _state.value == State.Idle || _state.value is State.Error) break
 
             player.enqueue(result.samples)
+            Log.d(TAG, "TtsDebug | player.enqueue: ${result.samples.size} samples PCM, engine=${result.engineId}")
             val silenceMs = silenceDurationFor(result.text)
             val silenceLen = (result.sampleRate * silenceMs / 1000)
                 .coerceAtMost(GaplessAudioPlayer.SILENCE_BUFFER.size)
@@ -443,8 +489,14 @@ class PlaybackOrchestrator @Inject constructor(
                     System.currentTimeMillis())
                 scope.launch {
                     var lastIdx = startFrom
-                    while (currentJob?.isActive == true && _state.value == State.Playing &&
+                    while (currentJob?.isActive == true &&
+                           _state.value != State.Idle &&
+                           _state.value !is State.Error &&
                            player.completedCount < (total - startFrom) * 2) {
+                        if (_state.value == State.Paused) {
+                            delay(200)
+                            continue
+                        }
                         val c = player.completedCount
                         val sIdx = startFrom + c / 2
                         if (sIdx != lastIdx) {
@@ -464,11 +516,18 @@ class PlaybackOrchestrator @Inject constructor(
         }
 
         val expectedSegments = (total - startFrom) * 2
-        while (player.completedCount < expectedSegments && currentJob?.isActive == true && _state.value == State.Playing) {
-            delay(200)
+        while (player.completedCount < expectedSegments &&
+               currentJob?.isActive == true &&
+               (_state.value == State.Playing || _state.value == State.Paused)) {
+            if (_state.value == State.Paused) {
+                delay(500)
+            } else {
+                delay(200)
+            }
         }
         delay(300)
-        if (playGeneration.get() == myGeneration) {
+        // Ne pas écraser un état d'erreur (ex: perte réseau)
+        if (playGeneration.get() == myGeneration && _state.value !is State.Error) {
             _state.value = State.Idle
             updatePlaybackState(currentReadIdx, "", total, PlaybackStatus.IDLE)
             saveProgressAsync(bookId, chapterIndex, total, 0)
