@@ -97,15 +97,19 @@ class TtsRepositoryImpl @Inject constructor(
      * 5. En dernier recours, retourne "piper" (même indisponible)
      */
     private suspend fun resolveProvider(): TtsProvider {
+        // Forcer le rafraîchissement du cache si le moteur sélectionné a changé
+        val selectedEngineId = settingsRepository.ttsEngine.first()
+        if (cachedEngineId != selectedEngineId) {
+            cachedProvider = null
+            cachedEngineId = null
+        }
+
         // Cache valide : le provider est déjà sélectionné et disponible
         val cached = cachedProvider
         val cachedId = cachedEngineId
         if (cached != null && cachedId != null && cached.isAvailable) {
             return cached
         }
-
-        // Lire le moteur sélectionné dans DataStore
-        val selectedEngineId = settingsRepository.ttsEngine.first()
 
         // Chercher le provider correspondant
         val selected = providers.find { it.engineId == selectedEngineId && it.isAvailable }
