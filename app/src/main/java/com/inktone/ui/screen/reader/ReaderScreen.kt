@@ -100,6 +100,7 @@ fun ReaderScreen(
             .onSizeChanged { screenSize = it }
     ) {
         // ── COUCHE 0 : Texte (100% espace, jamais ne bouge) ─
+        Crossfade(targetState = state.readerTheme, animationSpec = tween(300)) {
         when {
             state.isLoading -> LoadingIndicator()
             state.error != null -> ErrorMessage(state.error!!)
@@ -128,7 +129,6 @@ fun ReaderScreen(
                 highlights = state.highlights,
                 bookmarks = state.bookmarks,
                 onTap = { offset ->
-                        // Tiers central uniquement
                         if (screenSize.width > 0) {
                             val left = screenSize.width / 3f
                             val right = 2f * screenSize.width / 3f
@@ -136,9 +136,11 @@ fun ReaderScreen(
                                 viewModel.toggleHud()
                             }
                         }
-                    }
+                    },
+                onDoubleTap = { viewModel.selectCurrentSentence() }
                 )
             }
+        } // Crossfade
 
         // ── Tooltip premier lancement lecteur ───────
         if (state.showReaderTooltip && state.isHudVisible) {

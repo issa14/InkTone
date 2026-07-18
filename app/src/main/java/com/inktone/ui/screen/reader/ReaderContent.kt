@@ -69,6 +69,7 @@ fun ReaderContent(
     isLoadingChapter: Boolean = false,
     onToggleMode: () -> Unit,
     onTap: (Offset) -> Unit,
+    onDoubleTap: () -> Unit = {},
     onPageTurned: () -> Unit,
     onNextChapter: () -> Unit,
     onTextSelected: (sentenceIndex: Int, selectedText: String) -> Unit,
@@ -116,6 +117,7 @@ fun ReaderContent(
             totalChapters = totalChapters,
             isLoadingChapter = isLoadingChapter,
             onTap = onTap,
+            onDoubleTap = onDoubleTap,
             onPageTurned = onPageTurned,
             onNextChapter = onNextChapter,
             onTextSelected = onTextSelected,
@@ -140,6 +142,7 @@ fun ReaderContent(
             readingMode = readingMode,
             onToggleMode = onToggleMode,
             onTap = onTap,
+            onDoubleTap = onDoubleTap,
             onNextChapter = onNextChapter,
             onTextSelected = onTextSelected,
             onSelectionDismissed = onSelectionDismissed,
@@ -165,6 +168,7 @@ private fun PagedContent(
     totalChapters: Int,
     isLoadingChapter: Boolean = false,
     onTap: (Offset) -> Unit,
+    onDoubleTap: () -> Unit = {},
     onPageTurned: () -> Unit,
     onNextChapter: () -> Unit,
     onTextSelected: (sentenceIndex: Int, selectedText: String) -> Unit,
@@ -267,31 +271,34 @@ private fun PagedContent(
             .padding(horizontal = horizontalMarginDp.dp, vertical = 16.dp)
             .onSizeChanged { containerSize = it }
             .pointerInput(Unit) {
-                detectTapGestures { offset ->
-                    if (containerSize.width > 0) {
-                        val left = containerSize.width / 3f
-                        val right = 2f * containerSize.width / 3f
-                        when {
-                            offset.x < left -> {
-                                onPageTurned()
-                                scope.launch {
-                                    if (pagerState.currentPage > 0) {
-                                        pagerState.animateScrollToPage(pagerState.currentPage - 1)
+                detectTapGestures(
+                    onTap = { offset ->
+                        if (containerSize.width > 0) {
+                            val left = containerSize.width / 3f
+                            val right = 2f * containerSize.width / 3f
+                            when {
+                                offset.x < left -> {
+                                    onPageTurned()
+                                    scope.launch {
+                                        if (pagerState.currentPage > 0) {
+                                            pagerState.animateScrollToPage(pagerState.currentPage - 1)
+                                        }
                                     }
                                 }
-                            }
-                            offset.x > right -> {
-                                onPageTurned()
-                                scope.launch {
-                                    if (pagerState.currentPage < pages.size) {
-                                        pagerState.animateScrollToPage(pagerState.currentPage + 1)
+                                offset.x > right -> {
+                                    onPageTurned()
+                                    scope.launch {
+                                        if (pagerState.currentPage < pages.size) {
+                                            pagerState.animateScrollToPage(pagerState.currentPage + 1)
+                                        }
                                     }
                                 }
+                                else -> onTap(offset)
                             }
-                            else -> onTap(offset)
                         }
-                    }
-                }
+                    },
+                    onDoubleTap = { onDoubleTap() }
+                )
             }
     ) {
         HorizontalPager(
@@ -383,6 +390,7 @@ private fun ScrollContent(
     readingMode: ReadingMode,
     onToggleMode: () -> Unit,
     onTap: (Offset) -> Unit,
+    onDoubleTap: () -> Unit = {},
     onNextChapter: () -> Unit,
     onTextSelected: (sentenceIndex: Int, selectedText: String) -> Unit,
     onSelectionDismissed: () -> Unit,
@@ -406,9 +414,10 @@ private fun ScrollContent(
             .windowInsetsPadding(WindowInsets.systemBars)
             .padding(horizontal = horizontalMarginDp.dp, vertical = 16.dp)
             .pointerInput(Unit) {
-                detectTapGestures { offset ->
-                    onTap(offset)
-                }
+                detectTapGestures(
+                    onTap = { offset -> onTap(offset) },
+                    onDoubleTap = { onDoubleTap() }
+                )
             }
     ) {
         LazyColumn(

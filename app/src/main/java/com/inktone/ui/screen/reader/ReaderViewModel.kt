@@ -111,6 +111,16 @@ class ReaderViewModel @Inject constructor(
         _uiState.update { it.copy(showPlayTooltip = false) }
         viewModelScope.launch { settingsRepository.markPlayTooltipSeen() }
     }
+
+    /** Double tap → sélectionne la phrase courante. */
+    fun selectCurrentSentence() {
+        val chapter = _uiState.value.currentChapter ?: return
+        val idx = _uiState.value.currentSentenceIndex
+        val sentence = chapter.sentences.getOrNull(idx) ?: return
+        _uiState.update {
+            it.copy(lastAction = "Phrase sélectionnée — copiez, surlignez, marque-page")
+        }
+    }
     fun showTtsSheet() { _uiState.update { it.copy(isTtsSheetVisible = true) } }
     fun hideTtsSheet() { _uiState.update { it.copy(isTtsSheetVisible = false) } }
     fun showTocSheet() { _uiState.update { it.copy(isTocSheetVisible = true) } }
