@@ -71,14 +71,27 @@ class PlaybackOrchestrator @Inject constructor(
         private const val TAG = "Orchestrator"
         private const val LOOKAHEAD = 3
 
-        /** Timeout synthèse ONNX/Piper local (CPU-bound, pas de réseau). */
-        const val ONNX_TIMEOUT_MS = 2000L
+        /** Timeout synthèse ONNX/Piper local (CPU-bound, pas de réseau).
+         *
+         * Sur Snapdragon 680, une phrase courte prend ~200-800ms.
+         * 4s laisse une marge confortable même avec le chargement
+         * initial du modèle ou des phrases très longues. */
+        const val ONNX_TIMEOUT_MS = 4_000L
 
-        /** Timeout synthèse Edge cloud (réseau + WebSocket + DRM + synthèse). */
-        const val EDGE_TIMEOUT_MS = 8000L
+        /** Timeout synthèse Edge cloud (réseau + WebSocket + DRM + synthèse).
+         *
+         * L'EdgeTtsClient a son propre timeout interne de 15s + 3 retries
+         * (backoff 500/1000/2000ms). Ce timeout doit être supérieur pour
+         * éviter les double-timeout qui sautent des phrases entières.
+         * 20s = 15s (EdgeTtsClient) + 3s (retries) + 2s (marge réseau). */
+        const val EDGE_TIMEOUT_MS = 20_000L
 
-        /** Timeout par défaut avant de connaître le moteur actif. */
-        private const val DEFAULT_TIMEOUT_MS = 5000L
+        /** Timeout par défaut avant de connaître le moteur actif.
+         *
+         * Suffisamment élevé pour couvrir le pire cas (Edge cloud)
+         * sans pour autant bloquer indéfiniment si aucun moteur
+         * n'est disponible. */
+        private const val DEFAULT_TIMEOUT_MS = 15_000L
 
         /** Erreurs consécutives max pour ONNX (local = fiable). */
         private const val MAX_CONSECUTIVE_ERRORS_ONNX = 3
