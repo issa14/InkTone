@@ -27,9 +27,10 @@ class MainActivity : ComponentActivity() {
         enableEdgeToEdge()
         setContent {
             val appTheme by settingsRepository.theme.collectAsStateWithLifecycle(initialValue = AppTheme.PAPIER_ART)
+            val dynamicColors by settingsRepository.dynamicColors.collectAsStateWithLifecycle(initialValue = false)
             val isFirstLaunch by settingsRepository.isFirstLaunch.collectAsStateWithLifecycle(initialValue = true)
             val scope = rememberCoroutineScope()
-            InkToneTheme(theme = appTheme) {
+            InkToneTheme(theme = appTheme, dynamicColors = dynamicColors) {
                 if (isFirstLaunch) {
                     OnboardingScreen(
                         onComplete = { scope.launch { settingsRepository.setOnboardingComplete() } }

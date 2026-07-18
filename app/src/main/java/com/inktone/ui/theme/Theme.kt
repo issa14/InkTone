@@ -1,11 +1,15 @@
 package com.inktone.ui.theme
 
 import android.app.Activity
+import android.os.Build
 import androidx.compose.foundation.isSystemInDarkTheme
 import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.dynamicDarkColorScheme
+import androidx.compose.material3.dynamicLightColorScheme
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.SideEffect
 import androidx.compose.ui.graphics.toArgb
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalView
 import androidx.core.view.WindowCompat
 import com.inktone.data.settings.AppTheme
@@ -13,18 +17,30 @@ import com.inktone.data.settings.AppTheme
 @Composable
 fun InkToneTheme(
     theme: AppTheme = AppTheme.PAPIER_ART,
+    dynamicColors: Boolean = false,
     content: @Composable () -> Unit
 ) {
-    val (scheme, isLightBars) = when (theme) {
-        AppTheme.PAPIER_ART -> PapierArtColors       to true
-        AppTheme.OBSIDIAN   -> ObsidianColors        to false
-        AppTheme.NORDIC_FOG -> NordicFogColors       to true
-        AppTheme.SIGNATURE  -> SignatureLightColors  to true
-        AppTheme.SYSTEM     -> {
-            if (isSystemInDarkTheme())
-                ObsidianColors to false
-            else
-                PapierArtColors to true
+    val context = LocalContext.current
+    val isDark = isSystemInDarkTheme()
+
+    val (scheme, isLightBars) = when {
+        // Dynamic Color (Material You) — Android 12+ uniquement
+        dynamicColors && Build.VERSION.SDK_INT >= Build.VERSION_CODES.S -> {
+            if (isDark) {
+                dynamicDarkColorScheme(context) to false
+            } else {
+                dynamicLightColorScheme(context) to true
+            }
+        }
+        else -> when (theme) {
+            AppTheme.PAPIER_ART -> PapierArtColors       to true
+            AppTheme.OBSIDIAN   -> ObsidianColors        to false
+            AppTheme.NORDIC_FOG -> NordicFogColors       to true
+            AppTheme.SIGNATURE  -> SignatureLightColors  to true
+            AppTheme.SYSTEM     -> {
+                if (isDark) ObsidianColors to false
+                else PapierArtColors to true
+            }
         }
     }
 

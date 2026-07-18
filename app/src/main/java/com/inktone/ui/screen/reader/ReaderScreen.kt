@@ -19,6 +19,7 @@ import androidx.compose.ui.platform.LocalClipboardManager
 import androidx.compose.ui.platform.LocalView
 import androidx.compose.ui.text.AnnotatedString
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.IntSize
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
@@ -205,6 +206,32 @@ fun ReaderScreen(
                     selectionState = null
                 }
             )
+        }
+
+        // ── Captions TTS (accessibilité) ─────────────
+        AnimatedVisibility(
+            visible = state.isPlaying && playbackState.activeSentenceText.isNotEmpty(),
+            enter = fadeIn(tween(reducedMotionDuration(300))),
+            exit = fadeOut(tween(reducedMotionDuration(200))),
+            modifier = Modifier
+                .align(Alignment.BottomCenter)
+                .padding(bottom = 48.dp, start = 24.dp, end = 24.dp)
+        ) {
+            Surface(
+                color = bgColor.copy(alpha = 0.85f),
+                shape = RoundedCornerShape(10.dp),
+                shadowElevation = 4.dp
+            ) {
+                Text(
+                    text = playbackState.activeSentenceText,
+                    color = textColor,
+                    fontSize = 14.sp,
+                    lineHeight = 20.sp,
+                    modifier = Modifier.padding(horizontal = 16.dp, vertical = 10.dp),
+                    maxLines = 3,
+                    overflow = TextOverflow.Ellipsis
+                )
+            }
         }
 
         // ── Micro-indicateur (HUD masqué) ────

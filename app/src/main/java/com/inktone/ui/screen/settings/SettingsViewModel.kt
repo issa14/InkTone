@@ -104,6 +104,24 @@ class SettingsViewModel @Inject constructor(
     fun setReduceMotion(enabled: Boolean) { viewModelScope.launch { repository.setReduceMotion(enabled) } }
     fun setRespectSystemFontScale(enabled: Boolean) { viewModelScope.launch { repository.setRespectSystemFontScale(enabled) } }
 
+    // ── Présets rapides ────────────────────────────
+
+    fun applyDarkModePreset() {
+        viewModelScope.launch {
+            repository.setTheme(AppTheme.OBSIDIAN)
+            repository.setReaderTheme("NIGHT")
+        }
+    }
+
+    fun applyAccessibilityPreset() {
+        viewModelScope.launch {
+            repository.setReaderFont("OPEN_DYSLEXIC")
+            repository.setFontSize(24f)
+            repository.setReaderTheme("DAY")
+            repository.setReduceMotion(true)
+        }
+    }
+
     fun exportBackup(uri: Uri) {
         viewModelScope.launch {
             try {

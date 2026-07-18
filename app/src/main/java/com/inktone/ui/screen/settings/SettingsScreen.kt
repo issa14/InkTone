@@ -65,8 +65,52 @@ fun SettingsScreen(
             .verticalScroll(rememberScrollState())
             .padding(horizontal = 20.dp, vertical = 16.dp)
     ) {
-        // ── SECTION AUDIO ──
-        SectionHeader("🎙️ Configuration Audio")
+        // ═══════════════════════════════════════════
+        //  ⚡ PRÉSETS RAPIDES
+        // ═══════════════════════════════════════════
+        SectionGroup("⚡ Présets rapides")
+        Row(
+            modifier = Modifier.fillMaxWidth(),
+            horizontalArrangement = Arrangement.spacedBy(12.dp)
+        ) {
+            Card(
+                modifier = Modifier.weight(1f),
+                colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface),
+                shape = RoundedCornerShape(14.dp),
+                onClick = { viewModel.applyDarkModePreset() }
+            ) {
+                Column(
+                    modifier = Modifier.padding(16.dp),
+                    horizontalAlignment = Alignment.CenterHorizontally
+                ) {
+                    Icon(Icons.Default.DarkMode, "Mode sombre", tint = MaterialTheme.colorScheme.primary, modifier = Modifier.size(28.dp))
+                    Spacer(Modifier.height(8.dp))
+                    Text("Mode sombre", fontSize = 13.sp, fontWeight = FontWeight.Medium, color = MaterialTheme.colorScheme.onSurface)
+                }
+            }
+            Card(
+                modifier = Modifier.weight(1f),
+                colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface),
+                shape = RoundedCornerShape(14.dp),
+                onClick = { viewModel.applyAccessibilityPreset() }
+            ) {
+                Column(
+                    modifier = Modifier.padding(16.dp),
+                    horizontalAlignment = Alignment.CenterHorizontally
+                ) {
+                    Icon(Icons.Default.Accessibility, "Accessibilité", tint = MaterialTheme.colorScheme.tertiary, modifier = Modifier.size(28.dp))
+                    Spacer(Modifier.height(8.dp))
+                    Text("Accessibilité", fontSize = 13.sp, fontWeight = FontWeight.Medium, color = MaterialTheme.colorScheme.onSurface)
+                }
+            }
+        }
+
+        Spacer(Modifier.height(24.dp))
+
+        // ═══════════════════════════════════════════
+        //  📖 LECTURE
+        // ═══════════════════════════════════════════
+        SectionGroup("📖 Lecture")
         Card(colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface), shape = RoundedCornerShape(14.dp), modifier = Modifier.fillMaxWidth()) {
             Column(modifier = Modifier.padding(16.dp)) {
 
@@ -77,7 +121,6 @@ fun SettingsScreen(
                     subtitle = state.voice,
                     onClick = { showVoicePicker = true }
                 )
-
                 HorizontalDivider(color = MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.3f), modifier = Modifier.padding(vertical = 4.dp))
 
                 // Vitesse
@@ -89,7 +132,6 @@ fun SettingsScreen(
                     format = { "${"%.1f".format(it)}x" },
                     onValueChange = { viewModel.setSpeed(it) }
                 )
-
                 HorizontalDivider(color = MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.3f), modifier = Modifier.padding(vertical = 4.dp))
 
                 // Gain
@@ -101,17 +143,9 @@ fun SettingsScreen(
                     format = { "${"%.1f".format(it)}x" },
                     onValueChange = { viewModel.setGain(it) }
                 )
-            }
-        }
+                HorizontalDivider(color = MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.3f), modifier = Modifier.padding(vertical = 4.dp))
 
-        Spacer(Modifier.height(16.dp))
-
-        // ── SECTION MOTEUR TTS ──
-        SectionHeader("⚙️ Moteur TTS")
-        Card(colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface), shape = RoundedCornerShape(14.dp), modifier = Modifier.fillMaxWidth()) {
-            Column(modifier = Modifier.padding(16.dp)) {
-
-                // Sélecteur de moteur
+                // Moteur TTS
                 val currentEngine = state.availableEngines.find { it.id == state.selectedEngine }
                 SettingRow(
                     icon = Icons.Default.Memory,
@@ -123,7 +157,6 @@ fun SettingsScreen(
                 // Si Edge sélectionné → sélecteur de voix
                 if (state.selectedEngine == "edge") {
                     HorizontalDivider(color = MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.3f), modifier = Modifier.padding(vertical = 4.dp))
-
                     val edgeVoiceLabel = when (state.selectedEdgeVoice) {
                         "fr-FR-VivienneNeural" -> "Vivienne (FR)"
                         "fr-FR-HenriNeural"    -> "Henri (FR)"
@@ -139,24 +172,24 @@ fun SettingsScreen(
             }
         }
 
-        Spacer(Modifier.height(16.dp))
+        Spacer(Modifier.height(24.dp))
 
-        // ── SECTION APPARENCE ──
-        SectionHeader("🎨 Apparence")
+        // ═══════════════════════════════════════════
+        //  📱 APPAREIL
+        // ═══════════════════════════════════════════
+        SectionGroup("📱 Appareil")
         Card(colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface), shape = RoundedCornerShape(14.dp), modifier = Modifier.fillMaxWidth()) {
             Column(modifier = Modifier.padding(16.dp)) {
 
-                // Thème
+                SectionHeader("🎨 Apparence")
                 SettingRow(
                     icon = Icons.Default.Palette,
                     title = "Thème",
                     subtitle = state.theme.label,
                     onClick = { showThemePicker = true }
                 )
-
                 HorizontalDivider(color = MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.3f), modifier = Modifier.padding(vertical = 4.dp))
 
-                // Couleurs dynamiques (Material You)
                 SwitchSetting(
                     icon = Icons.Default.ColorLens,
                     title = "Couleurs dynamiques",
@@ -164,15 +197,10 @@ fun SettingsScreen(
                     checked = state.dynamicColors,
                     onCheckedChange = { viewModel.setDynamicColors(it) }
                 )
-            }
-        }
 
-        Spacer(Modifier.height(16.dp))
+                HorizontalDivider(color = MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.3f), modifier = Modifier.padding(vertical = 8.dp))
 
-        // ── SECTION ACCESSIBILITÉ ──
-        SectionHeader("♿ Accessibilité")
-        Card(colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface), shape = RoundedCornerShape(14.dp), modifier = Modifier.fillMaxWidth()) {
-            Column(modifier = Modifier.padding(16.dp)) {
+                SectionHeader("♿ Accessibilité")
                 SwitchSetting(
                     icon = Icons.Default.Animation,
                     title = "Réduire les animations",
@@ -191,10 +219,12 @@ fun SettingsScreen(
             }
         }
 
-        Spacer(Modifier.height(16.dp))
+        Spacer(Modifier.height(24.dp))
 
-        // ── SECTION STOCKAGE ──
-        SectionHeader("📁 Stockage")
+        // ═══════════════════════════════════════════
+        //  💾 DONNÉES
+        // ═══════════════════════════════════════════
+        SectionGroup("💾 Données")
         Card(colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface), shape = RoundedCornerShape(14.dp), modifier = Modifier.fillMaxWidth()) {
             Column(modifier = Modifier.padding(16.dp)) {
                 SettingRow(
@@ -203,15 +233,7 @@ fun SettingsScreen(
                     subtitle = state.modelPath.ifBlank { "Chemin par défaut" },
                     onClick = { showPathEditor = true }
                 )
-            }
-        }
-
-        Spacer(Modifier.height(16.dp))
-
-        // ── SECTION SAUVEGARDE ──
-        SectionHeader("💾 Sauvegarde & Restauration")
-        Card(colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface), shape = RoundedCornerShape(14.dp), modifier = Modifier.fillMaxWidth()) {
-            Column(modifier = Modifier.padding(16.dp)) {
+                HorizontalDivider(color = MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.3f), modifier = Modifier.padding(vertical = 4.dp))
                 SettingRow(
                     icon = Icons.Default.SaveAlt,
                     title = "Exporter les données",
@@ -255,8 +277,13 @@ fun SettingsScreen(
 // ─────────────────────────────────────────────────────
 
 @Composable
+private fun SectionGroup(text: String) {
+    Text(text, color = MaterialTheme.colorScheme.onBackground, fontWeight = FontWeight.Bold, fontSize = 18.sp, modifier = Modifier.padding(bottom = 8.dp))
+}
+
+@Composable
 private fun SectionHeader(text: String) {
-    Text(text, color = MaterialTheme.colorScheme.onSurfaceVariant, fontWeight = FontWeight.SemiBold, fontSize = 14.sp, modifier = Modifier.padding(vertical = 8.dp))
+    Text(text, color = MaterialTheme.colorScheme.onSurfaceVariant, fontWeight = FontWeight.SemiBold, fontSize = 13.sp, modifier = Modifier.padding(vertical = 4.dp))
 }
 
 @Composable

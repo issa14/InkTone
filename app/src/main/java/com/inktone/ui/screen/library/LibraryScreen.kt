@@ -75,7 +75,7 @@ fun LibraryScreen(
         if (uris.isNotEmpty()) viewModel.importBooks(uris)
     }
 
-    InkToneTheme(theme = state.appTheme) {
+    InkToneTheme(theme = state.appTheme, dynamicColors = false) {
     Box(modifier = Modifier.fillMaxSize()) {
         Surface(
             modifier = Modifier.fillMaxSize(),
@@ -172,13 +172,19 @@ fun LibraryScreen(
                         NavigationDestination.LIBRARY -> {
                             when {
                                 state.isLoading && state.books.isEmpty() -> LoadingView()
-                                state.books.isEmpty() && !state.isLoading -> EmptyView(onImportClick = { epubPicker.launch(arrayOf("application/epub+zip")) })
+                                state.books.isEmpty() && !state.isLoading -> EmptyView(
+                                    onImportClick = { epubPicker.launch(arrayOf("application/epub+zip")) },
+                                    onBrowseClick = { viewModel.navigateTo(NavigationDestination.FILES) }
+                                )
                                 else -> ShelfGrid(state.books, state.bookProgress, onBookClick)
                             }
                         }
                         NavigationDestination.RECENTS -> {
                             val recent = state.allBooks.sortedByDescending { it.addedAt }
-                            if (recent.isEmpty()) EmptyView() else ShelfGrid(recent, state.bookProgress, onBookClick)
+                            if (recent.isEmpty()) EmptyView(
+                                onImportClick = { epubPicker.launch(arrayOf("application/epub+zip")) },
+                                onBrowseClick = { viewModel.navigateTo(NavigationDestination.FILES) }
+                            ) else ShelfGrid(recent, state.bookProgress, onBookClick)
                         }
                         NavigationDestination.FILES -> {
                             FilesScreen(
@@ -1031,7 +1037,7 @@ private fun FloatingControls(
 // ─────────────────────────────────────────────────────
 
 @Composable
-private fun EmptyView(onImportClick: (() -> Unit)? = null) {
+private fun EmptyView(onImportClick: (() -> Unit)? = null, onBrowseClick: (() -> Unit)? = null) {
     Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
         Column(horizontalAlignment = Alignment.CenterHorizontally) {
             Icon(Icons.Default.MenuBook, "Livres", Modifier.size(64.dp),
@@ -1050,6 +1056,17 @@ private fun EmptyView(onImportClick: (() -> Unit)? = null) {
                     Text("Importer un eBook")
                 }
             }
+            if (onBrowseClick != null) {
+                Spacer(Modifier.height(12.dp))
+                OutlinedButton(
+                    onClick = onBrowseClick,
+                    shape = RoundedCornerShape(12.dp)
+                ) {
+                    Icon(Icons.Default.Folder, "Parcourir", modifier = Modifier.size(18.dp))
+                    Spacer(Modifier.width(8.dp))
+                    Text("Parcourir mes fichiers")
+                }
+            }
         }
     }
 }
@@ -1062,11 +1079,38 @@ private fun LoadingView() {
 }
 
 @Composable
-private fun ErrorBanner(error: String, onDismiss: () -> Unit) {
-    Surface(color = MaterialTheme.colorScheme.errorContainer.copy(alpha = 0.2f)) {
-        Row(Modifier.padding(12.dp), verticalAlignment = Alignment.CenterVertically) {
-            Text("❌ $error", color = MaterialTheme.colorScheme.error, modifier = Modifier.weight(1f), fontSize = 13.sp)
-            TextButton(onClick = onDismiss) { Text("OK") }
+private fun ErrorBanner(error: String, onDismiss: () -> Unit, onRetry: (() -> Unit)? = null) {
+    Surface(
+        color = MaterialTheme.colorScheme.errorContainer.copy(alpha = 0.2f),
+        shape = RoundedCornerShape(8.dp),
+        modifier = Modifier.padding(horizontal = 12.dp, vertical = 4.dp)
+    ) {
+        Row(
+            Modifier.padding(12.dp),
+            verticalAlignment = Alignment.CenterVertically
+        ) {
+            Icon(
+                Icons.Default.Error,
+                contentDescription = null,
+                tint = MaterialTheme.colorScheme.error,
+                modifier = Modifier.size(20.dp)
+            )
+            Spacer(Modifier.width(8.dp))
+            Text(
+                error,
+                color = MaterialTheme.colorScheme.error,
+                modifier = Modifier.weight(1f),
+                fontSize = 13.sp,
+                lineHeight = 18.sp
+            )
+            if (onRetry != null) {
+                TextButton(onClick = onRetry) {
+                    Text("Réessayer", fontSize = 12.sp, color = MaterialTheme.colorScheme.primary)
+                }
+            }
+            TextButton(onClick = onDismiss) {
+                Text("OK", fontSize = 12.sp, color = MaterialTheme.colorScheme.onSurfaceVariant)
+            }
         }
     }
 }
