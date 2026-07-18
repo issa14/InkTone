@@ -90,6 +90,16 @@ class GaplessAudioPlayer @Inject constructor() {
         private set
 
     /**
+     * Flag atomique indiquant qu'un arrêt est demandé.
+     *
+     * [writeBlocking()] vérifie ce flag sous [writeLock] avant chaque écriture.
+     * Cela garantit une sortie propre de la boucle d'écriture même si le job
+     * n'a pas encore été annulé, évitant tout use-after-free sur l'[AudioTrack].
+     */
+    @Volatile var willStop = false
+        private set
+
+    /**
      * Ajoute un segment audio à la file de lecture.
      *
      * Non-bloquant : utilise [ConcurrentLinkedQueue.add] + [Semaphore.release].
@@ -114,6 +124,7 @@ class GaplessAudioPlayer @Inject constructor() {
     /** Démarre la lecture de la file d'attente. */
     fun play() {
         if (_state.value == State.Playing) return
+        willStop = false
         _state.value = State.Playing
         completedCount = 0
         startLoop()
@@ -158,6 +169,11 @@ class GaplessAudioPlayer @Inject constructor() {
 
     /** Arrête tout et vide la file. */
     fun stop() {
+        // Flag atomique : signale à writeBlocking() d'arrêter d'écrire
+        // avant même que le job soit annulé ou le verrou acquis.
+        // Évite le use-after-free : writeBlocking() vérifie willStop
+        // sous writeLock avant chaque appel à AudioTrack.write().
+        willStop = true
         _state.value = State.Stopped
         job?.cancel()
 
@@ -230,8 +246,10 @@ class GaplessAudioPlayer @Inject constructor() {
      * Convertit le FloatArray PCM (Sherpa-ONNX) en ShortArray PCM 16-bit
      * avec gain 3x, puis écrit dans l'AudioTrack par chunks.
      *
-     * Thread-safe : acquiert [writeLock] avant chaque écriture pour éviter
-     * le use-after-free si [stop()] libère le track concurremment.
+     * Thread-safe : acquiert [writeLock] avant chaque vérification d'état
+     * et chaque écriture pour éviter le use-after-free si [stop()] libère
+     * le track concurremment. Vérifie également [willStop] pour une sortie
+     * propre avant même l'annulation du job.
      */
     private fun writeBlocking(floatSamples: FloatArray) {
         // Conversion FloatArray → ShortArray avec gain (hors verrou, aucun accès au track)
@@ -245,10 +263,14 @@ class GaplessAudioPlayer @Inject constructor() {
         var totalWritten = 0
         val chunkSize = 4096
         var offset = 0
-        while (offset < n && _state.value == State.Playing) {
+        while (offset < n) {
             val len = minOf(chunkSize, n - offset)
             writeLock.lock()
             try {
+                // Vérifications sous verrou : willStop, état Playing, track non-null.
+                // L'ordre est important : si willStop est true ou si l'état n'est plus
+                // Playing, on sort immédiatement sans tenter d'écrire.
+                if (willStop || _state.value != State.Playing) break
                 val t = track ?: break
                 val written = t.write(shortSamples, offset, len)
                 if (written < 0) {
