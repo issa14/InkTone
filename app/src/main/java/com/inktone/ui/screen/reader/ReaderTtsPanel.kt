@@ -224,17 +224,7 @@ fun TtsPanel(
             FilterChip(
                 selected = currentVoice == 0,
                 onClick = { onVoiceChange(0) },
-                label = { Text("Jessica", style = MaterialTheme.typography.labelSmall) },
-                colors = FilterChipDefaults.filterChipColors(
-                    selectedContainerColor = MaterialTheme.colorScheme.ttsActive.copy(alpha = 0.25f),
-                    selectedLabelColor = Color.White
-                )
-            )
-            Spacer(Modifier.width(8.dp))
-            FilterChip(
-                selected = currentVoice == 1,
-                onClick = { onVoiceChange(1) },
-                label = { Text("Pierre", style = MaterialTheme.typography.labelSmall) },
+                label = { Text("Miro FR", style = MaterialTheme.typography.labelSmall) },
                 colors = FilterChipDefaults.filterChipColors(
                     selectedContainerColor = MaterialTheme.colorScheme.ttsActive.copy(alpha = 0.25f),
                     selectedLabelColor = Color.White

@@ -52,10 +52,11 @@ class OnnxInferenceService @Inject constructor(
     /** Mutex pour sérialiser l'initialisation. */
     private val initMutex = Mutex()
 
-    /** Voix disponibles. UPMC (Jessica + Pierre) est le modèle par défaut. */
+    /** Voix disponibles. */
     enum class Voice(val sid: Int, val label: String) {
-        JESSICA(0, "Jessica (FR)"),
-        PIERRE(1, "Pierre (FR)"),
+        MIRO(0, "Miro (FR high)"),
+        JESSICA(0, "Jessica (FR) — UPMC"),
+        PIERRE(1, "Pierre (FR) — UPMC"),
     }
 
     // ── Paramètres prosodiques ajustables ──────────────────────
@@ -100,11 +101,13 @@ class OnnxInferenceService @Inject constructor(
     }
 
     private fun doInitialize() {
-        // Déterminer quel modèle utiliser (UPMC par défaut, fallback Miro)
-        val (assetDir, onnxFile) = if (isModelAvailable(ASSET_DIR_UPMC, ONNX_FILE_UPMC)) {
+        // Priorité 1: Miro (compatible Sherpa-ONNX 1.13.4)
+        // UPMC sera activé après mise à jour de Sherpa-ONNX (modèle incompatible actuellement)
+        val useUPMC = false // TODO: activer après upgrade Sherpa-ONNX ≥ 1.14
+        val (assetDir, onnxFile) = if (useUPMC && isModelAvailable(ASSET_DIR_UPMC, ONNX_FILE_UPMC)) {
             ASSET_DIR_UPMC to ONNX_FILE_UPMC
         } else {
-            Log.w(TAG, "Modèle UPMC introuvable, fallback vers Miro")
+            if (useUPMC) Log.w(TAG, "Modèle UPMC introuvable, fallback Miro")
             ASSET_DIR_MIRO to ONNX_FILE_MIRO
         }
 
@@ -163,7 +166,7 @@ class OnnxInferenceService @Inject constructor(
      */
     suspend fun synthesize(
         text: String,
-        voice: Voice = Voice.JESSICA,
+        voice: Voice = Voice.MIRO,
         speed: Float = 1.0f
     ): SynthesisResult = withContext(Dispatchers.IO) {
         val engine = tts
