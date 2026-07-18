@@ -1,5 +1,7 @@
 package com.inktone.ui.screen.reader
 
+import androidx.compose.animation.core.animateFloatAsState
+import androidx.compose.animation.core.tween
 import androidx.compose.foundation.background
 import androidx.compose.foundation.gestures.detectTapGestures
 import androidx.compose.foundation.layout.*
@@ -19,6 +21,7 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.geometry.Rect
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.layout.onSizeChanged
 import androidx.compose.ui.platform.LocalDensity
@@ -657,45 +660,42 @@ private fun ActiveSentenceText(
     startTimestamp: Long,
     modifier: Modifier = Modifier
 ) {
-    var elapsed by remember(startTimestamp) { mutableStateOf(System.currentTimeMillis() - startTimestamp) }
-    
-    // Tracking à ~60fps pour une transition fluide entre les mots
+    var rawElapsed by remember(startTimestamp) { mutableStateOf(0L) }
+
+    // Tracking à ~60fps pour un suivi précis du mot actif
     LaunchedEffect(startTimestamp, durationMs) {
         val start = startTimestamp
         while (System.currentTimeMillis() - start < durationMs) {
-            elapsed = System.currentTimeMillis() - start
-            kotlinx.coroutines.delay(16) // ~60 FPS
+            rawElapsed = System.currentTimeMillis() - start
+            kotlinx.coroutines.delay(16)
         }
-        elapsed = durationMs
+        rawElapsed = durationMs
     }
-    
+
     val cleanWords = remember(text) { text.split(Regex("\\s+")).filter { it.isNotEmpty() } }
-    
+
     if (cleanWords.isEmpty() || durationMs <= 0) {
         Text(text, style = style.copy(color = accentColor, fontWeight = FontWeight.Medium), modifier = modifier)
         return
     }
-    
+
     val totalChars = cleanWords.sumOf { it.length }.toFloat()
-    val activeWordIdx = remember(elapsed, cleanWords, durationMs) {
-        val fraction = (elapsed.toFloat() / durationMs).coerceIn(0f, 1f)
+    val activeWordIdx = remember(rawElapsed, cleanWords, durationMs) {
+        val fraction = (rawElapsed.toFloat() / durationMs).coerceIn(0f, 1f)
         val targetCharCount = fraction * totalChars
         var currentCharCount = 0
         var foundIdx = 0
         for (i in cleanWords.indices) {
             currentCharCount += cleanWords[i].length
-            if (currentCharCount >= targetCharCount) {
-                foundIdx = i
-                break
-            }
+            if (currentCharCount >= targetCharCount) { foundIdx = i; break }
         }
         foundIdx
     }
-    
+
     val annotatedString = remember(cleanWords, activeWordIdx, accentColor, textColor) {
         val builder = AnnotatedString.Builder()
         val originalWords = text.split(" ")
-        
+
         var wordCounter = 0
         originalWords.forEachIndexed { index, part ->
             if (part.trim().isEmpty()) {
@@ -703,22 +703,34 @@ private fun ActiveSentenceText(
                 return@forEachIndexed
             }
             if (wordCounter == activeWordIdx) {
-                builder.pushStyle(style.toSpanStyle().copy(color = accentColor, fontWeight = FontWeight.Bold))
+                builder.pushStyle(style.toSpanStyle().copy(
+                    color = accentColor,
+                    fontWeight = FontWeight.Bold,
+                    fontSize = style.fontSize * 1.08f
+                ))
+                builder.append(part)
+                builder.pop()
+            } else if (wordCounter in (activeWordIdx + 1)..(activeWordIdx + 2)) {
+                builder.pushStyle(style.toSpanStyle().copy(
+                    color = accentColor.copy(alpha = 0.55f),
+                    fontWeight = FontWeight.Normal
+                ))
                 builder.append(part)
                 builder.pop()
             } else {
-                builder.pushStyle(style.toSpanStyle().copy(color = textColor.copy(alpha = 0.88f), fontWeight = FontWeight.Normal))
+                builder.pushStyle(style.toSpanStyle().copy(
+                    color = textColor.copy(alpha = 0.88f),
+                    fontWeight = FontWeight.Normal
+                ))
                 builder.append(part)
                 builder.pop()
             }
             wordCounter++
-            if (index < originalWords.lastIndex) {
-                builder.append(" ")
-            }
+            if (index < originalWords.lastIndex) builder.append(" ")
         }
         builder.toAnnotatedString()
     }
-    
+
     Text(
         text = annotatedString,
         style = style,

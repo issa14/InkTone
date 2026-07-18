@@ -7,6 +7,8 @@ import androidx.compose.foundation.*
 import androidx.compose.foundation.gestures.detectTapGestures
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.PlayArrow
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
@@ -218,6 +220,30 @@ fun ReaderScreen(
                     .windowInsetsPadding(WindowInsets.systemBars.only(WindowInsetsSides.Bottom))
                     .padding(bottom = 8.dp)
             )
+        }
+
+        // ── FAB Lecture flottant (HUD masqué, pas de TTS) ──
+        AnimatedVisibility(
+            visible = !state.isHudVisible && !state.isPlaying && chapter != null,
+            enter = fadeIn(tween(reducedMotionDuration(300))) + scaleIn(tween(reducedMotionDuration(300)), initialScale = 0.8f),
+            exit = fadeOut(tween(reducedMotionDuration(200))) + scaleOut(tween(reducedMotionDuration(200)), targetScale = 0.8f),
+            modifier = Modifier
+                .align(Alignment.BottomEnd)
+                .padding(end = 20.dp, bottom = 20.dp)
+                .windowInsetsPadding(WindowInsets.systemBars.only(WindowInsetsSides.Bottom))
+        ) {
+            FloatingActionButton(
+                onClick = { viewModel.play() },
+                containerColor = accentColor.copy(alpha = 0.85f),
+                contentColor = Color.White,
+                shape = RoundedCornerShape(18.dp)
+            ) {
+                Icon(
+                    Icons.Default.PlayArrow,
+                    contentDescription = "Lire",
+                    modifier = Modifier.size(28.dp)
+                )
+            }
         }
 
         // ── TopBar (overlay) ─────────────────────────
