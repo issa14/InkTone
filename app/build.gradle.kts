@@ -72,6 +72,13 @@ android {
         }
     }
 
+    // Désactiver la validation ART profile (baseline-prof.txt corrompu par une dépendance)
+    tasks.configureEach {
+        if (name.contains("expandRelease") && name.contains("ArtProfileWildcards")) {
+            enabled = false
+        }
+    }
+
     compileOptions {
         sourceCompatibility = JavaVersion.VERSION_17
         targetCompatibility = JavaVersion.VERSION_17
