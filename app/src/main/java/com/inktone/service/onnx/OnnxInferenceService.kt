@@ -28,12 +28,13 @@ class OnnxInferenceService @Inject constructor(
 ) {
     companion object {
         private const val TAG = "OnnxInference"
-        private const val ASSET_DIR = "models/vits-piper-fr_FR-miro-high"
-        private const val ONNX_FILE  = "fr_FR-miro-high.onnx"
+        private const val ASSET_DIR_UPMC = "models/vits-piper-fr_FR-upmc"
+        private const val ONNX_FILE_UPMC  = "fr_FR-upmc.onnx"
+        private const val ASSET_DIR_MIRO = "models/vits-piper-fr_FR-miro-high"
+        private const val ONNX_FILE_MIRO  = "fr_FR-miro-high.onnx"
         private const val TOKENS_TXT = "tokens.txt"
 
         // Patterns compilés une seule fois (thread-safe, immuables)
-        // Évite la compilation coûteuse de Regex à chaque appel synthesize()
         private val MULTIPLE_PUNCT_SPACES = Regex("([.!?])\\s+\\1\\s+\\1")
         private val REPEATED_PUNCT = Regex("([.!?])\\1{2,}")
         private val MULTIPLE_SPACES = Regex("\\s+")
@@ -45,15 +46,16 @@ class OnnxInferenceService @Inject constructor(
     @Volatile var isInitialized: Boolean = false
         private set
 
-    /** true pendant l'initialisation (évite les double-init concurrents). */
+    /** true pendant l'initialisation. */
     @Volatile private var isInitializing: Boolean = false
 
     /** Mutex pour sérialiser l'initialisation. */
     private val initMutex = Mutex()
 
-    /** Piper VITS : modèle mono-locuteur français. */
+    /** Voix disponibles. UPMC (Jessica + Pierre) est le modèle par défaut. */
     enum class Voice(val sid: Int, val label: String) {
-        MIRO(0, "Miro (FR high)"),
+        JESSICA(0, "Jessica (FR)"),
+        PIERRE(1, "Pierre (FR)"),
     }
 
     // ── Paramètres prosodiques ajustables ──────────────────────
@@ -98,15 +100,23 @@ class OnnxInferenceService @Inject constructor(
     }
 
     private fun doInitialize() {
+        // Déterminer quel modèle utiliser (UPMC par défaut, fallback Miro)
+        val (assetDir, onnxFile) = if (isModelAvailable(ASSET_DIR_UPMC, ONNX_FILE_UPMC)) {
+            ASSET_DIR_UPMC to ONNX_FILE_UPMC
+        } else {
+            Log.w(TAG, "Modèle UPMC introuvable, fallback vers Miro")
+            ASSET_DIR_MIRO to ONNX_FILE_MIRO
+        }
+
         try {
             // 1. Vérification d'intégrité du modèle ONNX
-            if (!isModelAvailable()) {
-                throw IllegalStateException("Le fichier modèle $ASSET_DIR/$ONNX_FILE est introuvable ou corrompu.")
+            if (!isModelAvailable(assetDir, onnxFile)) {
+                throw IllegalStateException("Le fichier modèle $assetDir/$onnxFile est introuvable ou corrompu.")
             }
             
             // 2. Vérification d'intégrité du fichier de tokens
             try {
-                context.assets.open("$ASSET_DIR/$TOKENS_TXT").use { input ->
+                context.assets.open("$assetDir/$TOKENS_TXT").use { input ->
                     if (input.available() <= 0) {
                         throw IllegalStateException("Le fichier de tokens $TOKENS_TXT est vide.")
                     }
@@ -118,8 +128,8 @@ class OnnxInferenceService @Inject constructor(
             val dataDir = copyEspeakDataToInternal()
 
             val vitsConfig = OfflineTtsVitsModelConfig(
-                model    = "$ASSET_DIR/$ONNX_FILE",
-                tokens   = "$ASSET_DIR/$TOKENS_TXT",
+                model    = "$assetDir/$onnxFile",
+                tokens   = "$assetDir/$TOKENS_TXT",
                 dataDir  = dataDir,
                 lexicon  = "",
                 dictDir  = "",
@@ -136,9 +146,9 @@ class OnnxInferenceService @Inject constructor(
             }
             val config = OfflineTtsConfig(modelConfig, "", "", 1, 1.0f)
 
-            Log.i(TAG, "Tentative d'initialisation du moteur natif OfflineTts...")
+            Log.i(TAG, "Initialisation du moteur TTS ($assetDir)...")
             tts = OfflineTts(context.assets, config)
-            Log.i(TAG, "Piper VITS OK — ${tts!!.numSpeakers()} locuteur, ${tts!!.sampleRate()} Hz")
+            Log.i(TAG, "TTS OK — ${tts!!.numSpeakers()} locuteur(s), ${tts!!.sampleRate()} Hz, modèle: $assetDir")
         } catch (t: Throwable) {
             Log.e(TAG, "Erreur fatale lors de l'initialisation du moteur natif Sherpa-ONNX", t)
             tts = null
@@ -153,7 +163,7 @@ class OnnxInferenceService @Inject constructor(
      */
     suspend fun synthesize(
         text: String,
-        voice: Voice = Voice.MIRO,
+        voice: Voice = Voice.JESSICA,
         speed: Float = 1.0f
     ): SynthesisResult = withContext(Dispatchers.IO) {
         val engine = tts
@@ -200,9 +210,9 @@ class OnnxInferenceService @Inject constructor(
 
     fun getSampleRate(): Int = tts?.sampleRate() ?: 22050
 
-    fun isModelAvailable(): Boolean {
+    private fun isModelAvailable(dir: String, file: String): Boolean {
         return try {
-            context.assets.open("$ASSET_DIR/$ONNX_FILE").use { true }
+            context.assets.open("$dir/$file").use { true }
         } catch (_: Exception) { false }
     }
 
@@ -228,7 +238,8 @@ class OnnxInferenceService @Inject constructor(
             return target.absolutePath
         Log.i(TAG, "Copie espeak-ng-data → ${target.absolutePath}")
         target.mkdirs()
-        copyAssetDir("$ASSET_DIR/espeak-ng-data", target)
+        // Utiliser les données eSpeak du modèle Miro (compatibles UPMC, même langue)
+        copyAssetDir("$ASSET_DIR_MIRO/espeak-ng-data", target)
         return target.absolutePath
     }
 
