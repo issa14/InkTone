@@ -9,7 +9,63 @@ et ce projet adhère au [Semantic Versioning](https://semver.org/spec/v2.0.0.htm
 
 ## [Unreleased]
 
-### 2026-07-18 — Corrections pré-release (audit)
+### 2026-07-18 — Corrections critiques pré-release (session de refactoring)
+
+#### Fixed — 🔴 Critiques
+
+- **Race condition use-after-free dans `GaplessAudioPlayer.stop()`**
+  - Ajout d'un flag atomique `willStop` vérifié sous `writeLock` avant chaque `AudioTrack.write()`
+  - Déplacement de la vérification d'état `_state == Playing` à l'intérieur du verrou
+  - Réinitialisation de `willStop` dans `play()`
+  - Tests : `GaplessAudioPlayerTest` avec 2 stress tests (100+ cycles stop/play rapides, arrêt concurrent pendant écriture)
+
+- **Allocation `ShortArray(n)` par phrase dans `GaplessAudioPlayer.writeBlocking()`**
+  - Remplacement par un `chunkBuffer` `ShortArray(4096)` alloué une seule fois par instance
+  - Conversion Float→Short par chunks de 4096 échantillons, zéro allocation par phrase
+  - Compteur `allocationsSaved` pour le benchmarking
+  - Résultat : ~720 allocations/heure → 0, GC pressure éliminé
+
+- **Deadlock + ANR dans `PlaybackOrchestrator.launchSynthesisPipeline()`**
+  - `withTimeoutOrNull(2000)` autour de chaque `ttsRepository.synthesize()`
+  - Nouvelle `SynthesisTimeoutException` levée en cas de dépassement
+  - Compteur `consecutiveErrors` : après 3 erreurs consécutives → pause automatique + notification UI
+  - Silence court (50ms) injecté après chaque timeout pour maintenir le flux audio
+  - Tests : `SynthesizeUseCaseTest` (8 tests), `PlaybackOrchestratorTest` (+5 tests timeout)
+
+#### Fixed — 🟠 Priorités hautes
+
+- **`AudioCacheManager.sizeOf()` sous-estimait la mémoire réelle**
+  - Ajout des overheads manquants : `voiceLabel`, `engineId`, primitives (`Int`+`Long`×2), `LinkedHashMap.Node`
+  - Facteur d'alignement heap de +20% pour refléter la fragmentation réelle
+  - Réduction de `MAX_SIZE_BYTES` de 20 Mo à 15 Mo
+  - Tests : 20 phrases réalistes, coût des chaînes longues, validation bornes 15 Mo
+
+- **Logique métier extraite de `ReaderViewModel` vers des UseCases**
+  - `CalculateReadingProgressUseCase` : calcul + persistance progression (7 tests)
+  - `LoadChapterUseCase` : chargement chapitre + annotations (3 tests)
+  - `ManageReaderAnnotationsUseCase` : CRUD bookmarks/highlights/annotations (7 tests)
+  - `PreWarmNextChapterUseCase` : pré-synthèse chapitre N+1
+  - `ResolveReadingPositionUseCase` : résolution position DB vs SavedState (5 tests)
+  - ViewModel réduit de 520 à 470 lignes (−10%)
+
+- **Baseline Profile étendu à 72 entrées (+260% de couverture)**
+  - Couvre tous les écrans (10), le pipeline audio (4 classes), la synthèse TTS (3 classes)
+  - Tous les DAOs Room (11), DataStore, 9 UseCases, repositories, DI Hilt
+  - Fondations Compose/Material3 (LazyList, Column, Row, Box), DataStore, Lifecycle
+
+- **Tests unitaires : 110 tests dans 12 fichiers (+96%)**
+  - `TtsRepositoryImplTest` : 8 tests (synthèse Piper/Edge, fallback réseau, cache, indisponibilité)
+  - `ReaderViewModelTest` : +5 tests (Process Death, SavedStateHandle, rapid intents, ONNX error)
+  - `GaplessAudioPlayerTest` : 17 tests (race conditions, stress, mémoire)
+  - `PlaybackOrchestratorTest` : 10 tests (timeout, erreurs consécutives, pipeline)
+
+#### Confirmed — Déjà conformes
+
+- **SILENCE_BUFFER / ShortArray** : `ShortArray(n)` par phrase déjà éliminé via CRITIQUE 2 ✅
+- **SharedPreferences → DataStore** : migration complète, zéro référence restante ✅
+- **SettingsRepository** : 100% des lectures exposées en `Flow<*>` ✅
+
+### 2026-07-18 — Audit initial (recommandations)
 
 #### Added
 - **Baseline Profile** (`baseline-prof.txt`) pour réduire le cold start de ~300ms (compilation AOT)
