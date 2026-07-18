@@ -1,32 +1,129 @@
-# ReadFlow — Baseline Profile (Cold Start Optimization)
-# Généré manuellement pour le premier écran critique (LibraryScreen).
-# À régénérer avec l'outil Macrobenchmark BaselineProfileGenerator pour
-# une couverture plus complète (navigation → ReaderScreen, démarrage TTS).
+# ===================================================================
+# ReadFlow — Baseline Profile v2 (Cold Start + Warm Start Hotspots)
+# ===================================================================
+# Couvre tous les écrans critiques, le pipeline audio, la navigation,
+# la persistance (Room + DataStore), les UseCases et le DI (Hilt).
+#
+# Pour régénérer automatiquement (recommandé avant release) :
+#   1. Ajouter le module :benchmark avec androidx.benchmark:benchmark-macro
+#   2. Lancer : adb shell cmd package compile -m speed-profile -f com.readflow.debug
+#   3. Mesurer : adb shell cmd startop record-trace --app com.readflow.debug
+#   4. Copier le profil généré depuis /data/misc/profman/
+#
+# Cible cold start : < 300ms (actuel ~400ms, voir COLD_START_AUDIT.md)
+# ===================================================================
 
-# ── LibraryScreen — Premier écran affiché ──
-HSPLcom/readflow/ui/screen/library/LibraryScreenKt
-HSPLcom/readflow/ui/screen/library/LibraryViewModel
-HSPLcom/readflow/ui/navigation/ReadFlowNavGraphKt
-HSPLcom/readflow/ui/theme/ThemeKt
-HSPLcom/readflow/ui/theme/ColorKt
-HSPLcom/readflow/data/settings/SettingsRepository
-HSPLcom/readflow/data/database/ReadFlowDatabase
-HSPLcom/readflow/data/database/BookDao
+# ── Bootstrap : Application + Hilt ─────────────────────────
+HSPLcom/readflow/ReadFlowApplication
 HSPLcom/readflow/di/AppModule
+HSPLdagger/hilt/android/internal/managers/ActivityComponentManager
 
-# ── Compose / Material3 ──
-HSPLandroidx/compose/material3/MaterialThemeKt
-HSPLandroidx/compose/material3/ColorSchemeKt
+# ── Navigation (premier frame critique) ────────────────────
+HSPLcom/readflow/ui/navigation/ReadFlowNavGraphKt
 HSPLandroidx/navigation/compose/NavHostKt
 
-# ── Coroutines ──
+# ── LibraryScreen — Premier écran affiché ──────────────────
+HSPLcom/readflow/ui/screen/library/LibraryScreenKt
+HSPLcom/readflow/ui/screen/library/LibraryViewModel
+HSPLcom/readflow/ui/screen/library/FilesScreenKt
+HSPLcom/readflow/data/repository/BookRepositoryImpl
+
+# ── ReaderScreen — Écran principal de lecture (warm start) ─
+HSPLcom/readflow/ui/screen/reader/ReaderScreenKt
+HSPLcom/readflow/ui/screen/reader/ReaderViewModel
+
+# ── Autres écrans (navigation secondaire) ──────────────────
+HSPLcom/readflow/ui/screen/settings/SettingsScreenKt
+HSPLcom/readflow/ui/screen/settings/SettingsViewModel
+HSPLcom/readflow/ui/screen/stats/StatsScreenKt
+HSPLcom/readflow/ui/screen/stats/StatsViewModel
+HSPLcom/readflow/ui/screen/sync/SyncSettingsScreenKt
+HSPLcom/readflow/ui/screen/sync/SyncSettingsViewModel
+HSPLcom/readflow/ui/screen/search/SearchScreenKt
+HSPLcom/readflow/ui/screen/search/SearchViewModel
+HSPLcom/readflow/ui/screen/bookmark/BookmarkScreenKt
+HSPLcom/readflow/ui/screen/bookmark/BookmarkViewModel
+HSPLcom/readflow/ui/screen/opds/OpdsScreenKt
+HSPLcom/readflow/ui/screen/opds/OpdsViewModel
+HSPLcom/readflow/ui/screen/about/AboutScreenKt
+
+# ── Theme / Couleurs / Typographie ─────────────────────────
+HSPLcom/readflow/ui/theme/ThemeKt
+HSPLcom/readflow/ui/theme/ColorKt
+HSPLcom/readflow/ui/theme/TypeKt
+
+# ── Pipeline Audio (critique pour la lecture) ──────────────
+HSPLcom/readflow/service/audio/PlaybackOrchestrator
+HSPLcom/readflow/service/audio/GaplessAudioPlayer
+HSPLcom/readflow/service/audio/AudioCacheManager
+HSPLcom/readflow/service/audio/AudioFocusManager
+
+# ── Synthèse TTS (ONNX + Edge) ─────────────────────────────
+HSPLcom/readflow/service/onnx/OnnxInferenceService
+HSPLcom/readflow/service/edge/EdgeTtsClient
+HSPLcom/readflow/data/repository/TtsRepositoryImpl
+
+# ── Persistance : Room Database ────────────────────────────
+HSPLcom/readflow/data/database/ReadFlowDatabase
+HSPLcom/readflow/data/database/BookDao
+HSPLcom/readflow/data/database/ReadingProgressDao
+HSPLcom/readflow/data/database/BookmarkDao
+HSPLcom/readflow/data/database/HighlightDao
+HSPLcom/readflow/data/database/AnnotationDao
+HSPLcom/readflow/data/database/PronunciationRuleDao
+HSPLcom/readflow/data/database/SentenceCacheDao
+HSPLcom/readflow/data/database/BookProgressDao
+HSPLcom/readflow/data/database/RecentBookDao
+HSPLcom/readflow/data/database/SearchDao
+
+# ── Persistance : DataStore (Settings) ─────────────────────
+HSPLcom/readflow/data/settings/SettingsRepository
+
+# ── UseCases (logique métier critique) ─────────────────────
+HSPLcom/readflow/domain/usecase/SynthesizeUseCase
+HSPLcom/readflow/domain/usecase/CalculateReadingProgressUseCase
+HSPLcom/readflow/domain/usecase/LoadChapterUseCase
+HSPLcom/readflow/domain/usecase/ChunkTextUseCase
+HSPLcom/readflow/domain/usecase/FrenchSentenceSplitter
+HSPLcom/readflow/domain/usecase/ParseEpubUseCase
+HSPLcom/readflow/domain/usecase/ManageReaderAnnotationsUseCase
+HSPLcom/readflow/domain/usecase/PreWarmNextChapterUseCase
+HSPLcom/readflow/domain/usecase/ResolveReadingPositionUseCase
+
+# ── Repositories (interfaces domaine) ──────────────────────
+HSPLcom/readflow/domain/repository/BookRepository
+HSPLcom/readflow/domain/repository/TtsRepository
+
+# ── Compose / Material3 (framework) ────────────────────────
+HSPLandroidx/compose/material3/MaterialThemeKt
+HSPLandroidx/compose/material3/ColorSchemeKt
+HSPLandroidx/compose/foundation/lazy/LazyListKt
+HSPLandroidx/compose/foundation/layout/ColumnKt
+HSPLandroidx/compose/foundation/layout/RowKt
+HSPLandroidx/compose/foundation/layout/BoxKt
+
+# ── Coroutines ─────────────────────────────────────────────
 HSPLkotlinx/coroutines/BuildersKt
 HSPLkotlinx/coroutines/intrinsics/UndispatchedKt
 
-# ── Hilt ──
-HSPLdagger/hilt/android/internal/managers/ActivityComponentManager
-HSPLcom/readflow/ReadFlowApplication
-
-# ── Room ──
+# ── Room (framework) ───────────────────────────────────────
 HSPLandroidx/room/RoomDatabase
 HSPLandroidx/sqlite/db/framework/FrameworkSQLiteOpenHelperFactory
+
+# ── DataStore (framework) ──────────────────────────────────
+HSPLandroidx/datastore/preferences/PreferencesDataStore
+HSPLandroidx/datastore/core/SingleProcessDataStore
+
+# ── Lifecycle / ViewModel ──────────────────────────────────
+HSPLandroidx/lifecycle/ViewModelProvider
+HSPLandroidx/lifecycle/SavedStateHandle
+
+# ===================================================================
+# Total : ~70 entrées HSPL (vs ~20 précédemment, +250% de couverture)
+#
+# Prochaines étapes (nécessite un device physique) :
+#   1. ./gradlew :benchmark:connectedCheck
+#   2. adb shell cmd package compile -m speed-profile -f com.readflow
+#   3. Mesurer cold start : adb shell am start -W com.readflow/.MainActivity
+#   4. Valider < 300ms sur Snapdragon 680
+# ===================================================================
