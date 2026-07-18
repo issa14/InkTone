@@ -152,11 +152,11 @@ class PlaybackOrchestrator @Inject constructor(
     /**
      * Channel de préchauffage pour les phrases du chapitre suivant.
      *
+     * Recréé à chaque nouvel appel à [play] pour éviter les channels fermés.
      * Le ViewModel peut y pousser des résultats de synthèse pré-calculés
      * (pre-warm) qui seront consommés après l'épuisement du buffer principal.
-     * Cela permet un enchaînement inter-chapitre sans gap.
      */
-    private val preWarmChannel = Channel<SynthesisResult>(Channel.UNLIMITED)
+    private var preWarmChannel = Channel<SynthesisResult>(Channel.UNLIMITED)
 
     init {
         audioFocusManager.setListener(this)
@@ -369,8 +369,9 @@ class PlaybackOrchestrator @Inject constructor(
         try {
             currentJob?.cancel()
             currentJob = null
-            // Vider le channel de préchauffage
+            // Fermer et recréer le channel de préchauffage
             preWarmChannel.cancel()
+            preWarmChannel = Channel(Channel.UNLIMITED)
             player.stop()
             audioFocusManager.abandonFocus()
             _state.value = State.Idle
@@ -449,6 +450,7 @@ class PlaybackOrchestrator @Inject constructor(
         buffer: Channel<SynthesisResult>, sentences: List<Sentence>,
         voice: Int, speed: Float, startFrom: Int, total: Int
     ) = launch {
+        Log.d(TAG, "TtsDebug | launchSynthesisPipeline START: ${sentences.size} phrases, startFrom=$startFrom, total=$total, voice=$voice, speed=$speed")
         try {
             for (i in 0 until sentences.size) {
                 // Vérification proactive d'annulation avant chaque itération
@@ -483,6 +485,7 @@ class PlaybackOrchestrator @Inject constructor(
             }
         } finally {
             buffer.close()
+            Log.d(TAG, "TtsDebug | launchSynthesisPipeline END: buffer closed, ${sentences.size} phrases traitées")
         }
     }
 
@@ -492,6 +495,7 @@ class PlaybackOrchestrator @Inject constructor(
         bookTitle: String, chapterTitle: String, bookId: String, chapterIndex: Int,
         myGeneration: Long
     ) {
+        Log.d(TAG, "TtsDebug | consumeAndPlay START: startFrom=$startFrom, total=$total, state=${_state.value}")
         var started = false
         var currentReadIdx = startFrom
 
