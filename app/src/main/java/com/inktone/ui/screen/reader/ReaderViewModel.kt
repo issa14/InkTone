@@ -79,6 +79,10 @@ class ReaderViewModel @Inject constructor(
     private val resolvePosition: ResolveReadingPositionUseCase
 ) : ViewModel() {
 
+    companion object {
+        private const val TAG = "ReaderVM"
+    }
+
     private val _uiState = MutableStateFlow(ReaderUiState())
     val uiState: StateFlow<ReaderUiState> = _uiState.asStateFlow()
 
@@ -355,26 +359,41 @@ class ReaderViewModel @Inject constructor(
     }
 
     fun play() {
+        Log.d(TAG, "DEBUG play() called, isPausedForResume=$isPausedForResume")
         // Reprise après pause : pas de destruction/reconstruction, reprise instantanée
         if (isPausedForResume) {
+            Log.d(TAG, "DEBUG play() → resume path")
             isPausedForResume = false
             orchestrator.resume()
             _uiState.update { it.copy(isPlaying = true) }
             return
         }
 
-        val chapter = _uiState.value.currentChapter ?: return
-        val book = currentBook ?: return
+        val chapter = _uiState.value.currentChapter
+        if (chapter == null) {
+            Log.w(TAG, "DEBUG play() → ABORT: currentChapter is null")
+            return
+        }
+        val book = currentBook
+        if (book == null) {
+            Log.w(TAG, "DEBUG play() → ABORT: currentBook is null")
+            return
+        }
+        Log.d(TAG, "DEBUG play() book=${book.title}, chapter=${chapter.title}, sentences=${chapter.sentences.size}")
         if (!audioServiceLauncher.canStart()) {
+            Log.w(TAG, "DEBUG play() → ABORT: canStart()=false (notification permission)")
             _uiState.update { it.copy(error = "Permission notification requise.") }
             return
         }
+        Log.d(TAG, "DEBUG play() → canStart OK, starting service...")
         audioServiceLauncher.start()
+        Log.d(TAG, "DEBUG play() → service started, calling orchestrator.play()...")
         val s = _uiState.value
         orchestrator.play(
             chapter.sentences, voice = s.voice, speed = s.speed, startFrom = 0,
             bookTitle = book.title, chapterTitle = chapter.title, bookId = book.id, chapterIndex = s.currentChapterIndex
         )
+        Log.d(TAG, "DEBUG play() → orchestrator.play() done")
         _uiState.update { it.copy(isPlaying = true) }
     }
 
