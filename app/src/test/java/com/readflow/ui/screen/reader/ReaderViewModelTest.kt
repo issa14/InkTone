@@ -14,6 +14,8 @@ import com.readflow.domain.model.Sentence
 import com.readflow.domain.repository.BookRepository
 import com.readflow.domain.repository.TtsRepository
 import com.readflow.domain.service.AudioServiceLauncher
+import com.readflow.domain.usecase.CalculateReadingProgressUseCase
+import com.readflow.domain.usecase.LoadChapterUseCase
 import com.readflow.service.audio.PlaybackOrchestrator
 import com.readflow.service.audio.PlaybackState
 import com.readflow.service.audio.PlaybackStatus
@@ -53,6 +55,8 @@ class ReaderViewModelTest {
     private val annotationDao = mockk<AnnotationDao>(relaxed = true)
     private val audioServiceLauncher = mockk<AudioServiceLauncher>(relaxed = true)
     private val ttsRepository = mockk<TtsRepository>(relaxed = true)
+    private val calculateProgress = mockk<CalculateReadingProgressUseCase>(relaxed = true)
+    private val loadChapterUseCase = mockk<LoadChapterUseCase>(relaxed = true)
 
     private lateinit var viewModel: ReaderViewModel
 
@@ -116,7 +120,9 @@ class ReaderViewModelTest {
             highlightDao = highlightDao,
             annotationDao = annotationDao,
             audioServiceLauncher = audioServiceLauncher,
-            ttsRepository = ttsRepository
+            ttsRepository = ttsRepository,
+            calculateProgress = calculateProgress,
+            loadChapterUseCase = loadChapterUseCase
         )
     }
 

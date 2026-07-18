@@ -8,6 +8,8 @@ import com.readflow.domain.model.Book
 import com.readflow.domain.model.Chapter
 import com.readflow.domain.repository.BookRepository
 import com.readflow.domain.repository.TtsRepository
+import com.readflow.domain.usecase.CalculateReadingProgressUseCase
+import com.readflow.domain.usecase.LoadChapterUseCase
 import com.readflow.data.database.AnnotationDao
 import com.readflow.data.database.BookmarkDao
 import com.readflow.data.database.HighlightDao
@@ -66,7 +68,9 @@ class ReaderViewModel @Inject constructor(
     private val highlightDao: HighlightDao,
     private val annotationDao: AnnotationDao,
     private val audioServiceLauncher: com.readflow.domain.service.AudioServiceLauncher,
-    private val ttsRepository: TtsRepository
+    private val ttsRepository: TtsRepository,
+    private val calculateProgress: CalculateReadingProgressUseCase,
+    private val loadChapterUseCase: LoadChapterUseCase
 ) : ViewModel() {
 
     private val _uiState = MutableStateFlow(ReaderUiState())
@@ -220,21 +224,15 @@ class ReaderViewModel @Inject constructor(
                 // Persister la position pour Process Death
                 savedState["sentenceIndex"] = pbs.activeSentenceIndex
 
-                // Mettre à jour ProgressEntity de la bibliothèque en arrière-plan
+                // Persister la progression via UseCase (logique métier extraite)
                 val book = currentBook
                 if (book != null) {
-                    val chapterIdx = _uiState.value.currentChapterIndex
-                    val totalSent = pbs.totalSentences.coerceAtLeast(1)
-                    val fraction = (chapterIdx.toFloat() + pbs.activeSentenceIndex.toFloat() / totalSent) / book.totalChapters.coerceAtLeast(1)
-                    
                     try {
-                        bookRepository.saveProgress(
-                            com.readflow.domain.model.Progress(
-                                bookId = book.id,
-                                currentChapterIndex = chapterIdx,
-                                currentSentenceIndex = pbs.activeSentenceIndex,
-                                totalProgressFraction = fraction.coerceIn(0f, 1f)
-                            )
+                        calculateProgress(
+                            book = book,
+                            chapterIndex = _uiState.value.currentChapterIndex,
+                            sentenceIndex = pbs.activeSentenceIndex,
+                            totalSentences = pbs.totalSentences
                         )
                     } catch (e: Exception) {
                         Log.e("ReaderVM", "Error saving progress: ${e.message}", e)
@@ -289,14 +287,12 @@ class ReaderViewModel @Inject constructor(
         viewModelScope.launch {
             _uiState.update { it.copy(isLoading = true, isLoadingChapter = true, error = null) }
             try {
-                val chapter = bookRepository.getChapter(book.id, index)
-                val highlights = highlightDao.getHighlightsForChapter(book.id, index).first()
-                val bookmarks = bookmarkDao.getBookmarks(book.id).first()
+                val result = loadChapterUseCase(book.id, index)
                 _uiState.update {
                     it.copy(
-                        currentChapterIndex = index, currentChapter = chapter,
-                        totalSentences = chapter.sentences.size, currentSentenceIndex = sentenceIndex,
-                        highlights = highlights, bookmarks = bookmarks,
+                        currentChapterIndex = index, currentChapter = result.chapter,
+                        totalSentences = result.chapter.sentences.size, currentSentenceIndex = sentenceIndex,
+                        highlights = result.highlights, bookmarks = result.bookmarks,
                         isLoading = false, isLoadingChapter = false
                     )
                 }
