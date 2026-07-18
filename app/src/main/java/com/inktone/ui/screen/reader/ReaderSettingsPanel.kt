@@ -80,8 +80,8 @@ fun ReaderSettingsPanel(
             ThemeOptionItem(
                 label = "Clair",
                 isSelected = currentTheme == ReaderTheme.DAY,
-                bgCol = Color(0xFFFAFAFA),
-                textCol = Color(0xFF1A1A1A),
+                bgCol = MaterialTheme.colorScheme.surface,
+                textCol = MaterialTheme.colorScheme.onSurface,
                 borderColor = if (currentTheme == ReaderTheme.DAY) accentColor else Color.Transparent,
                 onClick = { onThemeChange(ReaderTheme.DAY) },
                 modifier = Modifier.weight(1f)
@@ -101,7 +101,7 @@ fun ReaderSettingsPanel(
                 label = "Sombre",
                 isSelected = currentTheme == ReaderTheme.NIGHT,
                 bgCol = Color(0xFF000000),
-                textCol = Color(0xFFFAFAFA),
+                textCol = MaterialTheme.colorScheme.surface,
                 borderColor = if (currentTheme == ReaderTheme.NIGHT) accentColor else Color.Transparent,
                 onClick = { onThemeChange(ReaderTheme.NIGHT) },
                 modifier = Modifier.weight(1f)
@@ -170,7 +170,7 @@ fun ReaderSettingsPanel(
         ) {
             Icon(
                 Icons.Default.FormatSize,
-                contentDescription = null,
+                contentDescription = "Taille de police",
                 tint = textColor.copy(alpha = 0.5f),
                 modifier = Modifier.size(20.dp)
             )
@@ -214,7 +214,7 @@ fun ReaderSettingsPanel(
         ) {
             Icon(
                 Icons.Default.FormatLineSpacing,
-                contentDescription = null,
+                contentDescription = "Espacement des lignes",
                 tint = textColor.copy(alpha = 0.5f),
                 modifier = Modifier.size(20.dp)
             )
@@ -257,7 +257,7 @@ fun ReaderSettingsPanel(
         ) {
             Icon(
                 Icons.Default.HorizontalDistribute,
-                contentDescription = null,
+                contentDescription = "Marges horizontales",
                 tint = textColor.copy(alpha = 0.5f),
                 modifier = Modifier.size(20.dp)
             )

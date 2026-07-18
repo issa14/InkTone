@@ -86,7 +86,7 @@ private fun BookmarkItem(
             Modifier.padding(12.dp),
             verticalAlignment = Alignment.CenterVertically
         ) {
-            Icon(Icons.Default.Bookmark, null, tint = Color(0xFFFFB74D), modifier = Modifier.size(20.dp))
+            Icon(Icons.Default.Bookmark, "Signets", tint = Color(0xFFFFB74D), modifier = Modifier.size(20.dp))
             Spacer(Modifier.width(12.dp))
             Column(Modifier.weight(1f)) {
                 Text("Chapitre ${bookmark.chapterIndex + 1} · Phrase ${bookmark.sentenceIndex + 1}",

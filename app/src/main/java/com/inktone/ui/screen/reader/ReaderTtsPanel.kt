@@ -26,6 +26,7 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.inktone.data.database.entity.PronunciationRule
+import com.inktone.ui.theme.ttsActive
 
 @Composable
 fun TtsPanel(
@@ -61,7 +62,7 @@ fun TtsPanel(
         AlertDialog(
             onDismissRequest = { showAddRuleDialog = false },
             title = { Text("Nouvelle règle de prononciation", color = Color.White) },
-            containerColor = Color(0xFF2E2E2E),
+            containerColor = MaterialTheme.colorScheme.surfaceVariant,
             text = {
                 Column {
                     OutlinedTextField(
@@ -70,8 +71,8 @@ fun TtsPanel(
                         label = { Text("Texte d'origine") },
                         singleLine = true,
                         colors = OutlinedTextFieldDefaults.colors(
-                            focusedBorderColor = Color(0xFFFFB74D),
-                            focusedLabelColor = Color(0xFFFFB74D)
+                            focusedBorderColor = MaterialTheme.colorScheme.ttsActive,
+                            focusedLabelColor = MaterialTheme.colorScheme.ttsActive
                         ),
                         modifier = Modifier.fillMaxWidth()
                     )
@@ -82,8 +83,8 @@ fun TtsPanel(
                         label = { Text("Prononciation de remplacement") },
                         singleLine = true,
                         colors = OutlinedTextFieldDefaults.colors(
-                            focusedBorderColor = Color(0xFFFFB74D),
-                            focusedLabelColor = Color(0xFFFFB74D)
+                            focusedBorderColor = MaterialTheme.colorScheme.ttsActive,
+                            focusedLabelColor = MaterialTheme.colorScheme.ttsActive
                         ),
                         modifier = Modifier.fillMaxWidth()
                     )
@@ -95,10 +96,10 @@ fun TtsPanel(
                         Checkbox(
                             checked = isRegexChecked,
                             onCheckedChange = { isRegexChecked = it },
-                            colors = CheckboxDefaults.colors(checkedColor = Color(0xFFFFB74D))
+                            colors = CheckboxDefaults.colors(checkedColor = MaterialTheme.colorScheme.ttsActive)
                         )
                         Spacer(Modifier.width(8.dp))
-                        Text("Expression régulière (Regex)", color = Color.White.copy(alpha = 0.8f))
+                        Text("Expression régulière (Regex)", color = MaterialTheme.colorScheme.onSurfaceVariant)
                     }
                 }
             },
@@ -110,14 +111,14 @@ fun TtsPanel(
                         }
                         showAddRuleDialog = false
                     },
-                    colors = ButtonDefaults.buttonColors(containerColor = Color(0xFFFFB74D))
+                    colors = ButtonDefaults.buttonColors(containerColor = MaterialTheme.colorScheme.ttsActive)
                 ) {
-                    Text("Enregistrer", color = Color(0xFF0D0D0D))
+                    Text("Enregistrer", color = MaterialTheme.colorScheme.onSurface)
                 }
             },
             dismissButton = {
                 TextButton(onClick = { showAddRuleDialog = false }) {
-                    Text("Annuler", color = Color.White.copy(alpha = 0.6f))
+                    Text("Annuler", color = MaterialTheme.colorScheme.onSurfaceVariant)
                 }
             }
         )
@@ -132,11 +133,11 @@ fun TtsPanel(
         horizontalAlignment = Alignment.CenterHorizontally
     ) {
         // Titre
-        Text(chapterTitle, color = Color.White.copy(alpha = 0.7f),
+        Text(chapterTitle, color = MaterialTheme.colorScheme.onSurfaceVariant,
             style = MaterialTheme.typography.titleSmall)
         Spacer(Modifier.height(4.dp))
         Text("Phrase ${sentenceIndex + 1} / $totalSentences",
-            color = Color.White.copy(alpha = 0.35f),
+            color = MaterialTheme.colorScheme.outlineVariant,
             style = MaterialTheme.typography.labelSmall)
 
         Spacer(Modifier.height(24.dp))
@@ -148,7 +149,7 @@ fun TtsPanel(
         ) {
             IconButton(onClick = onPrevious, modifier = Modifier.size(44.dp)) {
                 Icon(Icons.Default.SkipPrevious, "Précédent",
-                    tint = Color.White.copy(alpha = 0.5f))
+                    tint = MaterialTheme.colorScheme.outlineVariant)
             }
 
             Spacer(Modifier.width(24.dp))
@@ -157,14 +158,14 @@ fun TtsPanel(
                 onClick = { if (isPlaying) onPause() else onPlay() },
                 modifier = Modifier.size(64.dp),
                 colors = IconButtonDefaults.filledIconButtonColors(
-                    containerColor = Color(0xFFFFB74D)
+                    containerColor = MaterialTheme.colorScheme.ttsActive
                 )
             ) {
                 Icon(
                     if (isPlaying) Icons.Default.Pause else Icons.Default.PlayArrow,
                     contentDescription = if (isPlaying) "Pause" else "Lire",
                     modifier = Modifier.size(32.dp),
-                    tint = Color(0xFF0D0D0D)
+                    tint = MaterialTheme.colorScheme.onSurface
                 )
             }
 
@@ -172,7 +173,7 @@ fun TtsPanel(
 
             IconButton(onClick = onNext, modifier = Modifier.size(44.dp)) {
                 Icon(Icons.Default.SkipNext, "Suivant",
-                    tint = Color.White.copy(alpha = 0.5f))
+                    tint = MaterialTheme.colorScheme.outlineVariant)
             }
         }
 
@@ -180,12 +181,12 @@ fun TtsPanel(
 
         // Stop discret
         TextButton(onClick = onStop) {
-            Text("⏹ Arrêter", color = Color.White.copy(alpha = 0.35f),
+            Text("⏹ Arrêter", color = MaterialTheme.colorScheme.outlineVariant,
                 style = MaterialTheme.typography.labelSmall)
         }
 
         Spacer(Modifier.height(16.dp))
-        HorizontalDivider(color = Color.White.copy(alpha = 0.1f))
+        HorizontalDivider(color = MaterialTheme.colorScheme.outlineVariant)
         Spacer(Modifier.height(16.dp))
 
         // Vitesse
@@ -193,7 +194,7 @@ fun TtsPanel(
             modifier = Modifier.fillMaxWidth(),
             verticalAlignment = Alignment.CenterVertically
         ) {
-            Text("Vitesse", color = Color.White.copy(alpha = 0.5f),
+            Text("Vitesse", color = MaterialTheme.colorScheme.outlineVariant,
                 style = MaterialTheme.typography.labelSmall)
             Slider(
                 value = currentSpeed,
@@ -201,12 +202,12 @@ fun TtsPanel(
                 valueRange = 0.5f..2.0f,
                 modifier = Modifier.weight(1f).padding(horizontal = 12.dp),
                 colors = SliderDefaults.colors(
-                    thumbColor = Color(0xFFFFB74D),
-                    activeTrackColor = Color(0xFFFFB74D)
+                    thumbColor = MaterialTheme.colorScheme.ttsActive,
+                    activeTrackColor = MaterialTheme.colorScheme.ttsActive
                 )
             )
             Text("${"%.1f".format(currentSpeed)}x",
-                color = Color.White.copy(alpha = 0.7f),
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
                 style = MaterialTheme.typography.labelSmall)
         }
 
@@ -217,7 +218,7 @@ fun TtsPanel(
             modifier = Modifier.fillMaxWidth(),
             verticalAlignment = Alignment.CenterVertically
         ) {
-            Text("Voix", color = Color.White.copy(alpha = 0.5f),
+            Text("Voix", color = MaterialTheme.colorScheme.outlineVariant,
                 style = MaterialTheme.typography.labelSmall)
             Spacer(Modifier.width(12.dp))
             FilterChip(
@@ -225,14 +226,14 @@ fun TtsPanel(
                 onClick = { onVoiceChange(0) },
                 label = { Text("Miro FR", style = MaterialTheme.typography.labelSmall) },
                 colors = FilterChipDefaults.filterChipColors(
-                    selectedContainerColor = Color(0xFFFFB74D).copy(alpha = 0.25f),
+                    selectedContainerColor = MaterialTheme.colorScheme.ttsActive.copy(alpha = 0.25f),
                     selectedLabelColor = Color.White
                 )
             )
         }
 
         Spacer(Modifier.height(16.dp))
-        HorizontalDivider(color = Color.White.copy(alpha = 0.1f))
+        HorizontalDivider(color = MaterialTheme.colorScheme.outlineVariant)
         Spacer(Modifier.height(16.dp))
 
         // 💎 Sleep Timer (Minuteur de mise en veille)
@@ -243,13 +244,13 @@ fun TtsPanel(
             ) {
                 Icon(
                     Icons.Outlined.Timer, "Veille",
-                    tint = Color(0xFFFFB74D),
+                    tint = MaterialTheme.colorScheme.ttsActive,
                     modifier = Modifier.size(18.dp)
                 )
                 Spacer(Modifier.width(8.dp))
                 Text(
                     "Minuteur de veille",
-                    color = Color.White.copy(alpha = 0.85f),
+                    color = MaterialTheme.colorScheme.onSurface,
                     style = MaterialTheme.typography.labelLarge,
                     fontWeight = FontWeight.SemiBold
                 )
@@ -268,8 +269,8 @@ fun TtsPanel(
                             onClick = { onStartSleepTimer(min) },
                             label = { Text("$min min", style = MaterialTheme.typography.labelSmall) },
                             colors = InputChipDefaults.inputChipColors(
-                                containerColor = Color.White.copy(alpha = 0.05f),
-                                labelColor = Color.White.copy(alpha = 0.75f)
+                                containerColor = MaterialTheme.colorScheme.outlineVariant,
+                                labelColor = MaterialTheme.colorScheme.onSurfaceVariant
                             )
                         )
                     }
@@ -279,7 +280,7 @@ fun TtsPanel(
                 Row(
                     modifier = Modifier
                         .fillMaxWidth()
-                        .background(Color.White.copy(alpha = 0.05f), RoundedCornerShape(8.dp))
+                        .background(MaterialTheme.colorScheme.outlineVariant, RoundedCornerShape(8.dp))
                         .padding(horizontal = 12.dp, vertical = 10.dp),
                     verticalAlignment = Alignment.CenterVertically,
                     horizontalArrangement = Arrangement.SpaceBetween
@@ -288,7 +289,7 @@ fun TtsPanel(
                     val seconds = sleepTimerRemaining % 60
                     Text(
                         "Veille active : ${"%02d:%02d".format(minutes, seconds)}",
-                        color = Color(0xFFFFB74D),
+                        color = MaterialTheme.colorScheme.ttsActive,
                         style = MaterialTheme.typography.bodyMedium,
                         fontWeight = FontWeight.Medium
                     )
@@ -298,7 +299,7 @@ fun TtsPanel(
                     ) {
                         Icon(
                             Icons.Outlined.Close, "Annuler",
-                            tint = Color.White.copy(alpha = 0.6f),
+                            tint = MaterialTheme.colorScheme.onSurfaceVariant,
                             modifier = Modifier.size(16.dp)
                         )
                     }
@@ -307,7 +308,7 @@ fun TtsPanel(
         }
 
         Spacer(Modifier.height(16.dp))
-        HorizontalDivider(color = Color.White.copy(alpha = 0.1f))
+        HorizontalDivider(color = MaterialTheme.colorScheme.outlineVariant)
         Spacer(Modifier.height(16.dp))
 
         // 💎 Custom Pronunciation Dictionary
@@ -323,13 +324,13 @@ fun TtsPanel(
                 ) {
                     Icon(
                         Icons.Outlined.RecordVoiceOver, "Dictionnaire",
-                        tint = Color(0xFFFFB74D),
+                        tint = MaterialTheme.colorScheme.ttsActive,
                         modifier = Modifier.size(18.dp)
                     )
                     Spacer(Modifier.width(8.dp))
                     Text(
                         "Dictionnaire phonétique (${pronunciationRules.size})",
-                        color = Color.White.copy(alpha = 0.85f),
+                        color = MaterialTheme.colorScheme.onSurface,
                         style = MaterialTheme.typography.labelLarge,
                         fontWeight = FontWeight.SemiBold
                     )
@@ -341,7 +342,7 @@ fun TtsPanel(
                 ) {
                     Icon(
                         Icons.Outlined.Add, "Ajouter",
-                        tint = Color(0xFFFFB74D),
+                        tint = MaterialTheme.colorScheme.ttsActive,
                         modifier = Modifier.size(20.dp)
                     )
                 }
@@ -352,7 +353,7 @@ fun TtsPanel(
                 if (pronunciationRules.isEmpty()) {
                     Text(
                         "Aucune règle personnalisée. Corrigez la prononciation des mots en cliquant sur +.",
-                        color = Color.White.copy(alpha = 0.4f),
+                        color = MaterialTheme.colorScheme.outlineVariant,
                         style = MaterialTheme.typography.labelSmall
                     )
                 } else {
@@ -363,7 +364,7 @@ fun TtsPanel(
                             Row(
                                 modifier = Modifier
                                     .fillMaxWidth()
-                                    .background(Color.White.copy(alpha = 0.03f), RoundedCornerShape(8.dp))
+                                    .background(MaterialTheme.colorScheme.outlineVariant, RoundedCornerShape(8.dp))
                                     .padding(horizontal = 10.dp, vertical = 8.dp),
                                 verticalAlignment = Alignment.CenterVertically,
                                 horizontalArrangement = Arrangement.SpaceBetween
@@ -372,7 +373,7 @@ fun TtsPanel(
                                     Row(verticalAlignment = Alignment.CenterVertically) {
                                         Text(
                                             rule.pattern,
-                                            color = Color.White.copy(alpha = 0.85f),
+                                            color = MaterialTheme.colorScheme.onSurface,
                                             fontWeight = FontWeight.Medium,
                                             style = MaterialTheme.typography.bodyMedium
                                         )
@@ -380,17 +381,17 @@ fun TtsPanel(
                                             Spacer(Modifier.width(6.dp))
                                             Text(
                                                 "regex",
-                                                color = Color(0xFFFFB74D),
+                                                color = MaterialTheme.colorScheme.ttsActive,
                                                 fontSize = 9.sp,
                                                 modifier = Modifier
-                                                    .background(Color(0xFFFFB74D).copy(alpha = 0.15f), RoundedCornerShape(2.dp))
+                                                    .background(MaterialTheme.colorScheme.ttsActive.copy(alpha = 0.15f), RoundedCornerShape(2.dp))
                                                     .padding(horizontal = 4.dp, vertical = 1.dp)
                                             )
                                         }
                                     }
                                     Text(
                                         "➔ ${rule.replacement}",
-                                        color = Color.White.copy(alpha = 0.5f),
+                                        color = MaterialTheme.colorScheme.outlineVariant,
                                         style = MaterialTheme.typography.labelSmall
                                     )
                                 }
@@ -400,8 +401,8 @@ fun TtsPanel(
                                         checked = rule.isActive,
                                         onCheckedChange = { onTogglePronunciationRule(rule) },
                                         colors = SwitchDefaults.colors(
-                                            checkedThumbColor = Color(0xFFFFB74D),
-                                            checkedTrackColor = Color(0xFFFFB74D).copy(alpha = 0.35f)
+                                            checkedThumbColor = MaterialTheme.colorScheme.ttsActive,
+                                            checkedTrackColor = MaterialTheme.colorScheme.ttsActive.copy(alpha = 0.35f)
                                         ),
                                         modifier = Modifier.scale(0.7f)
                                     )
@@ -411,7 +412,7 @@ fun TtsPanel(
                                     ) {
                                         Icon(
                                             Icons.Outlined.Delete, "Supprimer",
-                                            tint = Color.White.copy(alpha = 0.4f),
+                                            tint = MaterialTheme.colorScheme.outlineVariant,
                                             modifier = Modifier.size(16.dp)
                                         )
                                     }

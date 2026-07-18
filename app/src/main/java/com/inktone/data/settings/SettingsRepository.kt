@@ -16,6 +16,7 @@ enum class AppTheme(val label: String) {
     PAPIER_ART("Papier d'Art"),
     OBSIDIAN("Obsidian Noir"),
     NORDIC_FOG("Brouillard Nordique"),
+    SIGNATURE("Signature"),
     SYSTEM("Système");
 
     companion object {

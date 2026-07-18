@@ -9,6 +9,7 @@ import androidx.compose.material.icons.filled.Pause
 import androidx.compose.material.icons.filled.PlayArrow
 import androidx.compose.material.icons.outlined.Headphones
 import androidx.compose.material3.*
+import com.inktone.ui.theme.ttsActive
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -61,14 +62,14 @@ fun UnifiedControlPanel(
                 IconButton(onClick = onTtsSettingsClick) {
                     Icon(
                         Icons.Outlined.Headphones,
-                        "Options TTS", tint = Color.White.copy(alpha = 0.6f),
+                        "Options TTS", tint = MaterialTheme.colorScheme.onSurfaceVariant,
                         modifier = Modifier.size(24.dp)
                     )
                 }
                 // Thème
                 IconButton(onClick = onThemeCycle) {
                     Icon(Icons.Default.Palette, "Thème",
-                        tint = Color.White.copy(alpha = 0.6f))
+                        tint = MaterialTheme.colorScheme.onSurfaceVariant)
                 }
                 // OpenDyslexic Quick Toggle
                 IconButton(
@@ -76,14 +77,14 @@ fun UnifiedControlPanel(
                     modifier = Modifier.semantics { contentDescription = "Police OpenDyslexic" }
                 ) {
                     Text("D",
-                        color = if (useOpenDyslexic) Color(0xFFFFB74D) else Color.White.copy(alpha = 0.6f),
+                        color = if (useOpenDyslexic) MaterialTheme.colorScheme.ttsActive else MaterialTheme.colorScheme.onSurfaceVariant,
                         fontSize = 16.sp, fontWeight = FontWeight.Bold)
                 }
                 // Options d'affichage avancées
                 IconButton(onClick = onDisplaySettingsClick) {
                     Icon(
                         Icons.Default.FormatSize,
-                        "Options d'affichage", tint = Color.White.copy(alpha = 0.6f),
+                        "Options d'affichage", tint = MaterialTheme.colorScheme.onSurfaceVariant,
                         modifier = Modifier.size(24.dp)
                     )
                 }
@@ -98,11 +99,11 @@ fun UnifiedControlPanel(
                 verticalAlignment = Alignment.CenterVertically
             ) {
                 TextButton(onClick = onPrevChapter) {
-                    Text("◀ Chapitre précédent", color = Color.White.copy(alpha = 0.45f), fontSize = 12.sp)
+                    Text("◀ Chapitre précédent", color = MaterialTheme.colorScheme.outlineVariant, fontSize = 12.sp)
                 }
                 Spacer(Modifier.width(24.dp))
                 TextButton(onClick = onNextChapter) {
-                    Text("Chapitre suivant ▶", color = Color.White.copy(alpha = 0.45f), fontSize = 12.sp)
+                    Text("Chapitre suivant ▶", color = MaterialTheme.colorScheme.outlineVariant, fontSize = 12.sp)
                 }
             }
         }

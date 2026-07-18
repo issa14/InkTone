@@ -58,7 +58,7 @@ fun SearchScreen(
                     if (q.length >= 2) viewModel.search(q)
                 },
                 placeholder = { Text("Rechercher dans le livre...", color = Color.White.copy(alpha = 0.4f)) },
-                leadingIcon = { Icon(Icons.Default.Search, null, tint = Color.White.copy(alpha = 0.5f)) },
+                leadingIcon = { Icon(Icons.Default.Search, "Rechercher", tint = Color.White.copy(alpha = 0.5f)) },
                 singleLine = true,
                 colors = OutlinedTextFieldDefaults.colors(
                     focusedTextColor = Color.White,

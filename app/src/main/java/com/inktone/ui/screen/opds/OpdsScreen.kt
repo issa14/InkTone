@@ -13,7 +13,6 @@ import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
-import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontWeight
@@ -27,9 +26,6 @@ import com.inktone.domain.model.OpdsEntry
 import com.inktone.domain.model.OpdsFeed
 import com.inktone.domain.model.OpdsLink
 
-private val DarkBg = Color(0xFF0D0D0D)
-private val CardBg = Color(0xFF1A1A1A)
-private val AccentBlue = Color(0xFF4FC3F7)
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -42,7 +38,7 @@ fun OpdsScreen(
     Box(modifier = Modifier.fillMaxSize()) {
         Column(modifier = Modifier.fillMaxSize()) {
             // ── Barre d'outils OPDS interne ──
-            Surface(color = DarkBg, shadowElevation = 2.dp) {
+            Surface(color = MaterialTheme.colorScheme.background, shadowElevation = 2.dp) {
                 Row(
                     modifier = Modifier
                         .fillMaxWidth()
@@ -51,18 +47,18 @@ fun OpdsScreen(
                 ) {
                     if (state.navigationStack.isNotEmpty()) {
                         IconButton(onClick = { viewModel.goBack() }) {
-                            Icon(Icons.AutoMirrored.Filled.ArrowBack, "Retour", tint = Color.White)
+                            Icon(Icons.AutoMirrored.Filled.ArrowBack, "Retour", tint = MaterialTheme.colorScheme.onSurface)
                         }
                     }
                     Text(
                         state.feed?.title ?: "Catalogues OPDS",
-                        color = Color.White.copy(alpha = 0.7f),
+                        color = MaterialTheme.colorScheme.onSurface,
                         fontSize = 13.sp,
                         modifier = Modifier.weight(1f).padding(horizontal = 8.dp),
                         maxLines = 1, overflow = TextOverflow.Ellipsis
                     )
                     IconButton(onClick = { viewModel.toggleAddCatalog() }) {
-                        Icon(Icons.Default.Add, "Ajouter", tint = Color.White.copy(alpha = 0.6f))
+                        Icon(Icons.Default.Add, "Ajouter", tint = MaterialTheme.colorScheme.onSurfaceVariant)
                     }
                 }
             }
@@ -70,7 +66,7 @@ fun OpdsScreen(
                 when {
                 state.isLoading -> {
                     Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
-                        CircularProgressIndicator(color = AccentBlue)
+                        CircularProgressIndicator(color = MaterialTheme.colorScheme.primary)
                     }
                 }
                 state.error != null -> {
@@ -79,9 +75,9 @@ fun OpdsScreen(
                         horizontalAlignment = Alignment.CenterHorizontally,
                         verticalArrangement = Arrangement.Center
                     ) {
-                        Icon(Icons.Default.CloudOff, null, tint = Color.White.copy(alpha = 0.3f), modifier = Modifier.size(48.dp))
+                        Icon(Icons.Default.CloudOff, "Hors ligne", tint = MaterialTheme.colorScheme.outlineVariant, modifier = Modifier.size(48.dp))
                         Spacer(Modifier.height(12.dp))
-                        Text(state.error!!, color = Color.White.copy(alpha = 0.6f), fontSize = 14.sp)
+                        Text(state.error!!, color = MaterialTheme.colorScheme.onSurfaceVariant, fontSize = 14.sp)
                         Spacer(Modifier.height(16.dp))
                         Button(onClick = { viewModel.loadCatalog() }) {
                             Text("Réessayer")
@@ -118,8 +114,8 @@ fun OpdsScreen(
     if (state.showAddCatalog) {
         AlertDialog(
             onDismissRequest = { viewModel.toggleAddCatalog() },
-            containerColor = Color(0xFF252525),
-            title = { Text("Ajouter un catalogue", color = Color.White) },
+            containerColor = MaterialTheme.colorScheme.surface,
+            title = { Text("Ajouter un catalogue", color = MaterialTheme.colorScheme.onSurface) },
             text = {
                 Column {
                     OutlinedTextField(
@@ -152,12 +148,12 @@ fun OpdsScreen(
             },
             confirmButton = {
                 TextButton(onClick = { viewModel.connectToCatalog() }) {
-                    Text("Se connecter", color = AccentBlue)
+                    Text("Se connecter", color = MaterialTheme.colorScheme.primary)
                 }
             },
             dismissButton = {
                 TextButton(onClick = { viewModel.toggleAddCatalog() }) {
-                    Text("Annuler", color = Color.White.copy(alpha = 0.5f))
+                    Text("Annuler", color = MaterialTheme.colorScheme.onSurfaceVariant)
                 }
             }
         )
@@ -182,12 +178,12 @@ private fun OpdsFeedContent(
         if (!feed.description.isNullOrBlank()) {
             item {
                 Card(
-                    colors = CardDefaults.cardColors(containerColor = CardBg),
+                    colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface),
                     shape = RoundedCornerShape(12.dp)
                 ) {
                     Text(
                         feed.description,
-                        color = Color.White.copy(alpha = 0.55f),
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
                         fontSize = 13.sp,
                         modifier = Modifier.padding(16.dp)
                     )
@@ -199,7 +195,7 @@ private fun OpdsFeedContent(
         // Liens de navigation (sous-catalogues)
         if (feed.navigationLinks.isNotEmpty()) {
             item {
-                Text("Catégories", color = Color.White.copy(alpha = 0.5f), fontSize = 12.sp,
+                Text("Catégories", color = MaterialTheme.colorScheme.onSurfaceVariant, fontSize = 12.sp,
                     modifier = Modifier.padding(bottom = 4.dp))
             }
             feed.navigationLinks.forEach { link ->
@@ -213,7 +209,7 @@ private fun OpdsFeedContent(
         // Entrées (livres)
         if (feed.entries.isNotEmpty()) {
             item {
-                Text("Livres (${feed.entries.size})", color = Color.White.copy(alpha = 0.5f), fontSize = 12.sp,
+                Text("Livres (${feed.entries.size})", color = MaterialTheme.colorScheme.onSurfaceVariant, fontSize = 12.sp,
                     modifier = Modifier.padding(bottom = 4.dp))
             }
             items(feed.entries, key = { it.id.ifBlank { it.title } }) { entry ->
@@ -241,22 +237,22 @@ private fun OpdsFeedContent(
 private fun NavigationLinkCard(link: OpdsLink, onClick: () -> Unit) {
     Card(
         modifier = Modifier.fillMaxWidth().clickable { onClick() },
-        colors = CardDefaults.cardColors(containerColor = CardBg),
+        colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface),
         shape = RoundedCornerShape(10.dp)
     ) {
         Row(
             modifier = Modifier.padding(horizontal = 16.dp, vertical = 14.dp),
             verticalAlignment = Alignment.CenterVertically
         ) {
-            Icon(Icons.Default.Folder, null, tint = Color(0xFFFFB74D), modifier = Modifier.size(20.dp))
+            Icon(Icons.Default.Folder, "Dossier", tint = MaterialTheme.colorScheme.secondary, modifier = Modifier.size(20.dp))
             Spacer(Modifier.width(12.dp))
             Text(
                 link.title ?: link.href,
-                color = Color.White.copy(alpha = 0.8f),
+                color = MaterialTheme.colorScheme.onSurface,
                 fontSize = 14.sp,
                 modifier = Modifier.weight(1f)
             )
-            Icon(Icons.Default.ChevronRight, null, tint = Color.White.copy(alpha = 0.3f), modifier = Modifier.size(20.dp))
+            Icon(Icons.Default.ChevronRight, "Ouvrir", tint = MaterialTheme.colorScheme.outlineVariant, modifier = Modifier.size(20.dp))
         }
     }
 }
@@ -265,7 +261,7 @@ private fun NavigationLinkCard(link: OpdsLink, onClick: () -> Unit) {
 private fun OpdsEntryCard(entry: OpdsEntry, onClick: () -> Unit) {
     Card(
         modifier = Modifier.fillMaxWidth().clickable { onClick() },
-        colors = CardDefaults.cardColors(containerColor = CardBg),
+        colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface),
         shape = RoundedCornerShape(10.dp)
     ) {
         Row(
@@ -288,14 +284,14 @@ private fun OpdsEntryCard(entry: OpdsEntry, onClick: () -> Unit) {
                 Spacer(Modifier.width(12.dp))
             }
             Column(modifier = Modifier.weight(1f)) {
-                Text(entry.title, color = Color.White, fontWeight = FontWeight.Medium,
+                Text(entry.title, color = MaterialTheme.colorScheme.onSurface, fontWeight = FontWeight.Medium,
                     fontSize = 14.sp, maxLines = 2, overflow = TextOverflow.Ellipsis)
                 if (entry.author.isNotBlank()) {
-                    Text(entry.author, color = Color.White.copy(alpha = 0.45f), fontSize = 12.sp)
+                    Text(entry.author, color = MaterialTheme.colorScheme.onSurfaceVariant, fontSize = 12.sp)
                 }
                 if (!entry.summary.isNullOrBlank()) {
                     Spacer(Modifier.height(4.dp))
-                    Text(entry.summary, color = Color.White.copy(alpha = 0.35f),
+                    Text(entry.summary, color = MaterialTheme.colorScheme.outlineVariant,
                         fontSize = 11.sp, maxLines = 3, overflow = TextOverflow.Ellipsis)
                 }
                 // Badge téléchargeable
@@ -305,8 +301,8 @@ private fun OpdsEntryCard(entry: OpdsEntry, onClick: () -> Unit) {
                         onClick = onClick,
                         label = { Text("EPUB disponible", fontSize = 10.sp) },
                         colors = AssistChipDefaults.assistChipColors(
-                            containerColor = Color(0xFF4FC3F7).copy(alpha = 0.15f),
-                            labelColor = AccentBlue
+                            containerColor = MaterialTheme.colorScheme.primary.copy(alpha = 0.15f),
+                            labelColor = MaterialTheme.colorScheme.primary
                         ),
                         modifier = Modifier.height(24.dp)
                     )
@@ -318,11 +314,11 @@ private fun OpdsEntryCard(entry: OpdsEntry, onClick: () -> Unit) {
 
 @Composable
 private fun darkFieldColors() = OutlinedTextFieldDefaults.colors(
-    focusedTextColor = Color.White,
-    unfocusedTextColor = Color.White.copy(alpha = 0.7f),
-    focusedLabelColor = AccentBlue,
-    unfocusedLabelColor = Color.White.copy(alpha = 0.4f),
-    cursorColor = AccentBlue,
-    focusedBorderColor = AccentBlue,
-    unfocusedBorderColor = Color.White.copy(alpha = 0.2f)
+    focusedTextColor = MaterialTheme.colorScheme.onSurface,
+    unfocusedTextColor = MaterialTheme.colorScheme.onSurface,
+    focusedLabelColor = MaterialTheme.colorScheme.primary,
+    unfocusedLabelColor = MaterialTheme.colorScheme.outlineVariant,
+    cursorColor = MaterialTheme.colorScheme.primary,
+    focusedBorderColor = MaterialTheme.colorScheme.primary,
+    unfocusedBorderColor = MaterialTheme.colorScheme.outlineVariant.copy(alpha = 1.00f)
 )

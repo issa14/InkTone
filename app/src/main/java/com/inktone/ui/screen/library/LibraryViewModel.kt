@@ -127,7 +127,8 @@ class LibraryViewModel @Inject constructor(
         val next = when (_uiState.value.appTheme) {
             AppTheme.PAPIER_ART -> AppTheme.OBSIDIAN
             AppTheme.OBSIDIAN   -> AppTheme.NORDIC_FOG
-            AppTheme.NORDIC_FOG -> AppTheme.PAPIER_ART
+            AppTheme.NORDIC_FOG -> AppTheme.SIGNATURE
+            AppTheme.SIGNATURE  -> AppTheme.PAPIER_ART
             AppTheme.SYSTEM     -> AppTheme.PAPIER_ART
         }
         _uiState.update { it.copy(appTheme = next) }

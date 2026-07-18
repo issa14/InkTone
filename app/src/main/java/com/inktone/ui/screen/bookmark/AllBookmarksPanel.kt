@@ -50,7 +50,7 @@ fun AllBookmarksPanel(
             onValueChange = { searchQuery = it },
             placeholder = { Text("Rechercher...", color = Color.White.copy(alpha = 0.3f)) },
             leadingIcon = {
-                Icon(Icons.Default.Search, null, tint = Color.White.copy(alpha = 0.4f), modifier = Modifier.size(20.dp))
+                Icon(Icons.Default.Search, "Rechercher", tint = Color.White.copy(alpha = 0.4f), modifier = Modifier.size(20.dp))
             },
             singleLine = true,
             colors = OutlinedTextFieldDefaults.colors(
@@ -106,7 +106,7 @@ private fun BookmarkDrawerItem(
             verticalAlignment = Alignment.Top
         ) {
             Icon(
-                Icons.Default.Bookmark, null,
+                Icons.Default.Bookmark, "Signets",
                 tint = Color(0xFFFFB74D),
                 modifier = Modifier.size(20.dp)
             )

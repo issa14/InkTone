@@ -41,6 +41,7 @@ import com.inktone.ui.screen.library.FilterType
 import com.inktone.ui.screen.library.LayoutMode
 import com.inktone.ui.screen.library.NavigationDestination
 import com.inktone.ui.screen.opds.OpdsScreen
+import com.inktone.ui.theme.ttsActive
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -114,7 +115,7 @@ fun LibraryScreen(
                                 if (progress != null) {
                                     CircularProgressIndicator(
                                         progress = { progress },
-                                        color = AccentBlue,
+                                        color = MaterialTheme.colorScheme.primary,
                                         strokeWidth = 4.dp,
                                         modifier = Modifier.size(56.dp)
                                     )
@@ -128,7 +129,7 @@ fun LibraryScreen(
                                     Spacer(Modifier.height(8.dp))
                                     Text(
                                         text = status,
-                                        color = TextMuted,
+                                        color = MaterialTheme.colorScheme.onSurfaceVariant,
                                         fontSize = 14.sp,
                                         textAlign = androidx.compose.ui.text.style.TextAlign.Center,
                                         modifier = Modifier.padding(horizontal = 16.dp)
@@ -136,7 +137,7 @@ fun LibraryScreen(
                                     Spacer(Modifier.height(16.dp))
                                     LinearProgressIndicator(
                                         progress = { progress },
-                                        color = AccentBlue,
+                                        color = MaterialTheme.colorScheme.primary,
                                         trackColor = Color.White.copy(alpha = 0.1f),
                                         modifier = Modifier
                                             .fillMaxWidth(0.8f)
@@ -144,11 +145,11 @@ fun LibraryScreen(
                                             .clip(RoundedCornerShape(2.dp))
                                     )
                                 } else {
-                                    CircularProgressIndicator(color = AccentBlue)
+                                    CircularProgressIndicator(color = MaterialTheme.colorScheme.primary)
                                     Spacer(Modifier.height(12.dp))
                                     Text(
                                         text = status,
-                                        color = TextMuted,
+                                        color = MaterialTheme.colorScheme.onSurfaceVariant,
                                         fontSize = 14.sp,
                                         textAlign = androidx.compose.ui.text.style.TextAlign.Center
                                     )
@@ -295,7 +296,7 @@ private fun TopBar(
                 Text(currentDest.label, fontWeight = FontWeight.Medium, fontSize = 17.sp)
                 if (isLibrary) {
                     Spacer(Modifier.width(4.dp))
-                    Icon(Icons.Default.ArrowDropDown, null, tint = Color.White, modifier = Modifier.size(18.dp))
+                    Icon(Icons.Default.ArrowDropDown, "Menu déroulant", tint = Color.White, modifier = Modifier.size(18.dp))
                 }
             }
         },
@@ -318,7 +319,7 @@ private fun TopBar(
             }
         },
         colors = TopAppBarDefaults.topAppBarColors(
-            containerColor = AccentBlue
+            containerColor = MaterialTheme.colorScheme.primary
         )
     )
 }
@@ -354,7 +355,7 @@ private fun SearchBar(
                 Icon(Icons.Default.ArrowBack, "Fermer", tint = Color.White)
             }
         },
-        colors = TopAppBarDefaults.topAppBarColors(containerColor = AccentBlue)
+        colors = TopAppBarDefaults.topAppBarColors(containerColor = MaterialTheme.colorScheme.primary)
     )
 }
 
@@ -477,7 +478,7 @@ private fun BookCover(
                             .size(4.dp)
                             .clip(CircleShape)
                             .background(
-                                if (i == 0) Color(0xFF00E676)
+                                if (i == 0) MaterialTheme.colorScheme.tertiary
                                 else Color.White.copy(alpha = 0.4f)
                             )
                     )
@@ -491,14 +492,14 @@ private fun BookCover(
             book.title,
             fontWeight = FontWeight.Medium,
             fontSize = 12.sp,
-            color = TextMain,
+            color = MaterialTheme.colorScheme.onBackground,
             maxLines = 1,
             overflow = TextOverflow.Ellipsis
         )
         Text(
             book.author,
             fontSize = 10.sp,
-            color = TextMuted,
+            color = MaterialTheme.colorScheme.onSurfaceVariant,
             maxLines = 1,
             overflow = TextOverflow.Ellipsis
         )
@@ -546,7 +547,7 @@ private fun LibraryNavigationPopup(
                 .fillMaxWidth(0.95f)
                 .heightIn(max = 400.dp),
             shape = RoundedCornerShape(8.dp),
-            colors = CardDefaults.cardColors(containerColor = SurfaceRaised),
+            colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceVariant),
             elevation = CardDefaults.cardElevation(defaultElevation = 8.dp)
         ) {
             Row(modifier = Modifier.fillMaxSize()) {
@@ -561,7 +562,7 @@ private fun LibraryNavigationPopup(
                         val isActive = label == selectedCategory
 
                         Surface(
-                            color = if (isActive) SurfaceDark else Color.Transparent,
+                            color = if (isActive) MaterialTheme.colorScheme.surface else Color.Transparent,
                             onClick = {
                                 selectedCategory = label
                                 onFilterSelect(mode)
@@ -576,15 +577,15 @@ private fun LibraryNavigationPopup(
                                     label,
                                     fontSize = 13.sp,
                                     fontWeight = if (isActive) FontWeight.SemiBold else FontWeight.Normal,
-                                    color = if (isActive) AccentBlue else TextMain,
+                                    color = if (isActive) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onBackground,
                                     modifier = Modifier.weight(1f),
                                     maxLines = 1,
                                     overflow = TextOverflow.Ellipsis
                                 )
                                 if (isActive) {
                                     Icon(
-                                        Icons.Default.ChevronRight, null,
-                                        tint = TextMuted,
+                                        Icons.Default.ChevronRight, "Ouvrir",
+                                        tint = MaterialTheme.colorScheme.onSurfaceVariant,
                                         modifier = Modifier.size(14.dp)
                                     )
                                 }
@@ -608,13 +609,13 @@ private fun LibraryNavigationPopup(
                             Text(
                                 "Aucun élément",
                                 fontSize = 13.sp,
-                                color = TextMuted
+                                color = MaterialTheme.colorScheme.onSurfaceVariant
                             )
                         }
                     } else {
                         subItems.forEach { (name, count) ->
                             Surface(
-                                color = SurfaceRaised,
+                                color = MaterialTheme.colorScheme.surfaceVariant,
                                 onClick = onDismiss
                             ) {
                                 Row(
@@ -627,7 +628,7 @@ private fun LibraryNavigationPopup(
                                     Text(
                                         name,
                                         fontSize = 13.sp,
-                                        color = TextMain,
+                                        color = MaterialTheme.colorScheme.onBackground,
                                         modifier = Modifier.weight(1f),
                                         maxLines = 1,
                                         overflow = TextOverflow.Ellipsis
@@ -636,10 +637,10 @@ private fun LibraryNavigationPopup(
                                         "$count",
                                         fontSize = 11.sp,
                                         fontWeight = FontWeight.SemiBold,
-                                        color = TextMuted,
+                                        color = MaterialTheme.colorScheme.onSurfaceVariant,
                                         modifier = Modifier
                                             .background(
-                                                ShelfOverlay,
+                                                MaterialTheme.colorScheme.surface.copy(alpha = 0.07f),
                                                 RoundedCornerShape(10.dp)
                                             )
                                             .padding(horizontal = 8.dp, vertical = 2.dp)
@@ -670,11 +671,11 @@ private fun FilterAndSortDialog(
 ) {
     AlertDialog(
         onDismissRequest = onDismiss,
-        containerColor = SurfaceDark,
-        titleContentColor = TextMain,
-        textContentColor = TextMain,
+        containerColor = MaterialTheme.colorScheme.surface,
+        titleContentColor = MaterialTheme.colorScheme.onBackground,
+        textContentColor = MaterialTheme.colorScheme.onBackground,
         icon = {
-            Icon(Icons.Default.Tune, null, tint = AccentBlue, modifier = Modifier.size(24.dp))
+            Icon(Icons.Default.Tune, "Options de tri", tint = MaterialTheme.colorScheme.primary, modifier = Modifier.size(24.dp))
         },
         title = {
             Row(
@@ -704,14 +705,14 @@ private fun FilterAndSortDialog(
                                     selected = sortOrder == order,
                                     onClick = { onSortChange(order) },
                                     colors = RadioButtonDefaults.colors(
-                                        selectedColor = AccentBlue,
-                                        unselectedColor = TextMuted
+                                        selectedColor = MaterialTheme.colorScheme.primary,
+                                        unselectedColor = MaterialTheme.colorScheme.onSurfaceVariant
                                     ),
                                     modifier = Modifier.size(20.dp)
                                 )
                                 Spacer(Modifier.width(4.dp))
                                 Text(order.label, fontSize = 13.sp,
-                                    color = if (sortOrder == order) AccentBlue else TextMain)
+                                    color = if (sortOrder == order) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onBackground)
                             }
                         }
                     }
@@ -730,14 +731,14 @@ private fun FilterAndSortDialog(
                                     checked = filterType == type,
                                     onCheckedChange = { onFilterChange(type) },
                                     colors = CheckboxDefaults.colors(
-                                        checkedColor = AccentBlue,
-                                        uncheckedColor = TextMuted
+                                        checkedColor = MaterialTheme.colorScheme.primary,
+                                        uncheckedColor = MaterialTheme.colorScheme.onSurfaceVariant
                                     ),
                                     modifier = Modifier.size(20.dp)
                                 )
                                 Spacer(Modifier.width(4.dp))
                                 Text(type.label, fontSize = 13.sp,
-                                    color = if (filterType == type) AccentBlue else TextMain)
+                                    color = if (filterType == type) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onBackground)
                             }
                         }
                     }
@@ -745,12 +746,12 @@ private fun FilterAndSortDialog(
 
                 HorizontalDivider(
                     modifier = Modifier.padding(vertical = 12.dp),
-                    color = BorderDark
+                    color = MaterialTheme.colorScheme.outline
                 )
 
                 // ── MISE EN PAGE ──────────────────────
                 Text("Mise en page", fontWeight = FontWeight.SemiBold,
-                    fontSize = 14.sp, color = TextMain)
+                    fontSize = 14.sp, color = MaterialTheme.colorScheme.onBackground)
                 Spacer(Modifier.height(8.dp))
 
                 Row(
@@ -775,11 +776,11 @@ private fun FilterAndSortDialog(
                             ) },
                             leadingIcon = {
                                 Icon(icon, null, modifier = Modifier.size(16.dp),
-                                    tint = if (layoutMode == mode) AccentBlue else TextMuted)
+                                    tint = if (layoutMode == mode) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurfaceVariant)
                             },
                             colors = FilterChipDefaults.filterChipColors(
-                                selectedContainerColor = AccentBlue.copy(alpha = 0.15f),
-                                selectedLabelColor = AccentBlue
+                                selectedContainerColor = MaterialTheme.colorScheme.primary.copy(alpha = 0.15f),
+                                selectedLabelColor = MaterialTheme.colorScheme.primary
                             )
                         )
                     }
@@ -787,7 +788,7 @@ private fun FilterAndSortDialog(
 
                 HorizontalDivider(
                     modifier = Modifier.padding(vertical = 12.dp),
-                    color = BorderDark
+                    color = MaterialTheme.colorScheme.outline
                 )
 
                 // ── BAS : Type de fichier + Fermer ────
@@ -796,9 +797,9 @@ private fun FilterAndSortDialog(
                     horizontalArrangement = Arrangement.SpaceBetween,
                     verticalAlignment = Alignment.CenterVertically
                 ) {
-                    Text("Type de fichier : Tous", fontSize = 12.sp, color = TextMuted)
+                    Text("Type de fichier : Tous", fontSize = 12.sp, color = MaterialTheme.colorScheme.onSurfaceVariant)
                     TextButton(onClick = onDismiss) {
-                        Text("Fermer", color = AccentBlue)
+                        Text("Fermer", color = MaterialTheme.colorScheme.primary)
                     }
                 }
             }
@@ -834,7 +835,7 @@ private fun OverflowMenu(onDismiss: () -> Unit, onImport: () -> Unit) {
                 OverflowMenuItem("Reconstruire les couvertures", Icons.Default.Refresh) { onDismiss() }
                 HorizontalDivider(modifier = Modifier.padding(vertical = 4.dp))
                 OverflowMenuItem("Synchroniser avec le cloud", Icons.Default.CloudUpload,
-                    color = AccentBlue) { onDismiss() }
+                    color = MaterialTheme.colorScheme.primary) { onDismiss() }
             }
         }
     }
@@ -842,7 +843,7 @@ private fun OverflowMenu(onDismiss: () -> Unit, onImport: () -> Unit) {
 
 @Composable
 private fun OverflowMenuItem(text: String, icon: androidx.compose.ui.graphics.vector.ImageVector,
-                              color: Color = Color(0xFF333333), onClick: () -> Unit) {
+                              color: Color = MaterialTheme.colorScheme.surfaceVariant, onClick: () -> Unit) {
     Row(
         modifier = Modifier
             .fillMaxWidth()
@@ -850,7 +851,7 @@ private fun OverflowMenuItem(text: String, icon: androidx.compose.ui.graphics.ve
             .padding(horizontal = 16.dp, vertical = 12.dp),
         verticalAlignment = Alignment.CenterVertically
     ) {
-        Icon(icon, null, tint = Color(0xFF757575), modifier = Modifier.size(18.dp))
+        Icon(icon, null, tint = MaterialTheme.colorScheme.onSurfaceVariant, modifier = Modifier.size(18.dp))
         Spacer(Modifier.width(10.dp))
         Text(text, fontSize = 14.sp, color = color)
     }
@@ -896,7 +897,7 @@ private fun NavDrawer(
                     modifier = Modifier
                         .fillMaxWidth()
                         .height(140.dp)
-                        .background(Brush.linearGradient(listOf(Color(0xFF1A237E), Color(0xFF3F51B5))))
+                        .background(Brush.linearGradient(listOf(MaterialTheme.colorScheme.primaryContainer, MaterialTheme.colorScheme.primary)))
                         .padding(16.dp),
                     contentAlignment = Alignment.BottomStart
                 ) {
@@ -911,7 +912,7 @@ private fun NavDrawer(
                         .forEach { dest ->
                         val isActive = dest == currentDest
                         Surface(
-                            color = if (isActive) Color(0xFFE8F0FE) else Color.Transparent,
+                            color = if (isActive) MaterialTheme.colorScheme.primaryContainer else Color.Transparent,
                             onClick = { onNavigate(dest) }
                         ) {
                             Row(
@@ -922,14 +923,14 @@ private fun NavDrawer(
                             ) {
                                 Icon(
                                     dest.icon, null,
-                                    tint = if (isActive) AccentBlue else Color(0xFF757575),
+                                    tint = if (isActive) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurfaceVariant,
                                     modifier = Modifier.size(20.dp)
                                 )
                                 Spacer(Modifier.width(24.dp))
                                 Text(
                                     dest.label, fontSize = 14.sp,
                                     fontWeight = FontWeight.Medium,
-                                    color = if (isActive) AccentBlue else Color(0xFF444444)
+                                    color = if (isActive) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurface
                                 )
                             }
                         }
@@ -937,7 +938,7 @@ private fun NavDrawer(
                 }
 
                 // Footer
-                Surface(color = Color(0xFFF5F5F5)) {
+                Surface(color = MaterialTheme.colorScheme.surface) {
                     Row(
                         modifier = Modifier
                             .fillMaxWidth()
@@ -971,8 +972,8 @@ private fun DrawerFooterBtn(text: String,
         horizontalAlignment = Alignment.CenterHorizontally,
         modifier = Modifier.clickable(onClick = onClick)
     ) {
-        Icon(icon, null, tint = Color(0xFF616161), modifier = Modifier.size(16.dp))
-        Text(text, fontSize = 9.sp, color = Color(0xFF616161))
+        Icon(icon, null, tint = MaterialTheme.colorScheme.onSurfaceVariant, modifier = Modifier.size(16.dp))
+        Text(text, fontSize = 9.sp, color = MaterialTheme.colorScheme.onSurfaceVariant)
     }
 }
 
@@ -995,7 +996,7 @@ private fun FloatingControls(
         ) {
             IconButton(onClick = onReadResume) {
                 Icon(Icons.Outlined.Headphones, "Audio",
-                    tint = AccentTts, modifier = Modifier.size(18.dp))
+                    tint = MaterialTheme.colorScheme.ttsActive, modifier = Modifier.size(18.dp))
             }
         }
 
@@ -1004,7 +1005,7 @@ private fun FloatingControls(
         // FAB
         FloatingActionButton(
             onClick = onReadResume,
-            containerColor = AccentBlue,
+            containerColor = MaterialTheme.colorScheme.primary,
             shape = CircleShape,
             modifier = Modifier.size(56.dp)
         ) {
@@ -1022,10 +1023,10 @@ private fun FloatingControls(
 private fun EmptyView() {
     Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
         Column(horizontalAlignment = Alignment.CenterHorizontally) {
-            Icon(Icons.Default.MenuBook, null, Modifier.size(64.dp),
-                tint = TextMuted.copy(alpha = 0.3f))
+            Icon(Icons.Default.MenuBook, "Livres", Modifier.size(64.dp),
+                tint = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.3f))
             Spacer(Modifier.height(12.dp))
-            Text("Bibliothèque vide", color = TextMuted, fontSize = 16.sp)
+            Text("Bibliothèque vide", color = MaterialTheme.colorScheme.onSurfaceVariant, fontSize = 16.sp)
         }
     }
 }
@@ -1033,15 +1034,15 @@ private fun EmptyView() {
 @Composable
 private fun LoadingView() {
     Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
-        CircularProgressIndicator(color = AccentBlue)
+        CircularProgressIndicator(color = MaterialTheme.colorScheme.primary)
     }
 }
 
 @Composable
 private fun ErrorBanner(error: String, onDismiss: () -> Unit) {
-    Surface(color = Color(0x33FF6B6B)) {
+    Surface(color = MaterialTheme.colorScheme.errorContainer.copy(alpha = 0.2f)) {
         Row(Modifier.padding(12.dp), verticalAlignment = Alignment.CenterVertically) {
-            Text("❌ $error", color = Color(0xFFFF6B6B), modifier = Modifier.weight(1f), fontSize = 13.sp)
+            Text("❌ $error", color = MaterialTheme.colorScheme.error, modifier = Modifier.weight(1f), fontSize = 13.sp)
             TextButton(onClick = onDismiss) { Text("OK") }
         }
     }
@@ -1051,10 +1052,10 @@ private fun ErrorBanner(error: String, onDismiss: () -> Unit) {
 private fun ComingSoonPlaceholder(label: String) {
     Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
         Column(horizontalAlignment = Alignment.CenterHorizontally) {
-            Icon(Icons.Default.Construction, null, Modifier.size(48.dp), tint = TextMuted.copy(alpha = 0.3f))
+            Icon(Icons.Default.Construction, "En construction", Modifier.size(48.dp), tint = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.3f))
             Spacer(Modifier.height(12.dp))
-            Text(label, color = TextMuted, fontSize = 16.sp)
-            Text("Bientôt disponible", color = TextMuted.copy(alpha = 0.5f), fontSize = 13.sp)
+            Text(label, color = MaterialTheme.colorScheme.onSurfaceVariant, fontSize = 16.sp)
+            Text("Bientôt disponible", color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.5f), fontSize = 13.sp)
         }
     }
 }

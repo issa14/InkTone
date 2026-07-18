@@ -16,9 +16,10 @@ fun InkToneTheme(
     content: @Composable () -> Unit
 ) {
     val (scheme, isLightBars) = when (theme) {
-        AppTheme.PAPIER_ART -> PapierArtColors   to true
-        AppTheme.OBSIDIAN   -> ObsidianColors    to false
-        AppTheme.NORDIC_FOG -> NordicFogColors   to true
+        AppTheme.PAPIER_ART -> PapierArtColors       to true
+        AppTheme.OBSIDIAN   -> ObsidianColors        to false
+        AppTheme.NORDIC_FOG -> NordicFogColors       to true
+        AppTheme.SIGNATURE  -> SignatureLightColors  to true
         AppTheme.SYSTEM     -> {
             if (isSystemInDarkTheme())
                 ObsidianColors to false

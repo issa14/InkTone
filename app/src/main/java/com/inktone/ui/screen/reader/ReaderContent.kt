@@ -11,6 +11,7 @@ import androidx.compose.foundation.pager.HorizontalPager
 import androidx.compose.foundation.pager.rememberPagerState
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.CircularProgressIndicator
+import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
@@ -593,7 +594,7 @@ private fun SentenceRenderer(
         try {
             Color(android.graphics.Color.parseColor(it.colorHex))
         } catch (_: Exception) {
-            Color(0xFFFFEB3D)
+            MaterialTheme.colorScheme.tertiary
         }
     }
 

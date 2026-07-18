@@ -14,7 +14,6 @@ import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.input.PasswordVisualTransformation
@@ -28,9 +27,6 @@ import kotlinx.coroutines.launch
 import java.io.BufferedReader
 import java.io.InputStreamReader
 
-private val DarkBg = Color(0xFF0D0D0D)
-private val CardBg = Color(0xFF1A1A1A)
-private val AccentBlue = Color(0xFF4FC3F7)
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -113,21 +109,21 @@ fun SyncSettingsScreen(
                 Button(
                     onClick = { scope.launch { viewModel.testWebdav() } },
                     enabled = !state.isLoading,
-                    colors = ButtonDefaults.buttonColors(containerColor = AccentBlue)
+                    colors = ButtonDefaults.buttonColors(containerColor = MaterialTheme.colorScheme.primary)
                 ) {
-                    if (state.isLoading) CircularProgressIndicator(modifier = Modifier.size(16.dp), color = Color.White)
+                    if (state.isLoading) CircularProgressIndicator(modifier = Modifier.size(16.dp), color = MaterialTheme.colorScheme.onSurface)
                     else Text("Tester connexion")
                 }
                 if (state.webdavConnected) {
                     AssistChip(
                         onClick = {},
-                        label = { Text("✓ Connecté", color = Color(0xFF81C784)) }
+                        label = { Text("✓ Connecté", color = MaterialTheme.colorScheme.tertiary) }
                     )
                 }
             }
 
             Spacer(Modifier.height(24.dp))
-            HorizontalDivider(color = Color.White.copy(alpha = 0.1f))
+            HorizontalDivider(color = MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.50f))
             Spacer(Modifier.height(16.dp))
 
             // ── Section Google Drive ──
@@ -138,7 +134,7 @@ fun SyncSettingsScreen(
                 modifier = Modifier.fillMaxWidth(),
                 enabled = !state.isLoading
             ) {
-                Icon(Icons.Default.Cloud, null, modifier = Modifier.size(20.dp))
+                Icon(Icons.Default.Cloud, "Synchronisation", modifier = Modifier.size(20.dp))
                 Spacer(Modifier.width(8.dp))
                 Text(
                     if (state.driveConnected) "✓ Connecté à Google Drive"
@@ -147,7 +143,7 @@ fun SyncSettingsScreen(
             }
 
             Spacer(Modifier.height(24.dp))
-            HorizontalDivider(color = Color.White.copy(alpha = 0.1f))
+            HorizontalDivider(color = MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.50f))
             Spacer(Modifier.height(16.dp))
 
             // ── Section Fichier Local ──
@@ -170,10 +166,10 @@ fun SyncSettingsScreen(
                 Button(
                     onClick = { exportLauncher.launch("inktone_backup.rfbackup") },
                     enabled = state.encryptionPassword.isNotBlank() && !state.isLoading,
-                    colors = ButtonDefaults.buttonColors(containerColor = AccentBlue),
+                    colors = ButtonDefaults.buttonColors(containerColor = MaterialTheme.colorScheme.primary),
                     modifier = Modifier.weight(1f)
                 ) {
-                    Icon(Icons.Default.Upload, null, modifier = Modifier.size(18.dp))
+                    Icon(Icons.Default.Upload, "Exporter", modifier = Modifier.size(18.dp))
                     Spacer(Modifier.width(6.dp))
                     Text("Exporter")
                 }
@@ -182,14 +178,14 @@ fun SyncSettingsScreen(
                     enabled = state.encryptionPassword.isNotBlank() && !state.isLoading,
                     modifier = Modifier.weight(1f)
                 ) {
-                    Icon(Icons.Default.Download, null, modifier = Modifier.size(18.dp))
+                    Icon(Icons.Default.Download, "Importer", modifier = Modifier.size(18.dp))
                     Spacer(Modifier.width(6.dp))
                     Text("Importer")
                 }
             }
 
             Spacer(Modifier.height(24.dp))
-            HorizontalDivider(color = Color.White.copy(alpha = 0.1f))
+            HorizontalDivider(color = MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.50f))
             Spacer(Modifier.height(16.dp))
 
             // ── Synchronisation cloud ──
@@ -198,14 +194,14 @@ fun SyncSettingsScreen(
             Button(
                 onClick = { scope.launch { viewModel.syncNow() } },
                 enabled = !state.isLoading,
-                colors = ButtonDefaults.buttonColors(containerColor = Color(0xFF7C4DFF)),
+                colors = ButtonDefaults.buttonColors(containerColor = MaterialTheme.colorScheme.tertiary),
                 modifier = Modifier.fillMaxWidth()
             ) {
                 if (state.isLoading) {
-                    CircularProgressIndicator(modifier = Modifier.size(18.dp), color = Color.White)
+                    CircularProgressIndicator(modifier = Modifier.size(18.dp), color = MaterialTheme.colorScheme.onSurface)
                     Spacer(Modifier.width(8.dp))
                 }
-                Icon(Icons.Default.Sync, null, modifier = Modifier.size(18.dp))
+                Icon(Icons.Default.Sync, "Synchroniser", modifier = Modifier.size(18.dp))
                 Spacer(Modifier.width(6.dp))
                 Text("Synchroniser maintenant")
             }
@@ -214,7 +210,7 @@ fun SyncSettingsScreen(
                 Spacer(Modifier.height(4.dp))
                 Text(
                     "Dernière synchro: ${formatTimestamp(state.lastSyncTimestamp)}",
-                    color = Color.White.copy(alpha = 0.35f),
+                    color = MaterialTheme.colorScheme.outlineVariant,
                     fontSize = 12.sp
                 )
             }
@@ -224,13 +220,13 @@ fun SyncSettingsScreen(
                 Spacer(Modifier.height(12.dp))
                 Card(
                     colors = CardDefaults.cardColors(
-                        containerColor = if (state.isError) Color(0xFF4E1A1A) else Color(0xFF1A3A1A)
+                        containerColor = if (state.isError) MaterialTheme.colorScheme.errorContainer else MaterialTheme.colorScheme.tertiaryContainer
                     ),
                     shape = RoundedCornerShape(8.dp)
                 ) {
                     Text(
                         msg,
-                        color = if (state.isError) Color(0xFFFF6B6B) else Color(0xFF81C784),
+                        color = if (state.isError) MaterialTheme.colorScheme.error else MaterialTheme.colorScheme.tertiary,
                         modifier = Modifier.padding(12.dp),
                         fontSize = 13.sp
                     )
@@ -245,7 +241,7 @@ fun SyncSettingsScreen(
 private fun SectionTitle(text: String) {
     Text(
         text,
-        color = Color.White.copy(alpha = 0.7f),
+        color = MaterialTheme.colorScheme.onSurface,
         fontWeight = FontWeight.SemiBold,
         fontSize = 14.sp
     )
@@ -258,11 +254,11 @@ private fun formatTimestamp(ts: Long): String {
 
 @Composable
 private fun darkTextFieldColors() = OutlinedTextFieldDefaults.colors(
-    focusedTextColor = Color.White,
-    unfocusedTextColor = Color.White.copy(alpha = 0.7f),
-    focusedLabelColor = AccentBlue,
-    unfocusedLabelColor = Color.White.copy(alpha = 0.4f),
-    cursorColor = AccentBlue,
-    focusedBorderColor = AccentBlue,
-    unfocusedBorderColor = Color.White.copy(alpha = 0.2f)
+    focusedTextColor = MaterialTheme.colorScheme.onSurface,
+    unfocusedTextColor = MaterialTheme.colorScheme.onSurface,
+    focusedLabelColor = MaterialTheme.colorScheme.primary,
+    unfocusedLabelColor = MaterialTheme.colorScheme.outlineVariant,
+    cursorColor = MaterialTheme.colorScheme.primary,
+    focusedBorderColor = MaterialTheme.colorScheme.primary,
+    unfocusedBorderColor = MaterialTheme.colorScheme.outlineVariant.copy(alpha = 1.00f)
 )

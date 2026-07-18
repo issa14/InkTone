@@ -28,10 +28,7 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
-import com.inktone.ui.theme.AccentBlue
-import com.inktone.ui.theme.AccentTts
-import com.inktone.ui.theme.TextMain
-import com.inktone.ui.theme.TextMuted
+import com.inktone.ui.theme.ttsActive
 import java.io.File
 import java.io.FileFilter
 
@@ -76,15 +73,15 @@ fun FilesScreen(
         ) {
             Column(horizontalAlignment = Alignment.CenterHorizontally) {
                 Icon(Icons.Default.Lock, null, modifier = Modifier.size(56.dp),
-                    tint = TextMuted.copy(alpha = 0.3f))
+                    tint = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.3f))
                 Spacer(Modifier.height(16.dp))
                 Text("Accès au stockage requis", fontSize = 17.sp,
-                    fontWeight = FontWeight.Medium, color = TextMain)
+                    fontWeight = FontWeight.Medium, color = MaterialTheme.colorScheme.onBackground)
                 Spacer(Modifier.height(6.dp))
                 Text("Pour parcourir vos fichiers EPUB,",
-                    fontSize = 13.sp, color = TextMuted)
+                    fontSize = 13.sp, color = MaterialTheme.colorScheme.onSurfaceVariant)
                 Text("Android nécessite une autorisation.",
-                    fontSize = 13.sp, color = TextMuted)
+                    fontSize = 13.sp, color = MaterialTheme.colorScheme.onSurfaceVariant)
                 Spacer(Modifier.height(24.dp))
                 Button(
                     onClick = {
@@ -95,7 +92,7 @@ fun FilesScreen(
                             permissionLauncher.launch(intent)
                         }
                     },
-                    colors = ButtonDefaults.buttonColors(containerColor = AccentBlue),
+                    colors = ButtonDefaults.buttonColors(containerColor = MaterialTheme.colorScheme.primary),
                     shape = RoundedCornerShape(8.dp)
                 ) {
                     Icon(Icons.Default.Settings, null, modifier = Modifier.size(18.dp))
@@ -145,9 +142,9 @@ private fun EmptyDir() {
     ) {
         Column(horizontalAlignment = Alignment.CenterHorizontally) {
             Icon(Icons.Default.Folder, null, modifier = Modifier.size(56.dp),
-                tint = TextMuted.copy(alpha = 0.25f))
+                tint = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.25f))
             Spacer(Modifier.height(12.dp))
-            Text("Dossier vide ou inaccessible", fontSize = 15.sp, color = TextMuted)
+            Text("Dossier vide ou inaccessible", fontSize = 15.sp, color = MaterialTheme.colorScheme.onSurfaceVariant)
         }
     }
 }
@@ -162,11 +159,11 @@ private fun FileRow(name: String, isDirectory: Boolean, onClick: () -> Unit) {
         ) {
             Icon(
                 if (isDirectory) Icons.Default.Folder else Icons.Default.Description,
-                null, tint = if (isDirectory) AccentBlue else AccentTts,
+                null, tint = if (isDirectory) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.ttsActive,
                 modifier = Modifier.size(22.dp)
             )
             Spacer(Modifier.width(16.dp))
-            Text(name, fontSize = 14.sp, color = TextMain,
+            Text(name, fontSize = 14.sp, color = MaterialTheme.colorScheme.onBackground,
                 fontWeight = if (isDirectory) FontWeight.Medium else FontWeight.Normal,
                 maxLines = 1, overflow = TextOverflow.Ellipsis)
         }

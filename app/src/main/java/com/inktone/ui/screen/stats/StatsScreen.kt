@@ -28,11 +28,6 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.hilt.navigation.compose.hiltViewModel
 
-private val AccentBlue = Color(0xFF4FC3F7)
-private val AccentViolet = Color(0xFFB388FF)
-private val AccentGreen = Color(0xFF81C784)
-private val DarkBg = Color(0xFF0D0D0D)
-private val CardBg = Color(0xFF1A1A1A)
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -76,7 +71,7 @@ fun StatsScreen(
                     value = "${state.averageWpm}",
                     unit = "WPM",
                     icon = Icons.Default.Speed,
-                    color = AccentBlue,
+                    color = MaterialTheme.colorScheme.primary,
                     modifier = Modifier.weight(1f)
                 )
                 QuickStatCard(
@@ -84,7 +79,7 @@ fun StatsScreen(
                     value = String.format("%.1f", state.totalHoursRead),
                     unit = "h",
                     icon = Icons.Default.Schedule,
-                    color = AccentViolet,
+                    color = MaterialTheme.colorScheme.primaryContainer,
                     modifier = Modifier.weight(1f)
                 )
                 QuickStatCard(
@@ -92,7 +87,7 @@ fun StatsScreen(
                     value = "${state.totalBooksRead}",
                     unit = "",
                     icon = Icons.Default.MenuBook,
-                    color = AccentGreen,
+                    color = MaterialTheme.colorScheme.tertiary,
                     modifier = Modifier.weight(1f)
                 )
             }
@@ -120,7 +115,9 @@ private fun DailyGoalProgress(
         label = "goalProgress"
     )
 
-    val gradientColors = listOf(AccentBlue, AccentViolet)
+    val outlineVariant = MaterialTheme.colorScheme.outlineVariant
+    val primaryColor = MaterialTheme.colorScheme.primary
+    val gradientColors = listOf(primaryColor, MaterialTheme.colorScheme.primaryContainer)
 
     Box(
         modifier = Modifier
@@ -139,7 +136,7 @@ private fun DailyGoalProgress(
 
             // Fond
             drawArc(
-                color = Color.White.copy(alpha = 0.08f),
+                color = outlineVariant.copy(alpha = 0.3f),
                 startAngle = -90f,
                 sweepAngle = 360f,
                 useCenter = false,
@@ -150,7 +147,7 @@ private fun DailyGoalProgress(
 
             // Progression
             drawArc(
-                color = AccentBlue,
+                color = primaryColor,
                 startAngle = -90f,
                 sweepAngle = 360f * animatedProgress,
                 useCenter = false,
@@ -164,19 +161,19 @@ private fun DailyGoalProgress(
         Column(horizontalAlignment = Alignment.CenterHorizontally) {
             Icon(
                 Icons.Default.LocalFireDepartment,
-                contentDescription = null,
-                tint = if (progress >= 1f) AccentGreen else AccentBlue,
+                contentDescription = "Objectif quotidien",
+                tint = if (progress >= 1f) MaterialTheme.colorScheme.tertiary else MaterialTheme.colorScheme.primary,
                 modifier = Modifier.size(28.dp)
             )
             Text(
                 "${minutes.toInt()} / ${goal} min",
-                color = Color.White,
+                color = MaterialTheme.colorScheme.onSurface,
                 fontWeight = FontWeight.Bold,
                 fontSize = 16.sp
             )
             Text(
                 "${(progress * 100).toInt()}%",
-                color = Color.White.copy(alpha = 0.5f),
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
                 fontSize = 12.sp
             )
         }
@@ -191,7 +188,7 @@ private fun DailyGoalProgress(
 private fun StreakCard(currentStreak: Int, maxStreak: Int) {
     Card(
         modifier = Modifier.fillMaxWidth(),
-        colors = CardDefaults.cardColors(containerColor = CardBg),
+        colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface),
         shape = RoundedCornerShape(16.dp)
     ) {
         Row(
@@ -205,15 +202,15 @@ private fun StreakCard(currentStreak: Int, maxStreak: Int) {
                     .size(56.dp)
                     .clip(CircleShape)
                     .background(
-                        if (currentStreak > 0) AccentGreen.copy(alpha = 0.15f)
-                        else Color.White.copy(alpha = 0.05f)
+                        if (currentStreak > 0) MaterialTheme.colorScheme.tertiary.copy(alpha = 0.15f)
+                        else MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.25f)
                     ),
                 contentAlignment = Alignment.Center
             ) {
                 Icon(
                     Icons.Default.LocalFireDepartment,
-                    contentDescription = null,
-                    tint = if (currentStreak > 0) AccentGreen else Color.White.copy(alpha = 0.3f),
+                    contentDescription = "Série de lecture",
+                    tint = if (currentStreak > 0) MaterialTheme.colorScheme.tertiary else MaterialTheme.colorScheme.outlineVariant,
                     modifier = Modifier.size(30.dp)
                 )
             }
@@ -222,14 +219,14 @@ private fun StreakCard(currentStreak: Int, maxStreak: Int) {
                 Text(
                     if (currentStreak > 0) "$currentStreak jour${if (currentStreak > 1) "s" else ""} consécutif${if (currentStreak > 1) "s" else ""} !"
                     else "Pas de série en cours",
-                    color = Color.White,
+                    color = MaterialTheme.colorScheme.onSurface,
                     fontWeight = FontWeight.Bold,
                     fontSize = 16.sp
                 )
                 Spacer(Modifier.height(2.dp))
                 Text(
                     "Record: $maxStreak jour${if (maxStreak > 1) "s" else ""}",
-                    color = Color.White.copy(alpha = 0.4f),
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
                     fontSize = 13.sp
                 )
             }
@@ -252,7 +249,7 @@ private fun QuickStatCard(
 ) {
     Card(
         modifier = modifier,
-        colors = CardDefaults.cardColors(containerColor = CardBg),
+        colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface),
         shape = RoundedCornerShape(14.dp)
     ) {
         Column(
@@ -261,18 +258,18 @@ private fun QuickStatCard(
                 .padding(14.dp),
             horizontalAlignment = Alignment.CenterHorizontally
         ) {
-            Icon(icon, contentDescription = null, tint = color, modifier = Modifier.size(22.dp))
+            Icon(icon, contentDescription = title, tint = color, modifier = Modifier.size(22.dp))
             Spacer(Modifier.height(6.dp))
             Text(
                 value,
-                color = Color.White,
+                color = MaterialTheme.colorScheme.onSurface,
                 fontWeight = FontWeight.Bold,
                 fontSize = 22.sp
             )
             if (unit.isNotEmpty()) {
-                Text(unit, color = Color.White.copy(alpha = 0.4f), fontSize = 12.sp)
+                Text(unit, color = MaterialTheme.colorScheme.onSurfaceVariant, fontSize = 12.sp)
             }
-            Text(title, color = Color.White.copy(alpha = 0.5f), fontSize = 11.sp)
+            Text(title, color = MaterialTheme.colorScheme.onSurfaceVariant, fontSize = 11.sp)
         }
     }
 }
@@ -286,17 +283,18 @@ private fun WpmChart(history: List<Pair<String, Int>>) {
     if (history.isEmpty()) return
 
     val maxWpm = (history.maxOfOrNull { it.second } ?: 1).coerceAtLeast(100)
-    val primaryColor = AccentBlue
+    val primaryColor = MaterialTheme.colorScheme.primary
+    val outlineColor = MaterialTheme.colorScheme.outlineVariant
 
     Card(
         modifier = Modifier.fillMaxWidth(),
-        colors = CardDefaults.cardColors(containerColor = CardBg),
+        colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface),
         shape = RoundedCornerShape(16.dp)
     ) {
         Column(modifier = Modifier.padding(20.dp)) {
             Text(
                 "Vitesse de lecture (WPM)",
-                color = Color.White.copy(alpha = 0.7f),
+                color = MaterialTheme.colorScheme.onSurface,
                 fontWeight = FontWeight.SemiBold,
                 fontSize = 14.sp
             )
@@ -319,7 +317,7 @@ private fun WpmChart(history: List<Pair<String, Int>>) {
                 for (i in 0..4) {
                     val y = paddingTop + chartHeight * (1 - i / 4f)
                     drawLine(
-                        color = Color.White.copy(alpha = 0.05f),
+                        color = outlineColor.copy(alpha = 0.25f),
                         start = Offset(paddingLeft, y),
                         end = Offset(size.width - 8.dp.toPx(), y),
                         strokeWidth = 1.dp.toPx()

@@ -67,7 +67,7 @@ fun ReaderScreen(
     // Couleurs selon le thème
     val (bgColor, textColor, accentColor) = when (state.readerTheme) {
         ReaderTheme.NIGHT -> Triple(Color(0xFF0D0D0D), Color.White, Color(0xFFFFB74D))
-        ReaderTheme.DAY -> Triple(Color(0xFFFAFAFA), Color(0xFF1A1A1A), Color(0xFF0091EA))
+        ReaderTheme.DAY -> Triple(Color(0xFFFAFAFA), Color(0xFF1A1A1A), MaterialTheme.colorScheme.primary)
         ReaderTheme.SEPIA -> Triple(Color(0xFFF4ECD8), Color(0xFF3C2F2F), Color(0xFFB65D30))
     }
 
@@ -251,7 +251,7 @@ fun ReaderScreen(
     if (state.isTtsSheetVisible) {
         ModalBottomSheet(
             onDismissRequest = { viewModel.hideTtsSheet() },
-            containerColor = Color(0xFF1E1E1E),
+            containerColor = MaterialTheme.colorScheme.surfaceVariant,
             shape = RoundedCornerShape(topStart = 24.dp, topEnd = 24.dp),
             dragHandle = { BottomSheetDefaults.DragHandle(color = Color.White.copy(alpha = 0.3f)) }
         ) {
@@ -328,7 +328,7 @@ fun ReaderScreen(
     if (state.isTocSheetVisible && book != null) {
         ModalBottomSheet(
             onDismissRequest = { viewModel.hideTocSheet() },
-            containerColor = Color(0xFF1E1E1E),
+            containerColor = MaterialTheme.colorScheme.surfaceVariant,
             shape = RoundedCornerShape(topStart = 24.dp, topEnd = 24.dp),
             dragHandle = { BottomSheetDefaults.DragHandle(color = Color.White.copy(alpha = 0.3f)) }
         ) {
@@ -413,7 +413,7 @@ private fun LoadingIndicator() {
 @Composable
 private fun ErrorMessage(msg: String) {
     Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
-        Text("❌ $msg", color = Color(0xFFFF6B6B),
+        Text("❌ $msg", color = MaterialTheme.colorScheme.error,
             style = MaterialTheme.typography.bodyMedium,
             modifier = Modifier.padding(24.dp))
     }
