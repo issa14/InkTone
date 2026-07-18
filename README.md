@@ -6,8 +6,8 @@
 [![Compose](https://img.shields.io/badge/Jetpack%20Compose-Material%203-4285F4?logo=jetpackcompose)](https://developer.android.com/jetpack/compose)
 [![Architecture](https://img.shields.io/badge/Architecture-Clean%20%2B%20MVI-00C853)](./architecture.md)
 [![License](https://img.shields.io/badge/License-MIT-blue)](./LICENSE)
-[![Status](https://img.shields.io/badge/Status-Phase%205%20%E2%80%94%20Audit%20%26%20Corrections%20%E2%9C%85-brightgreen)](./PROJECT_STATUS.md)
-[![Tests](https://img.shields.io/badge/Tests-43%20passed%2C%200%20failed-success)](./app/src/test/)
+[![Status](https://img.shields.io/badge/Status-Phase%206%20%E2%80%94%20Beta%20%26%20Release-brightgreen)](./PROJECT_STATUS.md)
+[![Tests](https://img.shields.io/badge/Tests-110%20passed%2C%200%20failed-success)](./app/src/test/)
 
 ---
 

@@ -1,10 +1,11 @@
 # 📊 ReadFlow — Suivi d'Avancement Projet
 
 > Dernière mise à jour : 2026-07-18  
-> Phase actuelle : **Phase 5 — Audit & Corrections pré-release (complétée) → Phase 6 — Beta & Release**  
-> Progression globale : **~90%**  
+> Phase actuelle : **Phase 6 — Beta & Release**  
+> Progression globale : **~95%**  
 > Moteurs TTS : **Piper VITS `fr_FR-miro-high`** (local) + **Microsoft Edge TTS** (cloud, Vivienne & Henri)  
-> Tests unitaires : **43 tests, 0 échec**
+> Tests unitaires : **110 tests, 0 échec** (12 fichiers)  
+> Score audit : **8.0/10** (corrigé depuis 6.2/10)
 
 ---
 
@@ -111,27 +112,22 @@ Lecteur d'ebooks Android (EPUB2/EPUB3) avec synthèse vocale neuronale locale en
 | 5.11 | Beta fermée — 10-20 lecteurs francophones | ⬜ À faire | 🔴 | — |
 | 5.12 | Publication Play Store (internal testing) | ⬜ À faire | 🔴 | — |
 
-### Phase 5b — Audit & Corrections pré-release ✅ COMPLÉTÉE (2026-07-18)
+### Phase 5b — Corrections critiques pré-release ✅ COMPLÉTÉE (2026-07-18)
 
-| # | Tâche | Statut | Priorité | Notes |
-|---|---|---|---|---|
-| 5b.1 | Cold Start : Room + DataStore sur Dispatchers.IO | ✅ Fait | 🔴 | Déjà en place, `baseline-prof.txt` ajouté |
-| 5b.2 | Tests unitaires PlaybackOrchestrator | ✅ Fait | 🔴 | 5 tests : fillJob, stop, erreur, play, pause/resume |
-| 5b.3 | Tests unitaires OnnxInferenceService | ✅ Fait | 🔴 | 6 tests : état initial, paramètres, validation, synthèse |
-| 5b.4 | Tests unitaires ReaderViewModel | ✅ Fait | 🔴 | 10 tests : UI state, setters, theme, play/pause/stop, restoration |
-| 5b.5 | fillJob orphelin : ensureActive() | ✅ Fait | 🔴 | Avant/après synthèse JNI + avant buffer.send() |
-| 5b.6 | AudioCacheManager : LruCache + taille réelle | ✅ Fait | 🟠 | AndroidX LruCache, 20 Mo, snapshot().size |
-| 5b.7 | FloatArray silence : réutilisation buffer | ✅ Fait | 🟠 | SILENCE_BUFFER réutilisé sans copyOf |
-| 5b.8 | SharedPreferences → DataStore | ✅ Fait | 🟠 | Déjà migré, 0 référence restante |
-| 5b.9 | AudioServiceLauncher (ViewModel/Android) | ✅ Fait | 🟠 | Interface domaine, implémentation service |
-| 5b.10 | Baseline Profile | ✅ Fait | 🟠 | `app/src/main/baseline-prof.txt` |
-| 5b.11 | CI/CD GitHub Actions | ✅ Fait | 🟠 | `.github/workflows/ci.yml` |
-| 5b.12 | FrenchSentenceSplitter : 10/10 tests | ✅ Fait | 🟠 | findLastPunctuationBefore() + isInsideGuillemets() |
-| 5b.13 | SystemClock.elapsedRealtime() | ✅ Fait | 🟢 | Timestamps playback monotonic |
-| 5b.14 | Code mort : currentWordOffset | ✅ Fait | 🟢 | Supprimé de ProgressEntity + BookMapper |
-| 5b.15 | PlaybackOrchestrator.play() refactoré | ✅ Fait | 🟠 | Déjà en sous-méthodes (A01) |
-| 5b.16 | rememberTextMeasurer() sur Dispatchers.Default | ✅ Fait | 🔴 | Déjà via produceState (C04) |
-| 5b.17 | Double ouverture EPUB (cache hit) | ✅ Fait | 🟠 | Déjà corrigé (P01) |
+**Session de refactoring** — 11 commits sur `fix/corrections-pre-release`.  
+Voir [`CHANGELOG.md`](./CHANGELOG.md) et [`files/EXECUTIVE_SUMMARY_CORRECTIONS.md`](./files/EXECUTIVE_SUMMARY_CORRECTIONS.md) pour le détail complet.
+
+| # | Correctif | Commit | Impact |
+|---|---|---|---|
+| 🔴 C1 | Race condition AudioTrack use-after-free | `0b53f42` | Crash SIGSEGV éliminé |
+| 🔴 C2 | Allocation ShortArray(n) par phrase | `a05398d` | GC pressure ÷ ∞ |
+| 🔴 C3 | Timeout synthèse ONNX + consecutiveErrors | `5599a1e` | ANR 5-10s éliminé |
+| 🟠 H1 | AudioCacheManager sizeOf() +20% alignement | `a060b3c` | Mémoire réelle estimée correctement |
+| 🟠 H4 | ReaderViewModel → 5 UseCases extraits | `559e5f4`, `7612302` | ViewModel 520→470 L, logique métier dans domain |
+| 🟠 H5 | Baseline Profile 72 entrées (+260%) | `3a7709b` | Cold start cible <300ms |
+| 🟠 H6 | Tests unitaires : 110 tests, 12 fichiers | `57dd4fd` | Couverture ~50% (était ~12%) |
+
+**Validation** : `./gradlew clean test` ✅, `lint` ✅, `assembleDebug` ✅
 
 ### 🔄 Historique TTS : Kokoro → Piper
 
