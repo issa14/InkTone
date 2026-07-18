@@ -536,11 +536,6 @@ class PlaybackOrchestrator @Inject constructor(
                                 Log.d(TAG, "Moteur ONNX/Piper détecté → timeout=${synthesisTimeout}ms, maxErreurs=$maxConsecutiveErrors")
                             }
                         }
-                        // Ajuster le sampleRate du player au résultat réel (Edge = 24000 Hz, ONNX = 22050 Hz)
-                        if (result.sampleRate != player.sampleRate) {
-                            Log.d(TAG, "SampleRate player ajusté: ${player.sampleRate} → ${result.sampleRate}")
-                            player.sampleRate = result.sampleRate
-                        }
                     }
 
                     sentenceDurations[idx] = result.audioDurationMs
@@ -633,6 +628,13 @@ class PlaybackOrchestrator @Inject constructor(
             player.enqueue(silence)
 
             if (!started) {
+                // Ajuster le sampleRate du player au résultat réel AVANT ensureTrack()
+                // (Edge = 24000 Hz, ONNX = 22050 Hz). Sans cela, l'AudioTrack est créé
+                // au mauvais sampleRate → distorsion ou absence de son.
+                if (result.sampleRate > 0 && result.sampleRate != player.sampleRate) {
+                    Log.d(TAG, "SampleRate player ajusté: ${player.sampleRate} → ${result.sampleRate}")
+                    player.sampleRate = result.sampleRate
+                }
                 _state.value = State.Playing
                 player.play()
                 started = true
