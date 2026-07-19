@@ -37,8 +37,11 @@ data class LibraryUiState(
     val appTheme: AppTheme = AppTheme.PAPIER_ART,
     val importProgress: Float? = null,
     val importStatus: String? = null,
-    val importSuccessSnackbar: String? = null
+    val importSuccessSnackbar: String? = null,
+    val navSubItems: Map<String, List<NavSubItem>> = emptyMap()
 )
+
+data class NavSubItem(val label: String, val count: Int, val filterId: String)
 
 enum class FilterMode { ALL, BY_AUTHOR, BY_TITLE, IN_PROGRESS, READ, UNREAD }
 enum class SortOrder(val label: String) { TITLE("Nom de livre"), AUTHOR("Auteur"), DATE("Date d'import"), FOLDERS("Dossiers"), RECENT("Liste des récents") }
@@ -89,6 +92,7 @@ class LibraryViewModel @Inject constructor(
                 }
                 _uiState.update { it.copy(allBooks = books, bookProgress = progressMap, isLoading = false) }
                 applyFilters()
+                loadNavSubItems(books)
                 com.inktone.PerfLogger.logMemorySnapshot("Library loaded")
             } catch (e: Exception) {
                 _uiState.update { it.copy(error = e.message, isLoading = false) }
@@ -125,6 +129,34 @@ class LibraryViewModel @Inject constructor(
 
     fun navigateTo(dest: NavigationDestination) {
         _uiState.update { it.copy(currentDestination = dest) }
+    }
+
+    private fun loadNavSubItems(books: List<Book>) {
+        val byAuthor = books
+            .groupBy { it.author }
+            .map { (author, authorBooks) -> NavSubItem(author, authorBooks.size, "author:$author") }
+            .sortedBy { it.label.lowercase() }
+
+        val allItem = NavSubItem("Tous les livres", books.size, "all")
+
+        _uiState.update {
+            it.copy(navSubItems = mapOf(
+                "Tous les livres" to listOf(allItem),
+                "Auteur" to byAuthor,
+                "Favoris" to emptyList(),
+                "Séries" to emptyList(),
+                "Tags" to emptyList(),
+                "Dossiers" to emptyList()
+            ))
+        }
+    }
+
+    /** Sélection d'un sous-élément du popup de navigation (auteur, "tous les livres"...). */
+    fun selectNavSubItem(filterId: String) {
+        when {
+            filterId == "all" -> setSearchQuery("")
+            filterId.startsWith("author:") -> setSearchQuery(filterId.removePrefix("author:"))
+        }
     }
 
     fun toggleTheme() {

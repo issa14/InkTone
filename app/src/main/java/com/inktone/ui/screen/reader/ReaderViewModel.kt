@@ -55,7 +55,9 @@ data class ReaderUiState(
     val highlights: List<HighlightEntity> = emptyList(),
     val bookmarks: List<BookmarkEntity> = emptyList(),
     val showReaderTooltip: Boolean = false,
-    val showPlayTooltip: Boolean = false
+    val showPlayTooltip: Boolean = false,
+    val etaMinutes: Int? = null,
+    val chapterProgressFraction: Float = 0f
 )
 
 enum class ReaderTheme { DAY, NIGHT, SEPIA }
@@ -68,10 +70,10 @@ class ReaderViewModel @Inject constructor(
     private val orchestrator: PlaybackOrchestrator,
     private val onnxService: OnnxInferenceService,
     private val settingsRepository: com.inktone.data.settings.SettingsRepository,
-    private val pronunciationRuleDao: com.inktone.data.database.PronunciationRuleDao,
     private val bookmarkDao: BookmarkDao,
     private val highlightDao: HighlightDao,
     private val annotationDao: AnnotationDao,
+    private val readingSessionDao: com.inktone.data.database.ReadingSessionDao,
     private val audioServiceLauncher: com.inktone.domain.service.AudioServiceLauncher,
     private val ttsRepository: TtsRepository,
     private val calculateProgress: CalculateReadingProgressUseCase,
@@ -89,10 +91,6 @@ class ReaderViewModel @Inject constructor(
     val uiState: StateFlow<ReaderUiState> = _uiState.asStateFlow()
 
     val sleepTimerRemaining: StateFlow<Int?> = orchestrator.sleepTimerRemaining
-
-    val pronunciationRules: StateFlow<List<com.inktone.data.database.entity.PronunciationRule>> = 
-        pronunciationRuleDao.getAllRulesFlow()
-            .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), emptyList())
 
     val playbackState: StateFlow<PlaybackState> = orchestrator.playbackState
 
@@ -132,32 +130,6 @@ class ReaderViewModel @Inject constructor(
 
     fun startSleepTimer(minutes: Int) { orchestrator.startSleepTimer(minutes) }
     fun cancelSleepTimer() { orchestrator.cancelSleepTimer() }
-
-    fun addPronunciationRule(original: String, replacement: String, isRegex: Boolean) {
-        viewModelScope.launch {
-            try {
-                pronunciationRuleDao.insertRule(
-                    com.inktone.data.database.entity.PronunciationRule(
-                        pattern = original, replacement = replacement, isRegex = isRegex
-                    )
-                )
-            } catch (e: Exception) { Log.e("ReaderVM", "Error inserting pronunciation rule", e) }
-        }
-    }
-
-    fun deletePronunciationRule(rule: com.inktone.data.database.entity.PronunciationRule) {
-        viewModelScope.launch {
-            try { pronunciationRuleDao.deleteRule(rule) }
-            catch (e: Exception) { Log.e("ReaderVM", "Error deleting pronunciation rule", e) }
-        }
-    }
-
-    fun togglePronunciationRule(rule: com.inktone.data.database.entity.PronunciationRule) {
-        viewModelScope.launch {
-            try { pronunciationRuleDao.toggleRuleActive(rule.id, !rule.isActive) }
-            catch (e: Exception) { Log.e("ReaderVM", "Error updating pronunciation rule", e) }
-        }
-    }
 
     fun setReaderTheme(theme: ReaderTheme) {
         _uiState.update { it.copy(readerTheme = theme) }
@@ -261,6 +233,9 @@ class ReaderViewModel @Inject constructor(
                 _uiState.update {
                     it.copy(currentSentenceIndex = pbs.activeSentenceIndex, totalSentences = pbs.totalSentences)
                 }
+                _uiState.value.currentChapter?.let { chapter ->
+                    updateEta(pbs.activeSentenceIndex, pbs.totalSentences, chapter)
+                }
                 // Détecter la première sortie audio
                 if (!firstAudioReported && pbs.activeSentenceIndex == 0 && pbs.status == com.inktone.service.audio.PlaybackStatus.PLAYING) {
                     firstAudioReported = true
@@ -359,6 +334,8 @@ class ReaderViewModel @Inject constructor(
                     preWarmChapter(book, index, _uiState.value.voice, _uiState.value.speed)
                 }
 
+                updateEta(sentenceIndex, result.chapter.sentences.size, result.chapter)
+
                 // Relancer la lecture automatiquement après un auto-advance
                 if (autoPlay) {
                     play()
@@ -387,6 +364,7 @@ class ReaderViewModel @Inject constructor(
         else {
             val prevIdx = (_uiState.value.currentSentenceIndex - 1).coerceAtLeast(0)
             _uiState.update { it.copy(currentSentenceIndex = prevIdx) }
+            _uiState.value.currentChapter?.let { updateEta(prevIdx, _uiState.value.totalSentences, it) }
         }
     }
 
@@ -396,6 +374,29 @@ class ReaderViewModel @Inject constructor(
         else {
             val nextIdx = (_uiState.value.currentSentenceIndex + 1).coerceAtMost(maxIdx)
             _uiState.update { it.copy(currentSentenceIndex = nextIdx) }
+            _uiState.value.currentChapter?.let { updateEta(nextIdx, _uiState.value.totalSentences, it) }
+        }
+    }
+
+    /** Calcule le temps de lecture restant estimé pour le chapitre courant, à partir du WPM moyen de l'utilisateur. */
+    private fun updateEta(currentSentenceIndex: Int, totalSentences: Int, chapter: Chapter) {
+        viewModelScope.launch(Dispatchers.Default) {
+            val sessions = readingSessionDao.getAllSync()
+            val totalWords = sessions.sumOf { it.wordsRead.toLong() }
+            val totalSeconds = sessions.sumOf { it.durationSeconds }
+            val chapterPct = if (totalSentences > 0)
+                currentSentenceIndex.toFloat() / totalSentences else 0f
+
+            if (totalSeconds < 60) {
+                _uiState.update { it.copy(chapterProgressFraction = chapterPct) }
+                return@launch
+            }
+
+            val wpm = (totalWords * 60.0 / totalSeconds).toInt().coerceIn(80, 500)
+            val wordsRemaining = chapter.sentences.drop(currentSentenceIndex).sumOf { it.text.split(" ").size }
+            val etaMin = (wordsRemaining / wpm.toDouble()).toInt().coerceAtLeast(1)
+
+            _uiState.update { it.copy(etaMinutes = etaMin, chapterProgressFraction = chapterPct) }
         }
     }
 

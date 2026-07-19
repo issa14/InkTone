@@ -13,7 +13,6 @@ import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
@@ -41,18 +40,13 @@ fun BookmarkScreen(
                     IconButton(onClick = onBack) {
                         Icon(Icons.AutoMirrored.Filled.ArrowBack, "Retour")
                     }
-                },
-                colors = TopAppBarDefaults.topAppBarColors(
-                    containerColor = Color(0xFF0D0E15),
-                    titleContentColor = Color.White
-                )
+                }
             )
-        },
-        containerColor = Color(0xFF0D0E15)
+        }
     ) { padding ->
         if (bookmarks.isEmpty()) {
             Box(Modifier.fillMaxSize().padding(padding), contentAlignment = Alignment.Center) {
-                Text("Aucun signet", color = Color.White.copy(alpha = 0.4f), fontSize = 16.sp)
+                Text("Aucun signet", color = MaterialTheme.colorScheme.onSurfaceVariant, fontSize = 16.sp)
             }
         } else {
             LazyColumn(Modifier.padding(padding)) {
@@ -79,24 +73,24 @@ private fun BookmarkItem(
             .fillMaxWidth()
             .clickable { onTap() }
             .padding(horizontal = 12.dp, vertical = 4.dp),
-        color = Color(0xFF1A1A2E),
+        color = MaterialTheme.colorScheme.surfaceVariant,
         shape = RoundedCornerShape(10.dp)
     ) {
         Row(
             Modifier.padding(12.dp),
             verticalAlignment = Alignment.CenterVertically
         ) {
-            Icon(Icons.Default.Bookmark, "Signets", tint = Color(0xFFFFB74D), modifier = Modifier.size(20.dp))
+            Icon(Icons.Default.Bookmark, "Signets", tint = MaterialTheme.colorScheme.primary, modifier = Modifier.size(20.dp))
             Spacer(Modifier.width(12.dp))
             Column(Modifier.weight(1f)) {
                 Text("Chapitre ${bookmark.chapterIndex + 1} · Phrase ${bookmark.sentenceIndex + 1}",
-                    color = Color.White.copy(alpha = 0.5f), fontSize = 11.sp)
+                    color = MaterialTheme.colorScheme.onSurfaceVariant, fontSize = 11.sp)
                 Spacer(Modifier.height(2.dp))
-                Text(bookmark.text, color = Color.White.copy(alpha = 0.85f),
+                Text(bookmark.text, color = MaterialTheme.colorScheme.onSurface,
                     fontSize = 14.sp, maxLines = 2, overflow = TextOverflow.Ellipsis)
             }
             IconButton(onClick = onDelete) {
-                Icon(Icons.Default.Delete, "Supprimer", tint = Color.White.copy(alpha = 0.3f), modifier = Modifier.size(18.dp))
+                Icon(Icons.Default.Delete, "Supprimer", tint = MaterialTheme.colorScheme.onSurfaceVariant, modifier = Modifier.size(18.dp))
             }
         }
     }

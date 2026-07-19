@@ -1,5 +1,6 @@
 package com.inktone.ui.screen.reader
 
+import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
@@ -10,17 +11,20 @@ import androidx.compose.material.icons.filled.PlayArrow
 import androidx.compose.material.icons.filled.SkipNext
 import androidx.compose.material.icons.filled.SkipPrevious
 import androidx.compose.material.icons.outlined.Headphones
+import androidx.compose.material.icons.outlined.Timer
 import androidx.compose.material3.*
-import com.inktone.ui.theme.ttsActive
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
-import androidx.compose.ui.semantics.contentDescription
-import androidx.compose.ui.semantics.semantics
-import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.graphics.vector.ImageVector
+import androidx.compose.ui.hapticfeedback.HapticFeedbackType
+import androidx.compose.ui.platform.LocalHapticFeedback
+import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import com.inktone.R
 
 @Composable
 fun UnifiedControlPanel(
@@ -33,99 +37,144 @@ fun UnifiedControlPanel(
     onThemeCycle: () -> Unit,
     onFontToggle: () -> Unit,
     onDisplaySettingsClick: () -> Unit,
-    onPrevSentence: () -> Unit,
-    onNextSentence: () -> Unit,
+    onSleepTimerClick: () -> Unit,
     onPrevChapter: () -> Unit,
     onNextChapter: () -> Unit
 ) {
+    val haptic = LocalHapticFeedback.current
+
     Surface(
         modifier = Modifier.fillMaxWidth(),
-        color = panelBg.copy(alpha = 0.94f),
-        shape = RoundedCornerShape(topStart = 16.dp, topEnd = 16.dp)
+        color = panelBg.copy(alpha = 0.95f),
+        shape = RoundedCornerShape(topStart = 20.dp, topEnd = 20.dp)
     ) {
         Column(
             modifier = Modifier
                 .fillMaxWidth()
-                .windowInsetsPadding(WindowInsets.systemBars.only(WindowInsetsSides.Bottom + WindowInsetsSides.Horizontal))
-                .padding(horizontal = 16.dp, vertical = 8.dp)
+                .windowInsetsPadding(WindowInsets.systemBars.only(
+                    WindowInsetsSides.Bottom + WindowInsetsSides.Horizontal
+                ))
+                .padding(horizontal = 20.dp, vertical = 12.dp),
+            horizontalAlignment = Alignment.CenterHorizontally
         ) {
-            // ── Rangée 1 : Outils rapides ────────────
+            // ── RANGÉE PRIMAIRE : Skip ← Play/Pause → Skip ──
+            Row(
+                verticalAlignment = Alignment.CenterVertically,
+                horizontalArrangement = Arrangement.Center,
+                modifier = Modifier.fillMaxWidth()
+            ) {
+                IconButton(
+                    onClick = onPrevChapter,
+                    modifier = Modifier.size(44.dp)
+                ) {
+                    Icon(
+                        Icons.Default.SkipPrevious,
+                        contentDescription = stringResource(R.string.cd_tts_previous),
+                        tint = accentColor.copy(alpha = 0.4f),
+                        modifier = Modifier.size(22.dp)
+                    )
+                }
+
+                Spacer(Modifier.width(24.dp))
+
+                FilledIconButton(
+                    onClick = {
+                        haptic.performHapticFeedback(HapticFeedbackType.LongPress)
+                        onTtsClick()
+                    },
+                    modifier = Modifier.size(56.dp),
+                    colors = IconButtonDefaults.filledIconButtonColors(
+                        containerColor = accentColor
+                    )
+                ) {
+                    Icon(
+                        if (isPlaying) Icons.Default.Pause else Icons.Default.PlayArrow,
+                        contentDescription = stringResource(
+                            if (isPlaying) R.string.cd_tts_pause else R.string.cd_tts_play
+                        ),
+                        modifier = Modifier.size(28.dp),
+                        tint = panelBg
+                    )
+                }
+
+                Spacer(Modifier.width(24.dp))
+
+                IconButton(
+                    onClick = onNextChapter,
+                    modifier = Modifier.size(44.dp)
+                ) {
+                    Icon(
+                        Icons.Default.SkipNext,
+                        contentDescription = stringResource(R.string.cd_tts_next),
+                        tint = accentColor.copy(alpha = 0.4f),
+                        modifier = Modifier.size(22.dp)
+                    )
+                }
+            }
+
+            Spacer(Modifier.height(8.dp))
+
+            HorizontalDivider(
+                color = accentColor.copy(alpha = 0.08f),
+                thickness = 0.5.dp
+            )
+
+            Spacer(Modifier.height(8.dp))
+
+            // ── RANGÉE SECONDAIRE : actions avec labels ──
             Row(
                 modifier = Modifier.fillMaxWidth(),
                 horizontalArrangement = Arrangement.SpaceEvenly,
                 verticalAlignment = Alignment.CenterVertically
             ) {
-                // Phrase précédente
-                IconButton(onClick = onPrevSentence) {
-                    Icon(
-                        Icons.Default.SkipPrevious,
-                        "Phrase précédente", tint = MaterialTheme.colorScheme.onSurfaceVariant,
-                        modifier = Modifier.size(22.dp)
-                    )
-                }
-                // Play/Pause TTS
-                IconButton(onClick = onTtsClick) {
-                    Icon(
-                        if (isPlaying) Icons.Default.Pause else Icons.Default.PlayArrow,
-                        "TTS", tint = accentColor, modifier = Modifier.size(26.dp)
-                    )
-                }
-                // Phrase suivante
-                IconButton(onClick = onNextSentence) {
-                    Icon(
-                        Icons.Default.SkipNext,
-                        "Phrase suivante", tint = MaterialTheme.colorScheme.onSurfaceVariant,
-                        modifier = Modifier.size(22.dp)
-                    )
-                }
-                // Options TTS (Headphones)
-                IconButton(onClick = onTtsSettingsClick) {
-                    Icon(
-                        Icons.Outlined.Headphones,
-                        "Options TTS", tint = MaterialTheme.colorScheme.onSurfaceVariant,
-                        modifier = Modifier.size(24.dp)
-                    )
-                }
-                // Thème
-                IconButton(onClick = onThemeCycle) {
-                    Icon(Icons.Default.Palette, "Thème",
-                        tint = MaterialTheme.colorScheme.onSurfaceVariant)
-                }
-                // OpenDyslexic Quick Toggle
-                IconButton(
-                    onClick = onFontToggle,
-                    modifier = Modifier.semantics { contentDescription = "Police OpenDyslexic" }
-                ) {
-                    Text("D",
-                        color = if (useOpenDyslexic) MaterialTheme.colorScheme.ttsActive else MaterialTheme.colorScheme.onSurfaceVariant,
-                        fontSize = 16.sp, fontWeight = FontWeight.Bold)
-                }
-                // Options d'affichage avancées
-                IconButton(onClick = onDisplaySettingsClick) {
-                    Icon(
-                        Icons.Default.FormatSize,
-                        "Options d'affichage", tint = MaterialTheme.colorScheme.onSurfaceVariant,
-                        modifier = Modifier.size(24.dp)
-                    )
-                }
-            }
-
-            Spacer(Modifier.height(4.dp))
-
-            // ── Rangée 2 : Navigation chapitres ──────
-            Row(
-                modifier = Modifier.fillMaxWidth(),
-                horizontalArrangement = Arrangement.Center,
-                verticalAlignment = Alignment.CenterVertically
-            ) {
-                TextButton(onClick = onPrevChapter) {
-                    Text("◀ Chapitre précédent", color = MaterialTheme.colorScheme.outlineVariant, fontSize = 12.sp)
-                }
-                Spacer(Modifier.width(24.dp))
-                TextButton(onClick = onNextChapter) {
-                    Text("Chapitre suivant ▶", color = MaterialTheme.colorScheme.outlineVariant, fontSize = 12.sp)
-                }
+                SecondaryAction(
+                    icon = Icons.Outlined.Headphones,
+                    label = "Voix",
+                    tint = accentColor.copy(alpha = 0.7f),
+                    onClick = onTtsSettingsClick
+                )
+                SecondaryAction(
+                    icon = Icons.Default.FormatSize,
+                    label = "Police",
+                    tint = if (useOpenDyslexic) accentColor
+                           else accentColor.copy(alpha = 0.5f),
+                    onClick = onFontToggle
+                )
+                SecondaryAction(
+                    icon = Icons.Default.Palette,
+                    label = "Thème",
+                    tint = accentColor.copy(alpha = 0.5f),
+                    onClick = onThemeCycle
+                )
+                SecondaryAction(
+                    icon = Icons.Outlined.Timer,
+                    label = "Veille",
+                    tint = accentColor.copy(alpha = 0.5f),
+                    onClick = onSleepTimerClick
+                )
             }
         }
+    }
+}
+
+@Composable
+private fun SecondaryAction(
+    icon: ImageVector,
+    label: String,
+    tint: Color,
+    onClick: () -> Unit
+) {
+    Column(
+        horizontalAlignment = Alignment.CenterHorizontally,
+        modifier = Modifier
+            .clip(RoundedCornerShape(8.dp))
+            .clickable(onClick = onClick)
+            .padding(horizontal = 12.dp, vertical = 6.dp)
+    ) {
+        Icon(icon, contentDescription = label, tint = tint,
+            modifier = Modifier.size(20.dp))
+        Spacer(Modifier.height(3.dp))
+        Text(label, fontSize = 10.sp, color = tint,
+            style = MaterialTheme.typography.labelSmall)
     }
 }

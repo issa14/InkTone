@@ -23,7 +23,10 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
-import androidx.compose.ui.graphics.asImageBitmap
+import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.res.stringResource
+import androidx.compose.ui.semantics.contentDescription
+import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
@@ -33,6 +36,9 @@ import androidx.compose.ui.unit.sp
 import androidx.compose.ui.window.Popup
 import androidx.compose.ui.window.PopupProperties
 import androidx.hilt.navigation.compose.hiltViewModel
+import coil.compose.AsyncImage
+import coil.request.ImageRequest
+import com.inktone.R
 import com.inktone.domain.model.Book
 import com.inktone.ui.theme.*
 import com.inktone.ui.screen.library.FilterMode
@@ -42,6 +48,7 @@ import com.inktone.ui.screen.library.LayoutMode
 import com.inktone.ui.screen.library.NavigationDestination
 import com.inktone.ui.screen.opds.OpdsScreen
 import com.inktone.ui.theme.ttsActive
+import kotlinx.coroutines.launch
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -52,7 +59,8 @@ fun LibraryScreen(
     viewModel: LibraryViewModel = hiltViewModel()
 ) {
     val state by viewModel.uiState.collectAsState()
-    var showDrawer by remember { mutableStateOf(false) }
+    val drawerState = rememberDrawerState(DrawerValue.Closed)
+    val drawerScope = rememberCoroutineScope()
     var showOverflow by remember { mutableStateOf(false) }
     var showNavPopup by remember { mutableStateOf(false) }
     var showSearch by remember { mutableStateOf(false) }
@@ -76,6 +84,22 @@ fun LibraryScreen(
     }
 
     InkToneTheme(theme = state.appTheme, dynamicColors = false) {
+    ModalNavigationDrawer(
+        drawerState = drawerState,
+        drawerContent = {
+            ModalDrawerSheet(modifier = Modifier.width(310.dp)) {
+                NavDrawerContent(
+                    currentDest = state.currentDestination,
+                    onNavigate = { dest ->
+                        viewModel.navigateTo(dest)
+                        drawerScope.launch { drawerState.close() }
+                    },
+                    onThemeToggle = { viewModel.toggleTheme() },
+                    onDebug = { drawerScope.launch { drawerState.close() }; onDebugClick() }
+                )
+            }
+        }
+    ) {
     Box(modifier = Modifier.fillMaxSize()) {
         Surface(
             modifier = Modifier.fillMaxSize(),
@@ -93,7 +117,7 @@ fun LibraryScreen(
                     } else {
                         TopBar(
                             currentDest = state.currentDestination,
-                            onMenu = { showDrawer = true },
+                            onMenu = { drawerScope.launch { drawerState.open() } },
                             onNavPopup = { showNavPopup = true },
                             onFilterMode = { viewModel.showFilterDialog() },
                             onSearch = { showSearch = true },
@@ -133,7 +157,7 @@ fun LibraryScreen(
                                     Spacer(Modifier.height(16.dp))
                                     Text(
                                         text = "${(progress * 100).toInt()}%",
-                                        color = Color.White,
+                                        color = MaterialTheme.colorScheme.onBackground,
                                         fontWeight = FontWeight.Bold,
                                         fontSize = 18.sp
                                     )
@@ -149,7 +173,7 @@ fun LibraryScreen(
                                     LinearProgressIndicator(
                                         progress = { progress },
                                         color = MaterialTheme.colorScheme.primary,
-                                        trackColor = Color.White.copy(alpha = 0.1f),
+                                        trackColor = MaterialTheme.colorScheme.onBackground.copy(alpha = 0.1f),
                                         modifier = Modifier
                                             .fillMaxWidth(0.8f)
                                             .height(4.dp)
@@ -231,8 +255,10 @@ fun LibraryScreen(
         // ── POPUP NAVIGATION (titre TopBar) ──────────
         if (showNavPopup) {
             LibraryNavigationPopup(
+                navSubItems = state.navSubItems,
                 onDismiss = { showNavPopup = false },
                 onFilterSelect = { viewModel.setFilterMode(it) },
+                onSubItemSelect = { viewModel.selectNavSubItem(it) },
                 currentFilter = state.filterMode
             )
         }
@@ -258,22 +284,6 @@ fun LibraryScreen(
             )
         }
 
-        // ── NAV DRAWER ───────────────────────────────
-        if (showDrawer) {
-            DrawerOverlay(onDismiss = { showDrawer = false })
-        }
-        NavDrawer(
-            visible = showDrawer,
-            currentDest = state.currentDestination,
-            onDismiss = { showDrawer = false },
-            onNavigate = { dest ->
-                viewModel.navigateTo(dest)
-                showDrawer = false
-            },
-            onThemeToggle = { viewModel.toggleTheme() },
-            onDebug = onDebugClick
-        )
-
         // ── FLOATING CONTROLS ────────────────────────
         FloatingControls(
             modifier = Modifier
@@ -284,6 +294,7 @@ fun LibraryScreen(
                 if (latest != null) onBookClick(latest.id)
             }
         )
+    }
     }
     }
 }
@@ -310,28 +321,29 @@ private fun TopBar(
                 verticalAlignment = Alignment.CenterVertically,
                 modifier = Modifier.clickable(onClick = onNavPopup)
             ) {
-                Text(currentDest.label, fontWeight = FontWeight.Medium, fontSize = 17.sp)
+                Text(currentDest.label, fontWeight = FontWeight.Medium, fontSize = 17.sp,
+                    color = MaterialTheme.colorScheme.onPrimary)
                 if (isLibrary) {
                     Spacer(Modifier.width(4.dp))
-                    Icon(Icons.Default.ArrowDropDown, "Menu déroulant", tint = Color.White, modifier = Modifier.size(18.dp))
+                    Icon(Icons.Default.ArrowDropDown, "Menu déroulant", tint = MaterialTheme.colorScheme.onPrimary, modifier = Modifier.size(18.dp))
                 }
             }
         },
         navigationIcon = {
             IconButton(onClick = onMenu) {
-                Icon(Icons.Default.Menu, "Menu", tint = Color.White)
+                Icon(Icons.Default.Menu, stringResource(R.string.cd_menu_open), tint = MaterialTheme.colorScheme.onPrimary)
             }
         },
         actions = {
             if (isLibrary) {
                 IconButton(onClick = onSearch) {
-                    Icon(Icons.Default.Search, "Rechercher", tint = Color.White)
+                    Icon(Icons.Default.Search, stringResource(R.string.cd_search), tint = MaterialTheme.colorScheme.onPrimary)
                 }
                 IconButton(onClick = onFilterMode) {
-                    Icon(Icons.Default.FilterList, "Filtrer", tint = Color.White)
+                    Icon(Icons.Default.FilterList, stringResource(R.string.cd_filter), tint = MaterialTheme.colorScheme.onPrimary)
                 }
                 IconButton(onClick = onOverflow) {
-                    Icon(Icons.Default.MoreVert, "Plus", tint = Color.White)
+                    Icon(Icons.Default.MoreVert, stringResource(R.string.cd_more_options), tint = MaterialTheme.colorScheme.onPrimary)
                 }
             }
         },
@@ -353,15 +365,15 @@ private fun SearchBar(
             TextField(
                 value = query,
                 onValueChange = onQueryChange,
-                placeholder = { Text("Rechercher un livre...", color = Color.White.copy(alpha = 0.5f)) },
+                placeholder = { Text("Rechercher un livre...", color = MaterialTheme.colorScheme.onPrimary.copy(alpha = 0.5f)) },
                 colors = TextFieldDefaults.colors(
                     focusedContainerColor = Color.Transparent,
                     unfocusedContainerColor = Color.Transparent,
-                    focusedTextColor = Color.White,
-                    unfocusedTextColor = Color.White,
-                    cursorColor = Color.White,
-                    focusedIndicatorColor = Color.White.copy(alpha = 0.5f),
-                    unfocusedIndicatorColor = Color.White.copy(alpha = 0.3f)
+                    focusedTextColor = MaterialTheme.colorScheme.onPrimary,
+                    unfocusedTextColor = MaterialTheme.colorScheme.onPrimary,
+                    cursorColor = MaterialTheme.colorScheme.onPrimary,
+                    focusedIndicatorColor = MaterialTheme.colorScheme.onPrimary.copy(alpha = 0.5f),
+                    unfocusedIndicatorColor = MaterialTheme.colorScheme.onPrimary.copy(alpha = 0.3f)
                 ),
                 singleLine = true,
                 modifier = Modifier.fillMaxWidth()
@@ -369,7 +381,7 @@ private fun SearchBar(
         },
         navigationIcon = {
             IconButton(onClick = onClose) {
-                Icon(Icons.Default.ArrowBack, "Fermer", tint = Color.White)
+                Icon(Icons.Default.ArrowBack, stringResource(R.string.cd_close_search), tint = MaterialTheme.colorScheme.onPrimary)
             }
         },
         colors = TopAppBarDefaults.topAppBarColors(containerColor = MaterialTheme.colorScheme.primary)
@@ -402,22 +414,6 @@ private fun ShelfGrid(books: List<Book>, progressMap: Map<String, Float>, onBook
 }
 
 @Composable
-private fun rememberBookCoverPainter(coverPath: String?): androidx.compose.ui.graphics.ImageBitmap? {
-    if (coverPath == null) return null
-    return remember(coverPath) {
-        try {
-            val file = java.io.File(coverPath)
-            if (file.exists()) {
-                val bitmap = android.graphics.BitmapFactory.decodeFile(file.absolutePath)
-                bitmap?.asImageBitmap()
-            } else null
-        } catch (e: Exception) {
-            null
-        }
-    }
-}
-
-@Composable
 private fun BookCover(
     book: Book,
     progress: Float,
@@ -425,7 +421,6 @@ private fun BookCover(
     onClick: () -> Unit
 ) {
     val gradient = CoverGradients[gradientIndex.coerceIn(0, CoverGradients.lastIndex)]
-    val coverBitmap = rememberBookCoverPainter(book.coverPath)
 
     Column(
         modifier = Modifier
@@ -440,10 +435,13 @@ private fun BookCover(
                 .clip(RoundedCornerShape(3.dp))
                 .background(Brush.linearGradient(gradient))
         ) {
-            if (coverBitmap != null) {
-                androidx.compose.foundation.Image(
-                    bitmap = coverBitmap,
-                    contentDescription = book.title,
+            if (book.coverPath != null) {
+                AsyncImage(
+                    model = ImageRequest.Builder(LocalContext.current)
+                        .data(book.coverPath)
+                        .crossfade(true)
+                        .build(),
+                    contentDescription = stringResource(R.string.cd_book_cover, book.title),
                     contentScale = androidx.compose.ui.layout.ContentScale.Crop,
                     modifier = Modifier.fillMaxSize()
                 )
@@ -463,22 +461,30 @@ private fun BookCover(
             }
 
             // Badge progression (%)
-            Surface(
+            val progressPct = (progress * 100).toInt().coerceIn(0, 100)
+            val progressDescription = stringResource(R.string.cd_book_progress, progressPct)
+            Box(
                 modifier = Modifier
                     .align(Alignment.BottomEnd)
                     .padding(6.dp)
-                    .size(26.dp),
-                shape = CircleShape,
-                color = Color.Black.copy(alpha = 0.65f),
-                border = ButtonDefaults.outlinedButtonBorder(enabled = true)
+                    .semantics {
+                        contentDescription = progressDescription
+                    }
             ) {
-                Box(contentAlignment = Alignment.Center) {
-                    Text(
-                        "${(progress * 100).toInt().coerceIn(0, 100)}%",
-                        fontSize = 8.sp,
-                        fontWeight = FontWeight.Bold,
-                        color = Color.White
-                    )
+                Surface(
+                    modifier = Modifier.size(26.dp),
+                    shape = CircleShape,
+                    color = Color.Black.copy(alpha = 0.65f),
+                    border = ButtonDefaults.outlinedButtonBorder(enabled = true)
+                ) {
+                    Box(contentAlignment = Alignment.Center) {
+                        Text(
+                            "$progressPct%",
+                            fontSize = 8.sp,
+                            fontWeight = FontWeight.Bold,
+                            color = Color.White
+                        )
+                    }
                 }
             }
 
@@ -529,11 +535,13 @@ private fun BookCover(
 
 @Composable
 private fun LibraryNavigationPopup(
+    navSubItems: Map<String, List<NavSubItem>>,
     onDismiss: () -> Unit,
     onFilterSelect: (FilterMode) -> Unit,
+    onSubItemSelect: (String) -> Unit,
     currentFilter: FilterMode
 ) {
-    var selectedCategory by remember { mutableStateOf("Séries") }
+    var selectedCategory by remember { mutableStateOf("Tous les livres") }
 
     val categories = listOf(
         "Tous les livres" to FilterMode.ALL,
@@ -544,14 +552,7 @@ private fun LibraryNavigationPopup(
         "Dossiers" to FilterMode.ALL
     )
 
-    // Sous-éléments mockés (à terme depuis le ViewModel)
-    val subItems = remember(selectedCategory) {
-        when (selectedCategory) {
-            "Séries" -> listOf("Black Wings" to 1, "Contes et nouvelles" to 5, "Epub commercial" to 1)
-            "Auteur" -> listOf("Tous" to 12)
-            else -> emptyList()
-        }
-    }
+    val subItems = navSubItems[selectedCategory] ?: emptyList()
 
     Popup(
         alignment = Alignment.TopStart,
@@ -573,7 +574,7 @@ private fun LibraryNavigationPopup(
                     modifier = Modifier
                         .weight(1f)
                         .fillMaxHeight()
-                        .background(Color.Black.copy(alpha = 0.2f))
+                        .background(MaterialTheme.colorScheme.surface.copy(alpha = 0.4f))
                 ) {
                     categories.forEach { (label, mode) ->
                         val isActive = label == selectedCategory
@@ -630,10 +631,13 @@ private fun LibraryNavigationPopup(
                             )
                         }
                     } else {
-                        subItems.forEach { (name, count) ->
+                        subItems.forEach { item ->
                             Surface(
                                 color = MaterialTheme.colorScheme.surfaceVariant,
-                                onClick = onDismiss
+                                onClick = {
+                                    onSubItemSelect(item.filterId)
+                                    onDismiss()
+                                }
                             ) {
                                 Row(
                                     modifier = Modifier
@@ -643,7 +647,7 @@ private fun LibraryNavigationPopup(
                                     verticalAlignment = Alignment.CenterVertically
                                 ) {
                                     Text(
-                                        name,
+                                        item.label,
                                         fontSize = 13.sp,
                                         color = MaterialTheme.colorScheme.onBackground,
                                         modifier = Modifier.weight(1f),
@@ -651,7 +655,7 @@ private fun LibraryNavigationPopup(
                                         overflow = TextOverflow.Ellipsis
                                     )
                                     Text(
-                                        "$count",
+                                        "${item.count}",
                                         fontSize = 11.sp,
                                         fontWeight = FontWeight.SemiBold,
                                         color = MaterialTheme.colorScheme.onSurfaceVariant,
@@ -840,7 +844,7 @@ private fun OverflowMenu(onDismiss: () -> Unit, onImport: () -> Unit) {
                 .align(Alignment.TopEnd)
                 .padding(top = 55.dp, end = 8.dp)
                 .width(260.dp),
-            color = Color.White,
+            color = MaterialTheme.colorScheme.surface,
             shape = RoundedCornerShape(4.dp),
             tonalElevation = 8.dp
         ) {
@@ -879,103 +883,76 @@ private fun OverflowMenuItem(text: String, icon: androidx.compose.ui.graphics.ve
 // ─────────────────────────────────────────────────────
 
 @Composable
-private fun DrawerOverlay(onDismiss: () -> Unit) {
-    Box(
-        modifier = Modifier
-            .fillMaxSize()
-            .background(Color.Black.copy(alpha = 0.5f))
-            .clickable(onClick = onDismiss)
-    )
-}
-
-@Composable
-private fun NavDrawer(
-    visible: Boolean,
+private fun NavDrawerContent(
     currentDest: NavigationDestination,
-    onDismiss: () -> Unit,
     onNavigate: (NavigationDestination) -> Unit,
     onThemeToggle: () -> Unit,
     onDebug: () -> Unit
 ) {
-    AnimatedVisibility(
-        visible = visible,
-        enter = slideInHorizontally { -it },
-        exit = slideOutHorizontally { -it }
-    ) {
-        Surface(
+    Column(modifier = Modifier.fillMaxHeight()) {
+        // Header
+        Box(
             modifier = Modifier
-                .fillMaxHeight()
-                .width(310.dp),
-            color = Color.White
+                .fillMaxWidth()
+                .height(140.dp)
+                .background(Brush.linearGradient(listOf(MaterialTheme.colorScheme.primaryContainer, MaterialTheme.colorScheme.primary)))
+                .padding(16.dp),
+            contentAlignment = Alignment.BottomStart
         ) {
-            Column {
-                // Header
-                Box(
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .height(140.dp)
-                        .background(Brush.linearGradient(listOf(MaterialTheme.colorScheme.primaryContainer, MaterialTheme.colorScheme.primary)))
-                        .padding(16.dp),
-                    contentAlignment = Alignment.BottomStart
+            Text("InkTone", color = MaterialTheme.colorScheme.onPrimary,
+                fontSize = 20.sp, fontWeight = FontWeight.SemiBold)
+        }
+
+        // Menu items dynamiques
+        Column(modifier = Modifier.weight(1f)) {
+            NavigationDestination.entries
+                .filter { it != NavigationDestination.SETTINGS && it != NavigationDestination.ABOUT }
+                .forEach { dest ->
+                val isActive = dest == currentDest
+                Surface(
+                    color = if (isActive) MaterialTheme.colorScheme.primaryContainer else Color.Transparent,
+                    onClick = { onNavigate(dest) }
                 ) {
-                    Text("InkTone", color = Color.White,
-                        fontSize = 20.sp, fontWeight = FontWeight.SemiBold)
-                }
-
-                // Menu items dynamiques
-                Column(modifier = Modifier.weight(1f)) {
-                    NavigationDestination.entries
-                        .filter { it != NavigationDestination.SETTINGS && it != NavigationDestination.ABOUT }
-                        .forEach { dest ->
-                        val isActive = dest == currentDest
-                        Surface(
-                            color = if (isActive) MaterialTheme.colorScheme.primaryContainer else Color.Transparent,
-                            onClick = { onNavigate(dest) }
-                        ) {
-                            Row(
-                                modifier = Modifier
-                                    .fillMaxWidth()
-                                    .padding(horizontal = 20.dp, vertical = 14.dp),
-                                verticalAlignment = Alignment.CenterVertically
-                            ) {
-                                Icon(
-                                    dest.icon, null,
-                                    tint = if (isActive) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurfaceVariant,
-                                    modifier = Modifier.size(20.dp)
-                                )
-                                Spacer(Modifier.width(24.dp))
-                                Text(
-                                    dest.label, fontSize = 14.sp,
-                                    fontWeight = FontWeight.Medium,
-                                    color = if (isActive) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurface
-                                )
-                            }
-                        }
-                    }
-                }
-
-                // Footer
-                Surface(color = MaterialTheme.colorScheme.surface) {
                     Row(
                         modifier = Modifier
                             .fillMaxWidth()
-                            .height(60.dp)
-                            .padding(horizontal = 24.dp),
-                        horizontalArrangement = Arrangement.SpaceEvenly,
+                            .padding(horizontal = 20.dp, vertical = 14.dp),
                         verticalAlignment = Alignment.CenterVertically
                     ) {
-                        DrawerFooterBtn("Options", Icons.Default.Settings) {
-                            onNavigate(NavigationDestination.SETTINGS)
-                            onDismiss()
-                        }
-                        DrawerFooterBtn("À propos", Icons.Default.Info) {
-                            onNavigate(NavigationDestination.ABOUT)
-                            onDismiss()
-                        }
-                        DrawerFooterBtn("Thème", Icons.Default.Palette) { onThemeToggle() }
-                        DrawerFooterBtn("Debug", Icons.Default.Build) { onDismiss(); onDebug() }
+                        Icon(
+                            dest.icon, null,
+                            tint = if (isActive) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurfaceVariant,
+                            modifier = Modifier.size(20.dp)
+                        )
+                        Spacer(Modifier.width(24.dp))
+                        Text(
+                            dest.label, fontSize = 14.sp,
+                            fontWeight = FontWeight.Medium,
+                            color = if (isActive) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurface
+                        )
                     }
                 }
+            }
+        }
+
+        // Footer
+        Surface(color = MaterialTheme.colorScheme.surface) {
+            Row(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .height(60.dp)
+                    .padding(horizontal = 24.dp),
+                horizontalArrangement = Arrangement.SpaceEvenly,
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                DrawerFooterBtn("Options", Icons.Default.Settings) {
+                    onNavigate(NavigationDestination.SETTINGS)
+                }
+                DrawerFooterBtn("À propos", Icons.Default.Info) {
+                    onNavigate(NavigationDestination.ABOUT)
+                }
+                DrawerFooterBtn("Thème", Icons.Default.Palette) { onThemeToggle() }
+                DrawerFooterBtn("Debug", Icons.Default.Build) { onDebug() }
             }
         }
     }
@@ -1026,8 +1003,8 @@ private fun FloatingControls(
             shape = CircleShape,
             modifier = Modifier.size(56.dp)
         ) {
-            Icon(Icons.Default.MenuBook, "Lire",
-                tint = Color.White, modifier = Modifier.size(24.dp))
+            Icon(Icons.Default.MenuBook, stringResource(R.string.cd_resume_reading),
+                tint = MaterialTheme.colorScheme.onPrimary, modifier = Modifier.size(24.dp))
         }
     }
 }
@@ -1039,30 +1016,62 @@ private fun FloatingControls(
 @Composable
 private fun EmptyView(onImportClick: (() -> Unit)? = null, onBrowseClick: (() -> Unit)? = null) {
     Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
-        Column(horizontalAlignment = Alignment.CenterHorizontally) {
-            Icon(Icons.Default.MenuBook, "Livres", Modifier.size(64.dp),
-                tint = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.3f))
-            Spacer(Modifier.height(12.dp))
-            Text("Bibliothèque vide", color = MaterialTheme.colorScheme.onSurfaceVariant, fontSize = 16.sp)
+        Column(
+            modifier = Modifier.padding(horizontal = 48.dp),
+            horizontalAlignment = Alignment.CenterHorizontally
+        ) {
+            Surface(
+                modifier = Modifier.size(80.dp),
+                shape = CircleShape,
+                color = MaterialTheme.colorScheme.primaryContainer
+            ) {
+                Box(contentAlignment = Alignment.Center) {
+                    Icon(
+                        Icons.Default.MenuBook,
+                        contentDescription = null,
+                        modifier = Modifier.size(40.dp),
+                        tint = MaterialTheme.colorScheme.onPrimaryContainer
+                    )
+                }
+            }
+
+            Spacer(Modifier.height(24.dp))
+
+            Text(
+                "Commencez votre bibliothèque",
+                style = MaterialTheme.typography.titleMedium,
+                textAlign = androidx.compose.ui.text.style.TextAlign.Center,
+                color = MaterialTheme.colorScheme.onBackground
+            )
+
+            Spacer(Modifier.height(8.dp))
+
+            Text(
+                "Importez un fichier .epub depuis vos fichiers ou parcourez un catalogue OPDS.",
+                style = MaterialTheme.typography.bodyMedium,
+                textAlign = androidx.compose.ui.text.style.TextAlign.Center,
+                color = MaterialTheme.colorScheme.onSurfaceVariant
+            )
+
             if (onImportClick != null) {
-                Spacer(Modifier.height(24.dp))
+                Spacer(Modifier.height(32.dp))
                 Button(
                     onClick = onImportClick,
-                    colors = ButtonDefaults.buttonColors(containerColor = MaterialTheme.colorScheme.primary),
-                    shape = RoundedCornerShape(12.dp)
+                    modifier = Modifier.fillMaxWidth(0.7f)
                 ) {
-                    Icon(Icons.Default.Add, "Importer", modifier = Modifier.size(18.dp))
+                    Icon(Icons.Default.FileUpload, contentDescription = null,
+                        modifier = Modifier.size(18.dp))
                     Spacer(Modifier.width(8.dp))
-                    Text("Importer un eBook")
+                    Text("Importer un livre")
                 }
             }
             if (onBrowseClick != null) {
                 Spacer(Modifier.height(12.dp))
                 OutlinedButton(
                     onClick = onBrowseClick,
-                    shape = RoundedCornerShape(12.dp)
+                    modifier = Modifier.fillMaxWidth(0.7f)
                 ) {
-                    Icon(Icons.Default.Folder, "Parcourir", modifier = Modifier.size(18.dp))
+                    Icon(Icons.Default.Folder, contentDescription = null, modifier = Modifier.size(18.dp))
                     Spacer(Modifier.width(8.dp))
                     Text("Parcourir mes fichiers")
                 }
@@ -1080,36 +1089,36 @@ private fun LoadingView() {
 
 @Composable
 private fun ErrorBanner(error: String, onDismiss: () -> Unit, onRetry: (() -> Unit)? = null) {
+    val message = error.trimStart('⚠', '❌', '✅', ' ', '️')
     Surface(
-        color = MaterialTheme.colorScheme.errorContainer.copy(alpha = 0.2f),
-        shape = RoundedCornerShape(8.dp),
-        modifier = Modifier.padding(horizontal = 12.dp, vertical = 4.dp)
+        modifier = Modifier.fillMaxWidth(),
+        color = MaterialTheme.colorScheme.errorContainer,
+        shape = RoundedCornerShape(0.dp)
     ) {
         Row(
-            Modifier.padding(12.dp),
+            modifier = Modifier.padding(horizontal = 16.dp, vertical = 12.dp),
             verticalAlignment = Alignment.CenterVertically
         ) {
             Icon(
-                Icons.Default.Error,
-                contentDescription = null,
-                tint = MaterialTheme.colorScheme.error,
+                Icons.Default.ErrorOutline,
+                contentDescription = "Erreur",
+                tint = MaterialTheme.colorScheme.onErrorContainer,
                 modifier = Modifier.size(20.dp)
             )
-            Spacer(Modifier.width(8.dp))
+            Spacer(Modifier.width(12.dp))
             Text(
-                error,
-                color = MaterialTheme.colorScheme.error,
-                modifier = Modifier.weight(1f),
-                fontSize = 13.sp,
-                lineHeight = 18.sp
+                text = message,
+                color = MaterialTheme.colorScheme.onErrorContainer,
+                style = MaterialTheme.typography.bodySmall,
+                modifier = Modifier.weight(1f)
             )
             if (onRetry != null) {
                 TextButton(onClick = onRetry) {
-                    Text("Réessayer", fontSize = 12.sp, color = MaterialTheme.colorScheme.primary)
+                    Text("Réessayer", color = MaterialTheme.colorScheme.onErrorContainer)
                 }
             }
             TextButton(onClick = onDismiss) {
-                Text("OK", fontSize = 12.sp, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                Text("OK", color = MaterialTheme.colorScheme.onErrorContainer)
             }
         }
     }

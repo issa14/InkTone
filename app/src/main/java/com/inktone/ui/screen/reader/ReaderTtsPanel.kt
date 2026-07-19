@@ -1,7 +1,6 @@
 package com.inktone.ui.screen.reader
 
 import androidx.compose.foundation.background
-import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.RoundedCornerShape
@@ -11,21 +10,16 @@ import androidx.compose.material.icons.filled.Pause
 import androidx.compose.material.icons.filled.PlayArrow
 import androidx.compose.material.icons.filled.SkipNext
 import androidx.compose.material.icons.filled.SkipPrevious
-import androidx.compose.material.icons.outlined.Add
 import androidx.compose.material.icons.outlined.Close
-import androidx.compose.material.icons.outlined.Delete
-import androidx.compose.material.icons.outlined.RecordVoiceOver
 import androidx.compose.material.icons.outlined.Timer
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.draw.scale
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
-import com.inktone.data.database.entity.PronunciationRule
 import com.inktone.ui.theme.ttsActive
 
 @Composable
@@ -45,85 +39,8 @@ fun TtsPanel(
     currentVoice: Int,
     sleepTimerRemaining: Int?,
     onStartSleepTimer: (Int) -> Unit,
-    onCancelSleepTimer: () -> Unit,
-    pronunciationRules: List<PronunciationRule>,
-    onAddPronunciationRule: (String, String, Boolean) -> Unit,
-    onDeletePronunciationRule: (PronunciationRule) -> Unit,
-    onTogglePronunciationRule: (PronunciationRule) -> Unit
+    onCancelSleepTimer: () -> Unit
 ) {
-    var showAddRuleDialog by remember { mutableStateOf(false) }
-    var isRulesExpanded by remember { mutableStateOf(false) }
-
-    if (showAddRuleDialog) {
-        var originalText by remember { mutableStateOf("") }
-        var replacementText by remember { mutableStateOf("") }
-        var isRegexChecked by remember { mutableStateOf(false) }
-
-        AlertDialog(
-            onDismissRequest = { showAddRuleDialog = false },
-            title = { Text("Nouvelle règle de prononciation", color = Color.White) },
-            containerColor = MaterialTheme.colorScheme.surfaceVariant,
-            text = {
-                Column {
-                    OutlinedTextField(
-                        value = originalText,
-                        onValueChange = { originalText = it },
-                        label = { Text("Texte d'origine") },
-                        singleLine = true,
-                        colors = OutlinedTextFieldDefaults.colors(
-                            focusedBorderColor = MaterialTheme.colorScheme.ttsActive,
-                            focusedLabelColor = MaterialTheme.colorScheme.ttsActive
-                        ),
-                        modifier = Modifier.fillMaxWidth()
-                    )
-                    Spacer(Modifier.height(12.dp))
-                    OutlinedTextField(
-                        value = replacementText,
-                        onValueChange = { replacementText = it },
-                        label = { Text("Prononciation de remplacement") },
-                        singleLine = true,
-                        colors = OutlinedTextFieldDefaults.colors(
-                            focusedBorderColor = MaterialTheme.colorScheme.ttsActive,
-                            focusedLabelColor = MaterialTheme.colorScheme.ttsActive
-                        ),
-                        modifier = Modifier.fillMaxWidth()
-                    )
-                    Spacer(Modifier.height(12.dp))
-                    Row(
-                        verticalAlignment = Alignment.CenterVertically,
-                        modifier = Modifier.fillMaxWidth()
-                    ) {
-                        Checkbox(
-                            checked = isRegexChecked,
-                            onCheckedChange = { isRegexChecked = it },
-                            colors = CheckboxDefaults.colors(checkedColor = MaterialTheme.colorScheme.ttsActive)
-                        )
-                        Spacer(Modifier.width(8.dp))
-                        Text("Expression régulière (Regex)", color = MaterialTheme.colorScheme.onSurfaceVariant)
-                    }
-                }
-            },
-            confirmButton = {
-                Button(
-                    onClick = {
-                        if (originalText.isNotBlank() && replacementText.isNotBlank()) {
-                            onAddPronunciationRule(originalText, replacementText, isRegexChecked)
-                        }
-                        showAddRuleDialog = false
-                    },
-                    colors = ButtonDefaults.buttonColors(containerColor = MaterialTheme.colorScheme.ttsActive)
-                ) {
-                    Text("Enregistrer", color = MaterialTheme.colorScheme.onSurface)
-                }
-            },
-            dismissButton = {
-                TextButton(onClick = { showAddRuleDialog = false }) {
-                    Text("Annuler", color = MaterialTheme.colorScheme.onSurfaceVariant)
-                }
-            }
-        )
-    }
-
     Column(
         modifier = Modifier
             .fillMaxWidth()
@@ -227,7 +144,7 @@ fun TtsPanel(
                 label = { Text("Jessica", style = MaterialTheme.typography.labelSmall) },
                 colors = FilterChipDefaults.filterChipColors(
                     selectedContainerColor = MaterialTheme.colorScheme.ttsActive.copy(alpha = 0.25f),
-                    selectedLabelColor = Color.White
+                    selectedLabelColor = MaterialTheme.colorScheme.onSurface
                 )
             )
             Spacer(Modifier.width(8.dp))
@@ -237,7 +154,7 @@ fun TtsPanel(
                 label = { Text("Pierre", style = MaterialTheme.typography.labelSmall) },
                 colors = FilterChipDefaults.filterChipColors(
                     selectedContainerColor = MaterialTheme.colorScheme.ttsActive.copy(alpha = 0.25f),
-                    selectedLabelColor = Color.White
+                    selectedLabelColor = MaterialTheme.colorScheme.onSurface
                 )
             )
         }
@@ -317,121 +234,5 @@ fun TtsPanel(
             }
         }
 
-        Spacer(Modifier.height(16.dp))
-        HorizontalDivider(color = MaterialTheme.colorScheme.outlineVariant)
-        Spacer(Modifier.height(16.dp))
-
-        // 💎 Custom Pronunciation Dictionary
-        Column(modifier = Modifier.fillMaxWidth()) {
-            Row(
-                modifier = Modifier.fillMaxWidth(),
-                verticalAlignment = Alignment.CenterVertically,
-                horizontalArrangement = Arrangement.SpaceBetween
-            ) {
-                Row(
-                    verticalAlignment = Alignment.CenterVertically,
-                    modifier = Modifier.clickable { isRulesExpanded = !isRulesExpanded }
-                ) {
-                    Icon(
-                        Icons.Outlined.RecordVoiceOver, "Dictionnaire",
-                        tint = MaterialTheme.colorScheme.ttsActive,
-                        modifier = Modifier.size(18.dp)
-                    )
-                    Spacer(Modifier.width(8.dp))
-                    Text(
-                        "Dictionnaire phonétique (${pronunciationRules.size})",
-                        color = MaterialTheme.colorScheme.onSurface,
-                        style = MaterialTheme.typography.labelLarge,
-                        fontWeight = FontWeight.SemiBold
-                    )
-                }
-
-                IconButton(
-                    onClick = { showAddRuleDialog = true },
-                    modifier = Modifier.size(28.dp)
-                ) {
-                    Icon(
-                        Icons.Outlined.Add, "Ajouter",
-                        tint = MaterialTheme.colorScheme.ttsActive,
-                        modifier = Modifier.size(20.dp)
-                    )
-                }
-            }
-
-            if (isRulesExpanded || pronunciationRules.isNotEmpty()) {
-                Spacer(Modifier.height(12.dp))
-                if (pronunciationRules.isEmpty()) {
-                    Text(
-                        "Aucune règle personnalisée. Corrigez la prononciation des mots en cliquant sur +.",
-                        color = MaterialTheme.colorScheme.outlineVariant,
-                        style = MaterialTheme.typography.labelSmall
-                    )
-                } else {
-                    Column(
-                        verticalArrangement = Arrangement.spacedBy(8.dp)
-                    ) {
-                        pronunciationRules.forEach { rule ->
-                            Row(
-                                modifier = Modifier
-                                    .fillMaxWidth()
-                                    .background(MaterialTheme.colorScheme.outlineVariant, RoundedCornerShape(8.dp))
-                                    .padding(horizontal = 10.dp, vertical = 8.dp),
-                                verticalAlignment = Alignment.CenterVertically,
-                                horizontalArrangement = Arrangement.SpaceBetween
-                            ) {
-                                Column(modifier = Modifier.weight(1f)) {
-                                    Row(verticalAlignment = Alignment.CenterVertically) {
-                                        Text(
-                                            rule.pattern,
-                                            color = MaterialTheme.colorScheme.onSurface,
-                                            fontWeight = FontWeight.Medium,
-                                            style = MaterialTheme.typography.bodyMedium
-                                        )
-                                        if (rule.isRegex) {
-                                            Spacer(Modifier.width(6.dp))
-                                            Text(
-                                                "regex",
-                                                color = MaterialTheme.colorScheme.ttsActive,
-                                                fontSize = 9.sp,
-                                                modifier = Modifier
-                                                    .background(MaterialTheme.colorScheme.ttsActive.copy(alpha = 0.15f), RoundedCornerShape(2.dp))
-                                                    .padding(horizontal = 4.dp, vertical = 1.dp)
-                                            )
-                                        }
-                                    }
-                                    Text(
-                                        "➔ ${rule.replacement}",
-                                        color = MaterialTheme.colorScheme.outlineVariant,
-                                        style = MaterialTheme.typography.labelSmall
-                                    )
-                                }
-
-                                Row(verticalAlignment = Alignment.CenterVertically) {
-                                    Switch(
-                                        checked = rule.isActive,
-                                        onCheckedChange = { onTogglePronunciationRule(rule) },
-                                        colors = SwitchDefaults.colors(
-                                            checkedThumbColor = MaterialTheme.colorScheme.ttsActive,
-                                            checkedTrackColor = MaterialTheme.colorScheme.ttsActive.copy(alpha = 0.35f)
-                                        ),
-                                        modifier = Modifier.scale(0.7f)
-                                    )
-                                    IconButton(
-                                        onClick = { onDeletePronunciationRule(rule) },
-                                        modifier = Modifier.size(28.dp)
-                                    ) {
-                                        Icon(
-                                            Icons.Outlined.Delete, "Supprimer",
-                                            tint = MaterialTheme.colorScheme.outlineVariant,
-                                            modifier = Modifier.size(16.dp)
-                                        )
-                                    }
-                                }
-                            }
-                        }
-                    }
-                }
-            }
-        }
     }
 }

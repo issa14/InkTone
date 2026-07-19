@@ -3,6 +3,7 @@ package com.inktone.ui.screen.settings
 import android.net.Uri
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
+import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.rememberScrollState
@@ -10,14 +11,19 @@ import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.*
+import androidx.compose.material.icons.outlined.Add
+import androidx.compose.material.icons.outlined.Delete
+import androidx.compose.material.icons.outlined.RecordVoiceOver
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.scale
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.hilt.navigation.compose.hiltViewModel
+import com.inktone.data.database.entity.PronunciationRule
 import com.inktone.data.settings.AppTheme
 
 @Composable
@@ -25,6 +31,7 @@ fun SettingsScreen(
     viewModel: SettingsViewModel = hiltViewModel()
 ) {
     val state by viewModel.uiState.collectAsState()
+    val pronunciationRules by viewModel.pronunciationRules.collectAsState()
     var showVoicePicker by remember { mutableStateOf(false) }
     var showEnginePicker by remember { mutableStateOf(false) }
     var showEdgeVoicePicker by remember { mutableStateOf(false) }
@@ -246,6 +253,23 @@ fun SettingsScreen(
                     title = "Importer une sauvegarde",
                     subtitle = "Restaurer depuis un fichier .json",
                     onClick = { importLauncher.launch(arrayOf("application/json")) }
+                )
+            }
+        }
+
+        Spacer(Modifier.height(24.dp))
+
+        // ═══════════════════════════════════════════
+        //  🗣️ PRONONCIATION
+        // ═══════════════════════════════════════════
+        SectionGroup("🗣️ Prononciation")
+        Card(colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface), shape = RoundedCornerShape(14.dp), modifier = Modifier.fillMaxWidth()) {
+            Column(modifier = Modifier.padding(16.dp)) {
+                PronunciationDictionary(
+                    pronunciationRules = pronunciationRules,
+                    onAddPronunciationRule = { orig, rep, reg -> viewModel.addPronunciationRule(orig, rep, reg) },
+                    onDeletePronunciationRule = { viewModel.deletePronunciationRule(it) },
+                    onTogglePronunciationRule = { viewModel.togglePronunciationRule(it) }
                 )
             }
         }
@@ -474,4 +498,181 @@ private fun PathEditDialog(
     )
 }
 
-// Extension pour clickable sans ripple
+// ─────────────────────────────────────────────────────
+//  DICTIONNAIRE DE PRONONCIATION
+// ─────────────────────────────────────────────────────
+
+@Composable
+private fun PronunciationDictionary(
+    pronunciationRules: List<PronunciationRule>,
+    onAddPronunciationRule: (String, String, Boolean) -> Unit,
+    onDeletePronunciationRule: (PronunciationRule) -> Unit,
+    onTogglePronunciationRule: (PronunciationRule) -> Unit
+) {
+    var showAddRuleDialog by remember { mutableStateOf(false) }
+
+    if (showAddRuleDialog) {
+        var originalText by remember { mutableStateOf("") }
+        var replacementText by remember { mutableStateOf("") }
+        var isRegexChecked by remember { mutableStateOf(false) }
+
+        AlertDialog(
+            onDismissRequest = { showAddRuleDialog = false },
+            title = { Text("Nouvelle règle de prononciation", color = MaterialTheme.colorScheme.onSurface) },
+            containerColor = MaterialTheme.colorScheme.surface,
+            text = {
+                Column {
+                    OutlinedTextField(
+                        value = originalText,
+                        onValueChange = { originalText = it },
+                        label = { Text("Texte d'origine") },
+                        singleLine = true,
+                        colors = OutlinedTextFieldDefaults.colors(
+                            focusedBorderColor = MaterialTheme.colorScheme.primary,
+                            focusedLabelColor = MaterialTheme.colorScheme.primary
+                        ),
+                        modifier = Modifier.fillMaxWidth()
+                    )
+                    Spacer(Modifier.height(12.dp))
+                    OutlinedTextField(
+                        value = replacementText,
+                        onValueChange = { replacementText = it },
+                        label = { Text("Prononciation de remplacement") },
+                        singleLine = true,
+                        colors = OutlinedTextFieldDefaults.colors(
+                            focusedBorderColor = MaterialTheme.colorScheme.primary,
+                            focusedLabelColor = MaterialTheme.colorScheme.primary
+                        ),
+                        modifier = Modifier.fillMaxWidth()
+                    )
+                    Spacer(Modifier.height(12.dp))
+                    Row(
+                        verticalAlignment = Alignment.CenterVertically,
+                        modifier = Modifier.fillMaxWidth()
+                    ) {
+                        Checkbox(
+                            checked = isRegexChecked,
+                            onCheckedChange = { isRegexChecked = it },
+                            colors = CheckboxDefaults.colors(checkedColor = MaterialTheme.colorScheme.primary)
+                        )
+                        Spacer(Modifier.width(8.dp))
+                        Text("Expression régulière (Regex)", color = MaterialTheme.colorScheme.onSurfaceVariant)
+                    }
+                }
+            },
+            confirmButton = {
+                Button(
+                    onClick = {
+                        if (originalText.isNotBlank() && replacementText.isNotBlank()) {
+                            onAddPronunciationRule(originalText, replacementText, isRegexChecked)
+                        }
+                        showAddRuleDialog = false
+                    },
+                    colors = ButtonDefaults.buttonColors(containerColor = MaterialTheme.colorScheme.primary)
+                ) {
+                    Text("Enregistrer")
+                }
+            },
+            dismissButton = {
+                TextButton(onClick = { showAddRuleDialog = false }) {
+                    Text("Annuler", color = MaterialTheme.colorScheme.onSurfaceVariant)
+                }
+            }
+        )
+    }
+
+    Row(
+        modifier = Modifier.fillMaxWidth(),
+        verticalAlignment = Alignment.CenterVertically,
+        horizontalArrangement = Arrangement.SpaceBetween
+    ) {
+        Row(verticalAlignment = Alignment.CenterVertically) {
+            Icon(
+                Icons.Outlined.RecordVoiceOver, null,
+                tint = MaterialTheme.colorScheme.primary.copy(alpha = 0.7f),
+                modifier = Modifier.size(20.dp)
+            )
+            Spacer(Modifier.width(12.dp))
+            Text(
+                "Dictionnaire phonétique (${pronunciationRules.size})",
+                color = MaterialTheme.colorScheme.onSurface,
+                fontSize = 13.sp
+            )
+        }
+        IconButton(onClick = { showAddRuleDialog = true }, modifier = Modifier.size(28.dp)) {
+            Icon(Icons.Outlined.Add, "Ajouter une règle", tint = MaterialTheme.colorScheme.primary, modifier = Modifier.size(20.dp))
+        }
+    }
+
+    if (pronunciationRules.isEmpty()) {
+        Spacer(Modifier.height(8.dp))
+        Text(
+            "Aucune règle personnalisée. Corrigez la prononciation des mots en cliquant sur +.",
+            color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.7f),
+            fontSize = 11.sp
+        )
+    } else {
+        Spacer(Modifier.height(12.dp))
+        Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+            pronunciationRules.forEach { rule ->
+                Row(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .background(MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.15f), RoundedCornerShape(8.dp))
+                        .padding(horizontal = 10.dp, vertical = 8.dp),
+                    verticalAlignment = Alignment.CenterVertically,
+                    horizontalArrangement = Arrangement.SpaceBetween
+                ) {
+                    Column(modifier = Modifier.weight(1f)) {
+                        Row(verticalAlignment = Alignment.CenterVertically) {
+                            Text(
+                                rule.pattern,
+                                color = MaterialTheme.colorScheme.onSurface,
+                                fontWeight = FontWeight.Medium,
+                                fontSize = 13.sp
+                            )
+                            if (rule.isRegex) {
+                                Spacer(Modifier.width(6.dp))
+                                Text(
+                                    "regex",
+                                    color = MaterialTheme.colorScheme.primary,
+                                    fontSize = 9.sp,
+                                    modifier = Modifier
+                                        .background(MaterialTheme.colorScheme.primary.copy(alpha = 0.15f), RoundedCornerShape(2.dp))
+                                        .padding(horizontal = 4.dp, vertical = 1.dp)
+                                )
+                            }
+                        }
+                        Text(
+                            "➔ ${rule.replacement}",
+                            color = MaterialTheme.colorScheme.onSurfaceVariant,
+                            fontSize = 11.sp
+                        )
+                    }
+
+                    Row(verticalAlignment = Alignment.CenterVertically) {
+                        Switch(
+                            checked = rule.isActive,
+                            onCheckedChange = { onTogglePronunciationRule(rule) },
+                            colors = SwitchDefaults.colors(
+                                checkedThumbColor = MaterialTheme.colorScheme.primary,
+                                checkedTrackColor = MaterialTheme.colorScheme.primary.copy(alpha = 0.35f)
+                            ),
+                            modifier = Modifier.scale(0.7f)
+                        )
+                        IconButton(
+                            onClick = { onDeletePronunciationRule(rule) },
+                            modifier = Modifier.size(28.dp)
+                        ) {
+                            Icon(
+                                Icons.Outlined.Delete, "Supprimer",
+                                tint = MaterialTheme.colorScheme.onSurfaceVariant,
+                                modifier = Modifier.size(16.dp)
+                            )
+                        }
+                    }
+                }
+            }
+        }
+    }
+}

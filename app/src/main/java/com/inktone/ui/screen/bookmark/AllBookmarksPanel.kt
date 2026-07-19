@@ -11,7 +11,6 @@ import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
@@ -48,18 +47,11 @@ fun AllBookmarksPanel(
         OutlinedTextField(
             value = searchQuery,
             onValueChange = { searchQuery = it },
-            placeholder = { Text("Rechercher...", color = Color.White.copy(alpha = 0.3f)) },
+            placeholder = { Text("Rechercher...", color = MaterialTheme.colorScheme.onSurfaceVariant) },
             leadingIcon = {
-                Icon(Icons.Default.Search, "Rechercher", tint = Color.White.copy(alpha = 0.4f), modifier = Modifier.size(20.dp))
+                Icon(Icons.Default.Search, "Rechercher", tint = MaterialTheme.colorScheme.onSurfaceVariant, modifier = Modifier.size(20.dp))
             },
             singleLine = true,
-            colors = OutlinedTextFieldDefaults.colors(
-                focusedTextColor = Color.White,
-                unfocusedTextColor = Color.White.copy(alpha = 0.7f),
-                cursorColor = Color(0xFFFFB74D),
-                focusedBorderColor = Color(0xFFFFB74D),
-                unfocusedBorderColor = Color.White.copy(alpha = 0.2f)
-            ),
             modifier = Modifier.fillMaxWidth()
         )
         Spacer(Modifier.height(12.dp))
@@ -68,7 +60,7 @@ fun AllBookmarksPanel(
             Text(
                 if (searchQuery.isNotBlank()) "Aucun résultat pour « $searchQuery »"
                 else "Aucun marque-page. Ajoutez-en depuis le lecteur (icône 🔖).",
-                color = Color.White.copy(alpha = 0.3f),
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
                 style = MaterialTheme.typography.labelMedium,
                 modifier = Modifier.padding(vertical = 16.dp)
             )
@@ -98,7 +90,7 @@ private fun BookmarkDrawerItem(
             .fillMaxWidth()
             .padding(vertical = 3.dp)
             .clickable { onTap() },
-        color = Color.White.copy(alpha = 0.04f),
+        color = MaterialTheme.colorScheme.surfaceVariant,
         shape = RoundedCornerShape(10.dp)
     ) {
         Row(
@@ -107,27 +99,27 @@ private fun BookmarkDrawerItem(
         ) {
             Icon(
                 Icons.Default.Bookmark, "Signets",
-                tint = Color(0xFFFFB74D),
+                tint = MaterialTheme.colorScheme.primary,
                 modifier = Modifier.size(20.dp)
             )
             Spacer(Modifier.width(10.dp))
             Column(Modifier.weight(1f)) {
                 Text(
                     bookmark.text,
-                    color = Color.White.copy(alpha = 0.75f),
+                    color = MaterialTheme.colorScheme.onSurface,
                     style = MaterialTheme.typography.bodySmall,
                     maxLines = 2, overflow = TextOverflow.Ellipsis
                 )
                 Spacer(Modifier.height(2.dp))
                 Text(
                     "Ch. ${bookmark.chapterIndex + 1} · Phrase ${bookmark.sentenceIndex + 1}",
-                    color = Color.White.copy(alpha = 0.3f),
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
                     fontSize = 11.sp
                 )
             }
             IconButton(onClick = onDelete, modifier = Modifier.size(28.dp)) {
                 Icon(Icons.Default.Delete, "Supprimer",
-                    tint = Color.White.copy(alpha = 0.35f), modifier = Modifier.size(16.dp))
+                    tint = MaterialTheme.colorScheme.onSurfaceVariant, modifier = Modifier.size(16.dp))
             }
         }
     }

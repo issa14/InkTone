@@ -1,3 +1,31 @@
 <resources>
     <string name="app_name">InkTone</string>
+
+    <!-- Navigation -->
+    <string name="cd_menu_open">Ouvrir le menu</string>
+    <string name="cd_search">Rechercher</string>
+    <string name="cd_filter">Filtrer et trier</string>
+    <string name="cd_more_options">Plus d\'options</string>
+    <string name="cd_close_search">Fermer la recherche</string>
+
+    <!-- Library -->
+    <string name="cd_book_progress">Progression : %d%%</string>
+    <string name="cd_book_cover">Couverture de %s</string>
+    <string name="cd_resume_reading">Reprendre la lecture audio</string>
+    <string name="cd_import_books">Importer des livres</string>
+
+    <!-- Reader -->
+    <string name="cd_tts_play">Lire</string>
+    <string name="cd_tts_pause">Mettre en pause</string>
+    <string name="cd_tts_stop">Arrêter</string>
+    <string name="cd_tts_previous">Phrase précédente</string>
+    <string name="cd_tts_next">Phrase suivante</string>
+    <string name="cd_back_to_library">Retour à la bibliothèque</string>
+    <string name="cd_font_dyslexic_toggle">Police OpenDyslexic : activée/désactivée</string>
+    <string name="cd_theme_cycle">Changer de thème</string>
+
+    <!-- Stats -->
+    <string name="cd_stats_daily_goal">Objectif quotidien : %d minutes sur %d</string>
+    <string name="cd_stats_streak">Série de lecture : %d jours</string>
+    <string name="cd_stats_weekly_chart">Graphique de lecture hebdomadaire</string>
 </resources>

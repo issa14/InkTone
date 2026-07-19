@@ -22,11 +22,16 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.StrokeCap
 import androidx.compose.ui.graphics.drawscope.Stroke
 import androidx.compose.ui.graphics.nativeCanvas
+import androidx.compose.ui.graphics.toArgb
+import androidx.compose.ui.res.stringResource
+import androidx.compose.ui.semantics.contentDescription
+import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.hilt.navigation.compose.hiltViewModel
+import com.inktone.R
 import com.inktone.ui.theme.reducedMotionDuration
 
 
@@ -119,6 +124,7 @@ private fun DailyGoalProgress(
     val outlineVariant = MaterialTheme.colorScheme.outlineVariant
     val primaryColor = MaterialTheme.colorScheme.primary
     val gradientColors = listOf(primaryColor, MaterialTheme.colorScheme.primaryContainer)
+    val goalDescription = stringResource(R.string.cd_stats_daily_goal, minutes.toInt(), goal)
 
     Box(
         modifier = Modifier
@@ -126,7 +132,11 @@ private fun DailyGoalProgress(
             .padding(8.dp),
         contentAlignment = Alignment.Center
     ) {
-        Canvas(modifier = Modifier.fillMaxSize()) {
+        Canvas(
+            modifier = Modifier
+                .fillMaxSize()
+                .semantics { contentDescription = goalDescription }
+        ) {
             val strokeWidth = 14.dp.toPx()
             val radius = (size.minDimension - strokeWidth) / 2
             val topLeft = Offset(
@@ -210,7 +220,7 @@ private fun StreakCard(currentStreak: Int, maxStreak: Int) {
             ) {
                 Icon(
                     Icons.Default.LocalFireDepartment,
-                    contentDescription = "Série de lecture",
+                    contentDescription = stringResource(R.string.cd_stats_streak, currentStreak),
                     tint = if (currentStreak > 0) MaterialTheme.colorScheme.tertiary else MaterialTheme.colorScheme.outlineVariant,
                     modifier = Modifier.size(30.dp)
                 )
@@ -286,6 +296,8 @@ private fun WpmChart(history: List<Pair<String, Int>>) {
     val maxWpm = (history.maxOfOrNull { it.second } ?: 1).coerceAtLeast(100)
     val primaryColor = MaterialTheme.colorScheme.primary
     val outlineColor = MaterialTheme.colorScheme.outlineVariant
+    val labelColor = MaterialTheme.colorScheme.onSurfaceVariant.toArgb()
+    val chartDescription = stringResource(R.string.cd_stats_weekly_chart)
 
     Card(
         modifier = Modifier.fillMaxWidth(),
@@ -305,6 +317,7 @@ private fun WpmChart(history: List<Pair<String, Int>>) {
                 modifier = Modifier
                     .fillMaxWidth()
                     .height(160.dp)
+                    .semantics { contentDescription = chartDescription }
             ) {
                 val paddingLeft = 40.dp.toPx()
                 val paddingBottom = 32.dp.toPx()
@@ -330,7 +343,7 @@ private fun WpmChart(history: List<Pair<String, Int>>) {
                         4.dp.toPx(),
                         y + 4.dp.toPx(),
                         android.graphics.Paint().apply {
-                            color = android.graphics.Color.argb(100, 255, 255, 255)
+                            color = android.graphics.Color.argb(100, android.graphics.Color.red(labelColor), android.graphics.Color.green(labelColor), android.graphics.Color.blue(labelColor))
                             textSize = 10.sp.toPx()
                             textAlign = android.graphics.Paint.Align.LEFT
                         }
@@ -352,7 +365,7 @@ private fun WpmChart(history: List<Pair<String, Int>>) {
                         x,
                         size.height - 4.dp.toPx(),
                         android.graphics.Paint().apply {
-                            color = android.graphics.Color.argb(150, 255, 255, 255)
+                            color = android.graphics.Color.argb(150, android.graphics.Color.red(labelColor), android.graphics.Color.green(labelColor), android.graphics.Color.blue(labelColor))
                             textSize = 10.sp.toPx()
                             textAlign = android.graphics.Paint.Align.CENTER
                         }
@@ -389,7 +402,7 @@ private fun WpmChart(history: List<Pair<String, Int>>) {
                             x,
                             size.height - 4.dp.toPx(),
                             android.graphics.Paint().apply {
-                                color = android.graphics.Color.argb(150, 255, 255, 255)
+                                color = android.graphics.Color.argb(150, android.graphics.Color.red(labelColor), android.graphics.Color.green(labelColor), android.graphics.Color.blue(labelColor))
                                 textSize = 10.sp.toPx()
                                 textAlign = android.graphics.Paint.Align.CENTER
                             }
@@ -402,7 +415,7 @@ private fun WpmChart(history: List<Pair<String, Int>>) {
                                 x,
                                 y - 10.dp.toPx(),
                                 android.graphics.Paint().apply {
-                                    color = android.graphics.Color.argb(200, 255, 255, 255)
+                                    color = android.graphics.Color.argb(200, android.graphics.Color.red(labelColor), android.graphics.Color.green(labelColor), android.graphics.Color.blue(labelColor))
                                     textSize = 9.sp.toPx()
                                     textAlign = android.graphics.Paint.Align.CENTER
                                 }

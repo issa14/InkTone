@@ -23,6 +23,7 @@ import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.IntSize
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import androidx.compose.ui.zIndex
 import androidx.core.view.WindowCompat
 import androidx.core.view.WindowInsetsCompat
 import androidx.core.view.WindowInsetsControllerCompat
@@ -106,10 +107,22 @@ fun ReaderScreen(
             }
         }
 
+        // Barre de progression chapitre — 2dp, toujours présente, non obstruante
+        LinearProgressIndicator(
+            progress = { state.chapterProgressFraction },
+            modifier = Modifier
+                .fillMaxWidth()
+                .height(2.dp)
+                .align(Alignment.TopCenter)
+                .zIndex(1f),
+            color = accentColor.copy(alpha = 0.6f),
+            trackColor = Color.Transparent
+        )
+
         // ── COUCHE 0 : Texte (100% espace, jamais ne bouge) ─
         Crossfade(targetState = state.readerTheme, animationSpec = tween(300)) {
         when {
-            state.isLoading -> LoadingIndicator()
+            state.isLoading -> LoadingIndicator(color = textColor)
             state.error != null -> ErrorMessage(state.error!!)
             chapter != null -> ReaderContent(
                 chapter = chapter,
@@ -270,19 +283,31 @@ fun ReaderScreen(
             }
         }
 
-        // ── Micro-indicateur (HUD masqué) ────
+        // ── Micro-indicateur enrichi (HUD masqué) ────
         if (!state.isHudVisible && chapter != null) {
-            val pct = if (state.totalSentences > 0)
-                (state.currentSentenceIndex * 100.0 / state.totalSentences) else 0.0
-            Text(
-                "${"%.1f".format(pct)}%",
-                color = textColor.copy(alpha = 0.4f),
-                fontSize = 12.sp,
+            Row(
                 modifier = Modifier
                     .align(Alignment.BottomCenter)
                     .windowInsetsPadding(WindowInsets.systemBars.only(WindowInsetsSides.Bottom))
-                    .padding(bottom = 8.dp)
-            )
+                    .padding(bottom = 10.dp),
+                horizontalArrangement = Arrangement.spacedBy(12.dp),
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                Text(
+                    "Ch. ${state.currentChapterIndex + 1} / ${book?.totalChapters ?: 1}",
+                    color = textColor.copy(alpha = 0.4f),
+                    fontSize = 11.sp
+                )
+                state.etaMinutes?.let { eta ->
+                    Text("·", color = textColor.copy(alpha = 0.25f), fontSize = 11.sp)
+                    Text(
+                        "~$eta min",
+                        color = accentColor.copy(alpha = 0.7f),
+                        fontSize = 11.sp,
+                        fontWeight = FontWeight.Medium
+                    )
+                }
+            }
         }
 
         // ── FAB Lecture flottant (HUD masqué, pas de TTS) ──
@@ -349,8 +374,7 @@ fun ReaderScreen(
                 onThemeCycle = { viewModel.cycleTheme() },
                 onFontToggle = { viewModel.toggleOpenDyslexic() },
                 onDisplaySettingsClick = { viewModel.showSettingsSheet() },
-                onPrevSentence = { viewModel.previousSentence() },
-                onNextSentence = { viewModel.nextSentence() },
+                onSleepTimerClick = { viewModel.showTtsSheet() },
                 onPrevChapter = { viewModel.previousChapter() },
                 onNextChapter = { viewModel.nextChapter() }
             )
@@ -372,10 +396,9 @@ fun ReaderScreen(
             onDismissRequest = { viewModel.hideTtsSheet() },
             containerColor = MaterialTheme.colorScheme.surfaceVariant,
             shape = RoundedCornerShape(topStart = 24.dp, topEnd = 24.dp),
-            dragHandle = { BottomSheetDefaults.DragHandle(color = Color.White.copy(alpha = 0.3f)) }
+            dragHandle = { BottomSheetDefaults.DragHandle(color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.3f)) }
         ) {
             val sleepRemaining by viewModel.sleepTimerRemaining.collectAsState()
-            val rules by viewModel.pronunciationRules.collectAsState()
 
             TtsPanel(
                 chapterTitle = chapter?.title ?: "",
@@ -393,11 +416,7 @@ fun ReaderScreen(
                 currentVoice = state.voice,
                 sleepTimerRemaining = sleepRemaining,
                 onStartSleepTimer = { viewModel.startSleepTimer(it) },
-                onCancelSleepTimer = { viewModel.cancelSleepTimer() },
-                pronunciationRules = rules,
-                onAddPronunciationRule = { orig, rep, reg -> viewModel.addPronunciationRule(orig, rep, reg) },
-                onDeletePronunciationRule = { viewModel.deletePronunciationRule(it) },
-                onTogglePronunciationRule = { viewModel.togglePronunciationRule(it) }
+                onCancelSleepTimer = { viewModel.cancelSleepTimer() }
             )
         }
     }
@@ -449,7 +468,7 @@ fun ReaderScreen(
             onDismissRequest = { viewModel.hideTocSheet() },
             containerColor = MaterialTheme.colorScheme.surfaceVariant,
             shape = RoundedCornerShape(topStart = 24.dp, topEnd = 24.dp),
-            dragHandle = { BottomSheetDefaults.DragHandle(color = Color.White.copy(alpha = 0.3f)) }
+            dragHandle = { BottomSheetDefaults.DragHandle(color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.3f)) }
         ) {
             ChapterPicker(
                 totalChapters = book.totalChapters,
@@ -523,9 +542,9 @@ private fun SelectionActionBar(
 // ─────────────────────────────────────────────────────
 
 @Composable
-private fun LoadingIndicator() {
+private fun LoadingIndicator(color: Color) {
     Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
-        CircularProgressIndicator(color = Color.White.copy(alpha = 0.5f))
+        CircularProgressIndicator(color = color.copy(alpha = 0.5f))
     }
 }
 

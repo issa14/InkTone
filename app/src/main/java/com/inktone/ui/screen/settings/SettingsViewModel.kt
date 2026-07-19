@@ -47,7 +47,8 @@ data class EngineInfo(
 class SettingsViewModel @Inject constructor(
     private val repository: SettingsRepository,
     private val ttsRepository: TtsRepository,
-    private val backupManager: BackupManager
+    private val backupManager: BackupManager,
+    private val pronunciationRuleDao: com.inktone.data.database.PronunciationRuleDao
 ) : ViewModel() {
 
     companion object {
@@ -56,6 +57,10 @@ class SettingsViewModel @Inject constructor(
 
     private val _uiState = MutableStateFlow(SettingsUiState())
     val uiState: StateFlow<SettingsUiState> = _uiState.asStateFlow()
+
+    val pronunciationRules: StateFlow<List<com.inktone.data.database.entity.PronunciationRule>> =
+        pronunciationRuleDao.getAllRulesFlow()
+            .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), emptyList())
 
     init {
         viewModelScope.launch(Dispatchers.IO) { repository.voice.collect { _uiState.update { s -> s.copy(voice = it) } } }
@@ -148,5 +153,33 @@ class SettingsViewModel @Inject constructor(
 
     fun clearBackupMessage() {
         _uiState.update { it.copy(backupMessage = null) }
+    }
+
+    // ── Dictionnaire de prononciation ───────────────
+
+    fun addPronunciationRule(original: String, replacement: String, isRegex: Boolean) {
+        viewModelScope.launch {
+            try {
+                pronunciationRuleDao.insertRule(
+                    com.inktone.data.database.entity.PronunciationRule(
+                        pattern = original, replacement = replacement, isRegex = isRegex
+                    )
+                )
+            } catch (e: Exception) { Log.e(TAG, "Error inserting pronunciation rule", e) }
+        }
+    }
+
+    fun deletePronunciationRule(rule: com.inktone.data.database.entity.PronunciationRule) {
+        viewModelScope.launch {
+            try { pronunciationRuleDao.deleteRule(rule) }
+            catch (e: Exception) { Log.e(TAG, "Error deleting pronunciation rule", e) }
+        }
+    }
+
+    fun togglePronunciationRule(rule: com.inktone.data.database.entity.PronunciationRule) {
+        viewModelScope.launch {
+            try { pronunciationRuleDao.toggleRuleActive(rule.id, !rule.isActive) }
+            catch (e: Exception) { Log.e(TAG, "Error updating pronunciation rule", e) }
+        }
     }
 }
