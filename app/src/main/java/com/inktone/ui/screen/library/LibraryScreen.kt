@@ -56,6 +56,8 @@ fun LibraryScreen(
     onBookClick: (String) -> Unit,
     onDebugClick: () -> Unit,
     onOpdsClick: () -> Unit = {},
+    onNavigateToBookmark: (bookId: String, chapterIndex: Int, sentenceIndex: Int) -> Unit =
+        { bookId, _, _ -> onBookClick(bookId) },
     viewModel: LibraryViewModel = hiltViewModel()
 ) {
     val state by viewModel.uiState.collectAsState()
@@ -226,7 +228,9 @@ fun LibraryScreen(
                         }
                         NavigationDestination.BOOKMARKS -> {
                             com.inktone.ui.screen.bookmark.AllBookmarksPanel(
-                                onNavigateToBook = { bookId -> onBookClick(bookId) },
+                                onNavigateToBook = { bookId, chapterIndex, sentenceIndex ->
+                                    onNavigateToBookmark(bookId, chapterIndex, sentenceIndex)
+                                },
                                 onBack = { viewModel.navigateTo(NavigationDestination.LIBRARY) }
                             )
                         }

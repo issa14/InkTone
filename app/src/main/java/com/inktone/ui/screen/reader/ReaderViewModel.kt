@@ -197,11 +197,12 @@ class ReaderViewModel @Inject constructor(
             }.collect()
         }
 
-        // Navigation vers une position précise depuis Recherche/Signets (retour d'écran)
+        // Navigation vers une position précise depuis Recherche/Signets (retour d'écran).
+        // Ignoré tant que le livre n'est pas chargé : loadBook() gère ce cas au premier chargement.
         viewModelScope.launch {
             savedState.getStateFlow<Int?>("jumpChapter", null).collect { jumpChapter ->
                 val jumpSentence = savedState.get<Int>("jumpSentence")
-                if (jumpChapter != null && jumpSentence != null) {
+                if (jumpChapter != null && jumpChapter >= 0 && jumpSentence != null && jumpSentence >= 0 && currentBook != null) {
                     savedState.remove<Int>("jumpChapter")
                     savedState.remove<Int>("jumpSentence")
                     loadChapter(jumpChapter, jumpSentence)
@@ -300,6 +301,16 @@ class ReaderViewModel @Inject constructor(
                 val book = books.find { it.id == bookId } ?: throw IllegalStateException("Livre introuvable")
                 currentBook = book
                 _uiState.update { it.copy(book = book, isLoading = false) }
+
+                val jumpChapter = savedState.get<Int>("jumpChapter")
+                val jumpSentence = savedState.get<Int>("jumpSentence")
+                if (jumpChapter != null && jumpChapter >= 0 && jumpSentence != null && jumpSentence >= 0) {
+                    savedState.remove<Int>("jumpChapter")
+                    savedState.remove<Int>("jumpSentence")
+                    loadChapter(jumpChapter, jumpSentence)
+                    return@launch
+                }
+
                 val dbProgress = orchestrator.loadProgress(bookId)
                 val position = resolvePosition(
                     dbChapterIndex = dbProgress?.chapterIndex,
