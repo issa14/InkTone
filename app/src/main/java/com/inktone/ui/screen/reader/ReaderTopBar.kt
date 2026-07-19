@@ -69,14 +69,16 @@ fun ReaderTopBar(
 fun ChapterPicker(
     totalChapters: Int,
     currentChapter: Int,
+    chapterTitles: List<String> = emptyList(),
     onSelect: (Int) -> Unit
 ) {
     Column(modifier = Modifier.padding(horizontal = 16.dp, vertical = 8.dp)) {
         Text("Table des matières", color = MaterialTheme.colorScheme.onSurfaceVariant, style = MaterialTheme.typography.titleSmall, modifier = Modifier.padding(bottom = 12.dp))
         for (i in 0 until totalChapters) {
             val isCurrent = i == currentChapter
+            val title = chapterTitles.getOrNull(i) ?: "Chapitre ${i + 1}"
             Surface(modifier = Modifier.fillMaxWidth().padding(vertical = 2.dp), color = if (isCurrent) MaterialTheme.colorScheme.ttsActive.copy(alpha = 0.15f) else Color.Transparent, shape = RoundedCornerShape(8.dp), onClick = { onSelect(i) }) {
-                Text("Chapitre ${i + 1}", color = if (isCurrent) MaterialTheme.colorScheme.ttsActive else MaterialTheme.colorScheme.onSurfaceVariant, style = MaterialTheme.typography.bodyMedium, fontWeight = if (isCurrent) FontWeight.SemiBold else FontWeight.Normal, modifier = Modifier.padding(horizontal = 12.dp, vertical = 12.dp))
+                Text(title, color = if (isCurrent) MaterialTheme.colorScheme.ttsActive else MaterialTheme.colorScheme.onSurfaceVariant, style = MaterialTheme.typography.bodyMedium, fontWeight = if (isCurrent) FontWeight.SemiBold else FontWeight.Normal, maxLines = 2, overflow = androidx.compose.ui.text.style.TextOverflow.Ellipsis, modifier = Modifier.padding(horizontal = 12.dp, vertical = 12.dp))
             }
         }
         Spacer(Modifier.height(24.dp))

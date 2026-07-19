@@ -519,6 +519,7 @@ fun ReaderScreen(
             ChapterPicker(
                 totalChapters = book.totalChapters,
                 currentChapter = state.currentChapterIndex,
+                chapterTitles = state.chapterTitles,
                 onSelect = { idx ->
                     viewModel.goToChapter(idx)
                     viewModel.hideTocSheet()

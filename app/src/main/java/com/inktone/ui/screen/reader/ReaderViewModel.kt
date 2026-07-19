@@ -55,6 +55,7 @@ data class ReaderUiState(
     val highlights: List<HighlightEntity> = emptyList(),
     val bookmarks: List<BookmarkEntity> = emptyList(),
     val annotations: List<AnnotationEntity> = emptyList(),
+    val chapterTitles: List<String> = emptyList(),
     val showReaderTooltip: Boolean = false,
     val showPlayTooltip: Boolean = false,
     val etaMinutes: Int? = null,
@@ -74,6 +75,7 @@ class ReaderViewModel @Inject constructor(
     private val bookmarkDao: BookmarkDao,
     private val highlightDao: HighlightDao,
     private val annotationDao: AnnotationDao,
+    private val sentenceCacheDao: com.inktone.data.database.SentenceCacheDao,
     private val readingSessionDao: com.inktone.data.database.ReadingSessionDao,
     private val audioServiceLauncher: com.inktone.domain.service.AudioServiceLauncher,
     private val ttsRepository: TtsRepository,
@@ -302,6 +304,13 @@ class ReaderViewModel @Inject constructor(
                 val book = books.find { it.id == bookId } ?: throw IllegalStateException("Livre introuvable")
                 currentBook = book
                 _uiState.update { it.copy(book = book, isLoading = false) }
+
+                val titles = sentenceCacheDao.getChapterTitles(bookId)
+                    .associate { it.chapterIndex to it.chapterTitle }
+                val titleList = (0 until book.totalChapters).map { i ->
+                    titles[i] ?: "Chapitre ${i + 1}"
+                }
+                _uiState.update { it.copy(chapterTitles = titleList) }
 
                 val jumpChapter = savedState.get<Int>("jumpChapter")
                 val jumpSentence = savedState.get<Int>("jumpSentence")
