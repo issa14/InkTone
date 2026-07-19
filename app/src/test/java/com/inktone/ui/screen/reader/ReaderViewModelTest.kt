@@ -5,7 +5,8 @@ import app.cash.turbine.test
 import com.inktone.data.database.AnnotationDao
 import com.inktone.data.database.BookmarkDao
 import com.inktone.data.database.HighlightDao
-import com.inktone.data.database.PronunciationRuleDao
+import com.inktone.data.database.ReadingSessionDao
+import com.inktone.data.database.SentenceCacheDao
 import com.inktone.data.settings.SettingsRepository
 import com.inktone.domain.model.Book
 import com.inktone.domain.model.Chapter
@@ -53,10 +54,11 @@ class ReaderViewModelTest {
     private val orchestrator = mockk<PlaybackOrchestrator>(relaxed = true)
     private val onnxService = mockk<OnnxInferenceService>(relaxed = true)
     private val settingsRepository = mockk<SettingsRepository>(relaxed = true)
-    private val pronunciationRuleDao = mockk<PronunciationRuleDao>(relaxed = true)
     private val bookmarkDao = mockk<BookmarkDao>(relaxed = true)
     private val highlightDao = mockk<HighlightDao>(relaxed = true)
     private val annotationDao = mockk<AnnotationDao>(relaxed = true)
+    private val sentenceCacheDao = mockk<SentenceCacheDao>(relaxed = true)
+    private val readingSessionDao = mockk<ReadingSessionDao>(relaxed = true)
     private val audioServiceLauncher = mockk<AudioServiceLauncher>(relaxed = true)
     private val ttsRepository = mockk<TtsRepository>(relaxed = true)
     private val calculateProgress = mockk<CalculateReadingProgressUseCase>(relaxed = true)
@@ -100,9 +102,9 @@ class ReaderViewModelTest {
         every { settingsRepository.fontSize } returns flowOf(18f)
         every { settingsRepository.lineHeight } returns flowOf(1.8f)
         every { settingsRepository.horizontalMargin } returns flowOf(24)
-
-        // Pronunciation rules
-        every { pronunciationRuleDao.getAllRulesFlow() } returns flowOf(emptyList())
+        every { settingsRepository.hasSeenReaderTooltip } returns flowOf(true)
+        every { settingsRepository.hasSeenPlayTooltip } returns flowOf(true)
+        every { settingsRepository.voice } returns flowOf("Jessica")
 
         // Orchestrator
         every { orchestrator.state } returns MutableStateFlow(PlaybackOrchestrator.State.Idle)
@@ -122,10 +124,11 @@ class ReaderViewModelTest {
             orchestrator = orchestrator,
             onnxService = onnxService,
             settingsRepository = settingsRepository,
-            pronunciationRuleDao = pronunciationRuleDao,
             bookmarkDao = bookmarkDao,
             highlightDao = highlightDao,
             annotationDao = annotationDao,
+            sentenceCacheDao = sentenceCacheDao,
+            readingSessionDao = readingSessionDao,
             audioServiceLauncher = audioServiceLauncher,
             ttsRepository = ttsRepository,
             calculateProgress = calculateProgress,
@@ -404,10 +407,11 @@ class ReaderViewModelTest {
             orchestrator = orchestrator,
             onnxService = onnxService,
             settingsRepository = settingsRepository,
-            pronunciationRuleDao = pronunciationRuleDao,
             bookmarkDao = bookmarkDao,
             highlightDao = highlightDao,
             annotationDao = annotationDao,
+            sentenceCacheDao = sentenceCacheDao,
+            readingSessionDao = readingSessionDao,
             audioServiceLauncher = audioServiceLauncher,
             ttsRepository = ttsRepository,
             calculateProgress = calculateProgress,
