@@ -52,6 +52,7 @@ import androidx.compose.ui.unit.em
 import androidx.compose.ui.unit.sp
 import coil.compose.AsyncImage
 import coil.request.ImageRequest
+import com.inktone.data.database.entity.AnnotationEntity
 import com.inktone.data.database.entity.BookmarkEntity
 import com.inktone.data.database.entity.HighlightEntity
 import com.inktone.domain.model.Chapter
@@ -92,7 +93,8 @@ fun ReaderContent(
     onTextSelected: (sentenceIndex: Int, selectedText: String) -> Unit,
     onSelectionDismissed: () -> Unit,
     highlights: List<HighlightEntity> = emptyList(),
-    bookmarks: List<BookmarkEntity> = emptyList()
+    bookmarks: List<BookmarkEntity> = emptyList(),
+    annotations: List<AnnotationEntity> = emptyList()
 ) {
     val bodyFont = when (readerFont) {
         ReaderFont.SERIF -> FontFamily.Serif
@@ -140,7 +142,8 @@ fun ReaderContent(
             onTextSelected = onTextSelected,
             onSelectionDismissed = onSelectionDismissed,
             highlights = highlights,
-            bookmarks = bookmarks
+            bookmarks = bookmarks,
+            annotations = annotations
         )
         ReadingMode.SCROLL -> ScrollContent(
             chapter = chapter,
@@ -164,7 +167,8 @@ fun ReaderContent(
             onTextSelected = onTextSelected,
             onSelectionDismissed = onSelectionDismissed,
             highlights = highlights,
-            bookmarks = bookmarks
+            bookmarks = bookmarks,
+            annotations = annotations
         )
     }
 }
@@ -191,7 +195,8 @@ private fun PagedContent(
     onTextSelected: (sentenceIndex: Int, selectedText: String) -> Unit,
     onSelectionDismissed: () -> Unit,
     highlights: List<HighlightEntity>,
-    bookmarks: List<BookmarkEntity>
+    bookmarks: List<BookmarkEntity>,
+    annotations: List<AnnotationEntity>
 ) {
     var containerSize by remember { mutableStateOf(IntSize.Zero) }
     val measurer = rememberTextMeasurer()
@@ -347,7 +352,8 @@ private fun PagedContent(
                             onTextSelected = onTextSelected,
                             onDismiss = onSelectionDismissed,
                             highlights = highlights,
-                            bookmarks = bookmarks
+                            bookmarks = bookmarks,
+                            annotations = annotations
                         )
                     }
                 }
@@ -412,7 +418,8 @@ private fun ScrollContent(
     onTextSelected: (sentenceIndex: Int, selectedText: String) -> Unit,
     onSelectionDismissed: () -> Unit,
     highlights: List<HighlightEntity>,
-    bookmarks: List<BookmarkEntity>
+    bookmarks: List<BookmarkEntity>,
+    annotations: List<AnnotationEntity>
 ) {
     val lazyListState = rememberLazyListState()
 
@@ -485,7 +492,8 @@ private fun ScrollContent(
                         onTextSelected = onTextSelected,
                         onDismiss = onSelectionDismissed,
                         highlights = highlights,
-                        bookmarks = bookmarks
+                        bookmarks = bookmarks,
+                        annotations = annotations
                     )
 
                     richBlockAnchors[index + 1]?.forEach { block ->
@@ -580,7 +588,8 @@ private fun SelectableSentence(
     onTextSelected: (sentenceIndex: Int, selectedText: String) -> Unit,
     onDismiss: () -> Unit,
     highlights: List<HighlightEntity>,
-    bookmarks: List<BookmarkEntity>
+    bookmarks: List<BookmarkEntity>,
+    annotations: List<AnnotationEntity>
 ) {
     val defaultToolbar = LocalTextToolbar.current
 
@@ -618,7 +627,8 @@ private fun SelectableSentence(
                 accentColor = accentColor,
                 playbackState = playbackState,
                 highlights = highlights,
-                bookmarks = bookmarks
+                bookmarks = bookmarks,
+                annotations = annotations
             )
         }
     }
@@ -635,11 +645,13 @@ private fun SentenceRenderer(
     accentColor: Color,
     playbackState: PlaybackState,
     highlights: List<HighlightEntity> = emptyList(),
-    bookmarks: List<BookmarkEntity> = emptyList()
+    bookmarks: List<BookmarkEntity> = emptyList(),
+    annotations: List<AnnotationEntity> = emptyList()
 ) {
     val isActive = index == activeIdx && isSpeaking
     val highlight = highlights.find { it.sentenceIndex == index }
     val hasBookmark = bookmarks.any { it.sentenceIndex == index }
+    val hasNote = annotations.any { it.sentenceIndex == index }
 
     val highlightColor = highlight?.let {
         try {
@@ -670,6 +682,13 @@ private fun SentenceRenderer(
             Text(
                 "🔖",
                 fontSize = 12.sp,
+                modifier = Modifier.padding(end = 4.dp)
+            )
+        }
+        if (hasNote) {
+            Text(
+                "📝",
+                fontSize = 10.sp,
                 modifier = Modifier.padding(end = 4.dp)
             )
         }

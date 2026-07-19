@@ -1,5 +1,6 @@
 package com.inktone.domain.usecase
 
+import com.inktone.data.database.AnnotationDao
 import com.inktone.data.database.BookmarkDao
 import com.inktone.data.database.HighlightDao
 import com.inktone.data.database.entity.BookmarkEntity
@@ -19,6 +20,7 @@ class LoadChapterUseCaseTest {
     private val bookRepository = mockk<BookRepository>(relaxed = true)
     private val highlightDao = mockk<HighlightDao>(relaxed = true)
     private val bookmarkDao = mockk<BookmarkDao>(relaxed = true)
+    private val annotationDao = mockk<AnnotationDao>(relaxed = true)
     private lateinit var useCase: LoadChapterUseCase
 
     private val testChapter = Chapter(
@@ -32,7 +34,7 @@ class LoadChapterUseCaseTest {
 
     @BeforeEach
     fun setUp() {
-        useCase = LoadChapterUseCase(bookRepository, highlightDao, bookmarkDao)
+        useCase = LoadChapterUseCase(bookRepository, highlightDao, bookmarkDao, annotationDao)
     }
 
     @Test

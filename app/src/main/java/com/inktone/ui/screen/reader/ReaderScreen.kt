@@ -6,6 +6,7 @@ import androidx.compose.animation.core.tween
 import androidx.compose.foundation.*
 import androidx.compose.foundation.gestures.detectTapGestures
 import androidx.compose.foundation.layout.*
+import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.PlayArrow
@@ -13,6 +14,7 @@ import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.layout.onSizeChanged
 import androidx.compose.ui.platform.LocalClipboardManager
@@ -82,6 +84,14 @@ fun ReaderScreen(
 
     // État de la sélection de texte
     var selectionState by remember { mutableStateOf<SelectionInfo?>(null) }
+    var showNoteDialog by remember { mutableStateOf(false) }
+    var noteDialogSentenceIdx by remember { mutableStateOf(-1) }
+    var noteDialogSelectedText by remember { mutableStateOf("") }
+    var showColorPicker by remember { mutableStateOf(false) }
+    var colorPickerSentenceIdx by remember { mutableStateOf(-1) }
+    var colorPickerSelectedText by remember { mutableStateOf("") }
+    var colorPickerStartOffset by remember { mutableStateOf(0) }
+    var colorPickerEndOffset by remember { mutableStateOf(0) }
     val snackbarHostState = remember { SnackbarHostState() }
     val clipboardManager = LocalClipboardManager.current
     val scope = rememberCoroutineScope()
@@ -148,6 +158,7 @@ fun ReaderScreen(
                 },
                 highlights = state.highlights,
                 bookmarks = state.bookmarks,
+                annotations = state.annotations,
                 onTap = { offset ->
                         if (screenSize.width > 0) {
                             val left = screenSize.width / 3f
@@ -162,8 +173,9 @@ fun ReaderScreen(
             }
         } // Crossfade
 
-        // ── Tooltip premier lancement lecteur ───────
-        if (state.showReaderTooltip && state.isHudVisible) {
+        // ── Tooltip premier lancement lecteur (pointe vers le FAB ▶, donc visible
+        //    seulement quand le HUD est masqué — sinon collision avec UnifiedControlPanel) ──
+        if (state.showReaderTooltip && !state.isHudVisible) {
             Card(
                 modifier = Modifier
                     .align(Alignment.BottomCenter)
@@ -190,7 +202,9 @@ fun ReaderScreen(
         }
 
         // ── Tooltip 2 : après premier play ──────────
-        if (state.showPlayTooltip) {
+        // Masqué pendant la lecture (collision avec les captions TTS) et pendant
+        // une sélection de texte (collision avec SelectionActionBar).
+        if (state.showPlayTooltip && !state.isPlaying && selectionState == null) {
             Card(
                 modifier = Modifier
                     .align(Alignment.BottomCenter)
@@ -236,18 +250,19 @@ fun ReaderScreen(
                 onHighlight = {
                     val s = selectionState ?: return@SelectionActionBar
                     val sentence = chapter?.sentences?.getOrNull(s.sentenceIndex) ?: return@SelectionActionBar
-                    viewModel.addHighlight(
-                        sentenceIndex = s.sentenceIndex,
-                        selectedText = s.selectedText,
-                        startOffset = sentence.startOffset,
-                        endOffset = sentence.endOffset
-                    )
+                    colorPickerSentenceIdx = s.sentenceIndex
+                    colorPickerSelectedText = s.selectedText
+                    colorPickerStartOffset = sentence.startOffset
+                    colorPickerEndOffset = sentence.endOffset
                     selectionState = null
+                    showColorPicker = true
                 },
                 onNote = {
                     val s = selectionState ?: return@SelectionActionBar
-                    viewModel.addAnnotation(s.sentenceIndex, s.selectedText)
+                    noteDialogSentenceIdx = s.sentenceIndex
+                    noteDialogSelectedText = s.selectedText
                     selectionState = null
+                    showNoteDialog = true
                 },
                 onBookmark = {
                     val s = selectionState ?: return@SelectionActionBar
@@ -257,9 +272,44 @@ fun ReaderScreen(
             )
         }
 
+        // ── Mini color picker pour les surlignages ───
+        if (showColorPicker) {
+            val colors = listOf("#FFEB3D", "#90EE90", "#ADD8E6", "#FFB6C1", "#FFA500")
+            Surface(
+                modifier = Modifier
+                    .align(Alignment.BottomCenter)
+                    .padding(bottom = 64.dp),
+                shape = RoundedCornerShape(12.dp),
+                color = bgColor,
+                shadowElevation = 4.dp
+            ) {
+                Row(modifier = Modifier.padding(8.dp), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                    colors.forEach { hex ->
+                        Box(
+                            modifier = Modifier
+                                .size(32.dp)
+                                .clip(CircleShape)
+                                .background(Color(android.graphics.Color.parseColor(hex)))
+                                .clickable {
+                                    viewModel.addHighlight(
+                                        sentenceIndex = colorPickerSentenceIdx,
+                                        selectedText = colorPickerSelectedText,
+                                        startOffset = colorPickerStartOffset,
+                                        endOffset = colorPickerEndOffset,
+                                        colorHex = hex
+                                    )
+                                    showColorPicker = false
+                                }
+                        )
+                    }
+                }
+            }
+        }
+
         // ── Captions TTS (accessibilité) ─────────────
+        // Masquées pendant une sélection de texte (collision avec SelectionActionBar).
         AnimatedVisibility(
-            visible = state.isPlaying && playbackState.activeSentenceText.isNotEmpty(),
+            visible = state.isPlaying && playbackState.activeSentenceText.isNotEmpty() && selectionState == null,
             enter = fadeIn(tween(reducedMotionDuration(300))),
             exit = fadeOut(tween(reducedMotionDuration(200))),
             modifier = Modifier
@@ -473,6 +523,7 @@ fun ReaderScreen(
             ChapterPicker(
                 tocEntries = book.tocEntries,
                 currentChapter = state.currentChapterIndex,
+                chapterTitles = state.chapterTitles,
                 onSelect = { idx ->
                     viewModel.goToChapter(idx)
                     viewModel.hideTocSheet()
@@ -480,6 +531,45 @@ fun ReaderScreen(
                 }
             )
         }
+    }
+
+    // ── Dialog de saisie de note ─────────────────────
+    if (showNoteDialog) {
+        var noteText by remember { mutableStateOf("") }
+        AlertDialog(
+            onDismissRequest = { showNoteDialog = false },
+            title = { Text("Ajouter une note") },
+            text = {
+                Column {
+                    Text(
+                        noteDialogSelectedText.take(80) + if (noteDialogSelectedText.length > 80) "…" else "",
+                        style = MaterialTheme.typography.bodySmall,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                        modifier = Modifier.padding(bottom = 12.dp)
+                    )
+                    OutlinedTextField(
+                        value = noteText,
+                        onValueChange = { noteText = it },
+                        placeholder = { Text("Votre note...") },
+                        modifier = Modifier.fillMaxWidth().heightIn(min = 80.dp),
+                        maxLines = 5
+                    )
+                }
+            },
+            confirmButton = {
+                TextButton(
+                    onClick = {
+                        if (noteText.isNotBlank()) {
+                            viewModel.addAnnotation(noteDialogSentenceIdx, noteDialogSelectedText, noteText)
+                        }
+                        showNoteDialog = false
+                    }
+                ) { Text("Enregistrer") }
+            },
+            dismissButton = {
+                TextButton(onClick = { showNoteDialog = false }) { Text("Annuler") }
+            }
+        )
     }
 }
 

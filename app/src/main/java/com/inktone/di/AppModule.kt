@@ -5,19 +5,18 @@ import androidx.room.Room
 import androidx.room.RoomDatabase
 import com.inktone.data.database.AnnotationDao
 import com.inktone.data.database.BookDao
-import com.inktone.data.database.BookProgressDao
 import com.inktone.data.database.BookmarkDao
 import com.inktone.data.database.HighlightDao
 import com.inktone.data.database.MIGRATION_1_2
 import com.inktone.data.database.MIGRATION_2_3
 import com.inktone.data.database.MIGRATION_3_4
 import com.inktone.data.database.MIGRATION_4_5
+import com.inktone.data.database.MIGRATION_5_6
 import com.inktone.data.database.ProgressDao
 import com.inktone.data.database.PronunciationRuleDao
 import com.inktone.data.database.InkToneDatabase
 import com.inktone.data.database.ReadingProgressDao
 import com.inktone.data.database.ReadingSessionDao
-import com.inktone.data.database.RecentBookDao
 import com.inktone.data.database.RichBlockCacheDao
 import com.inktone.data.database.SearchDao
 import com.inktone.data.database.SentenceCacheDao
@@ -52,7 +51,7 @@ object AppModule {
             context,
             InkToneDatabase::class.java,
             "inktone.db"
-        ).addMigrations(MIGRATION_1_2, MIGRATION_2_3, MIGRATION_3_4, MIGRATION_4_5)
+        ).addMigrations(MIGRATION_1_2, MIGRATION_2_3, MIGRATION_3_4, MIGRATION_4_5, MIGRATION_5_6)
          .setJournalMode(RoomDatabase.JournalMode.TRUNCATE)
          .fallbackToDestructiveMigration()
          .build()
@@ -87,12 +86,6 @@ object AppModule {
 
     @Provides
     fun provideReadingSessionDao(db: InkToneDatabase): ReadingSessionDao = db.readingSessionDao()
-
-    @Provides
-    fun provideRecentBookDao(db: InkToneDatabase): RecentBookDao = db.recentBookDao()
-
-    @Provides
-    fun provideBookProgressDao(db: InkToneDatabase): BookProgressDao = db.bookProgressDao()
 
     @Provides
     fun provideRichBlockCacheDao(db: InkToneDatabase): RichBlockCacheDao = db.richBlockCacheDao()

@@ -26,7 +26,7 @@ import com.inktone.data.database.entity.BookmarkEntity
  */
 @Composable
 fun AllBookmarksPanel(
-    onNavigateToBook: (bookId: String) -> Unit,
+    onNavigateToBook: (bookId: String, chapterIndex: Int, sentenceIndex: Int) -> Unit,
     onBack: () -> Unit,
     viewModel: BookmarkViewModel = hiltViewModel()
 ) {
@@ -69,7 +69,7 @@ fun AllBookmarksPanel(
                 items(bookmarks, key = { it.id }) { bookmark ->
                     BookmarkDrawerItem(
                         bookmark = bookmark,
-                        onTap = { onNavigateToBook(bookmark.bookId) },
+                        onTap = { onNavigateToBook(bookmark.bookId, bookmark.chapterIndex, bookmark.sentenceIndex) },
                         onDelete = { viewModel.delete(bookmark) }
                     )
                 }

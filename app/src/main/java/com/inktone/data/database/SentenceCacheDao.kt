@@ -62,4 +62,17 @@ interface SentenceCacheDao {
      */
     @Query("UPDATE sentence_cache SET chapterTitle = :title WHERE bookId = :bookId AND chapterIndex = :chapterIndex")
     suspend fun updateChapterTitle(bookId: String, chapterIndex: Int, title: String)
+
+    /**
+     * Récupère le titre de chaque chapitre déjà segmenté, pour la table des matières.
+     */
+    @Query("""
+        SELECT DISTINCT chapterIndex, chapterTitle
+        FROM sentence_cache
+        WHERE bookId = :bookId AND chapterTitle != ''
+        ORDER BY chapterIndex ASC
+    """)
+    suspend fun getChapterTitles(bookId: String): List<ChapterTitleRow>
 }
+
+data class ChapterTitleRow(val chapterIndex: Int, val chapterTitle: String)

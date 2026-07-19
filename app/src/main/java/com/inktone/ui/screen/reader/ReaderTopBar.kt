@@ -71,6 +71,7 @@ fun ReaderTopBar(
 fun ChapterPicker(
     tocEntries: List<com.inktone.domain.model.TocEntry>,
     currentChapter: Int,
+    chapterTitles: List<String> = emptyList(),
     onSelect: (Int) -> Unit
 ) {
     Column(
@@ -82,6 +83,9 @@ fun ChapterPicker(
         Text("Table des matières", color = MaterialTheme.colorScheme.onSurfaceVariant, style = MaterialTheme.typography.titleSmall, modifier = Modifier.padding(bottom = 12.dp))
         tocEntries.forEach { entry ->
             val isCurrent = entry.index == currentChapter
+            val title = entry.title.takeIf { it.isNotBlank() }
+                ?: chapterTitles.getOrNull(entry.index)
+                ?: "Chapitre ${entry.index + 1}"
             Surface(
                 modifier = Modifier
                     .fillMaxWidth()
@@ -91,7 +95,7 @@ fun ChapterPicker(
                 onClick = { onSelect(entry.index) }
             ) {
                 Text(
-                    entry.title,
+                    title,
                     color = if (isCurrent) MaterialTheme.colorScheme.ttsActive else MaterialTheme.colorScheme.onSurfaceVariant,
                     style = MaterialTheme.typography.bodyMedium,
                     fontWeight = if (isCurrent) FontWeight.SemiBold else FontWeight.Normal,

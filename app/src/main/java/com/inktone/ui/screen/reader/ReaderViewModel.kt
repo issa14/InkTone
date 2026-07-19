@@ -54,6 +54,8 @@ data class ReaderUiState(
     val lastAction: String? = null,
     val highlights: List<HighlightEntity> = emptyList(),
     val bookmarks: List<BookmarkEntity> = emptyList(),
+    val annotations: List<AnnotationEntity> = emptyList(),
+    val chapterTitles: List<String> = emptyList(),
     val showReaderTooltip: Boolean = false,
     val showPlayTooltip: Boolean = false,
     val etaMinutes: Int? = null,
@@ -73,6 +75,7 @@ class ReaderViewModel @Inject constructor(
     private val bookmarkDao: BookmarkDao,
     private val highlightDao: HighlightDao,
     private val annotationDao: AnnotationDao,
+    private val sentenceCacheDao: com.inktone.data.database.SentenceCacheDao,
     private val readingSessionDao: com.inktone.data.database.ReadingSessionDao,
     private val audioServiceLauncher: com.inktone.domain.service.AudioServiceLauncher,
     private val ttsRepository: TtsRepository,
@@ -197,6 +200,19 @@ class ReaderViewModel @Inject constructor(
             }.collect()
         }
 
+        // Navigation vers une position précise depuis Recherche/Signets (retour d'écran).
+        // Ignoré tant que le livre n'est pas chargé : loadBook() gère ce cas au premier chargement.
+        viewModelScope.launch {
+            savedState.getStateFlow<Int?>("jumpChapter", null).collect { jumpChapter ->
+                val jumpSentence = savedState.get<Int>("jumpSentence")
+                if (jumpChapter != null && jumpChapter >= 0 && jumpSentence != null && jumpSentence >= 0 && currentBook != null) {
+                    savedState.remove<Int>("jumpChapter")
+                    savedState.remove<Int>("jumpSentence")
+                    loadChapter(jumpChapter, jumpSentence)
+                }
+            }
+        }
+
         // Tooltip premier lancement reader
         viewModelScope.launch {
             if (!settingsRepository.hasSeenReaderTooltip.first()) {
@@ -288,6 +304,23 @@ class ReaderViewModel @Inject constructor(
                 val book = books.find { it.id == bookId } ?: throw IllegalStateException("Livre introuvable")
                 currentBook = book
                 _uiState.update { it.copy(book = book, isLoading = false) }
+
+                val titles = sentenceCacheDao.getChapterTitles(bookId)
+                    .associate { it.chapterIndex to it.chapterTitle }
+                val titleList = (0 until book.totalChapters).map { i ->
+                    titles[i] ?: "Chapitre ${i + 1}"
+                }
+                _uiState.update { it.copy(chapterTitles = titleList) }
+
+                val jumpChapter = savedState.get<Int>("jumpChapter")
+                val jumpSentence = savedState.get<Int>("jumpSentence")
+                if (jumpChapter != null && jumpChapter >= 0 && jumpSentence != null && jumpSentence >= 0) {
+                    savedState.remove<Int>("jumpChapter")
+                    savedState.remove<Int>("jumpSentence")
+                    loadChapter(jumpChapter, jumpSentence)
+                    return@launch
+                }
+
                 val dbProgress = orchestrator.loadProgress(bookId)
                 val position = resolvePosition(
                     dbChapterIndex = dbProgress?.chapterIndex,
@@ -325,6 +358,7 @@ class ReaderViewModel @Inject constructor(
                         currentChapterIndex = index, currentChapter = result.chapter,
                         totalSentences = result.chapter.sentences.size, currentSentenceIndex = sentenceIndex,
                         highlights = result.highlights, bookmarks = result.bookmarks,
+                        annotations = result.annotations,
                         isLoading = false, isLoadingChapter = false
                     )
                 }
@@ -400,10 +434,10 @@ class ReaderViewModel @Inject constructor(
         }
     }
 
-    fun goToChapter(index: Int) {
+    fun goToChapter(index: Int, sentenceIndex: Int = 0) {
         if (_uiState.value.isLoadingChapter) return
         val book = currentBook ?: return
-        if (index in 0 until book.totalChapters) loadChapter(index)
+        if (index in 0 until book.totalChapters) loadChapter(index, sentenceIndex)
     }
 
     fun play() {
@@ -499,12 +533,12 @@ class ReaderViewModel @Inject constructor(
         }
     }
 
-    fun addHighlight(sentenceIndex: Int, selectedText: String, startOffset: Int, endOffset: Int) {
+    fun addHighlight(sentenceIndex: Int, selectedText: String, startOffset: Int, endOffset: Int, colorHex: String = "#FFEB3D") {
         val book = currentBook ?: return
         val chapterIdx = _uiState.value.currentChapterIndex
         viewModelScope.launch {
             try {
-                val result = annotationsUseCase.addHighlight(book.id, chapterIdx, sentenceIndex, selectedText, startOffset, endOffset)
+                val result = annotationsUseCase.addHighlight(book.id, chapterIdx, sentenceIndex, selectedText, startOffset, endOffset, colorHex)
                 if (result is com.inktone.domain.usecase.AnnotationResult.Success) {
                     _uiState.update { it.copy(lastAction = result.message) }
                 }
@@ -515,12 +549,12 @@ class ReaderViewModel @Inject constructor(
         }
     }
 
-    fun addAnnotation(sentenceIndex: Int, selectedText: String) {
+    fun addAnnotation(sentenceIndex: Int, selectedText: String, noteText: String) {
         val book = currentBook ?: return
         val chapterIdx = _uiState.value.currentChapterIndex
         viewModelScope.launch {
             try {
-                val result = annotationsUseCase.addAnnotation(book.id, chapterIdx, sentenceIndex, selectedText)
+                val result = annotationsUseCase.addAnnotation(book.id, chapterIdx, sentenceIndex, selectedText, noteText)
                 if (result is com.inktone.domain.usecase.AnnotationResult.Success) {
                     _uiState.update { it.copy(lastAction = result.message) }
                 }
@@ -534,7 +568,7 @@ class ReaderViewModel @Inject constructor(
     private suspend fun reloadAnnotations(bookId: String, chapterIdx: Int) {
         try {
             val reloaded = annotationsUseCase.reloadAnnotations(bookId, chapterIdx)
-            _uiState.update { it.copy(highlights = reloaded.highlights, bookmarks = reloaded.bookmarks) }
+            _uiState.update { it.copy(highlights = reloaded.highlights, bookmarks = reloaded.bookmarks, annotations = reloaded.annotations) }
         } catch (e: Exception) {
             Log.e("ReaderVM", "Error reloading annotations: ${e.message}", e)
         }

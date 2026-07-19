@@ -87,10 +87,10 @@ class ManageReaderAnnotationsUseCaseTest {
 
     @Test
     fun `addAnnotation insère une annotation`() = runTest {
-        val result = useCase.addAnnotation("book-1", 0, 2, "Note importante")
+        val result = useCase.addAnnotation("book-1", 0, 2, "texte sélectionné", "Note importante")
 
         assertTrue(result is AnnotationResult.Success)
-        assertEquals("Annotation ajoutée", (result as AnnotationResult.Success).message)
+        assertEquals("Note ajoutée", (result as AnnotationResult.Success).message)
         coVerify(exactly = 1) { annotationDao.insertAnnotation(any()) }
     }
 

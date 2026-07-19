@@ -23,7 +23,8 @@ sealed class AnnotationResult {
  */
 data class ReloadedAnnotations(
     val highlights: List<HighlightEntity>,
-    val bookmarks: List<BookmarkEntity>
+    val bookmarks: List<BookmarkEntity>,
+    val annotations: List<AnnotationEntity>
 )
 
 /**
@@ -76,7 +77,8 @@ class ManageReaderAnnotationsUseCase @Inject constructor(
         sentenceIndex: Int,
         selectedText: String,
         startOffset: Int,
-        endOffset: Int
+        endOffset: Int,
+        colorHex: String = "#FFEB3D"
     ): AnnotationResult {
         highlightDao.insertHighlight(
             HighlightEntity(
@@ -86,7 +88,7 @@ class ManageReaderAnnotationsUseCase @Inject constructor(
                 startOffset = startOffset,
                 endOffset = endOffset,
                 selectedText = selectedText,
-                colorHex = "#FFEB3D"
+                colorHex = colorHex
             )
         )
         return AnnotationResult.Success("Surlignage ajouté")
@@ -99,7 +101,8 @@ class ManageReaderAnnotationsUseCase @Inject constructor(
         bookId: String,
         chapterIndex: Int,
         sentenceIndex: Int,
-        selectedText: String
+        selectedText: String,
+        noteText: String
     ): AnnotationResult {
         annotationDao.insertAnnotation(
             AnnotationEntity(
@@ -107,14 +110,15 @@ class ManageReaderAnnotationsUseCase @Inject constructor(
                 chapterIndex = chapterIndex,
                 sentenceIndex = sentenceIndex,
                 selectedText = selectedText,
+                notes = noteText,
                 colorHex = "#FFF9C4"
             )
         )
-        return AnnotationResult.Success("Annotation ajoutée")
+        return AnnotationResult.Success("Note ajoutée")
     }
 
     /**
-     * Recharge les highlights et bookmarks pour un chapitre donné.
+     * Recharge les highlights, bookmarks et annotations pour un chapitre donné.
      */
     suspend fun reloadAnnotations(
         bookId: String,
@@ -122,6 +126,7 @@ class ManageReaderAnnotationsUseCase @Inject constructor(
     ): ReloadedAnnotations {
         val highlights = highlightDao.getHighlightsForChapter(bookId, chapterIndex).first()
         val bookmarks = bookmarkDao.getBookmarks(bookId).first()
-        return ReloadedAnnotations(highlights = highlights, bookmarks = bookmarks)
+        val annotations = annotationDao.getAnnotationsForChapter(bookId, chapterIndex)
+        return ReloadedAnnotations(highlights = highlights, bookmarks = bookmarks, annotations = annotations)
     }
 }
