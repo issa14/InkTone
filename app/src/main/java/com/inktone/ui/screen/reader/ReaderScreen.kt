@@ -173,8 +173,9 @@ fun ReaderScreen(
             }
         } // Crossfade
 
-        // ── Tooltip premier lancement lecteur ───────
-        if (state.showReaderTooltip && state.isHudVisible) {
+        // ── Tooltip premier lancement lecteur (pointe vers le FAB ▶, donc visible
+        //    seulement quand le HUD est masqué — sinon collision avec UnifiedControlPanel) ──
+        if (state.showReaderTooltip && !state.isHudVisible) {
             Card(
                 modifier = Modifier
                     .align(Alignment.BottomCenter)
@@ -201,7 +202,9 @@ fun ReaderScreen(
         }
 
         // ── Tooltip 2 : après premier play ──────────
-        if (state.showPlayTooltip) {
+        // Masqué pendant la lecture (collision avec les captions TTS) et pendant
+        // une sélection de texte (collision avec SelectionActionBar).
+        if (state.showPlayTooltip && !state.isPlaying && selectionState == null) {
             Card(
                 modifier = Modifier
                     .align(Alignment.BottomCenter)
@@ -304,8 +307,9 @@ fun ReaderScreen(
         }
 
         // ── Captions TTS (accessibilité) ─────────────
+        // Masquées pendant une sélection de texte (collision avec SelectionActionBar).
         AnimatedVisibility(
-            visible = state.isPlaying && playbackState.activeSentenceText.isNotEmpty(),
+            visible = state.isPlaying && playbackState.activeSentenceText.isNotEmpty() && selectionState == null,
             enter = fadeIn(tween(reducedMotionDuration(300))),
             exit = fadeOut(tween(reducedMotionDuration(200))),
             modifier = Modifier
