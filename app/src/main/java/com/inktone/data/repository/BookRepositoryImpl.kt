@@ -5,7 +5,9 @@ import android.content.Context
 import android.util.Log
 import com.inktone.data.database.BookDao
 import com.inktone.data.database.ProgressDao
+import com.inktone.data.database.SearchDao
 import com.inktone.data.database.SentenceCacheDao
+import com.inktone.data.database.entity.SentenceFts
 import com.inktone.data.epub.SpineIndex
 import com.inktone.data.mapper.toDomain
 import com.inktone.data.mapper.toEntity
@@ -39,6 +41,7 @@ class BookRepositoryImpl @Inject constructor(
     private val bookDao: BookDao,
     private val progressDao: ProgressDao,
     private val sentenceCacheDao: SentenceCacheDao,
+    private val searchDao: SearchDao,
     private val chunkText: ChunkTextUseCase
 ) : BookRepository {
 
@@ -185,8 +188,20 @@ class BookRepositoryImpl @Inject constructor(
                         }
                     }
 
-                    chunkText(bookId, i, combinedHtml)
+                    val sentences = chunkText(bookId, i, combinedHtml)
                     sentenceCacheDao.updateChapterTitle(bookId, i, chapterTitle)
+
+                    if (sentences.isNotEmpty()) {
+                        val ftsEntries = sentences.map { sentence ->
+                            SentenceFts(
+                                bookId = bookId,
+                                chapterIndex = i,
+                                sentenceIndex = sentence.index,
+                                text = sentence.text
+                            )
+                        }
+                        searchDao.insertAll(ftsEntries)
+                    }
                     Log.d("BookRepo", "Chapitre TOC $i '$chapterTitle' : spine ${spineRange.first}..${spineRange.last} (${spineRange.count()} fichiers)")
                 } catch (e: Exception) {
                     Log.e("BookRepo", "Erreur import chapitre TOC $i '$chapterTitle' : ${e.message}", e)
