@@ -48,6 +48,20 @@ class PlaybackOrchestratorTest {
         Sentence(index = 4, text = "Parfait.", startOffset = 50, endOffset = 58)
     )
 
+    /**
+     * Le pipeline de l'orchestrateur tourne sur un vrai [Dispatchers.IO], indépendant
+     * du [testDispatcher] virtuel de ce test. Un `Thread.sleep` fixe est donc racy
+     * (charge machine variable) : on attend plutôt la condition réellement atteinte,
+     * avec un timeout de sécurité.
+     */
+    private fun waitUntil(timeoutMs: Long = 3000, intervalMs: Long = 20, condition: () -> Boolean) {
+        val deadline = System.currentTimeMillis() + timeoutMs
+        while (System.currentTimeMillis() < deadline) {
+            if (condition()) return
+            Thread.sleep(intervalMs)
+        }
+    }
+
     private fun makeSynthesisResult(text: String, durationMs: Long = 300L, engineId: String = "piper"): SynthesisResult {
         return SynthesisResult(
             samples = FloatArray(4410) { 0.5f },  // ~200ms à 22050Hz
@@ -322,7 +336,7 @@ class PlaybackOrchestratorTest {
             bookTitle = "Test", chapterTitle = "Ch1", bookId = "book-1", chapterIndex = 0
         )
 
-        Thread.sleep(500)
+        waitUntil { orchestrator.state.value is PlaybackOrchestrator.State.Error }
 
         // Après 1 succès ONNX + 3 timeouts → Error (maxErreurs=3 pour ONNX)
         val state = orchestrator.state.value
@@ -354,7 +368,7 @@ class PlaybackOrchestratorTest {
             bookTitle = "Test Edge", chapterTitle = "Ch1", bookId = "book-1", chapterIndex = 0
         )
 
-        Thread.sleep(500)
+        waitUntil { callCount >= 5 }
 
         // Avec seulement 5 phrases et 1 succès + 4 timeouts (max 4 erreurs max),
         // l'état ne doit PAS être Error (Edge tolère jusqu'à 8)
@@ -365,6 +379,8 @@ class PlaybackOrchestratorTest {
         )
         orchestrator.stop()
     }
+
+    @Test
     fun `succès après erreur réinitialise le compteur`() = testScope.runTest {
         var callCount = 0
         coEvery { ttsRepository.synthesize(any(), any(), any()) } coAnswers {
@@ -386,7 +402,7 @@ class PlaybackOrchestratorTest {
             chapterIndex = 0
         )
 
-        delay(500)
+        waitUntil { callCount >= 3 }
 
         // Après 2 timeouts puis 1 succès, le compteur est réinitialisé → pas d'erreur
         val state = orchestrator.state.value
