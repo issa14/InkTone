@@ -3,7 +3,9 @@ package com.inktone.ui.screen.bookmark
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.inktone.data.database.BookmarkDao
+import com.inktone.data.database.HighlightDao
 import com.inktone.data.database.entity.BookmarkEntity
+import com.inktone.data.database.entity.HighlightEntity
 import dagger.hilt.android.lifecycle.HiltViewModel
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
@@ -12,11 +14,15 @@ import javax.inject.Inject
 
 @HiltViewModel
 class BookmarkViewModel @Inject constructor(
-    private val bookmarkDao: BookmarkDao
+    private val bookmarkDao: BookmarkDao,
+    private val highlightDao: HighlightDao
 ) : ViewModel() {
 
     private val _bookmarks = MutableStateFlow<List<BookmarkEntity>>(emptyList())
     val bookmarks: StateFlow<List<BookmarkEntity>> = _bookmarks
+
+    private val _highlights = MutableStateFlow<List<HighlightEntity>>(emptyList())
+    val highlights: StateFlow<List<HighlightEntity>> = _highlights
 
     private var currentBookId: String = ""
 
@@ -26,6 +32,13 @@ class BookmarkViewModel @Inject constructor(
         viewModelScope.launch {
             bookmarkDao.getBookmarks(bookId).collect { _bookmarks.value = it }
         }
+        viewModelScope.launch {
+            highlightDao.getHighlightsForBook(bookId).collect { _highlights.value = it }
+        }
+    }
+
+    fun deleteHighlight(highlight: HighlightEntity) {
+        viewModelScope.launch { highlightDao.deleteHighlight(highlight) }
     }
 
     fun add(bookmark: BookmarkEntity) {
