@@ -73,8 +73,8 @@ Lecteur d'ebooks Android (EPUB2/EPUB3) avec synthèse vocale neuronale locale en
 | 3.2 | Table des matières navigable (NCX/NAV) | ✅ Fait | 🔴 | Drawer TOC dans ReaderScreen |
 | 3.3 | `ReaderScreen` — Rendu texte immersif | ✅ Fait | 🔴 | Overlay, center-third tap, thèmes |
 | 3.4 | Surlignage synchronisé phrase par phrase | ✅ Fait | 🔴 | Scroll automatique sur lecture |
-| 3.5 | `UnifiedControlPanel` — Play, Pause, Next/Prev | ✅ Fait | 🔴 | 2 rangées, speed slider, voice chips |
-| 3.6 | Indicateur de progression | ✅ Fait | 🟡 | Micro-indicateur % + chapitre |
+| 3.5 | `UnifiedControlPanel` — Play, Pause, Next/Prev | ✅ Fait | 🔴 | Restructuré : rangée primaire (skip chapitre + play/pause central) + rangée secondaire icône+label (Voix, Police, Thème, Veille) |
+| 3.6 | Indicateur de progression | ✅ Fait | 🟡 | Barre fine 2dp en haut + micro-indicateur chapitre + ETA (WPM moyen via `ReadingSessionDao`) |
 | 3.7 | Réglages TTS dans le panneau (vitesse, voix) | ✅ Fait | 🟡 | Intégré au UnifiedControlPanel |
 | 3.8 | `BookmarkScreen` — Gestion signets | ✅ Fait | 🟡 | BookmarkScreen + BookmarkViewModel + BookmarkDao |
 | 3.9 | Thèmes : Nuit, Jour, Sépia | ✅ Fait | 🟢 | cycleTheme() + Material 3 |
@@ -106,7 +106,7 @@ Lecteur d'ebooks Android (EPUB2/EPUB3) avec synthèse vocale neuronale locale en
 | 5.5 | SAF : persistence permissions + réimport | ✅ Fait | 🟡 | takePersistableUriPermission() dans importEpub() |
 | 5.6 | ProGuard/R8 config (ONNX + Sherpa + Readium) | ✅ Fait | 🔴 | Règles complètes — build release OK (106 Mo) |
 | 5.7 | Backup/Restore données (bookmarks, progrès) | ✅ Fait | 🟡 | Export JSON via SAF, import avec restauration complète |
-| 5.8 | Accessibilité : TalkBack, tailles min/max | ✅ Fait | 🟡 | contentDescription sur contrôles critiques + OpenDyslexic |
+| 5.8 | Accessibilité : TalkBack, tailles min/max | ✅ Fait | 🟡 | contentDescription sur contrôles critiques + OpenDyslexic + strings.xml complet + semantics sur Canvas Stats |
 | 5.9 | Vérification licences (Sherpa, Readium, ONNX) | ✅ Fait | 🟡 | THIRD_PARTY_NOTICES.md (Apache 2.0, MIT, BSD, SIL OFL, EPL) |
 | 5.10 | Build signed APK / AAB release | ✅ Fait | 🔴 | Keystore généré, release 106 Mo signé |
 | 5.11 | Beta fermée — 10-20 lecteurs francophones | ⬜ À faire | 🔴 | — |
@@ -129,6 +129,26 @@ Voir [`CHANGELOG.md`](./CHANGELOG.md) et [`files/EXECUTIVE_SUMMARY_CORRECTIONS.m
 | 🔧 FIX | Timeout adaptatif ONNX/Edge + sampleRate dynamique | `389c24c`, `00d8b98` | Edge ne coupe plus après 3 phrases lentes, pitch corrigé |
 
 **Validation** : `./gradlew clean test` ✅, `lint` ✅, `assembleDebug` ✅, `installDebug` ✅
+
+### Phase 5c — Audit UI/UX Phase 1 ✅ COMPLÉTÉE (2026-07-19)
+
+**Branche** `ui-ux-audit-phase1` — 10 tâches exécutées depuis [`PLAN_ACTION_UXUI_CLAUDECODE.md`](./PLAN_ACTION_UXUI_CLAUDECODE.md).
+Voir [`CHANGELOG.md`](./CHANGELOG.md) pour le détail complet.
+
+| # | Tâche | Statut | Priorité |
+|---|---|---|---|
+| 1 | Suppression des couleurs hardcodées (cohérence 3 thèmes) | ✅ Fait | 🔴 |
+| 2 | `LibraryScreen` → `ModalNavigationDrawer` (back gesture, TalkBack) | ✅ Fait | 🔴 |
+| 3 | Empty state actionnable (CTA import) | ✅ Fait | 🔴 |
+| 4 | `ErrorBanner` aligné Material 3 | ✅ Fait | 🟠 |
+| 5 | Couvertures via Coil `AsyncImage` (décodage async) | ✅ Fait | 🟠 |
+| 6 | Accessibilité : `strings.xml` + `contentDescription` + semantics Canvas | ✅ Fait | 🔴 |
+| 7 | `UnifiedControlPanel` restructuré (primaire/secondaire) | ✅ Fait | 🟠 |
+| 8 | Barre de progression + ETA (WPM moyen) | ✅ Fait | 🟡 |
+| 9 | `LibraryNavigationPopup` connecté aux données réelles | ✅ Fait | 🟡 |
+| 10 | Dictionnaire phonétique déplacé vers `SettingsScreen` | ✅ Fait | 🟢 |
+
+**Validation** : `./gradlew assembleDebug` ✅ après chaque tâche.
 
 ### 🔄 Historique TTS : Kokoro → Piper
 
@@ -179,6 +199,16 @@ Le modèle **Kokoro int8 multi-langue** (150 Mo, 53 locuteurs) a été testé pu
 ---
 
 ## 📝 Notes de Session
+
+### 2026-07-19 (branche `ui-ux-audit-phase1`)
+- **Audit UI/UX Phase 1** : 10 tâches exécutées depuis `PLAN_ACTION_UXUI_CLAUDECODE.md` (voir Phase 5c ci-dessus et CHANGELOG.md)
+- **Cohérence thème** : plus aucune couleur hardcodée dans les composables `ui/**` (vérifié par grep) — tout passe par `MaterialTheme.colorScheme.*`
+- **`ModalNavigationDrawer`** : le drawer de `LibraryScreen` gère désormais back gesture, predictive back et TalkBack nativement
+- **Coil** : couvertures de livres chargées de façon asynchrone (remplace un `BitmapFactory.decodeFile()` bloquant)
+- **Accessibilité** : `strings.xml` complété, semantics ajoutées sur les Canvas de `StatsScreen`
+- **Reader** : `UnifiedControlPanel` restructuré + barre de progression avec ETA (temps de lecture restant estimé)
+- **Build validé** : `./gradlew assembleDebug` ✅ après chaque tâche
+- **Prochaine étape :** revue de la branche → merge → Beta fermée → Play Store
 
 ### 2026-07-19
 - **Suppression Miro** : modèle 61MB retiré, fallbacks nettoyés (25c66dc)

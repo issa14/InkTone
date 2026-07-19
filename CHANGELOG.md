@@ -9,6 +9,33 @@ et ce projet adhère au [Semantic Versioning](https://semver.org/spec/v2.0.0.htm
 
 ## [Unreleased]
 
+### 2026-07-19 — Refonte UI/UX (branche `ui-ux-audit-phase1`)
+
+Audit UI/UX complet exécuté selon [`PLAN_ACTION_UXUI_CLAUDECODE.md`](./PLAN_ACTION_UXUI_CLAUDECODE.md), 10 tâches.
+
+#### Changed — 🟢 Cohérence thème & Material 3
+
+- **Suppression des couleurs hardcodées** dans `BookmarkScreen`, `AllBookmarksPanel`, `SearchScreen`, `ReaderScreen`, `ReaderTtsPanel`, `LibraryScreen` — remplacées par `MaterialTheme.colorScheme.*`, désormais cohérentes sur les 3 thèmes (Papier d'Art, Obsidian, Nordic Fog). Les couleurs calculées depuis `ReaderTheme` (Jour/Nuit/Sépia) restent volontairement indépendantes du thème app.
+- **`LibraryScreen` migré vers `ModalNavigationDrawer`** — remplace le drawer manuel (`Surface` + `AnimatedVisibility`) ; gère nativement le back gesture Android, le predictive back (Android 14+) et l'annonce d'état TalkBack.
+- **Empty state actionnable** (bibliothèque et récents vides) — icône dans cercle `primaryContainer`, titre + description, CTA "Importer un livre" et "Parcourir mes fichiers".
+- **`ErrorBanner` aligné sur le pattern Material 3 error** — `errorContainer` plein, icône `ErrorOutline`, préfixes emoji retirés du message.
+- **Couvertures de livres via Coil `AsyncImage`** — remplace un `BitmapFactory.decodeFile()` synchrone dans `remember()` qui bloquait le thread de composition ; cache LRU et chargement async gérés nativement par Coil.
+- **`LibraryNavigationPopup` connecté aux données réelles** — le groupement par auteur (`NavSubItem`) vient désormais de `allBooks` en mémoire au lieu de données mockées ("Black Wings", etc.) ; cliquer un auteur filtre la bibliothèque via la recherche existante.
+
+#### Added — 🟡 Accessibilité
+
+- `strings.xml` peuplé (navigation, bibliothèque, lecteur, stats) et branché sur les icônes interactives (`IconButton` sans texte).
+- `semantics { contentDescription = ... }` ajouté sur les 2 `Canvas` de `StatsScreen` (jauge objectif quotidien, graphique WPM hebdomadaire) et sur le badge de progression des couvertures.
+- Correction incidente : labels du graphique WPM dessinés en blanc pur via `nativeCanvas` (invisibles en thème clair) → couleur dérivée de `MaterialTheme.colorScheme.onSurfaceVariant`.
+
+#### Changed — 🟡 Lecteur (Reader)
+
+- **`UnifiedControlPanel` restructuré** en deux rangées : contrôles primaires (chapitre précédent/suivant + play/pause central agrandi avec haptique) et actions secondaires avec icône + label (Voix, Police, Thème, Veille). La navigation phrase par phrase reste accessible depuis le panneau TTS.
+- **Barre de progression + ETA** — `LinearProgressIndicator` fine (2dp) toujours visible en haut de l'écran de lecture, plus une estimation du temps restant du chapitre (`etaMinutes`) calculée depuis le WPM moyen de l'utilisateur (`ReadingSessionDao`).
+- **Dictionnaire de prononciation déplacé** de `ReaderTtsPanel` (panneau de lecture) vers une nouvelle section "🗣️ Prononciation" dans `SettingsScreen` — CRUD porté par `SettingsViewModel`.
+
+Validation : `./gradlew assembleDebug` ✅ après chaque tâche.
+
 ### 2026-07-19 — Migration UPMC & Suppression Miro
 
 #### Changed — 🟢 Améliorations
