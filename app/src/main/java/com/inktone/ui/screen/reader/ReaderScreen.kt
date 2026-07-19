@@ -82,6 +82,9 @@ fun ReaderScreen(
 
     // État de la sélection de texte
     var selectionState by remember { mutableStateOf<SelectionInfo?>(null) }
+    var showNoteDialog by remember { mutableStateOf(false) }
+    var noteDialogSentenceIdx by remember { mutableStateOf(-1) }
+    var noteDialogSelectedText by remember { mutableStateOf("") }
     val snackbarHostState = remember { SnackbarHostState() }
     val clipboardManager = LocalClipboardManager.current
     val scope = rememberCoroutineScope()
@@ -148,6 +151,7 @@ fun ReaderScreen(
                 },
                 highlights = state.highlights,
                 bookmarks = state.bookmarks,
+                annotations = state.annotations,
                 onTap = { offset ->
                         if (screenSize.width > 0) {
                             val left = screenSize.width / 3f
@@ -246,8 +250,10 @@ fun ReaderScreen(
                 },
                 onNote = {
                     val s = selectionState ?: return@SelectionActionBar
-                    viewModel.addAnnotation(s.sentenceIndex, s.selectedText)
+                    noteDialogSentenceIdx = s.sentenceIndex
+                    noteDialogSelectedText = s.selectedText
                     selectionState = null
+                    showNoteDialog = true
                 },
                 onBookmark = {
                     val s = selectionState ?: return@SelectionActionBar
@@ -480,6 +486,45 @@ fun ReaderScreen(
                 }
             )
         }
+    }
+
+    // ── Dialog de saisie de note ─────────────────────
+    if (showNoteDialog) {
+        var noteText by remember { mutableStateOf("") }
+        AlertDialog(
+            onDismissRequest = { showNoteDialog = false },
+            title = { Text("Ajouter une note") },
+            text = {
+                Column {
+                    Text(
+                        noteDialogSelectedText.take(80) + if (noteDialogSelectedText.length > 80) "…" else "",
+                        style = MaterialTheme.typography.bodySmall,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                        modifier = Modifier.padding(bottom = 12.dp)
+                    )
+                    OutlinedTextField(
+                        value = noteText,
+                        onValueChange = { noteText = it },
+                        placeholder = { Text("Votre note...") },
+                        modifier = Modifier.fillMaxWidth().heightIn(min = 80.dp),
+                        maxLines = 5
+                    )
+                }
+            },
+            confirmButton = {
+                TextButton(
+                    onClick = {
+                        if (noteText.isNotBlank()) {
+                            viewModel.addAnnotation(noteDialogSentenceIdx, noteDialogSelectedText, noteText)
+                        }
+                        showNoteDialog = false
+                    }
+                ) { Text("Enregistrer") }
+            },
+            dismissButton = {
+                TextButton(onClick = { showNoteDialog = false }) { Text("Annuler") }
+            }
+        )
     }
 }
 
