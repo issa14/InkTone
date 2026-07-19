@@ -54,6 +54,7 @@ data class ReaderUiState(
     val lastAction: String? = null,
     val highlights: List<HighlightEntity> = emptyList(),
     val bookmarks: List<BookmarkEntity> = emptyList(),
+    val annotations: List<AnnotationEntity> = emptyList(),
     val showReaderTooltip: Boolean = false,
     val showPlayTooltip: Boolean = false,
     val etaMinutes: Int? = null,
@@ -348,6 +349,7 @@ class ReaderViewModel @Inject constructor(
                         currentChapterIndex = index, currentChapter = result.chapter,
                         totalSentences = result.chapter.sentences.size, currentSentenceIndex = sentenceIndex,
                         highlights = result.highlights, bookmarks = result.bookmarks,
+                        annotations = result.annotations,
                         isLoading = false, isLoadingChapter = false
                     )
                 }
@@ -538,12 +540,12 @@ class ReaderViewModel @Inject constructor(
         }
     }
 
-    fun addAnnotation(sentenceIndex: Int, selectedText: String) {
+    fun addAnnotation(sentenceIndex: Int, selectedText: String, noteText: String) {
         val book = currentBook ?: return
         val chapterIdx = _uiState.value.currentChapterIndex
         viewModelScope.launch {
             try {
-                val result = annotationsUseCase.addAnnotation(book.id, chapterIdx, sentenceIndex, selectedText)
+                val result = annotationsUseCase.addAnnotation(book.id, chapterIdx, sentenceIndex, selectedText, noteText)
                 if (result is com.inktone.domain.usecase.AnnotationResult.Success) {
                     _uiState.update { it.copy(lastAction = result.message) }
                 }
@@ -557,7 +559,7 @@ class ReaderViewModel @Inject constructor(
     private suspend fun reloadAnnotations(bookId: String, chapterIdx: Int) {
         try {
             val reloaded = annotationsUseCase.reloadAnnotations(bookId, chapterIdx)
-            _uiState.update { it.copy(highlights = reloaded.highlights, bookmarks = reloaded.bookmarks) }
+            _uiState.update { it.copy(highlights = reloaded.highlights, bookmarks = reloaded.bookmarks, annotations = reloaded.annotations) }
         } catch (e: Exception) {
             Log.e("ReaderVM", "Error reloading annotations: ${e.message}", e)
         }

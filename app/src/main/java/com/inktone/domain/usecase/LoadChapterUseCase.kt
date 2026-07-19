@@ -1,7 +1,9 @@
 package com.inktone.domain.usecase
 
+import com.inktone.data.database.AnnotationDao
 import com.inktone.data.database.BookmarkDao
 import com.inktone.data.database.HighlightDao
+import com.inktone.data.database.entity.AnnotationEntity
 import com.inktone.data.database.entity.BookmarkEntity
 import com.inktone.data.database.entity.HighlightEntity
 import com.inktone.domain.model.Chapter
@@ -16,7 +18,8 @@ import javax.inject.Singleton
 data class ChapterWithAnnotations(
     val chapter: Chapter,
     val highlights: List<HighlightEntity>,
-    val bookmarks: List<BookmarkEntity>
+    val bookmarks: List<BookmarkEntity>,
+    val annotations: List<AnnotationEntity>
 )
 
 /**
@@ -30,7 +33,8 @@ data class ChapterWithAnnotations(
 class LoadChapterUseCase @Inject constructor(
     private val bookRepository: BookRepository,
     private val highlightDao: HighlightDao,
-    private val bookmarkDao: BookmarkDao
+    private val bookmarkDao: BookmarkDao,
+    private val annotationDao: AnnotationDao
 ) {
     /**
      * Charge un chapitre avec ses annotations associées.
@@ -47,11 +51,13 @@ class LoadChapterUseCase @Inject constructor(
         val chapter = bookRepository.getChapter(bookId, chapterIndex)
         val highlights = highlightDao.getHighlightsForChapter(bookId, chapterIndex).first()
         val bookmarks = bookmarkDao.getBookmarks(bookId).first()
+        val annotations = annotationDao.getAnnotationsForChapter(bookId, chapterIndex)
 
         return ChapterWithAnnotations(
             chapter = chapter,
             highlights = highlights,
-            bookmarks = bookmarks
+            bookmarks = bookmarks,
+            annotations = annotations
         )
     }
 }
