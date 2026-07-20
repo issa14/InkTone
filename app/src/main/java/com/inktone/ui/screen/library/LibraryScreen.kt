@@ -42,6 +42,9 @@ import androidx.compose.ui.unit.sp
 import androidx.compose.ui.window.Popup
 import androidx.compose.ui.window.PopupProperties
 import androidx.hilt.navigation.compose.hiltViewModel
+import androidx.lifecycle.Lifecycle
+import androidx.lifecycle.LifecycleEventObserver
+import androidx.lifecycle.compose.LocalLifecycleOwner
 import coil.compose.AsyncImage
 import coil.request.ImageRequest
 import com.inktone.R
@@ -77,6 +80,22 @@ fun LibraryScreen(
     var fontSizeScale by remember { mutableStateOf(1) } // 0=small, 1=medium, 2=large
 
     val snackbarHostState = remember { SnackbarHostState() }
+
+    // Le ViewModel survit dans la back stack quand on navigue vers le Reader (scope à cette
+    // NavBackStackEntry, pas recréé au retour) — sans ça, la progression chargée une seule fois
+    // à l'ouverture de la bibliothèque resterait figée même après avoir beaucoup lu. On
+    // rafraîchit à chaque retour au premier plan de cet écran précis (ON_RESUME de sa propre
+    // lifecycle, pas celle de l'Activity).
+    val lifecycleOwner = LocalLifecycleOwner.current
+    DisposableEffect(lifecycleOwner) {
+        val observer = LifecycleEventObserver { _, event ->
+            if (event == Lifecycle.Event.ON_RESUME) {
+                viewModel.refresh()
+            }
+        }
+        lifecycleOwner.lifecycle.addObserver(observer)
+        onDispose { lifecycleOwner.lifecycle.removeObserver(observer) }
+    }
 
     // Snackbar de succès après premier import
     LaunchedEffect(state.importSuccessSnackbar) {

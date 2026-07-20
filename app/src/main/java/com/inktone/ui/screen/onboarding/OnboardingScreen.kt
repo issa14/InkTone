@@ -90,11 +90,7 @@ fun OnboardingScreen(
                 .padding(16.dp),
             horizontalArrangement = Arrangement.End
         ) {
-            TextButton(onClick = {
-                coroutineScope.launch {
-                    pagerState.animateScrollToPage(2)
-                }
-            }) {
+            TextButton(onClick = onComplete) {
                 Text("Passer", color = MaterialTheme.colorScheme.onSurfaceVariant)
             }
         }
