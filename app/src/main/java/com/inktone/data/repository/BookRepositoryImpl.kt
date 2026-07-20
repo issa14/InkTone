@@ -336,6 +336,36 @@ class BookRepositoryImpl @Inject constructor(
     override suspend fun getProgress(bookId: String): Progress? =
         progressDao.getByBookId(bookId)?.toDomain()
 
+    override suspend fun regenerateCover(bookId: String): String? =
+        withContext(Dispatchers.IO) {
+            val entity = bookDao.getById(bookId) ?: return@withContext null
+            val epubFile = File(entity.filePath)
+            if (!epubFile.exists()) return@withContext null
+            val epubDir = epubFile.parentFile ?: return@withContext null
+
+            entity.coverPath?.let { File(it).delete() }
+
+            val freshFileName = "cover_${System.currentTimeMillis()}.jpg"
+            val newPath = try {
+                val publication = openPublication(epubFile)
+                extractCoverViaReadium(publication, epubDir, freshFileName)
+            } catch (e: Exception) {
+                Log.w("BookRepo", "regenerateCover: ouverture Readium échouée pour $bookId : ${e.message}")
+                null
+            } ?: extractCoverHeuristic(epubFile, epubDir, freshFileName)
+
+            bookDao.updateCoverPath(bookId, newPath)
+            newPath
+        }
+
+    override suspend fun clearAllCovers(): Unit =
+        withContext(Dispatchers.IO) {
+            bookDao.getAll().first().forEach { entity ->
+                entity.coverPath?.let { File(it).delete() }
+            }
+            bookDao.clearAllCoverPaths()
+        }
+
     // ── Helpers — ouverture & extraction EPUB ──────────────
 
     private suspend fun openPublication(epubFile: File): Publication =
@@ -416,7 +446,7 @@ class BookRepositoryImpl @Inject constructor(
     // ── Helpers — couverture ────────────────────────────────
 
     /** EPUB3 : couverture via l'API Readium `Publication.cover()` (résout le lien cover + décode le bitmap). */
-    private suspend fun extractCoverViaReadium(publication: Publication, epubDir: File): String? {
+    private suspend fun extractCoverViaReadium(publication: Publication, epubDir: File, fileName: String = "cover.jpg"): String? {
         val bitmap = try {
             publication.cover()
         } catch (e: Exception) {
@@ -424,7 +454,7 @@ class BookRepositoryImpl @Inject constructor(
             null
         } ?: return null
 
-        val coverFile = File(epubDir, "cover.jpg")
+        val coverFile = File(epubDir, fileName)
         return try {
             coverFile.outputStream().use { out ->
                 bitmap.compress(android.graphics.Bitmap.CompressFormat.JPEG, 90, out)
@@ -438,7 +468,7 @@ class BookRepositoryImpl @Inject constructor(
     }
 
     /** EPUB2 : fallback heuristique sur les noms de fichiers de l'archive ZIP. */
-    private fun extractCoverHeuristic(epubFile: File, epubDir: File): String? {
+    private fun extractCoverHeuristic(epubFile: File, epubDir: File, fileName: String = "cover.jpg"): String? {
         return try {
             ZipFile(epubFile).use { zip ->
                 val entry = zip.entries().asSequence()
@@ -449,7 +479,7 @@ class BookRepositoryImpl @Inject constructor(
                                 (name.endsWith(".jpg") || name.endsWith(".jpeg") || name.endsWith(".png"))
                     }
                 if (entry != null) {
-                    val coverFile = File(epubDir, "cover.jpg")
+                    val coverFile = File(epubDir, fileName)
                     zip.getInputStream(entry).use { input ->
                         coverFile.outputStream().use { output -> input.copyTo(output) }
                     }

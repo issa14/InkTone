@@ -22,4 +22,10 @@ interface BookRepository {
     /** Sauvegarde/charge la progression de lecture. */
     suspend fun saveProgress(progress: Progress)
     suspend fun getProgress(bookId: String): Progress?
+
+    /** Ré-extrait la couverture d'un livre depuis son EPUB source. Retourne le nouveau chemin, ou null si aucune couverture trouvée. */
+    suspend fun regenerateCover(bookId: String): String?
+
+    /** Retire les couvertures de tous les livres (retour au placeholder dégradé automatique). */
+    suspend fun clearAllCovers()
 }

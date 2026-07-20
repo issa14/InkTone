@@ -20,4 +20,10 @@ interface BookDao {
 
     @Query("DELETE FROM books WHERE id = :id")
     suspend fun delete(id: String)
+
+    @Query("UPDATE books SET coverPath = :coverPath WHERE id = :id")
+    suspend fun updateCoverPath(id: String, coverPath: String?)
+
+    @Query("UPDATE books SET coverPath = NULL")
+    suspend fun clearAllCoverPaths()
 }

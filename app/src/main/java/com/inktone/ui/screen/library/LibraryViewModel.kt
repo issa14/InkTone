@@ -38,7 +38,10 @@ data class LibraryUiState(
     val importProgress: Float? = null,
     val importStatus: String? = null,
     val importSuccessSnackbar: String? = null,
-    val navSubItems: Map<String, List<NavSubItem>> = emptyMap()
+    val navSubItems: Map<String, List<NavSubItem>> = emptyMap(),
+    val isRebuildingCovers: Boolean = false,
+    val coverRebuildProgress: Pair<Int, Int>? = null,
+    val libraryActionMessage: String? = null
 )
 
 data class NavSubItem(val label: String, val count: Int, val filterId: String)
@@ -292,6 +295,37 @@ class LibraryViewModel @Inject constructor(
     fun refresh() = loadBooks()
     fun clearError() { _uiState.update { it.copy(error = null) } }
     fun clearImportSuccessSnackbar() { _uiState.update { it.copy(importSuccessSnackbar = null) } }
+    fun clearLibraryActionMessage() { _uiState.update { it.copy(libraryActionMessage = null) } }
+
+    /** Ré-extrait la couverture de chaque livre depuis son EPUB source (menu Bibliothèque). */
+    fun regenerateAllCovers() {
+        if (_uiState.value.isRebuildingCovers) return
+        viewModelScope.launch {
+            val books = _uiState.value.allBooks
+            _uiState.update { it.copy(isRebuildingCovers = true, coverRebuildProgress = 0 to books.size) }
+            books.forEachIndexed { index, book ->
+                bookRepository.regenerateCover(book.id)
+                _uiState.update { it.copy(coverRebuildProgress = (index + 1) to books.size) }
+            }
+            _uiState.update {
+                it.copy(
+                    isRebuildingCovers = false,
+                    coverRebuildProgress = null,
+                    libraryActionMessage = "✅ Couvertures reconstruites"
+                )
+            }
+            loadBooks()
+        }
+    }
+
+    /** Retire les couvertures extraites de tous les livres (retour au dégradé par défaut). */
+    fun resetCoversToDefault() {
+        viewModelScope.launch {
+            bookRepository.clearAllCovers()
+            loadBooks()
+            _uiState.update { it.copy(libraryActionMessage = "✅ Couvertures réinitialisées") }
+        }
+    }
 
     private fun resolveFileName(uri: Uri): String? {
         val cursor = context.contentResolver.query(uri, null, null, null, null)

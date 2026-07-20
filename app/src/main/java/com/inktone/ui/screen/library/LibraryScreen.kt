@@ -79,6 +79,14 @@ fun LibraryScreen(
         }
     }
 
+    // Snackbar de feedback pour les actions du menu bibliothèque (couvertures, actualisation…)
+    LaunchedEffect(state.libraryActionMessage) {
+        state.libraryActionMessage?.let { msg ->
+            snackbarHostState.showSnackbar(msg, duration = SnackbarDuration.Short)
+            viewModel.clearLibraryActionMessage()
+        }
+    }
+
     val epubPicker = rememberLauncherForActivityResult(
         ActivityResultContracts.OpenMultipleDocuments()
     ) { uris ->
@@ -280,11 +288,25 @@ fun LibraryScreen(
             )
         }
 
-        // ── OVERFLOW MENU ────────────────────────────
+        // ── MENU D'ACTIONS BIBLIOTHÈQUE ──────────────
         if (showOverflow) {
-            OverflowMenu(
+            LibraryActionsSheet(
+                state = state,
                 onDismiss = { showOverflow = false },
-                onImport = { epubPicker.launch(arrayOf("application/epub+zip")) }
+                onImport = {
+                    showOverflow = false
+                    epubPicker.launch(arrayOf("application/epub+zip"))
+                },
+                onRefresh = {
+                    showOverflow = false
+                    viewModel.refresh()
+                },
+                onRebuildCovers = { viewModel.regenerateAllCovers() },
+                onResetCovers = { viewModel.resetCoversToDefault() },
+                onSync = {
+                    showOverflow = false
+                    viewModel.navigateTo(NavigationDestination.SYNC)
+                }
             )
         }
 
@@ -835,50 +857,160 @@ private fun FilterAndSortDialog(
 }
 // ─────────────────────────────────────────────────────
 
+@OptIn(ExperimentalMaterial3Api::class)
 @Composable
-private fun OverflowMenu(onDismiss: () -> Unit, onImport: () -> Unit) {
-    // Overlay pour fermer au tap extérieur
-    Box(
-        modifier = Modifier
-            .fillMaxSize()
-            .clickable(onClick = onDismiss)
+private fun LibraryActionsSheet(
+    state: LibraryUiState,
+    onDismiss: () -> Unit,
+    onImport: () -> Unit,
+    onRefresh: () -> Unit,
+    onRebuildCovers: () -> Unit,
+    onResetCovers: () -> Unit,
+    onSync: () -> Unit
+) {
+    var showResetCoversConfirm by remember { mutableStateOf(false) }
+
+    ModalBottomSheet(
+        onDismissRequest = onDismiss,
+        containerColor = MaterialTheme.colorScheme.surface,
+        shape = RoundedCornerShape(topStart = 24.dp, topEnd = 24.dp),
+        dragHandle = { BottomSheetDefaults.DragHandle(color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.3f)) }
     ) {
-        Surface(
-            modifier = Modifier
-                .align(Alignment.TopEnd)
-                .padding(top = 55.dp, end = 8.dp)
-                .width(260.dp),
-            color = MaterialTheme.colorScheme.surface,
-            shape = RoundedCornerShape(4.dp),
-            tonalElevation = 8.dp
-        ) {
-            Column {
-                OverflowMenuItem("Importer des livres", Icons.Default.FileUpload) {
-                    onDismiss(); onImport()
+        Column(modifier = Modifier.padding(horizontal = 8.dp, vertical = 4.dp).padding(bottom = 24.dp)) {
+            ActionSheetSectionHeader("Bibliothèque")
+            ActionSheetItem(
+                icon = Icons.Default.FileUpload,
+                label = stringResource(R.string.cd_import_books),
+                onClick = onImport
+            )
+            ActionSheetItem(
+                icon = Icons.Default.Refresh,
+                label = "Actualiser la bibliothèque",
+                onClick = onRefresh
+            )
+
+            Spacer(Modifier.height(8.dp))
+            ActionSheetSectionHeader("Couvertures")
+            ActionSheetItem(
+                icon = Icons.Default.AutoFixHigh,
+                label = "Reconstruire les couvertures",
+                enabled = !state.isRebuildingCovers,
+                onClick = onRebuildCovers,
+                trailing = {
+                    state.coverRebuildProgress?.let { (current, total) ->
+                        Row(verticalAlignment = Alignment.CenterVertically) {
+                            CircularProgressIndicator(
+                                modifier = Modifier.size(16.dp),
+                                strokeWidth = 2.dp,
+                                color = MaterialTheme.colorScheme.primary
+                            )
+                            Spacer(Modifier.width(8.dp))
+                            Text(
+                                "$current/$total",
+                                fontSize = 12.sp,
+                                color = MaterialTheme.colorScheme.onSurfaceVariant
+                            )
+                        }
+                    }
                 }
-                OverflowMenuItem("Couverture par défaut", Icons.Default.Image) { onDismiss() }
-                OverflowMenuItem("Reconstruire les couvertures", Icons.Default.Refresh) { onDismiss() }
-                HorizontalDivider(modifier = Modifier.padding(vertical = 4.dp))
-                OverflowMenuItem("Synchroniser avec le cloud", Icons.Default.CloudUpload,
-                    color = MaterialTheme.colorScheme.primary) { onDismiss() }
-            }
+            )
+            ActionSheetItem(
+                icon = Icons.Default.Wallpaper,
+                label = "Couverture par défaut",
+                enabled = !state.isRebuildingCovers,
+                onClick = { showResetCoversConfirm = true }
+            )
+
+            HorizontalDivider(modifier = Modifier.padding(vertical = 12.dp, horizontal = 16.dp))
+            ActionSheetItem(
+                icon = Icons.Default.Sync,
+                label = "Synchroniser avec le cloud",
+                accentColor = MaterialTheme.colorScheme.primary,
+                onClick = onSync,
+                trailing = {
+                    Icon(
+                        Icons.Filled.KeyboardArrowRight,
+                        contentDescription = null,
+                        tint = MaterialTheme.colorScheme.primary.copy(alpha = 0.6f),
+                        modifier = Modifier.size(20.dp)
+                    )
+                }
+            )
         }
+    }
+
+    if (showResetCoversConfirm) {
+        AlertDialog(
+            onDismissRequest = { showResetCoversConfirm = false },
+            icon = { Icon(Icons.Default.Wallpaper, null, tint = MaterialTheme.colorScheme.primary) },
+            title = { Text("Réinitialiser les couvertures ?") },
+            text = {
+                Text(
+                    "Toutes les couvertures extraites seront retirées et remplacées par un dégradé par défaut. " +
+                        "Vous pourrez les reconstruire à tout moment.",
+                    fontSize = 14.sp
+                )
+            },
+            confirmButton = {
+                TextButton(onClick = {
+                    showResetCoversConfirm = false
+                    onResetCovers()
+                }) { Text("Réinitialiser", color = MaterialTheme.colorScheme.error) }
+            },
+            dismissButton = {
+                TextButton(onClick = { showResetCoversConfirm = false }) { Text("Annuler") }
+            },
+            shape = RoundedCornerShape(16.dp)
+        )
     }
 }
 
 @Composable
-private fun OverflowMenuItem(text: String, icon: androidx.compose.ui.graphics.vector.ImageVector,
-                              color: Color = MaterialTheme.colorScheme.surfaceVariant, onClick: () -> Unit) {
+private fun ActionSheetSectionHeader(text: String) {
+    Text(
+        text.uppercase(),
+        fontSize = 12.sp,
+        fontWeight = FontWeight.Bold,
+        color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.6f),
+        letterSpacing = 0.5.sp,
+        modifier = Modifier.padding(start = 16.dp, end = 16.dp, top = 8.dp, bottom = 4.dp)
+    )
+}
+
+@Composable
+private fun ActionSheetItem(
+    icon: androidx.compose.ui.graphics.vector.ImageVector,
+    label: String,
+    onClick: () -> Unit,
+    enabled: Boolean = true,
+    accentColor: Color? = null,
+    trailing: (@Composable () -> Unit)? = null
+) {
+    val contentColor = when {
+        !enabled -> MaterialTheme.colorScheme.onSurface.copy(alpha = 0.38f)
+        accentColor != null -> accentColor
+        else -> MaterialTheme.colorScheme.onSurface
+    }
+    val iconColor = if (!enabled) contentColor else accentColor ?: MaterialTheme.colorScheme.onSurfaceVariant
+
     Row(
         modifier = Modifier
             .fillMaxWidth()
-            .clickable(onClick = onClick)
-            .padding(horizontal = 16.dp, vertical = 12.dp),
+            .clip(RoundedCornerShape(12.dp))
+            .clickable(enabled = enabled, onClick = onClick)
+            .padding(horizontal = 16.dp, vertical = 14.dp),
         verticalAlignment = Alignment.CenterVertically
     ) {
-        Icon(icon, null, tint = MaterialTheme.colorScheme.onSurfaceVariant, modifier = Modifier.size(18.dp))
-        Spacer(Modifier.width(10.dp))
-        Text(text, fontSize = 14.sp, color = color)
+        Icon(icon, contentDescription = null, tint = iconColor, modifier = Modifier.size(22.dp))
+        Spacer(Modifier.width(16.dp))
+        Text(
+            label,
+            fontSize = 15.sp,
+            fontWeight = if (accentColor != null) FontWeight.Medium else FontWeight.Normal,
+            color = contentColor,
+            modifier = Modifier.weight(1f)
+        )
+        trailing?.invoke()
     }
 }
 
