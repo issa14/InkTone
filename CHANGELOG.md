@@ -9,6 +9,17 @@ et ce projet adhère au [Semantic Versioning](https://semver.org/spec/v2.0.0.htm
 
 ## [Unreleased]
 
+### 2026-07-20 — Plan Top-Tier, Phase 2.2bis : hrefs EPUB percent-encodés non résolus (branche `main`)
+
+Sous-tâche 2.2bis de [`PLAN_ACTION_TOP_TIER_CLAUDECODE.md`](./PLAN_ACTION_TOP_TIER_CLAUDECODE.md) — bug pré-existant découvert en testant la Phase 2 sur appareil, sans rapport avec elle (`SpineIndex.kt` non touché par 2.1/2.2).
+
+#### Fixed — 🟠 Import EPUB
+
+- **Hrefs de TOC percent-encodés non résolus dans le spine** — certains EPUB (souvent exportés par Calibre) exposent leurs hrefs avec espaces et ancres encodés (`%20`, `%23` au lieu des caractères littéraux). `SpineIndex.normalizeHref()` ne détectait pas l'ancre encodée et gardait tout le suffixe collé au nom de fichier, qui ne correspondait plus à aucune entrée du spine — **la table des matières entière échouait à se résoudre**, et le livre s'importait avec zéro contenu réel. `EpubZipIndex.find()` avait le même problème côté recherche d'entrée ZIP (comparaison contre les noms de fichiers réels de l'archive, non encodés).
+- `SpineIndex.decodeHref()` (nouveau) : décodage manuel des séquences `%XX`, pas `java.net.URLDecoder` (qui convertirait aussi `+` en espace à tort). `normalizeHref()`, `resolveAnchoredRange()` et `EpubZipIndex.find()` décodent désormais avant comparaison.
+
+**Validation** : `SpineIndexTest.kt` (10 tests, espaces/ancres encodés, UTF-8 multi-octets, non-corruption d'un `+` littéral, repli sur séquence malformée) ✅. Réimporté *Anna Karénine Tome 2* sur appareil physique — les 5 parties se résolvent et s'importent avec du contenu réel, zéro échec de résolution, aucun crash.
+
 ### 2026-07-20 — Plan Top-Tier, Phase 2.2 : Import EPUB — traitement parallèle des chapitres (branche `main`)
 
 Tâche 2.2 de [`PLAN_ACTION_TOP_TIER_CLAUDECODE.md`](./PLAN_ACTION_TOP_TIER_CLAUDECODE.md).

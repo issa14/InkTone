@@ -73,8 +73,19 @@ private class EpubZipIndex(private val zip: ZipFile) : Closeable {
     private val byName: Map<String, ZipEntry> = entries.associateBy { it.name }
     private val readLock = ReentrantLock()
 
-    /** Entrée par chemin exact (O(1)), puis par correspondance de suffixe pour les chemins relatifs/préfixés différemment. */
-    fun find(path: String): ZipEntry? = byName[path] ?: entries.firstOrNull { it.name.endsWith(path) }
+    /**
+     * Entrée par chemin exact (O(1)), puis par correspondance de suffixe pour les chemins
+     * relatifs/préfixés différemment. Essaie aussi la version percent-décodée du chemin (voir
+     * [com.inktone.data.epub.SpineIndex.decodeHref]) — certains EPUB exposent des hrefs avec
+     * leurs espaces/caractères spéciaux encodés (`%20`…), qui ne correspondent jamais aux noms
+     * d'entrées réels du ZIP sans décodage (PLAN_ACTION_TOP_TIER_CLAUDECODE.md §2.2bis).
+     */
+    fun find(path: String): ZipEntry? {
+        val decodedPath = com.inktone.data.epub.SpineIndex.decodeHref(path)
+        return byName[decodedPath] ?: byName[path]
+            ?: entries.firstOrNull { it.name.endsWith(decodedPath) }
+            ?: entries.firstOrNull { it.name.endsWith(path) }
+    }
 
     /** Parcours complet, pour les recherches heuristiques (ex. couverture par motif de nom). */
     fun entriesSequence(): Sequence<ZipEntry> = entries.asSequence()

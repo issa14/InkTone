@@ -101,7 +101,7 @@ class SpineIndex(private val spine: List<Link>) {
      */
     fun resolveAnchoredRange(tocLink: Link, nextTocLink: Link? = null): AnchoredRange {
         val rawHref = tocLink.href.toString()
-        val startAnchor = rawHref.substringAfter("#", "").takeIf { it.isNotBlank() }
+        val startAnchor = decodeHref(rawHref).substringAfter("#", "").takeIf { it.isNotBlank() }
         val href = normalizeHref(rawHref)
         val start = lookupIndex(href) ?: return AnchoredRange(IntRange.EMPTY, null, null)
 
@@ -109,7 +109,7 @@ class SpineIndex(private val spine: List<Link>) {
         val endAnchor: String?
         if (nextTocLink != null) {
             val nextRawHref = nextTocLink.href.toString()
-            val nextAnchor = nextRawHref.substringAfter("#", "").takeIf { it.isNotBlank() }
+            val nextAnchor = decodeHref(nextRawHref).substringAfter("#", "").takeIf { it.isNotBlank() }
             val nextHref = normalizeHref(nextRawHref)
             val nextIndex = lookupIndex(nextHref) ?: spine.size
             // Ancre de fin uniquement pertinente si le TOC suivant pointe vers LE MÊME fichier spine
@@ -127,15 +127,50 @@ class SpineIndex(private val spine: List<Link>) {
         /**
          * Normalise un href pour le lookup dans l'index.
          *
-         * Supprime :
+         * Décode d'abord les séquences percent-encoded (voir [decodeHref]), puis supprime :
          * - Tout ce qui suit un `#` (ancre/fragment)
          * - Le préfixe de chemin (ne garde que le nom du fichier)
          */
         fun normalizeHref(href: String): String {
-            return href
+            return decodeHref(href)
                 .substringBefore("#")
                 .substringAfterLast("/")
                 .trim()
+        }
+
+        /**
+         * Décode les séquences percent-encoded (`%20`, `%23`…) d'un href.
+         *
+         * Certains EPUB (souvent exportés par Calibre) exposent des hrefs de TOC/spine avec
+         * leurs caractères spéciaux — espaces, ancres `#` — percent-encodés au lieu de
+         * littéraux. Sans décodage, ces hrefs ne correspondent jamais aux noms d'entrées réels
+         * de l'archive ZIP, ni à une ancre `#` littérale lors du découpage de fragment (voir
+         * PLAN_ACTION_TOP_TIER_CLAUDECODE.md §2.2bis).
+         *
+         * Décodage manuel des séquences `%XX` plutôt que `java.net.URLDecoder` : ce dernier
+         * convertit aussi `+` en espace (convention `application/x-www-form-urlencoded`,
+         * hors sujet pour un chemin de fichier) — un `+` littéral dans un nom de fichier serait
+         * corrompu à tort. Repli sur le href original si la séquence percent est malformée.
+         */
+        fun decodeHref(href: String): String {
+            if ('%' !in href) return href
+            return try {
+                val bytes = java.io.ByteArrayOutputStream()
+                var i = 0
+                while (i < href.length) {
+                    val c = href[i]
+                    if (c == '%' && i + 2 < href.length) {
+                        bytes.write(href.substring(i + 1, i + 3).toInt(16))
+                        i += 3
+                    } else {
+                        bytes.write(c.code)
+                        i++
+                    }
+                }
+                bytes.toString("UTF-8")
+            } catch (e: Exception) {
+                href
+            }
         }
     }
 }
