@@ -34,7 +34,6 @@ import javax.inject.Singleton
 class BackupManager @Inject constructor(
     @ApplicationContext private val context: Context,
     private val db: InkToneDatabase,
-    private val progressDao: ProgressDao,
     private val readingProgressDao: ReadingProgressDao,
     private val bookmarkDao: BookmarkDao,
     private val pronunciationRuleDao: PronunciationRuleDao,
@@ -58,12 +57,10 @@ class BackupManager @Inject constructor(
         Log.i(TAG, "Export backup vers $uri")
 
         val payload = BackupPayload(
-            version = 1,
             appVersion = APP_VERSION,
             createdAt = System.currentTimeMillis(),
             bookmarks = bookmarkDao.getAllSync(),
             pronunciationRules = pronunciationRuleDao.getAllSync(),
-            progressEntries = progressDao.getAllSync(),
             readingProgressList = readingProgressDao.getAllSync(),
             readingSessions = readingSessionDao.getAllSync()
         )
@@ -98,16 +95,10 @@ class BackupManager @Inject constructor(
         }
 
         Log.i(TAG, "Backup v${payload.version}, app v${payload.appVersion}, " +
-            "${payload.bookmarks.size} signets, ${payload.progressEntries.size} progrès, " +
+            "${payload.bookmarks.size} signets, " +
             "${payload.readingProgressList.size} lectures, ${payload.readingSessions.size} sessions")
 
         var restored = 0
-
-        // Restaurer la progression
-        for (progress in payload.progressEntries) {
-            progressDao.upsert(progress)
-            restored++
-        }
 
         // Restaurer les signets
         for (bookmark in payload.bookmarks) {

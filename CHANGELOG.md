@@ -9,6 +9,36 @@ et ce projet adhère au [Semantic Versioning](https://semver.org/spec/v2.0.0.htm
 
 ## [Unreleased]
 
+### 2026-07-20 — Plan Top-Tier, Phase 1 : Progression de lecture (branche `main`)
+
+Phase 1 exécutée dans l'ordre 1.1 → 1.8 selon [`PLAN_ACTION_TOP_TIER_CLAUDECODE.md`](./PLAN_ACTION_TOP_TIER_CLAUDECODE.md). Conception préalable dans [`architecture.md` §11](./architecture.md).
+
+#### Changed — 🔴 Source de vérité unique pour la position de lecture
+
+- **Fusion des tables `progress` et `reading_progress`** en une seule table `reading_progress` (Room v15→16, `MIGRATION_15_16`) : `bookId, chapterIndex, sentenceIndex, characterOffset, totalProgressFraction, updatedAt, source`. Les deux anciennes tables ne se recouvraient pas forcément (l'une alimentait le badge `%` de la bibliothèque, l'autre la reprise exacte du Reader) — la migration préserve le champ propre à chacune plutôt que de garder une seule ligne "gagnante" qui aurait perdu l'autre moitié de l'information. `ProgressEntity.kt`, `ProgressDao.kt` et le modèle domaine `Progress.kt` supprimés ; `BookRepository`/`CalculateReadingProgressUseCase` retypés directement sur l'entité `ReadingProgress`.
+- **Pondération réelle de la progression par longueur de chapitre** — `TocEntry.charCount` (nouveau champ, peuplé gratuitement à l'import depuis `combinedHtml.length`, déjà en mémoire) remplace la formule naïve `(chapterIndex + sentenceIndex/totalSentences) / totalChapters` qui traitait tous les chapitres comme équivalents. Dégrade vers l'ancienne formule pour les livres importés avant ce changement (`charCount = 0`), sans blocage ni ré-import forcé.
+- **Course d'écriture éliminée** entre le chemin TTS (`PlaybackOrchestrator.saveProgressAsync`) et le chemin manuel (`CalculateReadingProgressUseCase` via `ReaderViewModel`) : les deux écrivaient indépendamment sur la même ligne (`INSERT OR REPLACE`) sans coordination une fois les tables fusionnées. `PlaybackOrchestrator` calcule et persiste désormais lui-même `totalProgressFraction` (formule partagée `computeReadingProgressFraction`, `source=TTS`) ; `CalculateReadingProgressUseCase` ne sert plus que pour le scroll manuel (`source=MANUAL_SCROLL`), qui ne s'exécute jamais pendant une lecture TTS active.
+- **`characterOffset` réutilisé** pour la pondération (offset caractère de la phrase courante dans son chapitre) au lieu d'être écrit sans jamais être lu.
+
+#### Fixed — 🔴 Reprise de lecture
+
+- **Scroll/tap manuel désormais persisté** — auparavant, seule une lecture TTS active déclenchait une écriture Room ; naviguer manuellement sans lancer l'audio ne survivait pas à un `kill` de process. `ReaderContent` débounce (500 ms) le scroll (`snapshotFlow` sur `firstVisibleItemIndex`/`pagerState.currentPage`), ignoré pendant l'auto-scroll programmatique du TTS (flag `isProgrammaticScroll`) ou une lecture active, et remonte vers `ReaderViewModel.onManualPositionChanged()`.
+- **`activeIdx` unifié** dans `ReaderContent` : `if (isSpeaking) playbackState.activeSentenceIndex else currentSentenceIndex` — la position restaurée s'affiche désormais dès le premier rendu, sans attendre une interaction (avant : toujours 0 par défaut hors lecture).
+- **`startFrom = 0` codé en dur** dans `ReaderViewModel.play()` remplacé par `startFrom = currentSentenceIndex` — presser Play redémarrait toujours en début de chapitre au lieu de la position affichée. `stop()` ne réinitialise plus l'affichage à 0 (la DB gardait déjà la bonne valeur, seul l'affichage était incohérent).
+
+#### Fixed — 🟠 Sous-problème découvert (hors périmètre initial, ajouté au plan en 1.2bis)
+
+- **Trou de migration Room `6→13`** — aucune `Migration` explicite pour ce chemin (versions consommées pendant une période de churn pré-beta, dont deux commits divergents ayant chacun bumpé vers la version 12 indépendamment), couvert silencieusement par `fallbackToDestructiveMigration()`. Remplacé par `fallbackToDestructiveMigrationFrom(1..12)` : seul ce trou historique (sans base installée réelle à reconstituer) tolère encore un fallback destructif — tout futur trou de migration non couvert fera désormais planter l'app au lieu d'effacer silencieusement la base d'un testeur.
+
+#### Added — Tests
+
+- `CalculateReadingProgressUseCaseTest` — pondération sur chapitres très inégaux (préface 200 caractères vs chapitre 50 000), dégradation gracieuse sans `charCount`.
+- `InkToneDatabaseMigrationTest` (instrumenté) — migration 15→16 contre une vraie base SQLite, fusion sans perte des deux anciennes tables.
+- `ReadingProgressIntegrationTest` (instrumenté) — scénario complet ouverture → scroll manuel sans audio → simulation de fermeture de process → réouverture → chapitre/phrase restaurés depuis Room (pas `SavedStateHandle`).
+- Garde-fous régression sur `startFrom`/`stop()` dans `ReaderViewModelTest`, vérifiés capables de détecter la régression (bug réintroduit temporairement en local, suite rouge confirmée, puis reverti).
+
+**Validation** : `./gradlew assembleDebug` ✅, `testDebugUnitTest` ✅ (130 tests, 0 échec), `connectedDebugAndroidTest` ✅ (3 tests instrumentés sur appareil physique, 0 échec).
+
 ### 2026-07-20 — Plan Top-Tier, Phase 0 : Conformité store & exploitation (branche `main`)
 
 Phase 0 exécutée selon [`PLAN_ACTION_TOP_TIER_CLAUDECODE.md`](./PLAN_ACTION_TOP_TIER_CLAUDECODE.md), basé sur [`AUDIT_INDEPENDANT_UX_PERFORMANCE_2026-07-20.md`](./AUDIT_INDEPENDANT_UX_PERFORMANCE_2026-07-20.md) (audit indépendant, commit `567d836`).

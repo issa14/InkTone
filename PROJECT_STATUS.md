@@ -1,10 +1,10 @@
 # 📊 InkTone — Suivi d'Avancement Projet
 
 > Dernière mise à jour : 2026-07-20  
-> Phase actuelle : **Plan Top-Tier — Phase 0 ✅ complétée, Phase 1 en cours**  
+> Phase actuelle : **Plan Top-Tier — Phases 0 et 1 ✅ complétées, Phase 2 à venir**  
 > Progression globale : **~95%**  
 > Moteurs TTS : **Piper VITS `fr_FR-upmc-medium`** — 2 locuteurs Jessica ♀ + Pierre ♂ (local) + **Microsoft Edge TTS** (cloud, Vivienne & Henri)  
-> Tests unitaires : **111 tests, 0 échec** (12 fichiers)  
+> Tests unitaires : **130 tests, 0 échec** (+ 3 tests instrumentés sur appareil réel — migration Room et reprise de lecture)  
 > Score audit : **8.0/10** (corrigé depuis 6.2/10)
 
 ---
@@ -190,6 +190,36 @@ Voir [`CHANGELOG.md`](./CHANGELOG.md) pour le détail complet.
 - Pipeline validé bout en bout : crash de test volontaire déclenché sur appareil physique, confirmé visible dans le dashboard Firebase Crashlytics du projet `ink-tone`.
 
 **Validation** : `./gradlew assembleDebug` ✅, `testDebugUnitTest` ✅, permission absente du manifeste fusionné (vérifié), crash de test remonté dans Crashlytics (vérifié manuellement).
+
+### Phase 5f — Plan Top-Tier, Phase 1 : Progression de lecture ✅ COMPLÉTÉE (2026-07-20)
+
+**Branche** `main` — Phase 1 (le chantier le plus long et couplé du plan) exécutée dans l'ordre 1.1 → 1.8 depuis [`PLAN_ACTION_TOP_TIER_CLAUDECODE.md`](./PLAN_ACTION_TOP_TIER_CLAUDECODE.md). Conception préalable documentée dans [`architecture.md` §11](./architecture.md).
+
+| # | Tâche | Statut | Priorité |
+|---|---|---|---|
+| 1.1 | Conception du schéma unifié de position de lecture (`architecture.md` §11) | ✅ Fait | 🔴 |
+| 1.2 | Migration Room fusionnant `progress` + `reading_progress` (v15→16) | ✅ Fait | 🔴 |
+| 1.2bis | Sous-problème découvert : trou de migration `6→13`, `fallbackToDestructiveMigrationFrom` restreint | ✅ Fait | 🟠 |
+| 1.3 | Pondération réelle de la progression par longueur de chapitre (`TocEntry.charCount`) | ✅ Fait | 🔴 |
+| 1.4 | Découplage de la sauvegarde de position du TTS (scroll manuel persisté) | ✅ Fait | 🔴 |
+| 1.5 | Unification de `activeIdx` (TTS actif vs position restaurée) | ✅ Fait | 🔴 |
+| 1.6 | Correction `startFrom = 0` codé en dur + `stop()` qui réinitialisait l'affichage | ✅ Fait | 🔴 |
+| 1.7 | Décision `characterOffset` : réutilisé pour la pondération, pas un champ mort | ✅ Fait | 🟡 |
+| 1.8 | Tests de non-régression (unitaires + intégration sur appareil réel) | ✅ Fait | 🔴 |
+
+**Détail** :
+- **Table unique `reading_progress` (v16)** : `bookId, chapterIndex, sentenceIndex, characterOffset, totalProgressFraction, updatedAt, source`. `progress`/`ProgressEntity`/`ProgressDao`/`Progress.kt` (domaine) supprimés — `BookRepository.saveProgress`/`getProgress` et `CalculateReadingProgressUseCase` retypés sur l'entité `ReadingProgress` directement (pas de nouveau wrapper domaine).
+- **Migration `MIGRATION_15_16`** : fusionne les deux anciennes tables sans perte — position depuis l'ancienne `reading_progress` si présente, `totalProgressFraction` depuis l'ancienne `progress` si présente (les deux tables ne se recouvraient pas forcément). Testée contre une vraie base SQLite (pas de mock) sur appareil physique.
+- **Course d'écriture éliminée** : avant la fusion, deux chemins indépendants (`PlaybackOrchestrator.saveProgressAsync` et `CalculateReadingProgressUseCase` via `ReaderViewModel`) auraient écrit sur la même ligne en `INSERT OR REPLACE` sans coordination. `PlaybackOrchestrator` calcule et persiste désormais lui-même `totalProgressFraction` (formule partagée `computeReadingProgressFraction`, `source=TTS`) ; `CalculateReadingProgressUseCase` ne sert plus que pour le chemin manuel (`source=MANUAL_SCROLL`), qui ne tourne jamais en même temps que le TTS.
+- **Pondération réelle** : `TocEntry.charCount` peuplé gratuitement à l'import (`combinedHtml.length`, déjà en mémoire). Dégrade vers l'ancienne formule non pondérée pour les livres importés avant ce changement (`charCount` à 0), pas de blocage ni de ré-import forcé.
+- **Scroll manuel persisté** : `ReaderContent` — flag `isProgrammaticScroll` autour de l'auto-scroll TTS, `snapshotFlow` débouncé (500 ms) sur `firstVisibleItemIndex`/`pagerState.currentPage` → `ReaderViewModel.onManualPositionChanged()`, ignoré pendant le scroll programmatique ou la lecture TTS.
+- **`activeIdx` unifié** : `if (isSpeaking) playbackState.activeSentenceIndex else currentSentenceIndex` — la position restaurée s'affiche désormais immédiatement à l'ouverture, sans attendre une interaction.
+- **`startFrom`/`stop()`** : `play()` démarre à `currentSentenceIndex` (plus jamais 0 en dur) ; `stop()` ne réinitialise plus l'affichage.
+- **Sous-problème découvert (1.2bis)** : trou de migration Room `6→13` (versions consommées pendant une période de churn pré-beta, dont deux commits divergents ayant tous deux bumpé vers la version 12 — pas de base installée réelle à cette période à reconstituer fidèlement). `fallbackToDestructiveMigration()` remplacé par `fallbackToDestructiveMigrationFrom(1..12)` : seul ce trou historique tolère un fallback destructif, tout futur trou de migration fera planter l'app au lieu d'effacer silencieusement la base d'un testeur.
+
+**Tests ajoutés** : `CalculateReadingProgressUseCaseTest` (pondération sur chapitres inégaux, dégradation gracieuse), `InkToneDatabaseMigrationTest` (migration 15→16 sur SQLite réel, instrumenté), `ReadingProgressIntegrationTest` (scénario complet ouverture → scroll manuel sans audio → simulation de fermeture de process → réouverture → position restaurée, instrumenté), garde-fous régression sur `startFrom`/`stop()` dans `ReaderViewModelTest` — vérifiés capables de détecter la régression (bug réintroduit temporairement, suite rouge, puis reverti).
+
+**Validation** : `./gradlew assembleDebug` ✅, `testDebugUnitTest` ✅ (130 tests, 0 échec), `connectedDebugAndroidTest` ✅ (3 tests instrumentés sur appareil physique V2206, 0 échec).
 
 ### 🔄 Historique TTS : Kokoro → Piper
 

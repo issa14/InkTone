@@ -3,7 +3,7 @@ package com.inktone.ui.screen.library
 import android.content.Context
 import com.inktone.data.settings.SettingsRepository
 import com.inktone.domain.model.Book
-import com.inktone.domain.model.Progress
+import com.inktone.data.database.entity.ReadingProgress
 import com.inktone.domain.repository.BookRepository
 import io.mockk.coEvery
 import io.mockk.coVerify
@@ -112,8 +112,8 @@ class LibraryViewModelTest {
         Dispatchers.setMain(testDispatcher)
 
         coEvery { bookRepository.getAllBooks() } returns allBooks
-        coEvery { bookRepository.getProgress(any()) } returns Progress(
-            bookId = "any", currentChapterIndex = 0, currentSentenceIndex = 0, totalProgressFraction = 0f
+        coEvery { bookRepository.getProgress(any()) } returns ReadingProgress(
+            bookId = "any", chapterIndex = 0, sentenceIndex = 0, characterOffset = 0, totalProgressFraction = 0f
         )
         coEvery { bookRepository.getAllTags() } returns listOf("Science-fiction")
         coEvery { settingsRepository.hasImportedFirstBook } returns flowOf(true)

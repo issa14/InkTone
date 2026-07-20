@@ -1,8 +1,8 @@
 package com.inktone.domain.repository
 
+import com.inktone.data.database.entity.ReadingProgress
 import com.inktone.domain.model.Book
 import com.inktone.domain.model.Chapter
-import com.inktone.domain.model.Progress
 import java.io.InputStream
 
 interface BookRepository {
@@ -20,9 +20,9 @@ interface BookRepository {
     /** Liste tous les livres importés. */
     suspend fun getAllBooks(): List<Book>
 
-    /** Sauvegarde/charge la progression de lecture. */
-    suspend fun saveProgress(progress: Progress)
-    suspend fun getProgress(bookId: String): Progress?
+    /** Sauvegarde/charge la progression de lecture (table unifiée `reading_progress`). */
+    suspend fun saveProgress(progress: ReadingProgress)
+    suspend fun getProgress(bookId: String): ReadingProgress?
 
     /** Ré-extrait la couverture d'un livre depuis son EPUB source. Retourne le nouveau chemin, ou null si aucune couverture trouvée. */
     suspend fun regenerateCover(bookId: String): String?

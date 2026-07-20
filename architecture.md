@@ -153,19 +153,9 @@ data class BookEntity(
     val addedAt: Long                    // timestamp ms
 )
 
-@Entity(
-    tableName = "progress",
-    foreignKeys = [ForeignKey(entity = BookEntity::class, parentColumns = ["id"], childColumns = ["bookId"], onDelete = ForeignKey.CASCADE)],
-    indices = [Index("bookId")]
-)
-data class ProgressEntity(
-    @PrimaryKey val bookId: String,      // FK → books.id
-    val currentChapterIndex: Int,
-    val currentSentenceIndex: Int,
-    val currentWordOffset: Int,
-    val totalProgressFraction: Float,    // 0.0 à 1.0
-    val updatedAt: Long
-)
+// ⚠️ Doc historique (pré-implémentation) — obsolète depuis la Phase 1 du plan Top-Tier.
+// L'état réel au 2026-07-20 (deux tables `progress`/`reading_progress` distinctes, sans
+// `currentWordOffset`) et le schéma cible unifié sont documentés en §11.
 
 @Entity(
     tableName = "bookmarks",
@@ -760,3 +750,122 @@ context.contentResolver.openInputStream(uri)?.use { input ->
 - [ ] Tester Readium Kotlin sur 5 EPUBs variés (EPUB2 simple, EPUB3 complexe, avec images, corrompu)
 - [ ] Configurer le Version Catalog (`libs.versions.toml`) avec toutes les dépendances
 - [ ] Mettre en place la CI (GitHub Actions) pour les tests unitaires
+
+---
+
+## 11. Progression de lecture — Schéma unifié (Plan Top-Tier, Phase 1)
+
+> Rédigé pour la tâche 1.1 de [`PLAN_ACTION_TOP_TIER_CLAUDECODE.md`](./PLAN_ACTION_TOP_TIER_CLAUDECODE.md), avant tout code des tâches 1.2 à 1.8. Basé sur l'état réel du code au commit `1298fc0` (2026-07-20), pas sur les sections §2-§3 ci-dessus qui datent d'avant l'implémentation et ont dérivé (voir l'avertissement §3).
+
+### 11.1 Constat — pourquoi une fusion est nécessaire
+
+Deux tables Room coexistent aujourd'hui pour la même responsabilité, avec des rôles qui se sont séparés au fil du développement au lieu d'être fusionnés dès le départ :
+
+| | `progress` (`ProgressEntity`) | `reading_progress` (`ReadingProgress`) |
+|---|---|---|
+| Colonnes | `bookId, currentChapterIndex, currentSentenceIndex, totalProgressFraction, updatedAt` | `bookId, chapterIndex, sentenceIndex, characterOffset, updatedAt` |
+| FK / index | `FOREIGN KEY → books.id ON DELETE CASCADE` + `Index("bookId")` | **aucun** |
+| Écrite par | `CalculateReadingProgressUseCase` (via `BookRepository.saveProgress`), déclenchée uniquement par `ReaderViewModel.init { orchestrator.playbackState.collect{} }` — donc **seulement pendant une lecture TTS active** | `PlaybackOrchestrator.saveProgressAsync()`, appelée à chaque transition de phrase pendant la lecture TTS |
+| Lue par | `LibraryViewModel.loadBooks()` via `bookRepository.getProgress(book.id)` — alimente le badge `%` de progression affiché dans la grille de la bibliothèque (`progressMap`) | `ReaderViewModel.loadBook()` via `orchestrator.loadProgress(bookId)` → `ResolveReadingPositionUseCase` — c'est la table utilisée pour restaurer chapitre/phrase exacts à la réouverture d'un livre |
+
+Constats vérifiés dans le code actuel (pas des suppositions) :
+- **Les deux tables ont chacune un vrai lecteur, mais pour des besoins différents** — `progress` alimente uniquement le badge `%` de la bibliothèque (`totalProgressFraction`), `reading_progress` alimente uniquement la reprise exacte (chapitre/phrase) dans le Reader. Aucune des deux n'était conçue comme la table unique dès le départ ; la fusion doit donc continuer à servir ces deux usages, pas seulement celui du Reader. `CalculateReadingProgressUseCase` utilise la formule non pondérée `(chapterIndex + sentenceIndex/totalSentences) / totalChapters`, confirmée telle quelle.
+- **`characterOffset` sur `reading_progress` est écrit (`PlaybackOrchestrator.saveProgressAsync`, ligne 787) mais jamais lu** nulle part dans le code — `ResolveReadingPositionUseCase` ne consomme que `chapterIndex`/`sentenceIndex`. C'est le champ mort mentionné en tâche 1.7 ; sa réutilisation est décidée ci-dessous (§11.3) plutôt que reportée, pour éviter de re-découvrir la même question en 1.7.
+- **Aucune position n'est persistée en dehors d'une lecture TTS active.** `ReaderContent.kt` dérive `activeIdx` uniquement de `playbackState.activeSentenceIndex` (jamais de la position restaurée par le ViewModel quand `isSpeaking == false`). La navigation manuelle (scroll, tap, `previousSentence()`/`nextSentence()` hors lecture) ne déclenche aucune écriture Room — la position ne survit à un `kill` de process que si elle a été écrite par le pipeline TTS avant.
+- **`ReaderViewModel.play()` code en dur `startFrom = 0`** (ligne 476) — presser Play redémarre toujours en début de chapitre, en ignorant `currentSentenceIndex`. `stop()` réinitialise en plus l'affichage à 0 alors que la DB garde la bonne valeur.
+- **`TocEntry` ne porte aucune métadonnée de longueur** (`index`, `title`, `level` seulement) — impossible de pondérer la progression par la taille réelle des chapitres sans l'ajouter.
+- **`BackupManager` et `SyncManager` sérialisent indépendamment les deux tables** (`BackupPayload.progressEntries` + `readingProgressList`, Gson brut, `version` figé à `1` sans branchement de désérialisation) — toute modification de schéma doit rester lisible par d'anciens exports.
+- **La base est en version 15**, avec un trou non documenté entre les migrations `5→6` et `13→14` (aucune `MIGRATION_6_7` … `MIGRATION_12_13` définie), couvert aujourd'hui par un `fallbackToDestructiveMigration()` actif dans `AppModule.kt`. Risque latent préexistant, sans rapport direct avec cette tâche — **noté comme sous-problème découvert plutôt que corrigé silencieusement ici** (ajouté à `PLAN_ACTION_TOP_TIER_CLAUDECODE.md`, tâche 1.2bis).
+
+### 11.2 Table unique cible : `reading_progress` (v16)
+
+On garde le nom `reading_progress` (meilleur design de départ : c'est déjà la table réellement lue) et on lui ajoute ce qui manquait à `progress` :
+
+```kotlin
+@Entity(
+    tableName = "reading_progress",
+    foreignKeys = [ForeignKey(
+        entity = BookEntity::class,
+        parentColumns = ["id"],
+        childColumns = ["bookId"],
+        onDelete = ForeignKey.CASCADE
+    )],
+    indices = [Index("bookId")]
+)
+data class ReadingProgress(
+    @PrimaryKey val bookId: String,
+    val chapterIndex: Int,
+    val sentenceIndex: Int,
+    val characterOffset: Int,        // Réutilisé pour la pondération (§11.3) — plus un champ mort
+    val totalProgressFraction: Float,
+    val updatedAt: Long,
+    val source: String = "TTS"       // "TTS" | "MANUAL_SCROLL" — String brute plutôt qu'un TypeConverter
+                                      // d'enum, pour garder la migration SQL simple ; deux valeurs seulement.
+)
+```
+
+Décisions :
+- `progress`, `ProgressEntity.kt`, `ProgressDao.kt` et le modèle domaine `Progress.kt` sont **supprimés**, pas dépréciés. `CalculateReadingProgressUseCase` lit/écrit désormais uniquement `reading_progress` via `ReadingProgressDao`.
+- `BookRepository.saveProgress`/`getProgress` sont repointés vers `ReadingProgressDao` (même table que `PlaybackOrchestrator`, qui garde son accès direct au DAO — pas de refonte de la couche repository au-delà de ce qui est nécessaire ici). `LibraryViewModel.loadBooks()` continue de lire `totalProgressFraction` via `getProgress()` sans changement d'API — seule la source de la donnée change, la table unifiée porte toujours ce champ.
+- `source` sert au debug/télémétrie, **pas** à arbitrer une priorité d'écriture : la règle reste last-write-wins par `updatedAt` (déjà le comportement de `INSERT OR REPLACE` sur la PK `bookId`). Un scroll manuel juste après une lecture TTS doit gagner, et inversement — c'est la définition même de "dernière position connue".
+- Renommer au passage le champ `progressDao` de `PlaybackOrchestrator` (actuellement mal nommé — c'est en réalité un `ReadingProgressDao`) en `readingProgressDao`, puisque le fichier est de toute façon touché par 1.2/1.6.
+
+### 11.3 Pondération par longueur réelle de chapitre
+
+- `TocEntry` gagne un champ `charCount: Int = 0`. Calculé **gratuitement** dans la boucle de `BookRepositoryImpl.importEpub()` (`for (i in 0 until totalChapters)`) à partir de `combinedHtml.length`, déjà en mémoire à cet endroit — aucun reparsing.
+- Pas de table `chapter_metadata` séparée : `TocEntry` est déjà persisté comme partie de `Book.tocEntries` sur `BookEntity` (colonne JSON), donc ajouter un champ ne demande pas de nouvelle table ni de migration dédiée à ces métadonnées — seule la colonne `reading_progress` change de schéma.
+- Cumul calculé à la lecture, pas stocké : `cumulativeCharsBeforeChapter(i) = tocEntries.take(i).sumOf { it.charCount }`. Coût négligeable (quelques centaines de chapitres au pire), évite un tableau dérivé qui pourrait diverger de `charCount`.
+- **`characterOffset` (§11.2) devient l'offset caractère de la phrase courante dans son chapitre** — rempli avec `sentence.startOffset` (déjà calculé par le découpeur de phrases, porté par `Sentence.startOffset`/`endOffset`) au moment de la sauvegarde de progression. C'est le champ qui alimente la formule pondérée ci-dessous. **Décision pour la tâche 1.7** : ce champ sert au calcul de progression pondérée, pas à un positionnement infra-phrase pour le rendu (pas de mode de rendu plus fin que "phrase" prévu à court terme).
+
+Nouvelle formule (`CalculateReadingProgressUseCase`) :
+
+```kotlin
+val totalBookChars = tocEntries.sumOf { it.charCount }
+val fraction = if (totalBookChars > 0) {
+    val before = tocEntries.take(chapterIndex).sumOf { it.charCount }
+    ((before + characterOffset).toFloat() / totalBookChars).coerceIn(0f, 1f)
+} else {
+    // Livre importé avant la migration : TocEntry.charCount vaut 0 (défaut) tant qu'il n'a
+    // pas été ré-importé. Dégradation gracieuse plutôt que division par zéro ou blocage —
+    // pas de ré-import forcé.
+    ((chapterIndex + sentenceIndex.toFloat() / totalSentences.coerceAtLeast(1)) / book.totalChapters.coerceAtLeast(1))
+        .coerceIn(0f, 1f)
+}
+```
+
+### 11.4 Migration Room 15 → 16
+
+`MIGRATION_15_16`, explicite (pas de `fallbackToDestructiveMigration` pour cette étape) :
+
+1. `CREATE TABLE reading_progress_new` avec le schéma unifié (FK + index inclus).
+2. Pour chaque `bookId` présent dans l'une ou l'autre ancienne table, insérer dans `reading_progress_new` la ligne dont `updatedAt` est le plus récent (comparaison SQL directe entre les deux anciennes tables). `totalProgressFraction` est recopiée telle quelle depuis la ligne gagnante — **pas** recalculée en SQL pur (impossible sans les données `TocEntry.charCount`, qui n'existent pas encore pour les livres déjà importés). La vraie valeur pondérée se recalcule paresseusement au prochain appel de `CalculateReadingProgressUseCase` pour ce livre (prochaine ouverture), cohérent avec le recalcul différé déjà anticipé par la tâche 1.2 du plan.
+3. `source` vaut `'TTS'` par défaut pour toutes les lignes migrées (on ne peut pas reconstituer rétroactivement l'origine de la dernière écriture — sans conséquence, `source` est informatif).
+4. `DROP TABLE progress`, `DROP TABLE reading_progress` (ancien schéma), `ALTER TABLE reading_progress_new RENAME TO reading_progress`.
+5. Le trou de migration préexistant `6→13` (§11.1) n'est **pas** traité par cette tâche — `fallbackToDestructiveMigration()` reste en place pour ce cas, qui lui préexiste et sort du périmètre de la Phase 1.
+
+### 11.5 Impact sur la sauvegarde (`BackupManager`, `SyncManager`, `BackupPayload`)
+
+- `BackupPayload.progressEntries: List<ProgressEntity>` supprimé (table disparue). Un ancien export contenant ce champ JSON continue de se désérialiser normalement (Gson ignore silencieusement les clés JSON inconnues) — pas de branchement explicite sur `version` nécessaire pour cette suppression.
+- `BackupPayload.readingProgressList: List<ReadingProgress>` garde son nom, porte désormais le schéma unifié. Le nouveau champ `source` a une valeur par défaut Kotlin (`"TTS"`) : un ancien export sans `source` dans son JSON se désérialise sans crash.
+- `BackupPayload.version` passe à `2` pour les nouveaux exports. Les imports d'anciens exports (`version == 1`) restent fonctionnels sans code de branchement dédié, la désérialisation structurelle de Gson suffisant ici — leur `progressEntries` (jamais lu par l'app de toute façon, §11.1) est simplement ignoré à l'import.
+- `BackupManager.kt` et `SyncManager.kt` doivent tous les deux être mis à jour (ils dupliquent indépendamment la même logique de sérialisation) — ne pas modifier l'un sans l'autre.
+
+### 11.6 Reprise de lecture — mécanisme concret (tâches 1.4 à 1.6)
+
+- **`ReaderContent.kt`** : `activeIdx = if (isSpeaking) playbackState.activeSentenceIndex else viewModel.uiState.currentSentenceIndex`, utilisé identiquement par `PagedContent` et `ScrollContent`.
+- **Persistance du scroll manuel** : un flag `isProgrammaticScroll` (porté par le ViewModel, partagé entre `PagedContent`/`ScrollContent` puisque les deux coordonnent avec le même `LaunchedEffect(activeIdx)` auto-scroll déclenché par le TTS) passe à `true` avant un `animateScrollToItem` déclenché par la lecture, `false` une fois l'animation terminée. `snapshotFlow { lazyListState.firstVisibleItemIndex }` (Scroll) / `snapshotFlow { pagerState.currentPage }` (Paged) → `.debounce(500)` → ignoré si `isProgrammaticScroll == true` → `viewModel.onManualPositionChanged(sentenceIndex)`.
+- **`ReaderViewModel.onManualPositionChanged(sentenceIndex: Int)`** (nouvelle méthode) : met à jour `currentSentenceIndex` et déclenche la même persistance que le chemin TTS (`calculateProgress(...)` + écriture `ReadingProgressDao` avec `source = "MANUAL_SCROLL"`), **sans** être conditionnée par `isPlaying` — c'est précisément ce qui manque aujourd'hui.
+- **`play()`** : `startFrom = s.currentSentenceIndex` au lieu de `0`.
+- **`stop()`** : ne réinitialise plus `currentSentenceIndex` à `0` dans `_uiState` — seul `isPlaying` passe à `false`. La position affichée reste celle où la lecture s'est arrêtée.
+
+### 11.7 Correspondance avec les tâches du plan
+
+| Tâche | Ce que ce document verrouille |
+|---|---|
+| 1.2 | Schéma `reading_progress` v16 exact (§11.2), SQL de migration (§11.4), suppression de `progress`/`ProgressEntity`/`ProgressDao`/`Progress.kt` |
+| 1.3 | `TocEntry.charCount`, formule pondérée avec dégradation gracieuse pour les livres pré-migration (§11.3) |
+| 1.4 | Mécanisme `isProgrammaticScroll` + `onManualPositionChanged` (§11.6) |
+| 1.5 | Formule `activeIdx` exacte (§11.6) |
+| 1.6 | `startFrom`/`stop()` — décision tranchée : conserver la position affichée (§11.6) |
+| 1.7 | `characterOffset` réutilisé pour la pondération, pas pour un positionnement infra-phrase (§11.3) — pas de champ mort restant |
+| — | Sous-problème découvert, hors périmètre Phase 1 : trou de migration `6→13` (§11.1), ajouté au plan en tâche 1.2bis |

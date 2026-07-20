@@ -146,6 +146,7 @@ fun ReaderScreen(
                 readingMode = readingMode,
                 currentChapterIndex = state.currentChapterIndex,
                 totalChapters = book?.totalChapters ?: 1,
+                currentSentenceIndex = state.currentSentenceIndex,
                 isLoadingChapter = state.isLoadingChapter,
                 onToggleMode = { readingMode = if (readingMode == ReadingMode.PAGED) ReadingMode.SCROLL else ReadingMode.PAGED },
                 onPageTurned = { viewModel.hideHud() },
@@ -156,6 +157,7 @@ fun ReaderScreen(
                 onSelectionDismissed = {
                     selectionState = null
                 },
+                onManualPositionChanged = { sentenceIndex -> viewModel.onManualPositionChanged(sentenceIndex) },
                 highlights = state.highlights,
                 bookmarks = state.bookmarks,
                 annotations = state.annotations,

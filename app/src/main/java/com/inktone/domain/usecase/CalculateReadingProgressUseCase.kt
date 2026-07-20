@@ -1,21 +1,20 @@
 package com.inktone.domain.usecase
 
+import com.inktone.data.database.entity.ReadingProgress
 import com.inktone.domain.model.Book
-import com.inktone.domain.model.Progress
 import com.inktone.domain.repository.BookRepository
 import javax.inject.Inject
 import javax.inject.Singleton
-import kotlin.math.roundToInt
 
 /**
- * Calcule la progression de lecture sous forme de fraction [0, 1]
- * et persiste le résultat via [BookRepository.saveProgress].
+ * Calcule la progression de lecture pondérée (voir [computeReadingProgressFraction]) et
+ * persiste le résultat dans la table unifiée `reading_progress` via [BookRepository.saveProgress].
  *
- * La fraction est calculée comme :
- *   (chapterIndex + sentenceIndex / totalSentences) / totalChapters
- *
- * Extraite de [ReaderViewModel] pour isoler la logique métier
- * du calcul de progression et la rendre testable unitairement.
+ * Utilisée pour le chemin de navigation manuelle (scroll/tap sans lecture TTS active — tâche
+ * 1.4). Le chemin TTS persiste directement via `PlaybackOrchestrator.saveProgressAsync`, qui
+ * appelle la même formule pure [computeReadingProgressFraction] : les deux chemins d'écriture
+ * ne se chevauchent jamais (le scroll manuel est ignoré tant qu'un scroll programmatique déclenché
+ * par le TTS est en cours), donc pas de risque d'écrasement mutuel d'un champ par l'autre.
  */
 @Singleton
 class CalculateReadingProgressUseCase @Inject constructor(
@@ -28,28 +27,38 @@ class CalculateReadingProgressUseCase @Inject constructor(
      * @param chapterIndex L'index du chapitre courant (0-based).
      * @param sentenceIndex L'index de la phrase courante dans le chapitre (0-based).
      * @param totalSentences Nombre total de phrases dans le chapitre.
+     * @param characterOffset Offset caractère de la phrase courante dans le chapitre (pour la pondération).
+     * @param source "TTS" | "MANUAL_SCROLL" — informatif, voir [ReadingProgress.source].
      * @return La fraction de progression calculée [0, 1].
      */
     suspend operator fun invoke(
         book: Book,
         chapterIndex: Int,
         sentenceIndex: Int,
-        totalSentences: Int
+        totalSentences: Int,
+        characterOffset: Int = 0,
+        source: String = "MANUAL_SCROLL"
     ): Float {
-        val totalSent = totalSentences.coerceAtLeast(1)
-        val totalChap = book.totalChapters.coerceAtLeast(1)
-
-        val fraction = (chapterIndex.toFloat() + sentenceIndex.toFloat() / totalSent) / totalChap
-        val clampedFraction = fraction.coerceIn(0f, 1f)
-
-        val progress = Progress(
-            bookId = book.id,
-            currentChapterIndex = chapterIndex,
-            currentSentenceIndex = sentenceIndex,
-            totalProgressFraction = clampedFraction
+        val fraction = computeReadingProgressFraction(
+            tocEntries = book.tocEntries,
+            chapterIndex = chapterIndex,
+            characterOffset = characterOffset,
+            sentenceIndex = sentenceIndex,
+            totalSentences = totalSentences,
+            totalChapters = book.totalChapters
         )
 
-        bookRepository.saveProgress(progress)
-        return clampedFraction
+        bookRepository.saveProgress(
+            ReadingProgress(
+                bookId = book.id,
+                chapterIndex = chapterIndex,
+                sentenceIndex = sentenceIndex,
+                characterOffset = characterOffset,
+                totalProgressFraction = fraction,
+                updatedAt = System.currentTimeMillis(),
+                source = source
+            )
+        )
+        return fraction
     }
 }

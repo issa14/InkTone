@@ -94,7 +94,7 @@ class PlaybackOrchestratorTest {
             player = player,
             onnxService = onnxService,
             audioFocusManager = audioFocusManager,
-            progressDao = progressDao
+            readingProgressDao = progressDao
         )
     }
 

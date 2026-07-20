@@ -8,7 +8,6 @@ import com.inktone.data.database.entity.AnnotationEntity
 import com.inktone.data.database.entity.BookEntity
 import com.inktone.data.database.entity.BookmarkEntity
 import com.inktone.data.database.entity.HighlightEntity
-import com.inktone.data.database.entity.ProgressEntity
 import com.inktone.data.database.entity.PronunciationRule
 import com.inktone.data.database.entity.ReadingProgress
 import com.inktone.data.database.entity.ReadingSessionEntity
@@ -82,10 +81,61 @@ val MIGRATION_14_15 = object : Migration(14, 15) {
     }
 }
 
+/**
+ * Fusionne les anciennes tables `progress` (badge % bibliothèque) et `reading_progress`
+ * (reprise exacte chapitre/phrase) en une seule table `reading_progress` — voir
+ * architecture.md §11. Pour chaque bookId, la position (chapterIndex/sentenceIndex/
+ * characterOffset) vient de l'ancienne `reading_progress` si présente, et la fraction
+ * (totalProgressFraction) vient de l'ancienne `progress` si présente — les deux tables ne
+ * se recouvraient pas forcément, donc on préserve le champ propre à chacune plutôt que de
+ * ne garder qu'une seule ligne "gagnante" qui aurait perdu l'autre moitié de l'information.
+ * `updatedAt` retient le plus récent des deux. `totalProgressFraction` n'est PAS recalculée
+ * avec la formule pondérée ici (les métadonnées `TocEntry.charCount` de la tâche 1.3 n'ont
+ * pas encore été rétro-remplies) — recalcul différé au prochain appel de
+ * `CalculateReadingProgressUseCase` pour ce livre.
+ */
+val MIGRATION_15_16 = object : Migration(15, 16) {
+    override fun migrate(db: SupportSQLiteDatabase) {
+        db.execSQL("""
+            CREATE TABLE IF NOT EXISTS reading_progress_new (
+                bookId TEXT NOT NULL PRIMARY KEY,
+                chapterIndex INTEGER NOT NULL,
+                sentenceIndex INTEGER NOT NULL,
+                characterOffset INTEGER NOT NULL,
+                totalProgressFraction REAL NOT NULL,
+                updatedAt INTEGER NOT NULL,
+                source TEXT NOT NULL,
+                FOREIGN KEY(bookId) REFERENCES books(id) ON DELETE CASCADE
+            )
+        """)
+        db.execSQL("""
+            INSERT INTO reading_progress_new (bookId, chapterIndex, sentenceIndex, characterOffset, totalProgressFraction, updatedAt, source)
+            SELECT
+                allIds.bookId,
+                COALESCE(rp.chapterIndex, 0),
+                COALESCE(rp.sentenceIndex, 0),
+                COALESCE(rp.characterOffset, 0),
+                COALESCE(p.totalProgressFraction, 0.0),
+                MAX(COALESCE(rp.updatedAt, 0), COALESCE(p.updatedAt, 0)),
+                'TTS'
+            FROM (
+                SELECT bookId FROM reading_progress
+                UNION
+                SELECT bookId FROM progress
+            ) AS allIds
+            LEFT JOIN reading_progress rp ON rp.bookId = allIds.bookId
+            LEFT JOIN progress p ON p.bookId = allIds.bookId
+        """)
+        db.execSQL("DROP TABLE progress")
+        db.execSQL("DROP TABLE reading_progress")
+        db.execSQL("ALTER TABLE reading_progress_new RENAME TO reading_progress")
+        db.execSQL("CREATE INDEX IF NOT EXISTS index_reading_progress_bookId ON reading_progress (bookId)")
+    }
+}
+
 @Database(
     entities = [
         BookEntity::class,
-        ProgressEntity::class,
         BookmarkEntity::class,
         SentenceFts::class,
         ReadingProgress::class,
@@ -96,12 +146,11 @@ val MIGRATION_14_15 = object : Migration(14, 15) {
         ReadingSessionEntity::class,
         RichBlockCacheEntity::class
     ],
-    version = 15,
+    version = 16,
     exportSchema = false
 )
 abstract class InkToneDatabase : RoomDatabase() {
     abstract fun bookDao(): BookDao
-    abstract fun progressDao(): ProgressDao
     abstract fun bookmarkDao(): BookmarkDao
     abstract fun searchDao(): SearchDao
     abstract fun readingProgressDao(): ReadingProgressDao

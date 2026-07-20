@@ -7,17 +7,17 @@ import com.inktone.CrashReporter
 import com.google.gson.Gson
 import com.google.gson.reflect.TypeToken
 import com.inktone.data.database.BookDao
-import com.inktone.data.database.ProgressDao
+import com.inktone.data.database.ReadingProgressDao
 import com.inktone.data.database.RichBlockCacheDao
 import com.inktone.data.database.SearchDao
 import com.inktone.data.database.SentenceCacheDao
+import com.inktone.data.database.entity.ReadingProgress
 import com.inktone.data.database.entity.SentenceFts
 import com.inktone.data.epub.SpineIndex
 import com.inktone.data.mapper.toDomain
 import com.inktone.data.mapper.toEntity
 import com.inktone.domain.model.Book
 import com.inktone.domain.model.Chapter
-import com.inktone.domain.model.Progress
 import com.inktone.domain.model.RichBlock
 import com.inktone.domain.model.Sentence
 import com.inktone.domain.model.TextSpan
@@ -53,7 +53,7 @@ import javax.inject.Singleton
 class BookRepositoryImpl @Inject constructor(
     @ApplicationContext private val context: Context,
     private val bookDao: BookDao,
-    private val progressDao: ProgressDao,
+    private val readingProgressDao: ReadingProgressDao,
     private val sentenceCacheDao: SentenceCacheDao,
     private val richBlockCacheDao: RichBlockCacheDao,
     private val searchDao: SearchDao,
@@ -256,6 +256,11 @@ class BookRepositoryImpl @Inject constructor(
                     val sentences = chunkText(bookId, i, combinedHtml)
                     sentenceCacheDao.updateChapterTitle(bookId, i, chapterTitle)
 
+                    // Longueur du chapitre en caractères, pour la pondération de la progression
+                    // (voir architecture.md §11.3) — calculée gratuitement, combinedHtml est déjà
+                    // en mémoire à cet endroit, aucun reparsing.
+                    tocEntries[i] = tocEntries[i].copy(charCount = combinedHtml.length)
+
                     val richEntities = richBlocks.map { it.toEntity(bookId, i) }
                     if (richEntities.isNotEmpty()) richBlockCacheDao.insertAll(richEntities)
 
@@ -352,11 +357,11 @@ class BookRepositoryImpl @Inject constructor(
     override suspend fun getAllBooks(): List<Book> =
         bookDao.getAll().first().map { it.toDomain() }
 
-    override suspend fun saveProgress(progress: Progress) =
-        progressDao.upsert(progress.toEntity())
+    override suspend fun saveProgress(progress: ReadingProgress) =
+        readingProgressDao.saveProgress(progress)
 
-    override suspend fun getProgress(bookId: String): Progress? =
-        progressDao.getByBookId(bookId)?.toDomain()
+    override suspend fun getProgress(bookId: String): ReadingProgress? =
+        readingProgressDao.getProgressForBook(bookId)
 
     override suspend fun regenerateCover(bookId: String): String? =
         withContext(Dispatchers.IO) {

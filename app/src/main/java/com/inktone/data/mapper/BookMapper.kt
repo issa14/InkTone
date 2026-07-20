@@ -3,9 +3,7 @@ package com.inktone.data.mapper
 import com.google.gson.Gson
 import com.google.gson.reflect.TypeToken
 import com.inktone.data.database.entity.BookEntity
-import com.inktone.data.database.entity.ProgressEntity
 import com.inktone.domain.model.Book
-import com.inktone.domain.model.Progress
 import com.inktone.domain.model.TocEntry
 
 private val gson = Gson()
@@ -59,19 +57,4 @@ fun Book.toEntity(filePath: String, coverPath: String? = null) = BookEntity(
     seriesName = seriesName,
     seriesIndex = seriesIndex,
     sourceFolder = sourceFolder
-)
-
-fun ProgressEntity.toDomain() = Progress(
-    bookId = bookId,
-    currentChapterIndex = currentChapterIndex,
-    currentSentenceIndex = currentSentenceIndex,
-    totalProgressFraction = totalProgressFraction
-)
-
-fun Progress.toEntity() = ProgressEntity(
-    bookId = bookId,
-    currentChapterIndex = currentChapterIndex,
-    currentSentenceIndex = currentSentenceIndex,
-    totalProgressFraction = totalProgressFraction,
-    updatedAt = System.currentTimeMillis()
 )

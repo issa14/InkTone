@@ -10,7 +10,6 @@ import com.inktone.data.database.SentenceCacheDao
 import com.inktone.data.settings.SettingsRepository
 import com.inktone.domain.model.Book
 import com.inktone.domain.model.Chapter
-import com.inktone.domain.model.Progress
 import com.inktone.domain.model.Sentence
 import com.inktone.domain.repository.BookRepository
 import com.inktone.domain.repository.TtsRepository
@@ -257,7 +256,7 @@ class ReaderViewModelTest {
         viewModel.play()
         advanceUntilIdle()
         verify(exactly = 0) { audioServiceLauncher.start() }
-        verify(exactly = 0) { orchestrator.play(any(), any(), any(), any(), any(), any(), any(), any()) }
+        verify(exactly = 0) { orchestrator.play(any(), any(), any(), any(), any(), any(), any(), any(), any(), any()) }
     }
 
     @Test
@@ -266,7 +265,7 @@ class ReaderViewModelTest {
         viewModel.play()
         advanceUntilIdle()
         verify(exactly = 0) { audioServiceLauncher.start() }
-        verify(exactly = 0) { orchestrator.play(any(), any(), any(), any(), any(), any(), any(), any()) }
+        verify(exactly = 0) { orchestrator.play(any(), any(), any(), any(), any(), any(), any(), any(), any(), any()) }
     }
 
     @Test
@@ -279,6 +278,51 @@ class ReaderViewModelTest {
     fun `stop arrête l'orchestrator et réinitialise isPlaying`() = testScope.runTest {
         viewModel.stop()
         verify { orchestrator.stop() }
+    }
+
+    @Test
+    fun `play démarre à la position restaurée, pas au début du chapitre (garde-fou régression startFrom=0)`() = testScope.runTest {
+        // Livre rouvert à mi-chapitre (phrase 5) — reproduit le bug de la tâche 1.6 : play()
+        // codait startFrom = 0 en dur, ignorant la position affichée/restaurée.
+        coEvery { bookRepository.getAllBooks() } returns listOf(testBook)
+        coEvery { bookRepository.getChapter("book-1", 0) } returns testChapter
+        coEvery { orchestrator.loadProgress("book-1") } returns null
+        every { resolvePosition.invoke(any(), any(), any(), any(), any()) } returns ResolvedPosition(0, 2)
+
+        viewModel.loadBook("book-1")
+        advanceUntilIdle()
+        assertEquals(2, viewModel.uiState.value.currentSentenceIndex, "Position restaurée attendue avant play()")
+
+        viewModel.play()
+        advanceUntilIdle()
+
+        verify {
+            orchestrator.play(
+                sentences = any(), voice = any(), speed = any(), startFrom = 2,
+                bookTitle = any(), chapterTitle = any(), bookId = any(), chapterIndex = any(),
+                tocEntries = any(), totalChapters = any()
+            )
+        }
+    }
+
+    @Test
+    fun `stop ne réinitialise pas la position affichée (garde-fou régression)`() = testScope.runTest {
+        coEvery { bookRepository.getAllBooks() } returns listOf(testBook)
+        coEvery { bookRepository.getChapter("book-1", 0) } returns testChapter
+        coEvery { orchestrator.loadProgress("book-1") } returns null
+        every { resolvePosition.invoke(any(), any(), any(), any(), any()) } returns ResolvedPosition(0, 2)
+
+        viewModel.loadBook("book-1")
+        advanceUntilIdle()
+        assertEquals(2, viewModel.uiState.value.currentSentenceIndex)
+
+        viewModel.stop()
+
+        assertEquals(
+            2, viewModel.uiState.value.currentSentenceIndex,
+            "stop() ne doit pas remettre la position affichée à 0 — la DB garde la bonne valeur, l'affichage doit rester cohérent"
+        )
+        assertFalse(viewModel.uiState.value.isPlaying)
     }
 
     // ── Tests SavedStateHandle Restoration ──────────────────

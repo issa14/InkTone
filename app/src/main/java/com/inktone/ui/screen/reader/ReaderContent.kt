@@ -65,6 +65,8 @@ import com.inktone.service.audio.PlaybackState
 import com.inktone.service.audio.PlaybackStatus
 import com.inktone.ui.theme.OpenDyslexicFamily
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.flow.debounce
+import kotlinx.coroutines.flow.distinctUntilChanged
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 import kotlinx.coroutines.yield
@@ -85,6 +87,7 @@ fun ReaderContent(
     readingMode: ReadingMode,
     currentChapterIndex: Int,
     totalChapters: Int,
+    currentSentenceIndex: Int,
     isLoadingChapter: Boolean = false,
     onToggleMode: () -> Unit,
     onTap: (Offset) -> Unit,
@@ -93,6 +96,7 @@ fun ReaderContent(
     onNextChapter: () -> Unit,
     onTextSelected: (sentenceIndex: Int, selectedText: String) -> Unit,
     onSelectionDismissed: () -> Unit,
+    onManualPositionChanged: (sentenceIndex: Int) -> Unit = {},
     highlights: List<HighlightEntity> = emptyList(),
     bookmarks: List<BookmarkEntity> = emptyList(),
     annotations: List<AnnotationEntity> = emptyList()
@@ -117,8 +121,12 @@ fun ReaderContent(
         lineHeight = lineHeightEm.em
     )
 
-    val activeIdx = playbackState.activeSentenceIndex
     val isSpeaking = playbackState.status == PlaybackStatus.PLAYING
+    // Source unique de la position affichée : le TTS pilote pendant la lecture, sinon la
+    // position restaurée/suivie par le ViewModel (scroll manuel, reprise) — voir
+    // architecture.md §11.6. playbackState.activeSentenceIndex vaut 0 par défaut, donc s'y
+    // fier hors lecture affichait toujours le début du chapitre au lieu de la vraie position.
+    val activeIdx = if (isSpeaking) playbackState.activeSentenceIndex else currentSentenceIndex
     val sentences = chapter.sentences
 
     when (readingMode) {
@@ -142,6 +150,7 @@ fun ReaderContent(
             onNextChapter = onNextChapter,
             onTextSelected = onTextSelected,
             onSelectionDismissed = onSelectionDismissed,
+            onManualPositionChanged = onManualPositionChanged,
             highlights = highlights,
             bookmarks = bookmarks,
             annotations = annotations
@@ -167,6 +176,7 @@ fun ReaderContent(
             onNextChapter = onNextChapter,
             onTextSelected = onTextSelected,
             onSelectionDismissed = onSelectionDismissed,
+            onManualPositionChanged = onManualPositionChanged,
             highlights = highlights,
             bookmarks = bookmarks,
             annotations = annotations
@@ -195,6 +205,7 @@ private fun PagedContent(
     onNextChapter: () -> Unit,
     onTextSelected: (sentenceIndex: Int, selectedText: String) -> Unit,
     onSelectionDismissed: () -> Unit,
+    onManualPositionChanged: (sentenceIndex: Int) -> Unit = {},
     highlights: List<HighlightEntity>,
     bookmarks: List<BookmarkEntity>,
     annotations: List<AnnotationEntity>
@@ -278,13 +289,39 @@ private fun PagedContent(
         }
     }
 
+    // Vrai pendant le scroll programmatique déclenché par le TTS ci-dessous — évite que le
+    // listener de scroll manuel plus bas interprète cet auto-scroll comme une navigation
+    // utilisateur (boucle de rétroaction). Voir architecture.md §11.6.
+    var isProgrammaticScroll by remember { mutableStateOf(false) }
+
     LaunchedEffect(activeIdx, pages.size) {
         if (pages.isNotEmpty() && activeIdx in sentences.indices) {
             val targetPage = pages.indexOfFirst { page -> page.any { it.first == activeIdx } }
             if (targetPage != -1 && targetPage != pagerState.currentPage) {
-                pagerState.animateScrollToPage(targetPage)
+                isProgrammaticScroll = true
+                try {
+                    pagerState.animateScrollToPage(targetPage)
+                } finally {
+                    isProgrammaticScroll = false
+                }
             }
         }
+    }
+
+    // Persistance de la position manuelle (tap de page hors lecture TTS) — débouncée pour
+    // ne pas écrire à chaque page tournée rapidement, ignorée pendant un scroll programmatique
+    // ou une lecture TTS active (déjà persistée par PlaybackOrchestrator).
+    LaunchedEffect(pages.size) {
+        snapshotFlow { pagerState.currentPage }
+            .distinctUntilChanged()
+            .debounce(500)
+            .collect { page ->
+                if (!isProgrammaticScroll && !isSpeaking && page in pages.indices) {
+                    pages[page].firstOrNull()?.first?.let { sentenceIndex ->
+                        onManualPositionChanged(sentenceIndex)
+                    }
+                }
+            }
     }
 
     Box(
@@ -418,6 +455,7 @@ private fun ScrollContent(
     onNextChapter: () -> Unit,
     onTextSelected: (sentenceIndex: Int, selectedText: String) -> Unit,
     onSelectionDismissed: () -> Unit,
+    onManualPositionChanged: (sentenceIndex: Int) -> Unit = {},
     highlights: List<HighlightEntity>,
     bookmarks: List<BookmarkEntity>,
     annotations: List<AnnotationEntity>
@@ -433,13 +471,38 @@ private fun ScrollContent(
         computeStructuralBlockAnchors(chapter.richBlocks)
     }
 
+    // Vrai pendant le scroll programmatique déclenché par le TTS ci-dessous — évite que le
+    // listener de scroll manuel plus bas interprète cet auto-scroll comme une navigation
+    // utilisateur (boucle de rétroaction). Voir architecture.md §11.6.
+    var isProgrammaticScroll by remember { mutableStateOf(false) }
+
     LaunchedEffect(activeIdx) {
         if (activeIdx in sentences.indices) {
-            lazyListState.animateScrollToItem(
-                index = activeIdx + 1, // +1 pour le titre en position 0
-                scrollOffset = 0
-            )
+            isProgrammaticScroll = true
+            try {
+                lazyListState.animateScrollToItem(
+                    index = activeIdx + 1, // +1 pour le titre en position 0
+                    scrollOffset = 0
+                )
+            } finally {
+                isProgrammaticScroll = false
+            }
         }
+    }
+
+    // Persistance de la position manuelle (scroll hors lecture TTS) — débouncée, ignorée
+    // pendant un scroll programmatique ou une lecture TTS active (déjà persistée par
+    // PlaybackOrchestrator).
+    LaunchedEffect(sentences.size) {
+        snapshotFlow { lazyListState.firstVisibleItemIndex }
+            .distinctUntilChanged()
+            .debounce(500)
+            .collect { firstVisibleItem ->
+                val sentenceIndex = (firstVisibleItem - 1).coerceIn(0, (sentences.size - 1).coerceAtLeast(0))
+                if (!isProgrammaticScroll && !isSpeaking && sentences.isNotEmpty()) {
+                    onManualPositionChanged(sentenceIndex)
+                }
+            }
     }
 
     Box(

@@ -8,7 +8,9 @@ import com.inktone.data.database.entity.ReadingProgress
 import com.inktone.domain.model.Sentence
 import com.inktone.domain.model.SynthesisResult
 import com.inktone.domain.model.SynthesisTimeoutException
+import com.inktone.domain.model.TocEntry
 import com.inktone.domain.repository.TtsRepository
+import com.inktone.domain.usecase.computeReadingProgressFraction
 import com.inktone.service.edge.EdgeTtsClient
 import com.inktone.service.onnx.OnnxInferenceService
 import kotlinx.coroutines.*
@@ -65,7 +67,7 @@ class PlaybackOrchestrator @Inject constructor(
     private val player: GaplessAudioPlayer,
     private val onnxService: OnnxInferenceService,
     private val audioFocusManager: AudioFocusManager,
-    private val progressDao: ReadingProgressDao
+    private val readingProgressDao: ReadingProgressDao
 ) : AudioFocusListener {
 
     companion object {
@@ -170,6 +172,8 @@ class PlaybackOrchestrator @Inject constructor(
     private val currentSentenceIdx = java.util.concurrent.atomic.AtomicInteger(0)
     @Volatile private var currentTotalSentences: Int = 0
     @Volatile private var currentSentences: List<Sentence> = emptyList()
+    @Volatile private var currentTocEntries: List<TocEntry> = emptyList()
+    @Volatile private var currentTotalChapters: Int = 0
 
     private lateinit var sentenceDurations: LongArray // alloué dans play()
 
@@ -252,7 +256,7 @@ class PlaybackOrchestrator @Inject constructor(
 
     suspend fun loadProgress(bookId: String): ReadingProgress? {
         return withContext(Dispatchers.IO) {
-            progressDao.getProgressForBook(bookId)
+            readingProgressDao.getProgressForBook(bookId)
         }
     }
 
@@ -271,7 +275,9 @@ class PlaybackOrchestrator @Inject constructor(
                 bookTitle = currentBookTitle,
                 chapterTitle = currentChapterTitle,
                 bookId = bookId,
-                chapterIndex = currentChapterIdx
+                chapterIndex = currentChapterIdx,
+                tocEntries = currentTocEntries,
+                totalChapters = currentTotalChapters
             )
         }
     }
@@ -291,7 +297,9 @@ class PlaybackOrchestrator @Inject constructor(
                 bookTitle = currentBookTitle,
                 chapterTitle = currentChapterTitle,
                 bookId = bookId,
-                chapterIndex = currentChapterIdx
+                chapterIndex = currentChapterIdx,
+                tocEntries = currentTocEntries,
+                totalChapters = currentTotalChapters
             )
         }
     }
@@ -304,13 +312,15 @@ class PlaybackOrchestrator @Inject constructor(
         bookTitle: String = "",
         chapterTitle: String = "",
         bookId: String = "",
-        chapterIndex: Int = 0
+        chapterIndex: Int = 0,
+        tocEntries: List<TocEntry> = emptyList(),
+        totalChapters: Int = 0
     ) {
         if (sentences.isEmpty()) return
         stop()
 
         if (!requestAudioFocus()) return
-        initPlaybackParams(sentences, voice, speed, startFrom, bookTitle, chapterTitle, bookId, chapterIndex)
+        initPlaybackParams(sentences, voice, speed, startFrom, bookTitle, chapterTitle, bookId, chapterIndex, tocEntries, totalChapters)
 
         val total = sentences.size
         _progress.value = Progress(startFrom, total, sentences.getOrNull(startFrom))
@@ -476,7 +486,8 @@ class PlaybackOrchestrator @Inject constructor(
 
     private fun initPlaybackParams(
         sentences: List<Sentence>, voice: Int, speed: Float, startFrom: Int,
-        bookTitle: String, chapterTitle: String, bookId: String, chapterIndex: Int
+        bookTitle: String, chapterTitle: String, bookId: String, chapterIndex: Int,
+        tocEntries: List<TocEntry>, totalChapters: Int
     ) {
         player.sampleRate = onnxService.getSampleRate()
         currentBookTitle = bookTitle
@@ -488,6 +499,8 @@ class PlaybackOrchestrator @Inject constructor(
         currentSentenceIdx.set(startFrom)
         currentTotalSentences = sentences.size
         currentSentences = sentences
+        currentTocEntries = tocEntries
+        currentTotalChapters = totalChapters
         sentenceDurations = LongArray(sentences.size)
         consecutiveErrors.set(0) // réinitialiser le compteur pour ce nouveau play()
     }
@@ -680,7 +693,7 @@ class PlaybackOrchestrator @Inject constructor(
                             val dur = if (sIdx >= 0 && sIdx < sentenceDurations.size) sentenceDurations[sIdx] else 0L
                             updatePlaybackState(sIdx, sent?.text ?: "", total,
                                 PlaybackStatus.PLAYING, dur, SystemClock.elapsedRealtime())
-                            saveProgressAsync(bookId, chapterIndex, sIdx, sent?.startOffset ?: 0)
+                            saveProgressAsync(bookId, chapterIndex, sIdx, sent?.startOffset ?: 0, total)
                             lastIdx = sIdx
                         }
                         delay(50)
@@ -722,7 +735,7 @@ class PlaybackOrchestrator @Inject constructor(
         if (playGeneration.get() == myGeneration && _state.value !is State.Error) {
             _state.value = State.Idle
             updatePlaybackState(currentReadIdx, "", total, PlaybackStatus.IDLE)
-            saveProgressAsync(bookId, chapterIndex, total, 0)
+            saveProgressAsync(bookId, chapterIndex, total, 0, total)
         }
     }
 
@@ -774,21 +787,34 @@ class PlaybackOrchestrator @Inject constructor(
         bookId: String,
         chapterIdx: Int,
         sentenceIdx: Int,
-        charOffset: Int
+        charOffset: Int,
+        totalSentences: Int
     ) {
         if (bookId.isEmpty()) return
+        val tocEntries = currentTocEntries
+        val totalChapters = currentTotalChapters
         scope.launch(Dispatchers.IO) {
             try {
-                progressDao.saveProgress(
+                val fraction = computeReadingProgressFraction(
+                    tocEntries = tocEntries,
+                    chapterIndex = chapterIdx,
+                    characterOffset = charOffset,
+                    sentenceIndex = sentenceIdx,
+                    totalSentences = totalSentences,
+                    totalChapters = totalChapters
+                )
+                readingProgressDao.saveProgress(
                     ReadingProgress(
                         bookId = bookId,
                         chapterIndex = chapterIdx,
                         sentenceIndex = sentenceIdx,
                         characterOffset = charOffset,
-                        updatedAt = System.currentTimeMillis()
+                        totalProgressFraction = fraction,
+                        updatedAt = System.currentTimeMillis(),
+                        source = "TTS"
                     )
                 )
-                Log.d(TAG, "Progression sauvegardée: book=$bookId ch=$chapterIdx sent=$sentenceIdx")
+                Log.d(TAG, "Progression sauvegardée: book=$bookId ch=$chapterIdx sent=$sentenceIdx fraction=$fraction")
             } catch (e: Exception) {
                 Log.e(TAG, "Échec sauvegarde progression: ${e.message}", e)
                 CrashReporter.recordException(e)

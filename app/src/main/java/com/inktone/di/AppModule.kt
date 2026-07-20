@@ -14,7 +14,7 @@ import com.inktone.data.database.MIGRATION_4_5
 import com.inktone.data.database.MIGRATION_5_6
 import com.inktone.data.database.MIGRATION_13_14
 import com.inktone.data.database.MIGRATION_14_15
-import com.inktone.data.database.ProgressDao
+import com.inktone.data.database.MIGRATION_15_16
 import com.inktone.data.database.PronunciationRuleDao
 import com.inktone.data.database.InkToneDatabase
 import com.inktone.data.database.ReadingProgressDao
@@ -53,9 +53,15 @@ object AppModule {
             context,
             InkToneDatabase::class.java,
             "inktone.db"
-        ).addMigrations(MIGRATION_1_2, MIGRATION_2_3, MIGRATION_3_4, MIGRATION_4_5, MIGRATION_5_6, MIGRATION_13_14, MIGRATION_14_15)
+        ).addMigrations(MIGRATION_1_2, MIGRATION_2_3, MIGRATION_3_4, MIGRATION_4_5, MIGRATION_5_6, MIGRATION_13_14, MIGRATION_14_15, MIGRATION_15_16)
          .setJournalMode(RoomDatabase.JournalMode.TRUNCATE)
-         .fallbackToDestructiveMigration()
+         // Le chemin 6→13 n'a jamais eu de migration explicite (versions consommées pendant
+         // une période de développement pré-beta sans base installée réelle à reconstituer
+         // fidèlement — voir architecture.md §11.1 et PLAN_ACTION_TOP_TIER_CLAUDECODE.md 1.2bis).
+         // Restreint volontairement le fallback destructif à ces versions précises : toute
+         // future migration non couverte au-delà de la version 13 fera planter l'app au lieu
+         // d'effacer silencieusement la base d'un testeur.
+         .fallbackToDestructiveMigrationFrom(1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12)
          .build()
     }
 
@@ -67,9 +73,6 @@ object AppModule {
 
     @Provides
     fun provideSearchDao(db: InkToneDatabase): SearchDao = db.searchDao()
-
-    @Provides
-    fun provideProgressDao(db: InkToneDatabase): ProgressDao = db.progressDao()
 
     @Provides
     fun provideReadingProgressDao(db: InkToneDatabase): ReadingProgressDao = db.readingProgressDao()

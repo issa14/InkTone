@@ -4,6 +4,7 @@ import android.util.Log
 import androidx.lifecycle.SavedStateHandle
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
+import com.inktone.CrashReporter
 import com.inktone.domain.model.Book
 import com.inktone.domain.model.Chapter
 import com.inktone.domain.repository.BookRepository
@@ -260,20 +261,10 @@ class ReaderViewModel @Inject constructor(
                 // Persister la position pour Process Death
                 savedState["sentenceIndex"] = pbs.activeSentenceIndex
 
-                // Persister la progression via UseCase (logique métier extraite)
-                val book = currentBook
-                if (book != null) {
-                    try {
-                        calculateProgress(
-                            book = book,
-                            chapterIndex = _uiState.value.currentChapterIndex,
-                            sentenceIndex = pbs.activeSentenceIndex,
-                            totalSentences = pbs.totalSentences
-                        )
-                    } catch (e: Exception) {
-                        Log.e("ReaderVM", "Error saving progress: ${e.message}", e)
-                    }
-                }
+                // La persistance Room (reading_progress, source=TTS) est gérée directement par
+                // PlaybackOrchestrator.saveProgressAsync() à chaque transition de phrase — pas
+                // de double-écriture ici, qui entrerait en conflit sur la même ligne (voir
+                // architecture.md §11.2).
             }
         }
     }
@@ -412,6 +403,40 @@ class ReaderViewModel @Inject constructor(
         }
     }
 
+    /**
+     * Appelée par [ReaderContent] (scroll/tap manuel, débouncé) quand la position affichée
+     * change en dehors d'une lecture TTS active — voir architecture.md §11.6. Persiste dans
+     * `reading_progress` avec `source = MANUAL_SCROLL`, chemin d'écriture indépendant de
+     * `PlaybackOrchestrator.saveProgressAsync` (aucun des deux ne tourne en même temps que
+     * l'autre : l'appelant ignore les scrolls programmatiques déclenchés par le TTS).
+     */
+    fun onManualPositionChanged(sentenceIndex: Int) {
+        _uiState.update { it.copy(currentSentenceIndex = sentenceIndex) }
+        savedState["sentenceIndex"] = sentenceIndex
+
+        val book = currentBook ?: return
+        val chapter = _uiState.value.currentChapter ?: return
+        val chapterIndex = _uiState.value.currentChapterIndex
+        val totalSentences = chapter.sentences.size
+        val characterOffset = chapter.sentences.getOrNull(sentenceIndex)?.startOffset ?: 0
+
+        viewModelScope.launch {
+            try {
+                calculateProgress(
+                    book = book,
+                    chapterIndex = chapterIndex,
+                    sentenceIndex = sentenceIndex,
+                    totalSentences = totalSentences,
+                    characterOffset = characterOffset,
+                    source = "MANUAL_SCROLL"
+                )
+            } catch (e: Exception) {
+                Log.e(TAG, "Error saving manual position: ${e.message}", e)
+                CrashReporter.recordException(e)
+            }
+        }
+    }
+
     /** Calcule le temps de lecture restant estimé pour le chapitre courant, à partir du WPM moyen de l'utilisateur. */
     private fun updateEta(currentSentenceIndex: Int, totalSentences: Int, chapter: Chapter) {
         viewModelScope.launch(Dispatchers.Default) {
@@ -473,8 +498,9 @@ class ReaderViewModel @Inject constructor(
         val s = _uiState.value
         com.inktone.PerfLogger.markTtsPlayRequest()
         orchestrator.play(
-            chapter.sentences, voice = s.voice, speed = s.speed, startFrom = 0,
-            bookTitle = book.title, chapterTitle = chapter.title, bookId = book.id, chapterIndex = s.currentChapterIndex
+            chapter.sentences, voice = s.voice, speed = s.speed, startFrom = s.currentSentenceIndex,
+            bookTitle = book.title, chapterTitle = chapter.title, bookId = book.id, chapterIndex = s.currentChapterIndex,
+            tocEntries = book.tocEntries, totalChapters = book.totalChapters
         )
         Log.d(TAG, "DEBUG play() → orchestrator.play() done")
         _uiState.update { it.copy(isPlaying = true) }
@@ -497,7 +523,9 @@ class ReaderViewModel @Inject constructor(
     fun stop() {
         isPausedForResume = false
         orchestrator.stop()
-        _uiState.update { it.copy(isPlaying = false, currentSentenceIndex = 0) }
+        // Ne pas réinitialiser currentSentenceIndex : la position affichée doit rester celle
+        // où la lecture s'est arrêtée (voir architecture.md §11.6).
+        _uiState.update { it.copy(isPlaying = false) }
     }
 
     private fun autoAdvanceIfAtEnd() {

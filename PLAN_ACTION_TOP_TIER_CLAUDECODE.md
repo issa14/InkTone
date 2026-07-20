@@ -96,6 +96,21 @@ Coût faible, risque d'ignorer disproportionné. À faire en premier, avant mêm
 
 ---
 
+### 1.2bis — 🟠 Sous-problème découvert : trou de migration Room `6→13`
+
+**Découvert pendant la conception du schéma unifié (tâche 1.1)**, hors périmètre initial de cette tâche — noté ici plutôt que corrigé silencieusement en marge, conformément au principe directeur de ce document.
+
+**Problème** : `InkToneDatabase.kt` est en version 15, mais seules les migrations `1→2`, `2→3`, `3→4`, `4→5`, `5→6`, `13→14`, `14→15` sont définies. Le chemin `6→13` n'a aucune `Migration` explicite. `AppModule.kt` configure `Room.databaseBuilder(...).fallbackToDestructiveMigration()`, ce qui signifie que toute base d'un testeur bloquée quelque part entre la version 6 et 13 (ou tout futur saut de version non couvert) est **silencieusement effacée** plutôt que migrée ou de faire planter le build en signalant le trou.
+
+**À faire** :
+- Déterminer si des versions 7 à 12 ont réellement existé en historique (`git log -p` sur `InkToneDatabase.kt`) pour reconstituer les migrations manquantes, ou si ces numéros de version ont été sautés sans changement de schéma réel (auquel cas des migrations `no-op` explicites suffisent).
+- Ajouter les `Migration` manquantes en conséquence.
+- Une fois le chemin `1→15` (puis `1→16` après 1.2) entièrement couvert par des migrations explicites, évaluer si `fallbackToDestructiveMigration()` doit être retiré complètement ou seulement restreint (ex. `fallbackToDestructiveMigrationOnDowngrade()` uniquement) — actuellement il masque ce genre de trou plutôt que de le signaler.
+
+**Validation** : test de migration Room couvrant le chemin complet `1→16` sans passer par le fallback destructif ; suppression ou restriction justifiée de `fallbackToDestructiveMigration()`.
+
+---
+
 ### 1.3 — 🔴 Pondération réelle de la progression par longueur de contenu
 
 **Problème initial** : `(chapterIndex + sentenceIndex/totalSentences) / totalChapters` traite chaque chapitre comme équivalent, sans lien avec sa longueur réelle.
