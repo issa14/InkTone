@@ -26,6 +26,14 @@ interface ReadingProgressDao {
     suspend fun getProgressForBook(bookId: String): ReadingProgress?
 
     /**
+     * Récupère la progression de plusieurs livres en une seule requête, pour éviter le
+     * N+1 (une requête par livre) au chargement de la bibliothèque — voir
+     * PLAN_ACTION_TOP_TIER_CLAUDECODE.md §4.1.
+     */
+    @Query("SELECT * FROM reading_progress WHERE bookId IN (:bookIds)")
+    suspend fun getProgressForBooks(bookIds: List<String>): List<ReadingProgress>
+
+    /**
      * Sauvegarde (insert ou remplace) la progression de lecture.
      * Stratégie REPLACE : mise à jour atomique si la clé primaire existe déjà.
      */

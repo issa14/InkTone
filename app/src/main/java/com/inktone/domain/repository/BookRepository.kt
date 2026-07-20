@@ -24,6 +24,9 @@ interface BookRepository {
     suspend fun saveProgress(progress: ReadingProgress)
     suspend fun getProgress(bookId: String): ReadingProgress?
 
+    /** Progression de plusieurs livres en une seule requête (voir [getProgress]). */
+    suspend fun getProgressForBooks(bookIds: List<String>): Map<String, ReadingProgress>
+
     /** Ré-extrait la couverture d'un livre depuis son EPUB source. Retourne le nouveau chemin, ou null si aucune couverture trouvée. */
     suspend fun regenerateCover(bookId: String): String?
 

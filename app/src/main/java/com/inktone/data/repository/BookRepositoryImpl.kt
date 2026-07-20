@@ -454,6 +454,9 @@ class BookRepositoryImpl @Inject constructor(
     override suspend fun getProgress(bookId: String): ReadingProgress? =
         readingProgressDao.getProgressForBook(bookId)
 
+    override suspend fun getProgressForBooks(bookIds: List<String>): Map<String, ReadingProgress> =
+        readingProgressDao.getProgressForBooks(bookIds).associateBy { it.bookId }
+
     override suspend fun regenerateCover(bookId: String): String? =
         withContext(Dispatchers.IO) {
             val entity = bookDao.getById(bookId) ?: return@withContext null

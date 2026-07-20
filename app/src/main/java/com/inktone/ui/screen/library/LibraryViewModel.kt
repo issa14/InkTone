@@ -89,15 +89,14 @@ class LibraryViewModel @Inject constructor(
             _uiState.update { it.copy(isLoading = true, error = null) }
             try {
                 val books = bookRepository.getAllBooks()
-                val progressMap = mutableMapOf<String, Float>()
-                books.forEach { book ->
-                    try {
-                        val progress = bookRepository.getProgress(book.id)
-                        progressMap[book.id] = progress?.totalProgressFraction ?: 0f
-                    } catch (e: Exception) {
-                        Log.e("LibraryVM", "Error loading progress for book ${book.id}", e)
-                        progressMap[book.id] = 0f
-                    }
+                val progressByBook = try {
+                    bookRepository.getProgressForBooks(books.map { it.id })
+                } catch (e: Exception) {
+                    Log.e("LibraryVM", "Error loading progress for books", e)
+                    emptyMap()
+                }
+                val progressMap = books.associate { book ->
+                    book.id to (progressByBook[book.id]?.totalProgressFraction ?: 0f)
                 }
                 val availableTags = try {
                     bookRepository.getAllTags()
