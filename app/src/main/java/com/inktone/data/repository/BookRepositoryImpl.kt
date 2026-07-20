@@ -3,6 +3,7 @@ package com.inktone.data.repository
 import android.text.Html
 import android.content.Context
 import android.util.Log
+import com.inktone.CrashReporter
 import com.google.gson.Gson
 import com.google.gson.reflect.TypeToken
 import com.inktone.data.database.BookDao
@@ -273,6 +274,7 @@ class BookRepositoryImpl @Inject constructor(
                     Log.d("BookRepo", "Chapitre TOC $i '$chapterTitle' : spine ${spineRange.first}..${spineRange.last} (${spineRange.count()} fichiers, ${richBlocks.size} blocs riches)")
                 } catch (e: Exception) {
                     Log.e("BookRepo", "Erreur import chapitre TOC $i '$chapterTitle' : ${e.message}", e)
+                    CrashReporter.recordException(e)
                 }
             }
 
@@ -431,6 +433,7 @@ class BookRepositoryImpl @Inject constructor(
             } else null
         } catch (e: Exception) {
             Log.e("BookRepo", "Error opening EPUB", e)
+            CrashReporter.recordException(e)
             throw e
         }
         ?: throw IllegalStateException("Impossible d'ouvrir l'EPUB")
@@ -452,6 +455,7 @@ class BookRepositoryImpl @Inject constructor(
             }
         } catch (e: Exception) {
             Log.e("BookRepo", "Error extracting HTML for href=$href", e)
+            CrashReporter.recordException(e)
             ""
         }
     }
@@ -531,6 +535,7 @@ class BookRepositoryImpl @Inject constructor(
             }
         } catch (e: Exception) {
             Log.e("BookRepo", "Erreur lors de l'extraction de la couverture du ZIP", e)
+            CrashReporter.recordException(e)
             null
         }
     }
@@ -794,6 +799,7 @@ class BookRepositoryImpl @Inject constructor(
             }
         } catch (e: Exception) {
             Log.e("BookRepo", "Erreur extraction image $imgHref", e)
+            CrashReporter.recordException(e)
             null
         }
     }

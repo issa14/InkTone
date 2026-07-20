@@ -1,7 +1,7 @@
 # 📊 InkTone — Suivi d'Avancement Projet
 
-> Dernière mise à jour : 2026-07-19  
-> Phase actuelle : **Phase 6 — Beta & Release**  
+> Dernière mise à jour : 2026-07-20  
+> Phase actuelle : **Plan Top-Tier — Phase 0 ✅ complétée, Phase 1 en cours**  
 > Progression globale : **~95%**  
 > Moteurs TTS : **Piper VITS `fr_FR-upmc-medium`** — 2 locuteurs Jessica ♀ + Pierre ♂ (local) + **Microsoft Edge TTS** (cloud, Vivienne & Henri)  
 > Tests unitaires : **111 tests, 0 échec** (12 fichiers)  
@@ -172,6 +172,24 @@ Voir [`CHANGELOG.md`](./CHANGELOG.md) pour le détail complet.
 - `PlaybackOrchestratorTest` stabilisé (attente réelle au lieu de `Thread.sleep` fixe, racy sous charge) + une annotation `@Test` manquante restaurée (test silencieusement jamais exécuté).
 
 **Validation** : `./gradlew assembleDebug` ✅, `kspDebugKotlin` ✅, `testDebugUnitTest` ✅ (111 tests, 0 échec, stable sur 15 exécutions répétées).
+
+### Phase 5e — Audit Top-Tier, Phase 0 ✅ COMPLÉTÉE (2026-07-20)
+
+**Branche** `main` — Phase 0 (Conformité store & exploitation) exécutée depuis [`PLAN_ACTION_TOP_TIER_CLAUDECODE.md`](./PLAN_ACTION_TOP_TIER_CLAUDECODE.md), lui-même basé sur [`AUDIT_INDEPENDANT_UX_PERFORMANCE_2026-07-20.md`](./AUDIT_INDEPENDANT_UX_PERFORMANCE_2026-07-20.md) (audit indépendant, commit `567d836`).
+
+| # | Tâche | Statut | Priorité |
+|---|---|---|---|
+| 0.1 | Suppression de `MANAGE_EXTERNAL_STORAGE` + `FilesScreen.kt` (risque de rejet Play Store, redondant avec le SAF) | ✅ Fait | 🔴 |
+| 0.2 | Intégration Firebase Crashlytics + routage des `Log.e()` critiques (`PlaybackOrchestrator`, `BookRepositoryImpl.importEpub`, `OnnxInferenceService`) | ✅ Fait | 🔴 |
+
+**Détail** :
+- `FilesScreen.kt` supprimé entièrement (explorateur de fichiers interne redondant avec l'import SAF `OpenMultipleDocuments` déjà en place) ; `NavigationDestination.FILES` et le bouton "Parcourir mes fichiers" retirés de `LibraryScreen`/`LibraryViewModel`.
+- `CrashReporter.kt` (nouveau, style aligné sur `PerfLogger`) : no-op silencieux si aucun projet Firebase n'est configuré (`FirebaseApp.initializeApp` renvoie `null` sans `google-services.json`), donc le build reste fonctionnel sans les identifiants Firebase du mainteneur.
+- Plugins `google-services`/`firebase-crashlytics` appliqués conditionnellement dans `app/build.gradle.kts` (même pattern que `keystore.properties` déjà utilisé pour la signature release).
+- `BuildConfig.GIT_COMMIT` (hash court, via `providers.exec`, compatible configuration cache) exposé comme clé custom Crashlytics aux côtés de `VERSION_NAME`.
+- Pipeline validé bout en bout : crash de test volontaire déclenché sur appareil physique, confirmé visible dans le dashboard Firebase Crashlytics du projet `ink-tone`.
+
+**Validation** : `./gradlew assembleDebug` ✅, `testDebugUnitTest` ✅, permission absente du manifeste fusionné (vérifié), crash de test remonté dans Crashlytics (vérifié manuellement).
 
 ### 🔄 Historique TTS : Kokoro → Piper
 

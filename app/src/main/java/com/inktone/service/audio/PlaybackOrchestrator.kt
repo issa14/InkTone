@@ -2,6 +2,7 @@ package com.inktone.service.audio
 
 import android.os.SystemClock
 import android.util.Log
+import com.inktone.CrashReporter
 import com.inktone.data.database.ReadingProgressDao
 import com.inktone.data.database.entity.ReadingProgress
 import com.inktone.domain.model.Sentence
@@ -564,6 +565,7 @@ class PlaybackOrchestrator @Inject constructor(
                     break
                 } catch (e: Exception) {
                     Log.e(TAG, "Synthesis error sentence $idx: ${e.message}", e)
+                    CrashReporter.recordException(e)
                     // Erreur réseau persistante (après retry Edge + fallback Piper) → arrêter
                     if (EdgeTtsClient.isNetworkError(e)) {
                         Log.w(TAG, "Erreur réseau persistante → arrêt du pipeline de synthèse")
@@ -741,6 +743,7 @@ class PlaybackOrchestrator @Inject constructor(
 
     private fun handlePlaybackError(e: Exception, myGeneration: Long) {
         Log.e(TAG, "Playback error", e)
+        CrashReporter.recordException(e)
         if (playGeneration.get() == myGeneration) _state.value = State.Error(e.message ?: "Erreur")
         updatePlaybackState(currentSentenceIdx.get(), "", currentTotalSentences, PlaybackStatus.IDLE)
         player.stop()
@@ -788,6 +791,7 @@ class PlaybackOrchestrator @Inject constructor(
                 Log.d(TAG, "Progression sauvegardée: book=$bookId ch=$chapterIdx sent=$sentenceIdx")
             } catch (e: Exception) {
                 Log.e(TAG, "Échec sauvegarde progression: ${e.message}", e)
+                CrashReporter.recordException(e)
             }
         }
     }

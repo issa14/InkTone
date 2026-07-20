@@ -220,8 +220,7 @@ fun LibraryScreen(
                                     onToggleFavorite = viewModel::toggleFavorite
                                 )
                                 state.books.isEmpty() && !state.isLoading -> EmptyView(
-                                    onImportClick = { epubPicker.launch(arrayOf("application/epub+zip")) },
-                                    onBrowseClick = { viewModel.navigateTo(NavigationDestination.FILES) }
+                                    onImportClick = { epubPicker.launch(arrayOf("application/epub+zip")) }
                                 )
                                 else -> Column {
                                     if (state.filterMode == FilterMode.TAGS) {
@@ -238,18 +237,8 @@ fun LibraryScreen(
                         NavigationDestination.RECENTS -> {
                             val recent = state.allBooks.sortedByDescending { it.addedAt }
                             if (recent.isEmpty()) EmptyView(
-                                onImportClick = { epubPicker.launch(arrayOf("application/epub+zip")) },
-                                onBrowseClick = { viewModel.navigateTo(NavigationDestination.FILES) }
+                                onImportClick = { epubPicker.launch(arrayOf("application/epub+zip")) }
                             ) else ShelfGrid(recent, state.bookProgress, onBookClick, viewModel::toggleFavorite)
-                        }
-                        NavigationDestination.FILES -> {
-                            FilesScreen(
-                                onFileSelected = { file ->
-                                    viewModel.importFile(file)
-                                    viewModel.navigateTo(NavigationDestination.LIBRARY)
-                                },
-                                onBack = { viewModel.navigateTo(NavigationDestination.LIBRARY) }
-                            )
                         }
                         NavigationDestination.OPDS -> {
                             OpdsScreen(onBack = { viewModel.navigateTo(NavigationDestination.LIBRARY) })
@@ -1307,7 +1296,7 @@ private fun FloatingControls(
 // ─────────────────────────────────────────────────────
 
 @Composable
-private fun EmptyView(onImportClick: (() -> Unit)? = null, onBrowseClick: (() -> Unit)? = null) {
+private fun EmptyView(onImportClick: (() -> Unit)? = null) {
     Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
         Column(
             modifier = Modifier.padding(horizontal = 48.dp),
@@ -1356,17 +1345,6 @@ private fun EmptyView(onImportClick: (() -> Unit)? = null, onBrowseClick: (() ->
                         modifier = Modifier.size(18.dp))
                     Spacer(Modifier.width(8.dp))
                     Text("Importer un livre")
-                }
-            }
-            if (onBrowseClick != null) {
-                Spacer(Modifier.height(12.dp))
-                OutlinedButton(
-                    onClick = onBrowseClick,
-                    modifier = Modifier.fillMaxWidth(0.7f)
-                ) {
-                    Icon(Icons.Outlined.Folder, contentDescription = null, modifier = Modifier.size(18.dp))
-                    Spacer(Modifier.width(8.dp))
-                    Text("Parcourir mes fichiers")
                 }
             }
         }

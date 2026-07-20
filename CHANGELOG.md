@@ -9,6 +9,23 @@ et ce projet adhère au [Semantic Versioning](https://semver.org/spec/v2.0.0.htm
 
 ## [Unreleased]
 
+### 2026-07-20 — Plan Top-Tier, Phase 0 : Conformité store & exploitation (branche `main`)
+
+Phase 0 exécutée selon [`PLAN_ACTION_TOP_TIER_CLAUDECODE.md`](./PLAN_ACTION_TOP_TIER_CLAUDECODE.md), basé sur [`AUDIT_INDEPENDANT_UX_PERFORMANCE_2026-07-20.md`](./AUDIT_INDEPENDANT_UX_PERFORMANCE_2026-07-20.md) (audit indépendant, commit `567d836`).
+
+#### Removed — 🔴 Risque de rejet Play Store
+
+- **`MANAGE_EXTERNAL_STORAGE`** retirée du manifeste et **`FilesScreen.kt`** supprimé entièrement — cet explorateur de fichiers interne était redondant avec l'import SAF (`OpenMultipleDocuments`) déjà en place, et cette permission "accès à tous les fichiers" expose à un rejet/suspension Play Store. `NavigationDestination.FILES`, le bouton "Parcourir mes fichiers" et `LibraryViewModel.importFile()` (devenu mort) retirés en cohérence.
+
+#### Added — 🔴 Observabilité
+
+- **Firebase Crashlytics** intégré (`CrashReporter.kt`, style aligné sur `PerfLogger`) — no-op silencieux tant qu'aucun `google-services.json` n'est présent (`FirebaseApp.initializeApp` renvoie `null`), donc le build reste fonctionnel sans les identifiants Firebase du mainteneur. Plugins `google-services`/`firebase-crashlytics` appliqués conditionnellement dans `app/build.gradle.kts`, sur le même modèle que `keystore.properties`.
+- Les `Log.e()` des zones critiques (`PlaybackOrchestrator`, `BookRepositoryImpl.importEpub`, `OnnxInferenceService`) remontent désormais aussi vers `CrashReporter.recordException()`, en plus du log local existant.
+- `BuildConfig.GIT_COMMIT` (hash court, résolu via `providers.exec` — compatible configuration cache) exposé comme clé custom Crashlytics aux côtés de `VERSION_NAME`, pour recouper un crash avec l'historique git.
+- Pipeline validé bout en bout sur appareil physique : crash de test volontaire déclenché et confirmé visible dans le dashboard Firebase Crashlytics (projet `ink-tone`).
+
+**Validation** : `./gradlew assembleDebug` ✅, `testDebugUnitTest` ✅, permission absente du manifeste fusionné (vérifié), crash de test remonté dans Crashlytics (vérifié manuellement sur appareil).
+
 ### 2026-07-19 — Audit fonctionnel (branche `feature/feature-polish`)
 
 Audit fonctionnel complet exécuté selon [`PLAN_FEATURE_AUDIT_CLAUDECODE.md`](./PLAN_FEATURE_AUDIT_CLAUDECODE.md), 8 tâches. Cible : fonctionnalités identifiées **CASSÉES** (Recherche FTS, Notes, navigation depuis Signets) ou en **CODE MORT** (Onboarding orphelin, `RecentBooksRepository`, `BookProgressDao`).

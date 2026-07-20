@@ -2,6 +2,7 @@ package com.inktone.service.onnx
 
 import android.content.Context
 import android.util.Log
+import com.inktone.CrashReporter
 import com.k2fsa.sherpa.onnx.OfflineTts
 import com.k2fsa.sherpa.onnx.OfflineTtsConfig
 import com.k2fsa.sherpa.onnx.OfflineTtsModelConfig
@@ -87,6 +88,7 @@ class OnnxInferenceService @Inject constructor(
                 isInitialized = true
             } catch (t: Throwable) {
                 Log.e(TAG, "Erreur fatale lors de l'initialisation du moteur natif Sherpa-ONNX", t)
+                CrashReporter.recordException(t)
                 tts = null
             } finally {
                 isInitializing = false
@@ -180,6 +182,7 @@ class OnnxInferenceService @Inject constructor(
             tts?.release()
         } catch (e: Exception) {
             Log.e(TAG, "Erreur libération TTS: ${e.message}", e)
+            CrashReporter.recordException(e)
         }
         tts = null
         isInitialized = false

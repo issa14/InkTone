@@ -9,5 +9,6 @@ class InkToneApplication : Application() {
         super.onCreate()
         PerfLogger.init(this)
         PerfLogger.markAppStart()
+        CrashReporter.init(this)
     }
 }

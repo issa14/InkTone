@@ -64,7 +64,6 @@ enum class NavigationDestination(
 ) {
     RECENTS("Liste des récents", Icons.Outlined.Schedule),
     LIBRARY("Bibliothèque", Icons.Outlined.Book),
-    FILES("Fichiers", Icons.Outlined.Folder),
     OPDS("Catalogues OPDS", Icons.Outlined.Language),
     BOOKMARKS("Marque-pages et notes", Icons.Outlined.Bookmark),
     STATS("Statistiques de lecture", Icons.Outlined.BarChart),
@@ -314,28 +313,6 @@ class LibraryViewModel @Inject constructor(
                 _uiState.update { it.copy(importProgress = null, importStatus = null) }
                 loadBooks()
                 // Toast de succès pour le premier import
-                if (!settingsRepository.hasImportedFirstBook.first()) {
-                    settingsRepository.markFirstBookImported()
-                    _uiState.update { it.copy(importSuccessSnackbar = "Livre importé — appuyez pour commencer la lecture") }
-                }
-            } catch (e: Exception) {
-                _uiState.update { it.copy(error = e.message, isLoading = false, importProgress = null, importStatus = null) }
-            }
-        }
-    }
-
-    /** Import depuis un fichier local (explorateur FilesScreen) — le dossier parent réel est enregistré comme source. */
-    fun importFile(file: java.io.File) {
-        viewModelScope.launch {
-            _uiState.update { it.copy(isLoading = true, error = null, importProgress = 0f, importStatus = "Préparation de l'import...") }
-            try {
-                file.inputStream().use { stream ->
-                    bookRepository.importEpub(stream, file.name, file.parentFile?.name) { progress, status ->
-                        _uiState.update { it.copy(importProgress = progress, importStatus = status) }
-                    }
-                }
-                _uiState.update { it.copy(importProgress = null, importStatus = null) }
-                loadBooks()
                 if (!settingsRepository.hasImportedFirstBook.first()) {
                     settingsRepository.markFirstBookImported()
                     _uiState.update { it.copy(importSuccessSnackbar = "Livre importé — appuyez pour commencer la lecture") }

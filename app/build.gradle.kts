@@ -16,6 +16,25 @@ if (keystorePropertiesFile.exists()) {
     keystoreProperties.load(keystorePropertiesFile.inputStream())
 }
 
+// Crashlytics : n'active les plugins Firebase que si google-services.json est présent
+// (fichier non versionné, propre à chaque projet Firebase — voir PLAN_ACTION_TOP_TIER_CLAUDECODE.md §0.2)
+val googleServicesFile = file("google-services.json")
+if (googleServicesFile.exists()) {
+    apply(plugin = "com.google.gms.google-services")
+    apply(plugin = "com.google.firebase.crashlytics")
+}
+
+// Hash de commit court, exposé via BuildConfig pour recouper les crashs avec l'historique git
+// (providers.exec plutôt que ProcessBuilder : compatible configuration cache)
+val gitCommitHash: String = try {
+    providers.exec {
+        workingDir = rootProject.projectDir
+        commandLine("git", "rev-parse", "--short", "HEAD")
+    }.standardOutput.asText.get().trim()
+} catch (e: Exception) {
+    "unknown"
+}
+
 android {
     namespace = "com.inktone"
     compileSdk = 35
@@ -28,6 +47,8 @@ android {
         versionName = "0.1.0"
 
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
+
+        buildConfigField("String", "GIT_COMMIT", "\"$gitCommitHash\"")
 
         // Pour Room : schéma exporté
         ksp {
@@ -165,6 +186,10 @@ dependencies {
     implementation(libs.readium.shared)
     implementation(libs.readium.streamer)
     coreLibraryDesugaring(libs.desugar.jdk.libs)
+
+    // --- Firebase Crashlytics (crash reporting — voir CrashReporter.kt) ---
+    implementation(platform(libs.firebase.bom))
+    implementation(libs.firebase.crashlytics)
 
     // --- Sync & Security (Phase 8) ---
     implementation("androidx.security:security-crypto:1.1.0-alpha06")
