@@ -6,12 +6,11 @@ import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.outlined.*
 import androidx.compose.material.icons.filled.Pause
 import androidx.compose.material.icons.filled.PlayArrow
 import androidx.compose.material.icons.filled.SkipNext
 import androidx.compose.material.icons.filled.SkipPrevious
-import androidx.compose.material.icons.outlined.Close
-import androidx.compose.material.icons.outlined.Timer
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
@@ -65,7 +64,7 @@ fun TtsPanel(
             horizontalArrangement = Arrangement.Center
         ) {
             IconButton(onClick = onPrevious, modifier = Modifier.size(48.dp)) {
-                Icon(Icons.Default.SkipPrevious, "Précédent",
+                Icon(Icons.Outlined.SkipPrevious, "Précédent",
                     tint = MaterialTheme.colorScheme.outlineVariant)
             }
 
@@ -79,7 +78,7 @@ fun TtsPanel(
                 )
             ) {
                 Icon(
-                    if (isPlaying) Icons.Default.Pause else Icons.Default.PlayArrow,
+                    if (isPlaying) Icons.Filled.Pause else Icons.Filled.PlayArrow,
                     contentDescription = if (isPlaying) "Pause" else "Lire",
                     modifier = Modifier.size(32.dp),
                     tint = MaterialTheme.colorScheme.onSurface
@@ -89,7 +88,7 @@ fun TtsPanel(
             Spacer(Modifier.width(24.dp))
 
             IconButton(onClick = onNext, modifier = Modifier.size(48.dp)) {
-                Icon(Icons.Default.SkipNext, "Suivant",
+                Icon(Icons.Outlined.SkipNext, "Suivant",
                     tint = MaterialTheme.colorScheme.outlineVariant)
             }
         }

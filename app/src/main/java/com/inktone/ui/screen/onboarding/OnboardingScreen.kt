@@ -10,9 +10,8 @@ import androidx.compose.foundation.pager.rememberPagerState
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.filled.MenuBook
-import androidx.compose.material.icons.filled.Security
-import androidx.compose.material.icons.filled.AutoStories
+import androidx.compose.material.icons.automirrored.outlined.MenuBook
+import androidx.compose.material.icons.outlined.*
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
@@ -42,7 +41,7 @@ fun OnboardingScreen(
             OnboardingSlide(
                 icon = {
                     Icon(
-                        Icons.Default.AutoStories,
+                        Icons.Outlined.AutoStories,
                         contentDescription = null,
                         modifier = Modifier.size(80.dp),
                         tint = MaterialTheme.colorScheme.primary
@@ -54,7 +53,7 @@ fun OnboardingScreen(
             OnboardingSlide(
                 icon = {
                     Icon(
-                        Icons.Default.Security,
+                        Icons.Outlined.Security,
                         contentDescription = null,
                         modifier = Modifier.size(80.dp),
                         tint = MaterialTheme.colorScheme.tertiary
@@ -66,7 +65,7 @@ fun OnboardingScreen(
             OnboardingSlide(
                 icon = {
                     Icon(
-                        Icons.Default.MenuBook,
+                        Icons.AutoMirrored.Outlined.MenuBook,
                         contentDescription = null,
                         modifier = Modifier.size(80.dp),
                         tint = MaterialTheme.colorScheme.secondary

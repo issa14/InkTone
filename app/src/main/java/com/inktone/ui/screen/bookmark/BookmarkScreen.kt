@@ -8,9 +8,8 @@ import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.outlined.*
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
-import androidx.compose.material.icons.filled.Bookmark
-import androidx.compose.material.icons.filled.Delete
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
@@ -142,7 +141,7 @@ private fun HighlightItem(
                     fontSize = 14.sp, maxLines = 2, overflow = TextOverflow.Ellipsis)
             }
             IconButton(onClick = onDelete) {
-                Icon(Icons.Default.Delete, "Supprimer", tint = MaterialTheme.colorScheme.onSurfaceVariant, modifier = Modifier.size(18.dp))
+                Icon(Icons.Outlined.Delete, "Supprimer", tint = MaterialTheme.colorScheme.onSurfaceVariant, modifier = Modifier.size(18.dp))
             }
         }
     }
@@ -166,7 +165,7 @@ private fun BookmarkItem(
             Modifier.padding(12.dp),
             verticalAlignment = Alignment.CenterVertically
         ) {
-            Icon(Icons.Default.Bookmark, "Signets", tint = MaterialTheme.colorScheme.primary, modifier = Modifier.size(20.dp))
+            Icon(Icons.Outlined.Bookmark, "Signets", tint = MaterialTheme.colorScheme.primary, modifier = Modifier.size(20.dp))
             Spacer(Modifier.width(12.dp))
             Column(Modifier.weight(1f)) {
                 Text("Chapitre ${bookmark.chapterIndex + 1} · Phrase ${bookmark.sentenceIndex + 1}",
@@ -176,7 +175,7 @@ private fun BookmarkItem(
                     fontSize = 14.sp, maxLines = 2, overflow = TextOverflow.Ellipsis)
             }
             IconButton(onClick = onDelete) {
-                Icon(Icons.Default.Delete, "Supprimer", tint = MaterialTheme.colorScheme.onSurfaceVariant, modifier = Modifier.size(18.dp))
+                Icon(Icons.Outlined.Delete, "Supprimer", tint = MaterialTheme.colorScheme.onSurfaceVariant, modifier = Modifier.size(18.dp))
             }
         }
     }

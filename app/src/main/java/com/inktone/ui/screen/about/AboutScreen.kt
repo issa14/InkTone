@@ -5,7 +5,8 @@ import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.filled.*
+import androidx.compose.material.icons.automirrored.outlined.MenuBook
+import androidx.compose.material.icons.outlined.*
 import androidx.compose.material3.*
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
@@ -27,7 +28,7 @@ fun AboutScreen() {
     ) {
         Spacer(Modifier.height(20.dp))
 
-        Icon(Icons.Default.MenuBook, null, tint = MaterialTheme.colorScheme.primary, modifier = Modifier.size(64.dp))
+        Icon(Icons.AutoMirrored.Outlined.MenuBook, null, tint = MaterialTheme.colorScheme.primary, modifier = Modifier.size(64.dp))
         Spacer(Modifier.height(12.dp))
         Text("InkTone", color = MaterialTheme.colorScheme.onSurface, fontWeight = FontWeight.Bold, fontSize = 26.sp)
         Text("Version 0.1.0", color = MaterialTheme.colorScheme.onSurfaceVariant, fontSize = 13.sp)
@@ -48,14 +49,14 @@ fun AboutScreen() {
 
         Spacer(Modifier.height(12.dp))
 
-        SectionHeader("Confidentialité & Sécurité Absolue", Icons.Default.Shield)
+        SectionHeader("Confidentialité & Sécurité Absolue", Icons.Outlined.Shield)
         PrivacyCard("Architecture 100% Locale", "La synthèse vocale s'exécute intégralement sur le processeur de votre appareil. Aucun texte n'est transféré vers des serveurs tiers.")
         PrivacyCard("Respect de la Vie Privée", "Vos habitudes de lecture et vos fichiers restent strictement confidentiels et ne sortent jamais de votre espace de stockage.")
         PrivacyCard("Autonomie Hors-Ligne", "L'application fonctionne sans aucune connexion internet, garantissant une utilisation ininterrompue, partout et à tout moment.")
 
         Spacer(Modifier.height(12.dp))
 
-        SectionHeader("Innovations Techniques", Icons.Default.Settings)
+        SectionHeader("Innovations Techniques", Icons.Outlined.Settings)
         Card(colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface), shape = RoundedCornerShape(14.dp), modifier = Modifier.fillMaxWidth()) {
             Column(modifier = Modifier.padding(20.dp)) {
                 Text("Développé avec un objectif d'optimisation matérielle et de performance, InkTone s'appuie sur des moteurs open-source industriels de premier plan :", color = MaterialTheme.colorScheme.onSurfaceVariant, fontSize = 13.sp, lineHeight = 19.sp)
@@ -67,10 +68,10 @@ fun AboutScreen() {
 
         Spacer(Modifier.height(12.dp))
 
-        SectionHeader("Crédits & Support", Icons.Default.Group)
-        CreditCard("Développement", "Issa ADAMOU", Icons.Default.Person)
-        CreditCard("Code Source", "github.com/issa14/InkTone", Icons.Default.Code)
-        CreditCard("Contact", "issadotnet@gmail.com", Icons.Default.Mail)
+        SectionHeader("Crédits & Support", Icons.Outlined.Group)
+        CreditCard("Développement", "Issa ADAMOU", Icons.Outlined.Person)
+        CreditCard("Code Source", "github.com/issa14/InkTone", Icons.Outlined.Code)
+        CreditCard("Contact", "issadotnet@gmail.com", Icons.Outlined.Mail)
 
         Spacer(Modifier.height(16.dp))
         Text("© 2026 InkTone. Tous droits réservés.", color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.6f), fontSize = 11.sp, textAlign = TextAlign.Center)
@@ -94,7 +95,7 @@ private fun SectionHeader(text: String, icon: androidx.compose.ui.graphics.vecto
 private fun PrivacyCard(title: String, description: String) {
     Card(colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface), shape = RoundedCornerShape(12.dp), modifier = Modifier.fillMaxWidth().padding(vertical = 3.dp)) {
         Row(modifier = Modifier.padding(14.dp), verticalAlignment = Alignment.Top) {
-            Icon(Icons.Default.Security, null, tint = MaterialTheme.colorScheme.tertiary.copy(alpha = 0.6f), modifier = Modifier.size(18.dp))
+            Icon(Icons.Outlined.Security, null, tint = MaterialTheme.colorScheme.tertiary.copy(alpha = 0.6f), modifier = Modifier.size(18.dp))
             Spacer(Modifier.width(10.dp))
             Column {
                 Text(title, color = MaterialTheme.colorScheme.onSurface, fontWeight = FontWeight.Medium, fontSize = 13.sp)

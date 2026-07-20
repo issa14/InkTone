@@ -8,8 +8,8 @@ import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.outlined.*
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
-import androidx.compose.material.icons.filled.*
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
@@ -143,7 +143,7 @@ fun SyncSettingsScreen(
                 enabled = !state.isLoading
             ) {
                 Icon(
-                    if (state.driveConnected) com.inktone.ui.theme.AppIcons.SuccessOutlined else Icons.Default.Cloud,
+                    if (state.driveConnected) com.inktone.ui.theme.AppIcons.SuccessOutlined else Icons.Outlined.Cloud,
                     contentDescription = "Synchronisation",
                     modifier = Modifier.size(20.dp)
                 )
@@ -181,7 +181,7 @@ fun SyncSettingsScreen(
                     colors = ButtonDefaults.buttonColors(containerColor = MaterialTheme.colorScheme.primary),
                     modifier = Modifier.weight(1f)
                 ) {
-                    Icon(Icons.Default.Upload, "Exporter", modifier = Modifier.size(18.dp))
+                    Icon(Icons.Outlined.Upload, "Exporter", modifier = Modifier.size(18.dp))
                     Spacer(Modifier.width(6.dp))
                     Text("Exporter")
                 }
@@ -190,7 +190,7 @@ fun SyncSettingsScreen(
                     enabled = state.encryptionPassword.isNotBlank() && !state.isLoading,
                     modifier = Modifier.weight(1f)
                 ) {
-                    Icon(Icons.Default.Download, "Importer", modifier = Modifier.size(18.dp))
+                    Icon(Icons.Outlined.Download, "Importer", modifier = Modifier.size(18.dp))
                     Spacer(Modifier.width(6.dp))
                     Text("Importer")
                 }
@@ -213,7 +213,7 @@ fun SyncSettingsScreen(
                     CircularProgressIndicator(modifier = Modifier.size(18.dp), color = MaterialTheme.colorScheme.onSurface)
                     Spacer(Modifier.width(8.dp))
                 }
-                Icon(Icons.Default.Sync, "Synchroniser", modifier = Modifier.size(18.dp))
+                Icon(Icons.Outlined.Sync, "Synchroniser", modifier = Modifier.size(18.dp))
                 Spacer(Modifier.width(6.dp))
                 Text("Synchroniser maintenant")
             }

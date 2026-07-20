@@ -6,7 +6,7 @@ import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.filled.*
+import androidx.compose.material.icons.outlined.*
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
@@ -49,7 +49,7 @@ fun AllBookmarksPanel(
             onValueChange = { searchQuery = it },
             placeholder = { Text("Rechercher...", color = MaterialTheme.colorScheme.onSurfaceVariant) },
             leadingIcon = {
-                Icon(Icons.Default.Search, "Rechercher", tint = MaterialTheme.colorScheme.onSurfaceVariant, modifier = Modifier.size(20.dp))
+                Icon(Icons.Outlined.Search, "Rechercher", tint = MaterialTheme.colorScheme.onSurfaceVariant, modifier = Modifier.size(20.dp))
             },
             singleLine = true,
             modifier = Modifier.fillMaxWidth()
@@ -98,7 +98,7 @@ private fun BookmarkDrawerItem(
             verticalAlignment = Alignment.Top
         ) {
             Icon(
-                Icons.Default.Bookmark, "Signets",
+                Icons.Outlined.Bookmark, "Signets",
                 tint = MaterialTheme.colorScheme.primary,
                 modifier = Modifier.size(20.dp)
             )
@@ -118,7 +118,7 @@ private fun BookmarkDrawerItem(
                 )
             }
             IconButton(onClick = onDelete, modifier = Modifier.size(28.dp)) {
-                Icon(Icons.Default.Delete, "Supprimer",
+                Icon(Icons.Outlined.Delete, "Supprimer",
                     tint = MaterialTheme.colorScheme.onSurfaceVariant, modifier = Modifier.size(16.dp))
             }
         }

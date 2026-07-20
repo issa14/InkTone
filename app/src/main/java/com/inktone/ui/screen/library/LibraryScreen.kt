@@ -14,8 +14,11 @@ import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.filled.*
-import androidx.compose.material.icons.outlined.Headphones
+import androidx.compose.material.icons.automirrored.filled.KeyboardArrowRight
+import androidx.compose.material.icons.automirrored.outlined.List
+import androidx.compose.material.icons.automirrored.outlined.ArrowBack
+import androidx.compose.material.icons.automirrored.outlined.MenuBook
+import androidx.compose.material.icons.outlined.*
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
@@ -351,25 +354,25 @@ private fun TopBar(
                     color = MaterialTheme.colorScheme.onPrimary)
                 if (isLibrary) {
                     Spacer(Modifier.width(4.dp))
-                    Icon(Icons.Default.ArrowDropDown, "Menu déroulant", tint = MaterialTheme.colorScheme.onPrimary, modifier = Modifier.size(18.dp))
+                    Icon(Icons.Outlined.ArrowDropDown, "Menu déroulant", tint = MaterialTheme.colorScheme.onPrimary, modifier = Modifier.size(18.dp))
                 }
             }
         },
         navigationIcon = {
             IconButton(onClick = onMenu) {
-                Icon(Icons.Default.Menu, stringResource(R.string.cd_menu_open), tint = MaterialTheme.colorScheme.onPrimary)
+                Icon(Icons.Outlined.Menu, stringResource(R.string.cd_menu_open), tint = MaterialTheme.colorScheme.onPrimary)
             }
         },
         actions = {
             if (isLibrary) {
                 IconButton(onClick = onSearch) {
-                    Icon(Icons.Default.Search, stringResource(R.string.cd_search), tint = MaterialTheme.colorScheme.onPrimary)
+                    Icon(Icons.Outlined.Search, stringResource(R.string.cd_search), tint = MaterialTheme.colorScheme.onPrimary)
                 }
                 IconButton(onClick = onFilterMode) {
-                    Icon(Icons.Default.FilterList, stringResource(R.string.cd_filter), tint = MaterialTheme.colorScheme.onPrimary)
+                    Icon(Icons.Outlined.FilterList, stringResource(R.string.cd_filter), tint = MaterialTheme.colorScheme.onPrimary)
                 }
                 IconButton(onClick = onOverflow) {
-                    Icon(Icons.Default.MoreVert, stringResource(R.string.cd_more_options), tint = MaterialTheme.colorScheme.onPrimary)
+                    Icon(Icons.Outlined.MoreVert, stringResource(R.string.cd_more_options), tint = MaterialTheme.colorScheme.onPrimary)
                 }
             }
         },
@@ -407,7 +410,7 @@ private fun SearchBar(
         },
         navigationIcon = {
             IconButton(onClick = onClose) {
-                Icon(Icons.Default.ArrowBack, stringResource(R.string.cd_close_search), tint = MaterialTheme.colorScheme.onPrimary)
+                Icon(Icons.AutoMirrored.Outlined.ArrowBack, stringResource(R.string.cd_close_search), tint = MaterialTheme.colorScheme.onPrimary)
             }
         },
         colors = TopAppBarDefaults.topAppBarColors(containerColor = MaterialTheme.colorScheme.primary)
@@ -628,7 +631,7 @@ private fun LibraryNavigationPopup(
                                 )
                                 if (isActive) {
                                     Icon(
-                                        Icons.Default.ChevronRight, "Ouvrir",
+                                        Icons.Outlined.ChevronRight, "Ouvrir",
                                         tint = MaterialTheme.colorScheme.onSurfaceVariant,
                                         modifier = Modifier.size(14.dp)
                                     )
@@ -722,7 +725,7 @@ private fun FilterAndSortDialog(
         titleContentColor = MaterialTheme.colorScheme.onBackground,
         textContentColor = MaterialTheme.colorScheme.onBackground,
         icon = {
-            Icon(Icons.Default.Tune, "Options de tri", tint = MaterialTheme.colorScheme.primary, modifier = Modifier.size(24.dp))
+            Icon(Icons.Outlined.Tune, "Options de tri", tint = MaterialTheme.colorScheme.primary, modifier = Modifier.size(24.dp))
         },
         title = {
             Row(
@@ -806,9 +809,9 @@ private fun FilterAndSortDialog(
                     horizontalArrangement = Arrangement.spacedBy(8.dp)
                 ) {
                     listOf(
-                        LayoutMode.LIST to Icons.Default.List,
-                        LayoutMode.GRID to Icons.Default.GridView,
-                        LayoutMode.GRID_COVERS to Icons.Default.ViewModule
+                        LayoutMode.LIST to Icons.AutoMirrored.Outlined.List,
+                        LayoutMode.GRID to Icons.Outlined.GridView,
+                        LayoutMode.GRID_COVERS to Icons.Outlined.ViewModule
                     ).forEach { (mode, icon) ->
                         FilterChip(
                             selected = layoutMode == mode,
@@ -879,12 +882,12 @@ private fun LibraryActionsSheet(
         Column(modifier = Modifier.padding(horizontal = 8.dp, vertical = 4.dp).padding(bottom = 24.dp)) {
             ActionSheetSectionHeader("Bibliothèque")
             ActionSheetItem(
-                icon = Icons.Default.FileUpload,
+                icon = Icons.Outlined.FileUpload,
                 label = stringResource(R.string.cd_import_books),
                 onClick = onImport
             )
             ActionSheetItem(
-                icon = Icons.Default.Refresh,
+                icon = Icons.Outlined.Refresh,
                 label = "Actualiser la bibliothèque",
                 onClick = onRefresh
             )
@@ -892,7 +895,7 @@ private fun LibraryActionsSheet(
             Spacer(Modifier.height(8.dp))
             ActionSheetSectionHeader("Couvertures")
             ActionSheetItem(
-                icon = Icons.Default.AutoFixHigh,
+                icon = Icons.Outlined.AutoFixHigh,
                 label = "Reconstruire les couvertures",
                 enabled = !state.isRebuildingCovers,
                 onClick = onRebuildCovers,
@@ -915,7 +918,7 @@ private fun LibraryActionsSheet(
                 }
             )
             ActionSheetItem(
-                icon = Icons.Default.Wallpaper,
+                icon = Icons.Outlined.Wallpaper,
                 label = "Couverture par défaut",
                 enabled = !state.isRebuildingCovers,
                 onClick = { showResetCoversConfirm = true }
@@ -923,13 +926,13 @@ private fun LibraryActionsSheet(
 
             HorizontalDivider(modifier = Modifier.padding(vertical = 12.dp, horizontal = 16.dp))
             ActionSheetItem(
-                icon = Icons.Default.Sync,
+                icon = Icons.Outlined.Sync,
                 label = "Synchroniser avec le cloud",
                 accentColor = MaterialTheme.colorScheme.primary,
                 onClick = onSync,
                 trailing = {
                     Icon(
-                        Icons.Filled.KeyboardArrowRight,
+                        Icons.AutoMirrored.Filled.KeyboardArrowRight,
                         contentDescription = null,
                         tint = MaterialTheme.colorScheme.primary.copy(alpha = 0.6f),
                         modifier = Modifier.size(20.dp)
@@ -942,7 +945,7 @@ private fun LibraryActionsSheet(
     if (showResetCoversConfirm) {
         AlertDialog(
             onDismissRequest = { showResetCoversConfirm = false },
-            icon = { Icon(Icons.Default.Wallpaper, null, tint = MaterialTheme.colorScheme.primary) },
+            icon = { Icon(Icons.Outlined.Wallpaper, null, tint = MaterialTheme.colorScheme.primary) },
             title = { Text("Réinitialiser les couvertures ?") },
             text = {
                 Text(
@@ -1081,15 +1084,15 @@ private fun NavDrawerContent(
                 horizontalArrangement = Arrangement.SpaceEvenly,
                 verticalAlignment = Alignment.CenterVertically
             ) {
-                DrawerFooterBtn("Options", Icons.Default.Settings) {
+                DrawerFooterBtn("Options", Icons.Outlined.Settings) {
                     onNavigate(NavigationDestination.SETTINGS)
                 }
-                DrawerFooterBtn("À propos", Icons.Default.Info) {
+                DrawerFooterBtn("À propos", Icons.Outlined.Info) {
                     onNavigate(NavigationDestination.ABOUT)
                 }
-                DrawerFooterBtn("Thème", Icons.Default.Palette) { onThemeToggle() }
+                DrawerFooterBtn("Thème", Icons.Outlined.Palette) { onThemeToggle() }
                 if (com.inktone.BuildConfig.DEBUG) {
-                    DrawerFooterBtn("Debug", Icons.Default.Build) { onDebug() }
+                    DrawerFooterBtn("Debug", Icons.Outlined.Build) { onDebug() }
                 }
             }
         }
@@ -1141,7 +1144,7 @@ private fun FloatingControls(
             shape = CircleShape,
             modifier = Modifier.size(56.dp)
         ) {
-            Icon(Icons.Default.MenuBook, stringResource(R.string.cd_resume_reading),
+            Icon(Icons.AutoMirrored.Outlined.MenuBook, stringResource(R.string.cd_resume_reading),
                 tint = MaterialTheme.colorScheme.onPrimary, modifier = Modifier.size(24.dp))
         }
     }
@@ -1165,7 +1168,7 @@ private fun EmptyView(onImportClick: (() -> Unit)? = null, onBrowseClick: (() ->
             ) {
                 Box(contentAlignment = Alignment.Center) {
                     Icon(
-                        Icons.Default.MenuBook,
+                        Icons.AutoMirrored.Outlined.MenuBook,
                         contentDescription = null,
                         modifier = Modifier.size(40.dp),
                         tint = MaterialTheme.colorScheme.onPrimaryContainer
@@ -1197,7 +1200,7 @@ private fun EmptyView(onImportClick: (() -> Unit)? = null, onBrowseClick: (() ->
                     onClick = onImportClick,
                     modifier = Modifier.fillMaxWidth(0.7f)
                 ) {
-                    Icon(Icons.Default.FileUpload, contentDescription = null,
+                    Icon(Icons.Outlined.FileUpload, contentDescription = null,
                         modifier = Modifier.size(18.dp))
                     Spacer(Modifier.width(8.dp))
                     Text("Importer un livre")
@@ -1209,7 +1212,7 @@ private fun EmptyView(onImportClick: (() -> Unit)? = null, onBrowseClick: (() ->
                     onClick = onBrowseClick,
                     modifier = Modifier.fillMaxWidth(0.7f)
                 ) {
-                    Icon(Icons.Default.Folder, contentDescription = null, modifier = Modifier.size(18.dp))
+                    Icon(Icons.Outlined.Folder, contentDescription = null, modifier = Modifier.size(18.dp))
                     Spacer(Modifier.width(8.dp))
                     Text("Parcourir mes fichiers")
                 }
@@ -1237,7 +1240,7 @@ private fun ErrorBanner(error: String, onDismiss: () -> Unit, onRetry: (() -> Un
             verticalAlignment = Alignment.CenterVertically
         ) {
             Icon(
-                Icons.Default.ErrorOutline,
+                Icons.Outlined.ErrorOutline,
                 contentDescription = "Erreur",
                 tint = MaterialTheme.colorScheme.onErrorContainer,
                 modifier = Modifier.size(20.dp)
@@ -1265,7 +1268,7 @@ private fun ErrorBanner(error: String, onDismiss: () -> Unit, onRetry: (() -> Un
 private fun ComingSoonPlaceholder(label: String) {
     Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
         Column(horizontalAlignment = Alignment.CenterHorizontally) {
-            Icon(Icons.Default.Construction, "En construction", Modifier.size(48.dp), tint = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.3f))
+            Icon(Icons.Outlined.Construction, "En construction", Modifier.size(48.dp), tint = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.3f))
             Spacer(Modifier.height(12.dp))
             Text(label, color = MaterialTheme.colorScheme.onSurfaceVariant, fontSize = 16.sp)
             Text("Bientôt disponible", color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.5f), fontSize = 13.sp)

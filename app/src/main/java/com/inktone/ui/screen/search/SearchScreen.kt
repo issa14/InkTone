@@ -6,8 +6,8 @@ import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.outlined.*
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
-import androidx.compose.material.icons.filled.Search
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
@@ -52,7 +52,7 @@ fun SearchScreen(
                     if (q.length >= 2) viewModel.search(q)
                 },
                 placeholder = { Text("Rechercher dans le livre...", color = MaterialTheme.colorScheme.onSurfaceVariant) },
-                leadingIcon = { Icon(Icons.Default.Search, "Rechercher", tint = MaterialTheme.colorScheme.onSurfaceVariant) },
+                leadingIcon = { Icon(Icons.Outlined.Search, "Rechercher", tint = MaterialTheme.colorScheme.onSurfaceVariant) },
                 singleLine = true,
                 modifier = Modifier.fillMaxWidth().padding(horizontal = 16.dp, vertical = 8.dp)
             )

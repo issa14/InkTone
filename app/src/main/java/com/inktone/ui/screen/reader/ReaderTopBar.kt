@@ -5,12 +5,8 @@ import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.outlined.*
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
-import androidx.compose.material.icons.filled.Bookmark
-import androidx.compose.material.icons.filled.ImportContacts
-import androidx.compose.material.icons.filled.List
-import androidx.compose.material.icons.filled.Search
-import androidx.compose.material.icons.filled.ViewDay
 import androidx.compose.material3.*
 import com.inktone.ui.theme.ttsActive
 import androidx.compose.runtime.Composable
@@ -52,17 +48,17 @@ fun ReaderTopBar(
             }
             IconButton(onClick = onToggleMode) {
                 Icon(
-                    if (readingMode == ReadingMode.PAGED) Icons.Default.ViewDay else Icons.Default.ImportContacts,
+                    if (readingMode == ReadingMode.PAGED) Icons.Outlined.ViewDay else Icons.Outlined.ImportContacts,
                     contentDescription = if (readingMode == ReadingMode.PAGED) "Mode défilement" else "Mode paginé",
                     tint = MaterialTheme.colorScheme.onSurfaceVariant
                 )
             }
             @Suppress("DEPRECATION")
-            IconButton(onClick = onSearch) { Icon(Icons.Default.Search, "Rechercher", tint = MaterialTheme.colorScheme.onSurfaceVariant) }
+            IconButton(onClick = onSearch) { Icon(Icons.Outlined.Search, "Rechercher", tint = MaterialTheme.colorScheme.onSurfaceVariant) }
             @Suppress("DEPRECATION")
-            IconButton(onClick = onBookmarks) { Icon(Icons.Default.Bookmark, "Signets", tint = MaterialTheme.colorScheme.onSurfaceVariant) }
+            IconButton(onClick = onBookmarks) { Icon(Icons.Outlined.Bookmark, "Signets", tint = MaterialTheme.colorScheme.onSurfaceVariant) }
             @Suppress("DEPRECATION")
-            IconButton(onClick = onToc) { Icon(Icons.Default.List, "TOC", tint = MaterialTheme.colorScheme.onSurfaceVariant) }
+            IconButton(onClick = onToc) { Icon(Icons.Outlined.List, "TOC", tint = MaterialTheme.colorScheme.onSurfaceVariant) }
         }
     }
 }

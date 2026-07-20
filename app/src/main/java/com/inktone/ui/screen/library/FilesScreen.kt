@@ -13,11 +13,8 @@ import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.outlined.*
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
-import androidx.compose.material.icons.filled.Description
-import androidx.compose.material.icons.filled.Folder
-import androidx.compose.material.icons.filled.Lock
-import androidx.compose.material.icons.filled.Settings
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
@@ -72,7 +69,7 @@ fun FilesScreen(
             contentAlignment = Alignment.Center
         ) {
             Column(horizontalAlignment = Alignment.CenterHorizontally) {
-                Icon(Icons.Default.Lock, null, modifier = Modifier.size(56.dp),
+                Icon(Icons.Outlined.Lock, null, modifier = Modifier.size(56.dp),
                     tint = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.3f))
                 Spacer(Modifier.height(16.dp))
                 Text("Accès au stockage requis", fontSize = 17.sp,
@@ -95,7 +92,7 @@ fun FilesScreen(
                     colors = ButtonDefaults.buttonColors(containerColor = MaterialTheme.colorScheme.primary),
                     shape = RoundedCornerShape(8.dp)
                 ) {
-                    Icon(Icons.Default.Settings, null, modifier = Modifier.size(18.dp))
+                    Icon(Icons.Outlined.Settings, null, modifier = Modifier.size(18.dp))
                     Spacer(Modifier.width(8.dp))
                     Text("Accorder l'accès dans les paramètres")
                 }
@@ -141,7 +138,7 @@ private fun EmptyDir() {
         contentAlignment = Alignment.Center
     ) {
         Column(horizontalAlignment = Alignment.CenterHorizontally) {
-            Icon(Icons.Default.Folder, null, modifier = Modifier.size(56.dp),
+            Icon(Icons.Outlined.Folder, null, modifier = Modifier.size(56.dp),
                 tint = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.25f))
             Spacer(Modifier.height(12.dp))
             Text("Dossier vide ou inaccessible", fontSize = 15.sp, color = MaterialTheme.colorScheme.onSurfaceVariant)
@@ -158,7 +155,7 @@ private fun FileRow(name: String, isDirectory: Boolean, onClick: () -> Unit) {
             verticalAlignment = Alignment.CenterVertically
         ) {
             Icon(
-                if (isDirectory) Icons.Default.Folder else Icons.Default.Description,
+                if (isDirectory) Icons.Outlined.Folder else Icons.Outlined.Description,
                 null, tint = if (isDirectory) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.ttsActive,
                 modifier = Modifier.size(22.dp)
             )

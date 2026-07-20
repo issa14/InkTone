@@ -391,7 +391,7 @@ fun ReaderScreen(
                 shape = RoundedCornerShape(18.dp)
             ) {
                 Icon(
-                    Icons.Default.PlayArrow,
+                    Icons.Filled.PlayArrow,
                     contentDescription = "Lire",
                     modifier = Modifier.size(28.dp)
                 )

@@ -5,7 +5,7 @@ import android.net.Uri
 import android.provider.OpenableColumns
 import android.util.Log
 import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.filled.*
+import androidx.compose.material.icons.outlined.*
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
@@ -55,15 +55,15 @@ enum class NavigationDestination(
     val label: String,
     val icon: ImageVector
 ) {
-    RECENTS("Liste des récents", Icons.Default.Schedule),
-    LIBRARY("Bibliothèque", Icons.Default.Book),
-    FILES("Fichiers", Icons.Default.Folder),
-    OPDS("Catalogues OPDS", Icons.Default.Language),
-    BOOKMARKS("Marque-pages et notes", Icons.Default.Bookmark),
-    STATS("Statistiques de lecture", Icons.Default.BarChart),
-    SYNC("Synchronisation & Sauvegarde", Icons.Default.Sync),
-    SETTINGS("Options", Icons.Default.Settings),
-    ABOUT("À propos", Icons.Default.Info)
+    RECENTS("Liste des récents", Icons.Outlined.Schedule),
+    LIBRARY("Bibliothèque", Icons.Outlined.Book),
+    FILES("Fichiers", Icons.Outlined.Folder),
+    OPDS("Catalogues OPDS", Icons.Outlined.Language),
+    BOOKMARKS("Marque-pages et notes", Icons.Outlined.Bookmark),
+    STATS("Statistiques de lecture", Icons.Outlined.BarChart),
+    SYNC("Synchronisation & Sauvegarde", Icons.Outlined.Sync),
+    SETTINGS("Options", Icons.Outlined.Settings),
+    ABOUT("À propos", Icons.Outlined.Info)
 }
 
 @HiltViewModel

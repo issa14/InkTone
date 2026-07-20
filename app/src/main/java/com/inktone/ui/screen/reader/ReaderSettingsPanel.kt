@@ -10,9 +10,7 @@ import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.filled.FormatLineSpacing
-import androidx.compose.material.icons.filled.FormatSize
-import androidx.compose.material.icons.filled.HorizontalDistribute
+import androidx.compose.material.icons.outlined.*
 import androidx.compose.material3.*
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
@@ -172,7 +170,7 @@ fun ReaderSettingsPanel(
             modifier = Modifier.fillMaxWidth()
         ) {
             Icon(
-                Icons.Default.FormatSize,
+                Icons.Outlined.FormatSize,
                 contentDescription = "Taille de police",
                 tint = textColor.copy(alpha = 0.5f),
                 modifier = Modifier.size(20.dp)
@@ -216,7 +214,7 @@ fun ReaderSettingsPanel(
             modifier = Modifier.fillMaxWidth()
         ) {
             Icon(
-                Icons.Default.FormatLineSpacing,
+                Icons.Outlined.FormatLineSpacing,
                 contentDescription = "Espacement des lignes",
                 tint = textColor.copy(alpha = 0.5f),
                 modifier = Modifier.size(20.dp)
@@ -259,7 +257,7 @@ fun ReaderSettingsPanel(
             modifier = Modifier.fillMaxWidth()
         ) {
             Icon(
-                Icons.Default.HorizontalDistribute,
+                Icons.Outlined.HorizontalDistribute,
                 contentDescription = "Marges horizontales",
                 tint = textColor.copy(alpha = 0.5f),
                 modifier = Modifier.size(20.dp)

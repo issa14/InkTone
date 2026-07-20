@@ -10,10 +10,8 @@ import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.filled.*
-import androidx.compose.material.icons.outlined.Add
-import androidx.compose.material.icons.outlined.Delete
-import androidx.compose.material.icons.outlined.RecordVoiceOver
+import androidx.compose.material.icons.automirrored.outlined.VolumeUp
+import androidx.compose.material.icons.outlined.*
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
@@ -90,7 +88,7 @@ fun SettingsScreen(
                     modifier = Modifier.padding(16.dp),
                     horizontalAlignment = Alignment.CenterHorizontally
                 ) {
-                    Icon(Icons.Default.DarkMode, "Mode sombre", tint = MaterialTheme.colorScheme.primary, modifier = Modifier.size(28.dp))
+                    Icon(Icons.Outlined.DarkMode, "Mode sombre", tint = MaterialTheme.colorScheme.primary, modifier = Modifier.size(28.dp))
                     Spacer(Modifier.height(8.dp))
                     Text("Mode sombre", fontSize = 13.sp, fontWeight = FontWeight.Medium, color = MaterialTheme.colorScheme.onSurface)
                 }
@@ -105,7 +103,7 @@ fun SettingsScreen(
                     modifier = Modifier.padding(16.dp),
                     horizontalAlignment = Alignment.CenterHorizontally
                 ) {
-                    Icon(Icons.Default.Accessibility, "Accessibilité", tint = MaterialTheme.colorScheme.tertiary, modifier = Modifier.size(28.dp))
+                    Icon(Icons.Outlined.Accessibility, "Accessibilité", tint = MaterialTheme.colorScheme.tertiary, modifier = Modifier.size(28.dp))
                     Spacer(Modifier.height(8.dp))
                     Text("Accessibilité", fontSize = 13.sp, fontWeight = FontWeight.Medium, color = MaterialTheme.colorScheme.onSurface)
                 }
@@ -123,7 +121,7 @@ fun SettingsScreen(
 
                 // Voix
                 SettingRow(
-                    icon = Icons.Default.RecordVoiceOver,
+                    icon = Icons.Outlined.RecordVoiceOver,
                     title = "Voix active",
                     subtitle = state.voice,
                     onClick = { showVoicePicker = true }
@@ -132,7 +130,7 @@ fun SettingsScreen(
 
                 // Vitesse
                 SliderSetting(
-                    icon = Icons.Default.Speed,
+                    icon = Icons.Outlined.Speed,
                     title = "Vitesse d'élocution",
                     value = state.speed,
                     valueRange = 0.5f..2.0f,
@@ -143,7 +141,7 @@ fun SettingsScreen(
 
                 // Gain
                 SliderSetting(
-                    icon = Icons.Default.VolumeUp,
+                    icon = Icons.AutoMirrored.Outlined.VolumeUp,
                     title = "Gain audio",
                     value = state.gain,
                     valueRange = 1.0f..4.0f,
@@ -155,7 +153,7 @@ fun SettingsScreen(
                 // Moteur TTS
                 val currentEngine = state.availableEngines.find { it.id == state.selectedEngine }
                 SettingRow(
-                    icon = Icons.Default.Memory,
+                    icon = Icons.Outlined.Memory,
                     title = "Moteur de synthèse",
                     subtitle = currentEngine?.label ?: state.selectedEngine,
                     onClick = { showEnginePicker = true }
@@ -170,7 +168,7 @@ fun SettingsScreen(
                         else                   -> state.selectedEdgeVoice
                     }
                     SettingRow(
-                        icon = Icons.Default.RecordVoiceOver,
+                        icon = Icons.Outlined.RecordVoiceOver,
                         title = "Voix Edge",
                         subtitle = edgeVoiceLabel,
                         onClick = { showEdgeVoicePicker = true }
@@ -190,7 +188,7 @@ fun SettingsScreen(
 
                 SectionHeader("Apparence", icon = com.inktone.ui.theme.AppIcons.Appearance)
                 SettingRow(
-                    icon = Icons.Default.Palette,
+                    icon = Icons.Outlined.Palette,
                     title = "Thème",
                     subtitle = state.theme.label,
                     onClick = { showThemePicker = true }
@@ -198,7 +196,7 @@ fun SettingsScreen(
                 HorizontalDivider(color = MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.3f), modifier = Modifier.padding(vertical = 4.dp))
 
                 SwitchSetting(
-                    icon = Icons.Default.ColorLens,
+                    icon = Icons.Outlined.ColorLens,
                     title = "Couleurs dynamiques",
                     subtitle = "Palette générée depuis le fond d'écran (Android 12+)",
                     checked = state.dynamicColors,
@@ -209,7 +207,7 @@ fun SettingsScreen(
 
                 SectionHeader("Accessibilité", icon = com.inktone.ui.theme.AppIcons.Accessibility)
                 SwitchSetting(
-                    icon = Icons.Default.Animation,
+                    icon = Icons.Outlined.Animation,
                     title = "Réduire les animations",
                     subtitle = "Désactiver les transitions animées",
                     checked = state.reduceMotion,
@@ -217,7 +215,7 @@ fun SettingsScreen(
                 )
                 HorizontalDivider(color = MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.3f), modifier = Modifier.padding(vertical = 4.dp))
                 SwitchSetting(
-                    icon = Icons.Default.TextFields,
+                    icon = Icons.Outlined.TextFields,
                     title = "Police adaptée au système",
                     subtitle = "Utiliser la taille de police Android",
                     checked = state.respectSystemFontScale,
@@ -235,21 +233,21 @@ fun SettingsScreen(
         Card(colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface), shape = RoundedCornerShape(14.dp), modifier = Modifier.fillMaxWidth()) {
             Column(modifier = Modifier.padding(16.dp)) {
                 SettingRow(
-                    icon = Icons.Default.Folder,
+                    icon = Icons.Outlined.Folder,
                     title = "Dossier des modèles",
                     subtitle = state.modelPath.ifBlank { "Chemin par défaut" },
                     onClick = { showPathEditor = true }
                 )
                 HorizontalDivider(color = MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.3f), modifier = Modifier.padding(vertical = 4.dp))
                 SettingRow(
-                    icon = Icons.Default.SaveAlt,
+                    icon = Icons.Outlined.SaveAlt,
                     title = "Exporter les données",
                     subtitle = "Sauvegarder progression, signets et réglages",
                     onClick = { exportLauncher.launch("inktone_backup_${System.currentTimeMillis()}.json") }
                 )
                 HorizontalDivider(color = MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.3f), modifier = Modifier.padding(vertical = 4.dp))
                 SettingRow(
-                    icon = Icons.Default.FileOpen,
+                    icon = Icons.Outlined.FileOpen,
                     title = "Importer une sauvegarde",
                     subtitle = "Restaurer depuis un fichier .json",
                     onClick = { importLauncher.launch(arrayOf("application/json")) }
@@ -342,7 +340,7 @@ private fun SettingRow(
             Text(title, color = MaterialTheme.colorScheme.onSurface, fontSize = 13.sp)
             Text(subtitle, color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.7f), fontSize = 11.sp)
         }
-        Icon(Icons.Default.ChevronRight, "Ouvrir", tint = MaterialTheme.colorScheme.outlineVariant, modifier = Modifier.size(18.dp))
+        Icon(Icons.Outlined.ChevronRight, "Ouvrir", tint = MaterialTheme.colorScheme.outlineVariant, modifier = Modifier.size(18.dp))
     }
 }
 

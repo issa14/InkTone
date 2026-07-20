@@ -4,14 +4,13 @@ import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.outlined.*
 import androidx.compose.material.icons.filled.FormatSize
 import androidx.compose.material.icons.filled.Palette
 import androidx.compose.material.icons.filled.Pause
 import androidx.compose.material.icons.filled.PlayArrow
 import androidx.compose.material.icons.filled.SkipNext
 import androidx.compose.material.icons.filled.SkipPrevious
-import androidx.compose.material.icons.outlined.Headphones
-import androidx.compose.material.icons.outlined.Timer
 import androidx.compose.material3.*
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
@@ -68,7 +67,7 @@ fun UnifiedControlPanel(
                     modifier = Modifier.size(44.dp)
                 ) {
                     Icon(
-                        Icons.Default.SkipPrevious,
+                        Icons.Outlined.SkipPrevious,
                         contentDescription = stringResource(R.string.cd_tts_previous),
                         tint = accentColor.copy(alpha = 0.4f),
                         modifier = Modifier.size(22.dp)
@@ -88,7 +87,7 @@ fun UnifiedControlPanel(
                     )
                 ) {
                     Icon(
-                        if (isPlaying) Icons.Default.Pause else Icons.Default.PlayArrow,
+                        if (isPlaying) Icons.Filled.Pause else Icons.Filled.PlayArrow,
                         contentDescription = stringResource(
                             if (isPlaying) R.string.cd_tts_pause else R.string.cd_tts_play
                         ),
@@ -104,7 +103,7 @@ fun UnifiedControlPanel(
                     modifier = Modifier.size(44.dp)
                 ) {
                     Icon(
-                        Icons.Default.SkipNext,
+                        Icons.Outlined.SkipNext,
                         contentDescription = stringResource(R.string.cd_tts_next),
                         tint = accentColor.copy(alpha = 0.4f),
                         modifier = Modifier.size(22.dp)
@@ -134,14 +133,14 @@ fun UnifiedControlPanel(
                     onClick = onTtsSettingsClick
                 )
                 SecondaryAction(
-                    icon = Icons.Default.FormatSize,
+                    icon = Icons.Outlined.FormatSize,
                     label = "Police",
                     tint = if (useOpenDyslexic) accentColor
                            else accentColor.copy(alpha = 0.5f),
                     onClick = onFontToggle
                 )
                 SecondaryAction(
-                    icon = Icons.Default.Palette,
+                    icon = Icons.Outlined.Palette,
                     label = "Thème",
                     tint = accentColor.copy(alpha = 0.5f),
                     onClick = onThemeCycle

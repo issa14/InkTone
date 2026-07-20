@@ -6,8 +6,8 @@ import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.outlined.*
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
-import androidx.compose.material.icons.filled.*
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
@@ -58,7 +58,7 @@ fun OpdsScreen(
                         maxLines = 1, overflow = TextOverflow.Ellipsis
                     )
                     IconButton(onClick = { viewModel.toggleAddCatalog() }) {
-                        Icon(Icons.Default.Add, "Ajouter", tint = MaterialTheme.colorScheme.onSurfaceVariant)
+                        Icon(Icons.Outlined.Add, "Ajouter", tint = MaterialTheme.colorScheme.onSurfaceVariant)
                     }
                 }
             }
@@ -75,7 +75,7 @@ fun OpdsScreen(
                         horizontalAlignment = Alignment.CenterHorizontally,
                         verticalArrangement = Arrangement.Center
                     ) {
-                        Icon(Icons.Default.CloudOff, "Hors ligne", tint = MaterialTheme.colorScheme.outlineVariant, modifier = Modifier.size(48.dp))
+                        Icon(Icons.Outlined.CloudOff, "Hors ligne", tint = MaterialTheme.colorScheme.outlineVariant, modifier = Modifier.size(48.dp))
                         Spacer(Modifier.height(12.dp))
                         Text(state.error!!, color = MaterialTheme.colorScheme.onSurfaceVariant, fontSize = 14.sp)
                         Spacer(Modifier.height(16.dp))
@@ -244,7 +244,7 @@ private fun NavigationLinkCard(link: OpdsLink, onClick: () -> Unit) {
             modifier = Modifier.padding(horizontal = 16.dp, vertical = 14.dp),
             verticalAlignment = Alignment.CenterVertically
         ) {
-            Icon(Icons.Default.Folder, "Dossier", tint = MaterialTheme.colorScheme.secondary, modifier = Modifier.size(20.dp))
+            Icon(Icons.Outlined.Folder, "Dossier", tint = MaterialTheme.colorScheme.secondary, modifier = Modifier.size(20.dp))
             Spacer(Modifier.width(12.dp))
             Text(
                 link.title ?: link.href,
@@ -252,7 +252,7 @@ private fun NavigationLinkCard(link: OpdsLink, onClick: () -> Unit) {
                 fontSize = 14.sp,
                 modifier = Modifier.weight(1f)
             )
-            Icon(Icons.Default.ChevronRight, "Ouvrir", tint = MaterialTheme.colorScheme.outlineVariant, modifier = Modifier.size(20.dp))
+            Icon(Icons.Outlined.ChevronRight, "Ouvrir", tint = MaterialTheme.colorScheme.outlineVariant, modifier = Modifier.size(20.dp))
         }
     }
 }

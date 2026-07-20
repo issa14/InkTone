@@ -10,8 +10,9 @@ import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.automirrored.outlined.MenuBook
+import androidx.compose.material.icons.outlined.*
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
-import androidx.compose.material.icons.filled.*
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
@@ -76,7 +77,7 @@ fun StatsScreen(
                     title = "Vitesse",
                     value = "${state.averageWpm}",
                     unit = "WPM",
-                    icon = Icons.Default.Speed,
+                    icon = Icons.Outlined.Speed,
                     color = MaterialTheme.colorScheme.primary,
                     modifier = Modifier.weight(1f)
                 )
@@ -84,7 +85,7 @@ fun StatsScreen(
                     title = "Temps total",
                     value = String.format("%.1f", state.totalHoursRead),
                     unit = "h",
-                    icon = Icons.Default.Schedule,
+                    icon = Icons.Outlined.Schedule,
                     color = MaterialTheme.colorScheme.primaryContainer,
                     modifier = Modifier.weight(1f)
                 )
@@ -92,7 +93,7 @@ fun StatsScreen(
                     title = "Livres lus",
                     value = "${state.totalBooksRead}",
                     unit = "",
-                    icon = Icons.Default.MenuBook,
+                    icon = Icons.AutoMirrored.Outlined.MenuBook,
                     color = MaterialTheme.colorScheme.tertiary,
                     modifier = Modifier.weight(1f)
                 )
@@ -171,7 +172,7 @@ private fun DailyGoalProgress(
         // Centre
         Column(horizontalAlignment = Alignment.CenterHorizontally) {
             Icon(
-                Icons.Default.LocalFireDepartment,
+                Icons.Outlined.LocalFireDepartment,
                 contentDescription = "Objectif quotidien",
                 tint = if (progress >= 1f) MaterialTheme.colorScheme.tertiary else MaterialTheme.colorScheme.primary,
                 modifier = Modifier.size(28.dp)
@@ -219,7 +220,7 @@ private fun StreakCard(currentStreak: Int, maxStreak: Int) {
                 contentAlignment = Alignment.Center
             ) {
                 Icon(
-                    Icons.Default.LocalFireDepartment,
+                    Icons.Outlined.LocalFireDepartment,
                     contentDescription = stringResource(R.string.cd_stats_streak, currentStreak),
                     tint = if (currentStreak > 0) MaterialTheme.colorScheme.tertiary else MaterialTheme.colorScheme.outlineVariant,
                     modifier = Modifier.size(30.dp)
