@@ -97,7 +97,7 @@ class ChunkTextUseCase @Inject constructor(
      * Utilisé lors de l'import initial d'un EPUB quand le bookId
      * n'est pas encore disponible, ou pour la prévisualisation rapide.
      *
-     * ⚠️ Cette méthode est synchrone et s'exécute sur le thread appelant.
+     * Attention : cette méthode est synchrone et s'exécute sur le thread appelant.
      * L'appelant doit s'assurer d'être sur un thread d'arrière-plan.
      */
     operator fun invoke(text: String): List<Sentence> {

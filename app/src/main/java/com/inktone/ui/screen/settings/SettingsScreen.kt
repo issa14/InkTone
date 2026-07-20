@@ -665,7 +665,7 @@ private fun PronunciationDictionary(
                             }
                         }
                         Text(
-                            "➔ ${rule.replacement}",
+                            "→ ${rule.replacement}",
                             color = MaterialTheme.colorScheme.onSurfaceVariant,
                             fontSize = 11.sp
                         )

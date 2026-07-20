@@ -48,14 +48,14 @@ fun AboutScreen() {
 
         Spacer(Modifier.height(12.dp))
 
-        SectionHeader("🛡️ Confidentialité & Sécurité Absolue")
+        SectionHeader("Confidentialité & Sécurité Absolue", Icons.Default.Shield)
         PrivacyCard("Architecture 100% Locale", "La synthèse vocale s'exécute intégralement sur le processeur de votre appareil. Aucun texte n'est transféré vers des serveurs tiers.")
         PrivacyCard("Respect de la Vie Privée", "Vos habitudes de lecture et vos fichiers restent strictement confidentiels et ne sortent jamais de votre espace de stockage.")
         PrivacyCard("Autonomie Hors-Ligne", "L'application fonctionne sans aucune connexion internet, garantissant une utilisation ininterrompue, partout et à tout moment.")
 
         Spacer(Modifier.height(12.dp))
 
-        SectionHeader("⚙️ Innovations Techniques")
+        SectionHeader("Innovations Techniques", Icons.Default.Settings)
         Card(colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface), shape = RoundedCornerShape(14.dp), modifier = Modifier.fillMaxWidth()) {
             Column(modifier = Modifier.padding(20.dp)) {
                 Text("Développé avec un objectif d'optimisation matérielle et de performance, InkTone s'appuie sur des moteurs open-source industriels de premier plan :", color = MaterialTheme.colorScheme.onSurfaceVariant, fontSize = 13.sp, lineHeight = 19.sp)
@@ -67,7 +67,7 @@ fun AboutScreen() {
 
         Spacer(Modifier.height(12.dp))
 
-        SectionHeader("👥 Crédits & Support")
+        SectionHeader("Crédits & Support", Icons.Default.Group)
         CreditCard("Développement", "Issa ADAMOU", Icons.Default.Person)
         CreditCard("Code Source", "github.com/issa14/InkTone", Icons.Default.Code)
         CreditCard("Contact", "issadotnet@gmail.com", Icons.Default.Mail)
@@ -79,8 +79,15 @@ fun AboutScreen() {
 }
 
 @Composable
-private fun SectionHeader(text: String) {
-    Text(text, color = MaterialTheme.colorScheme.onSurface, fontWeight = FontWeight.SemiBold, fontSize = 14.sp, modifier = Modifier.fillMaxWidth().padding(vertical = 6.dp))
+private fun SectionHeader(text: String, icon: androidx.compose.ui.graphics.vector.ImageVector) {
+    Row(
+        verticalAlignment = Alignment.CenterVertically,
+        modifier = Modifier.fillMaxWidth().padding(vertical = 6.dp)
+    ) {
+        Icon(icon, contentDescription = null, tint = MaterialTheme.colorScheme.onSurface, modifier = Modifier.size(18.dp))
+        Spacer(Modifier.width(8.dp))
+        Text(text, color = MaterialTheme.colorScheme.onSurface, fontWeight = FontWeight.SemiBold, fontSize = 14.sp)
+    }
 }
 
 @Composable
