@@ -127,6 +127,14 @@ android {
             excludes += "/META-INF/{AL2.0,LGPL2.1}"
             // Évite les conflits avec ONNX Runtime
             excludes += "/META-INF/DEPENDENCIES"
+            // mockk-android (androidTest) tire junit-jupiter/junit4 en transitif, qui
+            // dupliquent des fichiers de licence déjà présents ailleurs dans le classpath —
+            // voir PLAN_ACTION_TOP_TIER_CLAUDECODE.md §6.2.
+            excludes += "/META-INF/LICENSE.md"
+            excludes += "/META-INF/LICENSE-notice.md"
+            excludes += "/META-INF/LICENSE.txt"
+            excludes += "/META-INF/NOTICE.txt"
+            excludes += "/META-INF/NOTICE.md"
         }
     }
 
@@ -208,4 +216,5 @@ dependencies {
     testImplementation(libs.turbine)
     testImplementation(libs.kotlinx.coroutines.test)
     androidTestImplementation(libs.compose.ui.test)
+    androidTestImplementation(libs.mockk.android)
 }
