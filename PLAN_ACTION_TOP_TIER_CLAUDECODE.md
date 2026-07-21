@@ -96,21 +96,6 @@ Coût faible, risque d'ignorer disproportionné. À faire en premier, avant mêm
 
 ---
 
-### 1.2bis — 🟠 Sous-problème découvert : trou de migration Room `6→13`
-
-**Découvert pendant la conception du schéma unifié (tâche 1.1)**, hors périmètre initial de cette tâche — noté ici plutôt que corrigé silencieusement en marge, conformément au principe directeur de ce document.
-
-**Problème** : `InkToneDatabase.kt` est en version 15, mais seules les migrations `1→2`, `2→3`, `3→4`, `4→5`, `5→6`, `13→14`, `14→15` sont définies. Le chemin `6→13` n'a aucune `Migration` explicite. `AppModule.kt` configure `Room.databaseBuilder(...).fallbackToDestructiveMigration()`, ce qui signifie que toute base d'un testeur bloquée quelque part entre la version 6 et 13 (ou tout futur saut de version non couvert) est **silencieusement effacée** plutôt que migrée ou de faire planter le build en signalant le trou.
-
-**À faire** :
-- Déterminer si des versions 7 à 12 ont réellement existé en historique (`git log -p` sur `InkToneDatabase.kt`) pour reconstituer les migrations manquantes, ou si ces numéros de version ont été sautés sans changement de schéma réel (auquel cas des migrations `no-op` explicites suffisent).
-- Ajouter les `Migration` manquantes en conséquence.
-- Une fois le chemin `1→15` (puis `1→16` après 1.2) entièrement couvert par des migrations explicites, évaluer si `fallbackToDestructiveMigration()` doit être retiré complètement ou seulement restreint (ex. `fallbackToDestructiveMigrationOnDowngrade()` uniquement) — actuellement il masque ce genre de trou plutôt que de le signaler.
-
-**Validation** : test de migration Room couvrant le chemin complet `1→16` sans passer par le fallback destructif ; suppression ou restriction justifiée de `fallbackToDestructiveMigration()`.
-
----
-
 ### 1.3 — 🔴 Pondération réelle de la progression par longueur de contenu
 
 **Problème initial** : `(chapterIndex + sentenceIndex/totalSentences) / totalChapters` traite chaque chapitre comme équivalent, sans lien avec sa longueur réelle.
@@ -182,13 +167,33 @@ Coût faible, risque d'ignorer disproportionné. À faire en premier, avant mêm
 
 ---
 
-## PHASE 2 — Performance de l'import EPUB
+## PHASE 2 — Performance de l'import EPUB (diagnostic complet, y compris import par lot)
 
 **Dépend de** : rien, peut être fait en parallèle de la Phase 1 par un autre flux de travail si besoin, mais pas en même temps que 1.2 (les deux touchent `BookRepositoryImpl.kt`).
 
+**Diagnostic (2026-07-20, vérifié sur le code, cas réel signalé : 500 EPUB, 15+ minutes et toujours en cours)** : trois causes distinctes, qui se **multiplient** entre elles plutôt que s'additionner :
+1. Room force `RoomDatabase.JournalMode.TRUNCATE` (`AppModule.kt`, ligne 57) au lieu de `WAL` — chaque transaction (livre, TOC, chapitres, FTS par lot, blocs riches par lot) paie un coût de synchronisation disque évitable. Le coût de commit en `TRUNCATE` tend à augmenter avec la taille du fichier `.db`, ce qui explique un ralentissement perceptible au fil du lot (symptôme rapporté : "ça compte toujours" après 15 minutes).
+2. `LibraryViewModel.importBooks()` traite les fichiers du lot en série stricte (`forEachIndexed` sans `async`/`awaitAll`) — zéro concurrence entre livres.
+3. Pour chaque livre individuellement, le `ZipFile` est rouvert et son sommaire scanné linéairement à chaque fichier HTML de chapitre et à chaque image (cause déjà identifiée en tâche 2.2 ci-dessous) — démultiplié par le nombre de livres du lot.
+
+**Ordre d'exécution recommandé : 2.0 → 2.1 → 2.2 → 2.3**, en mesurant le temps d'import du même lot de référence après chacune, pour isoler la contribution réelle de chaque cause plutôt que de les corriger toutes d'un coup sans savoir laquelle comptait le plus.
+
+---
+
+### 2.0 — 🔴 Passer Room en mode journal WAL
+
+**À faire** :
+- `AppModule.kt` : remplacer `.setJournalMode(RoomDatabase.JournalMode.TRUNCATE)` par `.setJournalMode(RoomDatabase.JournalMode.WAL)` (ou retirer l'appel, WAL étant le comportement par défaut recommandé pour ce type de charge).
+- Vérifier qu'aucune autre partie du code ne dépend d'un accès concurrent multi-processus à `inktone.db` qui aurait motivé ce choix initial (peu probable ici, l'app n'a qu'un seul processus, mais à vérifier avant de merger).
+- Vérifier le comportement du backup/restore (`SyncManager.kt`) avec WAL actif — s'assurer qu'un export ne capture pas une base incohérente si des fichiers `-wal`/`-shm` existent au moment de la sauvegarde (checkpoint explicite avant export si nécessaire).
+
+**Validation** : réimporter le même lot de test (voir 2.3) et mesurer isolément le gain de ce seul changement avant de toucher à autre chose.
+
+---
+
 ### 2.1 — 🔴 Ouvrir le ZIP une seule fois par import
 
-**Problème** : `extractRawHtml()` et `extractAndSaveImage()` rouvrent `ZipFile(epubFile)` et scannent linéairement toutes les entrées à chaque appel — potentiellement 70-100+ ouvertures/scans redondants par import.
+**Problème** : `extractRawHtml()` et `extractAndSaveImage()` rouvrent `ZipFile(epubFile)` et scannent linéairement toutes les entrées à chaque appel — potentiellement 70-100+ ouvertures/scans redondants par import, démultiplié par le nombre de livres en cas d'import par lot.
 
 **À faire** :
 - Ouvrir un unique `ZipFile` en tête de `importEpub()`.
@@ -200,7 +205,7 @@ Coût faible, risque d'ignorer disproportionné. À faire en premier, avant mêm
 
 ---
 
-### 2.2 — 🟠 Paralléliser le traitement des chapitres
+### 2.2 — 🟠 Paralléliser le traitement des chapitres (au sein d'un même livre)
 
 **À faire** :
 - Rendre l'indexation des blocs riches indépendante du compteur global partagé entre chapitres (actuellement `richBlocks.size` sert d'offset cumulatif dans la boucle séquentielle — à revoir pour un calcul local par chapitre, recombiné après coup).
@@ -211,21 +216,17 @@ Coût faible, risque d'ignorer disproportionné. À faire en premier, avant mêm
 
 ---
 
-### 2.2bis — ✅ Corrigé : hrefs de TOC avec ancres percent-encodées non résolues dans le spine
+### 2.3 — 🔴 Paralléliser l'import par lot (plusieurs livres à la fois)
 
-**Découvert pendant la validation sur appareil de la tâche 2.2** (en testant l'import de *Anna Karénine*, un EPUB probablement exporté par Calibre), hors périmètre initial — noté ici plutôt que corrigé silencieusement en marge.
+**Problème** : `LibraryViewModel.importBooks(uris)` traite les fichiers en série stricte, sans concurrence, indépendamment de la vitesse de chaque import individuel.
 
-**Problème** : `SpineIndex.normalizeHref()` (`app/src/main/java/com/inktone/data/epub/SpineIndex.kt`) ne supprime que l'ancre après un caractère `#` littéral (`href.substringBefore("#")`). Sur ce livre, les hrefs de TOC contiennent leurs ancres percent-encodées (`%23` au lieu de `#`, ex. `content/....html%23cfs_3`), donc la normalisation ne les détecte pas et conserve tout le suffixe encodé collé au nom de fichier — qui ne correspond alors plus à aucune entrée du spine. Résultat observé : **les 25 entrées de la table des matières du livre échouent à se résoudre** (`"TOC '...' non trouvé dans le spine — ignoré"` pour chacune), et le livre s'importe avec zéro contenu réel mis en cache. À la lecture, `getChapter()` échoue ensuite à retrouver certaines entrées ZIP pour les mêmes raisons de href mal résolu.
+**À faire** :
+- Remplacer la boucle `uris.forEachIndexed { ... }` séquentielle par un traitement à concurrence limitée (ex. `Dispatchers.IO.limitedParallelism(3)` + `async`/`awaitAll` sur des lots, ou un `Semaphore` régulant le nombre d'imports simultanés).
+- Choisir la limite de concurrence par mesure empirique (trop élevée = contention CPU/IO qui annule le gain, notamment avec le mode WAL qui gère bien l'écriture concurrente mais pas de façon illimitée).
+- Adapter le calcul de `importProgress`/`importStatus` pour rester cohérent avec des imports qui progressent en parallèle plutôt qu'un simple `(index + progress) / total` séquentiel.
+- S'assurer que les erreurs sur un fichier du lot (EPUB corrompu, DRM — voir Phase 6.1) n'interrompent pas les autres imports en cours.
 
-**Confirmé indépendant de la Phase 2** : `SpineIndex.kt` n'a été modifié par aucune tâche de la Phase 2 (2.1/2.2) — la logique de résolution TOC→spine est antérieure et intacte. Le bug affecte potentiellement tout EPUB dont les hrefs de TOC contiennent des caractères percent-encodés dans leur ancre (espaces `%20` étant une autre variante possible du même problème).
-
-**Corrigé** :
-- `SpineIndex.decodeHref()` (nouveau) : décodage manuel des séquences `%XX` (pas `java.net.URLDecoder`, qui convertirait aussi `+` en espace à tort — hors sujet pour un chemin de fichier), UTF-8 multi-octets géré correctement, repli sur le href original si séquence malformée.
-- `SpineIndex.normalizeHref()` décode désormais avant de découper sur `#` et sur `/`. `resolveAnchoredRange()` décode aussi pour l'extraction d'ancre (`substringAfter("#")`), qui avait le même bug.
-- `EpubZipIndex.find()` (`BookRepositoryImpl.kt`) essaie la version décodée du chemin avant de comparer aux noms d'entrées réels du ZIP — c'était le deuxième point de rupture (les hrefs percent-encodés ne correspondaient jamais aux noms de fichiers réels de l'archive, qui contiennent les caractères littéraux).
-- `resolveRelativeHref()` n'a pas eu besoin de changement séparé : il alimente `EpubZipIndex.find()`, qui décode désormais en un point central.
-
-**Validation** : `SpineIndexTest.kt` (10 tests unitaires : espaces/ancres encodés, UTF-8 multi-octets, non-corruption d'un `+` littéral, repli sur séquence malformée) ✅. Réimporté *Anna Karénine Tome 2* sur appareil physique : les 5 parties se résolvent et s'importent avec du contenu réel (jusqu'à 972 blocs riches par chapitre), zéro échec de résolution spine, zéro entrée ZIP introuvable, aucun crash.
+**Validation** : réimporter un lot de test représentatif (au moins 50-100 EPUB de tailles variées, en plus d'un test à plus grande échelle si possible sur un lot proche de 500) et mesurer le temps total, cumulé avec 2.0-2.2. Documenter le temps final dans `CHANGELOG.md` en comparant au temps de départ (15+ minutes pour 500 livres) pour objectiver le gain réel.
 
 ---
 

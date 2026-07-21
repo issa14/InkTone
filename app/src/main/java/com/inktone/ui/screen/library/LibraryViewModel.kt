@@ -322,35 +322,66 @@ class LibraryViewModel @Inject constructor(
         }
     }
 
-    /** Import par lot depuis des URIs (multi-sélection SAF). */
+    /**
+     * Import par lot depuis des URIs (multi-sélection SAF). Traite plusieurs livres en
+     * parallèle (concurrence limitée) au lieu d'un `forEachIndexed` strictement séquentiel —
+     * voir PLAN_ACTION_TOP_TIER_CLAUDECODE.md §2.3, causé démultiplié avec la réouverture ZIP
+     * par livre (§2.1) sur un lot de centaines de fichiers.
+     */
     fun importBooks(uris: List<Uri>) {
         viewModelScope.launch(Dispatchers.IO) {
             _uiState.update { it.copy(isLoading = true, error = null, importProgress = 0f, importStatus = "Préparation de l'import...") }
-            try {
-                val total = uris.size
-                uris.forEachIndexed { index, uri ->
-                    val fileName = resolveFileName(uri) ?: "inconnu.epub"
-                    val sourceFolder = resolveSourceFolder(uri)
-                    context.contentResolver.openInputStream(uri)?.use { stream ->
-                        bookRepository.importEpub(stream, fileName, sourceFolder) { progress, status ->
-                            val batchProgress = (index.toFloat() + progress) / total
-                            _uiState.update {
-                                it.copy(
-                                    importProgress = batchProgress,
-                                    importStatus = "[Livre ${index + 1}/$total] $status"
-                                )
+            val total = uris.size
+            val perFileProgress = java.util.concurrent.atomic.AtomicReferenceArray(Array(total) { 0f })
+            val completedCount = java.util.concurrent.atomic.AtomicInteger(0)
+            val failedFiles = java.util.Collections.synchronizedList(mutableListOf<String>())
+
+            fun publishProgress() {
+                var sum = 0f
+                for (i in 0 until total) sum += perFileProgress.get(i)
+                _uiState.update {
+                    it.copy(
+                        importProgress = sum / total,
+                        importStatus = "${completedCount.get()}/$total livres importés"
+                    )
+                }
+            }
+
+            val importDispatcher = Dispatchers.IO.limitedParallelism(3)
+            coroutineScope {
+                uris.mapIndexed { index, uri ->
+                    async(importDispatcher) {
+                        val fileName = resolveFileName(uri) ?: "inconnu.epub"
+                        try {
+                            val sourceFolder = resolveSourceFolder(uri)
+                            context.contentResolver.openInputStream(uri)?.use { stream ->
+                                bookRepository.importEpub(stream, fileName, sourceFolder) { progress, _ ->
+                                    perFileProgress.set(index, progress)
+                                    publishProgress()
+                                }
                             }
+                        } catch (e: Exception) {
+                            Log.e("LibraryVM", "Échec import $fileName", e)
+                            failedFiles.add(fileName)
+                        } finally {
+                            perFileProgress.set(index, 1f)
+                            completedCount.incrementAndGet()
+                            publishProgress()
                         }
                     }
+                }.awaitAll()
+            }
+
+            withContext(Dispatchers.Main) {
+                _uiState.update {
+                    it.copy(
+                        importProgress = null,
+                        importStatus = null,
+                        error = failedFiles.takeIf { it.isNotEmpty() }
+                            ?.let { "${it.size} livre(s) non importé(s) : ${it.take(3).joinToString(", ")}${if (it.size > 3) "…" else ""}" }
+                    )
                 }
-                withContext(Dispatchers.Main) {
-                    _uiState.update { it.copy(importProgress = null, importStatus = null) }
-                    loadBooks()
-                }
-            } catch (e: Exception) {
-                withContext(Dispatchers.Main) {
-                    _uiState.update { it.copy(error = e.message, isLoading = false, importProgress = null, importStatus = null) }
-                }
+                loadBooks()
             }
         }
     }

@@ -54,7 +54,11 @@ object AppModule {
             InkToneDatabase::class.java,
             "inktone.db"
         ).addMigrations(MIGRATION_1_2, MIGRATION_2_3, MIGRATION_3_4, MIGRATION_4_5, MIGRATION_5_6, MIGRATION_13_14, MIGRATION_14_15, MIGRATION_15_16)
-         .setJournalMode(RoomDatabase.JournalMode.TRUNCATE)
+         // WAL plutôt que TRUNCATE : le coût de commit en TRUNCATE croît avec la taille du
+         // fichier .db, ce qui devenait perceptible lors d'un import par lot de centaines de
+         // livres (voir PLAN_ACTION_TOP_TIER_CLAUDECODE.md §2.0). Un seul processus accède à
+         // cette base, donc pas de contrainte multi-process qui aurait justifié TRUNCATE.
+         .setJournalMode(RoomDatabase.JournalMode.WRITE_AHEAD_LOGGING)
          // Le chemin 6→13 n'a jamais eu de migration explicite (versions consommées pendant
          // une période de développement pré-beta sans base installée réelle à reconstituer
          // fidèlement — voir architecture.md §11.1 et PLAN_ACTION_TOP_TIER_CLAUDECODE.md 1.2bis).
