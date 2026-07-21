@@ -1,14 +1,16 @@
 package com.inktone.ui.screen.reader
 
 import androidx.compose.foundation.layout.*
-import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.lazy.LazyColumn
+import androidx.compose.foundation.lazy.items
+import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.foundation.shape.RoundedCornerShape
-import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material3.*
 import com.inktone.ui.theme.ttsActive
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
@@ -61,37 +63,45 @@ fun ChapterPicker(
     chapterTitles: List<String> = emptyList(),
     onSelect: (Int) -> Unit
 ) {
+    val listState = rememberLazyListState()
+    LaunchedEffect(Unit) {
+        val currentPosition = tocEntries.indexOfFirst { it.index == currentChapter }
+        if (currentPosition >= 0) {
+            listState.scrollToItem(currentPosition)
+        }
+    }
     Column(
         modifier = Modifier
             .padding(horizontal = 16.dp, vertical = 8.dp)
             .heightIn(max = 480.dp)
-            .verticalScroll(rememberScrollState())
     ) {
         Text("Table des matières", color = MaterialTheme.colorScheme.onSurfaceVariant, style = MaterialTheme.typography.titleSmall, modifier = Modifier.padding(bottom = 12.dp))
-        tocEntries.forEach { entry ->
-            val isCurrent = entry.index == currentChapter
-            val title = entry.title.takeIf { it.isNotBlank() }
-                ?: chapterTitles.getOrNull(entry.index)
-                ?: "Chapitre ${entry.index + 1}"
-            Surface(
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .padding(start = (entry.level * 16).dp, top = 2.dp, bottom = 2.dp),
-                color = if (isCurrent) MaterialTheme.colorScheme.ttsActive.copy(alpha = 0.15f) else Color.Transparent,
-                shape = RoundedCornerShape(8.dp),
-                onClick = { onSelect(entry.index) }
-            ) {
-                Text(
-                    title,
-                    color = if (isCurrent) MaterialTheme.colorScheme.ttsActive else MaterialTheme.colorScheme.onSurfaceVariant,
-                    style = MaterialTheme.typography.bodyMedium,
-                    fontWeight = if (isCurrent) FontWeight.SemiBold else FontWeight.Normal,
-                    maxLines = 2,
-                    overflow = TextOverflow.Ellipsis,
-                    modifier = Modifier.padding(horizontal = 12.dp, vertical = 12.dp)
-                )
+        LazyColumn(state = listState) {
+            items(tocEntries, key = { it.index }) { entry ->
+                val isCurrent = entry.index == currentChapter
+                val title = entry.title.takeIf { it.isNotBlank() }
+                    ?: chapterTitles.getOrNull(entry.index)
+                    ?: "Chapitre ${entry.index + 1}"
+                Surface(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .padding(start = (entry.level * 16).dp, top = 2.dp, bottom = 2.dp),
+                    color = if (isCurrent) MaterialTheme.colorScheme.ttsActive.copy(alpha = 0.15f) else Color.Transparent,
+                    shape = RoundedCornerShape(8.dp),
+                    onClick = { onSelect(entry.index) }
+                ) {
+                    Text(
+                        title,
+                        color = if (isCurrent) MaterialTheme.colorScheme.ttsActive else MaterialTheme.colorScheme.onSurfaceVariant,
+                        style = MaterialTheme.typography.bodyMedium,
+                        fontWeight = if (isCurrent) FontWeight.SemiBold else FontWeight.Normal,
+                        maxLines = 2,
+                        overflow = TextOverflow.Ellipsis,
+                        modifier = Modifier.padding(horizontal = 12.dp, vertical = 12.dp)
+                    )
+                }
             }
+            item { Spacer(Modifier.height(24.dp)) }
         }
-        Spacer(Modifier.height(24.dp))
     }
 }
