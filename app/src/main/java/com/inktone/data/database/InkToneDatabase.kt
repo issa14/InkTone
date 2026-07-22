@@ -133,6 +133,17 @@ val MIGRATION_15_16 = object : Migration(15, 16) {
     }
 }
 
+/**
+ * Statut d'import par livre (IMPORTING/READY/FAILED) — permet de détecter au prochain
+ * lancement un livre resté bloqué en cours d'import après un arrêt du process (voir PLAN
+ * import EPUB §3). Les lignes existantes sont déjà terminées, d'où le défaut 'READY'.
+ */
+val MIGRATION_16_17 = object : Migration(16, 17) {
+    override fun migrate(db: SupportSQLiteDatabase) {
+        db.execSQL("ALTER TABLE books ADD COLUMN status TEXT NOT NULL DEFAULT 'READY'")
+    }
+}
+
 @Database(
     entities = [
         BookEntity::class,
@@ -146,7 +157,7 @@ val MIGRATION_15_16 = object : Migration(15, 16) {
         ReadingSessionEntity::class,
         RichBlockCacheEntity::class
     ],
-    version = 16,
+    version = 17,
     exportSchema = false
 )
 abstract class InkToneDatabase : RoomDatabase() {

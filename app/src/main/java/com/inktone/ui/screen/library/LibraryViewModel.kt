@@ -9,8 +9,17 @@ import androidx.compose.material.icons.outlined.*
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
+import androidx.work.ExistingWorkPolicy
+import androidx.work.OneTimeWorkRequestBuilder
+import androidx.work.WorkInfo
+import androidx.work.WorkManager
+import androidx.work.workDataOf
+import com.inktone.data.epub.resolveEpubFileName
+import com.inktone.data.epub.resolveEpubSourceFolder
+import com.inktone.data.work.EpubImportWorker
 import com.inktone.domain.model.Book
 import com.inktone.domain.repository.BookRepository
+import com.inktone.domain.usecase.ImportBooksUseCase
 import com.inktone.data.settings.AppTheme
 import com.inktone.data.settings.SettingsRepository
 import dagger.hilt.android.lifecycle.HiltViewModel
@@ -26,6 +35,14 @@ data class LibraryUiState(
     val books: List<Book> = emptyList(),
     val bookProgress: Map<String, Float> = emptyMap(),
     val isLoading: Boolean = true,
+    /** Import de livre(s) en cours — distinct de [isLoading] pour ne pas faire clignoter le
+     *  chargement initial de la bibliothèque pendant les rafraîchissements périodiques
+     *  déclenchés par un import en cours (voir PLAN import EPUB §1). */
+    val isImporting: Boolean = false,
+    /** Id des livres dont l'import n'est pas encore terminé — permet à la grille d'afficher un
+     *  indicateur sur les jaquettes correspondantes, y compris pour un livre déjà visible via
+     *  le premier insert en base (avant que son contenu ne soit complet). */
+    val importingBookIds: Set<String> = emptySet(),
     val error: String? = null,
     val searchQuery: String = "",
     val filterMode: FilterMode = FilterMode.ALL,
@@ -76,48 +93,79 @@ enum class NavigationDestination(
 class LibraryViewModel @Inject constructor(
     private val bookRepository: BookRepository,
     private val settingsRepository: SettingsRepository,
+    private val importBooksUseCase: ImportBooksUseCase,
+    private val workManager: WorkManager,
     @ApplicationContext private val context: Context
 ) : ViewModel() {
 
     private val _uiState = MutableStateFlow(LibraryUiState())
     val uiState: StateFlow<LibraryUiState> = _uiState.asStateFlow()
 
-    init { loadBooks() }
+    init {
+        observeImportWork()
+
+        // Une seule fois par session, avant tout import éventuel : un livre resté en
+        // IMPORTING signale a priori un import interrompu par un arrêt du process. Mais si un
+        // worker WorkManager couvre déjà notre nom de travail unique (RUNNING/ENQUEUED — la
+        // file de WorkManager survit à un redémarrage du process), ce livre est en réalité en
+        // train d'être repris tout seul : le marquer FAILED ici serait une fausse alerte, écrasée
+        // de toute façon dès que le worker le termine (voir observeImportWork). Ne vérifier que
+        // s'il n'y a explicitement aucun worker actif pour notre travail.
+        //
+        // Le message est appliqué APRÈS loadBooksInternal() (attendu, pas fire-and-forget) —
+        // celle-ci remet `error` à null dès son démarrage, donc le définir avant serait
+        // immédiatement écrasé par une exécution concurrente de loadBooks().
+        viewModelScope.launch(Dispatchers.IO) {
+            val activeWork = workManager
+                .getWorkInfosForUniqueWorkFlow(EpubImportWorker.UNIQUE_WORK_NAME)
+                .first()
+                .any { it.state == WorkInfo.State.RUNNING || it.state == WorkInfo.State.ENQUEUED }
+            val recovered = if (activeWork) emptyList() else bookRepository.recoverOrphanedImports()
+            loadBooksInternal()
+            if (recovered.isNotEmpty()) {
+                _uiState.update {
+                    it.copy(error = "${recovered.size} livre(s) n'ont pas pu être importés (session précédente interrompue) : ${recovered.take(3).joinToString(", ")}${if (recovered.size > 3) "…" else ""} — réimportez-les.")
+                }
+            }
+        }
+    }
 
     private fun loadBooks() {
-        viewModelScope.launch(Dispatchers.IO) {
-            _uiState.update { it.copy(isLoading = true, error = null) }
-            try {
-                val books = bookRepository.getAllBooks()
-                val progressByBook = try {
-                    bookRepository.getProgressForBooks(books.map { it.id })
-                } catch (e: Exception) {
-                    Log.e("LibraryVM", "Error loading progress for books", e)
-                    emptyMap()
-                }
-                val progressMap = books.associate { book ->
-                    book.id to (progressByBook[book.id]?.totalProgressFraction ?: 0f)
-                }
-                val availableTags = try {
-                    bookRepository.getAllTags()
-                } catch (e: Exception) {
-                    Log.e("LibraryVM", "Error loading tags", e)
-                    emptyList()
-                }
-                _uiState.update {
-                    it.copy(
-                        allBooks = books,
-                        bookProgress = progressMap,
-                        isLoading = false,
-                        availableTags = availableTags
-                    )
-                }
-                applyFilters()
-                loadNavSubItems(books)
-                com.inktone.PerfLogger.logMemorySnapshot("Library loaded")
+        viewModelScope.launch(Dispatchers.IO) { loadBooksInternal() }
+    }
+
+    private suspend fun loadBooksInternal() {
+        _uiState.update { it.copy(isLoading = true, error = null) }
+        try {
+            val books = bookRepository.getAllBooks()
+            val progressByBook = try {
+                bookRepository.getProgressForBooks(books.map { it.id })
             } catch (e: Exception) {
-                _uiState.update { it.copy(error = e.message, isLoading = false) }
+                Log.e("LibraryVM", "Error loading progress for books", e)
+                emptyMap()
             }
+            val progressMap = books.associate { book ->
+                book.id to (progressByBook[book.id]?.totalProgressFraction ?: 0f)
+            }
+            val availableTags = try {
+                bookRepository.getAllTags()
+            } catch (e: Exception) {
+                Log.e("LibraryVM", "Error loading tags", e)
+                emptyList()
+            }
+            _uiState.update {
+                it.copy(
+                    allBooks = books,
+                    bookProgress = progressMap,
+                    isLoading = false,
+                    availableTags = availableTags
+                )
+            }
+            applyFilters()
+            loadNavSubItems(books)
+            com.inktone.PerfLogger.logMemorySnapshot("Library loaded")
+        } catch (e: Exception) {
+            _uiState.update { it.copy(error = e.message, isLoading = false) }
         }
     }
 
@@ -290,7 +338,14 @@ class LibraryViewModel @Inject constructor(
 
     fun importEpub(uri: Uri) {
         viewModelScope.launch {
-            _uiState.update { it.copy(isLoading = true, error = null, importProgress = 0f, importStatus = "Préparation de l'import...") }
+            val bookId = java.util.UUID.randomUUID().toString()
+            _uiState.update {
+                it.copy(
+                    isImporting = true, error = null, importProgress = 0f,
+                    importStatus = "Préparation de l'import...",
+                    importingBookIds = it.importingBookIds + bookId
+                )
+            }
             try {
                 // Persister la permission SAF pour les réimports futurs
                 try {
@@ -302,14 +357,14 @@ class LibraryViewModel @Inject constructor(
                     // Permission non persistable (ex: URI temporaire) — on continue
                 }
 
-                val fileName = resolveFileName(uri) ?: "inconnu.epub"
-                val sourceFolder = resolveSourceFolder(uri)
+                val fileName = resolveEpubFileName(context, uri) ?: "inconnu.epub"
+                val sourceFolder = resolveEpubSourceFolder(uri)
                 context.contentResolver.openInputStream(uri)?.use { stream ->
-                    bookRepository.importEpub(stream, fileName, sourceFolder) { progress, status ->
+                    bookRepository.importEpub(bookId, stream, fileName, sourceFolder) { progress, status ->
                         _uiState.update { it.copy(importProgress = progress, importStatus = status) }
                     }
                 } ?: throw IllegalStateException("Impossible de lire le fichier")
-                _uiState.update { it.copy(importProgress = null, importStatus = null) }
+                _uiState.update { it.copy(isImporting = false, importProgress = null, importStatus = null) }
                 loadBooks()
                 // Toast de succès pour le premier import
                 if (!settingsRepository.hasImportedFirstBook.first()) {
@@ -317,72 +372,104 @@ class LibraryViewModel @Inject constructor(
                     _uiState.update { it.copy(importSuccessSnackbar = "Livre importé — appuyez pour commencer la lecture") }
                 }
             } catch (e: Exception) {
-                _uiState.update { it.copy(error = e.message, isLoading = false, importProgress = null, importStatus = null) }
+                _uiState.update { it.copy(error = e.message, isImporting = false, importProgress = null, importStatus = null) }
+            } finally {
+                _uiState.update { it.copy(importingBookIds = it.importingBookIds - bookId) }
             }
         }
     }
 
     /**
-     * Import par lot depuis des URIs (multi-sélection SAF). Traite plusieurs livres en
-     * parallèle (concurrence limitée) au lieu d'un `forEachIndexed` strictement séquentiel —
-     * voir PLAN_ACTION_TOP_TIER_CLAUDECODE.md §2.3, causé démultiplié avec la réouverture ZIP
-     * par livre (§2.1) sur un lot de centaines de fichiers.
+     * Import par lot depuis des URIs (multi-sélection SAF) — délègue l'exécution à
+     * [EpubImportWorker] via WorkManager plutôt que de tourner dans `viewModelScope` : survit à
+     * la navigation, à la mise en arrière-plan et à un redémarrage du process, avec notification
+     * persistante (voir PLAN import EPUB §4). L'état affiché (`isImporting`/`importProgress`/
+     * `importingBookIds`) est alimenté par [observeImportWork], pas mis à jour ici directement.
      */
     fun importBooks(uris: List<Uri>) {
         viewModelScope.launch(Dispatchers.IO) {
-            _uiState.update { it.copy(isLoading = true, error = null, importProgress = 0f, importStatus = "Préparation de l'import...") }
-            val total = uris.size
-            val perFileProgress = java.util.concurrent.atomic.AtomicReferenceArray(Array(total) { 0f })
-            val completedCount = java.util.concurrent.atomic.AtomicInteger(0)
-            val failedFiles = java.util.Collections.synchronizedList(mutableListOf<String>())
+            uris.forEach { importBooksUseCase.takePersistablePermission(it) }
 
-            fun publishProgress() {
-                var sum = 0f
-                for (i in 0 until total) sum += perFileProgress.get(i)
-                _uiState.update {
-                    it.copy(
-                        importProgress = sum / total,
-                        importStatus = "${completedCount.get()}/$total livres importés"
-                    )
-                }
-            }
+            val request = OneTimeWorkRequestBuilder<EpubImportWorker>()
+                .setInputData(workDataOf(EpubImportWorker.KEY_URIS to uris.map { it.toString() }.toTypedArray()))
+                .build()
+            workManager
+                .enqueueUniqueWork(EpubImportWorker.UNIQUE_WORK_NAME, ExistingWorkPolicy.KEEP, request)
+        }
+    }
 
-            val importDispatcher = Dispatchers.IO.limitedParallelism(3)
-            coroutineScope {
-                uris.mapIndexed { index, uri ->
-                    async(importDispatcher) {
-                        val fileName = resolveFileName(uri) ?: "inconnu.epub"
-                        try {
-                            val sourceFolder = resolveSourceFolder(uri)
-                            context.contentResolver.openInputStream(uri)?.use { stream ->
-                                bookRepository.importEpub(stream, fileName, sourceFolder) { progress, _ ->
-                                    perFileProgress.set(index, progress)
-                                    publishProgress()
+    /**
+     * Traduit l'état de [EpubImportWorker] (observé via `WorkInfo`, pas via un callback direct
+     * — le worker peut survivre à cette instance de ViewModel) en [LibraryUiState]. Lancé une
+     * seule fois à l'init : reprend aussi bien un import démarré par cette session qu'un import
+     * encore en cours d'une session précédente (WorkManager persiste sa file), ce qui rend
+     * `recoverOrphanedImports()` inutile tant qu'un worker actif couvre déjà le livre — voir
+     * la garde correspondante dans `init`.
+     */
+    private var importRefreshJob: Job? = null
+
+    private fun observeImportWork() {
+        viewModelScope.launch(Dispatchers.IO) {
+            workManager
+                .getWorkInfosForUniqueWorkFlow(EpubImportWorker.UNIQUE_WORK_NAME)
+                .collect { infos ->
+                    when (val info = infos.firstOrNull()) {
+                        null -> Unit
+                        else -> when (info.state) {
+                            WorkInfo.State.RUNNING, WorkInfo.State.ENQUEUED -> {
+                                val data = info.progress
+                                val total = data.getInt(EpubImportWorker.KEY_TOTAL, 0)
+                                val completed = data.getInt(EpubImportWorker.KEY_COMPLETED, 0)
+                                val progress = data.getFloat(EpubImportWorker.KEY_PROGRESS, 0f)
+                                val importingIds = data.getString(EpubImportWorker.KEY_IMPORTING_IDS)
+                                    ?.split(",")?.filter { it.isNotBlank() }?.toSet() ?: emptySet()
+                                _uiState.update {
+                                    it.copy(
+                                        isImporting = true,
+                                        importProgress = if (total > 0) progress else null,
+                                        importStatus = if (total > 0) "$completed/$total livres importés" else "Préparation de l'import...",
+                                        importingBookIds = importingIds
+                                    )
+                                }
+                                // Rafraîchit périodiquement la grille et les agrégats secondaires
+                                // (progression, tags, sous-menus) tant que le worker tourne — le
+                                // worker ne transmet que des ids/compteurs, pas les Book complets
+                                // (Data de WorkManager limité à des types primitifs), donc c'est
+                                // au ViewModel de relire la base pour les faire apparaître.
+                                if (importRefreshJob?.isActive != true) {
+                                    importRefreshJob = launch {
+                                        while (isActive) {
+                                            delay(2000)
+                                            loadBooksInternal()
+                                        }
+                                    }
                                 }
                             }
-                        } catch (e: Exception) {
-                            Log.e("LibraryVM", "Échec import $fileName", e)
-                            failedFiles.add(fileName)
-                        } finally {
-                            perFileProgress.set(index, 1f)
-                            completedCount.incrementAndGet()
-                            publishProgress()
+                            WorkInfo.State.SUCCEEDED -> {
+                                importRefreshJob?.cancel()
+                                val failedNames = info.outputData.getString(EpubImportWorker.KEY_FAILED_NAMES)
+                                    ?.split(",")?.filter { it.isNotBlank() } ?: emptyList()
+                                _uiState.update {
+                                    it.copy(
+                                        isImporting = false, importProgress = null, importStatus = null,
+                                        importingBookIds = emptySet(),
+                                        error = failedNames.takeIf { it.isNotEmpty() }
+                                            ?.let { "${it.size} livre(s) non importé(s) : ${it.take(3).joinToString(", ")}${if (it.size > 3) "…" else ""}" }
+                                    )
+                                }
+                                loadBooksInternal()
+                            }
+                            WorkInfo.State.FAILED, WorkInfo.State.CANCELLED -> {
+                                importRefreshJob?.cancel()
+                                _uiState.update {
+                                    it.copy(isImporting = false, importProgress = null, importStatus = null, importingBookIds = emptySet())
+                                }
+                                loadBooksInternal()
+                            }
+                            WorkInfo.State.BLOCKED -> Unit
                         }
                     }
-                }.awaitAll()
-            }
-
-            withContext(Dispatchers.Main) {
-                _uiState.update {
-                    it.copy(
-                        importProgress = null,
-                        importStatus = null,
-                        error = failedFiles.takeIf { it.isNotEmpty() }
-                            ?.let { "${it.size} livre(s) non importé(s) : ${it.take(3).joinToString(", ")}${if (it.size > 3) "…" else ""}" }
-                    )
                 }
-                loadBooks()
-            }
         }
     }
 
@@ -421,28 +508,4 @@ class LibraryViewModel @Inject constructor(
         }
     }
 
-    /**
-     * Meilleur effort pour nommer le dossier d'origine d'un document SAF : l'ID de document
-     * (`primary:Download/MesLivres/x.epub`) encode souvent le chemin relatif pour les fournisseurs
-     * de stockage local, mais pas pour tous (ex. Google Drive) — retourne `null` dans ce cas,
-     * regroupé ensuite sous [UNKNOWN_SOURCE_FOLDER_LABEL].
-     */
-    private fun resolveSourceFolder(uri: Uri): String? = try {
-        val docId = android.provider.DocumentsContract.getDocumentId(uri)
-        val path = docId.substringAfter(':')
-        val parent = path.substringBeforeLast('/', "")
-        parent.substringAfterLast('/').takeIf { it.isNotBlank() }
-    } catch (e: Exception) {
-        null
-    }
-
-    private fun resolveFileName(uri: Uri): String? {
-        val cursor = context.contentResolver.query(uri, null, null, null, null)
-        return cursor?.use {
-            if (it.moveToFirst()) {
-                val idx = it.getColumnIndex(OpenableColumns.DISPLAY_NAME)
-                if (idx >= 0) it.getString(idx) else null
-            } else null
-        }
-    }
 }

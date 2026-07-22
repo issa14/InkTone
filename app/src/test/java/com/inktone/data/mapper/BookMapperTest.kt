@@ -1,6 +1,7 @@
 package com.inktone.data.mapper
 
 import com.inktone.domain.model.Book
+import com.inktone.domain.model.BookImportStatus
 import org.junit.jupiter.api.Assertions.assertEquals
 import org.junit.jupiter.api.Test
 
@@ -37,5 +38,20 @@ class BookMapperTest {
         assertEquals(false, roundTripped.isFavorite)
         assertEquals(null, roundTripped.seriesName)
         assertEquals(null, roundTripped.seriesIndex)
+    }
+
+    @Test
+    fun `round-trip du statut d'import`() {
+        val importing = book.copy(status = BookImportStatus.IMPORTING)
+        val roundTripped = importing.toEntity(filePath = "/tmp/book.epub").toDomain()
+
+        assertEquals(BookImportStatus.IMPORTING, roundTripped.status)
+    }
+
+    @Test
+    fun `statut inconnu en base replie sur READY plutot que de planter`() {
+        val entity = book.toEntity(filePath = "/tmp/book.epub").copy(status = "VALEUR_INCONNUE")
+
+        assertEquals(BookImportStatus.READY, entity.toDomain().status)
     }
 }

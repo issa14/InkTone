@@ -203,6 +203,10 @@ dependencies {
     // --- Sync & Security (Phase 8) ---
     implementation("androidx.security:security-crypto:1.1.0-alpha06")
     implementation("androidx.work:work-runtime-ktx:2.9.0")
+    // Wiring Hilt pour WorkManager (import EPUB en arrière-plan — voir PLAN import EPUB §4) :
+    // permet à un CoroutineWorker @HiltWorker de recevoir ses dépendances par injection.
+    implementation("androidx.hilt:hilt-work:1.2.0")
+    ksp("androidx.hilt:hilt-compiler:1.2.0")
     implementation("com.google.android.gms:play-services-auth:21.1.1")
     implementation("com.google.code.gson:gson:2.10.1")
     implementation("com.squareup.okhttp3:okhttp:4.12.0")

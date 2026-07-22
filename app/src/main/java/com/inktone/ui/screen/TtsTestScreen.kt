@@ -129,7 +129,7 @@ fun TtsTestScreen() {
                     val fileName = resolveFileName(uri, context) ?: "livre.epub"
                     context.contentResolver.openInputStream(uri)?.use { stream ->
                         val book = withContext(Dispatchers.IO) {
-                            bookRepository.importEpub(stream, fileName)
+                            bookRepository.importEpub(java.util.UUID.randomUUID().toString(), stream, fileName)
                         }
                         importedBook = book
                         val chap = withContext(Dispatchers.IO) {

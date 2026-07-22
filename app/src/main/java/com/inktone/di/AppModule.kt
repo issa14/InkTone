@@ -3,6 +3,7 @@ package com.inktone.di
 import android.content.Context
 import androidx.room.Room
 import androidx.room.RoomDatabase
+import androidx.work.WorkManager
 import com.inktone.data.database.AnnotationDao
 import com.inktone.data.database.BookDao
 import com.inktone.data.database.BookmarkDao
@@ -15,6 +16,7 @@ import com.inktone.data.database.MIGRATION_5_6
 import com.inktone.data.database.MIGRATION_13_14
 import com.inktone.data.database.MIGRATION_14_15
 import com.inktone.data.database.MIGRATION_15_16
+import com.inktone.data.database.MIGRATION_16_17
 import com.inktone.data.database.PronunciationRuleDao
 import com.inktone.data.database.InkToneDatabase
 import com.inktone.data.database.ReadingProgressDao
@@ -53,7 +55,7 @@ object AppModule {
             context,
             InkToneDatabase::class.java,
             "inktone.db"
-        ).addMigrations(MIGRATION_1_2, MIGRATION_2_3, MIGRATION_3_4, MIGRATION_4_5, MIGRATION_5_6, MIGRATION_13_14, MIGRATION_14_15, MIGRATION_15_16)
+        ).addMigrations(MIGRATION_1_2, MIGRATION_2_3, MIGRATION_3_4, MIGRATION_4_5, MIGRATION_5_6, MIGRATION_13_14, MIGRATION_14_15, MIGRATION_15_16, MIGRATION_16_17)
          // WAL plutôt que TRUNCATE : le coût de commit en TRUNCATE croît avec la taille du
          // fichier .db, ce qui devenait perceptible lors d'un import par lot de centaines de
          // livres (voir PLAN_ACTION_TOP_TIER_CLAUDECODE.md §2.0). Un seul processus accède à
@@ -71,6 +73,14 @@ object AppModule {
          .fallbackToDestructiveMigrationFrom(7, 8, 9, 10, 11, 12)
          .build()
     }
+
+    // Injecté plutôt qu'appelé statiquement (WorkManager.getInstance(context)) pour rester
+    // testable — un mock JVM ne peut pas intercepter un appel statique Android (voir
+    // PLAN import EPUB §4, LibraryViewModel).
+    @Provides
+    @Singleton
+    fun provideWorkManager(@ApplicationContext context: Context): WorkManager =
+        WorkManager.getInstance(context)
 
     @Provides
     fun provideBookDao(db: InkToneDatabase): BookDao = db.bookDao()

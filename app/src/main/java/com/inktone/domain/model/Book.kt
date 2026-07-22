@@ -18,5 +18,6 @@ data class Book(
     val isFavorite: Boolean = false,
     val seriesName: String? = null,
     val seriesIndex: Float? = null,
-    val sourceFolder: String? = null
+    val sourceFolder: String? = null,
+    val status: BookImportStatus = BookImportStatus.READY
 )

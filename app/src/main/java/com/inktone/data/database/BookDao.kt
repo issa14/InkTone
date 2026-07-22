@@ -32,4 +32,10 @@ interface BookDao {
 
     @Query("SELECT DISTINCT subjects FROM books WHERE subjects != '[]'")
     suspend fun getAllSubjectsRaw(): List<String>
+
+    @Query("UPDATE books SET status = :status WHERE id = :id")
+    suspend fun updateStatus(id: String, status: String)
+
+    @Query("SELECT * FROM books WHERE status = :status")
+    suspend fun getByStatus(status: String): List<BookEntity>
 }

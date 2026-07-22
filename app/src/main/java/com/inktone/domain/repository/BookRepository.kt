@@ -6,8 +6,15 @@ import com.inktone.domain.model.Chapter
 import java.io.InputStream
 
 interface BookRepository {
-    /** Importe un EPUB depuis un InputStream et retourne le [Book] créé. */
+    /**
+     * Importe un EPUB depuis un InputStream et retourne le [Book] créé.
+     *
+     * @param bookId identifiant fourni par l'appelant (plutôt que généré en interne) — permet
+     * à l'UI de savoir dès l'appel quel livre est en cours d'import, avant même que le résultat
+     * ne soit disponible (voir PLAN import EPUB §2).
+     */
     suspend fun importEpub(
+        bookId: String,
         inputStream: InputStream,
         fileName: String,
         sourceFolder: String? = null,
@@ -38,4 +45,12 @@ interface BookRepository {
 
     /** Liste dédupliquée de tous les tags (subjects EPUB) présents dans la bibliothèque. */
     suspend fun getAllTags(): List<String>
+
+    /**
+     * Marque `FAILED` tout livre resté bloqué en `IMPORTING` (import interrompu par un arrêt
+     * du process — aucun worker actif ne le reprendra tant que la Phase WorkManager n'existe
+     * pas, voir PLAN import EPUB §3/§4). Retourne les titres des livres concernés, pour
+     * affichage d'un message à l'utilisateur avec retry manuel.
+     */
+    suspend fun recoverOrphanedImports(): List<String>
 }

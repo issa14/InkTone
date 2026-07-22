@@ -4,6 +4,7 @@ import com.google.gson.Gson
 import com.google.gson.reflect.TypeToken
 import com.inktone.data.database.entity.BookEntity
 import com.inktone.domain.model.Book
+import com.inktone.domain.model.BookImportStatus
 import com.inktone.domain.model.TocEntry
 
 private val gson = Gson()
@@ -35,7 +36,8 @@ fun BookEntity.toDomain() = Book(
     isFavorite = isFavorite,
     seriesName = seriesName,
     seriesIndex = seriesIndex,
-    sourceFolder = sourceFolder
+    sourceFolder = sourceFolder,
+    status = runCatching { BookImportStatus.valueOf(status) }.getOrDefault(BookImportStatus.READY)
 )
 
 fun Book.toEntity(filePath: String, coverPath: String? = null) = BookEntity(
@@ -56,5 +58,6 @@ fun Book.toEntity(filePath: String, coverPath: String? = null) = BookEntity(
     isFavorite = isFavorite,
     seriesName = seriesName,
     seriesIndex = seriesIndex,
-    sourceFolder = sourceFolder
+    sourceFolder = sourceFolder,
+    status = status.name
 )

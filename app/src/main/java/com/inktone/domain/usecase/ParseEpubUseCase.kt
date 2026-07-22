@@ -3,6 +3,7 @@ package com.inktone.domain.usecase
 import com.inktone.domain.model.Book
 import com.inktone.domain.repository.BookRepository
 import java.io.InputStream
+import java.util.UUID
 import javax.inject.Inject
 
 /** Importe un fichier EPUB et le parse en [Book] avec progression. */
@@ -17,6 +18,6 @@ class ParseEpubUseCase @Inject constructor(
         require(fileName.endsWith(".epub", ignoreCase = true)) {
             "Format non supporté : $fileName"
         }
-        return bookRepository.importEpub(inputStream, fileName, onProgress = onProgress)
+        return bookRepository.importEpub(UUID.randomUUID().toString(), inputStream, fileName, onProgress = onProgress)
     }
 }

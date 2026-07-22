@@ -26,5 +26,9 @@ data class BookEntity(
     val isFavorite: Boolean = false,
     val seriesName: String? = null,
     val seriesIndex: Float? = null,
-    val sourceFolder: String? = null
+    val sourceFolder: String? = null,
+    /** "IMPORTING" | "READY" | "FAILED" — voir [com.inktone.domain.model.BookImportStatus].
+     *  Convention déjà utilisée pour [ReadingProgress.source] : string brute documentée,
+     *  pas de TypeConverter Room. */
+    val status: String = "READY"
 )

@@ -17,6 +17,7 @@ import com.inktone.data.epub.SpineIndex
 import com.inktone.data.mapper.toDomain
 import com.inktone.data.mapper.toEntity
 import com.inktone.domain.model.Book
+import com.inktone.domain.model.BookImportStatus
 import com.inktone.domain.model.Chapter
 import com.inktone.domain.model.RichBlock
 import com.inktone.domain.model.Sentence
@@ -49,7 +50,6 @@ import java.io.Closeable
 import java.io.File
 import java.io.InputStream
 import java.io.OutputStream
-import java.util.UUID
 import java.util.concurrent.locks.ReentrantLock
 import java.util.zip.ZipEntry
 import java.util.zip.ZipFile
@@ -167,14 +167,15 @@ class BookRepositoryImpl @Inject constructor(
     private val gson = Gson()
 
     override suspend fun importEpub(
+        bookId: String,
         inputStream: InputStream,
         fileName: String,
         sourceFolder: String?,
         onProgress: (progress: Float, status: String) -> Unit
     ): Book =
         withContext(Dispatchers.IO) {
+        try {
             onProgress(0.05f, "Copie du fichier EPUB...")
-            val bookId = UUID.randomUUID().toString()
             val epubDir = File(context.filesDir, "epubs/$bookId")
             epubDir.mkdirs()
             val imagesDir = File(epubDir, "images").apply { mkdirs() }
@@ -271,6 +272,16 @@ class BookRepositoryImpl @Inject constructor(
 
                 val tocEntriesArray = arrayOfNulls<TocEntry>(totalChapters)
 
+                // TOC provisoire construite immédiatement à partir de flatToc (titres/niveaux
+                // déjà connus, aucun traitement de contenu de chapitre requis) — insérée dès le
+                // premier enregistrement du livre, plutôt qu'une liste vide, pour qu'un livre
+                // ouvert pendant que ses chapitres sont encore en cours de traitement affiche
+                // une table des matières correcte immédiatement (voir PLAN import EPUB §2.5,
+                // bug identifié en testant la Phase 5 : TOC vide pendant l'import).
+                val provisionalTocEntries = flatToc.mapIndexed { i, (link, level) ->
+                    TocEntry(index = i, title = link.title?.takeIf { it.isNotBlank() } ?: "Chapitre ${i + 1}", level = level)
+                }
+
                 val book = Book(
                     id = bookId,
                     title = title,
@@ -286,7 +297,9 @@ class BookRepositoryImpl @Inject constructor(
                     isbn = isbn,
                     seriesName = seriesInfo?.first,
                     seriesIndex = seriesInfo?.second,
-                    sourceFolder = sourceFolder
+                    sourceFolder = sourceFolder,
+                    tocEntries = provisionalTocEntries,
+                    status = BookImportStatus.IMPORTING
                 )
 
                 onProgress(0.25f, "Enregistrement du livre...")
@@ -386,16 +399,31 @@ class BookRepositoryImpl @Inject constructor(
 
                 val tocEntries = tocEntriesArray.map { it!! }
 
-                // Persister les vrais titres TOC maintenant qu'on les a tous collectés
+                // Persister les vrais titres TOC maintenant qu'on les a tous collectés, et
+                // passer le statut à READY dans le même insert. Si tocEntries est vide (EPUB
+                // sans TOC exploitable), il n'y a rien à réécrire côté TOC mais le statut doit
+                // quand même passer à READY — sinon le livre resterait bloqué en IMPORTING
+                // indéfiniment (voir PLAN import EPUB §3).
                 if (tocEntries.isNotEmpty()) {
-                    bookDao.insert(book.copy(tocEntries = tocEntries).toEntity(epubFile.absolutePath, coverPath))
+                    bookDao.insert(
+                        book.copy(tocEntries = tocEntries, status = BookImportStatus.READY)
+                            .toEntity(epubFile.absolutePath, coverPath)
+                    )
+                } else {
+                    bookDao.updateStatus(bookId, BookImportStatus.READY.name)
                 }
 
                 onProgress(1.00f, "Livre optimisé et prêt !")
-                book.copy(tocEntries = tocEntries)
+                book.copy(tocEntries = tocEntries, status = BookImportStatus.READY)
             } finally {
                 zipIndex.close()
             }
+        } catch (e: Exception) {
+            // Best-effort : si le livre n'a jamais atteint le premier insert (échec avant même
+            // sa création en base), cette mise à jour ne touche aucune ligne — inoffensif.
+            runCatching { bookDao.updateStatus(bookId, BookImportStatus.FAILED.name) }
+            throw e
+        }
         }
 
     override suspend fun getChapter(bookId: String, chapterIndex: Int): Chapter =
@@ -521,6 +549,13 @@ class BookRepositoryImpl @Inject constructor(
                 .filter { it.isNotBlank() }
                 .distinct()
                 .sortedBy { it.lowercase() }
+        }
+
+    override suspend fun recoverOrphanedImports(): List<String> =
+        withContext(Dispatchers.IO) {
+            val orphaned = bookDao.getByStatus(BookImportStatus.IMPORTING.name)
+            orphaned.forEach { bookDao.updateStatus(it.id, BookImportStatus.FAILED.name) }
+            orphaned.map { it.title }
         }
 
     // ── Helpers — ouverture & extraction EPUB ──────────────

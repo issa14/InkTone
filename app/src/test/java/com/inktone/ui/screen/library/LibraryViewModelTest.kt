@@ -1,12 +1,16 @@
 package com.inktone.ui.screen.library
 
 import android.content.Context
+import android.net.Uri
+import androidx.work.WorkManager
 import com.inktone.data.settings.SettingsRepository
 import com.inktone.domain.model.Book
 import com.inktone.data.database.entity.ReadingProgress
 import com.inktone.domain.repository.BookRepository
+import com.inktone.domain.usecase.ImportBooksUseCase
 import io.mockk.coEvery
 import io.mockk.coVerify
+import io.mockk.every
 import io.mockk.mockk
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.ExperimentalCoroutinesApi
@@ -19,6 +23,7 @@ import kotlinx.coroutines.test.setMain
 import kotlinx.coroutines.withTimeout
 import org.junit.jupiter.api.AfterEach
 import org.junit.jupiter.api.Assertions.assertEquals
+import org.junit.jupiter.api.Assertions.assertTrue
 import org.junit.jupiter.api.BeforeEach
 import org.junit.jupiter.api.Test
 
@@ -39,6 +44,8 @@ class LibraryViewModelTest {
 
     private val bookRepository = mockk<BookRepository>(relaxed = true)
     private val settingsRepository = mockk<SettingsRepository>(relaxed = true)
+    private val importBooksUseCase = mockk<ImportBooksUseCase>(relaxed = true)
+    private val workManager = mockk<WorkManager>(relaxed = true)
     private val context = mockk<Context>(relaxed = true)
 
     private lateinit var viewModel: LibraryViewModel
@@ -117,8 +124,9 @@ class LibraryViewModelTest {
         )
         coEvery { bookRepository.getAllTags() } returns listOf("Science-fiction")
         coEvery { settingsRepository.hasImportedFirstBook } returns flowOf(true)
+        every { workManager.getWorkInfosForUniqueWorkFlow(any()) } returns flowOf(emptyList())
 
-        viewModel = LibraryViewModel(bookRepository, settingsRepository, context)
+        viewModel = LibraryViewModel(bookRepository, settingsRepository, importBooksUseCase, workManager, context)
         awaitLoaded()
     }
 
@@ -127,9 +135,16 @@ class LibraryViewModelTest {
         Dispatchers.resetMain()
     }
 
-    /** Attend la fin du chargement initial (`loadBooks()` tourne sur `Dispatchers.IO`, hors dispatcher de test). */
+    /**
+     * Attend la fin du chargement initial (`loadBooks()` tourne sur `Dispatchers.IO`, hors
+     * dispatcher de test). `isLoading` passe à `false` AVANT que `loadNavSubItems()` (appel
+     * séparé, sa propre écriture d'état) n'ait fini de peupler `navSubItems` — attendre
+     * seulement `!isLoading` peut donc renvoyer un état où `navSubItems` est encore vide,
+     * d'où un `NoSuchElementException` intermittent sur `getValue("Tags")` etc. Attendre aussi
+     * que `navSubItems` soit peuplé élimine cette fenêtre.
+     */
     private fun awaitLoaded(): LibraryUiState = runBlocking {
-        withTimeout(5_000) { viewModel.uiState.first { !it.isLoading } }
+        withTimeout(5_000) { viewModel.uiState.first { !it.isLoading && it.navSubItems.isNotEmpty() } }
     }
 
     @Test
@@ -224,5 +239,70 @@ class LibraryViewModelTest {
         viewModel.setFilterMode(FilterMode.FOLDER)
 
         assertEquals(allBooks.size, viewModel.uiState.value.books.size)
+    }
+
+    // ── Import par lot : délégation à WorkManager ───────────
+
+    /**
+     * `importBooks()` ne fait plus l'import lui-même (déplacé dans [ImportBooksUseCase],
+     * exécuté par `EpubImportWorker` — voir PLAN import EPUB §4) : il persiste les permissions
+     * SAF puis enqueue un unique WorkManager work. Le rafraîchissement incrémental et le
+     * dédoublonnage par id sont désormais couverts côté `ImportBooksUseCase` (voir
+     * `ImportBooksUseCaseTest`) plutôt qu'ici.
+     */
+    @Test
+    fun `importBooks persiste les permissions SAF et enqueue un unique work WorkManager`() {
+        val uri1 = mockk<Uri>()
+        val uri2 = mockk<Uri>()
+
+        viewModel.importBooks(listOf(uri1, uri2))
+
+        runBlocking {
+            withTimeout(5_000) {
+                while (true) {
+                    val called = try {
+                        coVerify(exactly = 1) {
+                            workManager.enqueueUniqueWork(
+                                com.inktone.data.work.EpubImportWorker.UNIQUE_WORK_NAME,
+                                androidx.work.ExistingWorkPolicy.KEEP,
+                                any<androidx.work.OneTimeWorkRequest>()
+                            )
+                        }
+                        true
+                    } catch (e: AssertionError) {
+                        false
+                    }
+                    if (called) break
+                    kotlinx.coroutines.delay(20)
+                }
+            }
+        }
+
+        io.mockk.verify { importBooksUseCase.takePersistablePermission(uri1) }
+        io.mockk.verify { importBooksUseCase.takePersistablePermission(uri2) }
+    }
+
+    // ── Récupération des imports orphelins au démarrage ─────
+
+    /**
+     * Un livre resté en IMPORTING à la fin d'une session précédente (process tué en cours
+     * d'import) doit être signalé à l'utilisateur au lancement suivant — voir PLAN import
+     * EPUB §3. `recoverOrphanedImports()` (repository) fait le travail de marquage FAILED en
+     * base ; le ViewModel n'a qu'à surfacer le message.
+     */
+    @Test
+    fun `un import orphelin detecte au demarrage est signale a l'utilisateur`() {
+        coEvery { bookRepository.recoverOrphanedImports() } returns listOf("Livre Interrompu")
+
+        val vm = LibraryViewModel(bookRepository, settingsRepository, importBooksUseCase, workManager, context)
+
+        runBlocking {
+            withTimeout(5_000) { vm.uiState.first { it.error != null } }
+        }
+
+        assertTrue(
+            vm.uiState.value.error!!.contains("Livre Interrompu"),
+            "Le message devrait mentionner le livre récupéré : ${vm.uiState.value.error}"
+        )
     }
 }

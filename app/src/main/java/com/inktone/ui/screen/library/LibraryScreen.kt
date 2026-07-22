@@ -169,77 +169,26 @@ fun LibraryScreen(
                         ErrorBanner(err, viewModel::clearError)
                     }
 
-                    // Loading overlay pendant import
-                    if (state.isLoading) {
-                        Box(
-                            Modifier.fillMaxSize(),
-                            contentAlignment = Alignment.Center
-                        ) {
-                            Column(
-                                modifier = Modifier
-                                    .padding(24.dp)
-                                    .fillMaxWidth(),
-                                horizontalAlignment = Alignment.CenterHorizontally
-                            ) {
-                                val progress = state.importProgress
-                                val status = state.importStatus ?: "Importation en cours..."
+                    // Bannière d'import compacte, non bloquante — la bibliothèque reste
+                    // consultable/cliquable pendant tout l'import (remplace l'ancien overlay
+                    // plein écran qui masquait toute la grille — voir PLAN import EPUB §2).
+                    if (state.isImporting) {
+                        ImportBanner(progress = state.importProgress, status = state.importStatus)
+                    }
 
-                                if (progress != null) {
-                                    CircularProgressIndicator(
-                                        progress = { progress },
-                                        color = MaterialTheme.colorScheme.primary,
-                                        strokeWidth = 4.dp,
-                                        modifier = Modifier.size(56.dp)
-                                    )
-                                    Spacer(Modifier.height(16.dp))
-                                    Text(
-                                        text = "${(progress * 100).toInt()}%",
-                                        color = MaterialTheme.colorScheme.onBackground,
-                                        fontWeight = FontWeight.Bold,
-                                        fontSize = 18.sp
-                                    )
-                                    Spacer(Modifier.height(8.dp))
-                                    Text(
-                                        text = status,
-                                        color = MaterialTheme.colorScheme.onSurfaceVariant,
-                                        fontSize = 14.sp,
-                                        textAlign = androidx.compose.ui.text.style.TextAlign.Center,
-                                        modifier = Modifier.padding(horizontal = 16.dp)
-                                    )
-                                    Spacer(Modifier.height(16.dp))
-                                    LinearProgressIndicator(
-                                        progress = { progress },
-                                        color = MaterialTheme.colorScheme.primary,
-                                        trackColor = MaterialTheme.colorScheme.onBackground.copy(alpha = 0.1f),
-                                        modifier = Modifier
-                                            .fillMaxWidth(0.8f)
-                                            .height(4.dp)
-                                            .clip(RoundedCornerShape(2.dp))
-                                    )
-                                } else {
-                                    CircularProgressIndicator(color = MaterialTheme.colorScheme.primary)
-                                    Spacer(Modifier.height(12.dp))
-                                    Text(
-                                        text = status,
-                                        color = MaterialTheme.colorScheme.onSurfaceVariant,
-                                        fontSize = 14.sp,
-                                        textAlign = androidx.compose.ui.text.style.TextAlign.Center
-                                    )
-                                }
-                            }
-                        }
-                    } else {
-                        when (state.currentDestination) {
+                    when (state.currentDestination) {
                         NavigationDestination.LIBRARY -> {
                             when {
                                 state.isLoading && state.books.isEmpty() -> LoadingView()
                                 state.filterMode == FilterMode.SERIES -> SeriesGroupedView(
                                     seriesMap = viewModel.booksGroupedBySeries(),
                                     progressMap = state.bookProgress,
+                                    importingBookIds = state.importingBookIds,
                                     onBookClick = onBookClick,
                                     onToggleFavorite = viewModel::toggleFavorite
                                 )
                                 state.books.isEmpty() && !state.isLoading -> EmptyView(
+                                    isImporting = state.isImporting,
                                     onImportClick = { epubPicker.launch(arrayOf("application/epub+zip")) }
                                 )
                                 else -> Column {
@@ -250,15 +199,16 @@ fun LibraryScreen(
                                             onToggleTag = viewModel::toggleTagFilter
                                         )
                                     }
-                                    ShelfGrid(state.books, state.bookProgress, onBookClick, viewModel::toggleFavorite)
+                                    ShelfGrid(state.books, state.bookProgress, state.importingBookIds, onBookClick, viewModel::toggleFavorite)
                                 }
                             }
                         }
                         NavigationDestination.RECENTS -> {
                             val recent = state.allBooks.sortedByDescending { it.addedAt }
                             if (recent.isEmpty()) EmptyView(
+                                isImporting = state.isImporting,
                                 onImportClick = { epubPicker.launch(arrayOf("application/epub+zip")) }
-                            ) else ShelfGrid(recent, state.bookProgress, onBookClick, viewModel::toggleFavorite)
+                            ) else ShelfGrid(recent, state.bookProgress, state.importingBookIds, onBookClick, viewModel::toggleFavorite)
                         }
                         NavigationDestination.OPDS -> {
                             OpdsScreen(onBack = { viewModel.navigateTo(NavigationDestination.LIBRARY) })
@@ -288,7 +238,6 @@ fun LibraryScreen(
                             com.inktone.ui.screen.about.AboutScreen()
                         }
                     }
-                    } // end else (isLoading)
                 }
             }
         }
@@ -463,6 +412,63 @@ private fun SearchBar(
 }
 
 // ─────────────────────────────────────────────────────
+//  BANNIÈRE D'IMPORT — compacte, non bloquante
+// ─────────────────────────────────────────────────────
+
+/**
+ * Remplace l'ancien overlay plein écran (voir PLAN import EPUB §2) : reste discrète, ne
+ * couvre jamais la grille, laisse la bibliothèque utilisable pendant tout l'import.
+ */
+@Composable
+private fun ImportBanner(progress: Float?, status: String?) {
+    Surface(
+        modifier = Modifier.fillMaxWidth(),
+        color = MaterialTheme.colorScheme.surfaceVariant,
+        tonalElevation = 2.dp
+    ) {
+        Row(
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(horizontal = 16.dp, vertical = 10.dp),
+            verticalAlignment = Alignment.CenterVertically
+        ) {
+            if (progress != null) {
+                CircularProgressIndicator(
+                    progress = { progress },
+                    color = MaterialTheme.colorScheme.primary,
+                    strokeWidth = 2.dp,
+                    modifier = Modifier.size(20.dp)
+                )
+            } else {
+                CircularProgressIndicator(
+                    color = MaterialTheme.colorScheme.primary,
+                    strokeWidth = 2.dp,
+                    modifier = Modifier.size(20.dp)
+                )
+            }
+            Spacer(Modifier.width(12.dp))
+            Text(
+                text = status ?: "Importation en cours...",
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                fontSize = 13.sp,
+                maxLines = 1,
+                overflow = TextOverflow.Ellipsis,
+                modifier = Modifier.weight(1f)
+            )
+            if (progress != null) {
+                Spacer(Modifier.width(8.dp))
+                Text(
+                    text = "${(progress * 100).toInt()}%",
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    fontWeight = FontWeight.Bold,
+                    fontSize = 13.sp
+                )
+            }
+        }
+    }
+}
+
+// ─────────────────────────────────────────────────────
 //  SHELF GRID — 3 colonnes, couvertures gradient
 // ─────────────────────────────────────────────────────
 
@@ -470,6 +476,7 @@ private fun SearchBar(
 private fun ShelfGrid(
     books: List<Book>,
     progressMap: Map<String, Float>,
+    importingBookIds: Set<String>,
     onBookClick: (String) -> Unit,
     onToggleFavorite: (String) -> Unit
 ) {
@@ -492,6 +499,7 @@ private fun ShelfGrid(
                 book = book,
                 progress = progress,
                 gradientIndex = book.title.hashCode().mod(CoverGradients.size),
+                isImporting = book.id in importingBookIds,
                 onClick = { onBookClick(book.id) },
                 onToggleFavorite = { onToggleFavorite(book.id) }
             )
@@ -507,6 +515,7 @@ private fun ShelfGrid(
 private fun SeriesGroupedView(
     seriesMap: Map<String, List<Book>>,
     progressMap: Map<String, Float>,
+    importingBookIds: Set<String>,
     onBookClick: (String) -> Unit,
     onToggleFavorite: (String) -> Unit
 ) {
@@ -551,6 +560,7 @@ private fun SeriesGroupedView(
                                 book = book,
                                 progress = progressMap[book.id] ?: 0f,
                                 gradientIndex = book.title.hashCode().mod(CoverGradients.size),
+                                isImporting = book.id in importingBookIds,
                                 onClick = { onBookClick(book.id) },
                                 onToggleFavorite = { onToggleFavorite(book.id) }
                             )
@@ -595,6 +605,7 @@ private fun BookCover(
     book: Book,
     progress: Float,
     gradientIndex: Int,
+    isImporting: Boolean = false,
     onClick: () -> Unit,
     onToggleFavorite: () -> Unit
 ) {
@@ -686,6 +697,23 @@ private fun BookCover(
                 }
             }
 
+            // Indicateur "import en cours" — remplace les points de statut décoratifs tant que
+            // le livre n'est pas prêt (voir PLAN import EPUB §2). Disparaît dès que CE livre
+            // termine son import, indépendamment du fait qu'il ait déjà été ouvert ou non.
+            if (isImporting) {
+                Box(
+                    modifier = Modifier
+                        .align(Alignment.BottomStart)
+                        .padding(6.dp)
+                        .semantics { contentDescription = "Importation en cours" }
+                ) {
+                    CircularProgressIndicator(
+                        color = Color.White,
+                        strokeWidth = 1.5.dp,
+                        modifier = Modifier.size(12.dp)
+                    )
+                }
+            } else {
             // Dots de statut
             Row(
                 modifier = Modifier
@@ -704,6 +732,7 @@ private fun BookCover(
                             )
                     )
                 }
+            }
             }
         }
 
@@ -1326,7 +1355,7 @@ private fun FloatingControls(
 // ─────────────────────────────────────────────────────
 
 @Composable
-private fun EmptyView(onImportClick: (() -> Unit)? = null) {
+private fun EmptyView(isImporting: Boolean = false, onImportClick: (() -> Unit)? = null) {
     Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
         Column(
             modifier = Modifier.padding(horizontal = 48.dp),
@@ -1338,19 +1367,26 @@ private fun EmptyView(onImportClick: (() -> Unit)? = null) {
                 color = MaterialTheme.colorScheme.primaryContainer
             ) {
                 Box(contentAlignment = Alignment.Center) {
-                    Icon(
-                        Icons.AutoMirrored.Outlined.MenuBook,
-                        contentDescription = null,
-                        modifier = Modifier.size(40.dp),
-                        tint = MaterialTheme.colorScheme.onPrimaryContainer
-                    )
+                    if (isImporting) {
+                        CircularProgressIndicator(
+                            color = MaterialTheme.colorScheme.onPrimaryContainer,
+                            modifier = Modifier.size(32.dp)
+                        )
+                    } else {
+                        Icon(
+                            Icons.AutoMirrored.Outlined.MenuBook,
+                            contentDescription = null,
+                            modifier = Modifier.size(40.dp),
+                            tint = MaterialTheme.colorScheme.onPrimaryContainer
+                        )
+                    }
                 }
             }
 
             Spacer(Modifier.height(24.dp))
 
             Text(
-                "Commencez votre bibliothèque",
+                if (isImporting) "Import en cours..." else "Commencez votre bibliothèque",
                 style = MaterialTheme.typography.titleMedium,
                 textAlign = androidx.compose.ui.text.style.TextAlign.Center,
                 color = MaterialTheme.colorScheme.onBackground
@@ -1359,13 +1395,14 @@ private fun EmptyView(onImportClick: (() -> Unit)? = null) {
             Spacer(Modifier.height(8.dp))
 
             Text(
-                "Importez un fichier .epub depuis vos fichiers ou parcourez un catalogue OPDS.",
+                if (isImporting) "Vos premiers livres apparaîtront ici dès qu'ils seront prêts."
+                else "Importez un fichier .epub depuis vos fichiers ou parcourez un catalogue OPDS.",
                 style = MaterialTheme.typography.bodyMedium,
                 textAlign = androidx.compose.ui.text.style.TextAlign.Center,
                 color = MaterialTheme.colorScheme.onSurfaceVariant
             )
 
-            if (onImportClick != null) {
+            if (onImportClick != null && !isImporting) {
                 Spacer(Modifier.height(32.dp))
                 Button(
                     onClick = onImportClick,
