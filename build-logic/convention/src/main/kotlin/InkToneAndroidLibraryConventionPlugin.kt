@@ -25,7 +25,10 @@ class InkToneAndroidLibraryConventionPlugin : Plugin<Project> {
 
             extensions.configure<LibraryExtension> {
                 compileSdk = 34
-                defaultConfig { minSdk = 26 }
+                defaultConfig {
+                    minSdk = 26
+                    testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
+                }
                 compileOptions {
                     sourceCompatibility = JavaVersion.VERSION_17
                     targetCompatibility = JavaVersion.VERSION_17
@@ -42,6 +45,7 @@ class InkToneAndroidLibraryConventionPlugin : Plugin<Project> {
                 add("ksp", "com.google.dagger:hilt-android-compiler:2.52")
                 add("testImplementation", project(":core:testing"))
                 add("testImplementation", "junit:junit:4.13.2")
+                add("androidTestImplementation", "androidx.test:runner:1.6.2")
             }
         }
     }
