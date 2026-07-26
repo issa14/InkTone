@@ -21,7 +21,7 @@ que de référence de comportement (voir Blueprint §13.5).
 
 | Besoin | Emplacement |
 |---|---|
-| Architecture cible, tous les chapitres | `docs/blueprint/BLUEPRINT_ARCHITECTURE_INKTONE_v1.2.1.md` |
+| Architecture cible, tous les chapitres | `docs/blueprint/BLUEPRINT_ARCHITECTURE_INKTONE_v1.2.2.md` |
 | Décisions d'architecture et leurs alternatives écartées | `docs/adr/ADR-XXX-*.md` |
 | Plan détaillé de la phase en cours, tâches, critères de validation | `docs/execution/PHASE_N_*.md` |
 | Conventions de contribution | `CONTRIBUTING.md` |
