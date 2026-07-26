@@ -10,17 +10,27 @@ android {
         // HiltTestApplication comme application de test.
         testInstrumentationRunner = "com.inktone.feature.reader.HiltTestRunner"
     }
+
+    // data (androidTest, ci-dessous) tire transitivement infrastructure/parser
+    // et donc Readium, qui exige le desugaring (Tache 3.2) - propage jusqu'ici.
+    compileOptions {
+        isCoreLibraryDesugaringEnabled = true
+    }
 }
 
 dependencies {
     implementation(libs.androidx.lifecycle.viewmodel.compose)
     implementation(libs.androidx.lifecycle.runtime.compose)
     implementation(libs.androidx.hilt.navigation.compose)
+    coreLibraryDesugaring(libs.desugar.jdk.libs)
 
-    // infrastructure/database et infrastructure/tts : uniquement pour les
-    // tests instrumentes Hilt de la Tache 3.6 (le graphe complet doit
-    // pouvoir s'assembler dans ce module isole) - jamais en implementation,
-    // feature/* ne depend que de domain/core (Blueprint, regles de dependance).
+    // data (RepositoryModule/UseCaseModule), infrastructure/database
+    // (DatabaseModule) et infrastructure/tts (TtsModule) : uniquement pour
+    // les tests instrumentes Hilt de la Tache 3.6 (le graphe complet doit
+    // pouvoir s'assembler dans ce module isole, y compris les bindings dont
+    // ReaderViewModel depend) - jamais en implementation, feature/* ne
+    // depend que de domain/core (Blueprint, regles de dependance).
+    androidTestImplementation(project(":data"))
     androidTestImplementation(project(":infrastructure:database"))
     androidTestImplementation(project(":infrastructure:tts"))
     androidTestImplementation(libs.androidx.test.ext.junit)

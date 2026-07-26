@@ -19,7 +19,10 @@ class InkToneFeatureConventionPlugin : Plugin<Project> {
 
             extensions.configure<LibraryExtension> {
                 compileSdk = 34
-                defaultConfig { minSdk = 26 }
+                defaultConfig {
+                    minSdk = 26
+                    testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
+                }
                 buildFeatures { compose = true }
                 compileOptions {
                     sourceCompatibility = JavaVersion.VERSION_17
@@ -43,6 +46,7 @@ class InkToneFeatureConventionPlugin : Plugin<Project> {
                 add("implementation", "androidx.compose.material3:material3")
                 add("testImplementation", project(":core:testing"))
                 add("testImplementation", "junit:junit:4.13.2")
+                add("androidTestImplementation", "androidx.test:runner:1.6.2")
             }
         }
     }
