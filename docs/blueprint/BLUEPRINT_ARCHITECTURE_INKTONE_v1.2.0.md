@@ -2,14 +2,22 @@
 
 | | |
 |---|---|
-| **Version** | 1.1.0 |
+| **Version** | 1.2.0 |
 | **Statut** | Review |
 | **Date** | 2026-07-26 |
 | **Auteur** | Issa ADAMOU |
-| **Remplace** | 1.0.0 (Draft) |
+| **Remplace** | 1.1.0 |
 | **Références** | `REVUE_BLUEPRINT_ARCHITECTURE_V1_2026-07-26.md` · code legacy au commit `69d18a8` |
 
 **Changements majeurs depuis 1.0.0 :** ajout du chapitre 13 (Rewrite & Legacy Strategy) et du chapitre 14 (Testing Strategy) ; liste canonique unique des modules ; scission ReadingState / ReadingSession ; value object Locator unifié ; modèle de capacités TTS avec timestamps mot comme exigence de première classe ; réintégration des champs série/favoris/sujets dans Publication ; spécification MVI ; budgets de performance chiffrés ; modèle de concurrence ; arbitrage data/infrastructure ; réconciliation crash reporting / confidentialité ; ADR réécrits au format complet et 10 nouveaux ADR ; gouvernance documentaire ; purge des résidus éditoriaux.
+
+**1.2.0 (2026-07-26) :** ADR-013 superseded par ADR-021 suite à
+l'infirmation empirique de l'hypothèse « timestamps natifs Sherpa-ONNX »
+pendant le spike d'ouverture de la Phase 3. Nouvelle architecture à
+paliers pour le timing mot (Android natif + `onRangeStart` en Palier 1,
+Sherpa-ONNX + alignement forcé CTC en Palier 2). Piper écarté des
+moteurs candidats (licence GPL-3.0 depuis octobre 2025). §8.4/8.5/8.9/
+8.10 révisés en conséquence. Aucun changement du Domain Model.
 
 ---
 
@@ -651,14 +659,23 @@ TtsCapabilities
 
 L'application adapte son comportement aux capacités déclarées : le surlignage mot-à-mot est actif avec un moteur qui fournit `wordTimestamps` ; avec un moteur qui ne les fournit pas, le surlignage est **honnêtement** limité à la phrase — jamais simulé par interpolation proportionnelle aux caractères, une approche trompeuse explicitement rejetée par le projet (audit legacy : « product honesty around the highlighting feature »).
 
+**Précision post-ADR-021 :** `wordTimestamps` décrit une garantie de
+résultat (« ce moteur, tel que configuré, produit des timestamps mot
+réels »), jamais un mécanisme particulier. Un adaptateur peut satisfaire
+cette capacité par un callback natif (Palier 1) ou par un second passage
+d'alignement forcé qu'il orchestre lui-même en interne (Palier 2) — le
+Reader et le Player ne connaissent jamais cette distinction.
+
 ## 8.5 Engine Capability Matrix
 
 | Moteur | Offline | Timestamps mot | Français | Statut | Notes |
 |---|---|---|---|---|---|
-| **Sherpa-ONNX** | Oui | **Oui (natif)** | Oui | **Moteur de référence (ADR-013)** | Modèles ONNX locaux ; support timestamps confirmé |
-| Piper | Oui | Non | Oui | Intégré, capacité réduite | Pas de timestamps par mot — surlignage phrase uniquement |
-| Edge TTS | Non (en ligne) | Métadonnées de frontières disponibles | Oui | Optionnel | Voix cloud naturelles ; jamais requis pour l'usage quotidien |
-| Kokoro | Oui | À évaluer | **À évaluer** | **Non intégré tant que la capacité française n'est pas validée** | L'app est francophone-first (§1.3) : aucun moteur n'entre au catalogue sans validation fr |
+| **Android TextToSpeech natif** | Oui (voix Google embarquées) | **Oui (natif, via `onRangeStart`)** | Oui | **Palier 1 — référence de repli (ADR-021)** | Dépend du moteur OS actif ; à détecter au runtime (Google confirmé, moteurs constructeur non garantis) ; qualité vocale inférieure au TTS neuronal |
+| **Sherpa-ONNX (moteur JNI)** | Oui | **Non, nativement, quel que soit le modèle chargé** | Oui | **Palier 2 — moteur de synthèse de référence pour la qualité vocale (ADR-021)** | `GeneratedAudio` = `samples`+`sample_rate` uniquement (vérifié empiriquement, Kotlin et Python) ; timestamps obtenus par un second passage d'alignement forcé (CTC), pas par le moteur lui-même |
+| ↳ *modèle Kokoro (via Sherpa-ONNX)* | Oui | Non (voir ci-dessus) | Oui (54 voix, 8 langues dont le français) | Modèle recommandé pour la qualité vocale, licence Apache-2.0 | Un extracteur de durée natif existe côté Python (misaki) mais est perdu sur le chemin ONNX/Kotlin sans portage — piste d'optimisation future, pas la v1 |
+| ↳ *modèle VITS (via Sherpa-ONNX)* | Oui | Non (voir ci-dessus) | Oui | Alternative à Kokoro | Même mécanisme de timing (Palier 2) |
+| **Piper** | Oui | Non | Oui | **Écarté (ADR-021)** | Dépôt archivé le 6 octobre 2025, relicencié GPL-3.0 (`piper1-gpl`) — incompatible avec une app commerciale fermée, indépendamment des timestamps |
+| **Edge TTS** | Non (en ligne) | Oui (frontières de mot SSML) | Oui | Optionnel, jamais requis pour l'usage quotidien | Cité pour mémoire — le timing y est réel mais la dépendance réseau exclut ce moteur du Palier 1 comme du Palier 2 |
 
 Cette matrice est normative : un moteur n'est proposé à l'utilisateur que si sa ligne est complète et validée.
 
@@ -692,9 +709,24 @@ Règles :
 3. La reprise après pause repositionne sur le mot exact.
 4. Cette exigence figure dans les critères d'acceptation du module TTS (§14.7) — elle n'est pas une évolution future.
 
+**Mécanismes acceptés post-ADR-021 :** un timestamp mot est considéré
+« réel » (donc autorisant l'exigence du §8.9) s'il provient soit d'un
+callback natif du moteur de synthèse (Palier 1), soit d'un passage
+d'alignement forcé opéré sur l'audio effectivement généré, contraint par
+le texte connu (Palier 2). Les deux sont des mesures, pas des
+estimations — la distinction avec l'interpolation de caractères
+(interdite) est que l'un et l'autre s'appuient sur un signal réel
+(callback OS ou posterior acoustique), jamais sur une simple
+proportionnalité de durée.
+
 ## 8.10 Engine Selection
 
 L'utilisateur choisit son moteur ; InkTone mémorise le choix et signale clairement les capacités perdues ou gagnées lors d'un changement (ex. passage à Piper : « le surlignage mot à mot n'est pas disponible avec ce moteur »).
+
+**Note post-ADR-021 :** le choix affiché à l'utilisateur porte sur la
+**qualité vocale** (voix Android natives vs. voix neuronale Sherpa-ONNX/
+Kokoro) — le mécanisme de timing (Palier 1 ou 2) est une conséquence
+interne de ce choix, pas une option distincte présentée séparément.
 
 ## 8.11 Voice Model Distribution
 
@@ -1182,7 +1214,19 @@ Tout ADR doit remplir **chaque** rubrique — la version 1.0.0 de ce Blueprint v
 **Status : Accepted** · **Context :** la couche Presentation doit avoir un pattern d'état normatif, sinon chaque contributeur — humain ou agent — tranche différemment. Le legacy a éprouvé MVI avec succès. · **Decision :** MVI formalisé au §4.4 : état unique immuable par écran, intents explicites, effets par canal dédié. · **Rationale :** prévisibilité, testabilité des ViewModels en JVM, cohérence inter-écrans. · **Consequences :** un peu de cérémonie par écran ; en échange, chaque écran se teste par « intent entrant → état attendu ». · **Alternatives :** MVVM libre (rejeté : états multiples divergents, le défaut que MVI corrige) ; Molecule/autres frameworks (rejetés : dépendance supplémentaire sans besoin démontré).
 
 ### ADR-013 : Sherpa-ONNX moteur de référence, timestamps mot exigence de première classe
-**Status : Accepted** · **Context :** le surlignage mot-à-mot avec vrais timestamps est l'écart compétitif n°1 identifié face aux lecteurs top-tier. Sherpa-ONNX fournit des timestamps natifs ; Piper non — un pivot non documenté vers Piper a déjà été flagué et corrigé dans l'historique du projet. Le legacy simulait le surlignage par interpolation proportionnelle aux caractères, approche rejetée comme malhonnête. · **Decision :** Sherpa-ONNX est le moteur de référence ; `wordTimestamps` est une capability de premier rang du contrat `TtsCapabilities` ; le surlignage mot n'est jamais simulé (§8.9). · **Rationale :** la fonctionnalité signature repose sur des données réelles du moteur, pas sur une illusion. · **Consequences :** les moteurs sans timestamps offrent un surlignage phrase, honnêtement annoncé ; le critère de précision ±120 ms entre dans les benchmarks. · · **Alternatives :** interpolation par caractères (rejetée : trompeuse) ; exiger les timestamps de tous les moteurs (rejeté : exclurait Piper et Edge TTS inutilement).
+**Status : Superseded by ADR-021 (2026-07-26)**
+
+> **Note de révision :** la prémisse de cet ADR — « Sherpa-ONNX fournit
+> des timestamps natifs » — s'est révélée fausse à la vérification
+> empirique en Phase 3 (inspection directe des bindings Kotlin et
+> Python). `GeneratedAudio` n'expose que `samples`/`sample_rate`, pour
+> tous les modèles supportés. Sherpa-ONNX reste le moteur de synthèse de
+> référence pour la **qualité vocale** ; la question des timestamps mot
+> est traitée séparément par ADR-021. Contenu original conservé
+> ci-dessous pour l'historique — ne pas le lire comme la décision en
+> vigueur.
+
+**Context (original) :** le surlignage mot-à-mot avec vrais timestamps est l'écart compétitif n°1 identifié face aux lecteurs top-tier. Sherpa-ONNX fournit des timestamps natifs ; Piper non — un pivot non documenté vers Piper a déjà été flagué et corrigé dans l'historique du projet. Le legacy simulait le surlignage par interpolation proportionnelle aux caractères, approche rejetée comme malhonnête. · **Decision :** Sherpa-ONNX est le moteur de référence ; `wordTimestamps` est une capability de premier rang du contrat `TtsCapabilities` ; le surlignage mot n'est jamais simulé (§8.9). · **Rationale :** la fonctionnalité signature repose sur des données réelles du moteur, pas sur une illusion. · **Consequences :** les moteurs sans timestamps offrent un surlignage phrase, honnêtement annoncé ; le critère de précision ±120 ms entre dans les benchmarks. · · **Alternatives :** interpolation par caractères (rejetée : trompeuse) ; exiger les timestamps de tous les moteurs (rejeté : exclurait Piper et Edge TTS inutilement).
 
 ### ADR-014 : Crash reporting en opt-in explicite
 **Status : Accepted** · **Context :** Crashlytics est nécessaire à la qualité mais constitue un envoi réseau de données — en tension frontale avec « aucune donnée sans accord explicite » (§10.2). Le legacy embarquait Crashlytics sans flux de consentement. · **Decision :** rapport de crash désactivé par défaut ; opt-in à l'onboarding avec explication honnête du contenu ; réversible dans les réglages ; no-op gracieux sans identifiants Firebase commis (K10). · **Rationale :** réconcilier qualité et Privacy by Design sans hypocrisie documentaire. · **Consequences :** taux de remontée partiel — accepté ; les testeurs volontaires activent. · **Alternatives :** opt-out (rejeté : contraire au §10.2) ; aucun crash reporting (rejeté : voler à l'aveugle).
@@ -1204,6 +1248,69 @@ Tout ADR doit remplir **chaque** rubrique — la version 1.0.0 de ce Blueprint v
 
 ### ADR-020 : Rupture du schéma de base de données
 **Status : Accepted** · **Context :** le schéma legacy (v17) porte l'histoire de ses migrations, dont un trou 6→13 documenté ; le nouveau Data Model (§6) en diffère structurellement (Locator à plat, scission ReadingState/ReadingSession). · **Decision :** nouveau schéma version 1, aucune migration depuis le legacy ; installations de test ré-importées. · **Rationale :** pré-release, aucune installation publique — la seule fenêtre où cette rupture est gratuite. · **Consequences :** dès la première publication, plus aucune rupture ne sera possible : les règles du §6.4 s'appliquent sans exception à partir de la v1. · **Alternatives :** migration v17→v1 (rejetée : coût élevé pour zéro utilisateur) ; reprendre le schéma legacy (rejeté : reconduirait la conflation ReadingSession et l'adressage triple).
+
+### ADR-021 : Architecture à paliers pour le timing mot du TTS
+**Status : Accepted** · **Date : 2026-07-26**
+
+**Context :** ADR-013 supposait que Sherpa-ONNX fournissait des
+timestamps natifs pour le TTS. La vérification empirique en Phase 3 l'a
+infirmé : `GeneratedAudio` (Kotlin et Python, même cœur C++) n'expose
+que `samples`/`sample_rate`, pour tous les backends de modèle
+(VITS, Matcha, Kokoro, Pocket, Supertonic, ZipVoice). Une recherche
+comparative a confirmé qu'il s'agit d'un manque connu et documenté côté
+Sherpa-ONNX (issue #3536, alignement forcé demandé mais non implémenté),
+et a établi qu'aucun moteur TTS offline neuronal évalué n'expose de
+timing mot natif de bout en bout sur Android sans travail
+supplémentaire.
+
+**Decision :** InkTone adopte une architecture à paliers pour le
+surlignage mot-à-mot, au lieu de parier sur un unique moteur :
+
+- **Palier 1 (livré en premier) :** `android.speech.tts.TextToSpeech`
+  natif + `UtteranceProgressListener.onRangeStart` (API 26+), qui
+  fournit de vraies frontières de mots (plage de caractères + frame
+  audio), entièrement hors ligne avec les voix Google embarquées.
+- **Palier 2 (expérience premium) :** synthèse neuronale (Sherpa-ONNX,
+  modèle Kokoro ou VITS) pour la qualité vocale, augmentée d'un second
+  passage d'alignement forcé sur device (modèle CTC léger + décodage de
+  Viterbi contraint par le texte connu) pour produire de vrais
+  timestamps — jamais estimés par interpolation.
+- `TtsCapabilities.wordTimestamps` reste le contrat exposé à
+  l'application (Blueprint §8.4) ; la façon dont un adaptateur
+  `TtsEngine` le satisfait (callback natif ou passage d'alignement) est
+  un détail interne à cet adaptateur, jamais exposé au Reader.
+- Nouveau membre d'énumération `TtsEngineId.ANDROID_NATIVE` pour
+  l'adaptateur du Palier 1 (ajout non cassant, Tâche 3.0 de la Phase 3).
+- **Piper est écarté des moteurs candidats** : son dépôt a été archivé
+  le 6 octobre 2025 et le projet relicencié en GPL-3.0 (`piper1-gpl`) —
+  incompatible avec une application commerciale à code source fermé,
+  indépendamment même de la question des timestamps.
+
+**Rationale :** le Palier 1 est un filet de sécurité quasi gratuit
+(Kotlin pur, zéro JNI, zéro modèle supplémentaire) qui valide toute la
+chaîne Locator → surlignage → reprise (K3) dès la marche à blanc, avant
+d'avoir résolu le Palier 2. Le Palier 2 préserve la promesse de qualité
+vocale et d'usage hors ligne simultanément, via un mécanisme (alignement
+forcé) déjà éprouvé en production dans l'écosystème Sherpa-ONNX
+(`react-native-sherpa-onnx`, mode `timingMode: 'aligned'`).
+
+**Consequences :** deux chemins TTS à construire au lieu d'un ; la
+fiabilité du Palier 1 dépend du moteur OS installé (Google TTS confirmé,
+moteurs constructeur incertains — détection au runtime nécessaire) ; le
+Palier 2 ajoute un modèle CTC et une latence de traitement à mesurer
+(§11.2, nouveau budget à fixer en Phase 5) ; le contrat de domaine
+(`TtsEngine`, `WordTimestamp`, Tâche 1.7) reste inchangé — seule
+l'infrastructure change, preuve que la conception du domaine a bien
+isolé cette incertitude.
+
+**Alternatives Considered :** simuler le timing par interpolation de
+caractères (rejeté — malhonnête, §8.9) ; Edge TTS comme mécanisme
+principal de timing (rejeté — en ligne, contraire à Offline First) ;
+portage natif de l'extracteur de durée interne de Kokoro vers
+Kotlin/C++, qui éliminerait le second passage (retenu comme piste
+d'optimisation future si le Palier 2 s'avère trop coûteux, pas comme
+décision v1 — effort de portage élevé, non justifié sans mesure
+préalable).
 
 ---
 
@@ -1322,4 +1429,4 @@ L'objectif : qu'InkTone demeure modulaire, maintenable, performant, extensible, 
 # End of Document
 
 **InkTone Software Architecture Blueprint**
-**Version : 1.1.0** · **Statut : Review** · **Auteur : Issa ADAMOU**
+**Version : 1.2.0** · **Statut : Review** · **Auteur : Issa ADAMOU**

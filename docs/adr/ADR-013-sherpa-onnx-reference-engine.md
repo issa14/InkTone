@@ -1,9 +1,19 @@
 # ADR-013 : Sherpa-ONNX moteur de référence, timestamps mot exigence de première classe
 
-**Status :** Accepted
+**Status :** Superseded by ADR-021 (2026-07-26)
 **Date :** 2026-07-26
 
-## Context
+> **Note de révision :** la prémisse de cet ADR — « Sherpa-ONNX fournit
+> des timestamps natifs » — s'est révélée fausse à la vérification
+> empirique en Phase 3 (inspection directe des bindings Kotlin et
+> Python). `GeneratedAudio` n'expose que `samples`/`sample_rate`, pour
+> tous les modèles supportés. Sherpa-ONNX reste le moteur de synthèse de
+> référence pour la **qualité vocale** ; la question des timestamps mot
+> est traitée séparément par [ADR-021](ADR-021-tts-word-timing-tiered-architecture.md).
+> Contenu original conservé ci-dessous pour l'historique — ne pas le
+> lire comme la décision en vigueur.
+
+## Context (original)
 
 Le surlignage mot-à-mot avec de vrais timestamps est l'écart compétitif
 n°1 identifié face aux lecteurs top-tier du marché. Sherpa-ONNX fournit

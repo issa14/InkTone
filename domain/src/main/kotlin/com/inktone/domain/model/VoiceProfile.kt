@@ -1,6 +1,6 @@
 package com.inktone.domain.model
 
-enum class TtsEngineId { SHERPA_ONNX, PIPER, EDGE_TTS }
+enum class TtsEngineId { SHERPA_ONNX, PIPER, EDGE_TTS, ANDROID_NATIVE }
 
 /**
  * Configuration vocale réutilisable (Blueprint §3.3). Le champ `style`
