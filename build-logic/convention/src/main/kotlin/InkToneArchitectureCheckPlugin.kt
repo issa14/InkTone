@@ -11,7 +11,7 @@ import org.gradle.api.tasks.TaskAction
 private val ALLOWED_DEPENDENCIES: Map<String, Set<String>> = mapOf(
     ":domain" to emptySet(),
     ":core:common" to emptySet(),
-    ":core:testing" to setOf(":core:common"),
+    ":core:testing" to setOf(":core:common", ":domain"),
     ":core:designsystem" to setOf(":core:common"),
     ":core:ui" to setOf(":core:common", ":core:designsystem"),
     ":data" to setOf(":domain", ":infrastructure"),
