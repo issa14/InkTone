@@ -9,6 +9,7 @@ class InkToneDomainConventionPlugin : Plugin<Project> {
             pluginManager.apply("inktone.architecture.check")
 
             dependencies {
+                add("implementation", "org.jetbrains.kotlinx:kotlinx-coroutines-core:1.9.0")
                 add("testImplementation", "junit:junit:4.13.2")
                 add("testImplementation", "org.jetbrains.kotlinx:kotlinx-coroutines-test:1.9.0")
             }
