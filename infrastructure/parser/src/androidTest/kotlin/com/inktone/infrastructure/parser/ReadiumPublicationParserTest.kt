@@ -5,6 +5,7 @@ import androidx.test.core.app.ApplicationProvider
 import androidx.test.ext.junit.runners.AndroidJUnit4
 import com.inktone.domain.service.ParseResult
 import kotlinx.coroutines.test.runTest
+import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
 import org.junit.Assert.assertTrue
 import org.junit.Test
@@ -29,9 +30,19 @@ class ReadiumPublicationParserTest {
         val result = parser.parse(fixtureFile.absolutePath)
 
         assertTrue("le parsing doit reussir sur un EPUB valide", result is ParseResult.Success)
-        assertFalse(
-            "le fixture de test n'est pas protege par DRM",
-            (result as ParseResult.Success).isDrmProtected,
+        val success = result as ParseResult.Success
+        assertFalse("le fixture de test n'est pas protege par DRM", success.isDrmProtected)
+
+        // Tache 3.4 : le DocumentModel doit contenir le texte reel du
+        // fixture (extrait via publication.content()), pas le placeholder
+        // vide de la Tache 3.2.
+        assertEquals("le fixture n'a qu'un chapitre", 1, success.documentModel.chapters.size)
+        val chapter = success.documentModel.chapters.first()
+        val sentences = chapter.paragraphs.flatMap { it.sentences }
+        assertTrue("au moins une phrase attendue dans le chapitre", sentences.isNotEmpty())
+        assertTrue(
+            "le texte extrait doit correspondre au contenu du fixture",
+            sentences.any { it.text.contains("Bonjour") },
         )
     }
 
