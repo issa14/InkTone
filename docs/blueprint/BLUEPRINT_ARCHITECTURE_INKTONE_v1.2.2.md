@@ -2,11 +2,11 @@
 
 | | |
 |---|---|
-| **Version** | 1.2.1 |
+| **Version** | 1.2.2 |
 | **Statut** | Review |
 | **Date** | 2026-07-26 |
 | **Auteur** | Issa ADAMOU |
-| **Remplace** | 1.2.0 |
+| **Remplace** | 1.2.1 |
 | **Références** | `REVUE_BLUEPRINT_ARCHITECTURE_V1_2026-07-26.md` · code legacy au commit `69d18a8` |
 
 **Changements majeurs depuis 1.0.0 :** ajout du chapitre 13 (Rewrite & Legacy Strategy) et du chapitre 14 (Testing Strategy) ; liste canonique unique des modules ; scission ReadingState / ReadingSession ; value object Locator unifié ; modèle de capacités TTS avec timestamps mot comme exigence de première classe ; réintégration des champs série/favoris/sujets dans Publication ; spécification MVI ; budgets de performance chiffrés ; modèle de concurrence ; arbitrage data/infrastructure ; réconciliation crash reporting / confidentialité ; ADR réécrits au format complet et 10 nouveaux ADR ; gouvernance documentaire ; purge des résidus éditoriaux.
@@ -22,6 +22,12 @@ moteurs candidats (licence GPL-3.0 depuis octobre 2025). §8.4/8.5/8.9/
 **1.2.1 (2026-07-26) :** Corrige K9 (§13.4), devenu obsolète après
 ADR-021 — Sherpa-ONNX ne fournit pas de timestamps mot natifs, aucun
 moteur ne le fait.
+
+**1.2.2 (2026-07-26) :** Ajoute un addendum à ADR-021 documentant un
+comportement réel observé en Tâche 3.1 (device V2206) : certains moteurs
+TTS constructeur ne respectent pas la sémantique documentée par Android
+pour `onRangeStart`, ce qui justifie la double interprétation défensive
+dans `AndroidNativeTtsEngine.resolveWordBoundary()`.
 
 ---
 
@@ -1316,6 +1322,19 @@ d'optimisation future si le Palier 2 s'avère trop coûteux, pas comme
 décision v1 — effort de portage élevé, non justifié sans mesure
 préalable).
 
+**Addendum (Tâche 3.1, device V2206) :** certains moteurs TTS
+constructeur ne respectent pas la sémantique documentée par Android pour
+`onRangeStart(utteranceId, start, end, frame)`. Sur le device de test
+(voix embarquée `fr-fr-x-frb-seanet-embedded`), les paramètres portent en
+réalité `(audioPosition, charStart, charEnd)` au lieu de
+`(charStart, charEnd, audioFrame)` — décodage vérifié sur 7 mots
+consécutifs. `AndroidNativeTtsEngine.resolveWordBoundary()` teste les
+deux interprétations et ignore (avec avertissement) tout évènement qui
+ne correspond à aucune des deux, plutôt que de supposer laquelle est
+active. **Ne jamais retirer cette double interprétation en pensant
+simplifier** : elle encode un comportement réel observé, pas une
+précaution excessive.
+
 ---
 
 # 16. Future Roadmap
@@ -1433,4 +1452,4 @@ L'objectif : qu'InkTone demeure modulaire, maintenable, performant, extensible, 
 # End of Document
 
 **InkTone Software Architecture Blueprint**
-**Version : 1.2.1** · **Statut : Review** · **Auteur : Issa ADAMOU**
+**Version : 1.2.2** · **Statut : Review** · **Auteur : Issa ADAMOU**
