@@ -37,6 +37,7 @@ class InkToneAndroidLibraryConventionPlugin : Plugin<Project> {
 
             dependencies {
                 add("implementation", project(":domain"))
+                add("implementation", "org.jetbrains.kotlinx:kotlinx-coroutines-android:1.9.0")
                 add("implementation", "com.google.dagger:hilt-android:2.52")
                 add("ksp", "com.google.dagger:hilt-android-compiler:2.52")
                 add("testImplementation", project(":core:testing"))
