@@ -2,11 +2,11 @@
 
 | | |
 |---|---|
-| **Version** | 1.2.0 |
+| **Version** | 1.2.1 |
 | **Statut** | Review |
 | **Date** | 2026-07-26 |
 | **Auteur** | Issa ADAMOU |
-| **Remplace** | 1.1.0 |
+| **Remplace** | 1.2.0 |
 | **Références** | `REVUE_BLUEPRINT_ARCHITECTURE_V1_2026-07-26.md` · code legacy au commit `69d18a8` |
 
 **Changements majeurs depuis 1.0.0 :** ajout du chapitre 13 (Rewrite & Legacy Strategy) et du chapitre 14 (Testing Strategy) ; liste canonique unique des modules ; scission ReadingState / ReadingSession ; value object Locator unifié ; modèle de capacités TTS avec timestamps mot comme exigence de première classe ; réintégration des champs série/favoris/sujets dans Publication ; spécification MVI ; budgets de performance chiffrés ; modèle de concurrence ; arbitrage data/infrastructure ; réconciliation crash reporting / confidentialité ; ADR réécrits au format complet et 10 nouveaux ADR ; gouvernance documentaire ; purge des résidus éditoriaux.
@@ -18,6 +18,10 @@ paliers pour le timing mot (Android natif + `onRangeStart` en Palier 1,
 Sherpa-ONNX + alignement forcé CTC en Palier 2). Piper écarté des
 moteurs candidats (licence GPL-3.0 depuis octobre 2025). §8.4/8.5/8.9/
 8.10 révisés en conséquence. Aucun changement du Domain Model.
+
+**1.2.1 (2026-07-26) :** Corrige K9 (§13.4), devenu obsolète après
+ADR-021 — Sherpa-ONNX ne fournit pas de timestamps mot natifs, aucun
+moteur ne le fait.
 
 ---
 
@@ -1021,7 +1025,7 @@ Inventaire des acquis du legacy, chacun payé par un bug réel, un crash ou un a
 | K6 | Normalisation des hrefs EPUB percent-encodés | Phase 2.2bis | §7.3 |
 | K7 | Détection DRM à l'import, message clair | Phase 6.1 | §7.11 |
 | K8 | Requête groupée de progression ; jamais de N+1 | Phase 4.1 | §6.7, §11.6 |
-| K9 | Sherpa-ONNX retenu pour les timestamps mot ; Piper n'en fournit pas ; capability exposée par l'abstraction | Évaluation moteurs, pivot corrigé | §8.4, §8.5, §8.9, ADR-013 |
+| K9 | Aucun moteur TTS offline neuronal n'expose de timestamps mot natifs (Sherpa-ONNX y compris, quel que soit le modèle chargé) ; capability exposée par l'abstraction, satisfaite soit par un moteur natif (Android TextToSpeech), soit par un second passage d'alignement forcé | Vérification empirique Phase 3 (spike), recherche comparative | §8.4, §8.5, §8.9, ADR-021 |
 | K10 | Crash reporting no-op gracieux sans secrets commis | `CrashReporter.kt` | §10.7 |
 | K11 | `subjects` peuplé à l'import = tags immédiats ; série via `belongsTo` + fallback calibre | Modèle Book livré | §3.3, §6.8 |
 | K12 | Aucun emoji en production ; icônes centralisées ; jamais de compensation aval | `AppIcons.kt`, leçon du nettoyage aval | §12.5, contrôle lint CI |
@@ -1429,4 +1433,4 @@ L'objectif : qu'InkTone demeure modulaire, maintenable, performant, extensible, 
 # End of Document
 
 **InkTone Software Architecture Blueprint**
-**Version : 1.2.0** · **Statut : Review** · **Auteur : Issa ADAMOU**
+**Version : 1.2.1** · **Statut : Review** · **Auteur : Issa ADAMOU**
