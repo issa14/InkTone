@@ -1,13 +1,16 @@
 package com.inktone.infrastructure.parser
 
 import android.content.Context
-import com.inktone.domain.model.DocumentModel
 import com.inktone.domain.model.PublicationFormat
 import com.inktone.domain.service.ParseResult
 import com.inktone.domain.service.PublicationParser
 import dagger.hilt.android.qualifiers.ApplicationContext
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
+import org.readium.r2.shared.ExperimentalReadiumApi
+import org.readium.r2.shared.publication.services.content.DefaultContentService
+import org.readium.r2.shared.publication.services.content.contentServiceFactory
+import org.readium.r2.shared.publication.services.content.iterators.HtmlResourceContentIterator
 import org.readium.r2.shared.publication.services.isProtected
 import org.readium.r2.shared.util.asset.AssetRetriever
 import org.readium.r2.shared.util.getOrElse
@@ -33,12 +36,15 @@ import javax.inject.Singleton
  * — le renommage en `org.readium.*` n'a pas encore eu lieu en 3.0.0,
  * contrairement à ce que la branche `develop` pourrait laisser supposer.
  */
+@OptIn(ExperimentalReadiumApi::class)
 @Singleton
 class ReadiumPublicationParser @Inject constructor(
     @ApplicationContext private val context: Context,
 ) : PublicationParser {
 
     override val supportedFormats = listOf(PublicationFormat.EPUB)
+
+    private val documentModelExtractor = DocumentModelExtractor()
 
     // Instanciation paresseuse — coûteuse, un seul jeu de composants
     // Readium réutilisé pour tous les parses de la durée de vie du singleton.
@@ -55,6 +61,15 @@ class ReadiumPublicationParser @Inject constructor(
                 // Pas de pdfFactory : PDF hors périmètre v1 (ADR-017).
                 pdfFactory = null,
             ),
+            // Prerequis verifie contre les sources 3.0.0 (Tache 3.4, absent
+            // du plan d'origine) : publication.content() renvoie null tant
+            // que ce ContentService n'est pas enregistre explicitement —
+            // DefaultPublicationParser ne le fait pas de lui-meme.
+            onCreatePublication = {
+                servicesBuilder.contentServiceFactory = DefaultContentService.createFactory(
+                    resourceContentIteratorFactories = listOf(HtmlResourceContentIterator.Factory()),
+                )
+            },
         )
     }
 
@@ -79,7 +94,7 @@ class ReadiumPublicationParser @Inject constructor(
         // est detecte a la racine du conteneur. Suffisant pour K7 : detection, pas
         // dechiffrement (hors perimetre v1).
         ParseResult.Success(
-            documentModel = DocumentModel(chapters = emptyList(), tableOfContents = emptyList(), resources = emptyList()),
+            documentModel = documentModelExtractor.extract(publication),
             isDrmProtected = publication.isProtected,
         )
     }
