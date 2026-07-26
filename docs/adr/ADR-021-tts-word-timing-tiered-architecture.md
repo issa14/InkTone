@@ -72,3 +72,18 @@ incertitude.
   d'optimisation future si le Palier 2 s'avère trop coûteux, pas comme
   décision v1 — effort de portage élevé, non justifié sans mesure
   préalable.
+
+## Addendum (Tâche 3.1, device V2206)
+
+Certains moteurs TTS constructeur ne respectent pas la sémantique
+documentée par Android pour `onRangeStart(utteranceId, start, end,
+frame)`. Sur le device de test (voix embarquée
+`fr-fr-x-frb-seanet-embedded`), les paramètres portent en réalité
+`(audioPosition, charStart, charEnd)` au lieu de
+`(charStart, charEnd, audioFrame)` — décodage vérifié sur 7 mots
+consécutifs. `AndroidNativeTtsEngine.resolveWordBoundary()` teste les
+deux interprétations et ignore (avec avertissement) tout évènement qui
+ne correspond à aucune des deux, plutôt que de supposer laquelle est
+active. **Ne jamais retirer cette double interprétation en pensant
+simplifier** : elle encode un comportement réel observé, pas une
+précaution excessive.
