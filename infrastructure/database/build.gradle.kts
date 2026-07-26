@@ -6,6 +6,10 @@ plugins {
 
 android {
     namespace = "com.inktone.infrastructure.database"
+
+    sourceSets {
+        getByName("androidTest").assets.srcDirs("$projectDir/schemas")
+    }
 }
 
 room {
