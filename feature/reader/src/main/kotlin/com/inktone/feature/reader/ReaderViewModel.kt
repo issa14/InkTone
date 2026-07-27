@@ -43,6 +43,7 @@ class ReaderViewModel @Inject constructor(
     val state: StateFlow<ReaderUiState> = _state.asStateFlow()
 
     private var currentPublicationId: String? = null
+    private val chapterPreloader = ChapterPreloader(viewModelScope)
 
     fun onIntent(intent: ReaderIntent) {
         when (intent) {
@@ -79,6 +80,7 @@ class ReaderViewModel @Inject constructor(
                         tableOfContents = result.documentModel.tableOfContents,
                         currentChapterIndex = restored?.locator?.chapterIndex ?: 0,
                     )
+                    triggerPreload(_state.value.currentChapterIndex)
                 }
                 else -> Log.w("ReaderViewModel", "openPublication: echec de parsing ($result)")
             }
@@ -111,6 +113,12 @@ class ReaderViewModel @Inject constructor(
             highlightedWordRange = null, isTocVisible = false,
         )
         persistPosition(chapterIndex = targetIndex, sentenceIndex = 0)
+        triggerPreload(targetIndex)
+    }
+
+    private fun triggerPreload(currentIndex: Int) {
+        val nextChapter = _state.value.chapters.getOrNull(currentIndex + 1)
+        chapterPreloader.preload(nextChapter) { /* chapitre pret, no-op pour l'instant */ }
     }
 
     /**
