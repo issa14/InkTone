@@ -1,5 +1,8 @@
 # Plan d'action — Phases 2 à 10 (vue d'ensemble, sans code)
 
+**Changelog :** 2026-07-27 : Phase 5 revisee post-ADR-021 (Piper
+retire, alignement CTC ajoute comme mecanisme du Palier 2).
+
 **Statut :** vue d'ensemble de planification, pas un document d'exécution.
 Chaque phase sera détaillée au niveau Claude-Code-ready (code Kotlin complet,
 tests, critères avant/après — comme les Phases 0 et 1) juste avant son
@@ -85,8 +88,8 @@ révélé deux trous de la Phase 0, ce document sera corrigé, pas figé.
 
 | # | Tâche | Dépend de | Sortie vérifiable |
 |---|---|---|---|
-| 5.1 | Adaptateur Piper (pas de timestamps mot — capability déclarée en conséquence) | 3.4 | `TtsCapabilities.wordTimestamps = false` respecté, surlignage replié en phrase |
-| 5.2 | Adaptateur Edge TTS (en ligne, optionnel) | — | Fonctionne avec connexion, message clair sans connexion |
+| 5.1 | Adaptateur Sherpa-ONNX (synthèse, modèle Kokoro) — pas de timestamps natifs, voir ADR-021 | 3.4 (DocumentModel) | Audio produit, qualité vocale supérieure au Palier 1 |
+| 5.2 | Passage d'alignement forcé CTC sur l'audio Sherpa-ONNX généré (modèle CTC léger + Viterbi contraint par le texte connu) | 5.1 | WordTimestamp réels produits, précision mesurée contre le corpus de référence (±120ms, §11.2) |
 | 5.3 | Buffer/préchargement adaptatif (phrase n+1 pendant lecture de n) | 3.4 | Silence inter-phrases ≤ 150 ms (§11.2) |
 | 5.4 | MediaSession + service arrière-plan + notification | 5.3 | Lecture continue écran éteint, contrôlable depuis la notification |
 | 5.5 | Contrôles complets (play/pause/stop/vitesse/voix à chaud) | 5.4 | Changement de vitesse recalcule les timestamps sans coupure perceptible |
@@ -95,6 +98,10 @@ révélé deux trous de la Phase 0, ce document sera corrigé, pas figé.
 | 5.8 | Gestion d'erreurs TTS (voix indisponible, modèle corrompu, repli proposé) | 5.6 | Jamais d'interruption brutale |
 | 5.9 | Benchmarks TTS (latence premier audio, silence inter-phrases, précision surlignage ±120 ms) | 5.3, 3.5 | Budgets §11.2 tenus |
 | 5.10 | Tests par capacité (chaque adaptateur vérifié contre son propre contrat) | 5.1, 5.2 | Aucun adaptateur ne prétend une capacité qu'il n'a pas |
+
+**Point d'attention :** le passage CTC est un second modèle ONNX + une
+latence supplémentaire à mesurer — budget à fixer en Phase 5, pas
+encore acté dans les chiffres de §11.2.
 
 **Sortie de phase :** budgets TTS tenus ; lecture en arrière-plan survit à la mise en veille.
 

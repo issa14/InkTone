@@ -71,14 +71,12 @@ que ce document demande explicitement de soumettre à Issa.
   Readium à `infrastructure/parser` (ADR-011). Placé dans
   `infrastructure/parser` à la place.
 
-## Décision — Palier 1 seul ou Palier 1 + Palier 2 pour la v1 ?
+## Décision (Issa, 2026-07-27)
 
-**Tranchée par Issa le 2026-07-27, après écoute réelle de la voix
-native Android sur device (Tâche 3.8.2) : Palier 1 + Palier 2 dès la
-v1.** La voix native seule (Palier 1) ne suffit pas pour l'expérience
-visée ; l'intégration Sherpa-ONNX (Palier 2, synthèse neuronale +
-alignement forcé CTC, ADR-021) est requise avant de considérer le
-TTS complet pour la v1.
+Palier 1 + Palier 2 tous deux dans le périmètre v1. Le Palier 1
+(Android natif) reste la base de repli (ADR-021, détection au
+runtime) ; le Palier 2 (Sherpa-ONNX + alignement forcé CTC) est
+développé en Phase 5, pas différé en évolution future.
 
 Ce qui est acquis avant cette décision :
 
@@ -107,8 +105,9 @@ Ce qui est acquis avant cette décision :
 - [x] Tâche 3.7 : test manuel de bout en bout exécuté sur device réel,
       surlignage confirmé visuellement, reprise K3 confirmée par log
       + requête SQL directe, résultats documentés ci-dessus, décision
-      décision Palier 1 vs 1+2 tranchée par Issa (voir section
-      Décision ci-dessus) : Palier 1 + Palier 2 dès la v1.
+      Palier 1 vs 1+2 tranchée par Issa (voir section Décision
+      ci-dessus) : Palier 1 + Palier 2 tous deux dans le périmètre v1.
 - [x] Tâche 3.8 : lecture audio réelle câblée (`AudioSegmentPlayer`,
-      AudioTrack sur PCM brut), vérifiée sur device réel — voir section
-      Décision ci-dessus.
+      AudioTrack sur PCM brut) et vérifiée sur device réel — qualité
+      vocale jugée insuffisante seule (voir section Décision
+      ci-dessus), Palier 2 requis en Phase 5.
