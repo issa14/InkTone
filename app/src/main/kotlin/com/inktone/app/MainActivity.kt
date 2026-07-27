@@ -1,11 +1,20 @@
 package com.inktone.app
 
+import android.content.Intent
 import android.os.Bundle
 import androidx.activity.ComponentActivity
+import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.compose.setContent
+import androidx.activity.result.contract.ActivityResultContracts
+import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.padding
+import androidx.compose.material3.Button
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Surface
+import androidx.compose.material3.Text
 import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.ui.Modifier
+import androidx.compose.ui.unit.dp
 import androidx.hilt.navigation.compose.hiltViewModel
 import com.inktone.feature.reader.ReaderIntent
 import com.inktone.feature.reader.ReaderScreen
@@ -25,6 +34,11 @@ import java.io.File
  * fichier (pas d'accès Hilt) est faite dans cette Activity, le
  * bootstrap réel de la Publication passe par ReaderViewModel
  * (injection par constructeur, qui fonctionne).
+ *
+ * Bouton « Importer » (Tâche 4.11) : sélecteur SAF minimal pour valider
+ * le chemin réel `content://` -> `ReadiumPublicationParser` contre un
+ * vrai EPUB, sans construire l'écran d'import complet de
+ * `feature/import` (Phase 6).
  */
 @AndroidEntryPoint
 class MainActivity : ComponentActivity() {
@@ -50,7 +64,20 @@ class MainActivity : ComponentActivity() {
                             ),
                         )
                     }
-                    ReaderScreen(viewModel = viewModel)
+
+                    val importLauncher = rememberLauncherForActivityResult(ActivityResultContracts.OpenDocument()) { uri ->
+                        if (uri != null) {
+                            contentResolver.takePersistableUriPermission(uri, Intent.FLAG_GRANT_READ_URI_PERMISSION)
+                            viewModel.onIntent(ReaderIntent.ImportAndOpen(uri.toString()))
+                        }
+                    }
+
+                    Column(modifier = Modifier.padding(8.dp)) {
+                        Button(onClick = { importLauncher.launch(arrayOf("application/epub+zip", "application/octet-stream")) }) {
+                            Text("Importer (Tache 4.11)")
+                        }
+                        ReaderScreen(viewModel = viewModel)
+                    }
                 }
             }
         }
