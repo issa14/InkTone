@@ -461,6 +461,206 @@ discipline que le reste de cette tâche.
 
 ---
 
+## 6. Preuve du binding Android — AVANT tout code Kotlin de production
+
+**Mise à jour du 2026-07-27, soirée.** La section 5.6 laissait ouverte la
+question fork sherpa-onnx vs portage Kotlin, « à comparer avant d'écrire du
+code de production ». Cette section apporte cette comparaison de la seule
+façon qui compte ici : en exécutant réellement le binding sur un device
+Android physique, avec le même principe de preuve que le prototype Python
+(section 5) — pas de code de production écrit avant que chaque étape soit
+vérifiée.
+
+### 6.0 Environnement de build réel — rien n'était présent au départ
+
+Constat initial, avant toute action : ni NDK ni CMake n'étaient installés
+(`ANDROID_NDK_HOME`/`ANDROID_HOME` non définis, seuls `build-tools`,
+`cmdline-tools`, `emulator`, `platform-tools`, `platforms` présents dans le
+SDK local), et le disque était à 96 % (3.6 Go libres sur 78 Go) — insuffisant
+pour installer un NDK complet (~1,4 Go) sans y toucher. Ce blocage a été
+remonté explicitement avant toute tentative de contournement, conformément
+au principe de la tâche. Décision (utilisateur) : nettoyer et installer,
+plutôt que travailler autour.
+
+Nettoyage effectué (réversible, re-téléchargeable à la demande) : suppression
+des distributions Gradle et caches `~/.gradle` pour toutes les versions
+autres que celle utilisée par ReadFlow (8.9) — 7.3.3, 8.2, 8.6, 8.11.1, 9.2.0,
+9.6.1 — libérant environ 2 Go. Disque après nettoyage : 5.5 Go libres.
+
+Installation réelle via `sdkmanager` (pas supposée, vérifiée après coup) :
+
+```bash
+sdkmanager --install "ndk;27.2.12479018" "cmake;3.22.1"
+```
+
+NDK effectivement installé : r27c (27.2.12479018), 27 septembre 2024,
+~1,4 Go décompressé. CMake 3.22.1. Choisi comme version LTS stable la plus
+récente disponible au moment du test (pas la dernière RC), sans version
+`ndkVersion` déjà pinnée nulle part dans le dépôt ReadFlow à ce jour.
+
+### 6.1 Compilation de kaldi-native-fbank pour arm64-v8a — pas de blocage rencontré
+
+Contrairement à l'hypothèse de la section 4 (fork sherpa-onnx nécessaire,
+3-5 jours estimés), **kaldi-native-fbank se compile de façon autonome et
+triviale pour Android via CMake/NDK**, sans avoir besoin de sherpa-onnx du
+tout. Projet CMake minimal créé (hors dépôt, dans le scratchpad de session,
+même principe que les fixtures Python du prototype) :
+
+```cmake
+cmake_minimum_required(VERSION 3.18)
+project(fbank_jni_prototype CXX)
+include(FetchContent)
+FetchContent_Declare(kaldi_native_fbank
+  URL https://github.com/csukuangfj/kaldi-native-fbank/archive/refs/tags/v1.22.3.tar.gz
+  URL_HASH SHA256=9176cc66fc7ce1edf85cf355b06e320c57db6297df74277f575183468893cf61
+)
+FetchContent_MakeAvailable(kaldi_native_fbank)
+add_library(fbank_jni SHARED fbank_jni.cpp)
+target_link_libraries(fbank_jni PRIVATE kaldi-native-fbank-core log)
+```
+
+Version v1.22.3 choisie identique à celle déjà installée côté Python
+(`pip show kaldi_native_fbank` → 1.22.3) et identique à celle référencée
+dans `sherpa-onnx/cmake/kaldi-native-fbank.cmake` — pas une version
+devinée. Compilation lancée via un module Gradle Android minimal
+(`externalNativeBuild { cmake { path = "CMakeLists.txt" } }`,
+`ndkVersion = "27.2.12479018"`) : **succès du premier essai**, seuls des
+avertissements bénins `-Wcast-align` dans la dépendance transitive
+`kissfft`. Aucun patch nécessaire, aucun blocage non trivial — la
+prémisse d'un fork sherpa-onnx pour cette seule brique n'était donc pas
+justifiée.
+
+### 6.2 Binding JNI — mêmes paramètres que le prototype Python, aucun invention
+
+`fbank_jni.cpp` expose `Java_com_inktone_ctcproto_FbankNative_computeNemoFbank`
+qui reproduit exactement `compute_nemo_fbank()` (extract_log_probs.py) :
+même instanciation `knf::FbankOptions` (80 bins, low_freq=20.0,
+high_freq=-400.0, dither=0, snip_edges=false, povey window,
+preemph=0.97), et même normalisation NeMo per-feature
+`(x - mean) / (std + 1e-5)` par bin mel, variance population (ddof=0),
+implémentée à la main en C++ (pas de fonction bibliothèque équivalente
+disponible côté kaldi-native-fbank C++, contrairement à numpy côté Python).
+
+### 6.3 Test instrumenté sur device physique réel — pas un émulateur
+
+Un device Android était connecté en USB pendant la session
+(`adb devices -l`) : modèle Vivo **V2206**, SDK 34, `ro.board.platform=bengal`,
+**`ro.soc.model=SM6225`**. SM6225 est le nom modèle Qualcomm du
+**Snapdragon 680** — c'est-à-dire la cible matérielle exacte du Blueprint
+InkTone, pas un proxy. Ce n'est pas la mesure de latence exigée par le
+critère de sortie 5.2.0 (non tentée ici, hors périmètre de cette tâche),
+mais toute la validation qui suit tourne réellement sur silicium
+Snapdragon 680, pas sur un x86_64 desktop ni un émulateur.
+
+Test instrumenté (`androidTest`, `connectedDebugAndroidTest`) :
+charge `test_fr.wav` (assets du test APK), parse le WAV manuellement en
+suivant les chunks RIFF — **bug trouvé et corrigé ici** : le fichier
+contient un chunk `LIST/INFO` (écrit par `ffmpeg/Lavf62.3.100`) entre
+`fmt ` et `data`, qui décale `data` au-delà de l'offset 44 canonique
+supposé initialement (vérifié avec `xxd` : `data` commence en réalité à
+l'offset 70). Un parseur à offset fixe donnait `num_frames=0` sans erreur
+visible — corrigé en parcourant réellement les chunks RIFF plutôt qu'en
+supposant un layout.
+
+Contrainte d'environnement supplémentaire découverte en pratique : ce
+device (OEM Vivo/Funtouch) **désinstalle agressivement les apps de test
+sideloadées quelques secondes après l'exécution** — le fichier écrit dans
+`getExternalFilesDir()` et le package lui-même avaient déjà disparu au
+moment d'un `adb pull` lancé juste après le test (`run-as` également
+bloqué : `packagelist_parse failed: Operation not permitted`). Contournement
+retenu : encoder le résultat en Base64 et l'imprimer sur `System.out`, déjà
+capturé par Gradle dans un fichier logcat par-test local
+(`build/outputs/androidTest-results/.../logcat-<test>.txt`), indépendant du
+cycle de vie de l'app sur le device.
+
+### 6.4 Comparaison numérique feature-par-feature — pas visuelle
+
+`compare_kotlin_fbank.py` décode le Base64 récupéré du logcat, le compare
+élément par élément à `compute_nemo_fbank()` (même audio, même code Python
+déjà validé) :
+
+```
+Forme Kotlin/JNI : (398, 80)
+Forme Python     : (398, 80)
+Ecart absolu max  : 0.00009692
+Ecart absolu moyen: 0.00000075
+Ecart-type diff   : 0.00000212
+Position de l'ecart max : frame=45 bin=70 (kotlin=-1.528657, python=-1.528561)
+CONCORDANCE : tolerance=0.001 -> OK
+```
+
+Écart max ~1e-4, cohérent avec des différences d'arrondi fp32 entre
+compilateurs/plateformes (clang/NDK arm64 vs gcc/x86_64 desktop), pas une
+divergence de logique. **Binding de features confirmé bit-compatible en
+pratique, pas en théorie.**
+
+### 6.5 Portage Viterbi complet en Kotlin + onnxruntime-android — concordance exacte
+
+Le modèle (`model.onnx`, 440 Mo fp32) a été poussé directement sur le
+device via `adb push` vers `/data/local/tmp/ctcproto/` plutôt que bundlé
+comme asset APK, pour ne pas dupliquer 440 Mo supplémentaires sur un
+disque hôte déjà sous tension (3.5 Go libres à ce stade). `tokens.txt` et
+les 4 fichiers `.wav` de test également poussés de la même façon.
+
+`text_to_token_ids()`, `viterbi_forced_alignment()` et
+`words_from_viterbi_segments()` (test_alignment.py /
+run_viterbi_prototype.py, déjà validés section 5) ont été portés terme à
+terme en Kotlin (`CtcAlignment.kt`) — traduction directe, aucune nouvelle
+logique. Inférence ONNX via `onnxruntime-android:1.19.2` (déjà en cache
+Gradle local, pas de téléchargement supplémentaire), entrées
+`audio_signal (1,80,T)` / `length (1,)` identiques au script Python,
+sortie `logprobs` consommée telle quelle (déjà log-softmax, vérifié
+section 5.1).
+
+**Résultat sur les 4 phrases de référence, exécuté réellement sur
+Snapdragon 680 (SM6225), pas simulé :**
+
+| Fichier | Kotlin/ONNX (device) | Python (déjà validé §5.4) | Concordance |
+|---|---|---|---|
+| `test_fr.wav` | bonjour[0.000-0.480] le[0.640-0.720] monde[0.800-1.040] ceci[1.120-1.440] est[1.600-1.680] un[1.760-1.840] test[1.920-2.080] pour[2.240-2.320] vérifier[2.400-3.040] l'alignement[3.040-3.760] | identique | **Exacte, à la milliseconde** |
+| `liaison_elision_1.wav` | l'homme[0.000-0.560] et[0.560-0.640] la[0.720-0.800] femme[0.800-1.200] sont[1.280-1.440] arrivés[1.520-2.080] | identique | **Exacte** |
+| `liaison_2.wav` | les[0.000-0.080] amis[0.240-0.560] arrivent[0.640-1.200] bientôt[1.200-1.680] | identique | **Exacte** |
+| `elision_2.wav` | peut-être[0.000-0.560] qu'il[0.640-0.960] viendra[1.040-1.440] demain[1.680-1.920] | identique | **Exacte** |
+
+Concordance **100 %, mot pour mot, timestamp pour timestamp** entre le
+pipeline Kotlin/JNI/onnxruntime-android tournant sur le device physique
+Snapdragon 680 et le prototype Python déjà validé — liaisons et élisions
+toujours préservées comme des mots uniques (`l'homme`, `peut-être`,
+`qu'il`, `l'alignement`).
+
+### 6.6 Décision — la question ouverte en §5.6 est tranchée
+
+**Le fork sherpa-onnx n'est pas nécessaire.** Le pipeline complet — features
+fbank (kaldi-native-fbank compilé seul via CMake/NDK), inférence CTC
+(onnxruntime-android, AAR officiel, pas de patch), et alignement forcé
+Viterbi (port Kotlin direct du prototype Python) — fonctionne de bout en
+bout, prouvé sur le device physique cible (Snapdragon 680 réel), sans
+modifier une seule ligne de sherpa-onnx. C'était l'option B de la section
+5.6, maintenant confirmée par la pratique plutôt que choisie par défaut.
+
+Ce que ce prototype ne couvre pas encore, à traiter avant tout code de
+production dans `infrastructure/tts` (Blueprint §5.2, TODO déjà posé en
+`SherpaOnnxTtsEngine.kt`) :
+- Mesure de latence réelle sur ce Snapdragon 680 (critère de sortie 5.2.0,
+  toujours non tentée ici — modèle fp32 utilisé, pas int8, pas de
+  threading ONNX Runtime configuré).
+- Modèle quantifié int8 (recommandé section 2) plutôt que fp32 (440 Mo,
+  utilisé ici uniquement parce que déjà présent du prototypage Python).
+- Intégration dans l'architecture Clean/MVI réelle (`AlignmentManager`
+  esquissé section 4.2 reste un squelette à adapter, pas du code final).
+
+### 6.7 Fichiers
+
+- Projet CMake + module Gradle Android du prototype JNI/ONNX (scratchpad de
+  session, hors dépôt Git, même convention que le reste du prototypage de
+  cette tâche) : `CMakeLists.txt`, `fbank_jni.cpp`, `FbankNative.kt`,
+  `FbankNativeTest.kt`, `CtcAlignment.kt`, `OnnxAlignmentTest.kt`.
+- `compare_kotlin_fbank.py` — comparaison numérique, dans
+  `~/projects/inktone-ctc-prototype/` (même répertoire que le reste du
+  prototypage Python, non committé).
+
+---
+
 ## Références
 
 - [Sherpa-onnx GitHub](https://github.com/k2-fsa/sherpa-onnx)
