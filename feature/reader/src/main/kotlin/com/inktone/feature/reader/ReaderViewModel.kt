@@ -3,11 +3,13 @@ package com.inktone.feature.reader
 import android.util.Log
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
+import com.inktone.domain.model.EffectiveReadingSettings
 import com.inktone.domain.model.Publication
 import com.inktone.domain.model.PublicationFormat
 import com.inktone.domain.model.ReadingState
 import com.inktone.domain.model.TtsEngineId
 import com.inktone.domain.model.VoiceProfile
+import com.inktone.domain.repository.PreferencesRepository
 import com.inktone.domain.repository.PublicationRepository
 import com.inktone.domain.service.ParseResult
 import com.inktone.domain.service.PublicationParser
@@ -37,6 +39,7 @@ class ReaderViewModel @Inject constructor(
     private val updateReadingState: UpdateReadingStateUseCase,
     private val getReadingState: GetReadingStateUseCase,
     private val publicationRepository: PublicationRepository,
+    private val preferencesRepository: PreferencesRepository,
 ) : ViewModel() {
 
     private val _state = MutableStateFlow(ReaderUiState())
@@ -75,10 +78,19 @@ class ReaderViewModel @Inject constructor(
                 is ParseResult.Success -> {
                     currentPublicationId = publicationId
                     val restored = getReadingState(publicationId)
+                    // Cascade de precedence (Blueprint §3.3, Tache 1.3) :
+                    // surcharge de publication (ReadingState.overrides) >
+                    // preferences globales. Resolue ici, jamais recalculee
+                    // dans ReaderScreen (Tache 4.7).
+                    val effectiveSettings = EffectiveReadingSettings.resolve(
+                        overrides = restored?.overrides,
+                        global = preferencesRepository.get(),
+                    )
                     _state.value = ReaderUiState(
                         chapters = result.documentModel.chapters,
                         tableOfContents = result.documentModel.tableOfContents,
                         currentChapterIndex = restored?.locator?.chapterIndex ?: 0,
+                        effectiveSettings = effectiveSettings,
                     )
                     triggerPreload(_state.value.currentChapterIndex)
                 }

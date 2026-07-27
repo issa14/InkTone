@@ -1,6 +1,8 @@
 package com.inktone.feature.reader
 
 import com.inktone.domain.model.Chapter
+import com.inktone.domain.model.EffectiveReadingSettings
+import com.inktone.domain.model.ReadingTheme
 import com.inktone.domain.model.TableOfContentsEntry
 
 data class ReaderUiState(
@@ -11,6 +13,11 @@ data class ReaderUiState(
     val highlightedWordRange: IntRange? = null,
     val isPlaying: Boolean = false,
     val isTocVisible: Boolean = false,
+    // Deja resolu via EffectiveReadingSettings.resolve() (Tache 1.3) au
+    // moment de l'ouverture (Tache 4.7) - ReaderScreen ne connait jamais
+    // ReadingOverrides ni UserPreferences separement, seulement ce
+    // resultat final.
+    val effectiveSettings: EffectiveReadingSettings = EffectiveReadingSettings(ReadingTheme.SYSTEM, 18),
 ) {
     val currentChapter: Chapter? get() = chapters.getOrNull(currentChapterIndex)
     val hasNextChapter: Boolean get() = currentChapterIndex < chapters.lastIndex
