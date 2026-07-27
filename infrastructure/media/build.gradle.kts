@@ -5,3 +5,11 @@ plugins {
 android {
     namespace = "com.inktone.infrastructure.media"
 }
+
+dependencies {
+    implementation(libs.androidx.media3.session)
+    implementation(libs.androidx.media3.common)
+    implementation(libs.androidx.media3.exoplayer)
+
+    testImplementation(libs.kotlinx.coroutines.test)
+}
