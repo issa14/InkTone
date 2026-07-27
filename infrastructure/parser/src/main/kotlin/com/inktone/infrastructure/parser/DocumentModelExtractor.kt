@@ -60,6 +60,14 @@ class DocumentModelExtractor {
         // Sans cette resolution, le filtre ne matche jamais silencieusement
         // (confirme par un test qui echouait avec 0 phrase extraite alors
         // que content() renvoyait bien 2 elements).
+        //
+        // K6 (percent-encoding, Tache 4.3) : Href.resolve() normalise deja
+        // le percent-encoding mixte entre le href du spine et le nom de
+        // fichier physique dans le conteneur (HrefEncodingTest, fixture a
+        // href "chapitre%20un.xhtml" vs fichier "chapitre un.xhtml") -
+        // verifie empiriquement, pas suppose. Aucune normalisation
+        // supplementaire a ecrire ici : ce serait redondant avec ce que
+        // Readium fait deja.
         val chapterUrl = link.href.resolve()
         val chapterTextElements = allElements
             .filter { it.locator.href == chapterUrl }
