@@ -30,24 +30,34 @@ interface TtsEngine {
  * l'égalité par défaut d'une data class sur un ByteArray compare des
  * références, pas du contenu — piège classique. `equals`/`hashCode` sont
  * donc écrits à la main avec `contentEquals`/`contentHashCode`.
+ *
+ * `sampleRate` est nécessaire pour toute lecture réelle du PCM brut —
+ * ajout Tâche 3.8, absent depuis la Phase 1 car aucun code ne jouait
+ * encore l'audio à ce moment-là. Hypothèse posée ici, à documenter si un
+ * moteur futur la viole : PCM16 signé, mono. Si un moteur produit un
+ * format différent (stéréo, flottant), cette classe devra être étendue
+ * explicitement — jamais une supposition silencieuse côté lecteur.
  */
 class AudioSegment(
     val audioData: ByteArray,
     val durationMs: Long,
     val wordTimestamps: List<WordTimestamp>,
+    val sampleRate: Int,
 ) {
     override fun equals(other: Any?): Boolean {
         if (this === other) return true
         if (other !is AudioSegment) return false
         return audioData.contentEquals(other.audioData) &&
             durationMs == other.durationMs &&
-            wordTimestamps == other.wordTimestamps
+            wordTimestamps == other.wordTimestamps &&
+            sampleRate == other.sampleRate
     }
 
     override fun hashCode(): Int {
         var result = audioData.contentHashCode()
         result = 31 * result + durationMs.hashCode()
         result = 31 * result + wordTimestamps.hashCode()
+        result = 31 * result + sampleRate
         return result
     }
 }
