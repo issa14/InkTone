@@ -71,34 +71,23 @@ que ce document demande explicitement de soumettre à Issa.
   Readium à `infrastructure/parser` (ADR-011). Placé dans
   `infrastructure/parser` à la place.
 
-## Question ouverte pour Issa — Palier 1 seul ou Palier 1 + Palier 2 pour la v1 ?
+## Décision (Issa, 2026-07-27)
 
-Le doc de la Tâche 3.7 est explicite : « Cette décision appartient à
-Issa, informée par l'usage réel du point 5 — pas une conclusion que
-Claude Code ou moi devrions tirer à sa place. » Cette section ne
-tranche donc rien, elle rassemble ce qui est factuellement disponible
-pour éclairer la décision :
+Palier 1 + Palier 2 tous deux dans le périmètre v1. Le Palier 1
+(Android natif) reste la base de repli (ADR-021, détection au
+runtime) ; le Palier 2 (Sherpa-ONNX + alignement forcé CTC) est
+développé en Phase 5, pas différé en évolution future.
 
-- Ce qui est validé empiriquement : la chaîne complète
-  `TextToSpeech.onRangeStart → WordTimestamp → surlignage synchronisé →
-  Locator → persistance K3 → reprise` fonctionne de bout en bout avec
-  le Palier 1 (moteur natif Android), sur device réel.
-- Ce qui n'est PAS validé : la qualité audio perçue du Palier 1, car
-  aucune lecture audio réelle n'est encore câblée dans cette marche à
-  blanc (voir point 5 ci-dessus). Un jugement sur le confort d'écoute
-  du moteur natif Android nécessite d'abord `AudioPlaybackService`
-  (Phase 5) ou un test ad hoc hors de la portée de cette marche à
-  blanc.
+Ce qui est acquis avant cette décision :
+
+- Validé empiriquement : la chaîne complète `TextToSpeech.onRangeStart
+  → WordTimestamp → surlignage synchronisé → Locator → persistance K3
+  → reprise` fonctionne de bout en bout avec le Palier 1 (moteur natif
+  Android), sur device réel, lecture audio comprise (Tâche 3.8).
 - Le Palier 2 (Sherpa-ONNX + alignement forcé CTC, ADR-021) reste non
-  implémenté à ce stade — sa qualité vocale est donc également non
-  comparable empiriquement pour l'instant.
-
-En résumé : la mécanique de synchronisation mot-à-mot est prouvée
-indépendamment du moteur TTS utilisé. La question de savoir si le
-Palier 1 seul suffit pour une v1, ou si le Palier 2 est requis dès la
-v1 pour l'expérience visée, reste ouverte et dépend d'un critère
-(qualité audio perçue) que cette marche à blanc n'a pas encore les
-moyens de mesurer.
+  implémenté — c'est le travail que cette décision ouvre. Le contrat
+  de domaine (`TtsEngine`, `WordTimestamp`, `AudioSegment`) ne change
+  pas : seule l'infrastructure change (ADR-021, section Consequences).
 
 ## Checklist finale de sortie de Phase 3
 
@@ -116,4 +105,9 @@ moyens de mesurer.
 - [x] Tâche 3.7 : test manuel de bout en bout exécuté sur device réel,
       surlignage confirmé visuellement, reprise K3 confirmée par log
       + requête SQL directe, résultats documentés ci-dessus, décision
-      Palier 1 vs 1+2 explicitement laissée à Issa.
+      Palier 1 vs 1+2 tranchée par Issa (voir section Décision
+      ci-dessus) : Palier 1 + Palier 2 tous deux dans le périmètre v1.
+- [x] Tâche 3.8 : lecture audio réelle câblée (`AudioSegmentPlayer`,
+      AudioTrack sur PCM brut) et vérifiée sur device réel — qualité
+      vocale jugée insuffisante seule (voir section Décision
+      ci-dessus), Palier 2 requis en Phase 5.

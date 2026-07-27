@@ -24,12 +24,13 @@ import javax.inject.Inject
 /**
  * Squelette MVI de la marche à blanc — une seule phrase, pas de
  * navigation de chapitre complète (Phase 4). L'audio est joué via
- * MediaPlayer directement ici ; AudioPlaybackService (Phase 5) le
- * remplacera pour la lecture en arrière-plan.
+ * [AudioSegmentPlayer] (AudioTrack, Tâche 3.8) ; AudioPlaybackService
+ * (Phase 5) le remplacera pour la lecture en arrière-plan.
  */
 @HiltViewModel
 class ReaderViewModel @Inject constructor(
     private val ttsEngine: TtsEngine, // injecte AndroidNativeTtsEngine (Palier 1) via Hilt (infrastructure/tts/di/TtsModule)
+    private val audioSegmentPlayer: AudioSegmentPlayer,
     private val updateReadingState: UpdateReadingStateUseCase,
     private val getReadingState: GetReadingStateUseCase,
     private val publicationRepository: PublicationRepository,
@@ -105,15 +106,8 @@ class ReaderViewModel @Inject constructor(
                 voice = "fr-fr-default", language = "fr-FR",
             )
             val segment = ttsEngine.synthesize(sentence, voiceProfile)
+            audioSegmentPlayer.play(segment) // démarre en parallèle du surlignage ci-dessous — les deux dérivent leur timing du même événement de synthèse réel (Tâche 3.8)
 
-            // Lecture simplifiée pour la marche à blanc : on rejoue les
-            // WordTimestamp via un minuteur plutôt que de lire l'audio en
-            // synchronisation stricte — suffisant pour valider la chaîne
-            // Locator -> surlignage -> reprise. La synchronisation audio
-            // réelle (MediaPlayer/AudioTrack sur segment.audioData) est un
-            // point à compléter avant de considérer cette tâche terminée,
-            // volontairement non détaillé ici pour ne pas dupliquer le
-            // travail de AudioPlaybackService prévu en Phase 5.
             segment.wordTimestamps.forEach { wt ->
                 _state.value = _state.value.copy(
                     highlightedWordRange = wt.charOffset until (wt.charOffset + wt.word.length),

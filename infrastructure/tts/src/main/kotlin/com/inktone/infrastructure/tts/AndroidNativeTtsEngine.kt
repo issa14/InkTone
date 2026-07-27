@@ -125,7 +125,14 @@ class AndroidNativeTtsEngine @Inject constructor(
                                 charOffset = boundary.charStart,
                             )
                         }
-                        cont.resume(AudioSegment(audioData = pcm, durationMs = durationMs, wordTimestamps = wordTimestamps))
+                        cont.resume(
+                            AudioSegment(
+                                audioData = pcm,
+                                durationMs = durationMs,
+                                wordTimestamps = wordTimestamps,
+                                sampleRate = sampleRate,
+                            ),
+                        )
                     } catch (e: Exception) {
                         cont.resumeWithException(e)
                     } finally {
