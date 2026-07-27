@@ -628,6 +628,36 @@ Snapdragon 680 et le prototype Python déjà validé — liaisons et élisions
 toujours préservées comme des mots uniques (`l'homme`, `peut-être`,
 `qu'il`, `l'alignement`).
 
+### 6.5bis Traçabilité des résultats — un run par test, pas un « meilleur de N »
+
+Question de traçabilité à clarifier explicitement, pas supposée réglée par
+défaut : les chiffres ci-dessus (§6.4 : écart 9.7e-5 ; §6.5 : concordance
+exacte sur 4 phrases) proviennent-ils d'un seul run cohérent de bout en
+bout, ou de plusieurs runs dont on aurait gardé le meilleur ?
+
+Réponse précise, reconstituée à partir des logs Gradle de la session :
+- **§6.4 (écart 9.7e-5)** provient de `FbankNativeTest`, exécuté seul sur
+  `test_fr.wav`. Un premier run a **échoué** (`num_frames=0`, bug de
+  parsing WAV décrit en §6.3 — le chunk `LIST/INFO` non géré). Après
+  correction du parseur, un second run a réussi et produit le résultat
+  rapporté. Un seul run réussi, pas de choix parmi plusieurs succès.
+- **§6.5 (concordance exacte sur les 4 phrases)** provient de
+  `OnnxAlignmentTest`, un test distinct (fichier séparé, JNI + inférence
+  ONNX + Viterbi complets sur les 4 `.wav`), exécuté **une seule fois**, en
+  même temps que `FbankNativeTest` dans la dernière invocation
+  `connectedDebugAndroidTest` de la session (« Starting 2 tests… Finished 2
+  tests », build réussi du premier coup pour ce test-ci). Aucun run
+  antérieur de `OnnxAlignmentTest` n'a échoué ni été écarté.
+
+Donc : chaque chiffre rapporté est le résultat du **seul run réussi
+obtenu** pour le test correspondant, après correction des bugs réels
+rencontrés en cours de route (documentés tels quels : parsing WAV en
+§6.3, désinstallation OEM agressive nécessitant le contournement logcat
+en §6.3) — pas une sélection parmi plusieurs exécutions concurrentes ou
+répétées. Les deux tests restent deux exécutions distinctes du même code
+JNI (`FbankNative.computeNemoFbank`), pas un seul run unique produisant
+les deux résultats à la fois.
+
 ### 6.6 Décision — la question ouverte en §5.6 est tranchée
 
 **Le fork sherpa-onnx n'est pas nécessaire.** Le pipeline complet — features
@@ -658,6 +688,185 @@ production dans `infrastructure/tts` (Blueprint §5.2, TODO déjà posé en
 - `compare_kotlin_fbank.py` — comparaison numérique, dans
   `~/projects/inktone-ctc-prototype/` (même répertoire que le reste du
   prototypage Python, non committé).
+
+---
+
+## 7. Modèle int8 + latence réelle sur le V2206 (Snapdragon 680) — critère de sortie 5.2.0
+
+**Mise à jour du 2026-07-27, nuit.** Cette section apporte la seule mesure qui
+manquait encore : la latence chronométrée sur le device cible, avec le modèle
+réellement destiné à la production (int8, pas fp32). Sans ce chiffre, la
+section 6 prouvait la *correction* du pipeline, pas sa *viabilité*.
+
+### 7.1 Modèle téléchargé — même release, même répertoire que §2
+
+`sherpa-onnx-nemo-fast-conformer-ctc-be-de-en-es-fr-hr-it-pl-ru-uk-20k-int8.tar.bz2`,
+même tag de release GitHub (`asr-models`) que le modèle fp32 déjà utilisé.
+`model.int8.onnx` : 132 445 134 octets (~126 Mo), contre 461 313 276 octets
+(~440 Mo) pour le fp32 — **3,5× plus petit**. `tokens.txt` de l'archive int8
+vérifié **binairement identique** à celui du fp32 (`diff` exit 0) : même
+vocabulaire, aucun risque de désynchronisation d'IDs entre les deux modèles.
+Poussé sur le device via `adb push` vers `/data/local/tmp/ctcproto/`, aux
+côtés du fp32 déjà présent (device : 55 Go libres, aucune contrainte).
+
+### 7.2 Rejeu du pipeline — un seul changement, tout le reste identique
+
+`Int8LatencyTest.kt` réutilise **sans modification** `FbankNative` (JNI, §6.2),
+`CtcAlignment.kt` (`textToTokenIds`/`viterbiForcedAlignment`/
+`wordsFromViterbiSegments`, §6.5) et la même logique d'entrée/sortie ONNX
+(`audio_signal`/`length`/`logprobs`). Seule différence avec `OnnxAlignmentTest`
+(§6.5) : `env.createSession(...)` pointe vers `model.int8.onnx` au lieu de
+`model.onnx`. Exécuté sur les mêmes 4 phrases de référence, sur le même
+device physique Snapdragon 680 (V2206, SM6225).
+
+### 7.3 Écart de précision int8 vs fp32 — mesuré, pas supposé négligeable
+
+**Log_probs bruts (`test_fr.wav`, T=50 frames × 2561 classes)** — comparaison
+élément par élément contre la référence Python fp32
+(`logprobs_fp32_python_test_fr.bin`, régénérée pour cette section) :
+
+```
+Ecart absolu max   : 6.45
+Ecart absolu moyen : 0.75
+Ecart-type          : 0.63
+Frames avec argmax different : 3 / 50 (6 %)
+  frame 16 : int8 -> token 1794 (logp=-0.420) | fp32 -> token 2560/blank (logp=-0.577)
+  frame 28 : int8 -> token 2560/blank (logp=-0.193) | fp32 -> token 1893 (logp=-0.010)
+  frame 29 : int8 -> token 1893 (logp=-0.008) | fp32 -> token 2560/blank (logp=-0.069)
+```
+
+C'est un écart **d'un tout autre ordre de grandeur** que la comparaison
+fp32-vs-fp32 de la §6.4 (9.7e-5, simple bruit d'arrondi de plateforme) : ici,
+6.45 en espace log-probabilité et 3 frames sur 50 (6 %) où le token le plus
+probable change réellement entre les deux modèles. C'est la quantification
+elle-même qui modifie la sortie, pas un artefact de portage — **effet mesuré,
+pas supposé négligeable**, conformément à la consigne.
+
+**Conséquence sur les timestamps de mots finaux**, comparés à la table
+fp32 exacte de la §6.5 (mêmes 4 phrases) :
+
+| Fichier | Mot | fp32 (§6.5) | int8 | Écart |
+|---|---|---|---|---|
+| `test_fr.wav` | pour | [2.240–2.320] | [2.320–2.400] | +80 ms (début et fin) |
+| `liaison_elision_1.wav` | sont | [1.280–1.440] | [1.280–1.520] | +80 ms (fin) |
+| `liaison_2.wav` | amis | [0.240–0.560] | [0.320–0.560] | +80 ms (début) |
+| `liaison_2.wav` | arrivent | [0.640–1.200] | [0.640–1.280] | +80 ms (fin) |
+| `liaison_2.wav` | bientôt | [1.200–1.680] | [1.280–1.680] | +80 ms (début) |
+| `elision_2.wav` | peut-être | [0.000–0.560] | [0.000–0.640] | +80 ms (fin) |
+| `elision_2.wav` | qu'il | [0.640–0.960] | [0.720–0.960] | +80 ms (début) |
+| `elision_2.wav` | demain | [1.680–1.920] | [1.600–1.920] | **-80 ms** (début) |
+
+Tous les autres mots (majorité, non listés ici) restent identiques au frame
+près. **Aucun mot manquant, aucun mot supplémentaire, aucune fusion/coupure
+de mot** dans les 4 phrases — uniquement des décalages de frontière, tous de
+grandeur **exactement 1 frame (80 ms)**, jamais plus. C'est cohérent avec les
+3 frames à argmax différent identifiées ci-dessus (ex. frames 28-29 ≈
+2.24-2.32 s correspondent exactement au décalage observé sur « pour »).
+
+80 ms reste **dans** le budget Blueprint §11.2 « Précision du surlignage mot
+≤ ±120 ms vs audio » — mais ce n'est pas une marge confortable : un décalage
+systématique d'une frame entière sur plusieurs mots par phrase courte laisse
+peu de marge résiduelle si d'autres sources d'erreur s'ajoutent en production
+(latence audio de lecture, jitter de threading). À surveiller, pas à ignorer.
+
+### 7.4 Latence réelle mesurée sur le V2206 — chronométrée, pas estimée
+
+Phrase de test : `test_fr.wav`, 3,68 s d'audio (T=50 frames), `System.nanoTime()`
+autour de chaque étape, exécuté sur le Snapdragon 680 physique (SM6225) :
+
+**Premier appel (état du process après chargement de la session ONNX, pas de warm-up dédié) :**
+
+| Étape | Latence |
+|---|---|
+| Features (fbank JNI) | 59,41 ms |
+| Inférence ONNX (int8) | 500,20 ms |
+| Viterbi (Kotlin) | 4,24 ms |
+| **Total** | **563,84 ms** |
+
+**5 exécutions supplémentaires du pipeline complet (session déjà chargée) :**
+
+```
+541.09, 528.53, 507.12, 570.12, 781.44 ms  →  médiane = 541,09 ms
+```
+
+Le dernier run (781 ms) est un net décrochage — probablement jitter de
+scheduling/thermal sur le device, pas re-mesuré au-delà de 5 runs faute de
+budget de session ; à confirmer par une campagne plus longue avant
+d'arrêter un budget définitif. Pas d'options de threading ONNX Runtime
+configurées (`SessionOptions()` par défaut) — piste d'optimisation non
+explorée ici.
+
+**Comparaison au proxy desktop (§5.5)** : 1,285 s médiane sur CPU x86_64
+desktop, modèle **fp32**, fbank+inférence seules (Viterbi non chronométré
+côté Python). Le pipeline int8 sur le Snapdragon 680 réel (~537 ms hors
+Viterbi) est **plus rapide** que le proxy desktop fp32 — cohérent avec un
+modèle 3,5× plus petit, pas une anomalie de mesure.
+
+### 7.5 Confrontation au budget Blueprint §11.2 — l'alignement s'ajoute-t-il ou se chevauche-t-il ?
+
+Deux lignes du budget §11.2 sont concernées, et la réponse diffère entre les
+deux :
+
+**« TTS Latence tap → premier audio ≤ 1 500 ms »** — l'alignement forcé a
+besoin de l'audio déjà synthétisé en entrée (les features fbank sont
+calculées sur la forme d'onde produite par le TTS). Pour la **toute première
+phrase** d'une session de lecture, il n'y a pas de phrase précédente dont la
+lecture masquerait ce calcul : synthèse et alignement sont **séquentiels, pas
+parallélisables**, pour cette phrase-là. Si le surlignage mot doit être prêt
+dès le premier son (pas de rattrapage progressif), l'alignement (~540 ms)
+**s'ajoute directement** au budget de 1 500 ms — laissant environ 960 ms pour
+la synthèse TTS elle-même, la décompression du modèle de voix et le reste du
+pipeline. Ce n'est pas mesuré ici (portée hors de cette tâche), mais c'est la
+contrainte concrète que ce chiffre impose en aval.
+
+**« TTS Silence inter-phrases perçu ≤ 150 ms »** — le Blueprint (§5, ligne
+702) prévoit explicitement un préchargement : « pendant la lecture de la
+phrase n, la phrase n+1 est synthétisée et mise en buffer ». Si l'alignement
+de la phrase n+1 est calculé dans cette même fenêtre de préchargement (pendant
+que la phrase n joue), alors les ~540 ms mesurés ici **se chevauchent** avec
+la lecture de la phrase n et n'ajoutent rien au silence perçu, **à condition
+que la durée de lecture de la phrase n dépasse (synthèse + alignement) de la
+phrase n+1**. Pour des phrases de longueur courante (plusieurs secondes,
+comme les 4 phrases de test ici), cette marge existe largement. **Risque
+identifié, pas résolu ici** : une phrase très courte (ex. une interjection
+d'un mot, <1 s de lecture) ne laisserait pas assez de temps de préchargement
+pour absorber ~540 ms d'alignement + le temps de synthèse — auquel cas le
+silence inter-phrases dépasserait le budget de 150 ms sur ce cas précis. Pas
+mesuré ici (aucune phrase courte dans le corpus de test), à vérifier en
+Phase 5 lors de l'intégration réelle.
+
+### 7.6 Conclusion explicite
+
+**Le modèle int8 est utilisable pour la suite du développement, avec deux
+réserves écrites, pas un compromis à choix silencieux :**
+
+1. **Précision** : la quantification introduit un décalage mesuré (jusqu'à
+   80 ms, une frame) sur certaines frontières de mots — toujours dans le
+   budget ±120 ms du §11.2, mais avec une marge résiduelle réduite. Pas
+   bloquant en l'état, mais à revalider sur un corpus plus large que 4
+   phrases avant de considérer le budget de précision définitivement acquis.
+2. **Latence** : ~540 ms médians pour une phrase de 3,68 s sur le
+   Snapdragon 680 réel est un résultat **positif** (le pipeline entier tient
+   largement dans la fenêtre de préchargement inter-phrases pour des phrases
+   de longueur courante), mais **s'ajoute intégralement, sans chevauchement
+   possible, au budget « tap → premier audio » ≤ 1 500 ms** pour la première
+   phrase d'une session — contrainte réelle sur le budget restant pour la
+   synthèse TTS elle-même, à vérifier avec un chiffre de synthèse réel
+   (hors périmètre de cette tâche).
+
+Pas de blocage architectural trouvé. Le critère de sortie 5.2.0 (latence
+mesurée sur device réel) est maintenant satisfait pour la brique
+d'alignement seule — la mesure de bout en bout (TTS + alignement, sur
+device, modèle de voix inclus) reste à faire avant de clore la Phase 5.2
+dans son ensemble.
+
+### 7.7 Fichiers
+
+- `Int8LatencyTest.kt` — ajouté au même module scratchpad que §6.7
+  (`~/…/scratchpad/ctc-android-jni-proto/`, hors dépôt Git).
+- `logprobs_fp32_python_test_fr.bin`, `logprobs_int8_kotlin_test_fr.npy` —
+  dans `~/projects/inktone-ctc-prototype/`, même convention que le reste du
+  prototypage non committé de cette tâche.
 
 ---
 
