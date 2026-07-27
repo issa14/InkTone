@@ -52,6 +52,7 @@ class ReaderViewModel @Inject constructor(
         when (intent) {
             is ReaderIntent.OpenPublication -> openPublication(intent.publicationId)
             is ReaderIntent.BootstrapAndOpenFixture -> bootstrapAndOpenFixture(intent.publicationId, intent.fileUri)
+            is ReaderIntent.ImportAndOpen -> importAndOpen(intent.fileUri)
             is ReaderIntent.NextChapter -> navigateToChapter(_state.value.currentChapterIndex + 1)
             is ReaderIntent.PreviousChapter -> navigateToChapter(_state.value.currentChapterIndex - 1)
             is ReaderIntent.JumpToChapter -> navigateToChapter(intent.chapterIndex)
@@ -110,6 +111,25 @@ class ReaderViewModel @Inject constructor(
                     fileHash = "walking-skeleton-fixture-hash",
                     fileSize = java.io.File(fileUri).length(),
                     chapterCount = 1,
+                    importDate = System.currentTimeMillis(),
+                ),
+            )
+            openPublication(publicationId)
+        }
+    }
+
+    private fun importAndOpen(fileUri: String) {
+        viewModelScope.launch {
+            val publicationId = "import-" + fileUri.hashCode().toUInt().toString(16)
+            publicationRepository.insert(
+                Publication(
+                    id = publicationId,
+                    title = "Import (Tache 4.11)",
+                    format = PublicationFormat.EPUB,
+                    fileUri = fileUri,
+                    fileHash = publicationId,
+                    fileSize = 0L,
+                    chapterCount = 0,
                     importDate = System.currentTimeMillis(),
                 ),
             )

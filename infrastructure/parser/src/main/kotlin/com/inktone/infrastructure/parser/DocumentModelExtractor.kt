@@ -44,8 +44,25 @@ class DocumentModelExtractor {
             extractChapter(chapterIndex, link, allElements)
         }
 
-        val toc = publication.tableOfContents.mapIndexed { index, link ->
-            TableOfContentsEntry(title = link.title ?: "", chapterIndex = index)
+        // Bug reel trouve en testant contre un vrai EPUB (Tache 4.11,
+        // Les Miserables Tome I) : publication.tableOfContents a ses
+        // propres entrees (souvent des ancres #fragment DANS une meme
+        // ressource de spine - ce livre a 6 ressources de spine mais 153
+        // navPoints) - son cardinal n'a AUCUN rapport avec le nombre de
+        // chapitres (readingOrder/spine). Utiliser l'index de la TOC
+        // elle-meme comme chapterIndex (comme le faisait le code
+        // d'origine) produit un chapterIndex hors bornes pour la quasi
+        // totalite des entrees au-dela du nombre de ressources de spine,
+        // et ReaderViewModel.navigateToChapter (Tache 4.5) les ignore
+        // alors silencieusement (bornes verifiees par design, K3) - la
+        // TOC semblait fonctionner (aucun crash) mais ne naviguait nulle
+        // part pour la plupart des entrees. Resolu par correspondance de
+        // href (sans fragment) contre readingOrder, comme extractChapter
+        // le fait deja pour le filtrage des elements de contenu.
+        val readingOrderUrls = publication.readingOrder.map { it.href.resolve().removeFragment() }
+        val toc = publication.tableOfContents.map { link ->
+            val chapterIndex = readingOrderUrls.indexOf(link.href.resolve().removeFragment())
+            TableOfContentsEntry(title = link.title ?: "", chapterIndex = chapterIndex.coerceAtLeast(0))
         }
 
         return DocumentModel(chapters = chapters, tableOfContents = toc, resources = emptyList())

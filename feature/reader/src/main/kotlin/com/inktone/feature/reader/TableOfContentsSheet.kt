@@ -32,7 +32,14 @@ fun TableOfContentsSheet(
     }
 
     LazyColumn(state = listState, modifier = Modifier.fillMaxWidth()) {
-        itemsIndexed(entries, key = { _, entry -> entry.chapterIndex }) { _, entry ->
+        // Bug reel trouve en Tache 4.11 (crash IllegalArgumentException
+        // "Key already used") : chapterIndex n'est PAS unique par entree
+        // de TOC des qu'un livre reel a plusieurs ancres #fragment dans
+        // la meme ressource de spine (Les Miserables Tome I : 153
+        // entrees de TOC pour 6 chapitres). La position dans la liste
+        // (index), elle, est toujours unique - c'est la seule cle valide
+        // ici, meme si plusieurs entrees ciblent le meme chapitre.
+        itemsIndexed(entries, key = { index, _ -> index }) { _, entry ->
             val isCurrent = entry.chapterIndex == currentChapterIndex
             Text(
                 text = entry.title,

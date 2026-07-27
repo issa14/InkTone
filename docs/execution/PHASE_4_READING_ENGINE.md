@@ -826,5 +826,6 @@ class RegressionGuardsSuite
 | 8 | Gestion d'erreurs prouvée sur fixtures réelles | `ErrorHandlingTest` (3 cas) vert |
 | 9 | Outillage de benchmark en place | `EpubOpenBenchmark` s'exécute ; scénario complet noté comme différé à la Phase 6 |
 | 10 | Garde-fous K3/K6/K7 regroupés et traçables | `RegressionGuardsSuite` + note sur la limite inter-modules |
+| 11 | Validation contre un EPUB réel (amendement, Tâche 4.11) | `VALIDATION_EPUB_REEL_LES_MISERABLES.md` — 3 bugs réels trouvés et corrigés (support `content://`, mapping `chapterIndex` de la TOC, crash `LazyColumn`), tous couverts par un test de régression |
 
-Une fois les 10 critères vérifiés sur un clone frais, Phase 4 est close. Étape suivante : **Phase 5 — TTS Engine complet**, dont le tableau de tâches a déjà été révisé post-ADR-021 (Palier 1 + Palier 2, décision actée en Phase 3) — adaptateur Sherpa-ONNX (Tâche 5.1) et alignement forcé CTC (Tâche 5.2) en tête de liste.
+Une fois les 11 critères vérifiés sur un clone frais, Phase 4 est close. Étape suivante : **Phase 5 — TTS Engine complet**, dont le tableau de tâches a déjà été révisé post-ADR-021 (Palier 1 + Palier 2, décision actée en Phase 3) — adaptateur Sherpa-ONNX (Tâche 5.1) et alignement forcé CTC (Tâche 5.2) en tête de liste.
