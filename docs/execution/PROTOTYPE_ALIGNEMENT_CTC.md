@@ -420,7 +420,23 @@ Sortie réelle de `viterbi_forced_alignment()` (pas une valeur attendue) :
 | 1.040 | 1.440 | viendra |
 | 1.680 | 1.920 | demain |
 
-### 5.5 Conséquence sur la feuille de route Android (section 4.3)
+### 5.5 Latence — mesure desktop, PAS encore le Snapdragon 680 réel
+
+Mesurée : `extract_log_probs()` complet (fbank + normalisation + inférence ONNX,
+modèle **fp32**, pas int8) sur `test_fr.wav` (3.68 s d'audio), CPU x86_64 desktop,
+5 exécutions après un run de chauffe :
+
+| Métrique | Valeur |
+|---|---|
+| Latence médiane | 1.285 s |
+| Ratio temps-réel | 0.35× (plus rapide que le temps réel) |
+
+**Ce n'est pas une mesure du critère de sortie 5.2.0** (« latence mesurée sur device
+réel ») : c'est un CPU x86_64 desktop avec le modèle fp32, pas le Snapdragon 680 cible
+avec le modèle int8. Une mesure réelle nécessite le portage Kotlin/Android (section 5.5
+suivante) — non fait ici, à ne pas confondre avec une validation de budget §11.2.
+
+### 5.6 Conséquence sur la feuille de route Android (section 4.3)
 
 Le plan de fork sherpa-onnx (3-5 jours estimés, section 4.3) **n'est plus la seule
 option** : `onnxruntime` et `kaldi-native-fbank` disposent tous deux d'artefacts Android
@@ -433,7 +449,7 @@ sherpa-onnx en entier. **Décision explicitement non tranchée ici** — à comp
 (complexité JNI, taille binaire, latence) avant d'écrire du code de production, même
 discipline que le reste de cette tâche.
 
-### 5.6 Scripts
+### 5.7 Scripts
 
 - `extract_log_probs.py` — inférence ONNX Runtime directe + extraction fbank.
 - `run_viterbi_prototype.py` — branche `extract_log_probs()` dans
