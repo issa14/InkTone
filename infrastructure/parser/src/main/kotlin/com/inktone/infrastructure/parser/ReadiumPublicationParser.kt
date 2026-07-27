@@ -1,6 +1,7 @@
 package com.inktone.infrastructure.parser
 
 import android.content.Context
+import android.net.Uri
 import com.inktone.domain.model.PublicationFormat
 import com.inktone.domain.service.ParseResult
 import com.inktone.domain.service.PublicationParser
@@ -15,6 +16,7 @@ import org.readium.r2.shared.publication.services.isProtected
 import org.readium.r2.shared.util.asset.AssetRetriever
 import org.readium.r2.shared.util.getOrElse
 import org.readium.r2.shared.util.http.DefaultHttpClient
+import org.readium.r2.shared.util.toAbsoluteUrl
 import org.readium.r2.shared.util.toUrl
 import org.readium.r2.streamer.PublicationOpener
 import org.readium.r2.streamer.parser.DefaultPublicationParser
@@ -74,10 +76,18 @@ class ReadiumPublicationParser @Inject constructor(
     }
 
     override suspend fun parse(fileUri: String): ParseResult = withContext(Dispatchers.IO) {
-        // Tâche 3.2 : URI de fichier local de test uniquement. Le SAF réel
-        // (content://) sera branché en reliant infrastructure/storage à
-        // ce parser en Phase 4/6 — pas cette tâche.
-        val url = File(fileUri).toUrl()
+        // Tache 4.11 : accepte desormais aussi bien un chemin de fichier
+        // local de test (sans schema, ex. fixtures/marche a blanc) qu'une
+        // vraie URI SAF content:// (import reel) - Uri.toAbsoluteUrl()
+        // (Readium) gere les deux schemas (file/content) uniformement,
+        // contrairement a File(fileUri).toUrl() qui ne comprend que des
+        // chemins filesystem bruts.
+        val url = if (fileUri.contains("://")) {
+            Uri.parse(fileUri).toAbsoluteUrl()
+                ?: return@withContext ParseResult.Corrupted("URI non absolue: $fileUri")
+        } else {
+            File(fileUri).toUrl()
+        }
 
         val asset = assetRetriever.retrieve(url).getOrElse {
             return@withContext ParseResult.Corrupted("Echec de lecture de l'asset: $it")
