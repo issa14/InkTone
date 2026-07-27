@@ -47,6 +47,7 @@ class ReaderViewModel @Inject constructor(
 
     private var currentPublicationId: String? = null
     private val chapterPreloader = ChapterPreloader(viewModelScope)
+    private val sentenceAudioBuffer = SentenceAudioBuffer(viewModelScope, ttsEngine)
 
     fun onIntent(intent: ReaderIntent) {
         when (intent) {
@@ -185,8 +186,18 @@ class ReaderViewModel @Inject constructor(
                 id = "vp-native-fr", engine = TtsEngineId.ANDROID_NATIVE,
                 voice = "fr-fr-default", language = "fr-FR",
             )
-            val segment = ttsEngine.synthesize(sentence, voiceProfile)
+            val segment = sentenceAudioBuffer.get(sentence, voiceProfile)
             audioSegmentPlayer.play(segment) // démarre en parallèle du surlignage ci-dessous — les deux dérivent leur timing du même événement de synthèse réel (Tâche 3.8)
+
+            // Precharge la phrase suivante du meme chapitre pendant que
+            // celle-ci se joue (Tache 5.3) - beneficie pleinement une fois
+            // qu'une navigation phrase-a-phrase continue existe (Tache
+            // 5.4/5.5) ; pour l'instant, prepare le terrain sans changer
+            // le comportement observable (le Reader ne joue encore qu'une
+            // phrase a la fois, Tache 4.5).
+            chapter.paragraphs.flatMap { it.sentences }.getOrNull(_state.value.currentSentenceIndex + 1)?.let {
+                sentenceAudioBuffer.preloadNext(it, voiceProfile)
+            }
 
             segment.wordTimestamps.forEach { wt ->
                 _state.value = _state.value.copy(
