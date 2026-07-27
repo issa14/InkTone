@@ -42,3 +42,5 @@ include(":feature:import")
 include(":feature:settings")
 include(":feature:statistics")
 include(":feature:onboarding")
+
+include(":benchmark")
