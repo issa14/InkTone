@@ -1,6 +1,7 @@
 package com.inktone.feature.reader
 
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.padding
 import androidx.compose.material3.Button
 import androidx.compose.material3.Text
@@ -21,15 +22,40 @@ fun ReaderScreen(viewModel: ReaderViewModel = hiltViewModel()) {
     val state by viewModel.state.collectAsState()
 
     Column(modifier = Modifier.padding(16.dp)) {
-        Text(text = buildHighlightedText(state.sentenceText, state.highlightedWordRange))
-        Button(onClick = { viewModel.onIntent(ReaderIntent.PlayCurrentSentence) }) {
-            Text(if (state.isPlaying) "En lecture..." else "Lire")
+        if (state.isTocVisible) {
+            TableOfContentsSheet(
+                entries = state.tableOfContents,
+                currentChapterIndex = state.currentChapterIndex,
+                onEntryClick = { chapterIndex -> viewModel.onIntent(ReaderIntent.JumpToChapter(chapterIndex)) },
+            )
+            return@Column
+        }
+
+        val sentenceText = state.currentChapter
+            ?.paragraphs?.flatMap { it.sentences }
+            ?.getOrNull(state.currentSentenceIndex)?.text.orEmpty()
+
+        Text(text = buildHighlightedText(sentenceText, state.highlightedWordRange))
+
+        Row {
+            Button(onClick = { viewModel.onIntent(ReaderIntent.PreviousChapter) }, enabled = state.hasPreviousChapter) {
+                Text("Precedent")
+            }
+            Button(onClick = { viewModel.onIntent(ReaderIntent.PlayCurrentSentence) }) {
+                Text(if (state.isPlaying) "En lecture..." else "Lire")
+            }
+            Button(onClick = { viewModel.onIntent(ReaderIntent.NextChapter) }, enabled = state.hasNextChapter) {
+                Text("Suivant")
+            }
+            Button(onClick = { viewModel.onIntent(ReaderIntent.ToggleToc) }) {
+                Text("Sommaire")
+            }
         }
     }
 }
 
 private fun buildHighlightedText(text: String, range: IntRange?): AnnotatedString = buildAnnotatedString {
-    if (range == null) {
+    if (range == null || text.isEmpty()) {
         append(text)
         return@buildAnnotatedString
     }

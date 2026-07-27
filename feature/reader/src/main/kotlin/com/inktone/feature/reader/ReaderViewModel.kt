@@ -6,10 +6,11 @@ import androidx.lifecycle.viewModelScope
 import com.inktone.domain.model.Publication
 import com.inktone.domain.model.PublicationFormat
 import com.inktone.domain.model.ReadingState
-import com.inktone.domain.model.Sentence
 import com.inktone.domain.model.TtsEngineId
 import com.inktone.domain.model.VoiceProfile
 import com.inktone.domain.repository.PublicationRepository
+import com.inktone.domain.service.ParseResult
+import com.inktone.domain.service.PublicationParser
 import com.inktone.domain.service.TtsEngine
 import com.inktone.domain.usecase.GetReadingStateUseCase
 import com.inktone.domain.usecase.UpdateReadingStateUseCase
@@ -22,15 +23,17 @@ import kotlinx.coroutines.launch
 import javax.inject.Inject
 
 /**
- * Squelette MVI de la marche à blanc — une seule phrase, pas de
- * navigation de chapitre complète (Phase 4). L'audio est joué via
- * [AudioSegmentPlayer] (AudioTrack, Tâche 3.8) ; AudioPlaybackService
- * (Phase 5) le remplacera pour la lecture en arrière-plan.
+ * MVI complet du Reader (Tâche 4.5) — remplace le squelette à une seule
+ * phrase de la Phase 3 par la navigation par chapitre, la TOC et la
+ * reprise de position réelle. L'audio est joué via [AudioSegmentPlayer]
+ * (AudioTrack, Tâche 3.8) ; AudioPlaybackService (Phase 5) le
+ * remplacera pour la lecture en arrière-plan.
  */
 @HiltViewModel
 class ReaderViewModel @Inject constructor(
     private val ttsEngine: TtsEngine, // injecte AndroidNativeTtsEngine (Palier 1) via Hilt (infrastructure/tts/di/TtsModule)
     private val audioSegmentPlayer: AudioSegmentPlayer,
+    private val publicationParser: PublicationParser, // CompositePublicationParser via Hilt (infrastructure/parser/di/ParserModule)
     private val updateReadingState: UpdateReadingStateUseCase,
     private val getReadingState: GetReadingStateUseCase,
     private val publicationRepository: PublicationRepository,
@@ -39,67 +42,104 @@ class ReaderViewModel @Inject constructor(
     private val _state = MutableStateFlow(ReaderUiState())
     val state: StateFlow<ReaderUiState> = _state.asStateFlow()
 
-    private var currentSentence: Sentence? = null
+    private var currentPublicationId: String? = null
 
     fun onIntent(intent: ReaderIntent) {
         when (intent) {
-            is ReaderIntent.LoadSentence -> {
-                currentSentence = Sentence(index = 0, text = intent.text, startOffset = 0, endOffset = intent.text.length)
-                _state.value = _state.value.copy(sentenceText = intent.text, highlightedWordRange = null)
-                logRestoredPositionIfAny()
-            }
+            is ReaderIntent.OpenPublication -> openPublication(intent.publicationId)
+            is ReaderIntent.BootstrapAndOpenFixture -> bootstrapAndOpenFixture(intent.publicationId, intent.fileUri)
+            is ReaderIntent.NextChapter -> navigateToChapter(_state.value.currentChapterIndex + 1)
+            is ReaderIntent.PreviousChapter -> navigateToChapter(_state.value.currentChapterIndex - 1)
+            is ReaderIntent.JumpToChapter -> navigateToChapter(intent.chapterIndex)
+            is ReaderIntent.ToggleToc -> _state.value = _state.value.copy(isTocVisible = !_state.value.isTocVisible)
             is ReaderIntent.PlayCurrentSentence -> playCurrentSentence()
             is ReaderIntent.Pause -> _state.value = _state.value.copy(isPlaying = false)
         }
     }
 
     /**
-     * Tache 3.7, critere de validation #4 : verifier que ReadingState
-     * restaure la position exacte apres relance, via un log (pas encore
-     * d'affichage a l'ecran - la navigation reelle, Phase 4, remplacera
-     * ce point d'entree temporaire par une reprise automatique pilotant
-     * effectivement l'ouverture du bon chapitre/mot).
+     * Ouvre une publication déjà importée : récupère son `fileUri` via
+     * le repository, parse le contenu (CompositePublicationParser),
+     * puis restaure la dernière position connue (K3) si elle existe.
+     * Les cas d'erreur de parsing (Corrompu, DRM, format non supporté)
+     * ne sont pas encore reflétés dans `ReaderUiState` — Tâche 4.8.
      */
-    private fun logRestoredPositionIfAny() {
+    private fun openPublication(publicationId: String) {
         viewModelScope.launch {
-            val restored = getReadingState(WALKING_SKELETON_FIXTURE_PUBLICATION_ID)
-            Log.i(
-                "ReaderViewModel",
-                if (restored != null) {
-                    "K3 - position restauree: resourceHref=${restored.locator.resourceHref} " +
-                        "chapterIndex=${restored.locator.chapterIndex} charOffset=${restored.locator.charOffset} " +
-                        "lastReadAt=${restored.lastReadAt}"
-                } else {
-                    "K3 - aucune position sauvegardee pour $WALKING_SKELETON_FIXTURE_PUBLICATION_ID"
-                },
+            val publication = publicationRepository.getById(publicationId) ?: run {
+                Log.w("ReaderViewModel", "openPublication: publication introuvable ($publicationId)")
+                return@launch
+            }
+            when (val result = publicationParser.parse(publication.fileUri)) {
+                is ParseResult.Success -> {
+                    currentPublicationId = publicationId
+                    val restored = getReadingState(publicationId)
+                    _state.value = ReaderUiState(
+                        chapters = result.documentModel.chapters,
+                        tableOfContents = result.documentModel.tableOfContents,
+                        currentChapterIndex = restored?.locator?.chapterIndex ?: 0,
+                    )
+                }
+                else -> Log.w("ReaderViewModel", "openPublication: echec de parsing ($result)")
+            }
+        }
+    }
+
+    private fun bootstrapAndOpenFixture(publicationId: String, fileUri: String) {
+        viewModelScope.launch {
+            publicationRepository.insert(
+                Publication(
+                    id = publicationId,
+                    title = "Fixture marche a blanc",
+                    format = PublicationFormat.EPUB,
+                    fileUri = fileUri,
+                    fileHash = "walking-skeleton-fixture-hash",
+                    fileSize = java.io.File(fileUri).length(),
+                    chapterCount = 1,
+                    importDate = System.currentTimeMillis(),
+                ),
+            )
+            openPublication(publicationId)
+        }
+    }
+
+    private fun navigateToChapter(targetIndex: Int) {
+        val chapters = _state.value.chapters
+        if (targetIndex !in chapters.indices) return // pas de navigation hors bornes silencieuse
+        _state.value = _state.value.copy(
+            currentChapterIndex = targetIndex, currentSentenceIndex = 0,
+            highlightedWordRange = null, isTocVisible = false,
+        )
+        persistPosition(chapterIndex = targetIndex, sentenceIndex = 0)
+    }
+
+    /**
+     * Chemin manuel K3 (Blueprint §7.7) — distinct du chemin TTS
+     * (playCurrentSentence). Les deux ne s'exécutent jamais simultanément :
+     * la navigation manuelle interrompt implicitement toute lecture en
+     * cours (isPlaying repasse a false via l'etat recompose).
+     */
+    private fun persistPosition(chapterIndex: Int, sentenceIndex: Int) {
+        viewModelScope.launch {
+            val chapter = _state.value.chapters.getOrNull(chapterIndex) ?: return@launch
+            val sentence = chapter.paragraphs.flatMap { it.sentences }.getOrNull(sentenceIndex) ?: return@launch
+            updateReadingState(
+                ReadingState(
+                    publicationId = currentPublicationId ?: return@launch,
+                    locator = sentence.startLocator(chapterIndex = chapterIndex, resourceHref = chapter.href),
+                    lastReadAt = System.currentTimeMillis(),
+                ),
             )
         }
     }
 
     private fun playCurrentSentence() {
-        val sentence = currentSentence ?: return
+        val chapter = _state.value.currentChapter ?: return
+        val sentence = chapter.paragraphs.flatMap { it.sentences }.getOrNull(_state.value.currentSentenceIndex) ?: return
+        val publicationId = currentPublicationId ?: return
+
         viewModelScope.launch {
             _state.value = _state.value.copy(isPlaying = true)
-
-            // ReadingStateEntity porte une cle etrangere vers PublicationEntity
-            // (Phase 2) : sans cette ligne, la persistance K3 ci-dessous
-            // plante avec FOREIGN KEY constraint failed (bug reel trouve en
-            // executant le test de bout en bout manuel de la Tache 3.7, pas
-            // suppose). Bootstrap explicitement marque comme scaffolding de
-            // marche a blanc : la Phase 4 recevra une Publication deja
-            // importee et n'aura plus besoin de cet upsert defensif ici.
-            publicationRepository.insert(
-                Publication(
-                    id = WALKING_SKELETON_FIXTURE_PUBLICATION_ID,
-                    title = "Fixture marche a blanc",
-                    format = PublicationFormat.EPUB,
-                    fileUri = "content://fixture",
-                    fileHash = "walking-skeleton-fixture-hash",
-                    fileSize = 0L,
-                    chapterCount = 1,
-                    importDate = System.currentTimeMillis(),
-                ),
-            )
 
             val voiceProfile = VoiceProfile(
                 id = "vp-native-fr", engine = TtsEngineId.ANDROID_NATIVE,
@@ -117,21 +157,13 @@ class ReaderViewModel @Inject constructor(
 
             _state.value = _state.value.copy(isPlaying = false, highlightedWordRange = null)
 
-            // K3 : persistance après la lecture de la phrase — un seul
-            // chemin d'écriture pour cette marche à blanc (le scroll
-            // manuel silencieux, deuxième chemin K3, est hors de portée
-            // ici : une seule phrase, pas de scroll — Phase 4 le couvrira).
             updateReadingState(
                 ReadingState(
-                    publicationId = WALKING_SKELETON_FIXTURE_PUBLICATION_ID,
-                    locator = sentence.startLocator(chapterIndex = 0, resourceHref = "OEBPS/chapter1.xhtml"),
+                    publicationId = publicationId,
+                    locator = sentence.startLocator(chapterIndex = chapter.index, resourceHref = chapter.href),
                     lastReadAt = System.currentTimeMillis(),
                 ),
             )
         }
-    }
-
-    private companion object {
-        const val WALKING_SKELETON_FIXTURE_PUBLICATION_ID = "walking-skeleton-fixture"
     }
 }
