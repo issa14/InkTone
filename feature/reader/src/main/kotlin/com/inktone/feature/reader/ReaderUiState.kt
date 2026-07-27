@@ -39,6 +39,16 @@ sealed interface ReaderIntent {
      * un import réel.
      */
     data class BootstrapAndOpenFixture(val publicationId: String, val fileUri: String) : ReaderIntent
+
+    /**
+     * Scaffolding de validation (Tâche 4.11) : importer une vraie URI SAF
+     * content:// choisie par l'utilisateur via le sélecteur système, sans
+     * passer par ImportPublicationUseCase (toujours un TODO, Phase 6) ni
+     * par feature/import (placeholder). Exercice minimal du vrai chemin
+     * SAF -> ReadiumPublicationParser -> DocumentModel, pas un
+     * remplacement de l'import réel de la Phase 6.
+     */
+    data class ImportAndOpen(val fileUri: String) : ReaderIntent
     data object NextChapter : ReaderIntent
     data object PreviousChapter : ReaderIntent
     data class JumpToChapter(val chapterIndex: Int) : ReaderIntent
