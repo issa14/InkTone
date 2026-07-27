@@ -628,6 +628,36 @@ Snapdragon 680 et le prototype Python déjà validé — liaisons et élisions
 toujours préservées comme des mots uniques (`l'homme`, `peut-être`,
 `qu'il`, `l'alignement`).
 
+### 6.5bis Traçabilité des résultats — un run par test, pas un « meilleur de N »
+
+Question de traçabilité à clarifier explicitement, pas supposée réglée par
+défaut : les chiffres ci-dessus (§6.4 : écart 9.7e-5 ; §6.5 : concordance
+exacte sur 4 phrases) proviennent-ils d'un seul run cohérent de bout en
+bout, ou de plusieurs runs dont on aurait gardé le meilleur ?
+
+Réponse précise, reconstituée à partir des logs Gradle de la session :
+- **§6.4 (écart 9.7e-5)** provient de `FbankNativeTest`, exécuté seul sur
+  `test_fr.wav`. Un premier run a **échoué** (`num_frames=0`, bug de
+  parsing WAV décrit en §6.3 — le chunk `LIST/INFO` non géré). Après
+  correction du parseur, un second run a réussi et produit le résultat
+  rapporté. Un seul run réussi, pas de choix parmi plusieurs succès.
+- **§6.5 (concordance exacte sur les 4 phrases)** provient de
+  `OnnxAlignmentTest`, un test distinct (fichier séparé, JNI + inférence
+  ONNX + Viterbi complets sur les 4 `.wav`), exécuté **une seule fois**, en
+  même temps que `FbankNativeTest` dans la dernière invocation
+  `connectedDebugAndroidTest` de la session (« Starting 2 tests… Finished 2
+  tests », build réussi du premier coup pour ce test-ci). Aucun run
+  antérieur de `OnnxAlignmentTest` n'a échoué ni été écarté.
+
+Donc : chaque chiffre rapporté est le résultat du **seul run réussi
+obtenu** pour le test correspondant, après correction des bugs réels
+rencontrés en cours de route (documentés tels quels : parsing WAV en
+§6.3, désinstallation OEM agressive nécessitant le contournement logcat
+en §6.3) — pas une sélection parmi plusieurs exécutions concurrentes ou
+répétées. Les deux tests restent deux exécutions distinctes du même code
+JNI (`FbankNative.computeNemoFbank`), pas un seul run unique produisant
+les deux résultats à la fois.
+
 ### 6.6 Décision — la question ouverte en §5.6 est tranchée
 
 **Le fork sherpa-onnx n'est pas nécessaire.** Le pipeline complet — features
