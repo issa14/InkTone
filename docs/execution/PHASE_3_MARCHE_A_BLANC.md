@@ -83,12 +83,8 @@ pour éclairer la décision :
   `TextToSpeech.onRangeStart → WordTimestamp → surlignage synchronisé →
   Locator → persistance K3 → reprise` fonctionne de bout en bout avec
   le Palier 1 (moteur natif Android), sur device réel.
-- Ce qui n'est PAS validé : la qualité audio perçue du Palier 1, car
-  aucune lecture audio réelle n'est encore câblée dans cette marche à
-  blanc (voir point 5 ci-dessus). Un jugement sur le confort d'écoute
-  du moteur natif Android nécessite d'abord `AudioPlaybackService`
-  (Phase 5) ou un test ad hoc hors de la portée de cette marche à
-  blanc.
+- [MISE A JOUR] Lecture audio reelle cablee (Tache 3.8, AudioTrack sur
+  PCM brut). Qualite vocale a evaluer par Issa - voir Tache 3.8.2.
 - Le Palier 2 (Sherpa-ONNX + alignement forcé CTC, ADR-021) reste non
   implémenté à ce stade — sa qualité vocale est donc également non
   comparable empiriquement pour l'instant.
