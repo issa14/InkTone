@@ -38,4 +38,6 @@ dependencies {
     // HiltWorkerFactory pour que ImportWorker (@HiltWorker) recoive ses
     // dependances via le graphe Hilt plutot que le WorkerFactory par defaut.
     implementation(libs.androidx.work.runtime.ktx)
+    implementation(libs.androidx.hilt.work)
+    ksp(libs.androidx.hilt.compiler)
 }

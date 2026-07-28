@@ -9,6 +9,7 @@ import com.inktone.domain.usecase.ExportLibraryUseCase
 import com.inktone.domain.usecase.GetReadingStateUseCase
 import com.inktone.domain.usecase.GetVoiceProfilesUseCase
 import com.inktone.domain.usecase.ImportPublicationUseCase
+import com.inktone.domain.usecase.ToggleFavoriteUseCase
 import com.inktone.domain.usecase.UpdateReadingStateUseCase
 import dagger.Module
 import dagger.Provides
@@ -23,7 +24,8 @@ import dagger.hilt.components.SingletonComponent
  * GetReadingStateUseCase pour verifier la reprise K3 ; Tache 5.5 :
  * GetVoiceProfilesUseCase pour le selecteur de voix de PlayerScreen ;
  * Tache 6.2 : ImportPublicationUseCase, consomme par ImportWorker ;
- * Tache 6.7 : ExportLibraryUseCase),
+ * Tache 6.7 : ExportLibraryUseCase ; Tache 6.6 : ToggleFavoriteUseCase,
+ * consomme par LibraryViewModel),
  * pas par anticipation.
  */
 @Module
@@ -57,4 +59,9 @@ object UseCaseModule {
         publicationRepository: PublicationRepository,
         fileStorageService: FileStorageService,
     ): ExportLibraryUseCase = ExportLibraryUseCase(publicationRepository, fileStorageService)
+
+    @Provides
+    fun provideToggleFavoriteUseCase(
+        publicationRepository: PublicationRepository,
+    ): ToggleFavoriteUseCase = ToggleFavoriteUseCase(publicationRepository)
 }
