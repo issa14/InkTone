@@ -23,12 +23,15 @@ import java.io.File
  * d'app) puisqu'aucun parcours UI de lecture n'existe encore pour
  * déclencher une synthèse via `feature/player`.
  *
- * **Portée volontairement partielle**, comme l'annonce le plan de
- * Phase 5 : ceci mesure la latence de synthèse (proxy de "latence
- * premier audio", §11.2), PAS le silence inter-phrases (dépend d'un
- * parcours de lecture continue, Tâche 5.4/5.5 branché bout en bout)
- * ni la précision de surlignage ±120 ms (dépend de la Tâche 5.2,
- * alignement CTC, non complétée).
+ * Pour le Palier 2, `synthesize()` inclut désormais l'alignement forcé
+ * CTC (Tâche 5.2, branchée pour de vrai) — ce microbenchmark mesure donc
+ * la latence de synthèse **+ alignement** combinée, pas la synthèse
+ * seule. Chiffres réels sur device (Snapdragon 680, V2206) :
+ * `docs/execution/PROTOTYPE_ALIGNEMENT_CTC.md` §9. Reste une portée
+ * volontairement partielle : ceci mesure un proxy de "latence premier
+ * audio" (§11.2), PAS le silence inter-phrases (dépend du parcours de
+ * lecture continue via `SentenceAudioBuffer`, Tâche 5.3, analysé mais
+ * pas mesuré en conditions UI réelles ici).
  */
 @RunWith(AndroidJUnit4::class)
 class TtsSynthesisBenchmarkTest {
@@ -53,15 +56,24 @@ class TtsSynthesisBenchmarkTest {
     @Test
     fun latence_synthese_palier2_sherpa_onnx() {
         val modelPaths = SherpaOnnxModelPaths(context)
-        val staged = File(context.getExternalFilesDir(null), "kokoro-int8-multi-lang-v1_0")
-        if (!modelPaths.isReady && staged.exists()) {
-            staged.copyRecursively(modelPaths.modelFile.parentFile!!, overwrite = true)
+        val stagedKokoro = File(context.getExternalFilesDir(null), "kokoro-int8-multi-lang-v1_0")
+        if (!modelPaths.isReady && stagedKokoro.exists()) {
+            stagedKokoro.copyRecursively(modelPaths.modelFile.parentFile!!, overwrite = true)
+        }
+        val ctcModelPaths = CtcModelPaths(context)
+        val stagedCtc = File(context.getExternalFilesDir(null), "nemo-ctc-fr-multilang-int8")
+        if (!ctcModelPaths.isReady && stagedCtc.exists()) {
+            stagedCtc.copyRecursively(ctcModelPaths.modelFile.parentFile!!, overwrite = true)
         }
         assumeTrue(
             "Modele vocal Sherpa-ONNX absent - placer manuellement avant ce benchmark (Tache 5.6 le remplacera)",
             modelPaths.isReady,
         )
-        val engine = SherpaOnnxTtsEngine(modelPaths)
+        assumeTrue(
+            "Modele d'alignement CTC absent - placer manuellement avant ce benchmark (Tache 5.6 le remplacera)",
+            ctcModelPaths.isReady,
+        )
+        val engine = SherpaOnnxTtsEngine(modelPaths, CtcForcedAligner(ctcModelPaths))
         val voiceProfile = VoiceProfile(id = "vp-sherpa-fr", engine = TtsEngineId.SHERPA_ONNX, voice = "ff_siwis", language = "fr-FR")
 
         benchmarkRule.measureRepeated {

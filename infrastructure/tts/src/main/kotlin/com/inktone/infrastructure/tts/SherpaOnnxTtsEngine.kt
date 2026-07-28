@@ -22,16 +22,13 @@ import kotlin.math.roundToInt
 
 /**
  * Palier 2 (ADR-021) — qualité vocale neuronale (Kokoro, voix `ff_siwis`
- * française, Apache-2.0), PAS de timestamps mot natifs. Vérifié
- * empiriquement (Tâche 5.1.0, API Kotlin officielle vendorée dans
- * `com.k2fsa.sherpa.onnx.Tts.kt`) : `GeneratedAudio` n'expose que
- * `samples: FloatArray` (normalisé [-1, 1]) et `sampleRate: Int` — jamais
- * de `WordTimestamp`, quel que soit le modèle chargé. `wordTimestamps`
- * reste donc `false` ici jusqu'à ce que la Tâche 5.2 (alignement forcé
- * CTC, déjà prouvée sur device réel —
- * `docs/execution/PROTOTYPE_ALIGNEMENT_CTC.md`) soit réellement branchée
- * — jamais affirmé vrai par anticipation (§8.9 : "un moteur ne fait
- * jamais semblant").
+ * française, Apache-2.0), avec de vrais timestamps mot (alignement forcé
+ * CTC, Tâche 5.2, branché ici pour de vrai après avoir été prouvé
+ * séparément sur device réel — `docs/execution/PROTOTYPE_ALIGNEMENT_CTC.md`
+ * §1-9). `wordTimestamps = true` est honnête : chaque appel réussi à
+ * [synthesize] passe systématiquement par [CtcForcedAligner.align] —
+ * jamais un sous-ensemble silencieux de phrases avec timestamps et
+ * d'autres sans (§8.9 : "un moteur ne fait jamais semblant").
  *
  * Remplace la voix VITS `fr_FR-siwis-medium` retenue en Tâche 5.1.1. Sa
  * prémisse (« aucun modèle Kokoro français n'existe dans le catalogue
@@ -44,27 +41,43 @@ import kotlin.math.roundToInt
  * français correct (`docs/execution/PROTOTYPE_SYNTHESE_KOKORO_ONNX.md`).
  * `sid = 30` ci-dessous est donc spécifique à ce modèle exact — pas une
  * constante Kokoro générale, à revérifier si le modèle vendoré change.
+ *
+ * **Alerte performance réelle, mesurée sur device (Snapdragon 680, V2206,
+ * 2026-07-28)** : `synthesize()` prend actuellement **~28 à 34 secondes**
+ * pour une phrase de ~4,8 s d'audio (dont l'essentiel — ~28-34 s — est la
+ * synthèse Kokoro elle-même, l'alignement CTC ~3 s à chaud). Budget §11.2
+ * (tap → premier audio ≤ 1 500 ms, silence inter-phrases ≤ 150 ms) **très
+ * largement dépassé**, d'un facteur ~20-25×. Détail et pistes :
+ * `docs/execution/PROTOTYPE_ALIGNEMENT_CTC.md` §10. Ne pas considérer ce
+ * moteur comme viable en production tant que cet écart n'est pas résolu
+ * ou explicitement ré-arbitré (Blueprint §11.2 : un dépassement de budget
+ * bloque la release ou déclenche un ADR de révision — pas une ignorance
+ * silencieuse).
  */
 @Singleton
 class SherpaOnnxTtsEngine @Inject constructor(
     private val modelPaths: SherpaOnnxModelPaths,
+    private val ctcForcedAligner: CtcForcedAligner,
 ) : TtsEngine {
 
     override val id = TtsEngineId.SHERPA_ONNX
 
     override val capabilities = TtsCapabilities(
         offline = true,
-        wordTimestamps = false, // Tache 5.2 (alignement CTC) non complete - voir KDoc
+        wordTimestamps = true, // Tache 5.2 branchee - voir KDoc
         sentenceTimestamps = true,
         languages = listOf("fr"),
         streamingSynthesis = false,
         speedControl = true,
         pitchControl = false, // OfflineTtsKokoroModelConfig n'expose que lengthScale (duree/vitesse), pas de parametre de hauteur - verifie contre l'API (kotlin-api/Tts.kt)
-        modelSizeMb = 164, // model.int8.onnx + voices.bin + espeak-ng-data + lexiques (us-en, zh) + tokens.txt + regles zh, mesure reelle sur l'archive kokoro-int8-multi-lang-v1_0
-        license = "Apache-2.0 (Kokoro-82M, hexgrad)",
+        modelSizeMb = 290, // Kokoro (164 Mo, voir Tache 5.1.0) + modele CTC int8 + tokens.txt (~126 Mo, Tache 5.2 §7.1)
+        license = "Apache-2.0 (Kokoro-82M, hexgrad) + CC-BY-4.0 (NeMo FastConformer CTC multilingue, NVIDIA)",
     )
 
-    private val tts: OfflineTts by lazy {
+    // internal (pas private) uniquement pour permettre la mesure de latence
+    // decomposee synthese/alignement en test (SherpaOnnxTtsEngineLatencyTest) -
+    // jamais accede hors module.
+    internal val tts: OfflineTts by lazy {
         check(modelPaths.isReady) { "Modele vocal Sherpa-ONNX absent (${modelPaths.modelFile.parent}) - telechargement non encore cable (Tache 5.6)" }
         OfflineTts(
             assetManager = null,
@@ -94,10 +107,21 @@ class SherpaOnnxTtsEngine @Inject constructor(
             // lue dans les metadonnees ONNX speaker2id du modele (pas devinee) -
             // voir KDoc de la classe.
             val generated = tts.generate(text = sentence.text, sid = FF_SIWIS_SPEAKER_ID, speed = voiceProfile.speed)
+
+            // Alignement force CTC sur l'audio REELLEMENT produit (pas un
+            // fichier de test) - resampling 24kHz (Kokoro) -> 16kHz (modele
+            // CTC) fait a l'interieur de CtcForcedAligner.align(), a partir
+            // du sampleRate reel rapporte par Kokoro, jamais suppose.
+            val wordTimestamps = ctcForcedAligner.align(
+                audioSamples = generated.samples,
+                sampleRate = generated.sampleRate,
+                referenceText = sentence.text,
+            )
+
             AudioSegment(
                 audioData = floatSamplesToPcm16(generated.samples),
                 durationMs = (generated.samples.size.toLong() * 1000L) / generated.sampleRate,
-                wordTimestamps = emptyList(), // Tache 5.2
+                wordTimestamps = wordTimestamps,
                 sampleRate = generated.sampleRate,
             )
         }
