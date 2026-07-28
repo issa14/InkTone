@@ -6,6 +6,7 @@ import com.inktone.domain.model.Paragraph
 import com.inktone.domain.model.PublicationFormat
 import com.inktone.domain.model.Sentence
 import com.inktone.domain.service.ParseResult
+import com.inktone.domain.service.PublicationMetadata
 import com.inktone.domain.service.PublicationParser
 import java.io.File
 import javax.inject.Inject
@@ -47,6 +48,9 @@ class TxtPublicationParser @Inject constructor() : PublicationParser {
         return ParseResult.Success(
             documentModel = DocumentModel(chapters = listOf(chapter), tableOfContents = emptyList(), resources = emptyList()),
             isDrmProtected = false, // TXT n'a jamais de DRM par définition
+            // Un TXT n'a pas de metadonnees embarquees (pas d'OPF) — seul le
+            // nom de fichier est disponible comme titre.
+            metadata = PublicationMetadata(title = file.nameWithoutExtension),
         )
     }
 }

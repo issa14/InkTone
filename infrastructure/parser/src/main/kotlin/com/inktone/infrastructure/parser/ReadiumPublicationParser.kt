@@ -4,7 +4,9 @@ import android.content.Context
 import android.net.Uri
 import com.inktone.domain.model.PublicationFormat
 import com.inktone.domain.service.ParseResult
+import com.inktone.domain.service.PublicationMetadata
 import com.inktone.domain.service.PublicationParser
+import org.readium.r2.shared.publication.Metadata
 import dagger.hilt.android.qualifiers.ApplicationContext
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
@@ -106,6 +108,30 @@ class ReadiumPublicationParser @Inject constructor(
         ParseResult.Success(
             documentModel = documentModelExtractor.extract(publication),
             isDrmProtected = publication.isProtected,
+            metadata = publication.metadata.toDomain(),
+        )
+    }
+
+    /**
+     * Tâche 6.1.1 : forme de `Metadata` vérifiée contre les classes réelles
+     * du jar `readium-shared-3.0.0` (title/authors/subjects/belongsToSeries
+     * déjà aplatis en `String`/`List<Contributor>` par Readium — pas de
+     * `LocalizedString` à résoudre ici). `belongsToSeries` fournit à la
+     * fois le nom de série (`Contributor.name`) et l'index
+     * (`Contributor.position`, `Double?` — converti en `Float?`).
+     */
+    private fun Metadata.toDomain(): PublicationMetadata {
+        val series = belongsToSeries.firstOrNull()
+        return PublicationMetadata(
+            title = title,
+            subtitle = null,
+            authors = authors.mapNotNull { it.name },
+            publisher = publishers.firstOrNull()?.name,
+            language = language?.code,
+            description = description,
+            seriesName = series?.name,
+            seriesIndex = series?.position?.toFloat(),
+            subjects = subjects.mapNotNull { it.name },
         )
     }
 }
