@@ -42,17 +42,22 @@ import kotlin.math.roundToInt
  * `sid = 30` ci-dessous est donc spécifique à ce modèle exact — pas une
  * constante Kokoro générale, à revérifier si le modèle vendoré change.
  *
- * **Alerte performance réelle, mesurée sur device (Snapdragon 680, V2206,
- * 2026-07-28)** : `synthesize()` prend actuellement **~28 à 34 secondes**
- * pour une phrase de ~4,8 s d'audio (dont l'essentiel — ~28-34 s — est la
- * synthèse Kokoro elle-même, l'alignement CTC ~3 s à chaud). Budget §11.2
- * (tap → premier audio ≤ 1 500 ms, silence inter-phrases ≤ 150 ms) **très
- * largement dépassé**, d'un facteur ~20-25×. Détail et pistes :
- * `docs/execution/PROTOTYPE_ALIGNEMENT_CTC.md` §10. Ne pas considérer ce
- * moteur comme viable en production tant que cet écart n'est pas résolu
- * ou explicitement ré-arbitré (Blueprint §11.2 : un dépassement de budget
- * bloque la release ou déclenche un ADR de révision — pas une ignorance
- * silencieuse).
+ * **Alerte performance réelle, mesurée sur device (Snapdragon 680, V2206)**,
+ * **diagnostiquée avant conclusion architecturale** (`numThreads`, execution
+ * provider, int8 réel, G2P vs inférence — `docs/execution/PHASE_5_TTS_ENGINE.md`,
+ * section dédiée) : `synthesize()` prend **~25 secondes** pour une phrase
+ * de ~4,8 s d'audio (RTF ~4,7×, contre ~6-7× avant réglage de
+ * `numThreads`). Aucune accélération matérielle disponible dans le `.so`
+ * vendoré (XNNPACK absent du build, NNAPI compilé hors-jeu pour ce
+ * binaire ciblant l'API 21) ; le modèle est authentiquement quantifié
+ * int8 (vérifié) ; le G2P ne représente qu'environ 200 ms sur les ~25 s
+ * — l'inférence neuronale Kokoro domine à ~99 %. Budget §11.2 (tap →
+ * premier audio ≤ 1 500 ms) **toujours dépassé d'un facteur ~17×** après
+ * ce diagnostic — signal architectural réel, pas une négligence de
+ * configuration. Ne pas considérer ce moteur comme viable en production
+ * tant que cet écart n'est pas résolu ou explicitement ré-arbitré
+ * (Blueprint §11.2 : un dépassement de budget bloque la release ou
+ * déclenche un ADR de révision — pas une ignorance silencieuse).
  */
 @Singleton
 class SherpaOnnxTtsEngine @Inject constructor(
@@ -93,7 +98,25 @@ class SherpaOnnxTtsEngine @Inject constructor(
                         // (derive du speaker_names[sid] choisi), verifie en
                         // pratique (Tache 5.1.0, app d'exemple) - pas devine.
                     ),
-                    numThreads = 2,
+                    // 4 coeurs performants mesures sur ce device (Snapdragon
+                    // 680 / V2206 - cpu4-7 a 2.4GHz, cpu0-3 a 1.9GHz, verifie
+                    // via /sys/devices/system/cpu/cpuN/cpufreq/cpuinfo_max_freq).
+                    // Diagnostic complet (PHASE_5_TTS_ENGINE.md, section
+                    // dediee) : 2->4 fait passer le RTF Kokoro de ~6-7x a
+                    // ~4.7x (~20-25%) - garde car reellement meilleur, mais
+                    // n'explique pas la majorite de l'ecart.
+                    numThreads = 4,
+                    // "cpu" : seul provider reellement actif dans le .so
+                    // vendore, verifie explicitement (pas suppose) -
+                    // XNNPACK absent de ce build ("Available providers:
+                    // NnapiExecutionProvider, CPUExecutionProvider" - pas de
+                    // Xnnpack dans la liste) ; NNAPI present dans la liste
+                    // mais desactive au moment de la compilation du .so
+                    // (guard `__ANDROID_API__ >= 27`, ce binaire cible l'API
+                    // 21 - le device (API 34) supporterait NNAPI, c'est le
+                    // binaire prebuilt qui ne l'expose pas). Demander
+                    // "xnnpack" ou "nnapi" ici retomberait silencieusement
+                    // sur "cpu" de toute facon - autant le rendre explicite.
                     provider = "cpu",
                 ),
                 ruleFsts = "${modelPaths.phoneZhFst.absolutePath},${modelPaths.dateZhFst.absolutePath},${modelPaths.numberZhFst.absolutePath}",
