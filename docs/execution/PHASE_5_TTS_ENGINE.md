@@ -638,8 +638,10 @@ Trajectoire complète du RTF à travers ce diagnostic :
 |---|---|
 | Avant diagnostic (`numThreads=2`, provider cpu implicite) | ~5,9 – 7,1× |
 | Après `numThreads=4` | ~4,7× |
-| `numThreads=4` + xnnpack demandé (retombe sur cpu) | ~4,7× (inchangé) |
-| `numThreads=4` + nnapi demandé (retombe sur cpu) | ~4,7× (inchangé) |
+| `numThreads=4` + xnnpack demandé (retombe sur cpu, `.so` vendoré) | ~4,7× (inchangé) |
+| `numThreads=4` + nnapi demandé (retombe sur cpu, `.so` vendoré) | ~4,7× (inchangé) |
+| `numThreads=4` + nnapi recompilé et réellement actif (voir section dédiée) | ~5,4× — plus lent |
+| `numThreads=4` + **xnnpack recompilé et réellement actif** (voir section dédiée) | **~5,2× — plus lent** |
 
 Le RTF reste dans le même ordre de grandeur (~4,7× à ~7×) après avoir
 épuisé les quatre leviers de configuration listés dans cette tâche :
@@ -789,35 +791,556 @@ reste la référence à confronter au budget §11.2 dans l'ADR à venir.
 
 ---
 
+## `generateWithConfigAndCallback` livre-t-il vraiment l'audio en incrémental ? — vérifié avant compromis produit
+
+**2026-07-28, suite du diagnostic ci-dessus.** Avant de conclure que la
+latence Kokoro impose un compromis produit (attendre la phrase entière),
+cette section vérifie un point non testé jusqu'ici : `OfflineTts`
+expose `generateWithConfigAndCallback` (`Tts.kt:189-195`), qui accepte un
+callback invoqué pendant la génération — mais rien ne garantissait que
+ce callback se déclenche plus d'une fois. Une API de callback qui ne
+callback qu'à la toute fin serait un streaming illusoire.
+
+### Protocole
+
+Test instrumenté dédié
+(`SherpaOnnxCallbackStreamingTest.trajectoire_des_appels_du_callback`,
+`infrastructure/tts/src/androidTest/`), même phrase et même config que le
+diagnostic RTF ci-dessus (« Bonjour le monde. Ceci est un test pour
+vérifier l'alignement. », `numThreads=4`, `provider=cpu`, device V2206) :
+chaque appel du callback est horodaté individuellement par rapport au
+`t0` du run (pas seulement la valeur de retour finale de
+`generateWithConfigAndCallback`), sur 1 run à froid + 3 runs à chaud.
+
+**Contournement nécessaire, en soi un résultat notable** : la syntaxe
+lambda trainante Kotlin (`{ samples -> ... }`) fait planter le process en
+`SIGABRT`/`JNI DETECTED ERROR` (`NoSuchMethodError` sur
+`invoke([F)Ljava/lang/Integer;`) — le lambda généré par
+`invokedynamic` (comportement par défaut du compilateur Kotlin utilisé
+ici) n'expose pas la classe concrète que l'appel JNI réflexif de
+`generateWithConfigImpl` recherche. Remplacé par un
+`object : Function1<FloatArray, Int>` explicite (classe concrète, pas de
+métafactory `indy`), qui fonctionne sans erreur. Point à retenir si cette
+API est un jour branchée en production : la lambda trainante n'est pas
+un choix neutre ici.
+
+### Résultat : le callback se déclenche bien plusieurs fois — pas un streaming illusoire
+
+```
+[RUN 0] nb_appels_callback=2 total_ms=29901.30 audio_samples=114903 (froid)
+[RUN 0][CALLBACK 0] elapsed_ms=12038.87 samples=29777
+[RUN 0][CALLBACK 1] elapsed_ms=29899.98 samples=85126
+
+[RUN 1] nb_appels_callback=2 total_ms=23548.42 audio_samples=114916 (chaud)
+[RUN 1][CALLBACK 0] elapsed_ms=7272.60  samples=29780
+[RUN 1][CALLBACK 1] elapsed_ms=23547.92 samples=85136
+
+[RUN 2] nb_appels_callback=2 total_ms=22899.70 audio_samples=115088 (chaud)
+[RUN 2][CALLBACK 0] elapsed_ms=7240.77  samples=29880
+[RUN 2][CALLBACK 1] elapsed_ms=22899.17 samples=85208
+
+[RUN 3] nb_appels_callback=2 total_ms=22824.17 audio_samples=114927 (chaud)
+[RUN 3][CALLBACK 0] elapsed_ms=7149.25  samples=29785
+[RUN 3][CALLBACK 1] elapsed_ms=22823.64 samples=85142
+```
+
+**Le callback se déclenche 2 fois, pas 1** — confirmé sur les 4 runs,
+pas un artefact isolé. **2, pas un nombre arbitraire** : la phrase de
+test contient exactement 2 phrases au sens Kokoro (« Bonjour le monde. »
+et « Ceci est un test pour vérifier l'alignement. ») et
+`OfflineTtsConfig.maxNumSentences = 1` (valeur par défaut, jamais changée
+dans `SherpaOnnxTtsEngine`) — chaque appel du callback correspond à une
+phrase individuelle entièrement synthétisée, pas à un flux continu de
+petits blocs pendant l'inférence d'une seule phrase. C'est un streaming
+réel au niveau **phrase**, pas au niveau **frame audio** — une
+granularité plus grossière que ce qu'« incrémental » pourrait laisser
+supposer, mais ce n'est pas une fausse promesse d'API : le premier appel
+correspond bien à un audio partiel réellement disponible avant la fin de
+la génération complète (29 777-29 880 échantillons ≈ 1,24 s d'audio sur
+un total ≈ 4,79-4,80 s, cohérent avec la phrase de test déjà caractérisée).
+
+### Le temps jusqu'au PREMIER appel — le vrai candidat pour le budget tap-premier-audio
+
+| Run | 1er appel (ms) | Dernier appel (ms) | Total (ms) | Audio 1re phrase |
+|---|---|---|---|---|
+| 0 (froid) | **12 038,87** | 29 899,98 | 29 901,30 | ≈1,24 s |
+| 1 (chaud) | **7 272,60** | 23 547,92 | 23 548,42 | ≈1,24 s |
+| 2 (chaud) | **7 240,77** | 22 899,17 | 22 899,70 | ≈1,24 s |
+| 3 (chaud) | **7 149,25** | 22 823,64 | 22 824,17 | ≈1,24 s |
+
+Le premier appel (médiane à chaud ≈ **7 240 ms**) réduit l'attente
+d'environ **15,6-15,7 s** par rapport au dernier appel (~22,8-23,5 s) —
+un gain réel, pas négligeable. Mais **7,2 s reste ~4,8× au-dessus du
+budget §11.2 (≤ 1 500 ms)**, pas sous le seuil. Le RTF de la première
+phrase isolée (≈1,24 s d'audio produit en ≈7,2 s) est ≈5,8×, dans le même
+ordre de grandeur que le RTF déjà mesuré pour la phrase complète
+(~4,7-7×, sections ci-dessus) — cohérent avec l'hypothèse que le
+goulot est l'inférence neuronale par phrase, pas un coût fixe de
+préparation qui s'amortirait sur une phrase plus courte.
+
+### Ce que ça impliquerait pour l'architecture — décision à prendre ensemble, pas exécutée ici
+
+Le callback est un streaming réel (pas illusoire), au grain phrase.
+Techniquement, `TtsEngine.synthesize()` pourrait retourner un flux de
+`AudioSegment` (un par phrase Kokoro) plutôt qu'un `AudioSegment` unique
+— un changement de **contrat domaine** (`domain/service/TtsEngine.kt`),
+pas seulement d'implémentation infrastructure, avec un impact sur
+`AudioSegmentPlayer` et l'alignement CTC (qui devrait s'exécuter par
+segment, pas sur l'audio complet). **Ce changement n'est pas fait ici** —
+il est mentionné parce que la mesure ci-dessus change la question posée
+à l'ADR : ce n'est plus « attendre 22-30 s avant le premier son » mais
+« attendre ~7,2 s avant le premier son, si le texte lu est découpé en
+phrases courtes ». Cela **ne résout pas** le dépassement du budget
+§11.2 (7,2 s reste ~4,8× la limite), mais réduit l'écart d'un facteur
+~3-4× — une donnée nouvelle et pertinente pour la décision d'ADR
+(scinder le budget par phrase, réviser le budget, ou changer de moteur),
+pas un problème résolu.
+
+**Verdict de ce diagnostic** : streaming confirmé réel, pas une
+API de callback à un seul appel — mais le grain (phrase entière) et le
+RTF par phrase (~5,8×, cohérent avec le reste des mesures) font que même
+le meilleur candidat mesuré pour le budget tap-premier-audio (~7,2 s)
+dépasse toujours ce budget de façon significative. Signal architectural
+inchangé sur le fond ; nuance réelle sur l'ampleur exacte de l'écart et
+sur où il faudrait couper (par phrase, pas par segment de lecture entier).
+
+---
+
+## Réévaluation du modèle legacy `vits-piper-fr_FR-upmc-medium` sur le pipeline actuel — RTF ~0,33 confirmé, pas une affirmation de commentaire
+
+**2026-07-28.** `PROJECT_STATUS.md`/`architecture.md` du monolithe archivé
+(`legacy/monolith`) citaient un RTF ~0,33 pour ce modèle VITS/Piper — mais
+c'était une mesure de l'**implémentation legacy** (`PiperTtsProvider.kt`,
+archivé), jamais rejouée sur le pipeline actuel (`OfflineTts` de la même
+dépendance `sherpa-onnx` que Kokoro, câblée dans `SherpaOnnxTtsEngine`).
+Avant de la citer dans l'ADR comme alternative crédible au RTF Kokoro
+(~4,7-7×), cette section la revérifie par une mesure réelle, même
+protocole que les diagnostics ci-dessus.
+
+### 1. Récupération du modèle — déjà présent localement, pas retéléchargé
+
+Trouvé sur disque, `app/src/main/assets/models/vits-piper-fr_FR-upmc-medium/`
+(module `app/`, gitignoré — `.gitignore:32` — jamais commité, laissé sur
+le poste depuis le monolithe) : `fr_FR-upmc-medium.onnx` (76 682 529
+octets, ~73 Mo — cohérent avec la taille citée dans l'ancienne doc),
+`fr_FR-upmc-medium.onnx.json` (métadonnées), `tokens.txt`,
+`espeak-ng-data/`, `MODEL_CARD`. Fichiers intacts, pas besoin de
+retélécharger depuis Hugging Face (`rhasspy/piper-voices`). Métadonnées
+lues directement (`speaker_id_map`), pas devinées : `{"jessica": 0,
+"pierre": 1}`, `sample_rate: 22050`, `phoneme_type: espeak`.
+
+### 2. Branché sur le pipeline actuel — même `OfflineTts`, modèle différent
+
+`SherpaOnnxTtsEngine.tts` (le `lazy` de production) est câblé
+spécifiquement sur les chemins Kokoro (`SherpaOnnxModelPaths`) — pas
+modifié pour ce diagnostic, pour ne pas perturber le code de production
+en cours de mesure. Un test instrumenté dédié
+(`SherpaOnnxPiperUpmcLatencyTest`, `infrastructure/tts/src/androidTest/`)
+construit `OfflineTts` directement avec une `OfflineTtsVitsModelConfig`
+(`model`, `tokens`, `dataDir` — pas de `lexicon`, phonémisation espeak
+pure, même convention que l'exemple officiel `NonStreamingTtsPiperEn.java`)
+— **même classe `OfflineTts`, même `.so` vendoré** que Kokoro, seul le
+modèle chargé change. Même réglage déjà confirmé optimal sur ce device
+(`numThreads=4`, `provider=cpu`), même phrase de test, même device V2206,
+même discipline de mesure (1 run froid + 5 répétitions, pas
+`measureRepeated`).
+
+### 3. RTF mesuré — confirmé, pas juste dans le bon ordre de grandeur
+
+```
+[RTF] premier appel (froid) = 1909.03 ms, audio_duration_ms=3599, RTF=0.530
+[RTF] repetitions (ms) = 1191.89,1173.42,1191.75,1214.84,1288.37
+[RTF] mediane_ms=1191.89 RTF_median=0.331
+```
+
+| Modèle | RTF (médiane, à chaud) | Audio produit (même phrase) | Sample rate |
+|---|---|---|---|
+| Kokoro (`SherpaOnnxTtsEngine` actuel) | **~4,7×** (meilleure config mesurée, `numThreads=4`/cpu) | ≈4,79-4,80 s | 24 000 Hz |
+| **Piper VITS `fr_FR-upmc-medium`** | **~0,33×** (mesuré ici, pas cité) | ≈3,60 s (texte identique, voix plus rapide/courte) | 22 050 Hz |
+
+**Le RTF ~0,33 de la doc legacy est confirmé, pas approximativement — au
+centième près** (0,331 mesuré ici contre 0,33 cité) sur le pipeline
+actuel, pas seulement sur l'ancienne implémentation. **Sous le budget
+§11.2** (≤ 1 500 ms pour un tap-premier-audio) dans l'absolu : à ce RTF,
+même une phrase de plusieurs secondes se synthétise en une fraction de
+sa durée réelle — inverse complet du problème Kokoro (RTF > 1×, plus
+lent que le temps réel).
+
+### 4. Qualité vocale — échantillons produits, écoute non faite par ce diagnostic
+
+Les deux voix (`sid=0` Jessica, `sid=1` Pierre — confirmé via
+`speaker_id_map` du JSON, pas deviné) ont été synthétisées sur la même
+phrase de test et exportées en WAV
+(`SherpaOnnxPiperUpmcLatencyTest.exporte_echantillons_wav_pour_ecoute`) :
+
+Pulls depuis le device (`SherpaOnnxPiperUpmcLatencyTest.exporte_echantillons_wav_pour_ecoute`,
+répertoire externe de l'apk de test) vers le scratchpad de session —
+chemin propre à cette session, non versionné, à régénérer si besoin pour
+une écoute future :
+
+```
+piper_upmc_samples/jessica.wav
+piper_upmc_samples/pierre.wav
+```
+
+**Non évalué par ce diagnostic** : contrairement au RTF ou à la
+compatibilité CTC, la qualité perçue d'une voix ne peut pas être mesurée
+par un test automatisé — elle nécessite une écoute humaine, avec le même
+étalon déjà appliqué à Kokoro (barre 8/10). Les fichiers sont prêts ;
+l'évaluation reste à faire par écoute avant de trancher l'ADR sur cette
+base. Point de vigilance déjà documenté dans les métadonnées du modèle,
+indépendant de la qualité perçue : VITS/Piper `medium` est une
+architecture et une résolution de sortie antérieures à Kokoro (22 050 Hz
+contre 24 000 Hz, pas de composante de style/prosodie équivalente à
+StyleTTS2) — à confirmer ou infirmer par l'écoute, pas par supposition.
+
+### 5. Licence — vérifiée précisément, pas supposée identique à Kokoro
+
+Deux niveaux de licence distincts, **pas un seul comme pour Kokoro**
+(Apache-2.0, propre) :
+
+- **Dépôt `rhasspy/piper-voices` (Hugging Face)** : tag de licence
+  `mit` au niveau du dépôt.
+- **`MODEL_CARD` de la voix `fr_FR-upmc-medium` elle-même** (fichier
+  vérifié identique en local et sur Hugging Face, contenu confirmé
+  octet pour octet) :
+
+  ```
+  ## Dataset
+  * URL: https://github.com/marytts/upmc-pierre-data
+  * License: http://creativecommons.org/licenses/by-sa/4.0/
+  ```
+
+  Le **jeu de données d'entraînement** (`upmc-pierre-data`, MaryTTS) est
+  sous **CC-BY-SA 4.0** — licence à clause de partage à l'identique
+  (ShareAlike) et d'attribution, distincte du tag MIT du dépôt qui
+  héberge le poids exporté. **Nuance réelle à trancher pour l'ADR, pas à
+  ignorer** : contrairement à Kokoro (Apache-2.0 propre, sans clause
+  ShareAlike sur les données amont), une attribution du dataset
+  d'origine (et potentiellement une clause de partage à l'identique
+  selon l'interprétation retenue pour un modèle dérivé d'un jeu de
+  données CC-BY-SA) serait nécessaire si cette voix est distribuée en
+  production — pas un bloqueur en soi, mais une obligation différente de
+  ce qui a déjà été vérifié pour Kokoro.
+
+### 6. Compatibilité avec le pipeline d'alignement CTC — vérifiée par un vrai run, pas supposée
+
+`CtcForcedAligner.align()` appelé sur l'audio **réellement produit** par
+Piper (22 050 Hz, pas 24 000 Hz comme Kokoro) — le resampling interne
+(`AudioResampler`, déjà conçu pour ne jamais supposer un taux fixe côté
+moteur appelant) prend le taux réel rapporté par `GeneratedAudio`,
+vérifié ici avec une valeur différente de celle utilisée pour tous les
+diagnostics précédents :
+
+```
+[CTC] align_ms=5176.34 nb_mots=10
+[CTC][WORD] start=0    end=320  word=bonjour
+[CTC][WORD] start=560  end=640  word=le
+[CTC][WORD] start=640  end=960  word=monde
+[CTC][WORD] start=1040 end=1360 word=ceci
+[CTC][WORD] start=1520 end=1600 word=est
+[CTC][WORD] start=1680 end=1760 word=un
+[CTC][WORD] start=1760 end=2000 word=test
+[CTC][WORD] start=2160 end=2240 word=pour
+[CTC][WORD] start=2240 end=2800 word=vérifier
+[CTC][WORD] start=2800 end=3440 word=l'alignement
+```
+
+**10 mots alignés sur 10 attendus, timestamps cohérents avec l'audio
+produit (aucun mot manquant ni dupliqué)** — confirmé : le pipeline CTC
+est bien indifférent au moteur TTS source, comme attendu (il ne consomme
+que `audioSamples`/`sampleRate`), mais désormais **vérifié par un
+run réel sur un second moteur**, pas seulement déduit de la conception.
+`align_ms` ici (~5,18 s) est un appel à froid (session ONNX du modèle CTC
+pas encore chargée dans ce test, contrairement aux mesures Kokoro qui
+isolaient déjà froid/chaud) — pas comparable directement au ~540 ms déjà
+mesuré à chaud pour le CTC seul (`PROTOTYPE_ALIGNEMENT_CTC.md` §7.4),
+mais ce n'est pas ce que cette étape vérifie : elle confirme la
+compatibilité fonctionnelle, pas une nouvelle mesure de latence CTC.
+
+### Verdict de cette réévaluation
+
+Le RTF ~0,33 n'est plus une affirmation de commentaire — **mesuré sur le
+pipeline actuel, confirmé au centième près**, et sous le budget §11.2
+dans l'absolu (contrairement à Kokoro). Compatible avec le pipeline CTC
+déjà prouvé, sans modification. Deux réserves réelles à trancher avant
+de l'adopter pour l'ADR, pas des détails : (1) qualité vocale non encore
+évaluée par écoute (échantillons prêts, `jessica.wav`/`pierre.wav`),
+architecture plus ancienne que Kokoro — la barre 8/10 pourrait ne pas
+être atteinte ; (2) licence à deux niveaux, avec une obligation
+d'attribution/ShareAlike sur le dataset d'entraînement à clarifier,
+distincte du Apache-2.0 propre déjà vérifié pour Kokoro. Deux locuteurs
+seulement (Jessica, Pierre) contre le catalogue plus large visé
+initialement — à évaluer si suffisant pour une v1, pas un point technique.
+
+---
+
+## Recherche d'un candidat Piper à provenance de licence plus propre que `upmc-medium`
+
+**2026-07-28.** Avant de s'engager sur `upmc-medium` ou de chercher un
+avis juridique sur sa clause CC-BY-SA 4.0/ShareAlike (section
+ci-dessus), cette section examine **toutes** les voix françaises du
+catalogue `rhasspy/piper-voices` — pas seulement `upmc` — pour chercher
+un candidat entraîné *from scratch* sur un dataset à la licence claire,
+sans chaîne de provenance passant par une voix anglaise de base dont la
+licence des données d'entraînement d'origine n'est pas aussi bien
+documentée.
+
+### 1. Inventaire complet — 7 voix françaises, une seule sans chaîne de provenance trouble
+
+Catalogue interrogé directement (API Hugging Face, `tree/main/fr/fr_FR`
+puis chaque sous-répertoire) — 7 voix au total, chaque `MODEL_CARD` lu
+individuellement (pas seulement `upmc`) :
+
+| Voix | Qualité | Locuteurs | Dataset | Licence dataset | Voix de base (finetune) | Provenance |
+|---|---|---|---|---|---|---|
+| `gilles` | low (16 kHz) | 1 | French Single Speaker Speech Dataset (Kaggle, bryanpark) | **CC0** | EN `ryan` (low) | Trouble — chaîne via voix EN |
+| **`mls`** | **medium (22 050 Hz)** | **125** | **Multilingual LibriSpeech, OpenSLR-94** | **CC-BY 4.0** | **Aucune — entraîné from scratch** | **Propre — aucune chaîne** |
+| `mls_1840` | low (16 kHz) | 1 | Multilingual LibriSpeech, OpenSLR-94 (même dataset que `mls`, locuteur unique "1840" extrait) | CC-BY 4.0 | EN `ryan` (low) | Trouble — chaîne via voix EN, **alors que la variante `medium` du même dataset est from scratch** (incohérence de pipeline d'entraînement entre les deux variantes, notable en soi) |
+| `siwis` | low (16 kHz) | 1 | SIWIS (University of Edinburgh, datashare) | CC-BY 4.0 | EN `ryan` (low) | Trouble — chaîne via voix EN |
+| `siwis` | medium (22 050 Hz) | 1 | SIWIS (University of Edinburgh, datashare) | CC-BY 4.0 | EN `lessac` (medium) | Trouble — même chaîne que `upmc` (voix `fr_FR-siwis-medium`, déjà mentionnée comme remplacée par Kokoro dans le KDoc de `SherpaOnnxModelPaths.kt`, Tâche 5.1.1) |
+| `tom` | medium (44 100 Hz) | 1 | dépôt `git.bksp.space/Tjiho/French-tts-model-piper` | **AGPLv3** | Non précisé (« See URL ») | Trouble différemment — licence copyleft virale, pas une provenance floue mais une obligation de publication du code dérivé peu compatible avec une app propriétaire |
+| `upmc` | medium (22 050 Hz) | 2 | upmc-pierre-data (MaryTTS, GitHub) | CC-BY-SA 4.0 | EN `lessac` (medium) | Trouble — déjà documenté ci-dessus |
+
+**Un seul candidat réellement propre : `fr_FR-mls-medium`** — c'est le
+seul des 7 dont le `MODEL_CARD` indique « Trained from scratch », sans
+aucune ligne « Finetuned from … ». Tous les autres, y compris ceux dont
+le *dataset* est en licence permissive (CC0 pour `gilles`, CC-BY 4.0
+pour `siwis`/`mls_1840`), héritent d'une chaîne de provenance via une
+voix anglaise de base (`ryan` ou `lessac`) dont la licence des données
+d'entraînement d'origine n'est pas documentée avec la même précision
+dans ce catalogue — même défaut structurel que celui identifié pour
+`upmc`, pas un cas isolé. `tom` est un cas à part : licence très
+précisément documentée (AGPLv3), mais une obligation de copyleft fort,
+pas une provenance floue.
+
+### 2. RTF mesuré pour le candidat propre — même protocole exact
+
+Le `.onnx` brut téléchargé depuis Hugging Face **n'est pas directement
+utilisable** par `sherpa-onnx` : il lui manque les métadonnées ONNX
+(`model_type`/`comment`/`n_speakers`/`sample_rate`) que le script
+officiel `scripts/piper/add_meta_data.py` du dépôt `sherpa-onnx` injecte
+avant publication des modèles déjà "vendorés" — confirmé en comparant
+aux métadonnées réellement présentes dans le `.onnx` d'`upmc-medium` déjà
+utilisé en production (`model_type=vits`, `comment=piper`, etc., lues
+directement via `onnx.load()`, pas supposées). Régénérées ici hors
+device (mêmes clés, mêmes valeurs que le script officiel) avant de
+pousser le modèle sur le device — tokens.txt dérivé du
+`phoneme_id_map` du `.onnx.json` (159 entrées), même procédure que le
+script officiel.
+
+Test dédié (`SherpaOnnxPiperMlsLatencyTest`,
+`infrastructure/tts/src/androidTest/`), même `OfflineTts`/`.so` vendoré,
+même device V2206, même phrase de test, `numThreads=4`/`provider=cpu`,
+1 run froid + 5 répétitions :
+
+```
+[RTF] premier appel (froid) = 3062.28 ms, audio_duration_ms=6648, RTF=0.461
+[RTF] repetitions (ms) = 2491.96,2799.88,3567.59,2330.00,1840.72
+[RTF] mediane_ms=2491.96 RTF_median=0.375
+```
+
+| Voix | RTF médian (chaud) | Audio produit (même phrase) | Sample rate | Licence |
+|---|---|---|---|---|
+| Kokoro (`SherpaOnnxTtsEngine` actuel) | ~4,7× | ≈4,79-4,80 s | 24 000 Hz | Apache-2.0, propre |
+| Piper `upmc-medium` | 0,331× | ≈3,60 s | 22 050 Hz | CC-BY-SA 4.0 (dataset) + chaîne EN `lessac` trouble |
+| **Piper `mls-medium`** | **0,375×** | **≈6,65 s** (voix plus lente/débit différent, même texte) | 22 050 Hz | **CC-BY 4.0, from scratch, provenance propre** |
+
+**`mls-medium` est performant ET propre.** RTF 0,375× — même ordre de
+grandeur que `upmc-medium` (0,331×), très largement sous le budget
+§11.2, sans la réserve de licence à deux niveaux. La phrase de test dure
+≈6,65 s de synthèse (contre ≈3,60 s pour `upmc` et ≈4,79 s pour Kokoro) —
+débit propre à cette voix particulière (parmi les 125 locuteurs
+disponibles, le locuteur `sid=0` correspond à l'identifiant MLS anonymisé
+« 1840 », lu dans `speaker_id_map`, pas deviné — c'est d'ailleurs le même
+locuteur que la voix séparée `fr_FR-mls_1840-low` du catalogue), sans
+lien avec le RTF (le RTF rapporte le coût de calcul à la seconde d'audio
+produite, indépendamment de la longueur de cet audio).
+
+### 3. Qualité vocale — échantillon produit, écoute non faite par ce diagnostic
+
+`SherpaOnnxPiperMlsLatencyTest` exporte un échantillon
+(`mls_sid0.wav`, locuteur `sid=0`/« 1840 ») sur la même phrase de test,
+même limite que pour `upmc` : l'évaluation perceptuelle (barre 8/10 déjà
+appliquée à Kokoro) reste à faire par écoute humaine, pas par ce test.
+Réserve supplémentaire propre à ce candidat, à vérifier par l'écoute :
+125 locuteurs anonymisés issus d'un corpus de livres audio (Multilingual
+LibriSpeech) n'offrent pas la sélection curatée d'une voix dédiée comme
+`upmc` (Jessica/Pierre, noms et genres identifiés) — la qualité peut
+varier fortement d'un des 125 identifiants à l'autre, un seul échantillon
+(`sid=0`) ne suffit pas à caractériser l'ensemble du catalogue de voix
+disponibles dans ce modèle.
+
+### Verdict de cette recherche
+
+**Un candidat à la fois performant et à la licence propre existe :
+`fr_FR-mls-medium`.** RTF mesuré 0,375× (comparable à `upmc-medium`,
+largement sous le budget), dataset CC-BY 4.0 pur, entraîné from scratch
+— sans la réserve de provenance trouble qui s'applique à `upmc` et à 5
+des 6 autres voix françaises du catalogue. Ce n'est **pas** une
+résolution automatique par défaut vers ce candidat : la qualité vocale
+n'est pas encore évaluée par écoute (échantillon `mls_sid0.wav` prêt),
+et la nature du corpus (125 locuteurs anonymisés de livres audio,
+pas une voix dédiée) est une différence qualitative réelle par rapport à
+`upmc` à peser dans la décision d'ADR, pas seulement un chiffre de RTF.
+Les compromis précis pour la décision :
+
+| Option | Licence | RTF | Réserve principale |
+|---|---|---|---|
+| `upmc-medium` | Trouble (CC-BY-SA 4.0 + chaîne EN `lessac`) | 0,331× | Attribution/ShareAlike à clarifier ; seulement 2 locuteurs mais nommés/identifiés |
+| `mls-medium` | **Propre (CC-BY 4.0, from scratch)** | 0,375× | Qualité non évaluée ; 125 locuteurs anonymisés, pas de sélection curatée |
+| Kokoro (actuel) | Propre (Apache-2.0) | ~4,7× | RTF ~14× au-dessus du budget §11.2 — déjà disqualifié par les diagnostics précédents |
+
+---
+
+## XNNPACK recompilé depuis les sources — dernier levier non testé, mesuré et écarté
+
+**2026-07-28.** Dernier levier de configuration/matériel identifié mais
+jamais réellement testé : XNNPACK. À la différence de NNAPI (déjà
+recompilé et mesuré, section dédiée ci-dessus — disponible dans le
+binaire mais désactivé par un guard de compilation `__ANDROID_API__`),
+XNNPACK n'a **jamais** été activé pour de vrai jusqu'ici : le `.so`
+vendoré ne l'a simplement pas compilé (`Ort::GetAvailableProviders()`
+listait `NnapiExecutionProvider, CPUExecutionProvider` — pas de
+`XnnpackExecutionProvider`). Un test borné, une seule mesure — pas une
+nouvelle série de diagnostic.
+
+### Correction avant de commencer : ce n'est pas un flag sherpa-onnx
+
+La consigne de départ supposait un flag de build sherpa-onnx dédié,
+comme `SHERPA_ONNX_ANDROID_PLATFORM` pour NNAPI. Vérifié faux avant de
+lancer quoi que ce soit (`sherpa-onnx/csrc/session.cc:243-254`,
+`sherpa-onnx/csrc/provider.cc:24-25`, tous les fichiers
+`cmake/onnxruntime*.cmake`) : sherpa-onnx demande simplement le provider
+`"XNNPACK"` à ONNX Runtime au runtime — s'il n'est pas dans
+`Ort::GetAvailableProviders()`, repli silencieux sur CPU, sans aucun
+flag de compilation sherpa-onnx pour en décider. XNNPACK doit être
+compilé **dans ONNX Runtime lui-même** (`--use_xnnpack`), pas dans
+`libsherpa-onnx-jni.so`. Aucun prebuilt XNNPACK n'existe non plus côté
+`csukuangfj/onnxruntime-libs` (release v1.27.0 inspectée via l'API
+GitHub : `onnxruntime-android-1.27.0.zip` et 3 variantes statiques,
+aucune dédiée XNNPACK). Chantier plus lourd que la recompilation NNAPI
+(qui ne touchait que le JNI, ~10 min) : reconstruction complète d'ONNX
+Runtime depuis les sources.
+
+### Build — chiffré, un seul essai, avec l'incident réel qui l'a interrompu
+
+ONNX Runtime v1.27.0 (même version que le binaire déjà vendoré, pour
+rester comparable) cloné avec ses sous-modules, cross-compilé pour
+`arm64-v8a`/API 21 avec `tools/ci_build/build.py --use_xnnpack`
+(NDK 27.2.12479018, CMake 4.4.0 — le CMake du NDK, 3.22.1, s'est révélé
+trop ancien pour ONNX Runtime v1.27.0, qui exige ≥ 3.28 ; corrigé avec
+un CMake récent installé via `pip`). Le build a rempli le disque de la
+machine host (« Disk quota exceeded » sur le dernier binaire de test
+avant la fin — `--skip_tests` évite d'*exécuter* les tests mais pas de
+les *compiler*) : incident réel, pas masqué. **`libonnxruntime.so`
+lui-même avait déjà fini de compiler avant l'incident** — seuls des
+binaires de test superflus restaient en cours ; espace disque libéré,
+build non relancé (déjà exploitable en l'état).
+
+`libsherpa-onnx-jni.so` ensuite relié contre ce nouveau
+`libonnxruntime.so` (mêmes headers publics C que le binaire officiel
+vendoré, `ANDROID_PLATFORM=android-21`, script officiel
+`build-android-arm64-v8a.sh` avec `SHERPA_ONNXRUNTIME_LIB_DIR`/
+`SHERPA_ONNXRUNTIME_INCLUDE_DIR` pointés vers le build XNNPACK) —
+**temps réel mesuré (`time`) : 7 min 55 s**, comparable au temps du
+diagnostic NNAPI. Présence du symbole `XnnpackExecutionProvider`
+confirmée dans le nouveau `libonnxruntime.so` (`strings` + grep, pas
+supposée).
+
+### RTF mesuré — XNNPACK réellement actif, pas un repli silencieux
+
+`.so` de production remplacés **temporairement** (les deux :
+`libonnxruntime.so` et `libsherpa-onnx-jni.so`, puisque XNNPACK vit dans
+le premier) par les binaires recompilés, `provider="xnnpack"`,
+`debug=true`, même protocole exact que tous les diagnostics précédents
+(même phrase, device V2206, `numThreads=4`) :
+
+```
+[RTF] premier appel (froid) = 25918.67 ms, audio_duration_ms=4793, RTF=5.408
+[RTF] repetitions (ms) = 25142.84,25369.64,24999.80,24835.47,25054.80
+[RTF] mediane_ms=25054.80 RTF_median=5.227
+```
+
+**Aucun message « Fallback to cpu! »** dans les logs `sherpa-onnx` (ce
+message n'apparaît, par construction du code, que si
+`XnnpackExecutionProvider` est absent de la liste des providers
+disponibles — confirmé absent ici, donc XNNPACK bien accepté par
+`AppendExecutionProvider`, pas un repli déguisé) : XNNPACK s'active
+réellement, comme NNAPI avant lui.
+
+`.so` de production restaurés immédiatement après la mesure — **sha256
+revérifié identique aux fichiers d'origine avant remplacement** (pas
+seulement après une supposition de restauration correcte) :
+`libsherpa-onnx-jni.so` et `libonnxruntime.so` tous deux confirmés
+bit-à-bit identiques à l'état pré-diagnostic. `git status` sur
+`infrastructure/tts/src/main/jniLibs/` propre après restauration.
+
+### Verdict — XNNPACK réellement actif, mesuré plus lent que CPU
+
+**RTF 5,227× (médian, à chaud) — plus lent que CPU+4threads (~4,7×),
+proche du RTF NNAPI (~5,4×), pas sous 0,8×.** Chiffre rapporté tel quel,
+sans nouvelle exploration : la consigne de cette tâche était un test
+borné, pas une nouvelle série de diagnostic si XNNPACK ne suffit pas
+seul. Cohérent avec l'hypothèse déjà posée pour NNAPI (section
+dédiée, §3) — les opérateurs de quantification dynamique
+(`DynamicQuantizeLinear`/`MatMulInteger`/`ConvInteger`) et la composante
+LSTM (`DynamicQuantizeLSTM`) du graphe Kokoro ne bénéficient
+probablement pas des noyaux optimisés XNNPACK (conçus avant tout pour
+la convolution/matmul denses en float ou quantifiés statiquement), avec
+en plus une surcharge de partitionnement de graphe entre CPU et XNNPACK
+pour les opérateurs non supportés. Hypothèse plausible, pas vérifiée
+plus avant (hors périmètre de ce test borné).
+
+Avec XNNPACK, **les six leviers de configuration/matériel identifiables
+sur ce device sont maintenant épuisés et chiffrés** (threads, NNAPI
+compilé et testé, int8 authentique, G2P négligeable, streaming par
+segment mesuré, XNNPACK compilé et testé) — aucun ne fait passer le RTF
+sous ~4,7×, la meilleure configuration mesurée reste CPU+4 threads.
+
+---
+
 ## Checklist finale de sortie de Phase 5
 
-**Mise à jour du 2026-07-28** — case par case, d'après les mesures réelles
-de `docs/execution/PROTOTYPE_ALIGNEMENT_CTC.md` §1-10 (Kokoro et
-l'alignement CTC sont désormais assemblés en un pipeline réel, pas
-seulement prototypés séparément).
+**Mise à jour du 2026-07-28 (clôture)** — case par case, vérifiée contre
+le code réel (Blueprint §17.2 : le code fait foi, pas une affirmation de
+document), pas recopiée de la version précédente de cette checklist.
+**Deux corrections notables par rapport à la version précédente** : les
+items 5, 6, 7, 8 et 9 y étaient marqués « non commencé »/« non fait »
+alors que le code correspondant existait déjà depuis le commit `61bad7c`
+(antérieur à cette session) — écart entre documentation et code réel,
+du même type que celui que ce projet s'interdit explicitement (CLAUDE.md,
+« Règle fondatrice »), juste inversé (sous-déclaré au lieu de
+sur-déclaré). Corrigé ici après vérification directe de chaque fichier.
 
 | # | Critère | État réel | Vérification |
 |---|---|---|---|
 | 1 | Vendoring Sherpa-ONNX confirmé par la pratique (projet officiel buildé localement) | ✅ Fait — et Kokoro (remplace VITS) vendoré et branché en production | 5.1.0, `PROTOTYPE_ALIGNEMENT_CTC.md` §8 |
 | 2 | Adaptateur Sherpa-ONNX produit un `AudioSegment` réel | ✅ Fait — avec de vrais `WordTimestamp`, pas seulement l'audio | 5.1.2, §9.4 |
 | 3 | Alignement CTC prototypé et mesuré avant code de production | ✅ Fait, et **branché en production** (dépasse le critère d'origine) | `PROTOTYPE_ALIGNEMENT_CTC.md` §1-9 |
-| 4 | Silence inter-phrases ≤ 150 ms | ❌ **Échec mesuré, diagnostiqué avant conclusion architecturale (5 vérifications, y compris NNAPI recompilé et réellement testé)** — meilleure config mesurée : ~25 s (RTF ~4,7×, CPU+4 threads) ; NNAPI réellement actif mesuré *plus lent* (~5,4×) ; toujours très loin de 150 ms ; leviers de configuration épuisés, ADR justifié | §10.1-10.2, sections « Diagnostic de la latence Kokoro » et « NNAPI recompilé » |
-| 5 | Lecture continue écran éteint | ⬜ Non commencé (5.4) — inchangé par cette tâche | — |
-| 6 | Contrôles complets fonctionnels | ⬜ Non commencé (5.5) — inchangé | — |
-| 7 | Téléchargement de voix vérifié par empreinte | ⬜ Non commencé (5.6) — placement manuel des modèles toujours nécessaire | — |
-| 8 | UI `feature/player` complète | ⬜ Non commencé (5.7) — inchangé | — |
-| 9 | Repli automatique Palier 2 → Palier 1 sur erreur | ⬜ Non fait (5.8) — **devient critique** : sans lui, sélectionner Palier 2 aujourd'hui expose l'utilisateur à ~30 s de silence par phrase | — |
-| 10 | Budgets TTS §11.2 mesurés (précision ±120ms incluse) | ⚠️ **Mesurés pour de vrai, et en échec** sur 2 des 3 budgets TTS (tap→premier audio, silence inter-phrases) ; précision du surlignage (±120ms) dans le budget | §10.1 |
-| 11 | Aucun adaptateur ne ment sur ses capacités | ✅ Toujours vrai — `wordTimestamps=true` est honnête et vérifié (`TtsCapabilityConsistencyTest`), mais l'honnêteté des capacités ne dit rien de la viabilité en production (item 10) | §9.4 |
+| 4 | Silence inter-phrases ≤ 150 ms | ⚠️ **Mesuré et en écart documenté** (pas un échec silencieux ni une case cochée par optimisme) — diagnostiqué avant conclusion architecturale (6 vérifications, y compris NNAPI et XNNPACK recompilés et réellement testés) : meilleure config mesurée ~25 s (RTF ~4,7×, CPU+4 threads), NNAPI réellement actif mesuré *plus lent* (~5,4×), XNNPACK réellement actif mesuré *plus lent* (~5,2×), tous les leviers de configuration épuisés. **ADR-022 accepté** — Kokoro retenu malgré cet écart (atténuation produit en place, pas une résolution technique), alternatives Piper/VITS écartées (licence ou qualité) | §10.1-10.2, sections « Diagnostic de la latence Kokoro », « NNAPI recompilé », « XNNPACK recompilé », ADR-022 |
+| 5 | Lecture continue écran éteint | ✅ Fait — `AudioPlaybackService` (`MediaSessionService`, Media3), `foregroundServiceType="mediaPlayback"` déclaré dans `app/src/main/AndroidManifest.xml` | Tâche 5.4, commit `4961b39` |
+| 6 | Contrôles complets fonctionnels (Blueprint §8.8) | 🟡 **Partiel** — lecture/pause/arrêt/vitesse déjà fonctionnels (commit `6afad41`, Tâche 5.5) ; **cette tâche de clôture ajoute** une barre de progression réelle (position ExoPlayer dans le segment audio courant = position dans la phrase, un `MediaItem` par phrase) et un vrai sélecteur de voix (menu déroulant parmi les `VoiceProfile` réellement disponibles, `GetVoiceProfilesUseCase`) — remplace l'ID de voix affiché en texte brut. **Reste manquant**, hors du périmètre borné de cette tâche : phrase suivante/précédente, avance/recul (§8.8) | `PlayerScreen.kt`, `PlayerViewModel.kt` (cette tâche) |
+| 7 | Téléchargement de voix vérifié par empreinte | 🟡 **Partiel, correctement différé** — le mécanisme lui-même (téléchargement + vérification SHA-256, rejet et suppression si l'empreinte est fausse) est réellement implémenté et testé, pas un placeholder : `VoiceModelDownloader.kt` (commit `7bfbaca`, ADR-018), 3 tests réels dans `VoiceModelDownloaderTest.kt`. **Seul le déclenchement UI (onboarding) manque** — et c'est correctement différé à la Phase 8, pas un trou de la Phase 5 : `feature/onboarding` et `feature/settings` n'existent encore que comme squelettes vides (`Placeholder.kt`, aucun écran réel) à ce stade. La portée de la Tâche 5.6 telle qu'écrite dans le plan d'origine incluait à tort un câblage UI dépendant de modules non encore construits — le plan d'origine bornait mal cette tâche, pas cette phase qui aurait manqué de livrer | `VoiceModelDownloader.kt`, `VoiceModelDownloaderTest.kt` |
+| 8 | UI `feature/player` complète | 🟡 **Partiel** — même état sous-jacent que l'item 6 (même fichiers) : progression réelle apportée par cette tâche de clôture, navigation phrase par phrase restant à ajouter dans une itération suivante | `PlayerScreen.kt`, `PlayerViewModel.kt` |
+| 9 | Repli automatique Palier 2 → Palier 1 sur erreur | ✅ Fait — `FallbackTtsEngine.kt` (commit `1f33733`, Tâche 5.8), `capabilities`/`id` reflètent dynamiquement le palier réellement actif (jamais figés), 3 tests unitaires (`FallbackTtsEngineTest.kt`) + un 3ᵉ cas de cohérence des capacités ajouté par cette tâche de clôture (`TtsCapabilityConsistencyTest.kt`) | `FallbackTtsEngine.kt`, `FallbackTtsEngineTest.kt`, `TtsCapabilityConsistencyTest.kt` |
+| 10 | Budgets TTS §11.2 mesurés (précision ±120ms incluse) | ⚠️ **Mesurés pour de vrai, et en écart documenté** (ADR-022) sur 2 des 3 budgets TTS (tap→premier audio, silence inter-phrases) — un état connu, chiffré et atténué par un ADR accepté, pas un manque non traité ; précision du surlignage (±120ms) dans le budget. `TtsSynthesisBenchmarkTest.kt` (cette tâche) reflète désormais ces chiffres réels (RTF Kokoro ~4,7×, Palier 1 ~179 ms, ADR-022) comme garde-fou de régression, plus un simple micro-benchmark exploratoire | §10.1, ADR-022, `TtsSynthesisBenchmarkTest.kt` |
+| 11 | Aucun adaptateur ne ment sur ses capacités | ✅ Toujours vrai — `wordTimestamps` honnête et vérifié pour les **3 moteurs réellement en jeu** : `AndroidNativeTtsEngine`, `SherpaOnnxTtsEngine`/Kokoro, et désormais `FallbackTtsEngine` (3ᵉ cas ajouté par cette tâche de clôture — auparavant seuls les 2 premiers étaient couverts) | `TtsCapabilityConsistencyTest.kt` |
 
-**Verdict explicite** : cette phase n'est **pas prête à être close**. Les
-items 1-3 et 11 sont réellement acquis (pas juste déclarés). Les items
-4 et 10 ne sont pas simplement « pas encore faits » — ils ont été
-**mesurés et ont échoué**, ce qui rend l'item 9 (repli automatique)
-nécessaire avant tout déploiement de Palier 2, pas optionnel. Un ADR est
-nécessaire avant de continuer : soit une piste de réduction de latence
-Kokoro fonctionne (profilage, threads, modèle plus léger, accélération
-matérielle), soit le budget §11.2 est révisé, soit Palier 2 reste
-désactivé par défaut derrière le repli Palier 1 en attendant.
-
-**Deux points de décision explicites avant de considérer cette phase close**, cohérents avec la discipline du reste du projet : le choix ExoPlayer/fichier temporaire vs `MediaSource` custom (Tâche 5.4), et la validation empirique de l'alignement CTC (5.2.0) — ni l'un ni l'autre ne doit être tranché silencieusement en cours d'implémentation. **Un troisième point rejoint ces deux-là** : la viabilité de latence de Palier 2 (Kokoro), mesurée et en échec (§10), doit être explicitement arbitrée — pas contournée silencieusement par un futur commit qui changerait les seuils ou désactiverait les tests sans discussion.
+**Verdict de clôture** : cette phase est **close**. Les items 1, 2, 3, 5,
+9 et 11 sont pleinement acquis et vérifiés contre le code réel. Les
+items 6, 7 et 8 sont partiels par une décision de portée explicite (pas
+un oubli) : la navigation phrase par phrase est reportée à une
+itération suivante du Palier TTS, et le câblage onboarding du
+téléchargement de voix est correctement différé à la Phase 8 (modules
+`feature/onboarding`/`feature/settings` pas encore construits) — le
+mécanisme lui-même est fait et testé. L'item 4/10 (latence Kokoro) n'est
+plus un blocage ouvert : **ADR-022 accepté** tranche explicitement la
+question (Kokoro retenu, budget non tenu mais atténué par le repli
+Palier 1 déjà en production — item 9 — et par la lecture visuelle
+immédiate pendant la synthèse), avec deux alternatives (`upmc-medium`,
+`mls-medium`) évaluées et écartées chacune pour une raison distincte,
+documentée et vérifiée à la source. Rien n'est tranché silencieusement :
+chaque écart restant (contrôles de navigation, câblage onboarding) est
+nommé explicitement ci-dessus, avec sa raison et sa phase de
+rattachement, pas noyé dans un item générique « fait ».
