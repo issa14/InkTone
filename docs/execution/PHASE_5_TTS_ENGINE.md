@@ -665,6 +665,130 @@ fond.
 
 ---
 
+## NNAPI recompilé depuis les sources — vérifié réellement disponible, pas juste absent du prebuilt
+
+**2026-07-28, suite du diagnostic ci-dessus.** Le point 2 du diagnostic
+précédent identifiait une **contrainte de build** du binaire prébuilt
+(NNAPI compilé hors-jeu car `ANDROID_PLATFORM=android-21`), pas une
+limite prouvée du device. Avant d'écrire l'ADR sur cette base, cette
+section vérifie si NNAPI apporte un gain réel une fois activé pour de
+vrai — pas supposé à partir d'un message de repli.
+
+### 1. Recherche d'un prebuilt existant avec NNAPI — aucun trouvé
+
+185 releases GitHub `k2-fsa/sherpa-onnx` inspectées via l'API (pas une
+recherche manuelle partielle) : seules trois variantes de tarball Android
+existent par version (`android`, `android-rknn`, `android-static-link-onnxruntime`)
+— **aucune variante NNAPI dédiée**. Le script de build officiel
+(`build-android-arm64-v8a.sh`) documente lui-même la marche à suivre :
+
+```
+# Please use -DANDROID_PLATFORM=android-27 if you want to use Android NNAPI
+```
+
+mais le défaut du script est `android-21`, et le workflow CI officiel
+(`.github/workflows/android.yaml`) appelle le script **sans** surcharger
+cette variable — confirmé en lisant le YAML, pas supposé. Aucun raccourci
+légitime : il faut recompiler.
+
+### 2. Coût réel de la compilation — chiffré, pas juste tenté
+
+NDK 27.2.12479018 et CMake 3.22.1 déjà installés (Tâche 5.2.0),
+réutilisés tels quels. Seul ajustement nécessaire : `cmake` n'était pas
+sur le `PATH` (premier essai échoué en 58 s, `cmake: command not found` —
+corrigé en ajoutant `/home/majeur/Android/Sdk/cmake/3.22.1/bin` au
+`PATH`).
+
+```bash
+export ANDROID_NDK=.../ndk/27.2.12479018
+export SHERPA_ONNX_ANDROID_PLATFORM=android-27
+export SHERPA_ONNX_ENABLE_SPEAKER_DIARIZATION=OFF  # hors perimetre, reduit le temps de build
+bash build-android-arm64-v8a.sh
+```
+
+**Temps réel mesuré (`time`, pas estimé) : 9 min 45 s** — nettement
+moins que redouté (la machine de build n'a que 1,7 Go de RAM libre au
+moment du build). Explication : `libonnxruntime.so` n'est pas recompilé
+par ce script — il est téléchargé prébuilt (`csukuangfj/onnxruntime-libs`
+v1.27.0), **confirmé identique bit à bit** (`sha256sum`) à celui déjà
+vendoré (Tâche 5.1.0/5.2). Seul `libsherpa-onnx-jni.so` (le code
+sherpa-onnx lui-même, plus petit que l'intégralité d'ONNX Runtime) est
+réellement recompilé — d'où le temps raisonnable.
+
+### 3. RTF mesuré avec NNAPI réellement actif — comparaison directe
+
+`libsherpa-onnx-jni.so` recompilé substitué temporairement (même
+protocole de test que le diagnostic précédent : même phrase, même
+device V2206, `numThreads=4` inchangé, `provider="nnapi"`,
+`debug=true`) :
+
+```
+07-28 11:20:46 W sherpa-onnx: Use nnapi
+```
+
+**Aucun message de repli** (`Failed to enable NNAPI`/`Fallback to cpu`)
+— NNAPI s'active réellement cette fois, confirmé par le log, pas supposé.
+
+| Configuration | Synthèse Kokoro (médiane, ms) | RTF | Provider confirmé |
+|---|---|---|---|
+| `numThreads=2`, cpu (baseline initiale) | ~28 500 – 33 800 | ~5,9 – 7,1× | cpu (implicite) |
+| `numThreads=4`, cpu | ~22 476 – 22 793 | ~4,7× | cpu (confirmé, seul dispo dans le prebuilt) |
+| `numThreads=4`, **nnapi (recompilé, réellement actif)** | **25 714** | **~5,4×** | **nnapi (confirmé « Use nnapi », pas de repli)** |
+
+**NNAPI, une fois réellement activé, est plus lent que CPU** — pas
+seulement indisponible, réellement contre-productif sur ce modèle/device.
+Le premier appel (froid) avec NNAPI grimpe même à ~42,4 s (contre
+~31-39 s en cpu), cohérent avec le coût de compilation/partitionnement de
+graphe propre à NNAPI au premier appel.
+
+**Hypothèse plausible pour expliquer cette contre-performance**, cohérente
+avec l'inspection du graphe ONNX de la section précédente
+(`DynamicQuantizeLinear`, `MatMulInteger`, `ConvInteger`,
+`DynamicQuantizeLSTM`) : ces opérateurs de quantification dynamique et la
+composante LSTM ne sont probablement pas supportés nativement par le
+pilote NNAPI de ce device (Snapdragon 680, milieu de gamme, sans NPU
+dédié documenté) — NNAPI délèguerait alors une grande partie du graphe à
+un repli CPU interne à son propre HAL, avec en plus la surcharge de
+partitionnement/synchronisation entre les deux chemins d'exécution.
+Hypothèse plausible, pas vérifiée plus avant (nécessiterait un accès aux
+logs internes du HAL NNAPI du device, hors périmètre).
+
+### 4. Décision — binaire NNAPI non intégré
+
+Le `.so` recompilé (API 27) a été retiré après mesure — restauré à
+l'original vendoré (Tâche 5.1.0/5.2, API 21, `sha256` revérifié
+identique après restauration). Pas de bénéfice mesuré, donc pas de raison
+d'introduire la complexité supplémentaire (maintenance d'un fork de build
+sherpa-onnx, `minSdk` à relever à 27 pour ce module — actuellement 26 —
+avec la perte de compatibilité associée) pour un résultat pire.
+
+### 5. Verdict final — les leviers de configuration sont épuisés
+
+Cinquième donnée ajoutée aux quatre du diagnostic précédent : **NNAPI
+recompilé avec succès, réellement activé, mesuré plus lent que CPU.** Ce
+n'est pas un échec de compilation qui aurait laissé la question ouverte —
+c'est une mesure complète et négative. Combinée aux quatre vérifications
+précédentes (threads, provider, int8, G2P), **tous les leviers de
+configuration identifiables ont été essayés et chiffrés** :
+
+| # | Levier | Résultat |
+|---|---|---|
+| 1 | `numThreads` 2→4 | +20-25 %, insuffisant |
+| 2a | XNNPACK | Absent du binaire, non activable sans recompilation |
+| 2b | NNAPI (indisponibilité initiale) | Contrainte de build, pas de device |
+| 3 | Modèle int8 | Authentiquement quantifié, pas un mixup |
+| 4 | G2P vs inférence | G2P négligeable (~0,8 %) |
+| 5 | **NNAPI recompilé et réellement testé** | **Plus lent que CPU (~5,4× contre ~4,7×)** |
+
+**L'ADR est maintenant pleinement justifié** — pas seulement parce
+qu'un levier était indisponible, mais parce que le seul levier
+d'accélération matérielle réellement accessible sur ce device, une fois
+compilé et vérifié actif, dégrade la performance au lieu de l'améliorer.
+Le RTF ~4,7× (meilleure configuration mesurée à ce jour, CPU + 4 threads)
+reste la référence à confronter au budget §11.2 dans l'ADR à venir.
+
+---
+
 ## Checklist finale de sortie de Phase 5
 
 **Mise à jour du 2026-07-28** — case par case, d'après les mesures réelles
@@ -677,7 +801,7 @@ seulement prototypés séparément).
 | 1 | Vendoring Sherpa-ONNX confirmé par la pratique (projet officiel buildé localement) | ✅ Fait — et Kokoro (remplace VITS) vendoré et branché en production | 5.1.0, `PROTOTYPE_ALIGNEMENT_CTC.md` §8 |
 | 2 | Adaptateur Sherpa-ONNX produit un `AudioSegment` réel | ✅ Fait — avec de vrais `WordTimestamp`, pas seulement l'audio | 5.1.2, §9.4 |
 | 3 | Alignement CTC prototypé et mesuré avant code de production | ✅ Fait, et **branché en production** (dépasse le critère d'origine) | `PROTOTYPE_ALIGNEMENT_CTC.md` §1-9 |
-| 4 | Silence inter-phrases ≤ 150 ms | ❌ **Échec mesuré, diagnostiqué avant conclusion architecturale** — ~25 s après réglage des threads (RTF ~4,7×, contre ~6-7× avant), toujours très loin de 150 ms ; signal architectural confirmé, pas une négligence de config | §10.1-10.2, section « Diagnostic de la latence Kokoro » |
+| 4 | Silence inter-phrases ≤ 150 ms | ❌ **Échec mesuré, diagnostiqué avant conclusion architecturale (5 vérifications, y compris NNAPI recompilé et réellement testé)** — meilleure config mesurée : ~25 s (RTF ~4,7×, CPU+4 threads) ; NNAPI réellement actif mesuré *plus lent* (~5,4×) ; toujours très loin de 150 ms ; leviers de configuration épuisés, ADR justifié | §10.1-10.2, sections « Diagnostic de la latence Kokoro » et « NNAPI recompilé » |
 | 5 | Lecture continue écran éteint | ⬜ Non commencé (5.4) — inchangé par cette tâche | — |
 | 6 | Contrôles complets fonctionnels | ⬜ Non commencé (5.5) — inchangé | — |
 | 7 | Téléchargement de voix vérifié par empreinte | ⬜ Non commencé (5.6) — placement manuel des modèles toujours nécessaire | — |
