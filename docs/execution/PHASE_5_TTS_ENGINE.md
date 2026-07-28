@@ -1073,6 +1073,124 @@ initialement — à évaluer si suffisant pour une v1, pas un point technique.
 
 ---
 
+## Recherche d'un candidat Piper à provenance de licence plus propre que `upmc-medium`
+
+**2026-07-28.** Avant de s'engager sur `upmc-medium` ou de chercher un
+avis juridique sur sa clause CC-BY-SA 4.0/ShareAlike (section
+ci-dessus), cette section examine **toutes** les voix françaises du
+catalogue `rhasspy/piper-voices` — pas seulement `upmc` — pour chercher
+un candidat entraîné *from scratch* sur un dataset à la licence claire,
+sans chaîne de provenance passant par une voix anglaise de base dont la
+licence des données d'entraînement d'origine n'est pas aussi bien
+documentée.
+
+### 1. Inventaire complet — 7 voix françaises, une seule sans chaîne de provenance trouble
+
+Catalogue interrogé directement (API Hugging Face, `tree/main/fr/fr_FR`
+puis chaque sous-répertoire) — 7 voix au total, chaque `MODEL_CARD` lu
+individuellement (pas seulement `upmc`) :
+
+| Voix | Qualité | Locuteurs | Dataset | Licence dataset | Voix de base (finetune) | Provenance |
+|---|---|---|---|---|---|---|
+| `gilles` | low (16 kHz) | 1 | French Single Speaker Speech Dataset (Kaggle, bryanpark) | **CC0** | EN `ryan` (low) | Trouble — chaîne via voix EN |
+| **`mls`** | **medium (22 050 Hz)** | **125** | **Multilingual LibriSpeech, OpenSLR-94** | **CC-BY 4.0** | **Aucune — entraîné from scratch** | **Propre — aucune chaîne** |
+| `mls_1840` | low (16 kHz) | 1 | Multilingual LibriSpeech, OpenSLR-94 (même dataset que `mls`, locuteur unique "1840" extrait) | CC-BY 4.0 | EN `ryan` (low) | Trouble — chaîne via voix EN, **alors que la variante `medium` du même dataset est from scratch** (incohérence de pipeline d'entraînement entre les deux variantes, notable en soi) |
+| `siwis` | low (16 kHz) | 1 | SIWIS (University of Edinburgh, datashare) | CC-BY 4.0 | EN `ryan` (low) | Trouble — chaîne via voix EN |
+| `siwis` | medium (22 050 Hz) | 1 | SIWIS (University of Edinburgh, datashare) | CC-BY 4.0 | EN `lessac` (medium) | Trouble — même chaîne que `upmc` (voix `fr_FR-siwis-medium`, déjà mentionnée comme remplacée par Kokoro dans le KDoc de `SherpaOnnxModelPaths.kt`, Tâche 5.1.1) |
+| `tom` | medium (44 100 Hz) | 1 | dépôt `git.bksp.space/Tjiho/French-tts-model-piper` | **AGPLv3** | Non précisé (« See URL ») | Trouble différemment — licence copyleft virale, pas une provenance floue mais une obligation de publication du code dérivé peu compatible avec une app propriétaire |
+| `upmc` | medium (22 050 Hz) | 2 | upmc-pierre-data (MaryTTS, GitHub) | CC-BY-SA 4.0 | EN `lessac` (medium) | Trouble — déjà documenté ci-dessus |
+
+**Un seul candidat réellement propre : `fr_FR-mls-medium`** — c'est le
+seul des 7 dont le `MODEL_CARD` indique « Trained from scratch », sans
+aucune ligne « Finetuned from … ». Tous les autres, y compris ceux dont
+le *dataset* est en licence permissive (CC0 pour `gilles`, CC-BY 4.0
+pour `siwis`/`mls_1840`), héritent d'une chaîne de provenance via une
+voix anglaise de base (`ryan` ou `lessac`) dont la licence des données
+d'entraînement d'origine n'est pas documentée avec la même précision
+dans ce catalogue — même défaut structurel que celui identifié pour
+`upmc`, pas un cas isolé. `tom` est un cas à part : licence très
+précisément documentée (AGPLv3), mais une obligation de copyleft fort,
+pas une provenance floue.
+
+### 2. RTF mesuré pour le candidat propre — même protocole exact
+
+Le `.onnx` brut téléchargé depuis Hugging Face **n'est pas directement
+utilisable** par `sherpa-onnx` : il lui manque les métadonnées ONNX
+(`model_type`/`comment`/`n_speakers`/`sample_rate`) que le script
+officiel `scripts/piper/add_meta_data.py` du dépôt `sherpa-onnx` injecte
+avant publication des modèles déjà "vendorés" — confirmé en comparant
+aux métadonnées réellement présentes dans le `.onnx` d'`upmc-medium` déjà
+utilisé en production (`model_type=vits`, `comment=piper`, etc., lues
+directement via `onnx.load()`, pas supposées). Régénérées ici hors
+device (mêmes clés, mêmes valeurs que le script officiel) avant de
+pousser le modèle sur le device — tokens.txt dérivé du
+`phoneme_id_map` du `.onnx.json` (159 entrées), même procédure que le
+script officiel.
+
+Test dédié (`SherpaOnnxPiperMlsLatencyTest`,
+`infrastructure/tts/src/androidTest/`), même `OfflineTts`/`.so` vendoré,
+même device V2206, même phrase de test, `numThreads=4`/`provider=cpu`,
+1 run froid + 5 répétitions :
+
+```
+[RTF] premier appel (froid) = 3062.28 ms, audio_duration_ms=6648, RTF=0.461
+[RTF] repetitions (ms) = 2491.96,2799.88,3567.59,2330.00,1840.72
+[RTF] mediane_ms=2491.96 RTF_median=0.375
+```
+
+| Voix | RTF médian (chaud) | Audio produit (même phrase) | Sample rate | Licence |
+|---|---|---|---|---|
+| Kokoro (`SherpaOnnxTtsEngine` actuel) | ~4,7× | ≈4,79-4,80 s | 24 000 Hz | Apache-2.0, propre |
+| Piper `upmc-medium` | 0,331× | ≈3,60 s | 22 050 Hz | CC-BY-SA 4.0 (dataset) + chaîne EN `lessac` trouble |
+| **Piper `mls-medium`** | **0,375×** | **≈6,65 s** (voix plus lente/débit différent, même texte) | 22 050 Hz | **CC-BY 4.0, from scratch, provenance propre** |
+
+**`mls-medium` est performant ET propre.** RTF 0,375× — même ordre de
+grandeur que `upmc-medium` (0,331×), très largement sous le budget
+§11.2, sans la réserve de licence à deux niveaux. La phrase de test dure
+≈6,65 s de synthèse (contre ≈3,60 s pour `upmc` et ≈4,79 s pour Kokoro) —
+débit propre à cette voix particulière (parmi les 125 locuteurs
+disponibles, le locuteur `sid=0` correspond à l'identifiant MLS anonymisé
+« 1840 », lu dans `speaker_id_map`, pas deviné — c'est d'ailleurs le même
+locuteur que la voix séparée `fr_FR-mls_1840-low` du catalogue), sans
+lien avec le RTF (le RTF rapporte le coût de calcul à la seconde d'audio
+produite, indépendamment de la longueur de cet audio).
+
+### 3. Qualité vocale — échantillon produit, écoute non faite par ce diagnostic
+
+`SherpaOnnxPiperMlsLatencyTest` exporte un échantillon
+(`mls_sid0.wav`, locuteur `sid=0`/« 1840 ») sur la même phrase de test,
+même limite que pour `upmc` : l'évaluation perceptuelle (barre 8/10 déjà
+appliquée à Kokoro) reste à faire par écoute humaine, pas par ce test.
+Réserve supplémentaire propre à ce candidat, à vérifier par l'écoute :
+125 locuteurs anonymisés issus d'un corpus de livres audio (Multilingual
+LibriSpeech) n'offrent pas la sélection curatée d'une voix dédiée comme
+`upmc` (Jessica/Pierre, noms et genres identifiés) — la qualité peut
+varier fortement d'un des 125 identifiants à l'autre, un seul échantillon
+(`sid=0`) ne suffit pas à caractériser l'ensemble du catalogue de voix
+disponibles dans ce modèle.
+
+### Verdict de cette recherche
+
+**Un candidat à la fois performant et à la licence propre existe :
+`fr_FR-mls-medium`.** RTF mesuré 0,375× (comparable à `upmc-medium`,
+largement sous le budget), dataset CC-BY 4.0 pur, entraîné from scratch
+— sans la réserve de provenance trouble qui s'applique à `upmc` et à 5
+des 6 autres voix françaises du catalogue. Ce n'est **pas** une
+résolution automatique par défaut vers ce candidat : la qualité vocale
+n'est pas encore évaluée par écoute (échantillon `mls_sid0.wav` prêt),
+et la nature du corpus (125 locuteurs anonymisés de livres audio,
+pas une voix dédiée) est une différence qualitative réelle par rapport à
+`upmc` à peser dans la décision d'ADR, pas seulement un chiffre de RTF.
+Les compromis précis pour la décision :
+
+| Option | Licence | RTF | Réserve principale |
+|---|---|---|---|
+| `upmc-medium` | Trouble (CC-BY-SA 4.0 + chaîne EN `lessac`) | 0,331× | Attribution/ShareAlike à clarifier ; seulement 2 locuteurs mais nommés/identifiés |
+| `mls-medium` | **Propre (CC-BY 4.0, from scratch)** | 0,375× | Qualité non évaluée ; 125 locuteurs anonymisés, pas de sélection curatée |
+| Kokoro (actuel) | Propre (Apache-2.0) | ~4,7× | RTF ~14× au-dessus du budget §11.2 — déjà disqualifié par les diagnostics précédents |
+
+---
+
 ## Checklist finale de sortie de Phase 5
 
 **Mise à jour du 2026-07-28** — case par case, d'après les mesures réelles
