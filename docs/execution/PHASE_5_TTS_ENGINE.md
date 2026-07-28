@@ -506,6 +506,289 @@ Composant standard Compose (Material 3), consommant `PlayerViewModel` (Tâche 5.
 
 ---
 
+## Diagnostic de la latence Kokoro (RTF ~6-7×) — avant conclusion architecturale
+
+**2026-07-28.** `docs/execution/PROTOTYPE_ALIGNEMENT_CTC.md` §10 mesurait
+un RTF Kokoro de ~6-7× sur le V2206 (Snapdragon 680) et concluait à une
+latence bloquante pour le budget §11.2. Avant d'écrire un ADR sur cette
+base, cette section élimine méthodiquement les causes de configuration
+évidentes — même discipline que le reste de cette phase : ne pas
+supposer une limite matérielle avant d'avoir vérifié les leviers logiciels
+triviaux.
+
+Phrase de test inchangée : « Bonjour le monde. Ceci est un test pour
+vérifier l'alignement. » (~4,8 s d'audio Kokoro produit). Toutes les
+mesures ci-dessous sont des médianes sur 5 exécutions à chaud (modèle déjà
+chargé), sur le même device physique.
+
+### 1. `numThreads` — avant/après, avec le RTF de chaque valeur
+
+**Avant** : `numThreads = 2` (valeur non justifiée, héritée du prototype
+Kokoro d'origine). Mesuré (`PROTOTYPE_ALIGNEMENT_CTC.md` §10) :
+synthèse Kokoro seule ~28 500 – 33 800 ms → **RTF ≈ 5,9 – 7,1×**.
+
+Cœurs réellement disponibles, vérifiés sur le device (pas supposés) :
+
+```
+$ adb shell cat /sys/devices/system/cpu/cpu{0..7}/cpufreq/cpuinfo_max_freq
+cpu0-3: 1 900 800 Hz (cœurs efficience)
+cpu4-7: 2 400 000 Hz (cœurs performance)
+```
+
+→ 4 cœurs performants, pas 2. **Après**, `numThreads = 4` :
+
+| Run | Kokoro synth (ms) | RTF |
+|---|---|---|
+| 1 (provider cpu explicite) | 22 476,51 | 4,69× |
+| 2 (provider xnnpack demandé, voir §2) | 22 793,06 | 4,76× |
+| 3 (provider nnapi demandé, voir §2) | 22 750,03 | 4,75× |
+
+**Amélioration réelle mais partielle** : ~20-25 % de latence en moins
+(28-34 s → ~22,5-22,8 s), RTF passe de ~6-7× à **~4,7×**. Une
+amélioration, pas une résolution — toujours très loin du budget.
+
+### 2. Execution provider — vérifié explicitement, pas supposé
+
+`debug = true` (temporaire, pour ce diagnostic) fait apparaître les logs
+internes `sherpa-onnx`/ONNX Runtime. Deux fournisseurs demandés
+explicitement, chacun avec un message de repli clair :
+
+```
+provider = "xnnpack" →
+  Available providers: NnapiExecutionProvider, CPUExecutionProvider, . Fallback to cpu!
+
+provider = "nnapi" →
+  Android NNAPI requires API level >= 27. Current API level 21 Fallback to cpu!
+```
+
+**Deux causes distinctes, toutes deux vérifiées dans le code source de
+sherpa-onnx (`session.cc`), pas devinées :**
+
+- **XNNPACK** : absent de la liste `Ort::GetAvailableProviders()` — le
+  `.so` vendoré (sherpa-onnx v1.13.4, déjà documenté
+  `PROTOTYPE_ALIGNEMENT_CTC.md` §8.1) n'a simplement pas été compilé avec
+  le support XNNPACK.
+- **NNAPI** : présent dans la liste des providers disponibles, mais le
+  code qui l'active est protégé par une macro de compilation
+  `#elif defined(__ANDROID_API__)` avec le message « requires API level
+  >= 27 » — `__ANDROID_API__` est ici **la valeur au moment de la
+  compilation du binaire** (celui-ci cible l'API 21, cohérent avec
+  `libsherpa-onnx-jni.so` « built for Android 21 » déjà noté en §8.1),
+  **pas** le niveau d'API réel du device (34, largement suffisant pour
+  NNAPI). Le device supporterait NNAPI ; c'est le binaire prébuilt qui ne
+  l'expose pas pour cette cible de compilation.
+
+**Conclusion de cette étape** : `provider = "cpu"` n'est pas un défaut
+non exploré — c'est la **seule option réellement disponible** dans le
+binaire vendoré aujourd'hui. Aucune accélération matérielle accessible
+sans reconstruire sherpa-onnx depuis les sources avec un NDK ciblant une
+API plus récente (option non retenue : contredirait la décision de
+Phase 5.1.0 de ne pas compiler sherpa-onnx soi-même).
+
+### 3. Modèle int8 — confirmé réellement quantifié, pas un mixup fp32
+
+Fichier chargé : `model.int8.onnx`, 114 298 054 octets (~109 Mo) — taille
+cohérente avec un modèle quantifié (le Kokoro fp32 officiel fait ~310 Mo,
+un facteur ~2,7× plus gros ; un mixup de chemin vers le fp32 aurait été
+immédiatement visible à la taille). Inspection directe du graphe ONNX
+(`onnx.load` + comptage des types de tenseurs et d'opérateurs, pas une
+supposition) :
+
+```
+Tenseurs (poids)   : FLOAT=449, UINT8=354, INT64=81, INT8=24
+Operateurs quantifies presents : DynamicQuantizeLinear=98, MatMulInteger=83,
+                                  ConvInteger=90, DynamicQuantizeLSTM=6
+```
+
+**Confirmé : quantification dynamique int8 réellement active**
+(`DynamicQuantizeLinear`/`MatMulInteger`/`ConvInteger`, pattern standard
+d'ONNX Runtime `quantize_dynamic`, pas une quantification statique
+pré-calculée mais un calcul de quantification à l'exécution). Aucun
+avertissement « falling back to float » dans les logs `sherpa-onnx` sur
+l'ensemble des runs de ce diagnostic. Point notable, pas une certitude
+absolue : la présence de `DynamicQuantizeLSTM` (6 occurrences) suggère un
+composant LSTM dans l'architecture Kokoro (cohérent avec StyleTTS2, dont
+Kokoro-82M dérive) — une récurrence LSTM est intrinsèquement séquentielle
+dans le temps, ce qui limiterait le gain de plus de threads même avec un
+provider optimisé, cohérent avec le gain partiel (pas linéaire) observé
+en passant de 2 à 4 threads en étape 1. Hypothèse plausible, pas vérifiée
+plus avant (nécessiterait un profilage nœud-par-nœud, hors périmètre de
+ce diagnostic).
+
+### 4. G2P vs inférence neuronale — isolé par horodatage des logs internes
+
+À partir des logs `sherpa-onnx` horodatés à la milliseconde pour un run :
+
+| Étape | Début | Fin | Durée |
+|---|---|---|---|
+| G2P (conversion texte → tokens, lexique + règles) | 10:32:14.543 | 10:32:14.754 | **~211 ms** |
+| Inférence neuronale (2 lots, jusqu'au retour de `Generate`) | 10:32:14.755 | 10:32:41.484 | **~26 700 ms** |
+
+**Sans ambiguïté : le G2P (phonémisation espeak-ng/lexique) ne représente
+qu'environ 0,8 % du temps total.** La quasi-totalité (~99 %) est le
+passage avant du réseau de neurones lui-même. Une piste de cache de
+phonémisation (envisagée dans la consigne de ce diagnostic) **n'aurait
+qu'un effet négligeable** — ce n'est pas là que se trouve le coût.
+
+### 5. Verdict — signal architectural confirmé, pas une négligence de configuration
+
+Trajectoire complète du RTF à travers ce diagnostic :
+
+| Étape | RTF Kokoro |
+|---|---|
+| Avant diagnostic (`numThreads=2`, provider cpu implicite) | ~5,9 – 7,1× |
+| Après `numThreads=4` | ~4,7× |
+| `numThreads=4` + xnnpack demandé (retombe sur cpu) | ~4,7× (inchangé) |
+| `numThreads=4` + nnapi demandé (retombe sur cpu) | ~4,7× (inchangé) |
+
+Le RTF reste dans le même ordre de grandeur (~4,7× à ~7×) après avoir
+épuisé les quatre leviers de configuration listés dans cette tâche :
+threads corrigés (+20-25 %, gain réel mais insuffisant), aucun provider
+accéléré disponible dans le binaire vendoré, modèle authentiquement
+int8, G2P négligeable (~0,2 %). **Ce n'est donc pas une négligence de
+configuration — c'est un signal architectural réel**, conforme au critère
+explicitement posé pour cette tâche : un RTF qui reste 5-7× après ce
+diagnostic justifie un ADR plutôt que de le rendre prématuré.
+
+**Pistes restantes, non explorées ici (hors périmètre de ce diagnostic,
+matière pour l'ADR)** : reconstruire sherpa-onnx depuis les sources avec
+NNAPI/XNNPACK compilés (contredit la décision 5.1.0) ; un modèle Kokoro
+plus petit ou une architecture non-LSTM ; profilage nœud-par-nœud pour
+confirmer/infirmer l'hypothèse LSTM de l'étape 3 ; révision du budget
+§11.2 par ADR si aucune piste technique ne suffit.
+
+**Mise à jour du code** : `numThreads = 4` et `provider = "cpu"`
+(explicite, documenté comme seule option disponible plutôt que laissé
+implicite) conservés dans `SherpaOnnxTtsEngine.kt` — c'est une
+amélioration réelle mesurée, même si elle ne résout pas le problème de
+fond.
+
+---
+
+## NNAPI recompilé depuis les sources — vérifié réellement disponible, pas juste absent du prebuilt
+
+**2026-07-28, suite du diagnostic ci-dessus.** Le point 2 du diagnostic
+précédent identifiait une **contrainte de build** du binaire prébuilt
+(NNAPI compilé hors-jeu car `ANDROID_PLATFORM=android-21`), pas une
+limite prouvée du device. Avant d'écrire l'ADR sur cette base, cette
+section vérifie si NNAPI apporte un gain réel une fois activé pour de
+vrai — pas supposé à partir d'un message de repli.
+
+### 1. Recherche d'un prebuilt existant avec NNAPI — aucun trouvé
+
+185 releases GitHub `k2-fsa/sherpa-onnx` inspectées via l'API (pas une
+recherche manuelle partielle) : seules trois variantes de tarball Android
+existent par version (`android`, `android-rknn`, `android-static-link-onnxruntime`)
+— **aucune variante NNAPI dédiée**. Le script de build officiel
+(`build-android-arm64-v8a.sh`) documente lui-même la marche à suivre :
+
+```
+# Please use -DANDROID_PLATFORM=android-27 if you want to use Android NNAPI
+```
+
+mais le défaut du script est `android-21`, et le workflow CI officiel
+(`.github/workflows/android.yaml`) appelle le script **sans** surcharger
+cette variable — confirmé en lisant le YAML, pas supposé. Aucun raccourci
+légitime : il faut recompiler.
+
+### 2. Coût réel de la compilation — chiffré, pas juste tenté
+
+NDK 27.2.12479018 et CMake 3.22.1 déjà installés (Tâche 5.2.0),
+réutilisés tels quels. Seul ajustement nécessaire : `cmake` n'était pas
+sur le `PATH` (premier essai échoué en 58 s, `cmake: command not found` —
+corrigé en ajoutant `/home/majeur/Android/Sdk/cmake/3.22.1/bin` au
+`PATH`).
+
+```bash
+export ANDROID_NDK=.../ndk/27.2.12479018
+export SHERPA_ONNX_ANDROID_PLATFORM=android-27
+export SHERPA_ONNX_ENABLE_SPEAKER_DIARIZATION=OFF  # hors perimetre, reduit le temps de build
+bash build-android-arm64-v8a.sh
+```
+
+**Temps réel mesuré (`time`, pas estimé) : 9 min 45 s** — nettement
+moins que redouté (la machine de build n'a que 1,7 Go de RAM libre au
+moment du build). Explication : `libonnxruntime.so` n'est pas recompilé
+par ce script — il est téléchargé prébuilt (`csukuangfj/onnxruntime-libs`
+v1.27.0), **confirmé identique bit à bit** (`sha256sum`) à celui déjà
+vendoré (Tâche 5.1.0/5.2). Seul `libsherpa-onnx-jni.so` (le code
+sherpa-onnx lui-même, plus petit que l'intégralité d'ONNX Runtime) est
+réellement recompilé — d'où le temps raisonnable.
+
+### 3. RTF mesuré avec NNAPI réellement actif — comparaison directe
+
+`libsherpa-onnx-jni.so` recompilé substitué temporairement (même
+protocole de test que le diagnostic précédent : même phrase, même
+device V2206, `numThreads=4` inchangé, `provider="nnapi"`,
+`debug=true`) :
+
+```
+07-28 11:20:46 W sherpa-onnx: Use nnapi
+```
+
+**Aucun message de repli** (`Failed to enable NNAPI`/`Fallback to cpu`)
+— NNAPI s'active réellement cette fois, confirmé par le log, pas supposé.
+
+| Configuration | Synthèse Kokoro (médiane, ms) | RTF | Provider confirmé |
+|---|---|---|---|
+| `numThreads=2`, cpu (baseline initiale) | ~28 500 – 33 800 | ~5,9 – 7,1× | cpu (implicite) |
+| `numThreads=4`, cpu | ~22 476 – 22 793 | ~4,7× | cpu (confirmé, seul dispo dans le prebuilt) |
+| `numThreads=4`, **nnapi (recompilé, réellement actif)** | **25 714** | **~5,4×** | **nnapi (confirmé « Use nnapi », pas de repli)** |
+
+**NNAPI, une fois réellement activé, est plus lent que CPU** — pas
+seulement indisponible, réellement contre-productif sur ce modèle/device.
+Le premier appel (froid) avec NNAPI grimpe même à ~42,4 s (contre
+~31-39 s en cpu), cohérent avec le coût de compilation/partitionnement de
+graphe propre à NNAPI au premier appel.
+
+**Hypothèse plausible pour expliquer cette contre-performance**, cohérente
+avec l'inspection du graphe ONNX de la section précédente
+(`DynamicQuantizeLinear`, `MatMulInteger`, `ConvInteger`,
+`DynamicQuantizeLSTM`) : ces opérateurs de quantification dynamique et la
+composante LSTM ne sont probablement pas supportés nativement par le
+pilote NNAPI de ce device (Snapdragon 680, milieu de gamme, sans NPU
+dédié documenté) — NNAPI délèguerait alors une grande partie du graphe à
+un repli CPU interne à son propre HAL, avec en plus la surcharge de
+partitionnement/synchronisation entre les deux chemins d'exécution.
+Hypothèse plausible, pas vérifiée plus avant (nécessiterait un accès aux
+logs internes du HAL NNAPI du device, hors périmètre).
+
+### 4. Décision — binaire NNAPI non intégré
+
+Le `.so` recompilé (API 27) a été retiré après mesure — restauré à
+l'original vendoré (Tâche 5.1.0/5.2, API 21, `sha256` revérifié
+identique après restauration). Pas de bénéfice mesuré, donc pas de raison
+d'introduire la complexité supplémentaire (maintenance d'un fork de build
+sherpa-onnx, `minSdk` à relever à 27 pour ce module — actuellement 26 —
+avec la perte de compatibilité associée) pour un résultat pire.
+
+### 5. Verdict final — les leviers de configuration sont épuisés
+
+Cinquième donnée ajoutée aux quatre du diagnostic précédent : **NNAPI
+recompilé avec succès, réellement activé, mesuré plus lent que CPU.** Ce
+n'est pas un échec de compilation qui aurait laissé la question ouverte —
+c'est une mesure complète et négative. Combinée aux quatre vérifications
+précédentes (threads, provider, int8, G2P), **tous les leviers de
+configuration identifiables ont été essayés et chiffrés** :
+
+| # | Levier | Résultat |
+|---|---|---|
+| 1 | `numThreads` 2→4 | +20-25 %, insuffisant |
+| 2a | XNNPACK | Absent du binaire, non activable sans recompilation |
+| 2b | NNAPI (indisponibilité initiale) | Contrainte de build, pas de device |
+| 3 | Modèle int8 | Authentiquement quantifié, pas un mixup |
+| 4 | G2P vs inférence | G2P négligeable (~0,8 %) |
+| 5 | **NNAPI recompilé et réellement testé** | **Plus lent que CPU (~5,4× contre ~4,7×)** |
+
+**L'ADR est maintenant pleinement justifié** — pas seulement parce
+qu'un levier était indisponible, mais parce que le seul levier
+d'accélération matérielle réellement accessible sur ce device, une fois
+compilé et vérifié actif, dégrade la performance au lieu de l'améliorer.
+Le RTF ~4,7× (meilleure configuration mesurée à ce jour, CPU + 4 threads)
+reste la référence à confronter au budget §11.2 dans l'ADR à venir.
+
+---
+
 ## Checklist finale de sortie de Phase 5
 
 **Mise à jour du 2026-07-28** — case par case, d'après les mesures réelles
@@ -518,7 +801,7 @@ seulement prototypés séparément).
 | 1 | Vendoring Sherpa-ONNX confirmé par la pratique (projet officiel buildé localement) | ✅ Fait — et Kokoro (remplace VITS) vendoré et branché en production | 5.1.0, `PROTOTYPE_ALIGNEMENT_CTC.md` §8 |
 | 2 | Adaptateur Sherpa-ONNX produit un `AudioSegment` réel | ✅ Fait — avec de vrais `WordTimestamp`, pas seulement l'audio | 5.1.2, §9.4 |
 | 3 | Alignement CTC prototypé et mesuré avant code de production | ✅ Fait, et **branché en production** (dépasse le critère d'origine) | `PROTOTYPE_ALIGNEMENT_CTC.md` §1-9 |
-| 4 | Silence inter-phrases ≤ 150 ms | ❌ **Échec mesuré** — de l'ordre de 25-30 s, pas 150 ms (synthèse Kokoro ~28-34 s pour ~4,8 s d'audio) | §10.1-10.2 |
+| 4 | Silence inter-phrases ≤ 150 ms | ❌ **Échec mesuré, diagnostiqué avant conclusion architecturale (5 vérifications, y compris NNAPI recompilé et réellement testé)** — meilleure config mesurée : ~25 s (RTF ~4,7×, CPU+4 threads) ; NNAPI réellement actif mesuré *plus lent* (~5,4×) ; toujours très loin de 150 ms ; leviers de configuration épuisés, ADR justifié | §10.1-10.2, sections « Diagnostic de la latence Kokoro » et « NNAPI recompilé » |
 | 5 | Lecture continue écran éteint | ⬜ Non commencé (5.4) — inchangé par cette tâche | — |
 | 6 | Contrôles complets fonctionnels | ⬜ Non commencé (5.5) — inchangé | — |
 | 7 | Téléchargement de voix vérifié par empreinte | ⬜ Non commencé (5.6) — placement manuel des modèles toujours nécessaire | — |
