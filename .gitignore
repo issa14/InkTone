@@ -4,6 +4,7 @@ build/
 .kotlin/
 */build/
 out/
+.cxx/
 
 # Local configuration (machine-specific, never committed)
 local.properties
