@@ -55,7 +55,7 @@ class TtsCapabilityConsistencyTest {
     @Test
     fun palier2_sherpa_onnx_respecte_sa_capacite_wordTimestamps() {
         val modelPaths = SherpaOnnxModelPaths(context)
-        val staged = File(context.getExternalFilesDir(null), "vits-piper-fr_FR-siwis-medium")
+        val staged = File(context.getExternalFilesDir(null), "kokoro-int8-multi-lang-v1_0")
         if (!modelPaths.isReady && staged.exists()) {
             staged.copyRecursively(modelPaths.modelFile.parentFile!!, overwrite = true)
         }
@@ -64,7 +64,7 @@ class TtsCapabilityConsistencyTest {
             modelPaths.isReady,
         )
         val engine = SherpaOnnxTtsEngine(modelPaths)
-        val voiceProfile = VoiceProfile(id = "vp-sherpa-fr", engine = TtsEngineId.SHERPA_ONNX, voice = "fr_FR-siwis-medium", language = "fr-FR")
+        val voiceProfile = VoiceProfile(id = "vp-sherpa-fr", engine = TtsEngineId.SHERPA_ONNX, voice = "ff_siwis", language = "fr-FR")
         assertFalse(
             "Palier 2 declare wordTimestamps=false tant que la Tache 5.2 (alignement CTC) n'est pas completee",
             engine.capabilities.wordTimestamps,
