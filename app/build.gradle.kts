@@ -6,6 +6,23 @@ android {
     compileOptions {
         isCoreLibraryDesugaringEnabled = true
     }
+
+    // Meme conflit que infrastructure/tts (voir son build.gradle.kts) :
+    // libonnxruntime.so existe en deux exemplaires possibles (sherpa-onnx
+    // vendore vs AAR onnxruntime-android:1.27.0). La regle packaging
+    // d'un module bibliotheque ne s'applique qu'a SON propre merge - le
+    // module qui assemble l'APK final (celui-ci) doit redeclarer sa
+    // propre regle, sinon `app:mergeDebugNativeLibs` echoue avec "2 files
+    // found with path 'lib/arm64-v8a/libonnxruntime.so'" (verifie en CI,
+    // pas suppose). Meme decision qu'infrastructure/tts §8.1/§9.3
+    // (PROTOTYPE_ALIGNEMENT_CTC.md) : garder un seul binaire, peu importe
+    // lequel des deux gagne ici puisque meme version (1.27.0) des deux
+    // cotes.
+    packaging {
+        jniLibs {
+            pickFirsts += "**/libonnxruntime.so"
+        }
+    }
 }
 
 dependencies {
