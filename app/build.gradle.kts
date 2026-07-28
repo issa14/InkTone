@@ -33,4 +33,9 @@ dependencies {
     // complete, hors de portee de la marche a blanc (Phase 4).
     implementation("androidx.activity:activity-compose:1.9.1")
     implementation(libs.androidx.hilt.navigation.compose)
+
+    // Tache 6.2 : Configuration.Provider (InkToneApplication) cable
+    // HiltWorkerFactory pour que ImportWorker (@HiltWorker) recoive ses
+    // dependances via le graphe Hilt plutot que le WorkerFactory par defaut.
+    implementation(libs.androidx.work.runtime.ktx)
 }
