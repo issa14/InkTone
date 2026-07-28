@@ -79,4 +79,35 @@ class TtsCapabilityConsistencyTest {
         )
         assertCapabilityMatchesBehavior(engine, voiceProfile)
     }
+
+    /**
+     * `FallbackTtsEngine` (Tache 5.8, ADR-021) expose `capabilities` de
+     * facon DYNAMIQUE - toujours celles du moteur reellement actif
+     * (primaire ou replie), jamais figees a la construction (§8.9 : "un
+     * moteur ne fait jamais semblant"). Pas de gate sur la presence du
+     * modele Kokoro ici, contrairement au test Palier 2 ci-dessus : le
+     * comportement a verifier est justement que la coherence capacite/
+     * comportement tient DANS LES DEUX CAS - modele present (Palier 2
+     * actif) ou absent (repli automatique vers le Palier 1, capabilities
+     * qui basculent avec lui, pas de WordTimestamp fantome du palier
+     * abandonne).
+     */
+    @Test
+    fun fallback_engine_respecte_sa_capacite_wordTimestamps_quel_que_soit_le_palier_actif() {
+        val modelPaths = SherpaOnnxModelPaths(context)
+        val stagedKokoro = File(context.getExternalFilesDir(null), "kokoro-int8-multi-lang-v1_0")
+        if (!modelPaths.isReady && stagedKokoro.exists()) {
+            stagedKokoro.copyRecursively(modelPaths.modelFile.parentFile!!, overwrite = true)
+        }
+        val ctcModelPaths = CtcModelPaths(context)
+        val stagedCtc = File(context.getExternalFilesDir(null), "nemo-ctc-fr-multilang-int8")
+        if (!ctcModelPaths.isReady && stagedCtc.exists()) {
+            stagedCtc.copyRecursively(ctcModelPaths.modelFile.parentFile!!, overwrite = true)
+        }
+        val primary = SherpaOnnxTtsEngine(modelPaths, CtcForcedAligner(ctcModelPaths))
+        val fallback = AndroidNativeTtsEngine(context)
+        val engine = FallbackTtsEngine(primary, fallback)
+        val voiceProfile = VoiceProfile(id = "vp-fallback-fr", engine = TtsEngineId.SHERPA_ONNX, voice = "ff_siwis", language = "fr-FR")
+        assertCapabilityMatchesBehavior(engine, voiceProfile)
+    }
 }

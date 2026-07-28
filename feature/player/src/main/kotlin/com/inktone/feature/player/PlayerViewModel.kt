@@ -3,24 +3,40 @@ package com.inktone.feature.player
 import android.content.ComponentName
 import android.content.Context
 import androidx.lifecycle.ViewModel
+import androidx.lifecycle.viewModelScope
 import androidx.media3.common.PlaybackParameters
 import androidx.media3.common.Player
 import androidx.media3.session.MediaController
 import androidx.media3.session.SessionToken
 import com.google.common.util.concurrent.MoreExecutors
+import com.inktone.domain.model.VoiceProfile
+import com.inktone.domain.usecase.GetVoiceProfilesUseCase
 import dagger.hilt.android.lifecycle.HiltViewModel
 import dagger.hilt.android.qualifiers.ApplicationContext
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
+import kotlinx.coroutines.isActive
+import kotlinx.coroutines.launch
+import kotlinx.coroutines.delay
 import javax.inject.Inject
 
 data class PlayerUiState(
     val isPlaying: Boolean = false,
     val speed: Float = 1.0f,
     val currentVoiceProfileId: String? = null,
+    val availableVoiceProfiles: List<VoiceProfile> = emptyList(),
     val isConnected: Boolean = false,
-)
+    // Position/duree du segment audio courant (une phrase = un MediaItem,
+    // AudioPlaybackService.playSegment) - la progression ExoPlayer EST
+    // directement la progression dans la phrase courante, pas besoin d'un
+    // second signal.
+    val positionMs: Long = 0L,
+    val durationMs: Long = 0L,
+) {
+    val sentenceProgress: Float
+        get() = if (durationMs > 0L) (positionMs.toFloat() / durationMs.toFloat()).coerceIn(0f, 1f) else 0f
+}
 
 sealed interface PlayerIntent {
     data object PlayPause : PlayerIntent
@@ -40,6 +56,7 @@ sealed interface PlayerIntent {
 @HiltViewModel
 class PlayerViewModel @Inject constructor(
     @ApplicationContext private val context: Context,
+    private val getVoiceProfilesUseCase: GetVoiceProfilesUseCase,
 ) : ViewModel() {
 
     private val _state = MutableStateFlow(PlayerUiState())
@@ -59,6 +76,8 @@ class PlayerViewModel @Inject constructor(
 
     init {
         connectToPlaybackService()
+        loadVoiceProfiles()
+        startPositionPolling()
     }
 
     private fun connectToPlaybackService() {
@@ -74,6 +93,34 @@ class PlayerViewModel @Inject constructor(
             },
             MoreExecutors.directExecutor(),
         )
+    }
+
+    private fun loadVoiceProfiles() {
+        viewModelScope.launch {
+            val profiles = getVoiceProfilesUseCase()
+            _state.value = _state.value.copy(
+                availableVoiceProfiles = profiles,
+                currentVoiceProfileId = _state.value.currentVoiceProfileId ?: profiles.firstOrNull()?.id,
+            )
+        }
+    }
+
+    // ExoPlayer n'expose pas de callback continu de position (seulement des
+    // evenements discrets) - un sondage periodique reste l'approche standard
+    // Media3 pour une barre de progression, ici a 200ms (assez fin pour un
+    // rendu fluide, sans sonder inutilement vite).
+    private fun startPositionPolling() {
+        viewModelScope.launch {
+            while (isActive) {
+                controller?.let { c ->
+                    _state.value = _state.value.copy(
+                        positionMs = c.currentPosition,
+                        durationMs = c.duration.coerceAtLeast(0L),
+                    )
+                }
+                delay(POSITION_POLL_INTERVAL_MS)
+            }
+        }
     }
 
     fun onIntent(intent: PlayerIntent) {
@@ -122,5 +169,6 @@ class PlayerViewModel @Inject constructor(
 
     private companion object {
         const val AUDIO_PLAYBACK_SERVICE_CLASS_NAME = "com.inktone.infrastructure.media.AudioPlaybackService"
+        const val POSITION_POLL_INTERVAL_MS = 200L
     }
 }

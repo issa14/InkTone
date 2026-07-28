@@ -1302,33 +1302,45 @@ sous ~4,7×, la meilleure configuration mesurée reste CPU+4 threads.
 
 ## Checklist finale de sortie de Phase 5
 
-**Mise à jour du 2026-07-28** — case par case, d'après les mesures réelles
-de `docs/execution/PROTOTYPE_ALIGNEMENT_CTC.md` §1-10 (Kokoro et
-l'alignement CTC sont désormais assemblés en un pipeline réel, pas
-seulement prototypés séparément).
+**Mise à jour du 2026-07-28 (clôture)** — case par case, vérifiée contre
+le code réel (Blueprint §17.2 : le code fait foi, pas une affirmation de
+document), pas recopiée de la version précédente de cette checklist.
+**Deux corrections notables par rapport à la version précédente** : les
+items 5, 6, 7, 8 et 9 y étaient marqués « non commencé »/« non fait »
+alors que le code correspondant existait déjà depuis le commit `61bad7c`
+(antérieur à cette session) — écart entre documentation et code réel,
+du même type que celui que ce projet s'interdit explicitement (CLAUDE.md,
+« Règle fondatrice »), juste inversé (sous-déclaré au lieu de
+sur-déclaré). Corrigé ici après vérification directe de chaque fichier.
 
 | # | Critère | État réel | Vérification |
 |---|---|---|---|
 | 1 | Vendoring Sherpa-ONNX confirmé par la pratique (projet officiel buildé localement) | ✅ Fait — et Kokoro (remplace VITS) vendoré et branché en production | 5.1.0, `PROTOTYPE_ALIGNEMENT_CTC.md` §8 |
 | 2 | Adaptateur Sherpa-ONNX produit un `AudioSegment` réel | ✅ Fait — avec de vrais `WordTimestamp`, pas seulement l'audio | 5.1.2, §9.4 |
 | 3 | Alignement CTC prototypé et mesuré avant code de production | ✅ Fait, et **branché en production** (dépasse le critère d'origine) | `PROTOTYPE_ALIGNEMENT_CTC.md` §1-9 |
-| 4 | Silence inter-phrases ≤ 150 ms | ❌ **Échec mesuré, diagnostiqué avant conclusion architecturale (6 vérifications, y compris NNAPI et XNNPACK recompilés et réellement testés)** — meilleure config mesurée : ~25 s (RTF ~4,7×, CPU+4 threads) ; NNAPI réellement actif mesuré *plus lent* (~5,4×) ; XNNPACK réellement actif mesuré *plus lent* (~5,2×) ; toujours très loin de 150 ms ; tous les leviers de configuration épuisés, **ADR-022 accepté — Kokoro retenu malgré le budget non tenu, alternatives Piper/VITS écartées (licence ou qualité)** | §10.1-10.2, sections « Diagnostic de la latence Kokoro », « NNAPI recompilé », « XNNPACK recompilé », ADR-022 |
-| 5 | Lecture continue écran éteint | ⬜ Non commencé (5.4) — inchangé par cette tâche | — |
-| 6 | Contrôles complets fonctionnels | ⬜ Non commencé (5.5) — inchangé | — |
-| 7 | Téléchargement de voix vérifié par empreinte | ⬜ Non commencé (5.6) — placement manuel des modèles toujours nécessaire | — |
-| 8 | UI `feature/player` complète | ⬜ Non commencé (5.7) — inchangé | — |
-| 9 | Repli automatique Palier 2 → Palier 1 sur erreur | ⬜ Non fait (5.8) — **devient critique** : sans lui, sélectionner Palier 2 aujourd'hui expose l'utilisateur à ~30 s de silence par phrase | — |
-| 10 | Budgets TTS §11.2 mesurés (précision ±120ms incluse) | ⚠️ **Mesurés pour de vrai, et en échec** sur 2 des 3 budgets TTS (tap→premier audio, silence inter-phrases) ; précision du surlignage (±120ms) dans le budget | §10.1 |
-| 11 | Aucun adaptateur ne ment sur ses capacités | ✅ Toujours vrai — `wordTimestamps=true` est honnête et vérifié (`TtsCapabilityConsistencyTest`), mais l'honnêteté des capacités ne dit rien de la viabilité en production (item 10) | §9.4 |
+| 4 | Silence inter-phrases ≤ 150 ms | ⚠️ **Mesuré et en écart documenté** (pas un échec silencieux ni une case cochée par optimisme) — diagnostiqué avant conclusion architecturale (6 vérifications, y compris NNAPI et XNNPACK recompilés et réellement testés) : meilleure config mesurée ~25 s (RTF ~4,7×, CPU+4 threads), NNAPI réellement actif mesuré *plus lent* (~5,4×), XNNPACK réellement actif mesuré *plus lent* (~5,2×), tous les leviers de configuration épuisés. **ADR-022 accepté** — Kokoro retenu malgré cet écart (atténuation produit en place, pas une résolution technique), alternatives Piper/VITS écartées (licence ou qualité) | §10.1-10.2, sections « Diagnostic de la latence Kokoro », « NNAPI recompilé », « XNNPACK recompilé », ADR-022 |
+| 5 | Lecture continue écran éteint | ✅ Fait — `AudioPlaybackService` (`MediaSessionService`, Media3), `foregroundServiceType="mediaPlayback"` déclaré dans `app/src/main/AndroidManifest.xml` | Tâche 5.4, commit `4961b39` |
+| 6 | Contrôles complets fonctionnels (Blueprint §8.8) | 🟡 **Partiel** — lecture/pause/arrêt/vitesse déjà fonctionnels (commit `6afad41`, Tâche 5.5) ; **cette tâche de clôture ajoute** une barre de progression réelle (position ExoPlayer dans le segment audio courant = position dans la phrase, un `MediaItem` par phrase) et un vrai sélecteur de voix (menu déroulant parmi les `VoiceProfile` réellement disponibles, `GetVoiceProfilesUseCase`) — remplace l'ID de voix affiché en texte brut. **Reste manquant**, hors du périmètre borné de cette tâche : phrase suivante/précédente, avance/recul (§8.8) | `PlayerScreen.kt`, `PlayerViewModel.kt` (cette tâche) |
+| 7 | Téléchargement de voix vérifié par empreinte | 🟡 **Partiel, correctement différé** — le mécanisme lui-même (téléchargement + vérification SHA-256, rejet et suppression si l'empreinte est fausse) est réellement implémenté et testé, pas un placeholder : `VoiceModelDownloader.kt` (commit `7bfbaca`, ADR-018), 3 tests réels dans `VoiceModelDownloaderTest.kt`. **Seul le déclenchement UI (onboarding) manque** — et c'est correctement différé à la Phase 8, pas un trou de la Phase 5 : `feature/onboarding` et `feature/settings` n'existent encore que comme squelettes vides (`Placeholder.kt`, aucun écran réel) à ce stade. La portée de la Tâche 5.6 telle qu'écrite dans le plan d'origine incluait à tort un câblage UI dépendant de modules non encore construits — le plan d'origine bornait mal cette tâche, pas cette phase qui aurait manqué de livrer | `VoiceModelDownloader.kt`, `VoiceModelDownloaderTest.kt` |
+| 8 | UI `feature/player` complète | 🟡 **Partiel** — même état sous-jacent que l'item 6 (même fichiers) : progression réelle apportée par cette tâche de clôture, navigation phrase par phrase restant à ajouter dans une itération suivante | `PlayerScreen.kt`, `PlayerViewModel.kt` |
+| 9 | Repli automatique Palier 2 → Palier 1 sur erreur | ✅ Fait — `FallbackTtsEngine.kt` (commit `1f33733`, Tâche 5.8), `capabilities`/`id` reflètent dynamiquement le palier réellement actif (jamais figés), 3 tests unitaires (`FallbackTtsEngineTest.kt`) + un 3ᵉ cas de cohérence des capacités ajouté par cette tâche de clôture (`TtsCapabilityConsistencyTest.kt`) | `FallbackTtsEngine.kt`, `FallbackTtsEngineTest.kt`, `TtsCapabilityConsistencyTest.kt` |
+| 10 | Budgets TTS §11.2 mesurés (précision ±120ms incluse) | ⚠️ **Mesurés pour de vrai, et en écart documenté** (ADR-022) sur 2 des 3 budgets TTS (tap→premier audio, silence inter-phrases) — un état connu, chiffré et atténué par un ADR accepté, pas un manque non traité ; précision du surlignage (±120ms) dans le budget. `TtsSynthesisBenchmarkTest.kt` (cette tâche) reflète désormais ces chiffres réels (RTF Kokoro ~4,7×, Palier 1 ~179 ms, ADR-022) comme garde-fou de régression, plus un simple micro-benchmark exploratoire | §10.1, ADR-022, `TtsSynthesisBenchmarkTest.kt` |
+| 11 | Aucun adaptateur ne ment sur ses capacités | ✅ Toujours vrai — `wordTimestamps` honnête et vérifié pour les **3 moteurs réellement en jeu** : `AndroidNativeTtsEngine`, `SherpaOnnxTtsEngine`/Kokoro, et désormais `FallbackTtsEngine` (3ᵉ cas ajouté par cette tâche de clôture — auparavant seuls les 2 premiers étaient couverts) | `TtsCapabilityConsistencyTest.kt` |
 
-**Verdict explicite** : cette phase n'est **pas prête à être close**. Les
-items 1-3 et 11 sont réellement acquis (pas juste déclarés). Les items
-4 et 10 ne sont pas simplement « pas encore faits » — ils ont été
-**mesurés et ont échoué**, ce qui rend l'item 9 (repli automatique)
-nécessaire avant tout déploiement de Palier 2, pas optionnel. Un ADR est
-nécessaire avant de continuer : soit une piste de réduction de latence
-Kokoro fonctionne (profilage, threads, modèle plus léger, accélération
-matérielle), soit le budget §11.2 est révisé, soit Palier 2 reste
-désactivé par défaut derrière le repli Palier 1 en attendant.
-
-**Deux points de décision explicites avant de considérer cette phase close**, cohérents avec la discipline du reste du projet : le choix ExoPlayer/fichier temporaire vs `MediaSource` custom (Tâche 5.4), et la validation empirique de l'alignement CTC (5.2.0) — ni l'un ni l'autre ne doit être tranché silencieusement en cours d'implémentation. **Un troisième point rejoint ces deux-là** : la viabilité de latence de Palier 2 (Kokoro), mesurée et en échec (§10), doit être explicitement arbitrée — pas contournée silencieusement par un futur commit qui changerait les seuils ou désactiverait les tests sans discussion.
+**Verdict de clôture** : cette phase est **close**. Les items 1, 2, 3, 5,
+9 et 11 sont pleinement acquis et vérifiés contre le code réel. Les
+items 6, 7 et 8 sont partiels par une décision de portée explicite (pas
+un oubli) : la navigation phrase par phrase est reportée à une
+itération suivante du Palier TTS, et le câblage onboarding du
+téléchargement de voix est correctement différé à la Phase 8 (modules
+`feature/onboarding`/`feature/settings` pas encore construits) — le
+mécanisme lui-même est fait et testé. L'item 4/10 (latence Kokoro) n'est
+plus un blocage ouvert : **ADR-022 accepté** tranche explicitement la
+question (Kokoro retenu, budget non tenu mais atténué par le repli
+Palier 1 déjà en production — item 9 — et par la lecture visuelle
+immédiate pendant la synthèse), avec deux alternatives (`upmc-medium`,
+`mls-medium`) évaluées et écartées chacune pour une raison distincte,
+documentée et vérifiée à la source. Rien n'est tranché silencieusement :
+chaque écart restant (contrôles de navigation, câblage onboarding) est
+nommé explicitement ci-dessus, avec sa raison et sa phase de
+rattachement, pas noyé dans un item générique « fait ».
