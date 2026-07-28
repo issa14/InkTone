@@ -53,7 +53,7 @@ class TtsSynthesisBenchmarkTest {
     @Test
     fun latence_synthese_palier2_sherpa_onnx() {
         val modelPaths = SherpaOnnxModelPaths(context)
-        val staged = File(context.getExternalFilesDir(null), "vits-piper-fr_FR-siwis-medium")
+        val staged = File(context.getExternalFilesDir(null), "kokoro-int8-multi-lang-v1_0")
         if (!modelPaths.isReady && staged.exists()) {
             staged.copyRecursively(modelPaths.modelFile.parentFile!!, overwrite = true)
         }
@@ -62,7 +62,7 @@ class TtsSynthesisBenchmarkTest {
             modelPaths.isReady,
         )
         val engine = SherpaOnnxTtsEngine(modelPaths)
-        val voiceProfile = VoiceProfile(id = "vp-sherpa-fr", engine = TtsEngineId.SHERPA_ONNX, voice = "fr_FR-siwis-medium", language = "fr-FR")
+        val voiceProfile = VoiceProfile(id = "vp-sherpa-fr", engine = TtsEngineId.SHERPA_ONNX, voice = "ff_siwis", language = "fr-FR")
 
         benchmarkRule.measureRepeated {
             runBlocking { engine.synthesize(sentence, voiceProfile) }

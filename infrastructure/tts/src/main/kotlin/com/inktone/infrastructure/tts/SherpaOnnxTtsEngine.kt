@@ -9,8 +9,8 @@ import com.inktone.domain.service.TtsCapabilities
 import com.inktone.domain.service.TtsEngine
 import com.k2fsa.sherpa.onnx.OfflineTts
 import com.k2fsa.sherpa.onnx.OfflineTtsConfig
+import com.k2fsa.sherpa.onnx.OfflineTtsKokoroModelConfig
 import com.k2fsa.sherpa.onnx.OfflineTtsModelConfig
-import com.k2fsa.sherpa.onnx.OfflineTtsVitsModelConfig
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.channels.awaitClose
 import kotlinx.coroutines.flow.Flow
@@ -21,23 +21,29 @@ import javax.inject.Singleton
 import kotlin.math.roundToInt
 
 /**
- * Palier 2 (ADR-021) — qualité vocale neuronale (VITS, voix fr_FR-siwis-
- * medium, CC-BY 4.0), PAS de timestamps mot natifs. Vérifié empiriquement
- * (Tâche 5.1.0, API Kotlin officielle vendorée dans
+ * Palier 2 (ADR-021) — qualité vocale neuronale (Kokoro, voix `ff_siwis`
+ * française, Apache-2.0), PAS de timestamps mot natifs. Vérifié
+ * empiriquement (Tâche 5.1.0, API Kotlin officielle vendorée dans
  * `com.k2fsa.sherpa.onnx.Tts.kt`) : `GeneratedAudio` n'expose que
  * `samples: FloatArray` (normalisé [-1, 1]) et `sampleRate: Int` — jamais
- * de `WordTimestamp`, quel que soit le modèle chargé (VITS ou Kokoro).
- * `wordTimestamps` reste donc `false` ici jusqu'à ce que la Tâche 5.2
- * (alignement forcé CTC) soit réellement complétée et branchée — jamais
- * affirmé vrai par anticipation (§8.9 : "un moteur ne fait jamais
- * semblant").
+ * de `WordTimestamp`, quel que soit le modèle chargé. `wordTimestamps`
+ * reste donc `false` ici jusqu'à ce que la Tâche 5.2 (alignement forcé
+ * CTC, déjà prouvée sur device réel —
+ * `docs/execution/PROTOTYPE_ALIGNEMENT_CTC.md`) soit réellement branchée
+ * — jamais affirmé vrai par anticipation (§8.9 : "un moteur ne fait
+ * jamais semblant").
  *
- * Écart avec ADR-021/le plan de Phase 5 : aucun modèle Kokoro français
- * n'existe dans le catalogue officiel Sherpa-ONNX (vérifié empiriquement,
- * Tâche 5.1.1 — le modèle "multi-lang" ne couvre que zh/en). VITS (poids
- * Piper redistribués par Sherpa-ONNX, exécutés par le moteur VITS
- * indépendant de Sherpa-ONNX — pas le logiciel Piper rejeté en ADR-021)
- * est utilisé à la place, décision Issa.
+ * Remplace la voix VITS `fr_FR-siwis-medium` retenue en Tâche 5.1.1. Sa
+ * prémisse (« aucun modèle Kokoro français n'existe dans le catalogue
+ * Sherpa-ONNX, le modèle multi-lang ne couvre que zh/en ») était
+ * factuellement fausse — vérifié en pratique le 2026-07-28 : l'app
+ * d'exemple officielle `SherpaOnnxTts`, chargée avec
+ * `kokoro-int8-multi-lang-v1_0` sur un device Snapdragon 680 réel,
+ * confirme une voix française (`ff_siwis`, speaker id 30, lu dans les
+ * métadonnées ONNX `speaker2id` du modèle, pas deviné) produisant un
+ * français correct (`docs/execution/PROTOTYPE_SYNTHESE_KOKORO_ONNX.md`).
+ * `sid = 30` ci-dessous est donc spécifique à ce modèle exact — pas une
+ * constante Kokoro générale, à revérifier si le modèle vendoré change.
  */
 @Singleton
 class SherpaOnnxTtsEngine @Inject constructor(
@@ -53,9 +59,9 @@ class SherpaOnnxTtsEngine @Inject constructor(
         languages = listOf("fr"),
         streamingSynthesis = false,
         speedControl = true,
-        pitchControl = false, // VITS (Piper) n'expose pas de controle de hauteur independant de la vitesse, verifie contre l'API OfflineTtsVitsModelConfig (Tache 5.1.0)
-        modelSizeMb = 63, // fr_FR-siwis-medium.onnx (~63 Mo) + tokens.txt + espeak-ng-data, mesure reelle Tache 5.1.1
-        license = "CC-BY 4.0 (voix siwis, dataset Centre for Speech Technology Voice Cloning Toolkit, University of Edinburgh)",
+        pitchControl = false, // OfflineTtsKokoroModelConfig n'expose que lengthScale (duree/vitesse), pas de parametre de hauteur - verifie contre l'API (kotlin-api/Tts.kt)
+        modelSizeMb = 164, // model.int8.onnx + voices.bin + espeak-ng-data + lexiques (us-en, zh) + tokens.txt + regles zh, mesure reelle sur l'archive kokoro-int8-multi-lang-v1_0
+        license = "Apache-2.0 (Kokoro-82M, hexgrad)",
     )
 
     private val tts: OfflineTts by lazy {
@@ -64,21 +70,30 @@ class SherpaOnnxTtsEngine @Inject constructor(
             assetManager = null,
             config = OfflineTtsConfig(
                 model = OfflineTtsModelConfig(
-                    vits = OfflineTtsVitsModelConfig(
+                    kokoro = OfflineTtsKokoroModelConfig(
                         model = modelPaths.modelFile.absolutePath,
+                        voices = modelPaths.voicesFile.absolutePath,
                         tokens = modelPaths.tokensFile.absolutePath,
                         dataDir = modelPaths.espeakDataDir.absolutePath,
+                        lexicon = "${modelPaths.lexiconUsEnFile.absolutePath},${modelPaths.lexiconZhFile.absolutePath}",
+                        // lang laisse vide : le C++ retombe sur meta_data.voice
+                        // (derive du speaker_names[sid] choisi), verifie en
+                        // pratique (Tache 5.1.0, app d'exemple) - pas devine.
                     ),
                     numThreads = 2,
                     provider = "cpu",
                 ),
+                ruleFsts = "${modelPaths.phoneZhFst.absolutePath},${modelPaths.dateZhFst.absolutePath},${modelPaths.numberZhFst.absolutePath}",
             ),
         )
     }
 
     override suspend fun synthesize(sentence: Sentence, voiceProfile: VoiceProfile): AudioSegment =
         withContext(Dispatchers.Default) {
-            val generated = tts.generate(text = sentence.text, sid = 0, speed = voiceProfile.speed)
+            // sid=30 : voix francaise "ff_siwis" de kokoro-int8-multi-lang-v1_0,
+            // lue dans les metadonnees ONNX speaker2id du modele (pas devinee) -
+            // voir KDoc de la classe.
+            val generated = tts.generate(text = sentence.text, sid = FF_SIWIS_SPEAKER_ID, speed = voiceProfile.speed)
             AudioSegment(
                 audioData = floatSamplesToPcm16(generated.samples),
                 durationMs = (generated.samples.size.toLong() * 1000L) / generated.sampleRate,
@@ -86,6 +101,10 @@ class SherpaOnnxTtsEngine @Inject constructor(
                 sampleRate = generated.sampleRate,
             )
         }
+
+    private companion object {
+        const val FF_SIWIS_SPEAKER_ID = 30
+    }
 
     override fun observePlaybackEvents(): Flow<PlaybackEvent> = callbackFlow { awaitClose { } }
 }

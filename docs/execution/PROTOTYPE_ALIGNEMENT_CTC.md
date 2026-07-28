@@ -870,6 +870,227 @@ dans son ensemble.
 
 ---
 
+## 8. Vendoring Kokoro (Tâche 5.1.0) — risque `libonnxruntime.so`, app officielle, production, CTC sur audio réel
+
+**Mise à jour du 2026-07-28.** Cette section couvre le vendoring réel de
+Kokoro dans `infrastructure/tts` (remplaçant VITS), vérifié à chaque étape
+avant la suivante — même discipline que le reste du document.
+
+### 8.1 Risque de double `libonnxruntime.so` — vérifié avant tout
+
+Deux artefacts distincts existent dans ce projet :
+
+| Artefact | Origine | Version ONNX Runtime | NDK de build | minSdk |
+|---|---|---|---|---|
+| `infrastructure/tts/src/main/jniLibs/arm64-v8a/libonnxruntime.so` | sherpa-onnx v1.13.4 (déjà vendoré Tâche 5.1.0) | **1.27.0** | r27d | 27 |
+| `onnxruntime-android:1.19.2` (Maven) | Utilisé pour le prototype CTC (`PROTOTYPE_ALIGNEMENT_CTC.md` §6-7, scratchpad hors dépôt) | **1.19.2** | r26b | 21 |
+
+Vérifié, pas supposé : le `.so` déjà vendoré est **identique bit à bit**
+(`sha256sum`) à celui de l'archive officielle
+`sherpa-onnx-v1.13.4-android.tar.bz2` re-téléchargée pour l'occasion —
+aucune divergence entre ce qui est dans le dépôt et la release amont.
+Version extraite via `strings` (pas via le numéro de tag, pour éviter de
+supposer) : `1.27.0`. Le `.so` de l'artefact Maven `onnxruntime-android`
+version `1.19.2` exporte bien `1.19.2` en interne également (cohérence
+numéro de version ↔ contenu confirmée).
+
+**Écart réel, non trivial** : 8 versions mineures d'ONNX Runtime
+d'écart, `ORT_API_VERSION` différent entre les deux `.so` (le symbole
+`OrtGetApiBase` est identique dans les deux, mais c'est le point d'entrée
+versionné du C API — son nom ne change jamais entre versions, ce qui ne
+garantit rien sur la compatibilité du contenu qu'il expose). Si les deux
+`.so` finissaient avec le même nom de fichier (`libonnxruntime.so`) dans
+le même APK, la fusion de `mergeNativeLibs` choisirait l'un des deux
+silencieusement (`pickFirsts`/comportement par défaut) : si
+`libsherpa-onnx-jni.so` (compilé contre les en-têtes 1.27.0) se retrouvait
+lié à l'exécution contre un runtime 1.19.2, la requête de
+`ORT_API_VERSION` correspondant à 1.27.0 échouerait côté runtime plus
+ancien — crash ou pire (mismatch de layout de structures C).
+
+**Décision, pour cette tâche précise (vendoring Kokoro) :** aucun risque
+ne se matérialise ici. Le vendoring Kokoro réutilise **exclusivement**
+le `.so` sherpa-onnx 1.27.0 déjà présent — aucun nouvel onnxruntime
+n'est ajouté par cette tâche. Le pipeline CTC (onnxruntime-android
+1.19.2) vit uniquement dans le scratchpad de session, jamais mergé dans
+`infrastructure/tts` à ce jour — **pas de collision réelle
+actuellement dans le dépôt**, seulement un risque latent pour une
+intégration future.
+
+**Décision documentée pour cette intégration future (pas implémentée
+ici, hors périmètre de cette tâche)** : quand le pipeline CTC sera
+porté en production dans `infrastructure/tts`, il devra être reconstruit
+contre **onnxruntime 1.27.0** (celui déjà vendoré par sherpa-onnx, pas
+1.19.2) — un seul `libonnxruntime.so` partagé entre `libsherpa-onnx-jni.so`
+(TTS Kokoro) et le binding JNI CTC personnalisé (`fbank_jni.cpp` + appel
+ONNX Runtime direct), chargé une seule fois par le classloader Android.
+C'est l'option « un seul `.so` partagé » proposée en tête de tâche —
+rendue possible ici parce que le binding CTC est du code que nous
+contrôlons entièrement (kaldi-native-fbank + appel ONNX Runtime brut),
+donc reciblable sur n'importe quelle version d'ONNX Runtime sans
+dépendre d'un tiers. Pas une isolation par classloader/process séparé
+(compromis plus lourd, non retenu tant que l'option du .so partagé reste
+disponible).
+
+### 8.2 App d'exemple officielle — build et exécution réels, device physique
+
+`android/SherpaOnnxTts` (`~/projects/inktone-ctc-prototype/sherpa-onnx/`)
+configuré avec `kokoro-int8-multi-lang-v1_0` (déjà présent dans
+`~/Downloads`, vérifié `tar tjf` avant extraction — noms de fichiers
+réels différents de ceux commentés dans l'exemple officiel : `model.int8.onnx`
+et `kokoro-int8-multi-lang-v1_0`, pas `model.onnx`/`kokoro-multi-lang-v1_0`).
+`.so` copiés depuis l'archive `sherpa-onnx-v1.13.4-android.tar.bz2`
+(§8.1, identiques à ceux déjà vendorés). Build réel via `./gradlew
+assembleDebug` (AGP 7.3.1, Gradle 8.2 — wrapper d'origine, redownload
+nécessaire) : **succès**, 25 min 49 s (dominé par l'empaquetage des
+169 Mo d'assets du modèle, pas par la compilation).
+
+**ID du speaker français vérifié, pas deviné** : lu dans les métadonnées
+ONNX du modèle (`speaker2id`) via `onnxruntime.InferenceSession(...).get_modelmeta()`
+— `ff_siwis → 30`. Une hypothèse alphabétique naïve (position 31 dans la
+liste triée du voicepack officiel à 54 voix) aurait été fausse : ce
+paquet sherpa-onnx n'a que 53 voix (`em_santa` absent), décalant tous les
+index suivants.
+
+Installé et lancé sur le V2206 (Snapdragon 680) réel via `adb`
+(`am start` + `input tap`, capture d'écran pour vérification — pas
+d'interaction manuelle). Résultat, confirmé par logcat ET par
+capture d'écran :
+
+- **Aucun SIGBUS, aucun UnsatisfiedLinkError** — recherché explicitement
+  dans le logcat complet, absent.
+- Chargement du modèle réussi (`Finish initializing TTS`), `sampleRate:
+  24000` confirmé par le log `initAudioTrack` (pas 16 000 — voir §8.4).
+- Génération réussie : les boutons Play/Save/Share passent de désactivés
+  à activés après le clic sur Generate — preuve directe que
+  `audio.samples.size > 0 && audio.save(filename)` a retourné vrai
+  (logique du code source de l'app, pas une supposition).
+- Trace de génération réelle dans le logcat :
+  `kokoro-multi-lang-lexicon.cc:ConvertTextToTokenIds` confirme le
+  passage par la lexicon/espeak-ng pour le texte français (chemin
+  « Non-Chinese »), cohérent avec `PROTOTYPE_SYNTHESE_KOKORO_ONNX.md`.
+
+### 8.3 Portage dans `infrastructure/tts` — VITS remplacé par Kokoro
+
+**Découverte avant modification, signalée avant d'agir** :
+`SherpaOnnxTtsEngine.kt` n'avait pas de `TODO()` — une implémentation VITS
+complète existait déjà (Tâche 5.1.1, voix `fr_FR-siwis-medium`, CC-BY 4.0),
+avec un commentaire affirmant qu'« aucun modèle Kokoro français n'existe,
+le modèle multi-lang ne couvre que zh/en ». **Cette prémisse était
+factuellement fausse** — les §8.2 et `PROTOTYPE_SYNTHESE_KOKORO_ONNX.md`
+la contredisent directement (voix `ff_siwis` fonctionnelle, testée deux
+fois : Python et Android). Remplacement confirmé avec l'utilisateur avant
+modification (pas silencieux — une décision explicite et documentée en
+5.1.1 méritait une confirmation avant d'être écrasée).
+
+Fichiers modifiés :
+
+- `SherpaOnnxModelPaths.kt` : chemins Kokoro (`model.int8.onnx`,
+  `voices.bin`, `tokens.txt`, `espeak-ng-data/`, lexiques, règles `.fst`
+  zh) au lieu des chemins VITS.
+- `SherpaOnnxTtsEngine.kt` : `OfflineTtsKokoroModelConfig` au lieu de
+  `OfflineTtsVitsModelConfig` ; `sid = 30` (`ff_siwis`, documenté comme
+  spécifique à ce modèle exact, pas une constante Kokoro générale) ;
+  `license = "Apache-2.0"` (au lieu de CC-BY 4.0) ; `modelSizeMb = 164`
+  (mesuré sur les fichiers réellement nécessaires, `dict/` exclu — vérifié
+  non référencé par le code Kokoro de sherpa-onnx, seulement par
+  Matcha/VITS) ; `pitchControl` reste `false` (aucun paramètre de hauteur
+  dans `OfflineTtsKokoroModelConfig`, seulement `lengthScale`).
+- Trois fichiers de test (`SherpaOnnxTtsEngineTest.kt`,
+  `TtsCapabilityConsistencyTest.kt`, `TtsSynthesisBenchmarkTest.kt`) :
+  répertoire de staging, nom de voix et `sampleRate` attendu (24 000,
+  au lieu de 22 050 pour VITS) mis à jour en cohérence.
+
+**Non exécuté dans cette session** : le build Gradle complet
+d'InkTone (`:infrastructure:tts:connectedDebugAndroidTest`) — les
+changements sont au niveau code, vérifiés par lecture et cohérence avec
+l'API déjà vendorée (`Tts.kt`, identique bit à bit à la source
+sherpa-onnx v1.13.4 courante, vérifié par `diff`), pas par une exécution
+sur device dans ce module précis. À faire avant de considérer la Tâche
+5.1.2 close.
+
+### 8.4 Alignement CTC sur l'audio Kokoro réel — le sample rate n'est PAS 16 kHz
+
+Kokoro produit du **24 000 Hz** (confirmé §8.2 et
+`PROTOTYPE_SYNTHESE_KOKORO_ONNX.md`), pas 16 000 Hz comme les `.wav` de
+test utilisés jusqu'ici (gTTS). Vérification demandée explicitement,
+faite avec de l'audio Kokoro **réellement produit**
+(`kokoro-fr-samples/test_fr_ff_siwis.wav`, généré en session précédente,
+pas un fichier synthétique construit pour l'occasion) :
+`test_ctc_on_kokoro_audio.py` fait tourner le pipeline
+`compute_nemo_fbank()` + Viterbi (déjà prouvé §1-7) sur cet audio, dans
+deux conditions :
+
+**(a) Sans resampling** — `sample_rate=24000` passé tel quel à
+`compute_nemo_fbank()`. Le code l'accepte **sans aucune erreur**
+(`samp_freq` est un paramètre, pas une constante) — c'est précisément ce
+qui rend ce bug silencieux plutôt que détecté à la compilation ou à
+l'exécution.
+
+**(b) Avec resampling correct** — `scipy.signal.resample_poly(audio,
+up=2, down=3)` (24000 × 2/3 = 16000, filtrage anti-repliement inclus,
+pas une décimation naïve) avant `compute_nemo_fbank()`.
+
+Résultat mesuré (pas supposé) :
+
+| | Sans resampling (24kHz direct) | Avec resampling (16kHz correct) |
+|---|---|---|
+| T (frames) | 365 | 365 (identique — `frame_shift_ms` est une durée, pas un nombre d'échantillons, donc indépendant du sample rate) |
+| Décodage greedy | "bonjour le monde. Cci est un test pour vérifier l'alignement." | identique |
+| `un` (Viterbi) | 1.680–1.760 | **1.760–1.840** |
+| `l'alignement` (Viterbi) | 2.880–3.520 | **2.960–3.520** |
+| Autres mots (8/10) | identiques | identiques |
+
+**Constat honnête** : le nombre de frames et le décodage textuel ne sont
+**pas** catastrophiquement cassés en absence de resampling dans ce test
+précis — surprenant, mais réel, pas maquillé. La cause : `frame_shift_ms`
+étant une durée (10 ms), le nombre de frames sur ~3.65 s reste identique
+quel que soit le sample rate déclaré. Ce qui **change réellement** et
+silencieusement, c'est la couverture fréquentielle du banc de filtres mel
+(`high_freq = Nyquist − 400 Hz`, donc 7600 Hz à 16kHz contre 11600 Hz à
+24kHz) — les 80 bins mel ne représentent plus le même contenu spectral
+que celui sur lequel le modèle CTC a été entraîné. Effet mesuré ici :
+décalages de frontière de mot de **80 ms** (une frame) sur 2 mots sur 10
+— du même ordre de grandeur que l'écart de précision int8 déjà mesuré
+en §7.3, pas une coïncidence rassurante mais un signal que ces écarts
+s'additionnent avec toute approximation en amont. **Resampler
+correctement reste la bonne pratique à appliquer systématiquement** —
+ne pas se fier au fait que ce test précis n'ait pas explosé pour
+conclure que le sample rate n'a pas d'importance.
+
+Note additionnelle, documentée telle quelle : le décodage produit « Cci »
+au lieu de « Ceci » **dans les deux conditions** (pas lié au resampling
+donc) — cohérent avec le motif déjà documenté à deux reprises dans ce
+rapport (§5.2 « peuut »/« peut », §7.3) d'instabilités ponctuelles du
+modèle NeMo CTC sur des mots courts spécifiques, indépendamment du
+moteur TTS ou du sample rate.
+
+**État réel du code de production** : vérifié par `grep` sur
+`infrastructure/` et `domain/` — **aucun sample rate n'y est codé en
+dur** ; `AudioSegment.sampleRate` (Tâche 3.8.0) est déjà propagé
+dynamiquement partout où il est consommé. Il n'y a donc **rien à
+corriger dans le code committé aujourd'hui** — le pipeline d'alignement
+CTC n'est pas encore branché en production (toujours au stade prototype,
+§1-7). **Note d'architecture pour quand il le sera** : la conversion
+24kHz → 16kHz devra être un maillon explicite entre `SherpaOnnxTtsEngine.synthesize()`
+et le calcul des features fbank — jamais supposée implicite, exactement
+le genre d'erreur que le champ `sampleRate` de `AudioSegment` (Tâche
+3.8.0) existe pour rendre visible et vérifiable plutôt que silencieuse.
+
+### 8.5 Fichiers
+
+- `android/SherpaOnnxTts/` modifié (`MainActivity.kt`, `jniLibs/`,
+  `assets/kokoro-int8-multi-lang-v1_0/`) dans
+  `~/projects/inktone-ctc-prototype/sherpa-onnx/`, non committé (fork
+  local du dépôt sherpa-onnx cloné en Tâche 5.2).
+- `test_ctc_on_kokoro_audio.py` — dans
+  `~/projects/inktone-ctc-prototype/`, même convention que le reste du
+  prototypage Python.
+- Fichiers modifiés dans le dépôt InkTone (committés) :
+  `infrastructure/tts/src/main/kotlin/com/inktone/infrastructure/tts/SherpaOnnxModelPaths.kt`,
+  `SherpaOnnxTtsEngine.kt`, et les trois fichiers de test associés.
+
+---
+
 ## Références
 
 - [Sherpa-onnx GitHub](https://github.com/k2-fsa/sherpa-onnx)
