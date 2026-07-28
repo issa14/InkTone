@@ -119,6 +119,49 @@ class SherpaOnnxPiperMlsLatencyTest {
         Log.i(TAG, "[EXPORT] wav ecrit dans ${outDir.absolutePath}")
     }
 
+    /**
+     * Exporte quelques locuteurs supplementaires (repartis sur les 125
+     * disponibles, pas seulement sid=0) pour permettre une ecoute
+     * comparative avant de juger la qualite du modele dans son ensemble -
+     * un seul echantillon ne suffit pas a caracteriser 125 locuteurs
+     * anonymises (voir section "Qualite vocale" du rapport).
+     */
+    @Test
+    fun exporte_plusieurs_locuteurs_pour_ecoute(): Unit = runBlocking {
+        if (!isReady) stage()
+        assumeTrue("Modele Piper MLS absent", isReady)
+
+        val tts = OfflineTts(
+            assetManager = null,
+            config = OfflineTtsConfig(
+                model = OfflineTtsModelConfig(
+                    vits = OfflineTtsVitsModelConfig(
+                        model = modelFile.absolutePath,
+                        lexicon = "",
+                        tokens = tokensFile.absolutePath,
+                        dataDir = espeakDataDir.absolutePath,
+                    ),
+                    numThreads = 4,
+                    provider = "cpu",
+                ),
+            ),
+        )
+
+        val text = "Bonjour le monde. Ceci est un test pour vérifier l'alignement."
+        val outDir = File(context.getExternalFilesDir(null), "piper_mls_samples")
+        outDir.mkdirs()
+
+        // Repartis sur l'intervalle [0, 124] (125 locuteurs, speaker_id_map
+        // du json) - pas une selection curatee (aucune metadonnee de
+        // genre/nom disponible pour ce modele), juste un echantillonnage
+        // pour la comparaison a l'ecoute.
+        for (sid in listOf(0, 20, 40, 60, 80, 100, 124)) {
+            val generated = tts.generate(text = text, sid = sid, speed = 1.0f)
+            generated.save(File(outDir, "mls_sid$sid.wav").absolutePath)
+            Log.i(TAG, "[EXPORT] mls_sid$sid.wav ecrit")
+        }
+    }
+
     private companion object {
         const val TAG = "SherpaOnnxPiperMlsLatencyTest"
     }

@@ -638,8 +638,10 @@ Trajectoire complète du RTF à travers ce diagnostic :
 |---|---|
 | Avant diagnostic (`numThreads=2`, provider cpu implicite) | ~5,9 – 7,1× |
 | Après `numThreads=4` | ~4,7× |
-| `numThreads=4` + xnnpack demandé (retombe sur cpu) | ~4,7× (inchangé) |
-| `numThreads=4` + nnapi demandé (retombe sur cpu) | ~4,7× (inchangé) |
+| `numThreads=4` + xnnpack demandé (retombe sur cpu, `.so` vendoré) | ~4,7× (inchangé) |
+| `numThreads=4` + nnapi demandé (retombe sur cpu, `.so` vendoré) | ~4,7× (inchangé) |
+| `numThreads=4` + nnapi recompilé et réellement actif (voir section dédiée) | ~5,4× — plus lent |
+| `numThreads=4` + **xnnpack recompilé et réellement actif** (voir section dédiée) | **~5,2× — plus lent** |
 
 Le RTF reste dans le même ordre de grandeur (~4,7× à ~7×) après avoir
 épuisé les quatre leviers de configuration listés dans cette tâche :
@@ -1191,6 +1193,113 @@ Les compromis précis pour la décision :
 
 ---
 
+## XNNPACK recompilé depuis les sources — dernier levier non testé, mesuré et écarté
+
+**2026-07-28.** Dernier levier de configuration/matériel identifié mais
+jamais réellement testé : XNNPACK. À la différence de NNAPI (déjà
+recompilé et mesuré, section dédiée ci-dessus — disponible dans le
+binaire mais désactivé par un guard de compilation `__ANDROID_API__`),
+XNNPACK n'a **jamais** été activé pour de vrai jusqu'ici : le `.so`
+vendoré ne l'a simplement pas compilé (`Ort::GetAvailableProviders()`
+listait `NnapiExecutionProvider, CPUExecutionProvider` — pas de
+`XnnpackExecutionProvider`). Un test borné, une seule mesure — pas une
+nouvelle série de diagnostic.
+
+### Correction avant de commencer : ce n'est pas un flag sherpa-onnx
+
+La consigne de départ supposait un flag de build sherpa-onnx dédié,
+comme `SHERPA_ONNX_ANDROID_PLATFORM` pour NNAPI. Vérifié faux avant de
+lancer quoi que ce soit (`sherpa-onnx/csrc/session.cc:243-254`,
+`sherpa-onnx/csrc/provider.cc:24-25`, tous les fichiers
+`cmake/onnxruntime*.cmake`) : sherpa-onnx demande simplement le provider
+`"XNNPACK"` à ONNX Runtime au runtime — s'il n'est pas dans
+`Ort::GetAvailableProviders()`, repli silencieux sur CPU, sans aucun
+flag de compilation sherpa-onnx pour en décider. XNNPACK doit être
+compilé **dans ONNX Runtime lui-même** (`--use_xnnpack`), pas dans
+`libsherpa-onnx-jni.so`. Aucun prebuilt XNNPACK n'existe non plus côté
+`csukuangfj/onnxruntime-libs` (release v1.27.0 inspectée via l'API
+GitHub : `onnxruntime-android-1.27.0.zip` et 3 variantes statiques,
+aucune dédiée XNNPACK). Chantier plus lourd que la recompilation NNAPI
+(qui ne touchait que le JNI, ~10 min) : reconstruction complète d'ONNX
+Runtime depuis les sources.
+
+### Build — chiffré, un seul essai, avec l'incident réel qui l'a interrompu
+
+ONNX Runtime v1.27.0 (même version que le binaire déjà vendoré, pour
+rester comparable) cloné avec ses sous-modules, cross-compilé pour
+`arm64-v8a`/API 21 avec `tools/ci_build/build.py --use_xnnpack`
+(NDK 27.2.12479018, CMake 4.4.0 — le CMake du NDK, 3.22.1, s'est révélé
+trop ancien pour ONNX Runtime v1.27.0, qui exige ≥ 3.28 ; corrigé avec
+un CMake récent installé via `pip`). Le build a rempli le disque de la
+machine host (« Disk quota exceeded » sur le dernier binaire de test
+avant la fin — `--skip_tests` évite d'*exécuter* les tests mais pas de
+les *compiler*) : incident réel, pas masqué. **`libonnxruntime.so`
+lui-même avait déjà fini de compiler avant l'incident** — seuls des
+binaires de test superflus restaient en cours ; espace disque libéré,
+build non relancé (déjà exploitable en l'état).
+
+`libsherpa-onnx-jni.so` ensuite relié contre ce nouveau
+`libonnxruntime.so` (mêmes headers publics C que le binaire officiel
+vendoré, `ANDROID_PLATFORM=android-21`, script officiel
+`build-android-arm64-v8a.sh` avec `SHERPA_ONNXRUNTIME_LIB_DIR`/
+`SHERPA_ONNXRUNTIME_INCLUDE_DIR` pointés vers le build XNNPACK) —
+**temps réel mesuré (`time`) : 7 min 55 s**, comparable au temps du
+diagnostic NNAPI. Présence du symbole `XnnpackExecutionProvider`
+confirmée dans le nouveau `libonnxruntime.so` (`strings` + grep, pas
+supposée).
+
+### RTF mesuré — XNNPACK réellement actif, pas un repli silencieux
+
+`.so` de production remplacés **temporairement** (les deux :
+`libonnxruntime.so` et `libsherpa-onnx-jni.so`, puisque XNNPACK vit dans
+le premier) par les binaires recompilés, `provider="xnnpack"`,
+`debug=true`, même protocole exact que tous les diagnostics précédents
+(même phrase, device V2206, `numThreads=4`) :
+
+```
+[RTF] premier appel (froid) = 25918.67 ms, audio_duration_ms=4793, RTF=5.408
+[RTF] repetitions (ms) = 25142.84,25369.64,24999.80,24835.47,25054.80
+[RTF] mediane_ms=25054.80 RTF_median=5.227
+```
+
+**Aucun message « Fallback to cpu! »** dans les logs `sherpa-onnx` (ce
+message n'apparaît, par construction du code, que si
+`XnnpackExecutionProvider` est absent de la liste des providers
+disponibles — confirmé absent ici, donc XNNPACK bien accepté par
+`AppendExecutionProvider`, pas un repli déguisé) : XNNPACK s'active
+réellement, comme NNAPI avant lui.
+
+`.so` de production restaurés immédiatement après la mesure — **sha256
+revérifié identique aux fichiers d'origine avant remplacement** (pas
+seulement après une supposition de restauration correcte) :
+`libsherpa-onnx-jni.so` et `libonnxruntime.so` tous deux confirmés
+bit-à-bit identiques à l'état pré-diagnostic. `git status` sur
+`infrastructure/tts/src/main/jniLibs/` propre après restauration.
+
+### Verdict — XNNPACK réellement actif, mesuré plus lent que CPU
+
+**RTF 5,227× (médian, à chaud) — plus lent que CPU+4threads (~4,7×),
+proche du RTF NNAPI (~5,4×), pas sous 0,8×.** Chiffre rapporté tel quel,
+sans nouvelle exploration : la consigne de cette tâche était un test
+borné, pas une nouvelle série de diagnostic si XNNPACK ne suffit pas
+seul. Cohérent avec l'hypothèse déjà posée pour NNAPI (section
+dédiée, §3) — les opérateurs de quantification dynamique
+(`DynamicQuantizeLinear`/`MatMulInteger`/`ConvInteger`) et la composante
+LSTM (`DynamicQuantizeLSTM`) du graphe Kokoro ne bénéficient
+probablement pas des noyaux optimisés XNNPACK (conçus avant tout pour
+la convolution/matmul denses en float ou quantifiés statiquement), avec
+en plus une surcharge de partitionnement de graphe entre CPU et XNNPACK
+pour les opérateurs non supportés. Hypothèse plausible, pas vérifiée
+plus avant (hors périmètre de ce test borné).
+
+Avec XNNPACK, **les six leviers de configuration/matériel identifiables
+sur ce device sont maintenant épuisés et chiffrés** (threads, NNAPI
+compilé et testé, int8 authentique, G2P négligeable, streaming par
+segment mesuré, XNNPACK compilé et testé) — aucun ne fait passer le RTF
+sous ~4,7×, la meilleure configuration mesurée reste CPU+4 threads.
+
+---
+
 ## Checklist finale de sortie de Phase 5
 
 **Mise à jour du 2026-07-28** — case par case, d'après les mesures réelles
@@ -1203,7 +1312,7 @@ seulement prototypés séparément).
 | 1 | Vendoring Sherpa-ONNX confirmé par la pratique (projet officiel buildé localement) | ✅ Fait — et Kokoro (remplace VITS) vendoré et branché en production | 5.1.0, `PROTOTYPE_ALIGNEMENT_CTC.md` §8 |
 | 2 | Adaptateur Sherpa-ONNX produit un `AudioSegment` réel | ✅ Fait — avec de vrais `WordTimestamp`, pas seulement l'audio | 5.1.2, §9.4 |
 | 3 | Alignement CTC prototypé et mesuré avant code de production | ✅ Fait, et **branché en production** (dépasse le critère d'origine) | `PROTOTYPE_ALIGNEMENT_CTC.md` §1-9 |
-| 4 | Silence inter-phrases ≤ 150 ms | ❌ **Échec mesuré, diagnostiqué avant conclusion architecturale (5 vérifications, y compris NNAPI recompilé et réellement testé)** — meilleure config mesurée : ~25 s (RTF ~4,7×, CPU+4 threads) ; NNAPI réellement actif mesuré *plus lent* (~5,4×) ; toujours très loin de 150 ms ; leviers de configuration épuisés, ADR justifié | §10.1-10.2, sections « Diagnostic de la latence Kokoro » et « NNAPI recompilé » |
+| 4 | Silence inter-phrases ≤ 150 ms | ❌ **Échec mesuré, diagnostiqué avant conclusion architecturale (6 vérifications, y compris NNAPI et XNNPACK recompilés et réellement testés)** — meilleure config mesurée : ~25 s (RTF ~4,7×, CPU+4 threads) ; NNAPI réellement actif mesuré *plus lent* (~5,4×) ; XNNPACK réellement actif mesuré *plus lent* (~5,2×) ; toujours très loin de 150 ms ; tous les leviers de configuration épuisés, **ADR-022 accepté — Kokoro retenu malgré le budget non tenu, alternatives Piper/VITS écartées (licence ou qualité)** | §10.1-10.2, sections « Diagnostic de la latence Kokoro », « NNAPI recompilé », « XNNPACK recompilé », ADR-022 |
 | 5 | Lecture continue écran éteint | ⬜ Non commencé (5.4) — inchangé par cette tâche | — |
 | 6 | Contrôles complets fonctionnels | ⬜ Non commencé (5.5) — inchangé | — |
 | 7 | Téléchargement de voix vérifié par empreinte | ⬜ Non commencé (5.6) — placement manuel des modèles toujours nécessaire | — |
