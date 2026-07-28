@@ -2,9 +2,11 @@ package com.inktone.feature.library
 
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
+import com.inktone.domain.model.FilterMode
 import com.inktone.domain.repository.PublicationRepository
 import com.inktone.domain.usecase.ToggleFavoriteUseCase
 import dagger.hilt.android.lifecycle.HiltViewModel
+import kotlinx.coroutines.Job
 import kotlinx.coroutines.channels.Channel
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
@@ -25,12 +27,10 @@ class LibraryViewModel @Inject constructor(
     private val _effects = Channel<LibraryEffect>(Channel.BUFFERED)
     val effects = _effects.receiveAsFlow()
 
+    private var observeJob: Job? = null
+
     init {
-        viewModelScope.launch {
-            publicationRepository.observeAll().collect { publications ->
-                _state.value = LibraryUiState(publications = publications, isLoading = false)
-            }
-        }
+        observePublications(FilterMode.ALL)
     }
 
     fun onIntent(intent: LibraryIntent) {
@@ -40,6 +40,17 @@ class LibraryViewModel @Inject constructor(
             }
             is LibraryIntent.ToggleFavorite -> viewModelScope.launch {
                 toggleFavorite(intent.publicationId, intent.isFavorite)
+            }
+            is LibraryIntent.ChangeFilter -> observePublications(intent.filter)
+        }
+    }
+
+    private fun observePublications(filter: FilterMode) {
+        observeJob?.cancel()
+        _state.value = _state.value.copy(isLoading = true, activeFilter = filter)
+        observeJob = viewModelScope.launch {
+            publicationRepository.observeFiltered(filter).collect { publications ->
+                _state.value = _state.value.copy(publications = publications, isLoading = false)
             }
         }
     }

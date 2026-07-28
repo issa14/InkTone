@@ -2,15 +2,20 @@ package com.inktone.feature.library
 
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
+import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.aspectRatio
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.lazy.LazyRow
 import androidx.compose.foundation.lazy.grid.GridCells
 import androidx.compose.foundation.lazy.grid.LazyVerticalGrid
-import androidx.compose.foundation.lazy.grid.items
+import androidx.compose.foundation.lazy.grid.items as gridItems
+import androidx.compose.foundation.lazy.items as rowItems
 import androidx.compose.material3.CircularProgressIndicator
+import androidx.compose.material3.FilterChip
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
@@ -22,6 +27,7 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.hilt.navigation.compose.hiltViewModel
+import com.inktone.domain.model.FilterMode
 import com.inktone.domain.model.Publication
 
 /**
@@ -49,25 +55,62 @@ fun LibraryScreen(
         }
     }
 
-    when {
-        state.isLoading -> Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
-            CircularProgressIndicator()
-        }
-        state.publications.isEmpty() -> Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
-            Text("Bibliothèque vide — importez un EPUB pour commencer.")
-        }
-        else -> LazyVerticalGrid(
-            columns = GridCells.Adaptive(minSize = 120.dp),
-            contentPadding = PaddingValues(8.dp),
-        ) {
-            // Clé stable = id, jamais l'index — même leçon que la TOC
-            // (Tâche 4.11, crash LazyColumn à clé non unique).
-            items(state.publications, key = { it.id }) { publication ->
-                PublicationCard(
-                    publication = publication,
-                    onClick = { viewModel.onIntent(LibraryIntent.OpenPublication(publication.id)) },
-                )
+    Column(Modifier.fillMaxSize()) {
+        FilterRow(
+            active = state.activeFilter,
+            onSelect = { viewModel.onIntent(LibraryIntent.ChangeFilter(it)) },
+        )
+
+        when {
+            state.isLoading -> Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
+                CircularProgressIndicator()
             }
+            state.publications.isEmpty() -> Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
+                Text("Bibliothèque vide — importez un EPUB pour commencer.")
+            }
+            else -> LazyVerticalGrid(
+                columns = GridCells.Adaptive(minSize = 120.dp),
+                contentPadding = PaddingValues(8.dp),
+            ) {
+                // Clé stable = id, jamais l'index — même leçon que la TOC
+                // (Tâche 4.11, crash LazyColumn à clé non unique).
+                gridItems(state.publications, key = { it.id }) { publication ->
+                    PublicationCard(
+                        publication = publication,
+                        onClick = { viewModel.onIntent(LibraryIntent.OpenPublication(publication.id)) },
+                    )
+                }
+            }
+        }
+    }
+}
+
+// Modes sans valeur associee uniquement (SERIES/TAG/BY_AUTHOR exigeraient
+// un selecteur de valeurs distinctes en base, hors perimetre de la
+// bibliotheque basique - voir LibraryUiState).
+private val SelectableFilters = listOf(FilterMode.ALL, FilterMode.FAVORITES, FilterMode.UNREAD, FilterMode.IN_PROGRESS, FilterMode.READ)
+
+private fun FilterMode.label() = when (this) {
+    FilterMode.ALL -> "Tous"
+    FilterMode.FAVORITES -> "Favoris"
+    FilterMode.UNREAD -> "Non lus"
+    FilterMode.IN_PROGRESS -> "En cours"
+    FilterMode.READ -> "Terminés"
+    FilterMode.SERIES, FilterMode.TAG, FilterMode.BY_AUTHOR -> name
+}
+
+@Composable
+private fun FilterRow(active: FilterMode, onSelect: (FilterMode) -> Unit) {
+    LazyRow(
+        horizontalArrangement = Arrangement.spacedBy(8.dp),
+        contentPadding = PaddingValues(horizontal = 8.dp, vertical = 4.dp),
+    ) {
+        rowItems(SelectableFilters, key = { it.name }) { filter ->
+            FilterChip(
+                selected = filter == active,
+                onClick = { onSelect(filter) },
+                label = { Text(filter.label()) },
+            )
         }
     }
 }
