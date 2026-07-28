@@ -682,9 +682,10 @@ Reader et le Player ne connaissent jamais cette distinction.
 |---|---|---|---|---|---|
 | **Android TextToSpeech natif** | Oui (voix Google embarquées) | **Oui (natif, via `onRangeStart`)** | Oui | **Palier 1 — référence de repli (ADR-021)** | Dépend du moteur OS actif ; à détecter au runtime (Google confirmé, moteurs constructeur non garantis) ; qualité vocale inférieure au TTS neuronal |
 | **Sherpa-ONNX (moteur JNI)** | Oui | **Non, nativement, quel que soit le modèle chargé** | Oui | **Palier 2 — moteur de synthèse de référence pour la qualité vocale (ADR-021)** | `GeneratedAudio` = `samples`+`sample_rate` uniquement (vérifié empiriquement, Kotlin et Python) ; timestamps obtenus par un second passage d'alignement forcé (CTC), pas par le moteur lui-même |
-| ↳ *modèle Kokoro (via Sherpa-ONNX)* | Oui | Non (voir ci-dessus) | Oui (54 voix, 8 langues dont le français) | Modèle recommandé pour la qualité vocale, licence Apache-2.0 | Un extracteur de durée natif existe côté Python (misaki) mais est perdu sur le chemin ONNX/Kotlin sans portage — piste d'optimisation future, pas la v1 |
-| ↳ *modèle VITS (via Sherpa-ONNX)* | Oui | Non (voir ci-dessus) | Oui | Alternative à Kokoro | Même mécanisme de timing (Palier 2) |
-| **Piper** | Oui | Non | Oui | **Écarté (ADR-021)** | Dépôt archivé le 6 octobre 2025, relicencié GPL-3.0 (`piper1-gpl`) — incompatible avec une app commerciale fermée, indépendamment des timestamps |
+| ↳ *modèle Kokoro (via Sherpa-ONNX)* | Oui | Non (voir ci-dessus) | Oui (54 voix, 8 langues dont le français) | **Moteur retenu pour la v1 (ADR-022)**, licence Apache-2.0 | RTF ~4,7× (CPU+4 threads, meilleure configuration mesurée — threads, NNAPI et XNNPACK recompilés et testés, tous les deux plus lents que CPU) ; budget §11.2 non tenu, atténuation produit en place (voir ADR-022) ; un extracteur de durée natif existe côté Python (misaki) mais est perdu sur le chemin ONNX/Kotlin sans portage — piste d'optimisation future, pas la v1 |
+| ↳ *modèle VITS/Piper `upmc-medium` (via Sherpa-ONNX)* | Oui | Non (voir ci-dessus) | Oui (2 locuteurs) | **Écarté (ADR-022)** | RTF 0,331× mesuré (largement sous budget), qualité 8/10 confirmée par écoute — mais licence disqualifiante : voix de base `lessac` restreinte à un usage non-commercial (confirmé à la source primaire, CSTR Edinburgh), incompatible avec le don volontaire d'InkTone |
+| ↳ *modèle VITS/Piper `mls-medium` (via Sherpa-ONNX)* | Oui | Non (voir ci-dessus) | Oui (125 locuteurs) | **Écarté (ADR-022)** | RTF 0,375× mesuré, licence propre (CC-BY 4.0, entraîné from scratch) — mais qualité vocale insuffisante confirmée par écoute humaine sur 7 échantillons |
+| **Piper** | Oui | Non | Oui | **Écarté (ADR-021, confirmé ADR-022)** | Dépôt archivé le 6 octobre 2025, relicencié GPL-3.0 (`piper1-gpl`) — incompatible avec une app commerciale fermée, indépendamment des timestamps ; les deux voix candidates évaluées via Sherpa-ONNX (ci-dessus) écartées chacune pour une raison distincte (licence, qualité) |
 | **Edge TTS** | Non (en ligne) | Oui (frontières de mot SSML) | Oui | Optionnel, jamais requis pour l'usage quotidien | Cité pour mémoire — le timing y est réel mais la dépendance réseau exclut ce moteur du Palier 1 comme du Palier 2 |
 
 Cette matrice est normative : un moteur n'est proposé à l'utilisateur que si sa ligne est complète et validée.
@@ -868,7 +869,7 @@ La performance est une fonctionnalité. Elle est tenue par des **budgets chiffr�
 | Reader | Ouverture d'un EPUB de 5 Mo → premier rendu | ≤ 800 ms |
 | Reader | Défilement | 60 fps ; aucune frame > 32 ms |
 | Reader | Navigation vers un chapitre (préchargé) | ≤ 150 ms |
-| TTS | Latence tap → premier audio (Sherpa-ONNX local) | ≤ 1 500 ms |
+| TTS | Latence tap → premier audio (Sherpa-ONNX local) | ≤ 1 500 ms — **non tenu par Kokoro tel que mesuré (~4,7×, atténuation produit retenue plutôt que révision du budget, voir ADR-022)** |
 | TTS | Silence inter-phrases perçu | ≤ 150 ms |
 | TTS | Précision du surlignage mot | ≤ ±120 ms vs audio |
 | Import | 500 EPUB (taille moyenne 2 Mo) | ≤ 5 min, UI non bloquée |
