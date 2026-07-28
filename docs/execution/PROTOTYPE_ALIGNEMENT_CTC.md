@@ -1091,6 +1091,219 @@ le genre d'erreur que le champ `sampleRate` de `AudioSegment` (Tâche
 
 ---
 
+## 9. Pipeline complet en production — Kokoro + resampling + CTC assemblés pour de vrai
+
+**Mise à jour du 2026-07-28, soir.** Jusqu'ici Kokoro (§8) et l'alignement
+CTC (§1-7) étaient prouvés **séparément**. Cette section les assemble
+réellement dans `infrastructure/tts`, avec resampling explicite entre les
+deux, et mesure le résultat sur le V2206 (Snapdragon 680) réel.
+
+### 9.1 Resampling 24kHz → 16kHz — implémentation et validation
+
+`AudioResampler.kt` (nouveau, `infrastructure/tts`) : sinus cardinal
+fenêtré (fenêtre de Blackman, ±16 « taps »), pas une décimation naïve —
+la fréquence de coupure est fixée au Nyquist du **plus petit** des deux
+taux (`min(fromRate, toRate) / 2`), ce qui empêche le repliement lors
+d'une décimation. Générique : `fromRate`/`toRate` sont des paramètres
+réels à l'appel (jamais 24000/16000 figés en dur), lus respectivement sur
+`AudioSegment`-like (`GeneratedAudio.sampleRate` de Kokoro) et sur une
+constante du modèle CTC (`CTC_SAMPLE_RATE = 16000`, celle-là bien réelle
+et documentée comme telle — c'est le modèle qui est figé sur 16kHz, pas
+le code de resampling).
+
+**Validation numérique contre `scipy.signal.resample_poly`** (même
+méthode que §6.4/§7.3), sur l'audio Kokoro réel déjà généré
+(`test_fr_ff_siwis.wav`, 24kHz) :
+
+| Étage comparé | Écart absolu max | Écart absolu moyen |
+|---|---|---|
+| Signal PCM resamplé (Kotlin vs scipy) | 0.0137 | 0.00028 |
+| Log_probs CTC en aval (Kotlin-resamplé vs scipy-resamplé) | 0.348 | 0.0045 |
+
+**Résultat en aval, ce qui compte réellement** : 0 frame sur 46 avec un
+argmax différent, **mêmes mots reconnus, mêmes timestamps, écart de
+frontière = 0.0 ms**. L'écart brut sur le signal PCM (filtre plus court
+que celui de scipy, 16 taps contre un design polyphase optimisé) ne se
+propage pas jusqu'au résultat final sur cet échantillon réel. Script :
+`compare_kotlin_resampler_downstream.py`.
+
+Tests committés (`AudioResamplerTest.kt`, JVM, signal synthétique — pas
+de fixture externe) : identité quand `fromRate == toRate`, longueur de
+sortie cohérente avec le ratio, préservation de fréquence (sinusoïde
+440 Hz, estimation par passages par zéro) et d'amplitude pour un signal
+dans la bande passante.
+
+### 9.2 Portage natif — kaldi-native-fbank + Viterbi dans `infrastructure/tts`
+
+- `src/main/cpp/CMakeLists.txt` + `fbank_jni.cpp` : même code que le
+  binding JNI déjà prouvé (§6), package Kotlin ajusté
+  (`com.inktone.infrastructure.tts.CtcFbankNative`). `ndkVersion` et
+  `externalNativeBuild` ajoutés à `infrastructure/tts/build.gradle.kts` —
+  **conséquence d'architecture réelle** : ce module nécessite désormais le
+  NDK pour être buildé localement, ce qui n'était pas le cas avant (§5.1.0
+  avait explicitement mis le build C++/NDK hors périmètre pour le
+  vendoring Sherpa-ONNX lui-même). À documenter pour quiconque configure
+  un environnement de build ou une CI pour ce module.
+- `CtcForcedAlignment.kt` : port direct de `CtcAlignment.kt` (§6-7,
+  scratchpad), `internal` (pas exposé hors module).
+- `CtcModelPaths.kt` : résolution des chemins du modèle CTC int8
+  (`model.int8.onnx` + `tokens.txt`), même convention que
+  `SherpaOnnxModelPaths`.
+- `CtcForcedAligner.kt` : classe façade — resampling → fbank JNI →
+  inférence ONNX → Viterbi → **correspondance mot ↔ position réelle dans
+  `sentence.text`** (recherche séquentielle insensible à la casse, avance
+  après chaque mot trouvé pour gérer les répétitions sans les confondre).
+
+### 9.3 Résolution du risque `libonnxruntime.so` (§8.1) — vérifiée en pratique, pas juste décidée
+
+Décision prise en §8.1 : reconstruire le binding CTC contre **ONNX
+Runtime 1.27.0** (celui déjà vendoré par sherpa-onnx), pas 1.19.2.
+Implémentation : dépendance `onnxruntime-android:1.27.0` (Maven, version
+choisie pour correspondre exactement, pas une version récente au hasard)
++ règle de packaging explicite :
+
+```kotlin
+packaging {
+    jniLibs {
+        pickFirsts += "**/libonnxruntime.so"
+    }
+}
+```
+
+**Vérifié après build, pas supposé** : l'AAR `onnxruntime-android:1.27.0`
+officiel (Microsoft, 28 Mo) et le `.so` déjà vendoré par sherpa-onnx
+(build personnalisé, 21,7 Mo) sont la **même version mais pas le même
+binaire** (`sha256` différent, tailles différentes) — la fusion aurait pu
+choisir n'importe lequel silencieusement. Inspection de l'APK de test réel
+(`assembleDebugAndroidTest`, pas juste l'AAR de la bibliothèque — une AAR
+seule ne fusionne pas les `.so` transitifs, seul un module application/test
+le fait) : **un seul `libonnxruntime.so`** dans `lib/arm64-v8a/`, de taille
+quasi identique à la version vendorée par sherpa-onnx (21 688 912 contre
+21 688 920 octets — écart de 8 octets, quelques symboles d'en-tête ELF
+probablement réalignés par le pipeline de packaging, pas un binaire
+différent). `libonnxruntime4j_jni.so` (le pont Java↔natif nécessaire aux
+classes Kotlin `OrtEnvironment`/`OrtSession`, absent de l'AAR
+bibliothèque seule mais présent dans l'APK de test final) et
+`libinktone_ctc_fbank.so` sont tous les deux présents également. **Un
+seul onnxruntime, celui de sherpa-onnx, comme décidé** — pas une
+supposition.
+
+### 9.4 Test bout en bout sur device réel — succès
+
+`SherpaOnnxTtsEngineTest.synthesize_produit_un_audioSegment_reel_avec_wordTimestamps_reels`
+exécuté sur le V2206 (Snapdragon 680) réel, modèles Kokoro + CTC placés
+manuellement (Tâche 5.6 future) : **1 test, 0 échec, 0 erreur**, aucun
+SIGBUS ni UnsatisfiedLinkError dans le logcat complet. `AudioSegment`
+produit avec des `WordTimestamp` réels, `charOffset` valides dans le
+texte source, timestamps ordonnés et dans la durée du segment.
+
+Contrainte d'environnement rencontrée à nouveau (déjà documentée §6.3) :
+ce device (OEM Vivo/Funtouch) désinstalle l'app de test et son stockage
+externe associé très peu de temps après chaque exécution — chaque
+invocation de `connectedDebugAndroidTest` a nécessité un nouveau `adb
+push` des deux modèles juste avant de relancer, pas une seule fois pour
+toute la session.
+
+---
+
+## 10. Latence réelle du pipeline complet — budget §11.2 largement dépassé
+
+**Mesuré, pas estimé**, sur le V2206 (Snapdragon 680), phrase de test
+« Bonjour le monde. Ceci est un test pour vérifier l'alignement. »
+(~4,8 s d'audio produit, 10 mots) :
+
+| Mesure | Valeur |
+|---|---|
+| Premier appel (modèles froids, chargement inclus) | ~36 200 – 38 700 ms |
+| Appels répétés (modèles déjà chargés), médiane sur 5 | ~28 000 – 33 500 ms |
+| — dont synthèse Kokoro seule | ~28 500 – 33 800 ms |
+| — dont alignement CTC seul, session déjà chargée | ~3 000 ms |
+| — dont alignement CTC seul, session froide | ~6 200 – 7 000 ms |
+
+**La synthèse Kokoro elle-même domine très largement le total** — pas
+l'alignement CTC. Ratio temps-réel (RTF) mesuré ici : **~6 à 7×** (28-34 s
+pour 4,8 s d'audio) — nettement plus lent que le proxy desktop x86_64
+mesuré en Python en Tâche 5.1 (RTF ~0,75-0,85, *plus rapide* que le temps
+réel). C'est la **première mesure de latence Kokoro réelle sur ce device**
+— la validation Tâche 5.1.0 (app d'exemple) avait seulement confirmé
+l'absence de crash et la génération d'audio (boutons activés), jamais
+chronométré.
+
+Point d'incertitude signalé, pas masqué : les chiffres augmentent
+légèrement entre les runs successifs de cette session de test
+(28,5 s → 33,8 s pour la synthèse Kokoro seule ; l'alignement CTC à chaud
+passe de correspondre au ~540 ms déjà mesuré isolément en §7.4 à ~3 000 ms
+ici). `dumpsys thermalservice` rapporte `Thermal Status: 0` (aucun
+throttling signalé par l'API Android), donc pas de confirmation formelle
+de throttling thermique — mais une charge CPU intensive quasi continue
+sur plusieurs dizaines de minutes de tests répétés reste une explication
+plausible non écartée. À vérifier par une mesure isolée (device au repos
+depuis longtemps) avant d'arrêter un chiffre de référence définitif.
+
+### 10.1 Confrontation aux budgets §11.2 — chiffres réels, pas d'euphémisme
+
+| Budget §11.2 | Cible | Mesuré | Verdict |
+|---|---|---|---|
+| TTS Latence tap → premier audio | ≤ 1 500 ms | ~28 000 – 38 700 ms | **Dépassé d'un facteur ~19 à 26×** |
+| TTS Silence inter-phrases perçu | ≤ 150 ms | voir §10.2 | **Dépassé de façon catégorique** |
+| TTS Précision du surlignage mot | ≤ ±120 ms | ~0-80 ms (§7.3, §8.4) | Dans le budget |
+
+Les deux premiers budgets ne sont pas seulement dépassés — ils le sont
+d'un ordre de grandeur qui rend le Palier 2 (Kokoro + CTC), **tel que
+mesuré aujourd'hui, inutilisable en production sans changement
+significatif** (modèle plus rapide, accélération matérielle, ou
+réduction de portée). Ce n'est pas un écart à documenter puis ignorer :
+c'est un blocage réel au sens du Blueprint §11.2 (« un dépassement de
+budget bloque la release ou déclenche un ADR de révision »).
+
+### 10.2 `SentenceAudioBuffer` (Tâche 5.3) — le préchargement n'absorbe pas cette latence
+
+`SentenceAudioBuffer.preloadNext()` (`feature/reader`, déjà câblé dans
+`ReaderViewModel.kt`) démarre la synthèse de la phrase suivante **au
+moment où la phrase courante commence sa lecture** — la fenêtre
+disponible pour masquer la latence est donc, au mieux, la durée audio de
+la phrase courante (dans notre cas test, ~4,8 s).
+
+Avec une synthèse+alignement mesurée à **~28-34 secondes**, cette fenêtre
+de quelques secondes est complètement insuffisante — le mécanisme de
+préchargement, correctement conçu et déjà câblé, **ne peut absorber
+qu'une fraction négligeable** de cette latence. Le silence perçu entre
+deux phrases serait de l'ordre de **25 à 30 secondes**, pas 150 ms.
+
+**Précision de portée, pas cachée** : `ReaderViewModel.kt` câble
+aujourd'hui `SentenceAudioBuffer` avec `TtsEngineId.ANDROID_NATIVE`
+(Palier 1), pas `SherpaOnnxTtsEngine` (Palier 2/Kokoro) — le chemin de
+lecture réel de l'app ne passe donc pas encore par le pipeline mesuré
+ici. L'analyse ci-dessus reste directement applicable dès que/si Palier 2
+devient le moteur sélectionné : le mécanisme de `SentenceAudioBuffer` est
+agnostique au moteur (il appelle `TtsEngine.synthesize()` via l'interface
+commune), donc la conclusion ne dépend pas de ce câblage précis.
+
+### 10.3 Conclusion explicite — pas de « c'est bon » sans le chiffre
+
+**Le pipeline Kokoro + alignement CTC fonctionne correctement** (aucun
+crash, `WordTimestamp` réels et précis, resampling validé numériquement,
+un seul `libonnxruntime.so` partagé comme décidé) — la Tâche 5.2 est
+donc **techniquement complète et honnête** (`wordTimestamps = true` est
+mérité). **Mais il n'est pas viable en production dans son état actuel**,
+faute de latence acceptable : la synthèse Kokoro (pas l'alignement CTC,
+qui reste rapide à ~3 s à chaud) est ~6-7× plus lente que le temps réel
+sur le Snapdragon 680, dépassant le budget tap→premier-audio d'un facteur
+~20-25× et rendant le silence inter-phrases de l'ordre de la dizaine de
+secondes plutôt que 150 ms.
+
+Ce n'est pas un échec de cette tâche — c'est le résultat qu'elle devait
+produire : une mesure réelle plutôt qu'une estimation, permettant de
+statuer sur la viabilité plutôt que de la supposer. La suite (hors
+périmètre de cette tâche) doit être un choix explicite, pas une
+optimisation locale silencieuse : profilage pour identifier où le temps
+Kokoro est réellement dépensé, threads/accélération matérielle
+(NNAPI/XNNPACK, non essayés ici), un modèle Kokoro plus petit/rapide, ou
+une révision du budget §11.2 lui-même par ADR si aucune de ces pistes ne
+suffit.
+
+---
+
 ## Références
 
 - [Sherpa-onnx GitHub](https://github.com/k2-fsa/sherpa-onnx)

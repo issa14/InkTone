@@ -8,7 +8,6 @@ import com.inktone.domain.model.TtsEngineId
 import com.inktone.domain.model.VoiceProfile
 import com.inktone.domain.service.TtsEngine
 import kotlinx.coroutines.test.runTest
-import org.junit.Assert.assertFalse
 import org.junit.Assert.assertTrue
 import org.junit.Assume.assumeTrue
 import org.junit.Test
@@ -55,18 +54,27 @@ class TtsCapabilityConsistencyTest {
     @Test
     fun palier2_sherpa_onnx_respecte_sa_capacite_wordTimestamps() {
         val modelPaths = SherpaOnnxModelPaths(context)
-        val staged = File(context.getExternalFilesDir(null), "kokoro-int8-multi-lang-v1_0")
-        if (!modelPaths.isReady && staged.exists()) {
-            staged.copyRecursively(modelPaths.modelFile.parentFile!!, overwrite = true)
+        val stagedKokoro = File(context.getExternalFilesDir(null), "kokoro-int8-multi-lang-v1_0")
+        if (!modelPaths.isReady && stagedKokoro.exists()) {
+            stagedKokoro.copyRecursively(modelPaths.modelFile.parentFile!!, overwrite = true)
+        }
+        val ctcModelPaths = CtcModelPaths(context)
+        val stagedCtc = File(context.getExternalFilesDir(null), "nemo-ctc-fr-multilang-int8")
+        if (!ctcModelPaths.isReady && stagedCtc.exists()) {
+            stagedCtc.copyRecursively(ctcModelPaths.modelFile.parentFile!!, overwrite = true)
         }
         assumeTrue(
             "Modele vocal Sherpa-ONNX absent - placer manuellement avant ce test (Tache 5.6 le remplacera)",
             modelPaths.isReady,
         )
-        val engine = SherpaOnnxTtsEngine(modelPaths)
+        assumeTrue(
+            "Modele d'alignement CTC absent - placer manuellement avant ce test (Tache 5.6 le remplacera)",
+            ctcModelPaths.isReady,
+        )
+        val engine = SherpaOnnxTtsEngine(modelPaths, CtcForcedAligner(ctcModelPaths))
         val voiceProfile = VoiceProfile(id = "vp-sherpa-fr", engine = TtsEngineId.SHERPA_ONNX, voice = "ff_siwis", language = "fr-FR")
-        assertFalse(
-            "Palier 2 declare wordTimestamps=false tant que la Tache 5.2 (alignement CTC) n'est pas completee",
+        assertTrue(
+            "Palier 2 declare wordTimestamps=true - Tache 5.2 (alignement CTC) branchee pour de vrai",
             engine.capabilities.wordTimestamps,
         )
         assertCapabilityMatchesBehavior(engine, voiceProfile)
