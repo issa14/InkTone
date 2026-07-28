@@ -17,16 +17,18 @@ import java.io.File
 /**
  * Valide bout en bout (Tâche 5.1.2) : sur un device réel,
  * `SherpaOnnxTtsEngine.synthesize()` renvoie un `AudioSegment` réel
- * (audio non vide, sampleRate cohérent avec la voix VITS fr_FR-siwis-
- * medium — 22050 Hz), sans `WordTimestamp` (Tâche 5.2 non complétée).
+ * (audio non vide, sampleRate cohérent avec Kokoro — 24000 Hz, confirmé
+ * en pratique via l'app d'exemple officielle sur device réel, Tâche
+ * 5.1.0), sans `WordTimestamp` (Tâche 5.2 non branchée ici).
  *
- * Le modèle vocal (~63 Mo, licence CC-BY 4.0) n'est PAS committé — pas
- * un fixture de test automatisé pour l'instant, même principe que
+ * Le modèle vocal (`kokoro-int8-multi-lang-v1_0`, ~164 Mo, licence
+ * Apache-2.0) n'est PAS committé — pas un fixture de test automatisé
+ * pour l'instant, même principe que
  * `docs/execution/VALIDATION_EPUB_REEL_LES_MISERABLES.md` (Tâche 4.11)
  * pour l'EPUB réel. Ce test se saute (`assumeTrue`) tant que le modèle
  * n'est pas placé manuellement dans
- * `context.filesDir/voices/vits-piper-fr_FR-siwis-medium/` — la Tâche
- * 5.6 (téléchargement vérifié par empreinte) remplacera ce geste manuel.
+ * `context.filesDir/voices/kokoro-int8-multi-lang-v1_0/` — la Tâche 5.6
+ * (téléchargement vérifié par empreinte) remplacera ce geste manuel.
  */
 @RunWith(AndroidJUnit4::class)
 class SherpaOnnxTtsEngineTest {
@@ -36,7 +38,7 @@ class SherpaOnnxTtsEngineTest {
     private fun voiceProfile() = VoiceProfile(
         id = "vp-sherpa-fr",
         engine = TtsEngineId.SHERPA_ONNX,
-        voice = "fr_FR-siwis-medium",
+        voice = "ff_siwis",
         language = "fr-FR",
     )
 
@@ -49,7 +51,7 @@ class SherpaOnnxTtsEngineTest {
      */
     private fun stageModelFromExternalStorageIfPresent(modelPaths: SherpaOnnxModelPaths) {
         if (modelPaths.isReady) return
-        val staged = File(context.getExternalFilesDir(null), "vits-piper-fr_FR-siwis-medium")
+        val staged = File(context.getExternalFilesDir(null), "kokoro-int8-multi-lang-v1_0")
         if (staged.exists()) {
             staged.copyRecursively(modelPaths.modelFile.parentFile!!, overwrite = true)
         }
@@ -72,7 +74,7 @@ class SherpaOnnxTtsEngineTest {
 
         assertTrue("audioData ne doit pas etre vide", segment.audioData.isNotEmpty())
         assertTrue("durationMs doit etre positif", segment.durationMs > 0)
-        assertEquals("sampleRate attendu pour la voix VITS fr_FR-siwis-medium", 22050, segment.sampleRate)
+        assertEquals("sampleRate attendu pour Kokoro (confirme en pratique, Tache 5.1.0)", 24000, segment.sampleRate)
         assertEquals(
             "aucun WordTimestamp - Tache 5.2 (alignement CTC) non completee, jamais simule",
             emptyList<Any>(),
