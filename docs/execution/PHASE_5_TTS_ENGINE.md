@@ -508,18 +508,33 @@ Composant standard Compose (Material 3), consommant `PlayerViewModel` (Tâche 5.
 
 ## Checklist finale de sortie de Phase 5
 
-| # | Critère | Vérification |
-|---|---|---|
-| 1 | Vendoring Sherpa-ONNX confirmé par la pratique (projet officiel buildé localement) | 5.1.0 |
-| 2 | Adaptateur Sherpa-ONNX produit un `AudioSegment` réel | 5.1.2 complété |
-| 3 | Alignement CTC prototypé et mesuré avant code de production | `PROTOTYPE_ALIGNEMENT_CTC.md` (5.2.0) |
-| 4 | Silence inter-phrases ≤ 150 ms | 5.3 + mesure 5.9 |
-| 5 | Lecture continue écran éteint | 5.4 |
-| 6 | Contrôles complets fonctionnels | 5.5 |
-| 7 | Téléchargement de voix vérifié par empreinte | 5.6 |
-| 8 | UI `feature/player` complète | 5.7 |
-| 9 | Repli automatique Palier 2 → Palier 1 sur erreur | 5.8 |
-| 10 | Budgets TTS §11.2 mesurés (précision ±120ms incluse) | 5.9, après 5.2 |
-| 11 | Aucun adaptateur ne ment sur ses capacités | 5.10 |
+**Mise à jour du 2026-07-28** — case par case, d'après les mesures réelles
+de `docs/execution/PROTOTYPE_ALIGNEMENT_CTC.md` §1-10 (Kokoro et
+l'alignement CTC sont désormais assemblés en un pipeline réel, pas
+seulement prototypés séparément).
 
-**Deux points de décision explicites avant de considérer cette phase close**, cohérents avec la discipline du reste du projet : le choix ExoPlayer/fichier temporaire vs `MediaSource` custom (Tâche 5.4), et la validation empirique de l'alignement CTC (5.2.0) — ni l'un ni l'autre ne doit être tranché silencieusement en cours d'implémentation.
+| # | Critère | État réel | Vérification |
+|---|---|---|---|
+| 1 | Vendoring Sherpa-ONNX confirmé par la pratique (projet officiel buildé localement) | ✅ Fait — et Kokoro (remplace VITS) vendoré et branché en production | 5.1.0, `PROTOTYPE_ALIGNEMENT_CTC.md` §8 |
+| 2 | Adaptateur Sherpa-ONNX produit un `AudioSegment` réel | ✅ Fait — avec de vrais `WordTimestamp`, pas seulement l'audio | 5.1.2, §9.4 |
+| 3 | Alignement CTC prototypé et mesuré avant code de production | ✅ Fait, et **branché en production** (dépasse le critère d'origine) | `PROTOTYPE_ALIGNEMENT_CTC.md` §1-9 |
+| 4 | Silence inter-phrases ≤ 150 ms | ❌ **Échec mesuré** — de l'ordre de 25-30 s, pas 150 ms (synthèse Kokoro ~28-34 s pour ~4,8 s d'audio) | §10.1-10.2 |
+| 5 | Lecture continue écran éteint | ⬜ Non commencé (5.4) — inchangé par cette tâche | — |
+| 6 | Contrôles complets fonctionnels | ⬜ Non commencé (5.5) — inchangé | — |
+| 7 | Téléchargement de voix vérifié par empreinte | ⬜ Non commencé (5.6) — placement manuel des modèles toujours nécessaire | — |
+| 8 | UI `feature/player` complète | ⬜ Non commencé (5.7) — inchangé | — |
+| 9 | Repli automatique Palier 2 → Palier 1 sur erreur | ⬜ Non fait (5.8) — **devient critique** : sans lui, sélectionner Palier 2 aujourd'hui expose l'utilisateur à ~30 s de silence par phrase | — |
+| 10 | Budgets TTS §11.2 mesurés (précision ±120ms incluse) | ⚠️ **Mesurés pour de vrai, et en échec** sur 2 des 3 budgets TTS (tap→premier audio, silence inter-phrases) ; précision du surlignage (±120ms) dans le budget | §10.1 |
+| 11 | Aucun adaptateur ne ment sur ses capacités | ✅ Toujours vrai — `wordTimestamps=true` est honnête et vérifié (`TtsCapabilityConsistencyTest`), mais l'honnêteté des capacités ne dit rien de la viabilité en production (item 10) | §9.4 |
+
+**Verdict explicite** : cette phase n'est **pas prête à être close**. Les
+items 1-3 et 11 sont réellement acquis (pas juste déclarés). Les items
+4 et 10 ne sont pas simplement « pas encore faits » — ils ont été
+**mesurés et ont échoué**, ce qui rend l'item 9 (repli automatique)
+nécessaire avant tout déploiement de Palier 2, pas optionnel. Un ADR est
+nécessaire avant de continuer : soit une piste de réduction de latence
+Kokoro fonctionne (profilage, threads, modèle plus léger, accélération
+matérielle), soit le budget §11.2 est révisé, soit Palier 2 reste
+désactivé par défaut derrière le repli Palier 1 en attendant.
+
+**Deux points de décision explicites avant de considérer cette phase close**, cohérents avec la discipline du reste du projet : le choix ExoPlayer/fichier temporaire vs `MediaSource` custom (Tâche 5.4), et la validation empirique de l'alignement CTC (5.2.0) — ni l'un ni l'autre ne doit être tranché silencieusement en cours d'implémentation. **Un troisième point rejoint ces deux-là** : la viabilité de latence de Palier 2 (Kokoro), mesurée et en échec (§10), doit être explicitement arbitrée — pas contournée silencieusement par un futur commit qui changerait les seuils ou désactiverait les tests sans discussion.
