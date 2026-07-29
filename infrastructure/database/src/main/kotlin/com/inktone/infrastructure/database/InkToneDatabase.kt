@@ -6,6 +6,7 @@ import androidx.room.TypeConverters
 import com.inktone.infrastructure.database.converter.StringListConverter
 import com.inktone.infrastructure.database.dao.AnnotationDao
 import com.inktone.infrastructure.database.dao.BookmarkDao
+import com.inktone.infrastructure.database.dao.PronunciationRuleDao
 import com.inktone.infrastructure.database.dao.PublicationDao
 import com.inktone.infrastructure.database.dao.ReadingSessionDao
 import com.inktone.infrastructure.database.dao.ReadingStateDao
@@ -14,6 +15,7 @@ import com.inktone.infrastructure.database.dao.UserPreferencesDao
 import com.inktone.infrastructure.database.dao.VoiceProfileDao
 import com.inktone.infrastructure.database.entity.AnnotationEntity
 import com.inktone.infrastructure.database.entity.BookmarkEntity
+import com.inktone.infrastructure.database.entity.PronunciationRuleEntity
 import com.inktone.infrastructure.database.entity.PublicationEntity
 import com.inktone.infrastructure.database.entity.ReadingSessionEntity
 import com.inktone.infrastructure.database.entity.ReadingStateEntity
@@ -25,9 +27,9 @@ import com.inktone.infrastructure.database.entity.VoiceProfileEntity
     entities = [
         PublicationEntity::class, ReadingStateEntity::class, ReadingSessionEntity::class,
         BookmarkEntity::class, AnnotationEntity::class, VoiceProfileEntity::class,
-        UserPreferencesEntity::class, SentenceFtsEntity::class,
+        UserPreferencesEntity::class, SentenceFtsEntity::class, PronunciationRuleEntity::class,
     ],
-    version = 3, // Tache 8.0 : fontFamily/reduceMotion (MIGRATION_2_3)
+    version = 4, // Tache 8.3 : pronunciation_rules (MIGRATION_3_4)
     exportSchema = true, // condition du harnais de migration — Tâche 2.4
 )
 @TypeConverters(StringListConverter::class)
@@ -40,4 +42,5 @@ abstract class InkToneDatabase : RoomDatabase() {
     abstract fun voiceProfileDao(): VoiceProfileDao
     abstract fun userPreferencesDao(): UserPreferencesDao
     abstract fun sentenceFtsDao(): SentenceFtsDao
+    abstract fun pronunciationRuleDao(): PronunciationRuleDao
 }

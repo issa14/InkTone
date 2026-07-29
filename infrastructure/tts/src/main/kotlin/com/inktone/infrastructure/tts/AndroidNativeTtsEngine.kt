@@ -10,9 +10,11 @@ import com.inktone.domain.model.TtsEngineId
 import com.inktone.domain.model.VoiceProfile
 import com.inktone.domain.service.AudioSegment
 import com.inktone.domain.service.PlaybackEvent
+import com.inktone.domain.service.PronunciationRuleApplier
 import com.inktone.domain.service.TtsCapabilities
 import com.inktone.domain.service.TtsEngine
 import com.inktone.domain.service.WordTimestamp
+import com.inktone.domain.service.remapToOriginal
 import dagger.hilt.android.qualifiers.ApplicationContext
 import kotlinx.coroutines.channels.awaitClose
 import kotlinx.coroutines.flow.Flow
@@ -48,6 +50,7 @@ import kotlin.coroutines.resumeWithException
 @Singleton
 class AndroidNativeTtsEngine @Inject constructor(
     @ApplicationContext private val context: Context,
+    private val pronunciationRuleApplier: PronunciationRuleApplier,
 ) : TtsEngine {
 
     override val id = TtsEngineId.ANDROID_NATIVE
@@ -87,6 +90,11 @@ class AndroidNativeTtsEngine @Inject constructor(
         val utteranceId = UUID.randomUUID().toString()
         val outputFile = File(context.cacheDir, "tts-$utteranceId.wav")
         val boundaries = mutableListOf<WordBoundary>()
+        // Applique AVANT la synthese (Tache 8.3) - reversible sans
+        // reimport si l'utilisateur modifie une regle. Les WordTimestamp
+        // ci-dessous restent alignes sur sentence.text (texte affiche),
+        // jamais sur appliedText.substitutedText (texte envoye au moteur).
+        val appliedText = pronunciationRuleApplier.apply(sentence.text)
 
         return suspendCancellableCoroutine { cont ->
             engine.setOnUtteranceProgressListener(object : UtteranceProgressListener() {
@@ -94,12 +102,12 @@ class AndroidNativeTtsEngine @Inject constructor(
 
                 override fun onRangeStart(id: String?, start: Int, end: Int, frame: Int) {
                     if (id != utteranceId) return
-                    val resolved = resolveWordBoundary(start, end, frame, sentence.text.length)
+                    val resolved = resolveWordBoundary(start, end, frame, appliedText.substitutedText.length)
                     if (resolved == null) {
                         Log.w(
                             "AndroidNativeTtsEngine",
                             "onRangeStart ignore, offsets hors bornes: start=$start end=$end frame=$frame " +
-                                "textLength=${sentence.text.length}",
+                                "textLength=${appliedText.substitutedText.length}",
                         )
                         return
                     }
@@ -119,11 +127,11 @@ class AndroidNativeTtsEngine @Inject constructor(
                                 durationMs
                             }
                             WordTimestamp(
-                                word = sentence.text.substring(boundary.charStart, boundary.charEnd),
+                                word = appliedText.substitutedText.substring(boundary.charStart, boundary.charEnd),
                                 startMs = startMs,
                                 endMs = endMs,
                                 charOffset = boundary.charStart,
-                            )
+                            ).remapToOriginal(appliedText)
                         }
                         cont.resume(
                             AudioSegment(
@@ -152,7 +160,7 @@ class AndroidNativeTtsEngine @Inject constructor(
                 putFloat(TextToSpeech.Engine.KEY_PARAM_VOLUME, voiceProfile.volume)
             }
             engine.setSpeechRate(voiceProfile.speed)
-            engine.synthesizeToFile(sentence.text, bundle, outputFile, utteranceId)
+            engine.synthesizeToFile(appliedText.substitutedText, bundle, outputFile, utteranceId)
         }
     }
 

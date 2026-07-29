@@ -111,6 +111,24 @@ class DatabaseMigrationTest {
         v3.close()
     }
 
+    @Test
+    fun migration_3_vers_4_cree_la_table_pronunciation_rules_utilisable() {
+        val v3 = helper.createDatabase(TEST_DB_NAME, 3)
+        v3.close()
+
+        val v4 = helper.runMigrationsAndValidate(TEST_DB_NAME, 4, true, MIGRATION_2_3, MIGRATION_3_4)
+
+        v4.execSQL(
+            "INSERT INTO pronunciation_rules (id, originalText, replacementText, isRegex, isEnabled) " +
+                "VALUES ('r1', 'Dr.', 'Docteur', 0, 1)",
+        )
+        v4.query("SELECT replacementText FROM pronunciation_rules WHERE id = 'r1'").use { cursor ->
+            assertEquals(true, cursor.moveToFirst())
+            assertEquals("Docteur", cursor.getString(0))
+        }
+        v4.close()
+    }
+
     companion object {
         private const val TEST_DB_NAME = "migration-test"
     }

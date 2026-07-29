@@ -29,3 +29,20 @@ val MIGRATION_2_3 = object : Migration(2, 3) {
         db.execSQL("ALTER TABLE user_preferences ADD COLUMN reduceMotion INTEGER NOT NULL DEFAULT 0")
     }
 }
+
+/** Tache 8.3 : regles de prononciation personnalisees. */
+val MIGRATION_3_4 = object : Migration(3, 4) {
+    override fun migrate(db: SupportSQLiteDatabase) {
+        db.execSQL(
+            """
+            CREATE TABLE IF NOT EXISTS pronunciation_rules (
+                id TEXT NOT NULL PRIMARY KEY,
+                originalText TEXT NOT NULL,
+                replacementText TEXT NOT NULL,
+                isRegex INTEGER NOT NULL,
+                isEnabled INTEGER NOT NULL
+            )
+            """.trimIndent(),
+        )
+    }
+}

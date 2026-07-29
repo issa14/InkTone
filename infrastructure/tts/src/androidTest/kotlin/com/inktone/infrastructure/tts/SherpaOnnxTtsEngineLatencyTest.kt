@@ -9,6 +9,8 @@ import com.inktone.domain.model.TtsEngineId
 import com.inktone.domain.model.VoiceProfile
 import kotlinx.coroutines.runBlocking
 import org.junit.Assume.assumeTrue
+import com.inktone.core.testing.fake.FakePronunciationRuleRepository
+import com.inktone.domain.service.PronunciationRuleApplier
 import org.junit.Test
 import org.junit.runner.RunWith
 import java.io.File
@@ -46,7 +48,7 @@ class SherpaOnnxTtsEngineLatencyTest {
         assumeTrue("Modele Kokoro absent", modelPaths.isReady)
         assumeTrue("Modele CTC absent", ctcModelPaths.isReady)
 
-        val engine = SherpaOnnxTtsEngine(modelPaths, CtcForcedAligner(ctcModelPaths))
+        val engine = SherpaOnnxTtsEngine(modelPaths, CtcForcedAligner(ctcModelPaths), PronunciationRuleApplier(FakePronunciationRuleRepository()))
         val voiceProfile = VoiceProfile(id = "vp-sherpa-fr", engine = TtsEngineId.SHERPA_ONNX, voice = "ff_siwis", language = "fr-FR")
         val text = "Bonjour le monde. Ceci est un test pour vérifier l'alignement."
         val sentence = Sentence(index = 0, text = text, startOffset = 0, endOffset = text.length)

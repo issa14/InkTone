@@ -1,11 +1,14 @@
 package com.inktone.infrastructure.tts.di
 
+import com.inktone.domain.repository.PronunciationRuleRepository
+import com.inktone.domain.service.PronunciationRuleApplier
 import com.inktone.domain.service.TtsEngine
 import com.inktone.infrastructure.tts.AndroidNativeTtsEngine
 import com.inktone.infrastructure.tts.FallbackTtsEngine
 import com.inktone.infrastructure.tts.SherpaOnnxTtsEngine
 import dagger.Binds
 import dagger.Module
+import dagger.Provides
 import dagger.hilt.InstallIn
 import dagger.hilt.components.SingletonComponent
 import javax.inject.Singleton
@@ -33,4 +36,12 @@ abstract class TtsModule {
     @Binds
     @Palier1
     abstract fun bindPalier1(impl: AndroidNativeTtsEngine): TtsEngine
+
+    companion object {
+        @Provides
+        @Singleton
+        fun providePronunciationRuleApplier(
+            ruleRepository: PronunciationRuleRepository,
+        ): PronunciationRuleApplier = PronunciationRuleApplier(ruleRepository)
+    }
 }
