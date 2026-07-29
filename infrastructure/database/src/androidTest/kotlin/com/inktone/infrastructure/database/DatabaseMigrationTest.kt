@@ -4,17 +4,19 @@ import androidx.room.testing.MigrationTestHelper
 import androidx.sqlite.db.framework.FrameworkSQLiteOpenHelperFactory
 import androidx.test.ext.junit.runners.AndroidJUnit4
 import androidx.test.platform.app.InstrumentationRegistry
+import org.junit.Assert.assertEquals
 import org.junit.Rule
 import org.junit.Test
 import org.junit.runner.RunWith
 
 /**
- * Harnais de migration (Blueprint §14.5, acquis K4). Ne valide aucune
- * migration réelle pour l'instant — le schéma est en version 1, il n'y a
- * rien à migrer. Sert de GABARIT : copier cette structure pour CHAQUE
- * migration future (ajouter `helper.runMigrationsAndValidate(dbName, N,
- * true, MIGRATION_N_MINUS_1_TO_N)` après avoir créé la base à N-1 et
- * inséré des données représentatives). Ne jamais ajouter une version de
+ * Harnais de migration (Blueprint §14.5, acquis K4). `le_schema_v1_...`
+ * couvre encore la version 1 (jamais retiré — une régression sur v1 doit
+ * continuer à échouer même après l'ajout de v2). `MIGRATION_1_2` (Tâche
+ * 7.3.1, ajout de `sentence_fts`) est la première migration réelle de ce
+ * projet : gabarit à copier pour CHAQUE migration future (créer à N-1,
+ * insérer des données représentatives, `runMigrationsAndValidate` vers N,
+ * vérifier que les données survivent). Ne jamais ajouter une version de
  * schéma sans le test correspondant dans le même commit.
  */
 @RunWith(AndroidJUnit4::class)
@@ -34,6 +36,58 @@ class DatabaseMigrationTest {
         // correspond exactement à InkToneDatabase — toute divergence fait
         // échouer ce test immédiatement.
         helper.createDatabase(TEST_DB_NAME, 1).apply { close() }
+    }
+
+    @Test
+    fun migration_1_vers_2_conserve_les_donnees_et_ajoute_sentence_fts() {
+        val v1 = helper.createDatabase(TEST_DB_NAME, 1)
+
+        v1.execSQL(
+            """
+            INSERT INTO publications (
+                id, title, subtitle, authors, publisher, language, description, coverUri,
+                format, fileUri, fileHash, fileSize, chapterCount, seriesName, seriesIndex,
+                isFavorite, subjects, isDrmProtected, importDate, lastOpened
+            ) VALUES (
+                'pub-1', 'Titre representatif', NULL, '', NULL, NULL, NULL, NULL,
+                'EPUB', 'content://x/1', 'hash-1', 1000, 3, NULL, NULL,
+                0, '', 0, 0, NULL
+            )
+            """.trimIndent(),
+        )
+        v1.execSQL(
+            """
+            INSERT INTO reading_states (
+                publicationId, resourceHref, chapterIndex, paragraphIndex, charOffset,
+                lastReadAt, voiceProfileId, overrideTheme, overrideFontSize
+            ) VALUES ('pub-1', 'ch1.xhtml', 0, NULL, 42, 0, NULL, NULL, NULL)
+            """.trimIndent(),
+        )
+        v1.close()
+
+        val v2 = helper.runMigrationsAndValidate(TEST_DB_NAME, 2, true, MIGRATION_1_2)
+
+        v2.query("SELECT title FROM publications WHERE id = 'pub-1'").use { cursor ->
+            assertEquals(true, cursor.moveToFirst())
+            assertEquals("Titre representatif", cursor.getString(0))
+        }
+        v2.query("SELECT charOffset FROM reading_states WHERE publicationId = 'pub-1'").use { cursor ->
+            assertEquals(true, cursor.moveToFirst())
+            assertEquals(42, cursor.getInt(0))
+        }
+
+        // La table FTS existe et accepte une insertion — pas seulement
+        // "la migration ne plante pas", la table doit etre reellement
+        // utilisable derriere.
+        v2.execSQL(
+            "INSERT INTO sentence_fts (publicationId, chapterIndex, resourceHref, charOffset, text) " +
+                "VALUES ('pub-1', 0, 'ch1.xhtml', 0, 'Phrase de test migree')",
+        )
+        v2.query("SELECT count(*) FROM sentence_fts").use { cursor ->
+            cursor.moveToFirst()
+            assertEquals(1, cursor.getInt(0))
+        }
+        v2.close()
     }
 
     companion object {

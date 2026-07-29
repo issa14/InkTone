@@ -2,7 +2,6 @@ package com.inktone.infrastructure.database.dao
 
 import androidx.room.Dao
 import androidx.room.Insert
-import androidx.room.OnConflictStrategy
 import androidx.room.Query
 import androidx.room.Update
 import com.inktone.infrastructure.database.entity.PublicationEntity
@@ -47,7 +46,21 @@ interface PublicationDao {
     @Query("SELECT * FROM publications WHERE fileHash = :hash LIMIT 1")
     suspend fun getByFileHash(hash: String): PublicationEntity?
 
-    @Insert(onConflict = OnConflictStrategy.REPLACE)
+    /**
+     * `@Insert` sans `onConflict` = `OnConflictStrategy.ABORT` (défaut
+     * Room) — délibéré, pas un oubli. `REPLACE` faisait un DELETE+INSERT
+     * réel sur conflit d'id, qui cascadait silencieusement vers
+     * `ReadingState`/`Bookmark`/`Annotation` (`ON DELETE CASCADE`) —
+     * découvert Tâche 7.1 via `bootstrapAndOpenFixture` (scaffolding qui
+     * réinsère le même id à chaque lancement). `ImportPublicationUseCase`
+     * (Tâche 6.1) vérifie déjà les doublons par hash AVANT d'appeler cette
+     * méthode : `REPLACE` n'était donc jamais censé se déclencher en usage
+     * réel — juste un filet qui masquait un vrai bug de perte de données
+     * au lieu de le faire échouer bruyamment. Un futur besoin de
+     * « réimporter en gardant le même id » sera une méthode dédiée
+     * (ex. `upsertPreservingChildren()`), jamais un `insert()` ambigu.
+     */
+    @Insert
     suspend fun insert(entity: PublicationEntity)
 
     @Update

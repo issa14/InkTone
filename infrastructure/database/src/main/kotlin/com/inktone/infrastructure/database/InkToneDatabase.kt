@@ -9,6 +9,7 @@ import com.inktone.infrastructure.database.dao.BookmarkDao
 import com.inktone.infrastructure.database.dao.PublicationDao
 import com.inktone.infrastructure.database.dao.ReadingSessionDao
 import com.inktone.infrastructure.database.dao.ReadingStateDao
+import com.inktone.infrastructure.database.dao.SentenceFtsDao
 import com.inktone.infrastructure.database.dao.UserPreferencesDao
 import com.inktone.infrastructure.database.dao.VoiceProfileDao
 import com.inktone.infrastructure.database.entity.AnnotationEntity
@@ -16,6 +17,7 @@ import com.inktone.infrastructure.database.entity.BookmarkEntity
 import com.inktone.infrastructure.database.entity.PublicationEntity
 import com.inktone.infrastructure.database.entity.ReadingSessionEntity
 import com.inktone.infrastructure.database.entity.ReadingStateEntity
+import com.inktone.infrastructure.database.entity.SentenceFtsEntity
 import com.inktone.infrastructure.database.entity.UserPreferencesEntity
 import com.inktone.infrastructure.database.entity.VoiceProfileEntity
 
@@ -23,9 +25,9 @@ import com.inktone.infrastructure.database.entity.VoiceProfileEntity
     entities = [
         PublicationEntity::class, ReadingStateEntity::class, ReadingSessionEntity::class,
         BookmarkEntity::class, AnnotationEntity::class, VoiceProfileEntity::class,
-        UserPreferencesEntity::class,
+        UserPreferencesEntity::class, SentenceFtsEntity::class,
     ],
-    version = 1,
+    version = 2, // Tache 7.3.1 : ajout de sentence_fts (MIGRATION_1_2)
     exportSchema = true, // condition du harnais de migration — Tâche 2.4
 )
 @TypeConverters(StringListConverter::class)
@@ -37,4 +39,5 @@ abstract class InkToneDatabase : RoomDatabase() {
     abstract fun annotationDao(): AnnotationDao
     abstract fun voiceProfileDao(): VoiceProfileDao
     abstract fun userPreferencesDao(): UserPreferencesDao
+    abstract fun sentenceFtsDao(): SentenceFtsDao
 }
