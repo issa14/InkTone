@@ -7,6 +7,7 @@ import com.inktone.domain.model.Chapter
 import com.inktone.domain.model.EffectiveReadingSettings
 import com.inktone.domain.model.ReadingOverrides
 import com.inktone.domain.model.ReadingTheme
+import com.inktone.domain.model.SleepTimerState
 import com.inktone.domain.model.TableOfContentsEntry
 import com.inktone.domain.valueobject.Locator
 
@@ -37,6 +38,8 @@ data class ReaderUiState(
     // Surcharge par publication actuellement active (Tache 8.2) - null =
     // aucune surcharge, les reglages globaux s'appliquent tels quels.
     val currentOverrides: ReadingOverrides? = null,
+    // Tache 9bis.3.3 - null = minuteur desactive.
+    val sleepTimer: SleepTimerState? = null,
 ) {
     val currentChapter: Chapter? get() = chapters.getOrNull(currentChapterIndex)
     val hasNextChapter: Boolean get() = currentChapterIndex < chapters.lastIndex
@@ -134,4 +137,11 @@ sealed interface ReaderIntent {
      * réglages globaux (`UserPreferences`) reprennent la main.
      */
     data class SetOverrides(val overrides: ReadingOverrides?) : ReaderIntent
+
+    /**
+     * Tache 9bis.3.3 — `minutes = null` desactive le minuteur en cours.
+     * A expiration, met en Pause (fondu sonore non implemente, voir
+     * `SleepTimerState.fadeOutEnabled`).
+     */
+    data class SetSleepTimer(val minutes: Int?) : ReaderIntent
 }

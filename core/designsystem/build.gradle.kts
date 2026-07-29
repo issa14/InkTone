@@ -29,8 +29,12 @@ dependencies {
     implementation("androidx.compose.material3:material3")
     implementation("androidx.compose.material3:material3-window-size-class")
     // AppIcons (Tache 9bis.1.1) : icones hors du sous-ensemble Icons.Filled/
-    // Outlined de base embarque par material3.
-    implementation("androidx.compose.material:material-icons-extended")
+    // Outlined de base embarque par material3. api() et non implementation() :
+    // AppIcons expose des ImageVector de ce module dans sa propre API
+    // publique, les modules consommateurs (feature/*) en ont besoin sur
+    // leur propre classpath de compilation (Tache 9bis.3.3, decouvert en
+    // essayant d'utiliser Icons.Filled.Pause/Timer hors de ce module).
+    api("androidx.compose.material:material-icons-extended")
 
     testImplementation(libs.junit)
 }

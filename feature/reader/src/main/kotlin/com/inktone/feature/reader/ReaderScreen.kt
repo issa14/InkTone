@@ -39,6 +39,7 @@ import com.inktone.domain.model.AnnotationColor
 import com.inktone.domain.model.ReadingOverrides
 import com.inktone.domain.model.ReadingTheme
 import com.inktone.domain.model.Sentence
+import com.inktone.domain.model.SleepTimerState
 
 /**
  * `effectiveSettings` (theme, taille de police) arrive déjà résolu dans
@@ -78,7 +79,7 @@ import com.inktone.domain.model.Sentence
  */
 @OptIn(ExperimentalFoundationApi::class, ExperimentalLayoutApi::class)
 @Composable
-fun ReaderScreen(viewModel: ReaderViewModel = hiltViewModel()) {
+fun ReaderScreen(viewModel: ReaderViewModel = hiltViewModel(), onSearchClick: () -> Unit = {}) {
     val state by viewModel.state.collectAsState()
     // Tache 9bis.3.1 : HUD (panneau de controle + boutons) visible par
     // defaut, se masque seul apres 4s (ImmersiveReaderChrome), un appui
@@ -154,24 +155,23 @@ fun ReaderScreen(viewModel: ReaderViewModel = hiltViewModel()) {
         }
 
         if (isHudVisible) {
+            UnifiedControlPanel(
+                isPlaying = state.isPlaying,
+                sleepTimerActive = state.sleepTimer != null,
+                onPlayPause = {
+                    viewModel.onIntent(if (state.isPlaying) ReaderIntent.Pause else ReaderIntent.PlayCurrentSentence)
+                },
+                onPreviousChapter = { viewModel.onIntent(ReaderIntent.PreviousChapter) },
+                onNextChapter = { viewModel.onIntent(ReaderIntent.NextChapter) },
+                onSleepTimerClick = { viewModel.onIntent(ReaderIntent.SetSleepTimer(nextSleepTimerMinutes(state.sleepTimer))) },
+                onSearchClick = onSearchClick,
+                onBookmarksClick = { viewModel.onIntent(ReaderIntent.ToggleBookmarkList) },
+                onTocClick = { viewModel.onIntent(ReaderIntent.ToggleToc) },
+            )
+
             FlowRow(horizontalArrangement = Arrangement.spacedBy(4.dp)) {
-                Button(onClick = { viewModel.onIntent(ReaderIntent.PreviousChapter) }, enabled = state.hasPreviousChapter) {
-                    Text("Precedent")
-                }
-                Button(onClick = { viewModel.onIntent(ReaderIntent.PlayCurrentSentence) }) {
-                    Text(if (state.isPlaying) "En lecture..." else "Lire")
-                }
-                Button(onClick = { viewModel.onIntent(ReaderIntent.NextChapter) }, enabled = state.hasNextChapter) {
-                    Text("Suivant")
-                }
-                Button(onClick = { viewModel.onIntent(ReaderIntent.ToggleToc) }) {
-                    Text("Sommaire")
-                }
                 Button(onClick = { viewModel.onIntent(ReaderIntent.CreateBookmark) }) {
                     Text("+ Signet")
-                }
-                Button(onClick = { viewModel.onIntent(ReaderIntent.ToggleBookmarkList) }) {
-                    Text("Signets (${state.bookmarks.size})")
                 }
             }
 
@@ -201,6 +201,21 @@ private fun ChapterOverrideMenu(currentOverrides: ReadingOverrides?, onSetOverri
     ) {
         Text(if (hasOverride) "Reglages de ce livre : actifs" else "Utiliser les reglages de ce livre")
     }
+}
+
+private val SLEEP_TIMER_OPTIONS_MINUTES = listOf(15, 30, 45, 60)
+
+/**
+ * Tache 9bis.3.3 — un appui sur l'icone Veille fait cycler les durees
+ * proposees puis desactive le minuteur (pas de sheet de selection dediee
+ * pour l'instant, hors perimetre de cette tache).
+ */
+private fun nextSleepTimerMinutes(current: SleepTimerState?): Int? {
+    if (current == null) return SLEEP_TIMER_OPTIONS_MINUTES.first()
+    val currentMinutes = (current.remainingMs / 60_000L).toInt()
+    val currentIndex = SLEEP_TIMER_OPTIONS_MINUTES.indexOf(currentMinutes)
+    val nextIndex = currentIndex + 1
+    return SLEEP_TIMER_OPTIONS_MINUTES.getOrNull(nextIndex)
 }
 
 @OptIn(ExperimentalFoundationApi::class)
