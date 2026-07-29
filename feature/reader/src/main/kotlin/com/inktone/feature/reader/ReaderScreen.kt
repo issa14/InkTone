@@ -7,7 +7,6 @@ import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.ExperimentalLayoutApi
 import androidx.compose.foundation.layout.FlowRow
-import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.rememberScrollState
@@ -90,6 +89,15 @@ fun ReaderScreen(viewModel: ReaderViewModel = hiltViewModel()) {
             return@Column
         }
 
+        if (state.isBookmarkListVisible) {
+            BookmarkListSheet(
+                bookmarks = state.bookmarks,
+                onBookmarkClick = { bookmark -> viewModel.onIntent(ReaderIntent.NavigateToBookmark(bookmark.locator)) },
+                onBookmarkDelete = { bookmark -> viewModel.onIntent(ReaderIntent.DeleteBookmark(bookmark.id)) },
+            )
+            return@Column
+        }
+
         val scrollState = rememberScrollState()
         LaunchedEffect(state.currentChapterIndex) { scrollState.scrollTo(0) }
 
@@ -127,7 +135,7 @@ fun ReaderScreen(viewModel: ReaderViewModel = hiltViewModel()) {
             )
         }
 
-        Row {
+        FlowRow(horizontalArrangement = Arrangement.spacedBy(4.dp)) {
             Button(onClick = { viewModel.onIntent(ReaderIntent.PreviousChapter) }, enabled = state.hasPreviousChapter) {
                 Text("Precedent")
             }
@@ -139,6 +147,12 @@ fun ReaderScreen(viewModel: ReaderViewModel = hiltViewModel()) {
             }
             Button(onClick = { viewModel.onIntent(ReaderIntent.ToggleToc) }) {
                 Text("Sommaire")
+            }
+            Button(onClick = { viewModel.onIntent(ReaderIntent.CreateBookmark) }) {
+                Text("+ Signet")
+            }
+            Button(onClick = { viewModel.onIntent(ReaderIntent.ToggleBookmarkList) }) {
+                Text("Signets (${state.bookmarks.size})")
             }
         }
     }

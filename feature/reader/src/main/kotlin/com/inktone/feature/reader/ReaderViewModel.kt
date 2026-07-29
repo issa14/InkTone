@@ -5,6 +5,7 @@ import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.inktone.domain.model.Annotation
 import com.inktone.domain.model.AnnotationColor
+import com.inktone.domain.model.Bookmark
 import com.inktone.domain.model.EffectiveReadingSettings
 import com.inktone.domain.model.Publication
 import com.inktone.domain.model.PublicationFormat
@@ -12,14 +13,18 @@ import com.inktone.domain.model.ReadingState
 import com.inktone.domain.model.TtsEngineId
 import com.inktone.domain.model.VoiceProfile
 import com.inktone.domain.repository.AnnotationRepository
+import com.inktone.domain.repository.BookmarkRepository
 import com.inktone.domain.repository.PreferencesRepository
 import com.inktone.domain.repository.PublicationRepository
 import com.inktone.domain.service.ParseResult
 import com.inktone.domain.service.PublicationParser
 import com.inktone.domain.service.TtsEngine
 import com.inktone.domain.usecase.AddAnnotationUseCase
+import com.inktone.domain.usecase.CreateBookmarkUseCase
+import com.inktone.domain.usecase.DeleteBookmarkUseCase
 import com.inktone.domain.usecase.GetReadingStateUseCase
 import com.inktone.domain.usecase.UpdateReadingStateUseCase
+import com.inktone.domain.valueobject.Locator
 import dagger.hilt.android.lifecycle.HiltViewModel
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.MutableStateFlow
@@ -47,6 +52,9 @@ class ReaderViewModel @Inject constructor(
     private val preferencesRepository: PreferencesRepository,
     private val annotationRepository: AnnotationRepository,
     private val addAnnotation: AddAnnotationUseCase,
+    private val bookmarkRepository: BookmarkRepository,
+    private val createBookmark: CreateBookmarkUseCase,
+    private val deleteBookmark: DeleteBookmarkUseCase,
 ) : ViewModel() {
 
     private val _state = MutableStateFlow(ReaderUiState())
@@ -75,6 +83,12 @@ class ReaderViewModel @Inject constructor(
                 selectionAnchorIndex = null, selectionFocusIndex = null,
             )
             is ReaderIntent.ConfirmAnnotation -> confirmAnnotation(intent.color)
+            is ReaderIntent.CreateBookmark -> createBookmarkAtCurrentPosition()
+            is ReaderIntent.ToggleBookmarkList -> _state.value = _state.value.copy(
+                isBookmarkListVisible = !_state.value.isBookmarkListVisible,
+            )
+            is ReaderIntent.DeleteBookmark -> viewModelScope.launch { deleteBookmark(intent.id) }
+            is ReaderIntent.NavigateToBookmark -> navigateToLocator(intent.locator)
         }
     }
 
@@ -111,6 +125,7 @@ class ReaderViewModel @Inject constructor(
                     )
                     triggerPreload(_state.value.currentChapterIndex)
                     observeAnnotations(publicationId)
+                    observeBookmarks(publicationId)
                 }
                 else -> Log.w("ReaderViewModel", "openPublication: echec de parsing ($result)")
             }
@@ -161,6 +176,58 @@ class ReaderViewModel @Inject constructor(
             )
             _state.value = _state.value.copy(selectionAnchorIndex = null, selectionFocusIndex = null)
         }
+    }
+
+    /** Tâche 7.2 — même principe que [observeAnnotations] : observation continue, pas un chargement figé. */
+    private fun observeBookmarks(publicationId: String) {
+        viewModelScope.launch {
+            bookmarkRepository.observeForPublication(publicationId).collect { bookmarks ->
+                _state.value = _state.value.copy(bookmarks = bookmarks)
+            }
+        }
+    }
+
+    /**
+     * Capture la position courante (Tâche 7.2) — plus simple que
+     * [confirmAnnotation] : un seul `Locator`, pas de plage à résoudre.
+     * Réutilise `Sentence.startLocator`, déjà utilisé par
+     * [persistPosition]/[playCurrentSentence] pour la même conversion.
+     */
+    private fun createBookmarkAtCurrentPosition() {
+        val chapter = _state.value.currentChapter ?: return
+        val sentence = chapter.paragraphs.flatMap { it.sentences }.getOrNull(_state.value.currentSentenceIndex) ?: return
+        val publicationId = currentPublicationId ?: return
+
+        viewModelScope.launch {
+            createBookmark(
+                Bookmark(
+                    id = UUID.randomUUID().toString(),
+                    publicationId = publicationId,
+                    locator = sentence.startLocator(chapterIndex = chapter.index, resourceHref = chapter.href),
+                    createdAt = System.currentTimeMillis(),
+                ),
+            )
+        }
+    }
+
+    /**
+     * Navigue vers un `Locator` de signet (Tâche 7.2) — change de chapitre
+     * si besoin puis positionne sur la `Sentence` la plus proche de
+     * `charOffset`, contrairement à `navigateToChapter` seul qui repositionne
+     * toujours à l'index 0.
+     */
+    private fun navigateToLocator(locator: Locator) {
+        val chapters = _state.value.chapters
+        if (locator.chapterIndex !in chapters.indices) return
+        val sentences = chapters[locator.chapterIndex].paragraphs.flatMap { it.sentences }
+        val sentenceIndex = sentences.indexOfFirst { locator.charOffset in it.startOffset..it.endOffset }.coerceAtLeast(0)
+
+        _state.value = _state.value.copy(
+            currentChapterIndex = locator.chapterIndex, currentSentenceIndex = sentenceIndex,
+            highlightedWordRange = null, isTocVisible = false, isBookmarkListVisible = false,
+        )
+        persistPosition(chapterIndex = locator.chapterIndex, sentenceIndex = sentenceIndex)
+        triggerPreload(locator.chapterIndex)
     }
 
     private fun bootstrapAndOpenFixture(publicationId: String, fileUri: String) {

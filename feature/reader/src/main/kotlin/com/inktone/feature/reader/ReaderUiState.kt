@@ -2,10 +2,12 @@ package com.inktone.feature.reader
 
 import com.inktone.domain.model.Annotation
 import com.inktone.domain.model.AnnotationColor
+import com.inktone.domain.model.Bookmark
 import com.inktone.domain.model.Chapter
 import com.inktone.domain.model.EffectiveReadingSettings
 import com.inktone.domain.model.ReadingTheme
 import com.inktone.domain.model.TableOfContentsEntry
+import com.inktone.domain.valueobject.Locator
 
 data class ReaderUiState(
     val chapters: List<Chapter> = emptyList(),
@@ -29,6 +31,8 @@ data class ReaderUiState(
     val selectionAnchorIndex: Int? = null,
     val selectionFocusIndex: Int? = null,
     val annotations: List<Annotation> = emptyList(),
+    val bookmarks: List<Bookmark> = emptyList(),
+    val isBookmarkListVisible: Boolean = false,
 ) {
     val currentChapter: Chapter? get() = chapters.getOrNull(currentChapterIndex)
     val hasNextChapter: Boolean get() = currentChapterIndex < chapters.lastIndex
@@ -71,4 +75,10 @@ sealed interface ReaderIntent {
     data class ExtendSentenceSelection(val sentenceIndex: Int) : ReaderIntent
     data object ClearSentenceSelection : ReaderIntent
     data class ConfirmAnnotation(val color: AnnotationColor) : ReaderIntent
+
+    /** Tâche 7.2 — capture la position courante, pas de plage à résoudre (contrairement à l'annotation). */
+    data object CreateBookmark : ReaderIntent
+    data object ToggleBookmarkList : ReaderIntent
+    data class DeleteBookmark(val id: String) : ReaderIntent
+    data class NavigateToBookmark(val locator: Locator) : ReaderIntent
 }
