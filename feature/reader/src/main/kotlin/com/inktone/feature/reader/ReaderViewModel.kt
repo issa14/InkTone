@@ -3,17 +3,21 @@ package com.inktone.feature.reader
 import android.util.Log
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
+import com.inktone.domain.model.Annotation
+import com.inktone.domain.model.AnnotationColor
 import com.inktone.domain.model.EffectiveReadingSettings
 import com.inktone.domain.model.Publication
 import com.inktone.domain.model.PublicationFormat
 import com.inktone.domain.model.ReadingState
 import com.inktone.domain.model.TtsEngineId
 import com.inktone.domain.model.VoiceProfile
+import com.inktone.domain.repository.AnnotationRepository
 import com.inktone.domain.repository.PreferencesRepository
 import com.inktone.domain.repository.PublicationRepository
 import com.inktone.domain.service.ParseResult
 import com.inktone.domain.service.PublicationParser
 import com.inktone.domain.service.TtsEngine
+import com.inktone.domain.usecase.AddAnnotationUseCase
 import com.inktone.domain.usecase.GetReadingStateUseCase
 import com.inktone.domain.usecase.UpdateReadingStateUseCase
 import dagger.hilt.android.lifecycle.HiltViewModel
@@ -22,6 +26,7 @@ import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.launch
+import java.util.UUID
 import javax.inject.Inject
 
 /**
@@ -40,6 +45,8 @@ class ReaderViewModel @Inject constructor(
     private val getReadingState: GetReadingStateUseCase,
     private val publicationRepository: PublicationRepository,
     private val preferencesRepository: PreferencesRepository,
+    private val annotationRepository: AnnotationRepository,
+    private val addAnnotation: AddAnnotationUseCase,
 ) : ViewModel() {
 
     private val _state = MutableStateFlow(ReaderUiState())
@@ -48,6 +55,7 @@ class ReaderViewModel @Inject constructor(
     private var currentPublicationId: String? = null
     private val chapterPreloader = ChapterPreloader(viewModelScope)
     private val sentenceAudioBuffer = SentenceAudioBuffer(viewModelScope, ttsEngine)
+    private val annotationSelectionHandler = AnnotationSelectionHandler()
 
     fun onIntent(intent: ReaderIntent) {
         when (intent) {
@@ -60,6 +68,14 @@ class ReaderViewModel @Inject constructor(
             is ReaderIntent.ToggleToc -> _state.value = _state.value.copy(isTocVisible = !_state.value.isTocVisible)
             is ReaderIntent.PlayCurrentSentence -> playCurrentSentence()
             is ReaderIntent.Pause -> _state.value = _state.value.copy(isPlaying = false)
+            is ReaderIntent.BeginSentenceSelection -> _state.value = _state.value.copy(
+                selectionAnchorIndex = intent.sentenceIndex, selectionFocusIndex = intent.sentenceIndex,
+            )
+            is ReaderIntent.ExtendSentenceSelection -> _state.value = _state.value.copy(selectionFocusIndex = intent.sentenceIndex)
+            is ReaderIntent.ClearSentenceSelection -> _state.value = _state.value.copy(
+                selectionAnchorIndex = null, selectionFocusIndex = null,
+            )
+            is ReaderIntent.ConfirmAnnotation -> confirmAnnotation(intent.color)
         }
     }
 
@@ -95,9 +111,56 @@ class ReaderViewModel @Inject constructor(
                         effectiveSettings = effectiveSettings,
                     )
                     triggerPreload(_state.value.currentChapterIndex)
+                    observeAnnotations(publicationId)
                 }
                 else -> Log.w("ReaderViewModel", "openPublication: echec de parsing ($result)")
             }
+        }
+    }
+
+    /**
+     * Surlignage persistant (Tâche 7.1, critère de validation) : les
+     * annotations déjà créées doivent réapparaître sur le texte
+     * sélectionné à l'origine à la réouverture — observation continue,
+     * pas un chargement ponctuel figé au moment de l'ouverture.
+     */
+    private fun observeAnnotations(publicationId: String) {
+        viewModelScope.launch {
+            annotationRepository.observeForPublication(publicationId).collect { annotations ->
+                _state.value = _state.value.copy(annotations = annotations)
+            }
+        }
+    }
+
+    /**
+     * Construit l'`Annotation` à partir de la plage de phrases sélectionnée
+     * (Tâche 7.1) — jamais d'offset arbitraire, l'index de `Sentence` est
+     * connu par construction (sélection par phrase, voir
+     * `AnnotationSelectionHandler`).
+     */
+    private fun confirmAnnotation(color: AnnotationColor) {
+        val range = _state.value.selectedSentenceRange ?: return
+        val chapter = _state.value.currentChapter ?: return
+        val publicationId = currentPublicationId ?: return
+        val sentences = chapter.paragraphs.flatMap { it.sentences }
+        val (startLocator, endLocator) = annotationSelectionHandler.resolveSelection(
+            sentences, range.first, range.last, chapter.index, chapter.href,
+        ) ?: return
+
+        viewModelScope.launch {
+            val now = System.currentTimeMillis()
+            addAnnotation(
+                Annotation(
+                    id = UUID.randomUUID().toString(),
+                    publicationId = publicationId,
+                    startLocator = startLocator,
+                    endLocator = endLocator,
+                    color = color,
+                    createdAt = now,
+                    updatedAt = now,
+                ),
+            )
+            _state.value = _state.value.copy(selectionAnchorIndex = null, selectionFocusIndex = null)
         }
     }
 

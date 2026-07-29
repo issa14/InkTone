@@ -1,10 +1,12 @@
 package com.inktone.data.di
 
+import com.inktone.domain.repository.AnnotationRepository
 import com.inktone.domain.repository.PublicationRepository
 import com.inktone.domain.repository.ReadingStateRepository
 import com.inktone.domain.repository.VoiceProfileRepository
 import com.inktone.domain.service.FileStorageService
 import com.inktone.domain.service.PublicationParser
+import com.inktone.domain.usecase.AddAnnotationUseCase
 import com.inktone.domain.usecase.ExportLibraryUseCase
 import com.inktone.domain.usecase.GetReadingStateUseCase
 import com.inktone.domain.usecase.GetVoiceProfilesUseCase
@@ -25,7 +27,8 @@ import dagger.hilt.components.SingletonComponent
  * GetVoiceProfilesUseCase pour le selecteur de voix de PlayerScreen ;
  * Tache 6.2 : ImportPublicationUseCase, consomme par ImportWorker ;
  * Tache 6.7 : ExportLibraryUseCase ; Tache 6.6 : ToggleFavoriteUseCase,
- * consomme par LibraryViewModel),
+ * consomme par LibraryViewModel ; Tache 7.1 : AddAnnotationUseCase,
+ * consomme par ReaderViewModel),
  * pas par anticipation.
  */
 @Module
@@ -64,4 +67,9 @@ object UseCaseModule {
     fun provideToggleFavoriteUseCase(
         publicationRepository: PublicationRepository,
     ): ToggleFavoriteUseCase = ToggleFavoriteUseCase(publicationRepository)
+
+    @Provides
+    fun provideAddAnnotationUseCase(
+        annotationRepository: AnnotationRepository,
+    ): AddAnnotationUseCase = AddAnnotationUseCase(annotationRepository)
 }
