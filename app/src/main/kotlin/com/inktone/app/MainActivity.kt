@@ -49,20 +49,31 @@ class MainActivity : ComponentActivity() {
             MaterialTheme {
                 Surface {
                     val viewModel: ReaderViewModel = hiltViewModel()
-                    LaunchedEffect(Unit) {
-                        val fixtureFile = File(cacheDir, "fixture-marche-a-blanc.epub").apply {
-                            if (!exists()) {
-                                assets.open("fixture-marche-a-blanc.epub").use { input ->
-                                    outputStream().use { output -> input.copyTo(output) }
+                    // BootstrapAndOpenFixture reinsere systematiquement la
+                    // meme Publication (meme id fixe) a chaque lancement -
+                    // scaffolding de marche a blanc (Phase 3), jamais destine
+                    // a un build de release. Ne doit jamais s'executer hors
+                    // debug, point final (revue apres le bug
+                    // OnConflictStrategy.REPLACE/CASCADE decouvert Tache 7.1 -
+                    // meme sans REPLACE, reinserer un id fixe a chaque
+                    // lancement resterait un artefact de test qui n'a rien
+                    // a faire dans une build utilisateur).
+                    if (BuildConfig.DEBUG) {
+                        LaunchedEffect(Unit) {
+                            val fixtureFile = File(cacheDir, "fixture-marche-a-blanc.epub").apply {
+                                if (!exists()) {
+                                    assets.open("fixture-marche-a-blanc.epub").use { input ->
+                                        outputStream().use { output -> input.copyTo(output) }
+                                    }
                                 }
                             }
+                            viewModel.onIntent(
+                                ReaderIntent.BootstrapAndOpenFixture(
+                                    publicationId = WALKING_SKELETON_FIXTURE_PUBLICATION_ID,
+                                    fileUri = fixtureFile.absolutePath,
+                                ),
+                            )
                         }
-                        viewModel.onIntent(
-                            ReaderIntent.BootstrapAndOpenFixture(
-                                publicationId = WALKING_SKELETON_FIXTURE_PUBLICATION_ID,
-                                fileUri = fixtureFile.absolutePath,
-                            ),
-                        )
                     }
 
                     val importLauncher = rememberLauncherForActivityResult(ActivityResultContracts.OpenDocument()) { uri ->
