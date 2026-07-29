@@ -165,19 +165,26 @@ class ReaderViewModel @Inject constructor(
 
     private fun bootstrapAndOpenFixture(publicationId: String, fileUri: String) {
         viewModelScope.launch {
-            publicationRepository.insert(
-                Publication(
-                    id = publicationId,
-                    title = "Fixture marche a blanc",
-                    format = PublicationFormat.EPUB,
-                    fileUri = fileUri,
-                    fileHash = "walking-skeleton-fixture-hash",
-                    fileSize = java.io.File(fileUri).length(),
-                    chapterCount = 1,
-                    importDate = System.currentTimeMillis(),
-                ),
-            )
-            openPublication(publicationId)
+            // Idempotent depuis que PublicationDao.insert() n'est plus
+            // OnConflictStrategy.REPLACE (Tache 7.1bis) : cette fixture a un
+            // id et un fileHash fixes, appelee a chaque lancement debug -
+            // sans cette verification, le deuxieme lancement sur un device
+            // deja utilise levait SQLiteConstraintException (crash reel
+            // observe en testant ce changement, pas suppose).
+            if (publicationRepository.getById(publicationId) == null) {
+                publicationRepository.insert(
+                    Publication(
+                        id = publicationId,
+                        title = "Fixture marche a blanc",
+                        format = PublicationFormat.EPUB,
+                        fileUri = fileUri,
+                        fileHash = "walking-skeleton-fixture-hash",
+                        fileSize = java.io.File(fileUri).length(),
+                        chapterCount = 1,
+                        importDate = System.currentTimeMillis(),
+                    ),
+                )
+            }
         }
     }
 
