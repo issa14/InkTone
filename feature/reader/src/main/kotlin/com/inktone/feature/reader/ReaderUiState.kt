@@ -42,6 +42,29 @@ data class ReaderUiState(
     val hasNextChapter: Boolean get() = currentChapterIndex < chapters.lastIndex
     val hasPreviousChapter: Boolean get() = currentChapterIndex > 0
 
+    /**
+     * Tache 9bis.3.2 — progression du LIVRE ENTIER (`Locator.computeProgression`,
+     * ecrite en Tache 1.1, jamais branchee avant cette tache), pas la
+     * progression par chapitre du legacy. Recalculee a chaque acces plutot
+     * que mise en cache a l'ecriture : le `DocumentModel` complet est deja
+     * en memoire (Tache 4.6), la somme des longueurs de phrase reste bon
+     * marche meme pour un roman long - pas de mise en cache prematuree
+     * tant qu'un cout reel n'est pas mesure.
+     */
+    val bookProgression: Float
+        get() {
+            val chapter = currentChapter ?: return 0f
+            val sentence = chapter.paragraphs.flatMap { it.sentences }.getOrNull(currentSentenceIndex)
+            val locator = Locator(
+                resourceHref = chapter.href,
+                chapterIndex = chapter.index,
+                charOffset = sentence?.startOffset ?: 0,
+            )
+            val totalCharsBeforeChapter = chapters.take(currentChapterIndex).sumOf(::chapterCharCount)
+            val totalCharsInPublication = chapters.sumOf(::chapterCharCount)
+            return Locator.computeProgression(locator, totalCharsBeforeChapter, totalCharsInPublication)
+        }
+
     val selectedSentenceRange: IntRange?
         get() {
             val anchor = selectionAnchorIndex ?: return null
@@ -49,6 +72,9 @@ data class ReaderUiState(
             return minOf(anchor, focus)..maxOf(anchor, focus)
         }
 }
+
+private fun chapterCharCount(chapter: Chapter): Int =
+    chapter.paragraphs.sumOf { paragraph -> paragraph.sentences.sumOf { it.text.length } }
 
 sealed interface ReaderIntent {
     /**

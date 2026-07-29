@@ -2,7 +2,9 @@ package com.inktone.feature.reader
 
 import androidx.compose.foundation.ExperimentalFoundationApi
 import androidx.compose.foundation.background
+import androidx.compose.foundation.clickable
 import androidx.compose.foundation.combinedClickable
+import androidx.compose.foundation.interaction.MutableInteractionSource
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.ExperimentalLayoutApi
@@ -75,13 +77,24 @@ import com.inktone.domain.model.Sentence
 @Composable
 fun ReaderScreen(viewModel: ReaderViewModel = hiltViewModel()) {
     val state by viewModel.state.collectAsState()
+    // Tache 9bis.3.1 : HUD (panneau de controle + boutons) visible par
+    // defaut, se masque seul apres 4s (ImmersiveReaderChrome), un appui
+    // sur la zone de lecture le fait reapparaitre.
+    var isHudVisible by remember { mutableStateOf(true) }
 
+    ImmersiveReaderChrome(isHudVisible = isHudVisible, onAutoHide = { isHudVisible = false }) {
     Column(
         modifier = Modifier
             .fillMaxSize()
             .background(ThemeColors.background(state.effectiveSettings.theme))
+            .clickable(
+                interactionSource = remember { MutableInteractionSource() },
+                indication = null,
+            ) { isHudVisible = !isHudVisible }
             .padding(16.dp),
     ) {
+        BookProgressBar(progression = state.bookProgression)
+
         if (state.isTocVisible) {
             TableOfContentsSheet(
                 entries = state.tableOfContents,
@@ -137,31 +150,34 @@ fun ReaderScreen(viewModel: ReaderViewModel = hiltViewModel()) {
             )
         }
 
-        FlowRow(horizontalArrangement = Arrangement.spacedBy(4.dp)) {
-            Button(onClick = { viewModel.onIntent(ReaderIntent.PreviousChapter) }, enabled = state.hasPreviousChapter) {
-                Text("Precedent")
+        if (isHudVisible) {
+            FlowRow(horizontalArrangement = Arrangement.spacedBy(4.dp)) {
+                Button(onClick = { viewModel.onIntent(ReaderIntent.PreviousChapter) }, enabled = state.hasPreviousChapter) {
+                    Text("Precedent")
+                }
+                Button(onClick = { viewModel.onIntent(ReaderIntent.PlayCurrentSentence) }) {
+                    Text(if (state.isPlaying) "En lecture..." else "Lire")
+                }
+                Button(onClick = { viewModel.onIntent(ReaderIntent.NextChapter) }, enabled = state.hasNextChapter) {
+                    Text("Suivant")
+                }
+                Button(onClick = { viewModel.onIntent(ReaderIntent.ToggleToc) }) {
+                    Text("Sommaire")
+                }
+                Button(onClick = { viewModel.onIntent(ReaderIntent.CreateBookmark) }) {
+                    Text("+ Signet")
+                }
+                Button(onClick = { viewModel.onIntent(ReaderIntent.ToggleBookmarkList) }) {
+                    Text("Signets (${state.bookmarks.size})")
+                }
             }
-            Button(onClick = { viewModel.onIntent(ReaderIntent.PlayCurrentSentence) }) {
-                Text(if (state.isPlaying) "En lecture..." else "Lire")
-            }
-            Button(onClick = { viewModel.onIntent(ReaderIntent.NextChapter) }, enabled = state.hasNextChapter) {
-                Text("Suivant")
-            }
-            Button(onClick = { viewModel.onIntent(ReaderIntent.ToggleToc) }) {
-                Text("Sommaire")
-            }
-            Button(onClick = { viewModel.onIntent(ReaderIntent.CreateBookmark) }) {
-                Text("+ Signet")
-            }
-            Button(onClick = { viewModel.onIntent(ReaderIntent.ToggleBookmarkList) }) {
-                Text("Signets (${state.bookmarks.size})")
-            }
-        }
 
-        ChapterOverrideMenu(
-            currentOverrides = state.currentOverrides,
-            onSetOverride = { viewModel.onIntent(ReaderIntent.SetOverrides(it)) },
-        )
+            ChapterOverrideMenu(
+                currentOverrides = state.currentOverrides,
+                onSetOverride = { viewModel.onIntent(ReaderIntent.SetOverrides(it)) },
+            )
+        }
+    }
     }
 }
 
