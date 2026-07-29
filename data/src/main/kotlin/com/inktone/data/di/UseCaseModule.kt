@@ -1,14 +1,21 @@
 package com.inktone.data.di
 
+import com.inktone.domain.repository.AnnotationRepository
+import com.inktone.domain.repository.BookmarkRepository
 import com.inktone.domain.repository.PublicationRepository
 import com.inktone.domain.repository.ReadingStateRepository
 import com.inktone.domain.repository.VoiceProfileRepository
 import com.inktone.domain.service.FileStorageService
 import com.inktone.domain.service.PublicationParser
+import com.inktone.domain.service.SearchService
+import com.inktone.domain.usecase.AddAnnotationUseCase
+import com.inktone.domain.usecase.CreateBookmarkUseCase
+import com.inktone.domain.usecase.DeleteBookmarkUseCase
 import com.inktone.domain.usecase.ExportLibraryUseCase
 import com.inktone.domain.usecase.GetReadingStateUseCase
 import com.inktone.domain.usecase.GetVoiceProfilesUseCase
 import com.inktone.domain.usecase.ImportPublicationUseCase
+import com.inktone.domain.usecase.SearchPublicationUseCase
 import com.inktone.domain.usecase.ToggleFavoriteUseCase
 import com.inktone.domain.usecase.UpdateReadingStateUseCase
 import dagger.Module
@@ -25,7 +32,9 @@ import dagger.hilt.components.SingletonComponent
  * GetVoiceProfilesUseCase pour le selecteur de voix de PlayerScreen ;
  * Tache 6.2 : ImportPublicationUseCase, consomme par ImportWorker ;
  * Tache 6.7 : ExportLibraryUseCase ; Tache 6.6 : ToggleFavoriteUseCase,
- * consomme par LibraryViewModel),
+ * consomme par LibraryViewModel ; Tache 7.1 : AddAnnotationUseCase ;
+ * Tache 7.2 : CreateBookmarkUseCase/DeleteBookmarkUseCase, consommes par
+ * ReaderViewModel),
  * pas par anticipation.
  */
 @Module
@@ -51,8 +60,9 @@ object UseCaseModule {
         publicationParser: PublicationParser,
         publicationRepository: PublicationRepository,
         fileStorageService: FileStorageService,
+        searchService: SearchService,
     ): ImportPublicationUseCase =
-        ImportPublicationUseCase(publicationParser, publicationRepository, fileStorageService)
+        ImportPublicationUseCase(publicationParser, publicationRepository, fileStorageService, searchService)
 
     @Provides
     fun provideExportLibraryUseCase(
@@ -64,4 +74,24 @@ object UseCaseModule {
     fun provideToggleFavoriteUseCase(
         publicationRepository: PublicationRepository,
     ): ToggleFavoriteUseCase = ToggleFavoriteUseCase(publicationRepository)
+
+    @Provides
+    fun provideAddAnnotationUseCase(
+        annotationRepository: AnnotationRepository,
+    ): AddAnnotationUseCase = AddAnnotationUseCase(annotationRepository)
+
+    @Provides
+    fun provideCreateBookmarkUseCase(
+        bookmarkRepository: BookmarkRepository,
+    ): CreateBookmarkUseCase = CreateBookmarkUseCase(bookmarkRepository)
+
+    @Provides
+    fun provideDeleteBookmarkUseCase(
+        bookmarkRepository: BookmarkRepository,
+    ): DeleteBookmarkUseCase = DeleteBookmarkUseCase(bookmarkRepository)
+
+    @Provides
+    fun provideSearchPublicationUseCase(
+        searchService: SearchService,
+    ): SearchPublicationUseCase = SearchPublicationUseCase(searchService)
 }
