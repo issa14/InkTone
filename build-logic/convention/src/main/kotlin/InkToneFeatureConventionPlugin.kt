@@ -47,6 +47,12 @@ class InkToneFeatureConventionPlugin : Plugin<Project> {
                 add("testImplementation", project(":core:testing"))
                 add("testImplementation", "junit:junit:4.13.2")
                 add("androidTestImplementation", "androidx.test:runner:1.6.2")
+
+                // Tache 9.1 : audit d'accessibilite systematique - tests
+                // Compose reels (pas une checklist remplie de memoire) sur
+                // les composables sans-etat de chaque ecran.
+                add("androidTestImplementation", "androidx.compose.ui:ui-test-junit4")
+                add("debugImplementation", "androidx.compose.ui:ui-test-manifest")
             }
         }
     }
