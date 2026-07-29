@@ -12,6 +12,8 @@ class FakeBookmarkRepository : BookmarkRepository {
     override fun observeForPublication(publicationId: String): Flow<List<Bookmark>> =
         state.map { list -> list.filter { it.publicationId == publicationId } }
 
+    override fun observeAll(): Flow<List<Bookmark>> = state
+
     override suspend fun insert(bookmark: Bookmark) {
         state.value = state.value + bookmark
     }

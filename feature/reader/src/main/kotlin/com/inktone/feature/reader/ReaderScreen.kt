@@ -31,6 +31,8 @@ import androidx.compose.ui.unit.sp
 import androidx.hilt.navigation.compose.hiltViewModel
 import com.inktone.domain.model.Annotation
 import com.inktone.domain.model.AnnotationColor
+import com.inktone.domain.model.ReadingOverrides
+import com.inktone.domain.model.ReadingTheme
 import com.inktone.domain.model.Sentence
 
 /**
@@ -155,6 +157,30 @@ fun ReaderScreen(viewModel: ReaderViewModel = hiltViewModel()) {
                 Text("Signets (${state.bookmarks.size})")
             }
         }
+
+        ChapterOverrideMenu(
+            currentOverrides = state.currentOverrides,
+            onSetOverride = { viewModel.onIntent(ReaderIntent.SetOverrides(it)) },
+        )
+    }
+}
+
+/**
+ * Tâche 8.2 — bascule "utiliser les réglages de ce livre" : écrit
+ * `ReadingState.overrides` via `ReaderIntent.SetOverrides`
+ * (`UpdateReadingStateUseCase`, Tâche 1.8, déjà complet). Aucune UI ne
+ * permettait jusqu'ici de CRÉER une surcharge par publication — Tâche
+ * 4.7 ne fait qu'appliquer `EffectiveReadingSettings` au rendu.
+ */
+@Composable
+private fun ChapterOverrideMenu(currentOverrides: ReadingOverrides?, onSetOverride: (ReadingOverrides?) -> Unit) {
+    val hasOverride = currentOverrides != null
+    Button(
+        onClick = {
+            onSetOverride(if (hasOverride) null else ReadingOverrides(theme = ReadingTheme.DARK))
+        },
+    ) {
+        Text(if (hasOverride) "Reglages de ce livre : actifs" else "Utiliser les reglages de ce livre")
     }
 }
 

@@ -15,6 +15,9 @@ interface ReadingStateDao {
     @Query("SELECT * FROM reading_states WHERE publicationId = :publicationId")
     fun observe(publicationId: String): Flow<ReadingStateEntity?>
 
+    @Query("SELECT * FROM reading_states")
+    suspend fun getAll(): List<ReadingStateEntity>
+
     @Insert(onConflict = OnConflictStrategy.REPLACE)
     suspend fun save(entity: ReadingStateEntity)
 

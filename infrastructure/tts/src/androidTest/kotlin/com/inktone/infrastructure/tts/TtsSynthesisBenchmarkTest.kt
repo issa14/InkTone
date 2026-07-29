@@ -10,6 +10,8 @@ import com.inktone.domain.model.VoiceProfile
 import kotlinx.coroutines.runBlocking
 import org.junit.Assert.assertTrue
 import org.junit.Assume.assumeTrue
+import com.inktone.core.testing.fake.FakePronunciationRuleRepository
+import com.inktone.domain.service.PronunciationRuleApplier
 import org.junit.Test
 import org.junit.runner.RunWith
 import java.io.File
@@ -46,7 +48,7 @@ class TtsSynthesisBenchmarkTest {
 
     @Test
     fun latence_synthese_palier1_android_natif_dans_l_ordre_de_grandeur_documente(): Unit = runBlocking {
-        val engine = AndroidNativeTtsEngine(context)
+        val engine = AndroidNativeTtsEngine(context, PronunciationRuleApplier(FakePronunciationRuleRepository()))
         val voiceProfile = VoiceProfile(id = "vp-native-fr", engine = TtsEngineId.ANDROID_NATIVE, voice = "fr-fr-default", language = "fr-FR")
 
         engine.synthesize(sentence, voiceProfile) // echauffement, ecarte du chiffre retenu
@@ -86,7 +88,7 @@ class TtsSynthesisBenchmarkTest {
             "Modele d'alignement CTC absent - placer manuellement avant ce benchmark (Tache 5.6 le remplacera)",
             ctcModelPaths.isReady,
         )
-        val engine = SherpaOnnxTtsEngine(modelPaths, CtcForcedAligner(ctcModelPaths))
+        val engine = SherpaOnnxTtsEngine(modelPaths, CtcForcedAligner(ctcModelPaths), PronunciationRuleApplier(FakePronunciationRuleRepository()))
         val voiceProfile = VoiceProfile(id = "vp-sherpa-fr", engine = TtsEngineId.SHERPA_ONNX, voice = "ff_siwis", language = "fr-FR")
 
         val warm = engine.synthesize(sentence, voiceProfile) // echauffement (charge le modele), ecarte du chiffre retenu

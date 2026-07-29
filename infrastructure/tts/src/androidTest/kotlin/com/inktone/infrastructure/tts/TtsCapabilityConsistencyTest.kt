@@ -10,6 +10,8 @@ import com.inktone.domain.service.TtsEngine
 import kotlinx.coroutines.test.runTest
 import org.junit.Assert.assertTrue
 import org.junit.Assume.assumeTrue
+import com.inktone.core.testing.fake.FakePronunciationRuleRepository
+import com.inktone.domain.service.PronunciationRuleApplier
 import org.junit.Test
 import org.junit.runner.RunWith
 import java.io.File
@@ -45,7 +47,7 @@ class TtsCapabilityConsistencyTest {
 
     @Test
     fun palier1_android_natif_respecte_sa_capacite_wordTimestamps() {
-        val engine = AndroidNativeTtsEngine(context)
+        val engine = AndroidNativeTtsEngine(context, PronunciationRuleApplier(FakePronunciationRuleRepository()))
         val voiceProfile = VoiceProfile(id = "vp-native-fr", engine = TtsEngineId.ANDROID_NATIVE, voice = "fr-fr-default", language = "fr-FR")
         assertTrue("Palier 1 declare wordTimestamps=true (Tache 3.1)", engine.capabilities.wordTimestamps)
         assertCapabilityMatchesBehavior(engine, voiceProfile)
@@ -71,7 +73,7 @@ class TtsCapabilityConsistencyTest {
             "Modele d'alignement CTC absent - placer manuellement avant ce test (Tache 5.6 le remplacera)",
             ctcModelPaths.isReady,
         )
-        val engine = SherpaOnnxTtsEngine(modelPaths, CtcForcedAligner(ctcModelPaths))
+        val engine = SherpaOnnxTtsEngine(modelPaths, CtcForcedAligner(ctcModelPaths), PronunciationRuleApplier(FakePronunciationRuleRepository()))
         val voiceProfile = VoiceProfile(id = "vp-sherpa-fr", engine = TtsEngineId.SHERPA_ONNX, voice = "ff_siwis", language = "fr-FR")
         assertTrue(
             "Palier 2 declare wordTimestamps=true - Tache 5.2 (alignement CTC) branchee pour de vrai",
@@ -104,8 +106,8 @@ class TtsCapabilityConsistencyTest {
         if (!ctcModelPaths.isReady && stagedCtc.exists()) {
             stagedCtc.copyRecursively(ctcModelPaths.modelFile.parentFile!!, overwrite = true)
         }
-        val primary = SherpaOnnxTtsEngine(modelPaths, CtcForcedAligner(ctcModelPaths))
-        val fallback = AndroidNativeTtsEngine(context)
+        val primary = SherpaOnnxTtsEngine(modelPaths, CtcForcedAligner(ctcModelPaths), PronunciationRuleApplier(FakePronunciationRuleRepository()))
+        val fallback = AndroidNativeTtsEngine(context, PronunciationRuleApplier(FakePronunciationRuleRepository()))
         val engine = FallbackTtsEngine(primary, fallback)
         val voiceProfile = VoiceProfile(id = "vp-fallback-fr", engine = TtsEngineId.SHERPA_ONNX, voice = "ff_siwis", language = "fr-FR")
         assertCapabilityMatchesBehavior(engine, voiceProfile)

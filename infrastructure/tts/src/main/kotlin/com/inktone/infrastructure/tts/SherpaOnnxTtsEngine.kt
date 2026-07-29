@@ -5,8 +5,10 @@ import com.inktone.domain.model.TtsEngineId
 import com.inktone.domain.model.VoiceProfile
 import com.inktone.domain.service.AudioSegment
 import com.inktone.domain.service.PlaybackEvent
+import com.inktone.domain.service.PronunciationRuleApplier
 import com.inktone.domain.service.TtsCapabilities
 import com.inktone.domain.service.TtsEngine
+import com.inktone.domain.service.remapToOriginal
 import com.k2fsa.sherpa.onnx.OfflineTts
 import com.k2fsa.sherpa.onnx.OfflineTtsConfig
 import com.k2fsa.sherpa.onnx.OfflineTtsKokoroModelConfig
@@ -67,6 +69,7 @@ import kotlin.math.roundToInt
 class SherpaOnnxTtsEngine @Inject constructor(
     private val modelPaths: SherpaOnnxModelPaths,
     private val ctcForcedAligner: CtcForcedAligner,
+    private val pronunciationRuleApplier: PronunciationRuleApplier,
 ) : TtsEngine {
 
     override val id = TtsEngineId.SHERPA_ONNX
@@ -130,20 +133,30 @@ class SherpaOnnxTtsEngine @Inject constructor(
 
     override suspend fun synthesize(sentence: Sentence, voiceProfile: VoiceProfile): AudioSegment =
         withContext(Dispatchers.Default) {
+            // Applique AVANT la synthese (Tache 8.3), meme point d'integration
+            // que AndroidNativeTtsEngine — reste reversible sans reimport.
+            val appliedText = pronunciationRuleApplier.apply(sentence.text)
+
             // sid=30 : voix francaise "ff_siwis" de kokoro-int8-multi-lang-v1_0,
             // lue dans les metadonnees ONNX speaker2id du modele (pas devinee) -
             // voir KDoc de la classe.
-            val generated = tts.generate(text = sentence.text, sid = FF_SIWIS_SPEAKER_ID, speed = voiceProfile.speed)
+            val generated = tts.generate(
+                text = appliedText.substitutedText,
+                sid = FF_SIWIS_SPEAKER_ID,
+                speed = voiceProfile.speed,
+            )
 
             // Alignement force CTC sur l'audio REELLEMENT produit (pas un
             // fichier de test) - resampling 24kHz (Kokoro) -> 16kHz (modele
             // CTC) fait a l'interieur de CtcForcedAligner.align(), a partir
-            // du sampleRate reel rapporte par Kokoro, jamais suppose.
+            // du sampleRate reel rapporte par Kokoro, jamais suppose. Les
+            // WordTimestamp sont ensuite remappes sur sentence.text (texte
+            // affiche), jamais sur le texte substitue envoye au moteur.
             val wordTimestamps = ctcForcedAligner.align(
                 audioSamples = generated.samples,
                 sampleRate = generated.sampleRate,
-                referenceText = sentence.text,
-            )
+                referenceText = appliedText.substitutedText,
+            ).map { it.remapToOriginal(appliedText) }
 
             AudioSegment(
                 audioData = floatSamplesToPcm16(generated.samples),

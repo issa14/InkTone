@@ -1,5 +1,6 @@
 plugins {
     id("inktone.android.library")
+    alias(libs.plugins.kotlin.serialization)
 }
 
 android {
@@ -13,4 +14,6 @@ dependencies {
     implementation(project(":infrastructure:tts"))
     implementation(project(":infrastructure:media"))
     implementation(project(":infrastructure:worker"))
+    implementation(libs.kotlinx.serialization.json)
+    testImplementation(libs.kotlinx.coroutines.test)
 }
