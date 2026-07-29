@@ -3,6 +3,7 @@ package com.inktone.domain.usecase
 import com.inktone.core.testing.fake.FakeFileStorageService
 import com.inktone.core.testing.fake.FakePublicationParser
 import com.inktone.core.testing.fake.FakePublicationRepository
+import com.inktone.core.testing.fake.FakeSearchService
 import kotlinx.coroutines.async
 import kotlinx.coroutines.awaitAll
 import kotlinx.coroutines.flow.first
@@ -19,6 +20,7 @@ class ImportPublicationUseCaseTest {
             publicationParser = FakePublicationParser(),
             publicationRepository = publicationRepository,
             fileStorageService = FakeFileStorageService(),
+            searchService = FakeSearchService(),
         )
         val fixtureUri = "content://fake/fixture-minimal.epub"
 
@@ -46,6 +48,7 @@ class ImportPublicationUseCaseTest {
             publicationParser = FakePublicationParser(delayMs = 10),
             publicationRepository = publicationRepository,
             fileStorageService = FakeFileStorageService(),
+            searchService = FakeSearchService(),
         )
         val fixtureUri = "content://fake/fixture-minimal.epub"
 

@@ -7,6 +7,7 @@ import com.inktone.domain.repository.ReadingStateRepository
 import com.inktone.domain.repository.VoiceProfileRepository
 import com.inktone.domain.service.FileStorageService
 import com.inktone.domain.service.PublicationParser
+import com.inktone.domain.service.SearchService
 import com.inktone.domain.usecase.AddAnnotationUseCase
 import com.inktone.domain.usecase.CreateBookmarkUseCase
 import com.inktone.domain.usecase.DeleteBookmarkUseCase
@@ -14,6 +15,7 @@ import com.inktone.domain.usecase.ExportLibraryUseCase
 import com.inktone.domain.usecase.GetReadingStateUseCase
 import com.inktone.domain.usecase.GetVoiceProfilesUseCase
 import com.inktone.domain.usecase.ImportPublicationUseCase
+import com.inktone.domain.usecase.SearchPublicationUseCase
 import com.inktone.domain.usecase.ToggleFavoriteUseCase
 import com.inktone.domain.usecase.UpdateReadingStateUseCase
 import dagger.Module
@@ -58,8 +60,9 @@ object UseCaseModule {
         publicationParser: PublicationParser,
         publicationRepository: PublicationRepository,
         fileStorageService: FileStorageService,
+        searchService: SearchService,
     ): ImportPublicationUseCase =
-        ImportPublicationUseCase(publicationParser, publicationRepository, fileStorageService)
+        ImportPublicationUseCase(publicationParser, publicationRepository, fileStorageService, searchService)
 
     @Provides
     fun provideExportLibraryUseCase(
@@ -86,4 +89,9 @@ object UseCaseModule {
     fun provideDeleteBookmarkUseCase(
         bookmarkRepository: BookmarkRepository,
     ): DeleteBookmarkUseCase = DeleteBookmarkUseCase(bookmarkRepository)
+
+    @Provides
+    fun provideSearchPublicationUseCase(
+        searchService: SearchService,
+    ): SearchPublicationUseCase = SearchPublicationUseCase(searchService)
 }
