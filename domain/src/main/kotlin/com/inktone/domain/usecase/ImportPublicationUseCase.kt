@@ -7,6 +7,7 @@ import com.inktone.domain.service.FileStorageService
 import com.inktone.domain.service.ParseResult
 import com.inktone.domain.service.PublicationMetadata
 import com.inktone.domain.service.PublicationParser
+import com.inktone.domain.service.SearchService
 import kotlinx.coroutines.sync.Mutex
 import kotlinx.coroutines.sync.withLock
 import java.util.UUID
@@ -28,6 +29,7 @@ class ImportPublicationUseCase(
     private val publicationParser: PublicationParser,
     private val publicationRepository: PublicationRepository,
     private val fileStorageService: FileStorageService,
+    private val searchService: SearchService,
 ) {
     // Protege la section verification+insertion (Tache 6.3, K2) : plusieurs
     // invocations concurrentes de la meme instance (ImportWorker parallelise,
@@ -58,6 +60,10 @@ class ImportPublicationUseCase(
             is ParseResult.UnsupportedFormat -> return ImportResult.UnsupportedFormat(parseResult.format)
             is ParseResult.Success -> buildPublication(parseResult, fileUri, hash)
         }
+        // Sur par construction : toute branche non-Success du when ci-dessus
+        // est retournee immediatement, donc parseResult est forcement
+        // ParseResult.Success ici.
+        val documentModel = (parseResult as ParseResult.Success).documentModel
 
         // 3. Reverification + insertion atomiques sous verrou - seule
         // section vraiment critique. Persistance de la permission SAF
@@ -70,6 +76,14 @@ class ImportPublicationUseCase(
             }
             fileStorageService.persistReadPermission(fileUri)
             publicationRepository.insert(publication)
+            // Peuplement de l'index a l'import (Tache 7.3.2, decision
+            // actee) : le DocumentModel est deja extrait par le parsing
+            // ci-dessus, pas de second passage. Si l'app est tuee entre
+            // l'insertion et l'indexation, la publication devient
+            // durablement non trouvable par recherche jusqu'a reimport -
+            // limite connue, non traitee ici (pas une perte de donnees,
+            // juste une fonctionnalite degradee).
+            searchService.indexPublication(publication.id, documentModel)
             ImportResult.Success(publication)
         }
     }

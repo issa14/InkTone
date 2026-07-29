@@ -38,6 +38,14 @@ class ReadingResumeTest {
     fun la_position_sauvegardee_est_restauree_a_l_identique() = runTest {
         hiltRule.inject()
 
+        // Base Room reelle (pas in-memory, voir plus bas) partagee entre
+        // executions de ce test - PublicationDao.insert() n'est plus
+        // OnConflictStrategy.REPLACE (Tache 7.1bis, corrige un DELETE
+        // silencieux en cascade) : sans ce delete prealable, relancer ce
+        // test sur un device deja utilise leverait une exception de
+        // conflit d'id plutot que de rejouer proprement.
+        publicationRepository.delete("walking-skeleton-fixture")
+
         // ReadingStateEntity porte une contrainte de cle etrangere vers
         // PublicationEntity (Phase 2, ON DELETE CASCADE) : sauver un
         // ReadingState sans publication existante viole cette contrainte

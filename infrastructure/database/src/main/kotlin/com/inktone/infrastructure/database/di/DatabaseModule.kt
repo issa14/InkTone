@@ -4,6 +4,7 @@ import android.content.Context
 import androidx.room.Room
 import androidx.room.RoomDatabase
 import com.inktone.infrastructure.database.InkToneDatabase
+import com.inktone.infrastructure.database.MIGRATION_1_2
 import dagger.Module
 import dagger.Provides
 import dagger.hilt.InstallIn
@@ -22,6 +23,7 @@ object DatabaseModule {
             .setJournalMode(RoomDatabase.JournalMode.WRITE_AHEAD_LOGGING) // K1 — Blueprint §6.5, ADR-016
             // PAS de fallbackToDestructiveMigration ici (K4) : toute migration
             // manquante doit faire planter l'app, jamais effacer les données.
+            .addMigrations(MIGRATION_1_2) // Tache 7.3.1
             .build()
 
     @Provides fun providePublicationDao(db: InkToneDatabase) = db.publicationDao()
@@ -31,4 +33,5 @@ object DatabaseModule {
     @Provides fun provideAnnotationDao(db: InkToneDatabase) = db.annotationDao()
     @Provides fun provideVoiceProfileDao(db: InkToneDatabase) = db.voiceProfileDao()
     @Provides fun provideUserPreferencesDao(db: InkToneDatabase) = db.userPreferencesDao()
+    @Provides fun provideSentenceFtsDao(db: InkToneDatabase) = db.sentenceFtsDao()
 }
