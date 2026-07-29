@@ -17,6 +17,7 @@ import androidx.compose.foundation.lazy.items as rowItems
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.FilterChip
 import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
@@ -33,17 +34,24 @@ import com.inktone.domain.model.Publication
 /**
  * Écran bibliothèque (Tâche 6.6) — grille virtualisée, performante à
  * 1000+ livres par construction (`LazyVerticalGrid` ne compose que les
- * éléments visibles). Pas encore de sélecteur de filtre (dépend de la
- * Tâche 6.5) ni de couverture chargée (Coil absent du projet à ce
- * stade — un aplat de couleur portant le titre en attendant).
+ * éléments visibles). Pas de couverture chargée (Coil absent du projet à
+ * ce stade — un aplat de couleur portant le titre en attendant).
  *
  * `onNavigateToReader` : câblé par l'appelant (pas encore `MainActivity`,
  * qui n'a aucun graphe de navigation — voir `LibraryEffect`).
+ *
+ * `floatingActionButton` (Tâche 6.2bis) : point d'intégration du
+ * déclencheur d'import (`feature/import`, `ImportPickerButton`) — un
+ * slot plutôt qu'une dépendance directe, `feature/library` n'ayant pas le
+ * droit de dépendre d'un autre module `feature` (Blueprint §12.4,
+ * `checkArchitectureRules`). L'appelant (`app`, qui dépend des deux
+ * `feature`) fournit `{ ImportPickerButton() }`.
  */
 @Composable
 fun LibraryScreen(
     onNavigateToReader: (String) -> Unit,
     viewModel: LibraryViewModel = hiltViewModel(),
+    floatingActionButton: @Composable () -> Unit = {},
 ) {
     val state by viewModel.state.collectAsState()
 
@@ -55,30 +63,32 @@ fun LibraryScreen(
         }
     }
 
-    Column(Modifier.fillMaxSize()) {
-        FilterRow(
-            active = state.activeFilter,
-            onSelect = { viewModel.onIntent(LibraryIntent.ChangeFilter(it)) },
-        )
+    Scaffold(floatingActionButton = floatingActionButton) { innerPadding ->
+        Column(Modifier.fillMaxSize().padding(innerPadding)) {
+            FilterRow(
+                active = state.activeFilter,
+                onSelect = { viewModel.onIntent(LibraryIntent.ChangeFilter(it)) },
+            )
 
-        when {
-            state.isLoading -> Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
-                CircularProgressIndicator()
-            }
-            state.publications.isEmpty() -> Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
-                Text("Bibliothèque vide — importez un EPUB pour commencer.")
-            }
-            else -> LazyVerticalGrid(
-                columns = GridCells.Adaptive(minSize = 120.dp),
-                contentPadding = PaddingValues(8.dp),
-            ) {
-                // Clé stable = id, jamais l'index — même leçon que la TOC
-                // (Tâche 4.11, crash LazyColumn à clé non unique).
-                gridItems(state.publications, key = { it.id }) { publication ->
-                    PublicationCard(
-                        publication = publication,
-                        onClick = { viewModel.onIntent(LibraryIntent.OpenPublication(publication.id)) },
-                    )
+            when {
+                state.isLoading -> Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
+                    CircularProgressIndicator()
+                }
+                state.publications.isEmpty() -> Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
+                    Text("Bibliothèque vide — importez un EPUB pour commencer.")
+                }
+                else -> LazyVerticalGrid(
+                    columns = GridCells.Adaptive(minSize = 120.dp),
+                    contentPadding = PaddingValues(8.dp),
+                ) {
+                    // Clé stable = id, jamais l'index — même leçon que la TOC
+                    // (Tâche 4.11, crash LazyColumn à clé non unique).
+                    gridItems(state.publications, key = { it.id }) { publication ->
+                        PublicationCard(
+                            publication = publication,
+                            onClick = { viewModel.onIntent(LibraryIntent.OpenPublication(publication.id)) },
+                        )
+                    }
                 }
             }
         }

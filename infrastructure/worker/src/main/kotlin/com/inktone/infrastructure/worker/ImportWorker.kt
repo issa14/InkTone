@@ -20,15 +20,14 @@ import dagger.assisted.AssistedInject
  * une étape séparée, après confirmation que WAL (déjà actif depuis la
  * Phase 2) absorbe la charge concurrente.
  *
- * **Limite non résolue par ce Worker, à la charge de l'appelant** :
- * `WorkManager` sérialise `Data` sur ~10 Ko max. Un `StringArray` d'URI
- * SAF (`content://…`, ~100-150 caractères chacune) dépasse cette limite
- * autour de ~70-90 URI — bien en-dessous des 500 EPUB du budget §11.2.
- * Aucun code de cette Phase n'enqueue encore de `WorkRequest` (dépend de
- * l'écran d'import, Tâche 6.6/6.8) : au moment où ce code sera écrit, il
- * doit découper `uris` en plusieurs `WorkRequest` chaînées plutôt que de
- * construire un seul `Data` géant — ne pas supposer qu'un seul
- * `ImportWorker` suffit pour un import de bibliothèque complète.
+ * **Limite `Data` de WorkManager (~10 Ko), à la charge de l'appelant** :
+ * un seul `ImportWorker` ne suffit pas pour un import de bibliothèque
+ * complète — un `StringArray` d'URI SAF (`content://…`, ~100-150
+ * caractères chacune) dépasse ~10 Ko autour de ~70-90 URI, bien en-dessous
+ * des 500 EPUB du budget §11.2. [WorkManagerImportScheduler] (Tâche
+ * 6.2bis) découpe en plusieurs `WorkRequest` chaînées plutôt que de
+ * construire un seul `Data` géant — ne jamais enqueue un `ImportWorker`
+ * directement avec une liste non bornée, passer par ce scheduler.
  */
 @HiltWorker
 class ImportWorker @AssistedInject constructor(
