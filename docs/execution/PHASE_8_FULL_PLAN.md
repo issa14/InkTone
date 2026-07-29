@@ -425,7 +425,7 @@ fun OnboardingScreen(viewModel: OnboardingViewModel = hiltViewModel()) {
 
 | # | Critère | Vérification |
 |---|---|---|
-| 1 | Extensions de contrat faites en une fois, migration 2→3 testée | Tâche 8.0 |
+| 1 | Extensions de contrat faites en une fois, migration 2→3 testée | Tâche 8.0 — **exécuté réellement** sur device V2206, voir note ci-dessous |
 | 2 | Réglages persistés, vérifiés de bout en bout | Tâche 8.1 |
 | 3 | Cascade de précédence vérifiée avec une vraie UI de surcharge (créée ici, pas supposée exister) | Tâche 8.2 |
 | 4 | Règles de prononciation appliquées aux deux paliers TTS, alignement surlignage testé explicitement | Tâche 8.3 |
@@ -436,3 +436,26 @@ fun OnboardingScreen(viewModel: OnboardingViewModel = hiltViewModel()) {
 | 9 | Les 3 chemins d'onboarding testés | Tâche 8.8 |
 
 Une fois les 9 critères vérifiés, Phase 8 est close. Étape suivante : **Phase 9 — Durcissement transverse** (accessibilité, sécurité, benchmarks complets — y compris la note `WindowSizeClass` laissée en suspens par l'audit UX legacy).
+
+### Exécution réelle de `DatabaseMigrationTest` (device V2206) — 2026-07-29
+
+`./gradlew :infrastructure:database:connectedAndroidTest -Pandroid.testInstrumentationRunnerArguments.class=com.inktone.infrastructure.database.DatabaseMigrationTest`
+exécuté sur le device physique utilisé tout au long du projet (V2206,
+Android 14, transport `usb:1-6`) — pas une compilation seule, ni un
+appareil virtuel.
+
+**`DatabaseMigrationTest` ne contient que 4 méthodes `@Test`**, pas 5 —
+vérifié en comptant les annotations dans le fichier avant l'exécution.
+Rapport XML généré (`TEST-V2206 - 14-_infrastructure_database-.xml`) :
+`tests="4" failures="0" errors="0" skipped="0"`.
+
+| # | Test | Résultat | Durée |
+|---|---|---|---|
+| 1 | `le_schema_v1_exporte_se_cree_et_s_ouvre_sans_erreur` | ✅ vert | 0.015 s |
+| 2 | `migration_1_vers_2_conserve_les_donnees_et_ajoute_sentence_fts` | ✅ vert | 0.081 s |
+| 3 | `migration_2_vers_3_conserve_les_donnees_et_ajoute_fontFamily_reduceMotion` | ✅ vert | 0.220 s |
+| 4 | `migration_3_vers_4_cree_la_table_pronunciation_rules_utilisable` | ✅ vert | 0.158 s |
+
+**4/4 verts, aucun échec.** Les migrations 2→3 et 3→4 ajoutées en Phase 8
+sont donc confirmées fonctionnelles sur le device réel, pas seulement
+compilables — aucune correction de migration n'a été nécessaire.
