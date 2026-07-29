@@ -1,5 +1,6 @@
 package com.inktone.domain.service
 
+import java.io.File
 import java.io.InputStream
 
 /**
@@ -14,4 +15,13 @@ interface FileStorageService {
     suspend fun computeSha256(uri: String): String?
     suspend fun getFileSize(uri: String): Long?
     suspend fun persistReadPermission(uri: String)
+
+    /**
+     * Écrit [sourceFile] vers la destination SAF [uri] (Tâche 6.0 —
+     * absent depuis la Phase 2 car rien n'écrivait de fichier utilisateur
+     * jusqu'à l'export de la Phase 6). Retourne `false` sur tout échec
+     * (permission refusée, URI invalide) plutôt que de lever une
+     * exception (Blueprint §7.11).
+     */
+    suspend fun writeToUri(uri: String, sourceFile: File): Boolean
 }

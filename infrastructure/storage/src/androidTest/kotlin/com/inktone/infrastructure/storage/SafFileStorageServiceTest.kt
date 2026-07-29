@@ -55,4 +55,17 @@ class SafFileStorageServiceTest {
         assertEquals(5L, service.getFileSize(Uri.fromFile(file).toString()))
         file.delete()
     }
+
+    @Test
+    fun ecrit_puis_relit_le_meme_contenu() = runTest {
+        val source = tempFile("contenu a exporter")
+        val destination = File(context.cacheDir, "export-${System.nanoTime()}.txt")
+
+        val success = service.writeToUri(Uri.fromFile(destination).toString(), source)
+
+        assertEquals(true, success)
+        assertEquals("contenu a exporter", destination.readText())
+        source.delete()
+        destination.delete()
+    }
 }

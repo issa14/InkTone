@@ -2,6 +2,7 @@ package com.inktone.data.repository
 
 import com.inktone.data.mapper.toDomain
 import com.inktone.data.mapper.toEntity
+import com.inktone.domain.model.FilterMode
 import com.inktone.domain.model.Publication
 import com.inktone.domain.repository.PublicationRepository
 import com.inktone.infrastructure.database.dao.PublicationDao
@@ -14,6 +15,17 @@ class RoomPublicationRepository @Inject constructor(
 ) : PublicationRepository {
     override fun observeAll(): Flow<List<Publication>> =
         dao.observeAll().map { list -> list.map { it.toDomain() } }
+
+    override fun observeFiltered(mode: FilterMode, value: String?): Flow<List<Publication>> = when (mode) {
+        FilterMode.ALL -> observeAll()
+        // TAG/BY_AUTHOR : listes serialisees en colonne (StringListConverter,
+        // separateur non imprimable) - pas fiables a matcher en SQL brut. Une
+        // seule requete (observeAll) filtree cote Kotlin, pas de N+1 (K8).
+        FilterMode.TAG -> dao.observeAll().map { list -> list.filter { value in it.subjects }.map { it.toDomain() } }
+        FilterMode.BY_AUTHOR -> dao.observeAll().map { list -> list.filter { value in it.authors }.map { it.toDomain() } }
+        else -> dao.observeFiltered(mode.name, value).map { list -> list.map { it.toDomain() } }
+    }
+
     override suspend fun getById(id: String): Publication? = dao.getById(id)?.toDomain()
     override suspend fun getByFileHash(hash: String): Publication? = dao.getByFileHash(hash)?.toDomain()
     override suspend fun insert(publication: Publication) = dao.insert(publication.toEntity())

@@ -36,6 +36,23 @@
             </intent-filter>
         </service>
 
+        <!-- Tache 6.2 : desactive l'initialisation par defaut de WorkManager
+             (androidx-startup) — InkToneApplication (Configuration.Provider)
+             la remplace par une initialisation a la demande avec
+             HiltWorkerFactory, seule capable de construire ImportWorker
+             (@HiltWorker, dependances injectees). Sans ce retrait, les deux
+             initialisations entrent en conflit au demarrage. -->
+        <provider
+            android:name="androidx.startup.InitializationProvider"
+            android:authorities="${applicationId}.androidx-startup"
+            android:exported="false"
+            tools:node="merge">
+            <meta-data
+                android:name="androidx.work.WorkManagerInitializer"
+                android:value="androidx.startup"
+                tools:node="remove" />
+        </provider>
+
     </application>
 
 </manifest>
