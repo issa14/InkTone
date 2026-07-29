@@ -51,15 +51,18 @@ class LibraryViewModel @Inject constructor(
             is LibraryIntent.ToggleFavorite -> viewModelScope.launch {
                 toggleFavorite(intent.publicationId, intent.isFavorite)
             }
-            is LibraryIntent.ChangeFilter -> observePublications(intent.filter)
+            is LibraryIntent.ChangeFilter -> observePublications(intent.filter, intent.value)
+            is LibraryIntent.SetSearchQuery -> _state.value = _state.value.copy(searchQuery = intent.query)
+            is LibraryIntent.SetSortOrder -> _state.value = _state.value.copy(sortOrder = intent.order)
+            is LibraryIntent.ToggleLayout -> _state.value = _state.value.copy(isGridLayout = !_state.value.isGridLayout)
         }
     }
 
-    private fun observePublications(filter: FilterMode) {
+    private fun observePublications(filter: FilterMode, value: String? = null) {
         observeJob?.cancel()
-        _state.value = _state.value.copy(isLoading = true, activeFilter = filter)
+        _state.value = _state.value.copy(isLoading = true, activeFilter = filter, filterValue = value)
         observeJob = viewModelScope.launch {
-            publicationRepository.observeFiltered(filter).collect { publications ->
+            publicationRepository.observeFiltered(filter, value).collect { publications ->
                 _state.value = _state.value.copy(publications = publications, isLoading = false)
             }
         }
