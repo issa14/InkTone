@@ -1,8 +1,10 @@
 package com.inktone.feature.library
 
+import com.inktone.core.testing.fake.FakeImportProgressObserver
 import com.inktone.core.testing.fake.FakePublicationRepository
 import com.inktone.domain.model.Publication
 import com.inktone.domain.model.PublicationFormat
+import com.inktone.domain.service.ImportProgress
 import com.inktone.domain.usecase.ToggleFavoriteUseCase
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.ExperimentalCoroutinesApi
@@ -38,7 +40,7 @@ class LibraryViewModelTest {
     fun `expose les publications observees par le repository`() = runTest {
         val repository = FakePublicationRepository()
         repository.insert(publication("pub-1"))
-        val viewModel = LibraryViewModel(repository, ToggleFavoriteUseCase(repository))
+        val viewModel = LibraryViewModel(repository, ToggleFavoriteUseCase(repository), FakeImportProgressObserver())
 
         dispatcher.scheduler.advanceUntilIdle()
 
@@ -50,7 +52,7 @@ class LibraryViewModelTest {
     fun `ouvrir une publication emet un effet de navigation`() = runTest {
         val repository = FakePublicationRepository()
         repository.insert(publication("pub-1"))
-        val viewModel = LibraryViewModel(repository, ToggleFavoriteUseCase(repository))
+        val viewModel = LibraryViewModel(repository, ToggleFavoriteUseCase(repository), FakeImportProgressObserver())
         dispatcher.scheduler.advanceUntilIdle()
 
         var effect: LibraryEffect? = null
@@ -62,5 +64,18 @@ class LibraryViewModelTest {
         job.cancel()
         assertTrue(effect is LibraryEffect.NavigateToReader)
         assertEquals("pub-1", (effect as LibraryEffect.NavigateToReader).publicationId)
+    }
+
+    @Test
+    fun `reflete la progression d'import observee`() = runTest {
+        val importProgressObserver = FakeImportProgressObserver()
+        val viewModel = LibraryViewModel(FakePublicationRepository(), ToggleFavoriteUseCase(FakePublicationRepository()), importProgressObserver)
+        dispatcher.scheduler.advanceUntilIdle()
+        assertEquals(ImportProgress(), viewModel.state.value.importProgress)
+
+        importProgressObserver.emit(ImportProgress(current = 3, total = 10, hasQueuedChunks = true))
+        dispatcher.scheduler.advanceUntilIdle()
+
+        assertEquals(ImportProgress(current = 3, total = 10, hasQueuedChunks = true), viewModel.state.value.importProgress)
     }
 }

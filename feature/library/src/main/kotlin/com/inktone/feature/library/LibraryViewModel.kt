@@ -4,6 +4,7 @@ import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.inktone.domain.model.FilterMode
 import com.inktone.domain.repository.PublicationRepository
+import com.inktone.domain.service.ImportProgressObserver
 import com.inktone.domain.usecase.ToggleFavoriteUseCase
 import dagger.hilt.android.lifecycle.HiltViewModel
 import kotlinx.coroutines.Job
@@ -19,6 +20,7 @@ import javax.inject.Inject
 class LibraryViewModel @Inject constructor(
     private val publicationRepository: PublicationRepository,
     private val toggleFavorite: ToggleFavoriteUseCase,
+    private val importProgressObserver: ImportProgressObserver,
 ) : ViewModel() {
 
     private val _state = MutableStateFlow(LibraryUiState())
@@ -31,6 +33,14 @@ class LibraryViewModel @Inject constructor(
 
     init {
         observePublications(FilterMode.ALL)
+        // Job independant de observeJob (Tache 6.8) - un changement de
+        // filtre ne doit jamais interrompre l'observation de la
+        // progression d'import, les deux sont sans rapport.
+        viewModelScope.launch {
+            importProgressObserver.observe().collect { progress ->
+                _state.value = _state.value.copy(importProgress = progress)
+            }
+        }
     }
 
     fun onIntent(intent: LibraryIntent) {

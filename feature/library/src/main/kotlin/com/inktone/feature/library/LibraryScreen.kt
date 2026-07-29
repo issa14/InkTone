@@ -8,6 +8,7 @@ import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.aspectRatio
 import androidx.compose.foundation.layout.fillMaxSize
+import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.lazy.LazyRow
 import androidx.compose.foundation.lazy.grid.GridCells
@@ -16,6 +17,7 @@ import androidx.compose.foundation.lazy.grid.items as gridItems
 import androidx.compose.foundation.lazy.items as rowItems
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.FilterChip
+import androidx.compose.material3.LinearProgressIndicator
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Text
@@ -30,6 +32,7 @@ import androidx.compose.ui.unit.dp
 import androidx.hilt.navigation.compose.hiltViewModel
 import com.inktone.domain.model.FilterMode
 import com.inktone.domain.model.Publication
+import com.inktone.domain.service.ImportProgress
 
 /**
  * Écran bibliothèque (Tâche 6.6) — grille virtualisée, performante à
@@ -46,6 +49,12 @@ import com.inktone.domain.model.Publication
  * droit de dépendre d'un autre module `feature` (Blueprint §12.4,
  * `checkArchitectureRules`). L'appelant (`app`, qui dépend des deux
  * `feature`) fournit `{ ImportPickerButton() }`.
+ *
+ * Bannière de progression d'import (Tâche 6.8) : observe
+ * `ImportProgressObserver` (domain, implémenté par
+ * `WorkManagerImportProgressObserver`) via `LibraryViewModel` — invisible
+ * par défaut (aucune valeur affichée pour `ImportProgress()`), jamais
+ * besoin d'un état de chargement séparé pour l'UI.
  */
 @Composable
 fun LibraryScreen(
@@ -65,6 +74,7 @@ fun LibraryScreen(
 
     Scaffold(floatingActionButton = floatingActionButton) { innerPadding ->
         Column(Modifier.fillMaxSize().padding(innerPadding)) {
+            ImportProgressBanner(state.importProgress)
             FilterRow(
                 active = state.activeFilter,
                 onSelect = { viewModel.onIntent(LibraryIntent.ChangeFilter(it)) },
@@ -107,6 +117,32 @@ private fun FilterMode.label() = when (this) {
     FilterMode.IN_PROGRESS -> "En cours"
     FilterMode.READ -> "Terminés"
     FilterMode.SERIES, FilterMode.TAG, FilterMode.BY_AUTHOR -> name
+}
+
+/**
+ * Cachée par défaut (`total == 0 && !hasQueuedChunks`, l'état initial de
+ * [ImportProgress]). Progression déterminée pour le lot en cours ;
+ * indéterminée (`LinearProgressIndicator` sans valeur) quand d'autres
+ * lots suivent mais qu'aucun n'est encore `RUNNING` — limitation
+ * documentée sur [ImportProgress] (WorkManager n'expose pas la taille
+ * d'un lot pas encore démarré).
+ */
+@Composable
+private fun ImportProgressBanner(progress: ImportProgress) {
+    if (progress.total == 0 && !progress.hasQueuedChunks) return
+
+    Column(Modifier.fillMaxWidth().padding(horizontal = 8.dp, vertical = 4.dp)) {
+        if (progress.total > 0) {
+            LinearProgressIndicator(
+                progress = { progress.current.toFloat() / progress.total },
+                modifier = Modifier.fillMaxWidth(),
+            )
+            Text("Import : ${progress.current} / ${progress.total}")
+        } else {
+            LinearProgressIndicator(modifier = Modifier.fillMaxWidth())
+            Text("Import en attente…")
+        }
+    }
 }
 
 @Composable
