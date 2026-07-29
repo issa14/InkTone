@@ -7,6 +7,19 @@ android {
         isCoreLibraryDesugaringEnabled = true
     }
 
+    // Tache 9.3 : trouve par la mesure reelle de la taille de l'AAB
+    // (196 Mo, tres au-dessus du budget Blueprint §11.2 <= 60 Mo) -
+    // libonnxruntime.so pese ~20-33 Mo PAR ABI et etait embarque pour
+    // les 4 ABI (x86_64/x86/arm64-v8a/armeabi-v7a, ~107 Mo a lui seul)
+    // alors qu'infrastructure/tts (voir son build.gradle.kts) ne compile
+    // son propre code natif que pour arm64-v8a - aucun binaire natif de
+    // ce projet ne fonctionne sur les 3 autres ABI de toute facon.
+    defaultConfig {
+        ndk {
+            abiFilters += "arm64-v8a"
+        }
+    }
+
     // Meme conflit que infrastructure/tts (voir son build.gradle.kts) :
     // libonnxruntime.so existe en deux exemplaires possibles (sherpa-onnx
     // vendore vs AAR onnxruntime-android:1.27.0). La regle packaging
