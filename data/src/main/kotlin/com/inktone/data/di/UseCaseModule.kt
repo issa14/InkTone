@@ -4,6 +4,7 @@ import com.inktone.domain.repository.AnnotationRepository
 import com.inktone.domain.repository.BookmarkRepository
 import com.inktone.domain.repository.PreferencesRepository
 import com.inktone.domain.repository.PublicationRepository
+import com.inktone.domain.repository.ReadingSessionRepository
 import com.inktone.domain.repository.ReadingStateRepository
 import com.inktone.domain.repository.VoiceProfileRepository
 import com.inktone.domain.service.FileStorageService
@@ -15,6 +16,7 @@ import com.inktone.domain.usecase.CreateBookmarkUseCase
 import com.inktone.domain.usecase.DeleteBookmarkUseCase
 import com.inktone.domain.usecase.ExportLibraryUseCase
 import com.inktone.domain.usecase.GetReadingStateUseCase
+import com.inktone.domain.usecase.GetStatisticsUseCase
 import com.inktone.domain.usecase.GetVoiceProfilesUseCase
 import com.inktone.domain.usecase.ImportPublicationUseCase
 import com.inktone.domain.usecase.SearchPublicationUseCase
@@ -101,4 +103,10 @@ object UseCaseModule {
     fun provideApplyAccessibilityPresetUseCase(
         preferencesRepository: PreferencesRepository,
     ): ApplyAccessibilityPresetUseCase = ApplyAccessibilityPresetUseCase(preferencesRepository)
+
+    @Provides
+    fun provideGetStatisticsUseCase(
+        readingSessionRepository: ReadingSessionRepository,
+        publicationRepository: PublicationRepository,
+    ): GetStatisticsUseCase = GetStatisticsUseCase(readingSessionRepository, publicationRepository)
 }
