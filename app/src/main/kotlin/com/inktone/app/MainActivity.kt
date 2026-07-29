@@ -1,44 +1,46 @@
 package com.inktone.app
 
-import android.content.Intent
 import android.os.Bundle
 import androidx.activity.ComponentActivity
-import androidx.activity.compose.rememberLauncherForActivityResult
+import androidx.activity.compose.BackHandler
 import androidx.activity.compose.setContent
-import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.foundation.layout.Column
-import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.Row
 import androidx.compose.material3.Button
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.runtime.LaunchedEffect
-import androidx.compose.ui.Modifier
-import androidx.compose.ui.unit.dp
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
 import androidx.hilt.navigation.compose.hiltViewModel
+import com.inktone.feature.importer.ImportPickerButton
+import com.inktone.feature.library.LibraryScreen
 import com.inktone.feature.reader.ReaderIntent
 import com.inktone.feature.reader.ReaderScreen
 import com.inktone.feature.reader.ReaderViewModel
+import com.inktone.feature.search.SearchScreen
 import dagger.hilt.android.AndroidEntryPoint
 import java.io.File
 
 /**
- * Point d'entree minimal pour le test manuel de la Phase 4 : heberge
- * ReaderScreen et ouvre le fixture EPUB embarque (copie de
- * fixture-minimal.epub, Phase 3) via BootstrapAndOpenFixture. Pas de
- * navigation reelle vers une bibliotheque — Phase 6 remplacera ceci par
- * le graphe de navigation complet et l'import SAF reel.
+ * Point d'entrée de l'app (Tâche 7.1bis, révision) — jusqu'ici (Phases 3
+ * à 7) hébergeait `ReaderScreen` directement, sans navigation réelle.
+ * `LibraryScreen` (Tâche 6.6) existait mais n'était appelé nulle part.
+ * Écran par défaut maintenant `LibraryScreen` (avec `ImportPickerButton`
+ * en FAB, câblé depuis la Tâche 6.2bis), bascule vers `ReaderScreen` au
+ * clic sur un livre — état Compose simple ([AppScreen]), pas
+ * `androidx.navigation` : deux écrans, pas de back stack profond ni de
+ * deep links à gérer pour l'instant, une dépendance de navigation
+ * complète serait prématurée.
  *
- * Injection par champ de PublicationRepository volontairement évitée
- * ici (KSP error.NonExistentClass, Tâche 3.7) : seule la copie de
- * fichier (pas d'accès Hilt) est faite dans cette Activity, le
- * bootstrap réel de la Publication passe par ReaderViewModel
- * (injection par constructeur, qui fonctionne).
- *
- * Bouton « Importer » (Tâche 4.11) : sélecteur SAF minimal pour valider
- * le chemin réel `content://` -> `ReadiumPublicationParser` contre un
- * vrai EPUB, sans construire l'écran d'import complet de
- * `feature/import` (Phase 6).
+ * `BootstrapAndOpenFixture` (debug uniquement, `BuildConfig.DEBUG`) :
+ * insère la publication fixture dans la bibliothèque mais ne force plus
+ * l'ouverture directe du Reader — l'utilisateur (ou le testeur) la choisit
+ * depuis `LibraryScreen` comme n'importe quel autre livre, pas de
+ * court-circuit de la navigation réelle même en debug.
  */
 @AndroidEntryPoint
 class MainActivity : ComponentActivity() {
@@ -48,39 +50,92 @@ class MainActivity : ComponentActivity() {
         setContent {
             MaterialTheme {
                 Surface {
-                    val viewModel: ReaderViewModel = hiltViewModel()
-                    LaunchedEffect(Unit) {
-                        val fixtureFile = File(cacheDir, "fixture-marche-a-blanc.epub").apply {
-                            if (!exists()) {
-                                assets.open("fixture-marche-a-blanc.epub").use { input ->
-                                    outputStream().use { output -> input.copyTo(output) }
+                    val readerViewModel: ReaderViewModel = hiltViewModel()
+
+                    // BootstrapAndOpenFixture n'appelle plus que l'insertion +
+                    // le parsing interne du ViewModel (Tache 7.1bis) - la
+                    // navigation vers ReaderScreen se fait desormais via
+                    // AppScreen, jamais automatiquement, meme en debug.
+                    if (BuildConfig.DEBUG) {
+                        LaunchedEffect(Unit) {
+                            val fixtureFile = File(cacheDir, "fixture-marche-a-blanc.epub").apply {
+                                if (!exists()) {
+                                    assets.open("fixture-marche-a-blanc.epub").use { input ->
+                                        outputStream().use { output -> input.copyTo(output) }
+                                    }
                                 }
                             }
+                            readerViewModel.onIntent(
+                                ReaderIntent.BootstrapAndOpenFixture(
+                                    publicationId = WALKING_SKELETON_FIXTURE_PUBLICATION_ID,
+                                    fileUri = fixtureFile.absolutePath,
+                                ),
+                            )
                         }
-                        viewModel.onIntent(
-                            ReaderIntent.BootstrapAndOpenFixture(
-                                publicationId = WALKING_SKELETON_FIXTURE_PUBLICATION_ID,
-                                fileUri = fixtureFile.absolutePath,
-                            ),
+                    }
+
+                    var screen by remember { mutableStateOf<AppScreen>(AppScreen.Library) }
+
+                    when (val current = screen) {
+                        AppScreen.Library -> LibraryScreen(
+                            onNavigateToReader = { publicationId -> screen = AppScreen.Reader(publicationId) },
+                            floatingActionButton = {
+                                Row {
+                                    ImportPickerButton()
+                                    Button(onClick = { screen = AppScreen.Search }) { Text("Rechercher") }
+                                }
+                            },
                         )
-                    }
-
-                    val importLauncher = rememberLauncherForActivityResult(ActivityResultContracts.OpenDocument()) { uri ->
-                        if (uri != null) {
-                            contentResolver.takePersistableUriPermission(uri, Intent.FLAG_GRANT_READ_URI_PERMISSION)
-                            viewModel.onIntent(ReaderIntent.ImportAndOpen(uri.toString()))
+                        is AppScreen.Reader -> {
+                            BackHandler { screen = AppScreen.Library }
+                            LaunchedEffect(current.publicationId, current.targetResourceHref, current.targetChapterIndex, current.targetCharOffset) {
+                                readerViewModel.onIntent(
+                                    ReaderIntent.OpenPublication(
+                                        publicationId = current.publicationId,
+                                        targetResourceHref = current.targetResourceHref,
+                                        targetChapterIndex = current.targetChapterIndex,
+                                        targetCharOffset = current.targetCharOffset,
+                                    ),
+                                )
+                            }
+                            Column {
+                                Button(onClick = { screen = AppScreen.Library }) { Text("< Bibliotheque") }
+                                ReaderScreen(viewModel = readerViewModel)
+                            }
                         }
-                    }
-
-                    Column(modifier = Modifier.padding(8.dp)) {
-                        Button(onClick = { importLauncher.launch(arrayOf("application/epub+zip", "application/octet-stream")) }) {
-                            Text("Importer (Tache 4.11)")
+                        AppScreen.Search -> {
+                            BackHandler { screen = AppScreen.Library }
+                            Column {
+                                Button(onClick = { screen = AppScreen.Library }) { Text("< Bibliotheque") }
+                                SearchScreen(
+                                    onNavigateToReader = { publicationId, resourceHref, chapterIndex, charOffset ->
+                                        screen = AppScreen.Reader(publicationId, resourceHref, chapterIndex, charOffset)
+                                    },
+                                )
+                            }
                         }
-                        ReaderScreen(viewModel = viewModel)
                     }
                 }
             }
         }
+    }
+
+    // Tache 7.5 : targetResourceHref/targetChapterIndex/targetCharOffset en
+    // primitifs, pas un Locator - ce module (app) n'a pas le droit de
+    // dependre de domain directement (Blueprint §12.4). Voir le meme choix
+    // sur ReaderIntent.OpenPublication (feature/reader), qui reconstruit le
+    // Locator la ou domain est une dependance autorisee.
+    private sealed interface AppScreen {
+        data object Library : AppScreen
+        data class Reader(
+            val publicationId: String,
+            val targetResourceHref: String? = null,
+            val targetChapterIndex: Int? = null,
+            val targetCharOffset: Int? = null,
+        ) : AppScreen
+
+        /** Tâche 7.5 — extension du même pattern léger, pas une nouvelle dépendance de navigation. */
+        data object Search : AppScreen
     }
 
     private companion object {

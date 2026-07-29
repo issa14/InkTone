@@ -10,6 +10,7 @@ import com.inktone.data.repository.RoomPublicationRepository
 import com.inktone.domain.usecase.ImportPublicationUseCase
 import com.inktone.domain.usecase.ImportResult
 import com.inktone.infrastructure.database.InkToneDatabase
+import com.inktone.infrastructure.database.search.RoomSearchService
 import com.inktone.infrastructure.parser.ReadiumPublicationParser
 import com.inktone.infrastructure.storage.SafFileStorageService
 import kotlinx.coroutines.async
@@ -89,6 +90,9 @@ class ImportBenchmarkTest {
             publicationParser = ReadiumPublicationParser(context),
             publicationRepository = RoomPublicationRepository(db.publicationDao()),
             fileStorageService = SafFileStorageService(context),
+            // Tache 7.3 : indexation FTS reelle a l'import - le benchmark
+            // doit refleter le cout ajoute, pas le contourner avec un fake.
+            searchService = RoomSearchService(db.sentenceFtsDao()),
         )
 
         var successCount = 0

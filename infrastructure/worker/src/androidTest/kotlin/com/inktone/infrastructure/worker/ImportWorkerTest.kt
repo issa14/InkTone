@@ -11,6 +11,7 @@ import androidx.work.workDataOf
 import com.inktone.core.testing.fake.FakeFileStorageService
 import com.inktone.core.testing.fake.FakePublicationParser
 import com.inktone.core.testing.fake.FakePublicationRepository
+import com.inktone.core.testing.fake.FakeSearchService
 import com.inktone.domain.usecase.ImportPublicationUseCase
 import kotlinx.coroutines.test.runTest
 import org.junit.Assert.assertEquals
@@ -44,6 +45,7 @@ class ImportWorkerTest {
             publicationParser = FakePublicationParser(),
             publicationRepository = publicationRepository,
             fileStorageService = FakeFileStorageService(),
+            searchService = FakeSearchService(),
         )
 
         val worker = TestListenableWorkerBuilder<ImportWorker>(context)
@@ -74,6 +76,7 @@ class ImportWorkerTest {
             publicationParser = FakePublicationParser(),
             publicationRepository = FakePublicationRepository(),
             fileStorageService = FakeFileStorageService(),
+            searchService = FakeSearchService(),
         )
 
         val worker = TestListenableWorkerBuilder<ImportWorker>(context)
