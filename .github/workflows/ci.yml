@@ -32,3 +32,23 @@ jobs:
 
       - name: Vérifier l'absence de MANAGE_EXTERNAL_STORAGE
         run: bash scripts/check-no-manage-external-storage.sh
+
+      - name: Couverture de tests minimale
+        run: ./gradlew koverVerify
+        # Seuil mesure puis fixe (Tache 9.4.1, docs/execution/PHASE_9_HARDENING.md) :
+        # 15.2% de couverture ligne reelle le 2026-07-29, seuil retenu 10%
+        # (marge ~5 points, jamais un chiffre arbitraire par aspiration).
+        # Couvre uniquement les tests JVM unitaires (domain/data/fakes) -
+        # PAS les tests instrumentes (DAO Room, Compose UI, migrations),
+        # hors de la portee de koverHtmlReport par defaut.
+
+      # LIMITE DOCUMENTEE (Tache 9.4) : les tests instrumentes
+      # (androidTest - migrations Room, DAO, accessibilite Compose)
+      # ne tournent PAS dans cette CI. Ils exigent soit un emulateur
+      # (Gradle Managed Devices, jamais configure), soit un device
+      # physique (utilise manuellement tout au long du projet, V2206,
+      # jamais automatise en CI). Ne pas pretendre a une couverture
+      # instrumentee automatique qui n'existe pas : ces tests restent
+      # executes et verifies manuellement avant chaque merge sensible
+      # (voir docs/execution/PHASE_8_FULL_PLAN.md et PHASE_9_HARDENING.md
+      # pour les executions reelles documentees sur device).
