@@ -34,6 +34,11 @@ dependencies {
     implementation("androidx.activity:activity-compose:1.9.1")
     implementation(libs.androidx.hilt.navigation.compose)
 
+    // Tache 9.0.2 : calculateWindowSizeClass(this) dans MainActivity,
+    // fondation LocalWindowSizeClass (core:designsystem) - pas de mode
+    // tablette double page ici, juste la valeur disponible partout.
+    implementation("androidx.compose.material3:material3-window-size-class")
+
     // Tache 6.2 : Configuration.Provider (InkToneApplication) cable
     // HiltWorkerFactory pour que ImportWorker (@HiltWorker) recoive ses
     // dependances via le graphe Hilt plutot que le WorkerFactory par defaut.

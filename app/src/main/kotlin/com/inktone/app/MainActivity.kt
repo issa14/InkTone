@@ -10,12 +10,16 @@ import androidx.compose.material3.Button
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
+import androidx.compose.material3.windowsizeclass.ExperimentalMaterial3WindowSizeClassApi
+import androidx.compose.material3.windowsizeclass.calculateWindowSizeClass
+import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.hilt.navigation.compose.hiltViewModel
+import com.inktone.core.designsystem.LocalWindowSizeClass
 import com.inktone.feature.importer.ImportPickerButton
 import com.inktone.feature.library.LibraryScreen
 import com.inktone.feature.reader.ReaderIntent
@@ -45,9 +49,16 @@ import java.io.File
 @AndroidEntryPoint
 class MainActivity : ComponentActivity() {
 
+    @OptIn(ExperimentalMaterial3WindowSizeClassApi::class)
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         setContent {
+            // Tache 9.0.2 : calculee une seule fois ici, fournie a toute
+            // l'arborescence via LocalWindowSizeClass (core:designsystem) -
+            // fondation seulement, aucun layout existant ne la consomme
+            // encore (pas de mode tablette double page, hors perimetre v1).
+            val windowSizeClass = calculateWindowSizeClass(this)
+            CompositionLocalProvider(LocalWindowSizeClass provides windowSizeClass) {
             MaterialTheme {
                 Surface {
                     val readerViewModel: ReaderViewModel = hiltViewModel()
@@ -116,6 +127,7 @@ class MainActivity : ComponentActivity() {
                         }
                     }
                 }
+            }
             }
         }
     }
