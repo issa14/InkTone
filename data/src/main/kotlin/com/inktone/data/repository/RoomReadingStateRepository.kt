@@ -15,6 +15,7 @@ class RoomReadingStateRepository @Inject constructor(
     override suspend fun get(publicationId: String): ReadingState? = dao.get(publicationId)?.toDomain()
     override fun observe(publicationId: String): Flow<ReadingState?> =
         dao.observe(publicationId).map { it?.toDomain() }
+    override suspend fun getAll(): List<ReadingState> = dao.getAll().map { it.toDomain() }
     override suspend fun save(state: ReadingState) = dao.save(state.toEntity())
     override suspend fun delete(publicationId: String) = dao.delete(publicationId)
 }

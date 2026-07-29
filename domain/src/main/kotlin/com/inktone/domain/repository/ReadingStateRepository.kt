@@ -7,6 +7,9 @@ interface ReadingStateRepository {
     suspend fun get(publicationId: String): ReadingState?
     fun observe(publicationId: String): Flow<ReadingState?>
 
+    /** Necessaire pour BackupManager (Tache 8.5). */
+    suspend fun getAll(): List<ReadingState>
+
     /** Persiste l'état de reprise. Appelée par les deux chemins K3 (TTS / manuel) — jamais simultanément. */
     suspend fun save(state: ReadingState)
     suspend fun delete(publicationId: String)

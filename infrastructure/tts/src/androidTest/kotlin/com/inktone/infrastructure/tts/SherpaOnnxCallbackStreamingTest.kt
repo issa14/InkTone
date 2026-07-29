@@ -7,6 +7,8 @@ import androidx.test.ext.junit.runners.AndroidJUnit4
 import com.k2fsa.sherpa.onnx.GenerationConfig
 import kotlinx.coroutines.runBlocking
 import org.junit.Assume.assumeTrue
+import com.inktone.core.testing.fake.FakePronunciationRuleRepository
+import com.inktone.domain.service.PronunciationRuleApplier
 import org.junit.Test
 import org.junit.runner.RunWith
 import java.io.File
@@ -45,7 +47,7 @@ class SherpaOnnxCallbackStreamingTest {
         if (!modelPaths.isReady) stage("kokoro-int8-multi-lang-v1_0", modelPaths.modelFile.parentFile!!)
         assumeTrue("Modele Kokoro absent", modelPaths.isReady)
 
-        val engine = SherpaOnnxTtsEngine(modelPaths, ctcForcedAligner = CtcForcedAligner(CtcModelPaths(context)))
+        val engine = SherpaOnnxTtsEngine(modelPaths, ctcForcedAligner = CtcForcedAligner(CtcModelPaths(context)), pronunciationRuleApplier = PronunciationRuleApplier(FakePronunciationRuleRepository()))
         val text = "Bonjour le monde. Ceci est un test pour vérifier l'alignement."
         val config = GenerationConfig(speed = 1.0f, sid = 30)
 

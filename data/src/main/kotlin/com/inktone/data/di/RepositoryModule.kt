@@ -3,6 +3,7 @@ package com.inktone.data.di
 import com.inktone.data.repository.RoomAnnotationRepository
 import com.inktone.data.repository.RoomBookmarkRepository
 import com.inktone.data.repository.RoomPreferencesRepository
+import com.inktone.data.repository.RoomPronunciationRuleRepository
 import com.inktone.data.repository.RoomPublicationRepository
 import com.inktone.data.repository.RoomReadingSessionRepository
 import com.inktone.data.repository.RoomReadingStateRepository
@@ -10,6 +11,7 @@ import com.inktone.data.repository.RoomVoiceProfileRepository
 import com.inktone.domain.repository.AnnotationRepository
 import com.inktone.domain.repository.BookmarkRepository
 import com.inktone.domain.repository.PreferencesRepository
+import com.inktone.domain.repository.PronunciationRuleRepository
 import com.inktone.domain.repository.PublicationRepository
 import com.inktone.domain.repository.ReadingSessionRepository
 import com.inktone.domain.repository.ReadingStateRepository
@@ -30,4 +32,5 @@ abstract class RepositoryModule {
     @Binds @Singleton abstract fun bindAnnotationRepository(impl: RoomAnnotationRepository): AnnotationRepository
     @Binds @Singleton abstract fun bindVoiceProfileRepository(impl: RoomVoiceProfileRepository): VoiceProfileRepository
     @Binds @Singleton abstract fun bindPreferencesRepository(impl: RoomPreferencesRepository): PreferencesRepository
+    @Binds @Singleton abstract fun bindPronunciationRuleRepository(impl: RoomPronunciationRuleRepository): PronunciationRuleRepository
 }

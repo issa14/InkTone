@@ -11,8 +11,12 @@ data class UserPreferences(
     val defaultTtsEngine: TtsEngineId = TtsEngineId.SHERPA_ONNX,
     val crashReportingEnabled: Boolean = false,
     val language: String = "fr",
+    val fontFamily: FontFamily = FontFamily.DEFAULT,
+    val reduceMotion: Boolean = false,
 ) {
     init {
         require(fontSize > 0) { "fontSize doit être strictement positif" }
     }
 }
+
+enum class FontFamily { DEFAULT, OPEN_DYSLEXIC, SERIF, SANS_SERIF }

@@ -13,4 +13,6 @@ data class UserPreferencesEntity(
     val defaultTtsEngine: String,
     val crashReportingEnabled: Boolean,
     val language: String,
+    val fontFamily: String = "DEFAULT",
+    val reduceMotion: Boolean = false,
 )
