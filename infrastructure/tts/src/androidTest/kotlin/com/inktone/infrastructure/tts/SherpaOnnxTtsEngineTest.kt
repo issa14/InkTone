@@ -10,6 +10,8 @@ import kotlinx.coroutines.test.runTest
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertTrue
 import org.junit.Assume.assumeTrue
+import com.inktone.core.testing.fake.FakePronunciationRuleRepository
+import com.inktone.domain.service.PronunciationRuleApplier
 import org.junit.Test
 import org.junit.runner.RunWith
 import java.io.File
@@ -74,7 +76,7 @@ class SherpaOnnxTtsEngineTest {
             ctcModelPaths.isReady,
         )
 
-        val engine = SherpaOnnxTtsEngine(modelPaths, CtcForcedAligner(ctcModelPaths))
+        val engine = SherpaOnnxTtsEngine(modelPaths, CtcForcedAligner(ctcModelPaths), PronunciationRuleApplier(FakePronunciationRuleRepository()))
         val text = "Bonjour le monde. Ceci est un test pour vérifier l'alignement."
         val sentence = Sentence(index = 0, text = text, startOffset = 0, endOffset = text.length)
 

@@ -9,6 +9,8 @@ import com.inktone.domain.model.VoiceProfile
 import kotlinx.coroutines.test.runTest
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertTrue
+import com.inktone.core.testing.fake.FakePronunciationRuleRepository
+import com.inktone.domain.service.PronunciationRuleApplier
 import org.junit.Test
 import org.junit.runner.RunWith
 
@@ -33,7 +35,7 @@ class AndroidNativeTtsEngineTest {
 
     @Test
     fun synthesize_produit_un_wordTimestamp_par_mot_avec_offsets_et_timings_coherents() = runTest {
-        val engine = AndroidNativeTtsEngine(context)
+        val engine = AndroidNativeTtsEngine(context, PronunciationRuleApplier(FakePronunciationRuleRepository()))
         val text = "Bonjour, ceci est un test de synchronisation."
         val sentence = Sentence(index = 0, text = text, startOffset = 0, endOffset = text.length)
 

@@ -90,6 +90,45 @@ class DatabaseMigrationTest {
         v2.close()
     }
 
+    @Test
+    fun migration_2_vers_3_conserve_les_donnees_et_ajoute_fontFamily_reduceMotion() {
+        val v2 = helper.createDatabase(TEST_DB_NAME, 2)
+        v2.execSQL(
+            """
+            INSERT INTO user_preferences (id, theme, fontSize, defaultTtsEngine, crashReportingEnabled, language)
+            VALUES (0, 'SYSTEM', 18, 'SHERPA_ONNX', 0, 'fr')
+            """.trimIndent(),
+        )
+        v2.close()
+
+        val v3 = helper.runMigrationsAndValidate(TEST_DB_NAME, 3, true, MIGRATION_2_3)
+
+        v3.query("SELECT fontFamily, reduceMotion FROM user_preferences WHERE id = 0").use { cursor ->
+            assertEquals(true, cursor.moveToFirst())
+            assertEquals("DEFAULT", cursor.getString(0))
+            assertEquals(0, cursor.getInt(1))
+        }
+        v3.close()
+    }
+
+    @Test
+    fun migration_3_vers_4_cree_la_table_pronunciation_rules_utilisable() {
+        val v3 = helper.createDatabase(TEST_DB_NAME, 3)
+        v3.close()
+
+        val v4 = helper.runMigrationsAndValidate(TEST_DB_NAME, 4, true, MIGRATION_2_3, MIGRATION_3_4)
+
+        v4.execSQL(
+            "INSERT INTO pronunciation_rules (id, originalText, replacementText, isRegex, isEnabled) " +
+                "VALUES ('r1', 'Dr.', 'Docteur', 0, 1)",
+        )
+        v4.query("SELECT replacementText FROM pronunciation_rules WHERE id = 'r1'").use { cursor ->
+            assertEquals(true, cursor.moveToFirst())
+            assertEquals("Docteur", cursor.getString(0))
+        }
+        v4.close()
+    }
+
     companion object {
         private const val TEST_DB_NAME = "migration-test"
     }
