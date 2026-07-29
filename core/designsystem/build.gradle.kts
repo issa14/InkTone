@@ -28,4 +28,9 @@ dependencies {
     implementation("androidx.compose.ui:ui-tooling-preview")
     implementation("androidx.compose.material3:material3")
     implementation("androidx.compose.material3:material3-window-size-class")
+    // AppIcons (Tache 9bis.1.1) : icones hors du sous-ensemble Icons.Filled/
+    // Outlined de base embarque par material3.
+    implementation("androidx.compose.material:material-icons-extended")
+
+    testImplementation(libs.junit)
 }
