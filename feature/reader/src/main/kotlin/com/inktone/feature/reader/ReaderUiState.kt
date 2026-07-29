@@ -47,7 +47,21 @@ data class ReaderUiState(
 }
 
 sealed interface ReaderIntent {
-    data class OpenPublication(val publicationId: String) : ReaderIntent
+    /**
+     * `targetResourceHref`/`targetChapterIndex`/`targetCharOffset` :
+     * arrivée depuis un résultat de recherche (Tâche 7.5), position à
+     * rejoindre après ouverture. Décomposés en primitifs plutôt qu'un
+     * `Locator` — `MainActivity` (module `app`) construit cet intent et
+     * n'a pas le droit de dépendre de `domain` directement (Blueprint
+     * §12.4) ; `Locator` est reconstruit ici, dans `feature/reader`, qui
+     * en a le droit.
+     */
+    data class OpenPublication(
+        val publicationId: String,
+        val targetResourceHref: String? = null,
+        val targetChapterIndex: Int? = null,
+        val targetCharOffset: Int? = null,
+    ) : ReaderIntent
 
     /**
      * Scaffolding de marche à blanc (hérité de la Phase 3) : bootstrap
@@ -80,5 +94,7 @@ sealed interface ReaderIntent {
     data object CreateBookmark : ReaderIntent
     data object ToggleBookmarkList : ReaderIntent
     data class DeleteBookmark(val id: String) : ReaderIntent
-    data class NavigateToBookmark(val locator: Locator) : ReaderIntent
+
+    /** Navigue vers un `Locator` arbitraire — signet (Tâche 7.2) ou résultat de recherche (Tâche 7.5). */
+    data class NavigateToLocator(val locator: Locator) : ReaderIntent
 }

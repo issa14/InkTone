@@ -92,7 +92,7 @@ fun ReaderScreen(viewModel: ReaderViewModel = hiltViewModel()) {
         if (state.isBookmarkListVisible) {
             BookmarkListSheet(
                 bookmarks = state.bookmarks,
-                onBookmarkClick = { bookmark -> viewModel.onIntent(ReaderIntent.NavigateToBookmark(bookmark.locator)) },
+                onBookmarkClick = { bookmark -> viewModel.onIntent(ReaderIntent.NavigateToLocator(bookmark.locator)) },
                 onBookmarkDelete = { bookmark -> viewModel.onIntent(ReaderIntent.DeleteBookmark(bookmark.id)) },
             )
             return@Column

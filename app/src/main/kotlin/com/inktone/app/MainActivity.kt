@@ -5,6 +5,7 @@ import androidx.activity.ComponentActivity
 import androidx.activity.compose.BackHandler
 import androidx.activity.compose.setContent
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.Row
 import androidx.compose.material3.Button
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Surface
@@ -20,6 +21,7 @@ import com.inktone.feature.library.LibraryScreen
 import com.inktone.feature.reader.ReaderIntent
 import com.inktone.feature.reader.ReaderScreen
 import com.inktone.feature.reader.ReaderViewModel
+import com.inktone.feature.search.SearchScreen
 import dagger.hilt.android.AndroidEntryPoint
 import java.io.File
 
@@ -77,16 +79,39 @@ class MainActivity : ComponentActivity() {
                     when (val current = screen) {
                         AppScreen.Library -> LibraryScreen(
                             onNavigateToReader = { publicationId -> screen = AppScreen.Reader(publicationId) },
-                            floatingActionButton = { ImportPickerButton() },
+                            floatingActionButton = {
+                                Row {
+                                    ImportPickerButton()
+                                    Button(onClick = { screen = AppScreen.Search }) { Text("Rechercher") }
+                                }
+                            },
                         )
                         is AppScreen.Reader -> {
                             BackHandler { screen = AppScreen.Library }
-                            LaunchedEffect(current.publicationId) {
-                                readerViewModel.onIntent(ReaderIntent.OpenPublication(current.publicationId))
+                            LaunchedEffect(current.publicationId, current.targetResourceHref, current.targetChapterIndex, current.targetCharOffset) {
+                                readerViewModel.onIntent(
+                                    ReaderIntent.OpenPublication(
+                                        publicationId = current.publicationId,
+                                        targetResourceHref = current.targetResourceHref,
+                                        targetChapterIndex = current.targetChapterIndex,
+                                        targetCharOffset = current.targetCharOffset,
+                                    ),
+                                )
                             }
                             Column {
                                 Button(onClick = { screen = AppScreen.Library }) { Text("< Bibliotheque") }
                                 ReaderScreen(viewModel = readerViewModel)
+                            }
+                        }
+                        AppScreen.Search -> {
+                            BackHandler { screen = AppScreen.Library }
+                            Column {
+                                Button(onClick = { screen = AppScreen.Library }) { Text("< Bibliotheque") }
+                                SearchScreen(
+                                    onNavigateToReader = { publicationId, resourceHref, chapterIndex, charOffset ->
+                                        screen = AppScreen.Reader(publicationId, resourceHref, chapterIndex, charOffset)
+                                    },
+                                )
                             }
                         }
                     }
@@ -95,9 +120,22 @@ class MainActivity : ComponentActivity() {
         }
     }
 
+    // Tache 7.5 : targetResourceHref/targetChapterIndex/targetCharOffset en
+    // primitifs, pas un Locator - ce module (app) n'a pas le droit de
+    // dependre de domain directement (Blueprint §12.4). Voir le meme choix
+    // sur ReaderIntent.OpenPublication (feature/reader), qui reconstruit le
+    // Locator la ou domain est une dependance autorisee.
     private sealed interface AppScreen {
         data object Library : AppScreen
-        data class Reader(val publicationId: String) : AppScreen
+        data class Reader(
+            val publicationId: String,
+            val targetResourceHref: String? = null,
+            val targetChapterIndex: Int? = null,
+            val targetCharOffset: Int? = null,
+        ) : AppScreen
+
+        /** Tâche 7.5 — extension du même pattern léger, pas une nouvelle dépendance de navigation. */
+        data object Search : AppScreen
     }
 
     private companion object {

@@ -67,7 +67,21 @@ class ReaderViewModel @Inject constructor(
 
     fun onIntent(intent: ReaderIntent) {
         when (intent) {
-            is ReaderIntent.OpenPublication -> openPublication(intent.publicationId)
+            is ReaderIntent.OpenPublication -> {
+                val resourceHref = intent.targetResourceHref
+                val targetLocator = if (
+                    !resourceHref.isNullOrBlank() && intent.targetChapterIndex != null && intent.targetCharOffset != null
+                ) {
+                    Locator(
+                        resourceHref = resourceHref,
+                        chapterIndex = intent.targetChapterIndex,
+                        charOffset = intent.targetCharOffset,
+                    )
+                } else {
+                    null
+                }
+                openPublication(intent.publicationId, targetLocator)
+            }
             is ReaderIntent.BootstrapAndOpenFixture -> bootstrapAndOpenFixture(intent.publicationId, intent.fileUri)
             is ReaderIntent.NextChapter -> navigateToChapter(_state.value.currentChapterIndex + 1)
             is ReaderIntent.PreviousChapter -> navigateToChapter(_state.value.currentChapterIndex - 1)
@@ -88,7 +102,7 @@ class ReaderViewModel @Inject constructor(
                 isBookmarkListVisible = !_state.value.isBookmarkListVisible,
             )
             is ReaderIntent.DeleteBookmark -> viewModelScope.launch { deleteBookmark(intent.id) }
-            is ReaderIntent.NavigateToBookmark -> navigateToLocator(intent.locator)
+            is ReaderIntent.NavigateToLocator -> navigateToLocator(intent.locator)
         }
     }
 
@@ -99,7 +113,7 @@ class ReaderViewModel @Inject constructor(
      * Les cas d'erreur de parsing (Corrompu, DRM, format non supporté)
      * ne sont pas encore reflétés dans `ReaderUiState` — Tâche 4.8.
      */
-    private fun openPublication(publicationId: String) {
+    private fun openPublication(publicationId: String, targetLocator: Locator? = null) {
         viewModelScope.launch {
             val publication = publicationRepository.getById(publicationId) ?: run {
                 Log.w("ReaderViewModel", "openPublication: publication introuvable ($publicationId)")
@@ -126,6 +140,12 @@ class ReaderViewModel @Inject constructor(
                     triggerPreload(_state.value.currentChapterIndex)
                     observeAnnotations(publicationId)
                     observeBookmarks(publicationId)
+                    // Tache 7.5 : arrivee depuis un resultat de recherche -
+                    // appelee ICI (dans la meme coroutine, apres que
+                    // _state.value.chapters soit peuple), pas via un second
+                    // dispatch d'intent qui s'executerait avant que
+                    // l'ouverture asynchrone soit terminee.
+                    if (targetLocator != null) navigateToLocator(targetLocator)
                 }
                 else -> Log.w("ReaderViewModel", "openPublication: echec de parsing ($result)")
             }
