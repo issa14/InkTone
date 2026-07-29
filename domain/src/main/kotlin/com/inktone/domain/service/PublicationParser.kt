@@ -17,8 +17,30 @@ interface PublicationParser {
  * attendu est un type, pas une exception qui remonte au hasard.
  */
 sealed interface ParseResult {
-    data class Success(val documentModel: DocumentModel, val isDrmProtected: Boolean) : ParseResult
+    data class Success(
+        val documentModel: DocumentModel,
+        val isDrmProtected: Boolean,
+        val metadata: PublicationMetadata = PublicationMetadata(),
+    ) : ParseResult
     data class DrmProtected(val message: String) : ParseResult
     data class Corrupted(val message: String) : ParseResult
     data class UnsupportedFormat(val format: String) : ParseResult
 }
+
+/**
+ * Métadonnées portées par [ParseResult.Success] (Tâche 6.1.1) — déjà
+ * réduites aux types primitifs du domaine ici : `ReadiumPublicationParser`
+ * fait la traduction depuis `Metadata`/`Contributor`/`Subject` (Readium),
+ * jamais exposés au-delà d'infrastructure/parser (ADR-011).
+ */
+data class PublicationMetadata(
+    val title: String? = null,
+    val subtitle: String? = null,
+    val authors: List<String> = emptyList(),
+    val publisher: String? = null,
+    val language: String? = null,
+    val description: String? = null,
+    val seriesName: String? = null,
+    val seriesIndex: Float? = null,
+    val subjects: List<String> = emptyList(),
+)

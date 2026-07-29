@@ -1,9 +1,15 @@
 package com.inktone.data.di
 
+import com.inktone.domain.repository.PublicationRepository
 import com.inktone.domain.repository.ReadingStateRepository
 import com.inktone.domain.repository.VoiceProfileRepository
+import com.inktone.domain.service.FileStorageService
+import com.inktone.domain.service.PublicationParser
+import com.inktone.domain.usecase.ExportLibraryUseCase
 import com.inktone.domain.usecase.GetReadingStateUseCase
 import com.inktone.domain.usecase.GetVoiceProfilesUseCase
+import com.inktone.domain.usecase.ImportPublicationUseCase
+import com.inktone.domain.usecase.ToggleFavoriteUseCase
 import com.inktone.domain.usecase.UpdateReadingStateUseCase
 import dagger.Module
 import dagger.Provides
@@ -16,7 +22,10 @@ import dagger.hilt.components.SingletonComponent
  * framework de DI). Ajoutes au fil des phases qui les consomment
  * reellement (Tache 3.5 : UpdateReadingStateUseCase ; Tache 3.7 :
  * GetReadingStateUseCase pour verifier la reprise K3 ; Tache 5.5 :
- * GetVoiceProfilesUseCase pour le selecteur de voix de PlayerScreen),
+ * GetVoiceProfilesUseCase pour le selecteur de voix de PlayerScreen ;
+ * Tache 6.2 : ImportPublicationUseCase, consomme par ImportWorker ;
+ * Tache 6.7 : ExportLibraryUseCase ; Tache 6.6 : ToggleFavoriteUseCase,
+ * consomme par LibraryViewModel),
  * pas par anticipation.
  */
 @Module
@@ -36,4 +45,23 @@ object UseCaseModule {
     fun provideGetVoiceProfilesUseCase(
         voiceProfileRepository: VoiceProfileRepository,
     ): GetVoiceProfilesUseCase = GetVoiceProfilesUseCase(voiceProfileRepository)
+
+    @Provides
+    fun provideImportPublicationUseCase(
+        publicationParser: PublicationParser,
+        publicationRepository: PublicationRepository,
+        fileStorageService: FileStorageService,
+    ): ImportPublicationUseCase =
+        ImportPublicationUseCase(publicationParser, publicationRepository, fileStorageService)
+
+    @Provides
+    fun provideExportLibraryUseCase(
+        publicationRepository: PublicationRepository,
+        fileStorageService: FileStorageService,
+    ): ExportLibraryUseCase = ExportLibraryUseCase(publicationRepository, fileStorageService)
+
+    @Provides
+    fun provideToggleFavoriteUseCase(
+        publicationRepository: PublicationRepository,
+    ): ToggleFavoriteUseCase = ToggleFavoriteUseCase(publicationRepository)
 }
