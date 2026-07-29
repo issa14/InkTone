@@ -1,5 +1,7 @@
 package com.inktone.feature.reader
 
+import androidx.compose.animation.core.animateIntAsState
+import androidx.compose.animation.core.tween
 import androidx.compose.foundation.ExperimentalFoundationApi
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
@@ -31,6 +33,7 @@ import androidx.compose.ui.text.withStyle
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.hilt.navigation.compose.hiltViewModel
+import com.inktone.core.designsystem.reducedMotionDuration
 import com.inktone.domain.model.Annotation
 import com.inktone.domain.model.AnnotationColor
 import com.inktone.domain.model.ReadingOverrides
@@ -218,9 +221,29 @@ private fun SentenceText(
         existingAnnotationColor != null -> existingAnnotationColor.toComposeColor()
         else -> Color.Transparent
     }
+
+    // Tache 9bis.3.5 — transition douce entre mots plutot qu'un changement
+    // brut : le legacy n'avait pas de vrais timestamps CTC (surlignage
+    // necessairement plus simple), on a maintenant de vrais WordTimestamp
+    // (ADR-022). reducedMotionDuration (Tache 8.4) respecte le reglage
+    // systeme, pas juste une preference applicative.
+    val animationSpec = tween<Int>(durationMillis = reducedMotionDuration(150))
+    val animatedStart by animateIntAsState(
+        targetValue = highlightedWordRange?.first ?: 0,
+        animationSpec = animationSpec,
+        label = "highlightStart",
+    )
+    val animatedEnd by animateIntAsState(
+        targetValue = highlightedWordRange?.last ?: 0,
+        animationSpec = animationSpec,
+        label = "highlightEnd",
+    )
+
     Text(
-        text = if (isCurrentlyPlaying && highlightedWordRange != null) {
-            buildHighlightedSentence(sentence.text, highlightedWordRange)
+        text = if (isCurrentlyPlaying && highlightedWordRange != null && sentence.text.isNotEmpty()) {
+            val start = animatedStart.coerceIn(0, sentence.text.length - 1)
+            val end = animatedEnd.coerceIn(start, sentence.text.length - 1)
+            buildHighlightedSentence(sentence.text, start..end)
         } else {
             AnnotatedString(sentence.text)
         },
