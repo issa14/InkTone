@@ -27,7 +27,7 @@ import com.inktone.infrastructure.database.entity.VoiceProfileEntity
         BookmarkEntity::class, AnnotationEntity::class, VoiceProfileEntity::class,
         UserPreferencesEntity::class, SentenceFtsEntity::class,
     ],
-    version = 2, // Tache 7.3.1 : ajout de sentence_fts (MIGRATION_1_2)
+    version = 3, // Tache 8.0 : fontFamily/reduceMotion (MIGRATION_2_3)
     exportSchema = true, // condition du harnais de migration — Tâche 2.4
 )
 @TypeConverters(StringListConverter::class)

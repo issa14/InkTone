@@ -14,6 +14,8 @@ class RoomBookmarkRepository @Inject constructor(
 ) : BookmarkRepository {
     override fun observeForPublication(publicationId: String): Flow<List<Bookmark>> =
         dao.observeForPublication(publicationId).map { list -> list.map { it.toDomain() } }
+    override fun observeAll(): Flow<List<Bookmark>> =
+        dao.observeAll().map { list -> list.map { it.toDomain() } }
     override suspend fun insert(bookmark: Bookmark) = dao.insert(bookmark.toEntity())
     override suspend fun delete(id: String) = dao.delete(id)
 }

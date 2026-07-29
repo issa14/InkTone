@@ -11,6 +11,9 @@ interface BookmarkDao {
     @Query("SELECT * FROM bookmarks WHERE publicationId = :publicationId")
     fun observeForPublication(publicationId: String): Flow<List<BookmarkEntity>>
 
+    @Query("SELECT * FROM bookmarks")
+    fun observeAll(): Flow<List<BookmarkEntity>>
+
     @Insert
     suspend fun insert(entity: BookmarkEntity)
 

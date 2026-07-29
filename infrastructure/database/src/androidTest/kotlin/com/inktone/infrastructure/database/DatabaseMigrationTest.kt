@@ -90,6 +90,27 @@ class DatabaseMigrationTest {
         v2.close()
     }
 
+    @Test
+    fun migration_2_vers_3_conserve_les_donnees_et_ajoute_fontFamily_reduceMotion() {
+        val v2 = helper.createDatabase(TEST_DB_NAME, 2)
+        v2.execSQL(
+            """
+            INSERT INTO user_preferences (id, theme, fontSize, defaultTtsEngine, crashReportingEnabled, language)
+            VALUES (0, 'SYSTEM', 18, 'SHERPA_ONNX', 0, 'fr')
+            """.trimIndent(),
+        )
+        v2.close()
+
+        val v3 = helper.runMigrationsAndValidate(TEST_DB_NAME, 3, true, MIGRATION_2_3)
+
+        v3.query("SELECT fontFamily, reduceMotion FROM user_preferences WHERE id = 0").use { cursor ->
+            assertEquals(true, cursor.moveToFirst())
+            assertEquals("DEFAULT", cursor.getString(0))
+            assertEquals(0, cursor.getInt(1))
+        }
+        v3.close()
+    }
+
     companion object {
         private const val TEST_DB_NAME = "migration-test"
     }
