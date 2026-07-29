@@ -40,4 +40,22 @@ class EpubOpenBenchmark {
         // "ouverture EPUB" annonce par le budget §11.2.
         device.wait(Until.hasObject(By.pkg(packageName).depth(0)), 5000)
     }
+
+    /**
+     * Tache 9.3 — budget "reprise chaude" (Blueprint §11.2, <= 800ms),
+     * jamais mesure sur l'app complete avant cette tache. `StartupMode.WARM`
+     * : processus deja en memoire, Activity recreee (contrairement a HOT
+     * qui reutilise l'Activity existante sans la recreer).
+     */
+    @Test
+    fun repriseChaude() = benchmarkRule.measureRepeated(
+        packageName = "com.inktone.app",
+        metrics = listOf(StartupTimingMetric()),
+        iterations = 5,
+        startupMode = StartupMode.WARM,
+    ) {
+        pressHome()
+        startActivityAndWait()
+        device.wait(Until.hasObject(By.pkg(packageName).depth(0)), 5000)
+    }
 }
