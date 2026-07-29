@@ -6,6 +6,16 @@
     <uses-permission android:name="android.permission.FOREGROUND_SERVICE" />
     <uses-permission android:name="android.permission.FOREGROUND_SERVICE_MEDIA_PLAYBACK" />
 
+    <!-- Tache 9.2.2 : trouvee manquante par l'audit de securite -
+         VoiceModelDownloader (Tache 5.6/8.7/9.0.1) telecharge le modele
+         vocal via java.net.URL.openConnection() ; sans cette permission,
+         tout appel reel echoue avec SecurityException des la premiere
+         tentative de telechargement sur un device (jamais teste sur
+         device jusqu'a cette tache, seulement en unitaire avec des
+         fakes). Aucun autre usage reseau dans l'app (offline-first,
+         Blueprint §1.4). -->
+    <uses-permission android:name="android.permission.INTERNET" />
+
     <application
         android:name=".InkToneApplication"
         android:allowBackup="false"
