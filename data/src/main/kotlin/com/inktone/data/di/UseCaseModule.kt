@@ -2,6 +2,7 @@ package com.inktone.data.di
 
 import com.inktone.domain.repository.AnnotationRepository
 import com.inktone.domain.repository.BookmarkRepository
+import com.inktone.domain.repository.PreferencesRepository
 import com.inktone.domain.repository.PublicationRepository
 import com.inktone.domain.repository.ReadingStateRepository
 import com.inktone.domain.repository.VoiceProfileRepository
@@ -9,6 +10,7 @@ import com.inktone.domain.service.FileStorageService
 import com.inktone.domain.service.PublicationParser
 import com.inktone.domain.service.SearchService
 import com.inktone.domain.usecase.AddAnnotationUseCase
+import com.inktone.domain.usecase.ApplyAccessibilityPresetUseCase
 import com.inktone.domain.usecase.CreateBookmarkUseCase
 import com.inktone.domain.usecase.DeleteBookmarkUseCase
 import com.inktone.domain.usecase.ExportLibraryUseCase
@@ -94,4 +96,9 @@ object UseCaseModule {
     fun provideSearchPublicationUseCase(
         searchService: SearchService,
     ): SearchPublicationUseCase = SearchPublicationUseCase(searchService)
+
+    @Provides
+    fun provideApplyAccessibilityPresetUseCase(
+        preferencesRepository: PreferencesRepository,
+    ): ApplyAccessibilityPresetUseCase = ApplyAccessibilityPresetUseCase(preferencesRepository)
 }

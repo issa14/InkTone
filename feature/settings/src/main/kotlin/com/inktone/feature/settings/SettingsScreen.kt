@@ -64,6 +64,9 @@ fun SettingsScreen(
                 "Reduire les animations",
                 preferences.reduceMotion,
             ) { viewModel.onIntent(SettingsIntent.SetReduceMotion(it)) }
+            Button(onClick = { viewModel.onIntent(SettingsIntent.ApplyAccessibilityPreset) }) {
+                Text("Appliquer le preregalage d'accessibilite")
+            }
         }
     }
 }

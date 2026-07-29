@@ -3,6 +3,7 @@ package com.inktone.feature.settings
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.inktone.domain.repository.PreferencesRepository
+import com.inktone.domain.usecase.ApplyAccessibilityPresetUseCase
 import dagger.hilt.android.lifecycle.HiltViewModel
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
@@ -19,6 +20,7 @@ import javax.inject.Inject
 @HiltViewModel
 class SettingsViewModel @Inject constructor(
     private val preferencesRepository: PreferencesRepository,
+    private val applyAccessibilityPreset: ApplyAccessibilityPresetUseCase,
 ) : ViewModel() {
 
     private val _state = MutableStateFlow(SettingsUiState())
@@ -45,6 +47,7 @@ class SettingsViewModel @Inject constructor(
                 is SettingsIntent.SetCrashReportingEnabled ->
                     preferencesRepository.update(current.copy(crashReportingEnabled = intent.enabled))
                 is SettingsIntent.SetReduceMotion -> preferencesRepository.update(current.copy(reduceMotion = intent.enabled))
+                is SettingsIntent.ApplyAccessibilityPreset -> applyAccessibilityPreset()
             }
         }
     }
