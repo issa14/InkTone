@@ -9,6 +9,12 @@ import com.inktone.domain.usecase.ImportPublicationUseCase
 import com.inktone.domain.usecase.ImportResult
 import dagger.assisted.Assisted
 import dagger.assisted.AssistedInject
+import kotlinx.coroutines.async
+import kotlinx.coroutines.awaitAll
+import kotlinx.coroutines.coroutineScope
+import kotlinx.coroutines.sync.Semaphore
+import kotlinx.coroutines.sync.withPermit
+import java.util.concurrent.atomic.AtomicInteger
 
 /**
  * Import en tâche de fond (Tâche 6.2) — l'import survit à la mise en
@@ -16,9 +22,13 @@ import dagger.assisted.AssistedInject
  * fichiers (Blueprint §11.2 : 500 EPUB ≤ 5 min, personne ne garde l'app
  * au premier plan tout ce temps).
  *
- * Séquentiel ici — la parallélisation (K2, Tâche 6.3) est délibérément
- * une étape séparée, après confirmation que WAL (déjà actif depuis la
- * Phase 2) absorbe la charge concurrente.
+ * Parallélisé (K2, Tâche 6.3) — borné à [MAX_CONCURRENT_IMPORTS] permits,
+ * après confirmation que WAL (Tâche 2.3) absorbe l'écriture concurrente
+ * (K1 avant K2, même discipline que le legacy a apprise à ses dépens).
+ * **Gain non mesuré ici** : la comparaison séquentiel/parallèle est la
+ * Tâche 6.9 (benchmark), pas supposée avant d'être vérifiée — si l'import
+ * s'avère I/O-bound plutôt que CPU-bound, le gain réel pourrait être
+ * marginal malgré la complexité ajoutée.
  *
  * **Limite `Data` de WorkManager (~10 Ko), à la charge de l'appelant** :
  * un seul `ImportWorker` ne suffit pas pour un import de bibliothèque
@@ -36,34 +46,45 @@ class ImportWorker @AssistedInject constructor(
     private val importPublication: ImportPublicationUseCase,
 ) : CoroutineWorker(context, params) {
 
-    override suspend fun doWork(): Result {
-        val uris = inputData.getStringArray(KEY_URIS) ?: return Result.failure()
+    override suspend fun doWork(): Result = coroutineScope {
+        val uris = inputData.getStringArray(KEY_URIS) ?: return@coroutineScope Result.failure()
 
-        var successCount = 0
-        var duplicateCount = 0
-        var failureCount = 0
+        // Compteurs partages entre coroutines concurrentes (Dispatchers.Default,
+        // plusieurs threads reels) - AtomicInteger, pas de var+= non protege.
+        val successCount = AtomicInteger(0)
+        val duplicateCount = AtomicInteger(0)
+        val failureCount = AtomicInteger(0)
+        val completedCount = AtomicInteger(0)
 
-        uris.forEachIndexed { index, uri ->
-            setProgressAsync(
-                Data.Builder()
-                    .putInt(KEY_PROGRESS_CURRENT, index + 1)
-                    .putInt(KEY_PROGRESS_TOTAL, uris.size)
-                    .build(),
-            )
-
-            when (importPublication(uri)) {
-                is ImportResult.Success -> successCount++
-                is ImportResult.Duplicate -> duplicateCount++
-                else -> failureCount++
+        val semaphore = Semaphore(permits = MAX_CONCURRENT_IMPORTS)
+        uris.map { uri ->
+            async {
+                semaphore.withPermit {
+                    // Chaque appel importPublication() -> publicationParser.parse()
+                    // ouvre le ZIP UNE FOIS (ReadiumPublicationParser, Tache 3.2 -
+                    // AssetRetriever.retrieve() une seule fois par appel, pas de
+                    // reouverture repetee comme le legacy le faisait, K2).
+                    when (importPublication(uri)) {
+                        is ImportResult.Success -> successCount.incrementAndGet()
+                        is ImportResult.Duplicate -> duplicateCount.incrementAndGet()
+                        else -> failureCount.incrementAndGet()
+                    }
+                    setProgressAsync(
+                        Data.Builder()
+                            .putInt(KEY_PROGRESS_CURRENT, completedCount.incrementAndGet())
+                            .putInt(KEY_PROGRESS_TOTAL, uris.size)
+                            .build(),
+                    )
+                }
             }
-        }
+        }.awaitAll()
 
         val output = Data.Builder()
-            .putInt(KEY_RESULT_SUCCESS, successCount)
-            .putInt(KEY_RESULT_DUPLICATE, duplicateCount)
-            .putInt(KEY_RESULT_FAILURE, failureCount)
+            .putInt(KEY_RESULT_SUCCESS, successCount.get())
+            .putInt(KEY_RESULT_DUPLICATE, duplicateCount.get())
+            .putInt(KEY_RESULT_FAILURE, failureCount.get())
             .build()
-        return Result.success(output)
+        Result.success(output)
     }
 
     companion object {
@@ -73,5 +94,6 @@ class ImportWorker @AssistedInject constructor(
         const val KEY_RESULT_SUCCESS = "result_success"
         const val KEY_RESULT_DUPLICATE = "result_duplicate"
         const val KEY_RESULT_FAILURE = "result_failure"
+        private const val MAX_CONCURRENT_IMPORTS = 4
     }
 }

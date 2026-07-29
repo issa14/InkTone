@@ -7,6 +7,8 @@ import com.inktone.domain.service.FileStorageService
 import com.inktone.domain.service.ParseResult
 import com.inktone.domain.service.PublicationMetadata
 import com.inktone.domain.service.PublicationParser
+import kotlinx.coroutines.sync.Mutex
+import kotlinx.coroutines.sync.withLock
 import java.util.UUID
 
 /**
@@ -27,12 +29,23 @@ class ImportPublicationUseCase(
     private val publicationRepository: PublicationRepository,
     private val fileStorageService: FileStorageService,
 ) {
+    // Protege la section verification+insertion (Tache 6.3, K2) : plusieurs
+    // invocations concurrentes de la meme instance (ImportWorker parallelise,
+    // meme importPublication injecte une seule fois) peuvent partager un
+    // hash identique. Le parsing (couteux) reste hors verrou.
+    private val duplicateCheckMutex = Mutex()
+
     suspend operator fun invoke(fileUri: String): ImportResult {
         // 1. Hash AVANT de parser — evite de parser un doublon inutilement
         //    (le parsing d'un gros EPUB n'est pas gratuit, cf. Blueprint §11.2).
         val hash = fileStorageService.computeSha256(fileUri)
             ?: return ImportResult.Corrupted("Impossible de lire le fichier")
 
+        // Verification rapide hors verrou - evite de parser un doublon deja
+        // connu (le cas courant, non concurrent). Insuffisante seule sous
+        // execution parallele (Tache 6.3) : deux imports concurrents du
+        // meme hash peuvent tous deux la franchir avant que l'un des deux
+        // insere - d'ou la reverification protegee par mutex plus bas.
         publicationRepository.getByFileHash(hash)?.let {
             return ImportResult.Duplicate(existingPublicationId = it.id)
         }
@@ -46,13 +59,19 @@ class ImportPublicationUseCase(
             is ParseResult.Success -> buildPublication(parseResult, fileUri, hash)
         }
 
-        // 3. Persistance de la permission SAF AVANT insertion — si l'app est
-        //    tuee entre les deux, mieux vaut une permission orpheline
-        //    qu'une Publication en base pointant vers un URI inaccessible.
-        fileStorageService.persistReadPermission(fileUri)
-        publicationRepository.insert(publication)
-
-        return ImportResult.Success(publication)
+        // 3. Reverification + insertion atomiques sous verrou - seule
+        // section vraiment critique. Persistance de la permission SAF
+        // AVANT insertion — si l'app est tuee entre les deux, mieux vaut
+        // une permission orpheline qu'une Publication en base pointant
+        // vers un URI inaccessible.
+        return duplicateCheckMutex.withLock {
+            publicationRepository.getByFileHash(hash)?.let {
+                return@withLock ImportResult.Duplicate(existingPublicationId = it.id)
+            }
+            fileStorageService.persistReadPermission(fileUri)
+            publicationRepository.insert(publication)
+            ImportResult.Success(publication)
+        }
     }
 
     private suspend fun buildPublication(
