@@ -61,4 +61,12 @@ class SafFileStorageService @Inject constructor(
         }
         Unit
     }
+
+    override suspend fun writeToUri(uri: String, sourceFile: File): Boolean = withContext(Dispatchers.IO) {
+        runCatching {
+            resolver.openOutputStream(Uri.parse(uri))?.use { output ->
+                sourceFile.inputStream().use { input -> input.copyTo(output) }
+            } != null
+        }.getOrDefault(false)
+    }
 }
