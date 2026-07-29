@@ -3,25 +3,35 @@ package com.inktone.feature.reader
 import android.util.Log
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
+import com.inktone.domain.model.Annotation
+import com.inktone.domain.model.AnnotationColor
+import com.inktone.domain.model.Bookmark
 import com.inktone.domain.model.EffectiveReadingSettings
 import com.inktone.domain.model.Publication
 import com.inktone.domain.model.PublicationFormat
 import com.inktone.domain.model.ReadingState
 import com.inktone.domain.model.TtsEngineId
 import com.inktone.domain.model.VoiceProfile
+import com.inktone.domain.repository.AnnotationRepository
+import com.inktone.domain.repository.BookmarkRepository
 import com.inktone.domain.repository.PreferencesRepository
 import com.inktone.domain.repository.PublicationRepository
 import com.inktone.domain.service.ParseResult
 import com.inktone.domain.service.PublicationParser
 import com.inktone.domain.service.TtsEngine
+import com.inktone.domain.usecase.AddAnnotationUseCase
+import com.inktone.domain.usecase.CreateBookmarkUseCase
+import com.inktone.domain.usecase.DeleteBookmarkUseCase
 import com.inktone.domain.usecase.GetReadingStateUseCase
 import com.inktone.domain.usecase.UpdateReadingStateUseCase
+import com.inktone.domain.valueobject.Locator
 import dagger.hilt.android.lifecycle.HiltViewModel
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.launch
+import java.util.UUID
 import javax.inject.Inject
 
 /**
@@ -40,6 +50,11 @@ class ReaderViewModel @Inject constructor(
     private val getReadingState: GetReadingStateUseCase,
     private val publicationRepository: PublicationRepository,
     private val preferencesRepository: PreferencesRepository,
+    private val annotationRepository: AnnotationRepository,
+    private val addAnnotation: AddAnnotationUseCase,
+    private val bookmarkRepository: BookmarkRepository,
+    private val createBookmark: CreateBookmarkUseCase,
+    private val deleteBookmark: DeleteBookmarkUseCase,
 ) : ViewModel() {
 
     private val _state = MutableStateFlow(ReaderUiState())
@@ -48,18 +63,46 @@ class ReaderViewModel @Inject constructor(
     private var currentPublicationId: String? = null
     private val chapterPreloader = ChapterPreloader(viewModelScope)
     private val sentenceAudioBuffer = SentenceAudioBuffer(viewModelScope, ttsEngine)
+    private val annotationSelectionHandler = AnnotationSelectionHandler()
 
     fun onIntent(intent: ReaderIntent) {
         when (intent) {
-            is ReaderIntent.OpenPublication -> openPublication(intent.publicationId)
+            is ReaderIntent.OpenPublication -> {
+                val resourceHref = intent.targetResourceHref
+                val targetLocator = if (
+                    !resourceHref.isNullOrBlank() && intent.targetChapterIndex != null && intent.targetCharOffset != null
+                ) {
+                    Locator(
+                        resourceHref = resourceHref,
+                        chapterIndex = intent.targetChapterIndex,
+                        charOffset = intent.targetCharOffset,
+                    )
+                } else {
+                    null
+                }
+                openPublication(intent.publicationId, targetLocator)
+            }
             is ReaderIntent.BootstrapAndOpenFixture -> bootstrapAndOpenFixture(intent.publicationId, intent.fileUri)
-            is ReaderIntent.ImportAndOpen -> importAndOpen(intent.fileUri)
             is ReaderIntent.NextChapter -> navigateToChapter(_state.value.currentChapterIndex + 1)
             is ReaderIntent.PreviousChapter -> navigateToChapter(_state.value.currentChapterIndex - 1)
             is ReaderIntent.JumpToChapter -> navigateToChapter(intent.chapterIndex)
             is ReaderIntent.ToggleToc -> _state.value = _state.value.copy(isTocVisible = !_state.value.isTocVisible)
             is ReaderIntent.PlayCurrentSentence -> playCurrentSentence()
             is ReaderIntent.Pause -> _state.value = _state.value.copy(isPlaying = false)
+            is ReaderIntent.BeginSentenceSelection -> _state.value = _state.value.copy(
+                selectionAnchorIndex = intent.sentenceIndex, selectionFocusIndex = intent.sentenceIndex,
+            )
+            is ReaderIntent.ExtendSentenceSelection -> _state.value = _state.value.copy(selectionFocusIndex = intent.sentenceIndex)
+            is ReaderIntent.ClearSentenceSelection -> _state.value = _state.value.copy(
+                selectionAnchorIndex = null, selectionFocusIndex = null,
+            )
+            is ReaderIntent.ConfirmAnnotation -> confirmAnnotation(intent.color)
+            is ReaderIntent.CreateBookmark -> createBookmarkAtCurrentPosition()
+            is ReaderIntent.ToggleBookmarkList -> _state.value = _state.value.copy(
+                isBookmarkListVisible = !_state.value.isBookmarkListVisible,
+            )
+            is ReaderIntent.DeleteBookmark -> viewModelScope.launch { deleteBookmark(intent.id) }
+            is ReaderIntent.NavigateToLocator -> navigateToLocator(intent.locator)
         }
     }
 
@@ -70,7 +113,7 @@ class ReaderViewModel @Inject constructor(
      * Les cas d'erreur de parsing (Corrompu, DRM, format non supporté)
      * ne sont pas encore reflétés dans `ReaderUiState` — Tâche 4.8.
      */
-    private fun openPublication(publicationId: String) {
+    private fun openPublication(publicationId: String, targetLocator: Locator? = null) {
         viewModelScope.launch {
             val publication = publicationRepository.getById(publicationId) ?: run {
                 Log.w("ReaderViewModel", "openPublication: publication introuvable ($publicationId)")
@@ -95,46 +138,140 @@ class ReaderViewModel @Inject constructor(
                         effectiveSettings = effectiveSettings,
                     )
                     triggerPreload(_state.value.currentChapterIndex)
+                    observeAnnotations(publicationId)
+                    observeBookmarks(publicationId)
+                    // Tache 7.5 : arrivee depuis un resultat de recherche -
+                    // appelee ICI (dans la meme coroutine, apres que
+                    // _state.value.chapters soit peuple), pas via un second
+                    // dispatch d'intent qui s'executerait avant que
+                    // l'ouverture asynchrone soit terminee.
+                    if (targetLocator != null) navigateToLocator(targetLocator)
                 }
                 else -> Log.w("ReaderViewModel", "openPublication: echec de parsing ($result)")
             }
         }
     }
 
-    private fun bootstrapAndOpenFixture(publicationId: String, fileUri: String) {
+    /**
+     * Surlignage persistant (Tâche 7.1, critère de validation) : les
+     * annotations déjà créées doivent réapparaître sur le texte
+     * sélectionné à l'origine à la réouverture — observation continue,
+     * pas un chargement ponctuel figé au moment de l'ouverture.
+     */
+    private fun observeAnnotations(publicationId: String) {
         viewModelScope.launch {
-            publicationRepository.insert(
-                Publication(
-                    id = publicationId,
-                    title = "Fixture marche a blanc",
-                    format = PublicationFormat.EPUB,
-                    fileUri = fileUri,
-                    fileHash = "walking-skeleton-fixture-hash",
-                    fileSize = java.io.File(fileUri).length(),
-                    chapterCount = 1,
-                    importDate = System.currentTimeMillis(),
-                ),
-            )
-            openPublication(publicationId)
+            annotationRepository.observeForPublication(publicationId).collect { annotations ->
+                _state.value = _state.value.copy(annotations = annotations)
+            }
         }
     }
 
-    private fun importAndOpen(fileUri: String) {
+    /**
+     * Construit l'`Annotation` à partir de la plage de phrases sélectionnée
+     * (Tâche 7.1) — jamais d'offset arbitraire, l'index de `Sentence` est
+     * connu par construction (sélection par phrase, voir
+     * `AnnotationSelectionHandler`).
+     */
+    private fun confirmAnnotation(color: AnnotationColor) {
+        val range = _state.value.selectedSentenceRange ?: return
+        val chapter = _state.value.currentChapter ?: return
+        val publicationId = currentPublicationId ?: return
+        val sentences = chapter.paragraphs.flatMap { it.sentences }
+        val (startLocator, endLocator) = annotationSelectionHandler.resolveSelection(
+            sentences, range.first, range.last, chapter.index, chapter.href,
+        ) ?: return
+
         viewModelScope.launch {
-            val publicationId = "import-" + fileUri.hashCode().toUInt().toString(16)
-            publicationRepository.insert(
-                Publication(
-                    id = publicationId,
-                    title = "Import (Tache 4.11)",
-                    format = PublicationFormat.EPUB,
-                    fileUri = fileUri,
-                    fileHash = publicationId,
-                    fileSize = 0L,
-                    chapterCount = 0,
-                    importDate = System.currentTimeMillis(),
+            val now = System.currentTimeMillis()
+            addAnnotation(
+                Annotation(
+                    id = UUID.randomUUID().toString(),
+                    publicationId = publicationId,
+                    startLocator = startLocator,
+                    endLocator = endLocator,
+                    color = color,
+                    createdAt = now,
+                    updatedAt = now,
                 ),
             )
-            openPublication(publicationId)
+            _state.value = _state.value.copy(selectionAnchorIndex = null, selectionFocusIndex = null)
+        }
+    }
+
+    /** Tâche 7.2 — même principe que [observeAnnotations] : observation continue, pas un chargement figé. */
+    private fun observeBookmarks(publicationId: String) {
+        viewModelScope.launch {
+            bookmarkRepository.observeForPublication(publicationId).collect { bookmarks ->
+                _state.value = _state.value.copy(bookmarks = bookmarks)
+            }
+        }
+    }
+
+    /**
+     * Capture la position courante (Tâche 7.2) — plus simple que
+     * [confirmAnnotation] : un seul `Locator`, pas de plage à résoudre.
+     * Réutilise `Sentence.startLocator`, déjà utilisé par
+     * [persistPosition]/[playCurrentSentence] pour la même conversion.
+     */
+    private fun createBookmarkAtCurrentPosition() {
+        val chapter = _state.value.currentChapter ?: return
+        val sentence = chapter.paragraphs.flatMap { it.sentences }.getOrNull(_state.value.currentSentenceIndex) ?: return
+        val publicationId = currentPublicationId ?: return
+
+        viewModelScope.launch {
+            createBookmark(
+                Bookmark(
+                    id = UUID.randomUUID().toString(),
+                    publicationId = publicationId,
+                    locator = sentence.startLocator(chapterIndex = chapter.index, resourceHref = chapter.href),
+                    createdAt = System.currentTimeMillis(),
+                ),
+            )
+        }
+    }
+
+    /**
+     * Navigue vers un `Locator` de signet (Tâche 7.2) — change de chapitre
+     * si besoin puis positionne sur la `Sentence` la plus proche de
+     * `charOffset`, contrairement à `navigateToChapter` seul qui repositionne
+     * toujours à l'index 0.
+     */
+    private fun navigateToLocator(locator: Locator) {
+        val chapters = _state.value.chapters
+        if (locator.chapterIndex !in chapters.indices) return
+        val sentences = chapters[locator.chapterIndex].paragraphs.flatMap { it.sentences }
+        val sentenceIndex = sentences.indexOfFirst { locator.charOffset in it.startOffset..it.endOffset }.coerceAtLeast(0)
+
+        _state.value = _state.value.copy(
+            currentChapterIndex = locator.chapterIndex, currentSentenceIndex = sentenceIndex,
+            highlightedWordRange = null, isTocVisible = false, isBookmarkListVisible = false,
+        )
+        persistPosition(chapterIndex = locator.chapterIndex, sentenceIndex = sentenceIndex)
+        triggerPreload(locator.chapterIndex)
+    }
+
+    private fun bootstrapAndOpenFixture(publicationId: String, fileUri: String) {
+        viewModelScope.launch {
+            // Idempotent depuis que PublicationDao.insert() n'est plus
+            // OnConflictStrategy.REPLACE (Tache 7.1bis) : cette fixture a un
+            // id et un fileHash fixes, appelee a chaque lancement debug -
+            // sans cette verification, le deuxieme lancement sur un device
+            // deja utilise levait SQLiteConstraintException (crash reel
+            // observe en testant ce changement, pas suppose).
+            if (publicationRepository.getById(publicationId) == null) {
+                publicationRepository.insert(
+                    Publication(
+                        id = publicationId,
+                        title = "Fixture marche a blanc",
+                        format = PublicationFormat.EPUB,
+                        fileUri = fileUri,
+                        fileHash = "walking-skeleton-fixture-hash",
+                        fileSize = java.io.File(fileUri).length(),
+                        chapterCount = 1,
+                        importDate = System.currentTimeMillis(),
+                    ),
+                )
+            }
         }
     }
 

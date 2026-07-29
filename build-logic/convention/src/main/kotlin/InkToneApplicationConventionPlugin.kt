@@ -35,7 +35,12 @@ class InkToneApplicationConventionPlugin : Plugin<Project> {
                     versionName = "0.1.0"
                 }
 
-                buildFeatures { compose = true }
+                // buildConfig : expose BuildConfig.DEBUG a MainActivity, pour
+                // que le scaffolding de marche a blanc (BootstrapAndOpenFixture)
+                // ne puisse jamais s'executer sur un build de release (revue
+                // suite au bug OnConflictStrategy.REPLACE/CASCADE, voir
+                // PublicationDao).
+                buildFeatures { compose = true; buildConfig = true }
                 compileOptions {
                     sourceCompatibility = JavaVersion.VERSION_17
                     targetCompatibility = JavaVersion.VERSION_17
