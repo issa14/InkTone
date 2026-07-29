@@ -11,13 +11,34 @@ import java.util.zip.ZipOutputStream
 /**
  * Exporte toute la bibliothèque vers une seule destination SAF choisie par
  * l'utilisateur (Tâche 6.7) — contrat fixé en Phase 1
- * (`invoke(destinationUri)`, pas de sélection livre par livre). Une seule
- * URI de sortie pour plusieurs fichiers sources impose une archive : ZIP
- * plutôt qu'une arborescence SAF (`DocumentsContract.createDocument`),
- * qui exigerait d'étendre `FileStorageService` d'une capacité d'écriture
- * arborescente hors périmètre de la Tâche 6.0.
+ * (`invoke(destinationUri)`, pas de sélection livre par livre).
  *
- * Le fichier ZIP est assemblé dans un fichier temporaire JVM classique
+ * **ZIP retenu après comparaison réelle avec deux alternatives** (revue
+ * demandée après la décision initiale — comparaison complète et tableau
+ * dans `docs/execution/PHASE_6_LIBRARY_IMPORT.md` §6.7.1, pas seulement
+ * une confirmation) :
+ * - **Arborescence SAF** (`DocumentsContract.createDocument` sous un URI
+ *   d'arbre, un fichier EPUB par livre) : écartée non pas parce qu'elle
+ *   exigerait d'étendre [FileStorageService] (une extension légitime
+ *   aurait été faite si elle l'emportait réellement) mais parce qu'elle
+ *   n'est **pas atomique** — un échec à mi-parcours laisse un dossier
+ *   partiellement rempli, un état partiel implicite que le reste du
+ *   projet évite systématiquement (K3/K4) — et parce qu'elle casserait
+ *   le contrat `invoke(destinationUri)` déjà fixé en Phase 1 (elle exige
+ *   un URI d'arbre, pas un URI de fichier).
+ * - **Partage OS** (`Intent.ACTION_SEND_MULTIPLE`) : écartée sur un
+ *   critère technique dur, pas une préférence — la liste d'URI voyage
+ *   dans les extras de l'Intent (`ClipData`), soumise à la même limite
+ *   de taille de transaction Binder que `WorkManager.Data` (Tâche 6.2,
+ *   ~1 Mo, dépassée bien avant 500 entrées), et la plupart des apps
+ *   réceptrices plafonnent aussi le nombre de pièces jointes. Conçu pour
+ *   partager une poignée de fichiers choisis, pas exporter une
+ *   bibliothèque entière.
+ *
+ * ZIP l'emporte sur l'atomicité (l'archive est assemblée entièrement en
+ * local avant l'unique écriture SAF — échec = rien n'est écrit, jamais
+ * d'état à moitié exporté) et la stabilité du contrat existant. Le fichier
+ * ZIP est assemblé dans un fichier temporaire JVM classique
  * (`File.createTempFile` — pur Kotlin, aucune dépendance Android : le
  * domaine ne connaît que [FileStorageService] pour parler SAF), puis
  * écrit vers `destinationUri` via [FileStorageService.writeToUri]
