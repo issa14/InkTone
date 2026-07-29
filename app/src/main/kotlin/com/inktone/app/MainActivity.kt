@@ -1,21 +1,17 @@
 package com.inktone.app
 
-import android.content.Intent
 import android.os.Bundle
 import androidx.activity.ComponentActivity
-import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.compose.setContent
-import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.padding
-import androidx.compose.material3.Button
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Surface
-import androidx.compose.material3.Text
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.unit.dp
 import androidx.hilt.navigation.compose.hiltViewModel
+import com.inktone.feature.importer.ImportPickerButton
 import com.inktone.feature.reader.ReaderIntent
 import com.inktone.feature.reader.ReaderScreen
 import com.inktone.feature.reader.ReaderViewModel
@@ -25,9 +21,10 @@ import java.io.File
 /**
  * Point d'entree minimal pour le test manuel de la Phase 4 : heberge
  * ReaderScreen et ouvre le fixture EPUB embarque (copie de
- * fixture-minimal.epub, Phase 3) via BootstrapAndOpenFixture. Pas de
- * navigation reelle vers une bibliotheque — Phase 6 remplacera ceci par
- * le graphe de navigation complet et l'import SAF reel.
+ * fixture-minimal.epub, Phase 3) via BootstrapAndOpenFixture (debug
+ * uniquement). Pas de navigation reelle vers une bibliotheque — reste un
+ * artefact plus ancien que ce que la Phase 6 aurait du produire ici (pas
+ * corrige dans cette tache, signale separement).
  *
  * Injection par champ de PublicationRepository volontairement évitée
  * ici (KSP error.NonExistentClass, Tâche 3.7) : seule la copie de
@@ -35,10 +32,14 @@ import java.io.File
  * bootstrap réel de la Publication passe par ReaderViewModel
  * (injection par constructeur, qui fonctionne).
  *
- * Bouton « Importer » (Tâche 4.11) : sélecteur SAF minimal pour valider
- * le chemin réel `content://` -> `ReadiumPublicationParser` contre un
- * vrai EPUB, sans construire l'écran d'import complet de
- * `feature/import` (Phase 6).
+ * Import (Tâche 7.1bis) : `ImportPickerButton` (`feature/import`, Tâche
+ * 6.2bis) remplace le sélecteur SAF ad hoc de la Tâche 4.11
+ * (`ReaderIntent.ImportAndOpen`, retiré) — vrai pipeline `ImportWorker` +
+ * détection de doublons par hash, pas un raccourci qui contournait
+ * `ImportPublicationUseCase`. N'ouvre plus automatiquement le livre
+ * importé dans `ReaderScreen` : l'import est maintenant asynchrone
+ * (WorkManager) et il n'existe encore aucune navigation vers une
+ * bibliothèque pour choisir quoi ouvrir ensuite (voir plus haut).
  */
 @AndroidEntryPoint
 class MainActivity : ComponentActivity() {
@@ -76,17 +77,8 @@ class MainActivity : ComponentActivity() {
                         }
                     }
 
-                    val importLauncher = rememberLauncherForActivityResult(ActivityResultContracts.OpenDocument()) { uri ->
-                        if (uri != null) {
-                            contentResolver.takePersistableUriPermission(uri, Intent.FLAG_GRANT_READ_URI_PERMISSION)
-                            viewModel.onIntent(ReaderIntent.ImportAndOpen(uri.toString()))
-                        }
-                    }
-
                     Column(modifier = Modifier.padding(8.dp)) {
-                        Button(onClick = { importLauncher.launch(arrayOf("application/epub+zip", "application/octet-stream")) }) {
-                            Text("Importer (Tache 4.11)")
-                        }
+                        ImportPickerButton()
                         ReaderScreen(viewModel = viewModel)
                     }
                 }
