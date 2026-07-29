@@ -5,6 +5,7 @@ import com.inktone.domain.model.AnnotationColor
 import com.inktone.domain.model.Bookmark
 import com.inktone.domain.model.Chapter
 import com.inktone.domain.model.EffectiveReadingSettings
+import com.inktone.domain.model.ReadingOverrides
 import com.inktone.domain.model.ReadingTheme
 import com.inktone.domain.model.TableOfContentsEntry
 import com.inktone.domain.valueobject.Locator
@@ -33,6 +34,9 @@ data class ReaderUiState(
     val annotations: List<Annotation> = emptyList(),
     val bookmarks: List<Bookmark> = emptyList(),
     val isBookmarkListVisible: Boolean = false,
+    // Surcharge par publication actuellement active (Tache 8.2) - null =
+    // aucune surcharge, les reglages globaux s'appliquent tels quels.
+    val currentOverrides: ReadingOverrides? = null,
 ) {
     val currentChapter: Chapter? get() = chapters.getOrNull(currentChapterIndex)
     val hasNextChapter: Boolean get() = currentChapterIndex < chapters.lastIndex
@@ -97,4 +101,11 @@ sealed interface ReaderIntent {
 
     /** Navigue vers un `Locator` arbitraire — signet (Tâche 7.2) ou résultat de recherche (Tâche 7.5). */
     data class NavigateToLocator(val locator: Locator) : ReaderIntent
+
+    /**
+     * Tâche 8.2 — écrit la surcharge par publication (`ReadingState.overrides`)
+     * via `UpdateReadingStateUseCase`. `null` efface la surcharge : les
+     * réglages globaux (`UserPreferences`) reprennent la main.
+     */
+    data class SetOverrides(val overrides: ReadingOverrides?) : ReaderIntent
 }

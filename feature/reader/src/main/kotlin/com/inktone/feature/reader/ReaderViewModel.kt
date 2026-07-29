@@ -9,6 +9,7 @@ import com.inktone.domain.model.Bookmark
 import com.inktone.domain.model.EffectiveReadingSettings
 import com.inktone.domain.model.Publication
 import com.inktone.domain.model.PublicationFormat
+import com.inktone.domain.model.ReadingOverrides
 import com.inktone.domain.model.ReadingState
 import com.inktone.domain.model.TtsEngineId
 import com.inktone.domain.model.VoiceProfile
@@ -103,6 +104,29 @@ class ReaderViewModel @Inject constructor(
             )
             is ReaderIntent.DeleteBookmark -> viewModelScope.launch { deleteBookmark(intent.id) }
             is ReaderIntent.NavigateToLocator -> navigateToLocator(intent.locator)
+            is ReaderIntent.SetOverrides -> setOverrides(intent.overrides)
+        }
+    }
+
+    /**
+     * Tâche 8.2 — écrit la surcharge de publication et recalcule
+     * immédiatement `effectiveSettings` (cascade Blueprint §3.3) : la
+     * surcharge prime sur les préférences globales, jamais l'inverse.
+     */
+    private fun setOverrides(overrides: ReadingOverrides?) {
+        val publicationId = currentPublicationId ?: return
+        viewModelScope.launch {
+            val existing = getReadingState(publicationId)
+            val baseState = existing ?: ReadingState(
+                publicationId = publicationId,
+                locator = Locator(resourceHref = "unknown", chapterIndex = 0, charOffset = 0),
+                lastReadAt = System.currentTimeMillis(),
+            )
+            updateReadingState(baseState.copy(overrides = overrides, lastReadAt = System.currentTimeMillis()))
+            _state.value = _state.value.copy(
+                currentOverrides = overrides,
+                effectiveSettings = EffectiveReadingSettings.resolve(overrides, preferencesRepository.get()),
+            )
         }
     }
 
@@ -136,6 +160,7 @@ class ReaderViewModel @Inject constructor(
                         tableOfContents = result.documentModel.tableOfContents,
                         currentChapterIndex = restored?.locator?.chapterIndex ?: 0,
                         effectiveSettings = effectiveSettings,
+                        currentOverrides = restored?.overrides,
                     )
                     triggerPreload(_state.value.currentChapterIndex)
                     observeAnnotations(publicationId)
