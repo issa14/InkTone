@@ -1,12 +1,9 @@
 package com.inktone.app
 
-import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
-import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.padding
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
-import androidx.compose.material.icons.filled.Settings
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
@@ -22,8 +19,6 @@ import androidx.navigation.compose.NavHost
 import androidx.navigation.compose.composable
 import androidx.navigation.compose.rememberNavController
 import androidx.navigation.toRoute
-import com.inktone.core.designsystem.AppIcons
-import com.inktone.core.designsystem.InkToneSpacing
 import com.inktone.core.ui.AboutScreen
 import com.inktone.feature.importer.ImportPickerButton
 import com.inktone.feature.library.GlobalBookmarksScreen
@@ -54,24 +49,11 @@ fun InkToneNavHost(navController: NavHostController = rememberNavController()) {
             LibraryScreen(
                 onNavigateToReader = { publicationId -> navController.navigate(ReaderRoute(publicationId)) },
                 onOpenBookmarks = { navController.navigate(BookmarksRoute) },
-                floatingActionButton = {
-                    // Tache 9bis.4 (biblotheque complete) remplacera ce Row par
-                    // le drawer/menu 3-points prevu - point d'entree minimal en
-                    // attendant, sinon SearchRoute/SettingsRoute/StatisticsRoute
-                    // seraient des routes reelles mais jamais atteignables.
-                    Row(horizontalArrangement = Arrangement.spacedBy(InkToneSpacing.sm)) {
-                        IconButton(onClick = { navController.navigate(SearchRoute) }) {
-                            Icon(AppIcons.Search, contentDescription = "Rechercher")
-                        }
-                        IconButton(onClick = { navController.navigate(StatisticsRoute) }) {
-                            Icon(AppIcons.Stats, contentDescription = "Statistiques")
-                        }
-                        IconButton(onClick = { navController.navigate(SettingsRoute) }) {
-                            Icon(Icons.Filled.Settings, contentDescription = "Reglages")
-                        }
-                        ImportPickerButton()
-                    }
-                },
+                // Tache 1.0 (Partie 1) : seul l'import reste dans le FAB.
+                // Search/Stats/Settings sont atteignables uniquement depuis
+                // le drawer (Partie 2) — c'est tout l'interet d'avoir un
+                // drawer plutot que des icones eparpillees.
+                floatingActionButton = { ImportPickerButton() },
             )
         }
         composable<ReaderRoute> { entry ->
