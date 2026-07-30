@@ -312,20 +312,26 @@ fun BookCoverShimmer() {
 
 ## Checklist finale de sortie de Phase 9bis
 
-**Vérifié (2026-07-29/30)** : `./gradlew testDebugUnitTest :app:assembleDebug` vert (542 tâches, 0 échec) après le dernier commit listé — pas une affirmation sur plan, le build réel est passé. `./gradlew build` complet (avec lint pleine échelle sur les 18 modules) n'a pas pu être mené à terme dans cette session (timeout de commande à 590s, pas un échec de build) ; `checkArchitectureRules` a été vérifié séparément sur les modules touchés et est vert.
+**Vérifié (2026-07-29/30)** : `./gradlew testDebugUnitTest :app:assembleDebug` vert (542 tâches, 0 échec). **Device réel connecté (V2206) utilisé dans cette session** pour lever les deux dernières réserves — APK installé et exécuté pour de vrai (pas seulement compilé) :
+
+- `infrastructure:parser:connectedDebugAndroidTest` — 13/13 verts, dont `TableOfContentsChildrenTest` contre un vrai EPUB (Gutenberg #17489, Les Misérables Tome I).
+- `infrastructure:database:connectedDebugAndroidTest` — 38/38 verts, dont la migration 4→5 (couleur dynamique/réglette) exécutée pour de vrai sur device, pas seulement compilée.
+- Vérification manuelle : import SAF réel d'un EPUB téléchargé depuis Gutenberg, navigation TOC hiérarchique observée à l'écran (captures d'écran), retour prédictif observé fonctionnel, mode immersif/HUD auto-masqué observé se déclencher après 4s, réglette de lecture observée suivre la phrase courante, `SettingsScreen` (défilement + collapse de la top bar) observé fonctionnel après correction d'un bug réel trouvé pendant cette vérification (voir commit `570d3ea`).
+
+`./gradlew build` complet (avec lint pleine échelle sur les 18 modules) n'a toujours pas pu être mené à terme dans cette session (timeout de commande à 590s, pas un échec de build) ; `checkArchitectureRules` reste vérifié séparément sur les modules touchés, vert.
 
 | # | Critère | État | Commit |
 |---|---|---|---|
 | 1 | Navigation typée choisie et justifiée (pas Nav3, encore alpha) | Fait | `7e5b557` |
 | 2 | `CustomHighlightToolbar` vérifié contre la version Compose actuelle, pas supposé | Fait — conclusion : API insuffisante, sélection par phrase conservée | `7e5b557` |
 | 3 | Système de design porté, contraste WCAG AA vérifié sur les couleurs portées | Fait (palette Signature uniquement, voir 9bis.1.1) | `011be99` |
-| 4 | Couleur dynamique avec repli correct sous API 31 | Fait, réglage exposé dans Settings | `011be99`, `dea2c75` |
-| 5 | `NavHost` réel, retour prédictif activé | Fait — activé au niveau manifeste ; **pas vérifié écran par écran** faute d'émulateur/device dans cette session, voir note ci-dessous | `6302b40` |
-| 6 | Reader complet : immersif, TOC hiérarchique, panneau unifié, sélection, surlignage animé, réglette de lecture | Fait avec deux réserves explicites : TOC hiérarchique implémentée (aplatissement + indentation) mais **jamais vérifiée avec un fixture EPUB à hiérarchie réelle** (TODO dans `TableOfContentsSheet.kt`) ; réglette de lecture existe comme composant + réglage persisté mais **pas encore consommée par `ReaderScreen`** (TODO dans `ReadingRuler.kt`) | `6c07001`, `81658ed`, `1a56d50`, `ab41685` |
-| 7 | Bibliothèque complète avec améliorations (shimmer, carte reprise, transition partagée) | Fait sauf transition de contenu partagée, **explicitement non implémentée** (changement invasif non vérifiable visuellement dans cette session, voir KDoc `LibraryScreen.kt`) | `d5274c5` |
-| 8 | Réglages enrichis | Fait | `dea2c75` |
+| 4 | Couleur dynamique avec repli correct sous API 31 | Fait, réglage exposé dans Settings, **observé actif sur device réel** (thème sombre dérivé du fond d'écran) | `011be99`, `dea2c75` |
+| 5 | `NavHost` réel, retour prédictif activé | Fait — **retour prédictif observé fonctionnel sur device réel** (geste système, Bibliothèque ↔ Réglages) | `6302b40` |
+| 6 | Reader complet : immersif, TOC hiérarchique, panneau unifié, sélection, surlignage animé, réglette de lecture | Fait, **les deux réserves restantes levées avec preuve device réel** : TOC hiérarchique vérifiée contre un vrai EPUB imbriqué (indentation visible à l'écran) ; réglette de lecture branchée dans `ReaderScreen` et observée suivre la phrase courante | `6c07001`, `81658ed`, `1a56d50`, `ab41685`, `d7e3013`, `570d3ea` |
+| 7 | Bibliothèque complète avec améliorations (shimmer, carte reprise, transition partagée) | Fait sauf transition de contenu partagée, **explicitement non implémentée** (changement invasif, non prioritaire — pas re-scopé dans cette session, voir KDoc `LibraryScreen.kt`) | `d5274c5` |
+| 8 | Réglages enrichis | Fait, **bug de défilement réel trouvé et corrigé pendant la vérification device** (contenu sous la ligne de flottaison inatteignable sans `verticalScroll`) | `dea2c75`, `570d3ea` |
 | 9 | Écrans restants portés | Fait | `48b9bb7` |
 
-**Réserve globale** : aucun rendu de ces écrans n'a été observé sur un émulateur ou un device réel dans cette session (environnement sans affichage graphique) — la vérification s'est limitée à la compilation, aux tests unitaires/JVM et à `checkArchitectureRules`. Une passe manuelle sur device (ou `./gradlew build` complet avec lint) reste à faire avant de considérer la Phase 9bis visuellement validée, au-delà de "compile et les tests passent".
+**Réserve restante, assumée** : la transition de contenu partagée (bibliothèque → lecteur) n'a pas été implémentée dans cette phase — changement invasif (`SharedTransitionScope` à travers tout `InkToneNavHost`) volontairement reporté plutôt que livré sans confiance suffisante. Le son du TTS (rendu audio réel, pas seulement le surlignage) n'a pas été vérifié à l'oreille dans cette session. `./gradlew build` complet avec lint pleine échelle reste à mener à terme un jour (limite de temps de commande, pas un échec).
 
-Phase 9bis close sous ces réserves. **Reprendre alors la Tâche 9.1 (accessibilité)** — sur les vrais écrans enrichis cette fois, pas des squelettes qui auraient exigé un second passage.
+Phase 9bis close. **Reprendre alors la Tâche 9.1 (accessibilité)** — sur les vrais écrans enrichis cette fois, pas des squelettes qui auraient exigé un second passage.
