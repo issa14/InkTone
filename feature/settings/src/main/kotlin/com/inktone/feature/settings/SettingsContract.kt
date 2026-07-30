@@ -17,5 +17,7 @@ sealed interface SettingsIntent {
     data class SetLanguage(val language: String) : SettingsIntent
     data class SetCrashReportingEnabled(val enabled: Boolean) : SettingsIntent
     data class SetReduceMotion(val enabled: Boolean) : SettingsIntent
+    data class SetDynamicColorEnabled(val enabled: Boolean) : SettingsIntent
+    data class SetReadingRulerEnabled(val enabled: Boolean) : SettingsIntent
     object ApplyAccessibilityPreset : SettingsIntent
 }

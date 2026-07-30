@@ -1,4 +1,4 @@
-package com.inktone.feature.reader
+package com.inktone.core.designsystem
 
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.luminance

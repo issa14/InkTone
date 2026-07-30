@@ -47,6 +47,10 @@ class SettingsViewModel @Inject constructor(
                 is SettingsIntent.SetCrashReportingEnabled ->
                     preferencesRepository.update(current.copy(crashReportingEnabled = intent.enabled))
                 is SettingsIntent.SetReduceMotion -> preferencesRepository.update(current.copy(reduceMotion = intent.enabled))
+                is SettingsIntent.SetDynamicColorEnabled ->
+                    preferencesRepository.update(current.copy(dynamicColorEnabled = intent.enabled))
+                is SettingsIntent.SetReadingRulerEnabled ->
+                    preferencesRepository.update(current.copy(readingRulerEnabled = intent.enabled))
                 is SettingsIntent.ApplyAccessibilityPreset -> applyAccessibilityPreset()
             }
         }
