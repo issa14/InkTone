@@ -37,3 +37,9 @@ object PronunciationRulesRoute
 
 @Serializable
 object StatisticsRoute
+
+@Serializable
+object BookmarksRoute
+
+@Serializable
+object AboutRoute

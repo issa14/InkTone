@@ -24,7 +24,9 @@ import androidx.navigation.compose.rememberNavController
 import androidx.navigation.toRoute
 import com.inktone.core.designsystem.AppIcons
 import com.inktone.core.designsystem.InkToneSpacing
+import com.inktone.core.ui.AboutScreen
 import com.inktone.feature.importer.ImportPickerButton
+import com.inktone.feature.library.GlobalBookmarksScreen
 import com.inktone.feature.library.LibraryScreen
 import com.inktone.feature.reader.ReaderIntent
 import com.inktone.feature.reader.ReaderScreen
@@ -51,6 +53,7 @@ fun InkToneNavHost(navController: NavHostController = rememberNavController()) {
         composable<LibraryRoute> {
             LibraryScreen(
                 onNavigateToReader = { publicationId -> navController.navigate(ReaderRoute(publicationId)) },
+                onOpenBookmarks = { navController.navigate(BookmarksRoute) },
                 floatingActionButton = {
                     // Tache 9bis.4 (biblotheque complete) remplacera ce Row par
                     // le drawer/menu 3-points prevu - point d'entree minimal en
@@ -108,6 +111,7 @@ fun InkToneNavHost(navController: NavHostController = rememberNavController()) {
             // generique ici contrairement aux autres destinations.
             SettingsScreen(
                 onOpenPronunciationRules = { navController.navigate(PronunciationRulesRoute) },
+                onOpenAbout = { navController.navigate(AboutRoute) },
                 onBack = navController::popBackStack,
             )
         }
@@ -119,6 +123,27 @@ fun InkToneNavHost(navController: NavHostController = rememberNavController()) {
         composable<StatisticsRoute> {
             BackScaffold(title = "Statistiques", onBack = navController::popBackStack) {
                 StatisticsScreen()
+            }
+        }
+        composable<BookmarksRoute> {
+            BackScaffold(title = "Signets", onBack = navController::popBackStack) {
+                GlobalBookmarksScreen(
+                    onNavigateToReader = { publicationId, resourceHref, chapterIndex, charOffset ->
+                        navController.navigate(
+                            ReaderRoute(
+                                publicationId = publicationId,
+                                targetResourceHref = resourceHref,
+                                targetChapterIndex = chapterIndex,
+                                targetCharOffset = charOffset,
+                            ),
+                        )
+                    },
+                )
+            }
+        }
+        composable<AboutRoute> {
+            BackScaffold(title = "A propos", onBack = navController::popBackStack) {
+                AboutScreen()
             }
         }
     }

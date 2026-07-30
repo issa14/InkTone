@@ -49,6 +49,7 @@ import com.inktone.domain.model.UserPreferences
 fun SettingsScreen(
     viewModel: SettingsViewModel = hiltViewModel(),
     onOpenPronunciationRules: () -> Unit = {},
+    onOpenAbout: () -> Unit = {},
     onBack: () -> Unit = {},
 ) {
     val state by viewModel.state.collectAsState()
@@ -69,7 +70,7 @@ fun SettingsScreen(
         },
     ) { innerPadding ->
         Box(Modifier.padding(innerPadding)) {
-            SettingsContent(state.preferences, viewModel::onIntent, onOpenPronunciationRules)
+            SettingsContent(state.preferences, viewModel::onIntent, onOpenPronunciationRules, onOpenAbout)
         }
     }
 }
@@ -84,6 +85,7 @@ internal fun SettingsContent(
     preferences: UserPreferences,
     onIntent: (SettingsIntent) -> Unit,
     onOpenPronunciationRules: () -> Unit = {},
+    onOpenAbout: () -> Unit = {},
 ) {
     Column(modifier = Modifier.padding(16.dp)) {
         SectionGroup("Lecture") {
@@ -142,6 +144,9 @@ internal fun SettingsContent(
             ) {
                 Text("Appliquer le preregalage d'accessibilite")
             }
+        }
+        SectionGroup("A propos") {
+            SettingRow("InkTone", "Voir") { onOpenAbout() }
         }
     }
 }

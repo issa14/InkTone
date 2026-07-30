@@ -86,6 +86,7 @@ fun LibraryScreen(
     onNavigateToReader: (String) -> Unit,
     viewModel: LibraryViewModel = hiltViewModel(),
     floatingActionButton: @Composable () -> Unit = {},
+    onOpenBookmarks: () -> Unit = {},
 ) {
     val state by viewModel.state.collectAsState()
     val drawerState = rememberDrawerState(DrawerValue.Closed)
@@ -108,6 +109,10 @@ fun LibraryScreen(
                     onSelectFilter = { filter, value ->
                         viewModel.onIntent(LibraryIntent.ChangeFilter(filter, value))
                         scope.launch { drawerState.close() }
+                    },
+                    onOpenBookmarks = {
+                        scope.launch { drawerState.close() }
+                        onOpenBookmarks()
                     },
                 )
             }
@@ -147,7 +152,7 @@ fun LibraryScreen(
 }
 
 @Composable
-private fun LibraryDrawerContent(state: LibraryUiState, onSelectFilter: (FilterMode, String?) -> Unit) {
+private fun LibraryDrawerContent(state: LibraryUiState, onSelectFilter: (FilterMode, String?) -> Unit, onOpenBookmarks: () -> Unit) {
     Column(Modifier.padding(16.dp)) {
         Text("Bibliothèque", style = MaterialTheme.typography.titleMedium, modifier = Modifier.padding(bottom = 8.dp))
         SelectableFilters.forEach { filter ->
@@ -157,6 +162,12 @@ private fun LibraryDrawerContent(state: LibraryUiState, onSelectFilter: (FilterM
                 onClick = { onSelectFilter(filter, null) },
             )
         }
+        NavigationDrawerItem(
+            label = { Text("Signets") },
+            icon = { Icon(AppIcons.Bookmark, contentDescription = null) },
+            selected = false,
+            onClick = onOpenBookmarks,
+        )
         if (state.availableSeries.isNotEmpty()) {
             Text("Séries", style = MaterialTheme.typography.titleSmall, modifier = Modifier.padding(top = 16.dp, bottom = 4.dp))
             state.availableSeries.forEach { series ->
