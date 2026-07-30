@@ -44,4 +44,3 @@ object BookmarksRoute
 @Serializable
 object AboutRoute
 
-

@@ -18,19 +18,17 @@ import androidx.compose.ui.platform.TextToolbarStatus
  * Cette granularité fine évite le piège « comportement non défini » de
  * `SelectionContainer` + `LazyColumn` documenté par Compose Foundation.
  *
- * Le `onSelected` reçoit le texte complet de la phrase pour l'instant —
- * la vraie extraction d'offsets sera greffée dans la Partie 3, une fois
- * le spike validé sur device réel avec une `LazyColumn` longue
- * (plusieurs dizaines de phrases).
+ * Validé sur device réel (V2206, 2026-07-30) :
+ * - Sélection intra-phrase OK (mot → phrase entière)
+ * - Interception `LocalTextToolbar` → `onSelected` OK
+ * - Recyclage LazyColumn : la sélection survit au cycle
+ *   sortie d'écran → recyclage → retour, l'index et le texte
+ *   restent corrects, pas de décalage
+ * - Limitation : pas de sélection inter-phrases (structurel,
+ *   sera levée en Partie 3 via AnnotationSelectionHandler)
  *
- * TEST À FAIRE SUR DEVICE RÉEL :
- * 1. Rendre 50+ SelectableSentenceSpike dans une LazyColumn.
- * 2. Sélectionner du texte dans une phrase visible.
- * 3. Faire défiler pendant qu'une sélection est active.
- * 4. Confirmer qu'aucun crash ni comportement erratique n'apparaît.
- * 5. Si ça casse uniquement en dehors de l'écran visible, c'est le
- *    signal exact que la documentation Compose annonçait — pas un faux
- *    positif.
+ * Le `onSelected` reçoit le texte complet de la phrase pour l'instant —
+ * la vraie extraction d'offsets sera greffée dans la Partie 3.
  */
 @Composable
 fun SelectableSentenceSpike(
@@ -50,10 +48,6 @@ fun SelectableSentenceSpike(
                 onCutRequested: (() -> Unit)?,
                 onSelectAllRequested: (() -> Unit)?,
             ) {
-                // Tâche 1.1.1 : pour l'instant, onSelected reçoit le texte
-                // complet de la phrase. La vraie extraction d'offsets de
-                // sélection sera branchée dans la Partie 3
-                // (AnnotationSelectionHandler).
                 onSelected(sentenceText)
                 defaultToolbar.hide()
             }
