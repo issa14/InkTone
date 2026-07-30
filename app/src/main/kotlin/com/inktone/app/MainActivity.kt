@@ -8,11 +8,14 @@ import androidx.compose.material3.windowsizeclass.ExperimentalMaterial3WindowSiz
 import androidx.compose.material3.windowsizeclass.calculateWindowSizeClass
 import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.collectAsState
+import androidx.compose.runtime.getValue
 import androidx.hilt.navigation.compose.hiltViewModel
 import com.inktone.core.designsystem.InkToneTheme
 import com.inktone.core.designsystem.LocalWindowSizeClass
 import com.inktone.feature.reader.ReaderIntent
 import com.inktone.feature.reader.ReaderViewModel
+import com.inktone.feature.settings.AppThemeViewModel
 import dagger.hilt.android.AndroidEntryPoint
 import java.io.File
 
@@ -45,7 +48,9 @@ class MainActivity : ComponentActivity() {
             // encore (pas de mode tablette double page, hors perimetre v1).
             val windowSizeClass = calculateWindowSizeClass(this)
             CompositionLocalProvider(LocalWindowSizeClass provides windowSizeClass) {
-                InkToneTheme {
+                val appThemeViewModel: AppThemeViewModel = hiltViewModel()
+                val useDynamicColor by appThemeViewModel.useDynamicColor.collectAsState()
+                InkToneTheme(useDynamicColor = useDynamicColor) {
                     Surface {
                         if (BuildConfig.DEBUG) {
                             val bootstrapViewModel: ReaderViewModel = hiltViewModel()

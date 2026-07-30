@@ -16,11 +16,12 @@ import androidx.compose.ui.unit.dp
  * la ligne en cours, aide documentee pour plusieurs conditions visuelles
  * et la dyslexie, absente du legacy.
  *
- * TODO(pas encore appele depuis ReaderScreen, Tache 9bis.5) : le reglage
- * on/off doit vivre dans `UserPreferences` (Blueprint, migration Room +
- * test dans le meme commit, K4) et etre expose par `SettingsScreen` -
- * hors perimetre de cette seule tache Reader. `currentLineY` devra venir
- * du `Modifier.onGloballyPositioned` de la phrase en cours de lecture TTS
+ * TODO(pas encore appele depuis ReaderScreen) : `UserPreferences.readingRulerEnabled`
+ * existe et est reglable depuis `SettingsScreen` (Tache 9bis.5), mais
+ * `ReaderUiState`/`ReaderViewModel` ne l'exposent pas encore (n'observent
+ * que `EffectiveReadingSettings`, theme/taille de police uniquement) -
+ * reste a fil tirer. `currentLineY` devra venir du
+ * `Modifier.onGloballyPositioned` de la phrase en cours de lecture TTS
  * dans `ReaderScreen`, non plus branche pour l'instant.
  */
 @Composable

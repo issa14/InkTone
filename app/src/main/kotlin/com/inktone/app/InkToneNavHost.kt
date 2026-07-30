@@ -103,9 +103,13 @@ fun InkToneNavHost(navController: NavHostController = rememberNavController()) {
             }
         }
         composable<SettingsRoute> {
-            BackScaffold(title = "Reglages", onBack = navController::popBackStack) {
-                SettingsScreen(onOpenPronunciationRules = { navController.navigate(PronunciationRulesRoute) })
-            }
+            // Tache 9bis.5 : SettingsScreen possede desormais son propre
+            // Scaffold/LargeTopAppBar (effet de collapse), pas de BackScaffold
+            // generique ici contrairement aux autres destinations.
+            SettingsScreen(
+                onOpenPronunciationRules = { navController.navigate(PronunciationRulesRoute) },
+                onBack = navController::popBackStack,
+            )
         }
         composable<PronunciationRulesRoute> {
             BackScaffold(title = "Regles de prononciation", onBack = navController::popBackStack) {
