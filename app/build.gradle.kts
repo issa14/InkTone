@@ -1,5 +1,6 @@
 plugins {
     id("inktone.application")
+    alias(libs.plugins.kotlin.serialization)
 }
 
 android {
@@ -46,6 +47,12 @@ dependencies {
     // complete, hors de portee de la marche a blanc (Phase 4).
     implementation("androidx.activity:activity-compose:1.9.1")
     implementation(libs.androidx.hilt.navigation.compose)
+
+    // Tache 9bis.0.1/9bis.2 : Compose Navigation 2.8+ a routes typees
+    // (@Serializable), remplace l'etat AppScreen a 3 cas (Phase 7).
+    // Navigation 3 ecarte : encore en alpha (1.0.0-alpha07) mi-2026.
+    implementation(libs.androidx.navigation.compose)
+    implementation(libs.kotlinx.serialization.json)
 
     // Tache 9.0.2 : calculateWindowSizeClass(this) dans MainActivity,
     // fondation LocalWindowSizeClass (core:designsystem) - pas de mode

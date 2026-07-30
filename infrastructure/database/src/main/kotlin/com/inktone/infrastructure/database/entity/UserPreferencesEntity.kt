@@ -15,4 +15,6 @@ data class UserPreferencesEntity(
     val language: String,
     val fontFamily: String = "DEFAULT",
     val reduceMotion: Boolean = false,
+    val dynamicColorEnabled: Boolean = true,
+    val readingRulerEnabled: Boolean = false,
 )

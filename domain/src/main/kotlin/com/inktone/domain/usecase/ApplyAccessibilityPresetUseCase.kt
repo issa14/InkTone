@@ -20,6 +20,9 @@ class ApplyAccessibilityPresetUseCase(
                 theme = ReadingTheme.LIGHT,
                 fontFamily = FontFamily.OPEN_DYSLEXIC,
                 reduceMotion = true,
+                // Tache 9bis.3.6 - extension notee dans le plan Phase 9bis :
+                // la reglette de lecture fait partie du preregalage.
+                readingRulerEnabled = true,
             ),
         )
     }

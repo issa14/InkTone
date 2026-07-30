@@ -1,20 +1,32 @@
 package com.inktone.feature.settings
 
 import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.selection.toggleable
+import androidx.compose.foundation.verticalScroll
+import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material3.Button
+import androidx.compose.material3.ExperimentalMaterial3Api
+import androidx.compose.material3.Icon
+import androidx.compose.material3.IconButton
+import androidx.compose.material3.LargeTopAppBar
+import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Slider
 import androidx.compose.material3.Switch
 import androidx.compose.material3.Text
+import androidx.compose.material3.TopAppBarDefaults
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.input.nestedscroll.nestedScroll
 import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.semantics
@@ -27,14 +39,42 @@ import com.inktone.domain.model.UserPreferences
  * un reglage, tuer l'app, la rouvrir - le reglage persiste
  * (PreferencesRepository Room-backed depuis la Phase 2, deja teste en
  * isolation ; cette tache prouve le chemin UI complet).
+ *
+ * Tache 9bis.5 — `LargeTopAppBar` avec effet de collapse au defilement
+ * (`TopAppBarDefaults.exitUntilCollapsedScrollBehavior`) plutot qu'un
+ * en-tete statique, absent du legacy. Portee par cet ecran lui-meme
+ * (pas par `BackScaffold`/`InkToneNavHost`, Tache 9bis.2) pour avoir acces
+ * au `scrollBehavior` partage avec le contenu defilant.
  */
+@OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun SettingsScreen(
     viewModel: SettingsViewModel = hiltViewModel(),
     onOpenPronunciationRules: () -> Unit = {},
+    onOpenAbout: () -> Unit = {},
+    onBack: () -> Unit = {},
 ) {
     val state by viewModel.state.collectAsState()
-    SettingsContent(state.preferences, viewModel::onIntent, onOpenPronunciationRules)
+    val scrollBehavior = TopAppBarDefaults.exitUntilCollapsedScrollBehavior()
+
+    Scaffold(
+        modifier = Modifier.nestedScroll(scrollBehavior.nestedScrollConnection),
+        topBar = {
+            LargeTopAppBar(
+                title = { Text("Reglages") },
+                navigationIcon = {
+                    IconButton(onClick = onBack) {
+                        Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = "Retour")
+                    }
+                },
+                scrollBehavior = scrollBehavior,
+            )
+        },
+    ) { innerPadding ->
+        Box(Modifier.padding(innerPadding)) {
+            SettingsContent(state.preferences, viewModel::onIntent, onOpenPronunciationRules, onOpenAbout)
+        }
+    }
 }
 
 /**
@@ -47,8 +87,15 @@ internal fun SettingsContent(
     preferences: UserPreferences,
     onIntent: (SettingsIntent) -> Unit,
     onOpenPronunciationRules: () -> Unit = {},
+    onOpenAbout: () -> Unit = {},
 ) {
-    Column(modifier = Modifier.padding(16.dp)) {
+    // Bug reel trouve en testant sur device (verification manuelle,
+    // Tache 9bis suite) : sans verticalScroll ici, le contenu qui deborde
+    // de l'ecran (reglette de lecture, preregalage, a propos) etait
+    // inatteignable - ET le LargeTopAppBar (Tache 9bis.5) n'avait rien a
+    // quoi accrocher son effet de collapse (aucun enfant scrollable ne
+    // produit de delta de defilement).
+    Column(modifier = Modifier.padding(16.dp).verticalScroll(rememberScrollState())) {
         SectionGroup("Lecture") {
             SettingRow("Theme", preferences.theme.name) {
                 onIntent(SettingsIntent.SetTheme(nextEnumValue(preferences.theme)))
@@ -77,17 +124,37 @@ internal fun SettingsContent(
                 preferences.crashReportingEnabled,
             ) { onIntent(SettingsIntent.SetCrashReportingEnabled(it)) }
         }
+        SectionGroup("Apparence") {
+            // Tache 9bis.1.2/9bis.5 - consomme par AppThemeViewModel
+            // (module app, MainActivity), pas par SettingsViewModel lui-meme :
+            // InkToneTheme s'applique avant tout hiltViewModel() scope a une
+            // destination de navigation.
+            ToggleSetting(
+                "Couleur dynamique (Material You)",
+                preferences.dynamicColorEnabled,
+            ) { onIntent(SettingsIntent.SetDynamicColorEnabled(it)) }
+        }
         SectionGroup("Accessibilite") {
             ToggleSetting(
                 "Reduire les animations",
                 preferences.reduceMotion,
             ) { onIntent(SettingsIntent.SetReduceMotion(it)) }
+            // Tache 9bis.3.6 - reglage seul pour l'instant, ReaderScreen ne
+            // consomme pas encore ce champ (voir TODO sur ReadingRuler.kt,
+            // feature/reader).
+            ToggleSetting(
+                "Reglette de lecture",
+                preferences.readingRulerEnabled,
+            ) { onIntent(SettingsIntent.SetReadingRulerEnabled(it)) }
             Button(
                 onClick = { onIntent(SettingsIntent.ApplyAccessibilityPreset) },
                 modifier = Modifier.heightIn(min = 48.dp),
             ) {
                 Text("Appliquer le preregalage d'accessibilite")
             }
+        }
+        SectionGroup("A propos") {
+            SettingRow("InkTone", "Voir") { onOpenAbout() }
         }
     }
 }

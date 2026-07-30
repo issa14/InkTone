@@ -46,3 +46,11 @@ val MIGRATION_3_4 = object : Migration(3, 4) {
         )
     }
 }
+
+/** Tache 9bis.5 : couleur dynamique et reglette de lecture (reglages). */
+val MIGRATION_4_5 = object : Migration(4, 5) {
+    override fun migrate(db: SupportSQLiteDatabase) {
+        db.execSQL("ALTER TABLE user_preferences ADD COLUMN dynamicColorEnabled INTEGER NOT NULL DEFAULT 1")
+        db.execSQL("ALTER TABLE user_preferences ADD COLUMN readingRulerEnabled INTEGER NOT NULL DEFAULT 0")
+    }
+}

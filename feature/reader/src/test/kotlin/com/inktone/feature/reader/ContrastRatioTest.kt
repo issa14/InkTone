@@ -1,5 +1,6 @@
 package com.inktone.feature.reader
 
+import com.inktone.core.designsystem.calculateContrastRatio
 import com.inktone.domain.model.ReadingTheme
 import org.junit.Assert.assertTrue
 import org.junit.Test

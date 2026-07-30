@@ -129,6 +129,27 @@ class DatabaseMigrationTest {
         v4.close()
     }
 
+    @Test
+    fun migration_4_vers_5_conserve_les_donnees_et_ajoute_dynamicColorEnabled_readingRulerEnabled() {
+        val v4 = helper.createDatabase(TEST_DB_NAME, 4)
+        v4.execSQL(
+            """
+            INSERT INTO user_preferences (id, theme, fontSize, defaultTtsEngine, crashReportingEnabled, language, fontFamily, reduceMotion)
+            VALUES (0, 'SYSTEM', 18, 'SHERPA_ONNX', 0, 'fr', 'DEFAULT', 0)
+            """.trimIndent(),
+        )
+        v4.close()
+
+        val v5 = helper.runMigrationsAndValidate(TEST_DB_NAME, 5, true, MIGRATION_2_3, MIGRATION_3_4, MIGRATION_4_5)
+
+        v5.query("SELECT dynamicColorEnabled, readingRulerEnabled FROM user_preferences WHERE id = 0").use { cursor ->
+            assertEquals(true, cursor.moveToFirst())
+            assertEquals(1, cursor.getInt(0))
+            assertEquals(0, cursor.getInt(1))
+        }
+        v5.close()
+    }
+
     companion object {
         private const val TEST_DB_NAME = "migration-test"
     }
