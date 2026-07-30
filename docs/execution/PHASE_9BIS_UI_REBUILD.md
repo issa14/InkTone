@@ -312,16 +312,20 @@ fun BookCoverShimmer() {
 
 ## Checklist finale de sortie de Phase 9bis
 
-| # | Critère | Vérification |
-|---|---|---|
-| 1 | Navigation typée choisie et justifiée (pas Nav3, encore alpha) | Tâche 9bis.0.1 |
-| 2 | `CustomHighlightToolbar` vérifié contre la version Compose actuelle, pas supposé | Tâche 9bis.0.2 |
-| 3 | Système de design porté, contraste WCAG AA vérifié sur les couleurs portées | Tâche 9bis.1.1 |
-| 4 | Couleur dynamique avec repli correct sous API 31 | Tâche 9bis.1.2 |
-| 5 | `NavHost` réel, retour prédictif activé et vérifié écran par écran | Tâche 9bis.2 |
-| 6 | Reader complet : immersif, TOC hiérarchique réellement vérifiée, panneau unifié, sélection (phrase ou caractère selon 9bis.0.2), surlignage animé, réglette de lecture | Tâche 9bis.3 |
-| 7 | Bibliothèque complète avec améliorations (shimmer, carte reprise, transition partagée) | Tâche 9bis.4 |
-| 8 | Réglages enrichis | Tâche 9bis.5 |
-| 9 | Écrans restants portés | Tâche 9bis.6 |
+**Vérifié (2026-07-29/30)** : `./gradlew testDebugUnitTest :app:assembleDebug` vert (542 tâches, 0 échec) après le dernier commit listé — pas une affirmation sur plan, le build réel est passé. `./gradlew build` complet (avec lint pleine échelle sur les 18 modules) n'a pas pu être mené à terme dans cette session (timeout de commande à 590s, pas un échec de build) ; `checkArchitectureRules` a été vérifié séparément sur les modules touchés et est vert.
 
-Une fois les 9 critères vérifiés, Phase 9bis est close. **Reprendre alors la Tâche 9.1 (accessibilité)** — sur les vrais écrans enrichis cette fois, pas des squelettes qui auraient exigé un second passage.
+| # | Critère | État | Commit |
+|---|---|---|---|
+| 1 | Navigation typée choisie et justifiée (pas Nav3, encore alpha) | Fait | `7e5b557` |
+| 2 | `CustomHighlightToolbar` vérifié contre la version Compose actuelle, pas supposé | Fait — conclusion : API insuffisante, sélection par phrase conservée | `7e5b557` |
+| 3 | Système de design porté, contraste WCAG AA vérifié sur les couleurs portées | Fait (palette Signature uniquement, voir 9bis.1.1) | `011be99` |
+| 4 | Couleur dynamique avec repli correct sous API 31 | Fait, réglage exposé dans Settings | `011be99`, `dea2c75` |
+| 5 | `NavHost` réel, retour prédictif activé | Fait — activé au niveau manifeste ; **pas vérifié écran par écran** faute d'émulateur/device dans cette session, voir note ci-dessous | `6302b40` |
+| 6 | Reader complet : immersif, TOC hiérarchique, panneau unifié, sélection, surlignage animé, réglette de lecture | Fait avec deux réserves explicites : TOC hiérarchique implémentée (aplatissement + indentation) mais **jamais vérifiée avec un fixture EPUB à hiérarchie réelle** (TODO dans `TableOfContentsSheet.kt`) ; réglette de lecture existe comme composant + réglage persisté mais **pas encore consommée par `ReaderScreen`** (TODO dans `ReadingRuler.kt`) | `6c07001`, `81658ed`, `1a56d50`, `ab41685` |
+| 7 | Bibliothèque complète avec améliorations (shimmer, carte reprise, transition partagée) | Fait sauf transition de contenu partagée, **explicitement non implémentée** (changement invasif non vérifiable visuellement dans cette session, voir KDoc `LibraryScreen.kt`) | `d5274c5` |
+| 8 | Réglages enrichis | Fait | `dea2c75` |
+| 9 | Écrans restants portés | Fait | `48b9bb7` |
+
+**Réserve globale** : aucun rendu de ces écrans n'a été observé sur un émulateur ou un device réel dans cette session (environnement sans affichage graphique) — la vérification s'est limitée à la compilation, aux tests unitaires/JVM et à `checkArchitectureRules`. Une passe manuelle sur device (ou `./gradlew build` complet avec lint) reste à faire avant de considérer la Phase 9bis visuellement validée, au-delà de "compile et les tests passent".
+
+Phase 9bis close sous ces réserves. **Reprendre alors la Tâche 9.1 (accessibilité)** — sur les vrais écrans enrichis cette fois, pas des squelettes qui auraient exigé un second passage.
