@@ -7,7 +7,9 @@ import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.selection.toggleable
+import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material3.Button
@@ -87,7 +89,13 @@ internal fun SettingsContent(
     onOpenPronunciationRules: () -> Unit = {},
     onOpenAbout: () -> Unit = {},
 ) {
-    Column(modifier = Modifier.padding(16.dp)) {
+    // Bug reel trouve en testant sur device (verification manuelle,
+    // Tache 9bis suite) : sans verticalScroll ici, le contenu qui deborde
+    // de l'ecran (reglette de lecture, preregalage, a propos) etait
+    // inatteignable - ET le LargeTopAppBar (Tache 9bis.5) n'avait rien a
+    // quoi accrocher son effet de collapse (aucun enfant scrollable ne
+    // produit de delta de defilement).
+    Column(modifier = Modifier.padding(16.dp).verticalScroll(rememberScrollState())) {
         SectionGroup("Lecture") {
             SettingRow("Theme", preferences.theme.name) {
                 onIntent(SettingsIntent.SetTheme(nextEnumValue(preferences.theme)))

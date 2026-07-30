@@ -40,6 +40,10 @@ data class ReaderUiState(
     val currentOverrides: ReadingOverrides? = null,
     // Tache 9bis.3.3 - null = minuteur desactive.
     val sleepTimer: SleepTimerState? = null,
+    // Tache 9bis.3.6 - observe en continu (UserPreferences.readingRulerEnabled,
+    // Tache 9bis.5), pas resolu une seule fois comme effectiveSettings :
+    // c'est un reglage global, pas une cascade overrides/preferences.
+    val isReadingRulerEnabled: Boolean = false,
 ) {
     val currentChapter: Chapter? get() = chapters.getOrNull(currentChapterIndex)
     val hasNextChapter: Boolean get() = currentChapterIndex < chapters.lastIndex

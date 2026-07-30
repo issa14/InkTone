@@ -8,6 +8,7 @@ import androidx.compose.foundation.clickable
 import androidx.compose.foundation.combinedClickable
 import androidx.compose.foundation.interaction.MutableInteractionSource
 import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.ExperimentalLayoutApi
 import androidx.compose.foundation.layout.FlowRow
@@ -26,6 +27,9 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.layout.onGloballyPositioned
+import androidx.compose.ui.layout.positionInParent
+import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.text.AnnotatedString
 import androidx.compose.ui.text.SpanStyle
 import androidx.compose.ui.text.buildAnnotatedString
@@ -124,24 +128,44 @@ fun ReaderScreen(viewModel: ReaderViewModel = hiltViewModel(), onSearchClick: ()
         val selectedRange = state.selectedSentenceRange
         var pendingColor by remember { mutableStateOf(AnnotationColor.YELLOW) }
 
-        FlowRow(
-            modifier = Modifier.weight(1f).verticalScroll(scrollState),
-            horizontalArrangement = Arrangement.spacedBy(4.dp),
-        ) {
-            sentences.forEachIndexed { index, sentence ->
-                SentenceText(
-                    sentence = sentence,
-                    isCurrentlyPlaying = index == state.currentSentenceIndex,
-                    highlightedWordRange = state.highlightedWordRange,
-                    isSelected = selectedRange?.contains(index) == true,
-                    existingAnnotationColor = annotationColorFor(state.currentChapterIndex, sentence, state.annotations),
-                    fontSizeSp = state.effectiveSettings.fontSize,
-                    textColor = ThemeColors.text(state.effectiveSettings.theme),
-                    onLongClick = { viewModel.onIntent(ReaderIntent.BeginSentenceSelection(index)) },
-                    onClick = {
-                        if (selectedRange != null) viewModel.onIntent(ReaderIntent.ExtendSentenceSelection(index))
-                    },
-                )
+        // Tache 9bis.3.6 - position (en Dp, relative au Box englobant) de
+        // la phrase en cours de lecture TTS, mise a jour par le
+        // Modifier.onGloballyPositioned de cette seule SentenceText
+        // (voir plus bas) - ReadingRuler s'overlaye dessus.
+        var currentLineY by remember { mutableStateOf(0.dp) }
+        val density = LocalDensity.current
+
+        Box(modifier = Modifier.weight(1f)) {
+            if (state.isReadingRulerEnabled) {
+                ReadingRuler(currentLineY = currentLineY, enabled = true)
+            }
+            FlowRow(
+                modifier = Modifier.verticalScroll(scrollState),
+                horizontalArrangement = Arrangement.spacedBy(4.dp),
+            ) {
+                sentences.forEachIndexed { index, sentence ->
+                    val isCurrentlyPlaying = index == state.currentSentenceIndex
+                    SentenceText(
+                        sentence = sentence,
+                        isCurrentlyPlaying = isCurrentlyPlaying,
+                        highlightedWordRange = state.highlightedWordRange,
+                        isSelected = selectedRange?.contains(index) == true,
+                        existingAnnotationColor = annotationColorFor(state.currentChapterIndex, sentence, state.annotations),
+                        fontSizeSp = state.effectiveSettings.fontSize,
+                        textColor = ThemeColors.text(state.effectiveSettings.theme),
+                        onLongClick = { viewModel.onIntent(ReaderIntent.BeginSentenceSelection(index)) },
+                        onClick = {
+                            if (selectedRange != null) viewModel.onIntent(ReaderIntent.ExtendSentenceSelection(index))
+                        },
+                        modifier = if (isCurrentlyPlaying && state.isReadingRulerEnabled) {
+                            Modifier.onGloballyPositioned { coordinates ->
+                                currentLineY = with(density) { coordinates.positionInParent().y.toDp() }
+                            }
+                        } else {
+                            Modifier
+                        },
+                    )
+                }
             }
         }
 
@@ -230,6 +254,7 @@ private fun SentenceText(
     textColor: Color,
     onLongClick: () -> Unit,
     onClick: () -> Unit,
+    modifier: Modifier = Modifier,
 ) {
     val background = when {
         isSelected -> SelectionHighlightColor
@@ -262,7 +287,7 @@ private fun SentenceText(
         } else {
             AnnotatedString(sentence.text)
         },
-        modifier = Modifier
+        modifier = modifier
             .background(background)
             .combinedClickable(onClick = onClick, onLongClick = onLongClick),
         fontSize = fontSizeSp.sp,

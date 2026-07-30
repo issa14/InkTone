@@ -63,6 +63,19 @@ class ReaderViewModel @Inject constructor(
     private val _state = MutableStateFlow(ReaderUiState())
     val state: StateFlow<ReaderUiState> = _state.asStateFlow()
 
+    init {
+        // Tache 9bis.3.6 - reglage global (UserPreferences.readingRulerEnabled,
+        // Tache 9bis.5), pas une cascade overrides/preferences comme
+        // effectiveSettings : observation continue, independante de toute
+        // publication ouverte (meme principe que ImportProgressObserver
+        // dans LibraryViewModel).
+        viewModelScope.launch {
+            preferencesRepository.observe().collect { preferences ->
+                _state.value = _state.value.copy(isReadingRulerEnabled = preferences.readingRulerEnabled)
+            }
+        }
+    }
+
     private var currentPublicationId: String? = null
     private val chapterPreloader = ChapterPreloader(viewModelScope)
     private val sentenceAudioBuffer = SentenceAudioBuffer(viewModelScope, ttsEngine)
