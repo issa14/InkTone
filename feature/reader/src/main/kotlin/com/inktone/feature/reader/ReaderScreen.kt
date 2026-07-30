@@ -1,9 +1,14 @@
 package com.inktone.feature.reader
 
+import androidx.compose.animation.core.animateIntAsState
+import androidx.compose.animation.core.tween
 import androidx.compose.foundation.ExperimentalFoundationApi
 import androidx.compose.foundation.background
+import androidx.compose.foundation.clickable
 import androidx.compose.foundation.combinedClickable
+import androidx.compose.foundation.interaction.MutableInteractionSource
 import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.ExperimentalLayoutApi
 import androidx.compose.foundation.layout.FlowRow
@@ -22,6 +27,9 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.layout.onGloballyPositioned
+import androidx.compose.ui.layout.positionInParent
+import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.text.AnnotatedString
 import androidx.compose.ui.text.SpanStyle
 import androidx.compose.ui.text.buildAnnotatedString
@@ -29,11 +37,13 @@ import androidx.compose.ui.text.withStyle
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.hilt.navigation.compose.hiltViewModel
+import com.inktone.core.designsystem.reducedMotionDuration
 import com.inktone.domain.model.Annotation
 import com.inktone.domain.model.AnnotationColor
 import com.inktone.domain.model.ReadingOverrides
 import com.inktone.domain.model.ReadingTheme
 import com.inktone.domain.model.Sentence
+import com.inktone.domain.model.SleepTimerState
 
 /**
  * `effectiveSettings` (theme, taille de police) arrive déjà résolu dans
@@ -73,15 +83,26 @@ import com.inktone.domain.model.Sentence
  */
 @OptIn(ExperimentalFoundationApi::class, ExperimentalLayoutApi::class)
 @Composable
-fun ReaderScreen(viewModel: ReaderViewModel = hiltViewModel()) {
+fun ReaderScreen(viewModel: ReaderViewModel = hiltViewModel(), onSearchClick: () -> Unit = {}) {
     val state by viewModel.state.collectAsState()
+    // Tache 9bis.3.1 : HUD (panneau de controle + boutons) visible par
+    // defaut, se masque seul apres 4s (ImmersiveReaderChrome), un appui
+    // sur la zone de lecture le fait reapparaitre.
+    var isHudVisible by remember { mutableStateOf(true) }
 
+    ImmersiveReaderChrome(isHudVisible = isHudVisible, onAutoHide = { isHudVisible = false }) {
     Column(
         modifier = Modifier
             .fillMaxSize()
             .background(ThemeColors.background(state.effectiveSettings.theme))
+            .clickable(
+                interactionSource = remember { MutableInteractionSource() },
+                indication = null,
+            ) { isHudVisible = !isHudVisible }
             .padding(16.dp),
     ) {
+        BookProgressBar(progression = state.bookProgression)
+
         if (state.isTocVisible) {
             TableOfContentsSheet(
                 entries = state.tableOfContents,
@@ -107,24 +128,44 @@ fun ReaderScreen(viewModel: ReaderViewModel = hiltViewModel()) {
         val selectedRange = state.selectedSentenceRange
         var pendingColor by remember { mutableStateOf(AnnotationColor.YELLOW) }
 
-        FlowRow(
-            modifier = Modifier.weight(1f).verticalScroll(scrollState),
-            horizontalArrangement = Arrangement.spacedBy(4.dp),
-        ) {
-            sentences.forEachIndexed { index, sentence ->
-                SentenceText(
-                    sentence = sentence,
-                    isCurrentlyPlaying = index == state.currentSentenceIndex,
-                    highlightedWordRange = state.highlightedWordRange,
-                    isSelected = selectedRange?.contains(index) == true,
-                    existingAnnotationColor = annotationColorFor(state.currentChapterIndex, sentence, state.annotations),
-                    fontSizeSp = state.effectiveSettings.fontSize,
-                    textColor = ThemeColors.text(state.effectiveSettings.theme),
-                    onLongClick = { viewModel.onIntent(ReaderIntent.BeginSentenceSelection(index)) },
-                    onClick = {
-                        if (selectedRange != null) viewModel.onIntent(ReaderIntent.ExtendSentenceSelection(index))
-                    },
-                )
+        // Tache 9bis.3.6 - position (en Dp, relative au Box englobant) de
+        // la phrase en cours de lecture TTS, mise a jour par le
+        // Modifier.onGloballyPositioned de cette seule SentenceText
+        // (voir plus bas) - ReadingRuler s'overlaye dessus.
+        var currentLineY by remember { mutableStateOf(0.dp) }
+        val density = LocalDensity.current
+
+        Box(modifier = Modifier.weight(1f)) {
+            if (state.isReadingRulerEnabled) {
+                ReadingRuler(currentLineY = currentLineY, enabled = true)
+            }
+            FlowRow(
+                modifier = Modifier.verticalScroll(scrollState),
+                horizontalArrangement = Arrangement.spacedBy(4.dp),
+            ) {
+                sentences.forEachIndexed { index, sentence ->
+                    val isCurrentlyPlaying = index == state.currentSentenceIndex
+                    SentenceText(
+                        sentence = sentence,
+                        isCurrentlyPlaying = isCurrentlyPlaying,
+                        highlightedWordRange = state.highlightedWordRange,
+                        isSelected = selectedRange?.contains(index) == true,
+                        existingAnnotationColor = annotationColorFor(state.currentChapterIndex, sentence, state.annotations),
+                        fontSizeSp = state.effectiveSettings.fontSize,
+                        textColor = ThemeColors.text(state.effectiveSettings.theme),
+                        onLongClick = { viewModel.onIntent(ReaderIntent.BeginSentenceSelection(index)) },
+                        onClick = {
+                            if (selectedRange != null) viewModel.onIntent(ReaderIntent.ExtendSentenceSelection(index))
+                        },
+                        modifier = if (isCurrentlyPlaying && state.isReadingRulerEnabled) {
+                            Modifier.onGloballyPositioned { coordinates ->
+                                currentLineY = with(density) { coordinates.positionInParent().y.toDp() }
+                            }
+                        } else {
+                            Modifier
+                        },
+                    )
+                }
             }
         }
 
@@ -137,31 +178,33 @@ fun ReaderScreen(viewModel: ReaderViewModel = hiltViewModel()) {
             )
         }
 
-        FlowRow(horizontalArrangement = Arrangement.spacedBy(4.dp)) {
-            Button(onClick = { viewModel.onIntent(ReaderIntent.PreviousChapter) }, enabled = state.hasPreviousChapter) {
-                Text("Precedent")
-            }
-            Button(onClick = { viewModel.onIntent(ReaderIntent.PlayCurrentSentence) }) {
-                Text(if (state.isPlaying) "En lecture..." else "Lire")
-            }
-            Button(onClick = { viewModel.onIntent(ReaderIntent.NextChapter) }, enabled = state.hasNextChapter) {
-                Text("Suivant")
-            }
-            Button(onClick = { viewModel.onIntent(ReaderIntent.ToggleToc) }) {
-                Text("Sommaire")
-            }
-            Button(onClick = { viewModel.onIntent(ReaderIntent.CreateBookmark) }) {
-                Text("+ Signet")
-            }
-            Button(onClick = { viewModel.onIntent(ReaderIntent.ToggleBookmarkList) }) {
-                Text("Signets (${state.bookmarks.size})")
-            }
-        }
+        if (isHudVisible) {
+            UnifiedControlPanel(
+                isPlaying = state.isPlaying,
+                sleepTimerActive = state.sleepTimer != null,
+                onPlayPause = {
+                    viewModel.onIntent(if (state.isPlaying) ReaderIntent.Pause else ReaderIntent.PlayCurrentSentence)
+                },
+                onPreviousChapter = { viewModel.onIntent(ReaderIntent.PreviousChapter) },
+                onNextChapter = { viewModel.onIntent(ReaderIntent.NextChapter) },
+                onSleepTimerClick = { viewModel.onIntent(ReaderIntent.SetSleepTimer(nextSleepTimerMinutes(state.sleepTimer))) },
+                onSearchClick = onSearchClick,
+                onBookmarksClick = { viewModel.onIntent(ReaderIntent.ToggleBookmarkList) },
+                onTocClick = { viewModel.onIntent(ReaderIntent.ToggleToc) },
+            )
 
-        ChapterOverrideMenu(
-            currentOverrides = state.currentOverrides,
-            onSetOverride = { viewModel.onIntent(ReaderIntent.SetOverrides(it)) },
-        )
+            FlowRow(horizontalArrangement = Arrangement.spacedBy(4.dp)) {
+                Button(onClick = { viewModel.onIntent(ReaderIntent.CreateBookmark) }) {
+                    Text("+ Signet")
+                }
+            }
+
+            ChapterOverrideMenu(
+                currentOverrides = state.currentOverrides,
+                onSetOverride = { viewModel.onIntent(ReaderIntent.SetOverrides(it)) },
+            )
+        }
+    }
     }
 }
 
@@ -184,6 +227,21 @@ private fun ChapterOverrideMenu(currentOverrides: ReadingOverrides?, onSetOverri
     }
 }
 
+private val SLEEP_TIMER_OPTIONS_MINUTES = listOf(15, 30, 45, 60)
+
+/**
+ * Tache 9bis.3.3 — un appui sur l'icone Veille fait cycler les durees
+ * proposees puis desactive le minuteur (pas de sheet de selection dediee
+ * pour l'instant, hors perimetre de cette tache).
+ */
+private fun nextSleepTimerMinutes(current: SleepTimerState?): Int? {
+    if (current == null) return SLEEP_TIMER_OPTIONS_MINUTES.first()
+    val currentMinutes = (current.remainingMs / 60_000L).toInt()
+    val currentIndex = SLEEP_TIMER_OPTIONS_MINUTES.indexOf(currentMinutes)
+    val nextIndex = currentIndex + 1
+    return SLEEP_TIMER_OPTIONS_MINUTES.getOrNull(nextIndex)
+}
+
 @OptIn(ExperimentalFoundationApi::class)
 @Composable
 private fun SentenceText(
@@ -196,19 +254,40 @@ private fun SentenceText(
     textColor: Color,
     onLongClick: () -> Unit,
     onClick: () -> Unit,
+    modifier: Modifier = Modifier,
 ) {
     val background = when {
         isSelected -> SelectionHighlightColor
         existingAnnotationColor != null -> existingAnnotationColor.toComposeColor()
         else -> Color.Transparent
     }
+
+    // Tache 9bis.3.5 — transition douce entre mots plutot qu'un changement
+    // brut : le legacy n'avait pas de vrais timestamps CTC (surlignage
+    // necessairement plus simple), on a maintenant de vrais WordTimestamp
+    // (ADR-022). reducedMotionDuration (Tache 8.4) respecte le reglage
+    // systeme, pas juste une preference applicative.
+    val animationSpec = tween<Int>(durationMillis = reducedMotionDuration(150))
+    val animatedStart by animateIntAsState(
+        targetValue = highlightedWordRange?.first ?: 0,
+        animationSpec = animationSpec,
+        label = "highlightStart",
+    )
+    val animatedEnd by animateIntAsState(
+        targetValue = highlightedWordRange?.last ?: 0,
+        animationSpec = animationSpec,
+        label = "highlightEnd",
+    )
+
     Text(
-        text = if (isCurrentlyPlaying && highlightedWordRange != null) {
-            buildHighlightedSentence(sentence.text, highlightedWordRange)
+        text = if (isCurrentlyPlaying && highlightedWordRange != null && sentence.text.isNotEmpty()) {
+            val start = animatedStart.coerceIn(0, sentence.text.length - 1)
+            val end = animatedEnd.coerceIn(start, sentence.text.length - 1)
+            buildHighlightedSentence(sentence.text, start..end)
         } else {
             AnnotatedString(sentence.text)
         },
-        modifier = Modifier
+        modifier = modifier
             .background(background)
             .combinedClickable(onClick = onClick, onLongClick = onLongClick),
         fontSize = fontSizeSp.sp,

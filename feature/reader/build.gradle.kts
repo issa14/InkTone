@@ -25,6 +25,8 @@ dependencies {
     implementation(libs.androidx.hilt.navigation.compose)
     // Tache 7.0 : SelectionContainer (androidx.compose.foundation.text.selection)
     implementation("androidx.compose.foundation:foundation")
+    // Tache 9bis.3.1 : WindowInsetsControllerCompat (mode immersif)
+    implementation(libs.androidx.core.ktx)
     coreLibraryDesugaring(libs.desugar.jdk.libs)
 
     // data (RepositoryModule/UseCaseModule), infrastructure/database

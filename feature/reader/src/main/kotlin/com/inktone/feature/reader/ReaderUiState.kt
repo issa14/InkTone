@@ -7,6 +7,7 @@ import com.inktone.domain.model.Chapter
 import com.inktone.domain.model.EffectiveReadingSettings
 import com.inktone.domain.model.ReadingOverrides
 import com.inktone.domain.model.ReadingTheme
+import com.inktone.domain.model.SleepTimerState
 import com.inktone.domain.model.TableOfContentsEntry
 import com.inktone.domain.valueobject.Locator
 
@@ -37,10 +38,39 @@ data class ReaderUiState(
     // Surcharge par publication actuellement active (Tache 8.2) - null =
     // aucune surcharge, les reglages globaux s'appliquent tels quels.
     val currentOverrides: ReadingOverrides? = null,
+    // Tache 9bis.3.3 - null = minuteur desactive.
+    val sleepTimer: SleepTimerState? = null,
+    // Tache 9bis.3.6 - observe en continu (UserPreferences.readingRulerEnabled,
+    // Tache 9bis.5), pas resolu une seule fois comme effectiveSettings :
+    // c'est un reglage global, pas une cascade overrides/preferences.
+    val isReadingRulerEnabled: Boolean = false,
 ) {
     val currentChapter: Chapter? get() = chapters.getOrNull(currentChapterIndex)
     val hasNextChapter: Boolean get() = currentChapterIndex < chapters.lastIndex
     val hasPreviousChapter: Boolean get() = currentChapterIndex > 0
+
+    /**
+     * Tache 9bis.3.2 — progression du LIVRE ENTIER (`Locator.computeProgression`,
+     * ecrite en Tache 1.1, jamais branchee avant cette tache), pas la
+     * progression par chapitre du legacy. Recalculee a chaque acces plutot
+     * que mise en cache a l'ecriture : le `DocumentModel` complet est deja
+     * en memoire (Tache 4.6), la somme des longueurs de phrase reste bon
+     * marche meme pour un roman long - pas de mise en cache prematuree
+     * tant qu'un cout reel n'est pas mesure.
+     */
+    val bookProgression: Float
+        get() {
+            val chapter = currentChapter ?: return 0f
+            val sentence = chapter.paragraphs.flatMap { it.sentences }.getOrNull(currentSentenceIndex)
+            val locator = Locator(
+                resourceHref = chapter.href,
+                chapterIndex = chapter.index,
+                charOffset = sentence?.startOffset ?: 0,
+            )
+            val totalCharsBeforeChapter = chapters.take(currentChapterIndex).sumOf(::chapterCharCount)
+            val totalCharsInPublication = chapters.sumOf(::chapterCharCount)
+            return Locator.computeProgression(locator, totalCharsBeforeChapter, totalCharsInPublication)
+        }
 
     val selectedSentenceRange: IntRange?
         get() {
@@ -49,6 +79,9 @@ data class ReaderUiState(
             return minOf(anchor, focus)..maxOf(anchor, focus)
         }
 }
+
+private fun chapterCharCount(chapter: Chapter): Int =
+    chapter.paragraphs.sumOf { paragraph -> paragraph.sentences.sumOf { it.text.length } }
 
 sealed interface ReaderIntent {
     /**
@@ -108,4 +141,11 @@ sealed interface ReaderIntent {
      * réglages globaux (`UserPreferences`) reprennent la main.
      */
     data class SetOverrides(val overrides: ReadingOverrides?) : ReaderIntent
+
+    /**
+     * Tache 9bis.3.3 — `minutes = null` desactive le minuteur en cours.
+     * A expiration, met en Pause (fondu sonore non implemente, voir
+     * `SleepTimerState.fadeOutEnabled`).
+     */
+    data class SetSleepTimer(val minutes: Int?) : ReaderIntent
 }

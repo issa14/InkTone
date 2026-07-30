@@ -10,6 +10,7 @@ fun UserPreferences.toEntity(): UserPreferencesEntity = UserPreferencesEntity(
     theme = theme.name, fontSize = fontSize, defaultTtsEngine = defaultTtsEngine.name,
     crashReportingEnabled = crashReportingEnabled, language = language,
     fontFamily = fontFamily.name, reduceMotion = reduceMotion,
+    dynamicColorEnabled = dynamicColorEnabled, readingRulerEnabled = readingRulerEnabled,
 )
 
 fun UserPreferencesEntity.toDomain(): UserPreferences = UserPreferences(
@@ -17,4 +18,5 @@ fun UserPreferencesEntity.toDomain(): UserPreferences = UserPreferences(
     defaultTtsEngine = TtsEngineId.valueOf(defaultTtsEngine),
     crashReportingEnabled = crashReportingEnabled, language = language,
     fontFamily = FontFamily.valueOf(fontFamily), reduceMotion = reduceMotion,
+    dynamicColorEnabled = dynamicColorEnabled, readingRulerEnabled = readingRulerEnabled,
 )

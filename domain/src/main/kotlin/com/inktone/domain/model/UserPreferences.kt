@@ -13,6 +13,12 @@ data class UserPreferences(
     val language: String = "fr",
     val fontFamily: FontFamily = FontFamily.DEFAULT,
     val reduceMotion: Boolean = false,
+    // Tache 9bis.1.2 — s'applique uniquement au chrome de l'app
+    // (InkToneTheme), jamais aux ReadingTheme de lecture.
+    val dynamicColorEnabled: Boolean = true,
+    // Tache 9bis.3.6 — reglage seul pour l'instant, ReaderScreen ne
+    // consomme pas encore ce champ (voir TODO sur ReadingRuler.kt).
+    val readingRulerEnabled: Boolean = false,
 ) {
     init {
         require(fontSize > 0) { "fontSize doit être strictement positif" }

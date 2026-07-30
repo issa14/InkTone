@@ -11,6 +11,7 @@ import com.inktone.domain.model.Publication
 import com.inktone.domain.model.PublicationFormat
 import com.inktone.domain.model.ReadingOverrides
 import com.inktone.domain.model.ReadingState
+import com.inktone.domain.model.SleepTimerState
 import com.inktone.domain.model.TtsEngineId
 import com.inktone.domain.model.VoiceProfile
 import com.inktone.domain.repository.AnnotationRepository
@@ -27,6 +28,7 @@ import com.inktone.domain.usecase.GetReadingStateUseCase
 import com.inktone.domain.usecase.UpdateReadingStateUseCase
 import com.inktone.domain.valueobject.Locator
 import dagger.hilt.android.lifecycle.HiltViewModel
+import kotlinx.coroutines.Job
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
@@ -61,10 +63,24 @@ class ReaderViewModel @Inject constructor(
     private val _state = MutableStateFlow(ReaderUiState())
     val state: StateFlow<ReaderUiState> = _state.asStateFlow()
 
+    init {
+        // Tache 9bis.3.6 - reglage global (UserPreferences.readingRulerEnabled,
+        // Tache 9bis.5), pas une cascade overrides/preferences comme
+        // effectiveSettings : observation continue, independante de toute
+        // publication ouverte (meme principe que ImportProgressObserver
+        // dans LibraryViewModel).
+        viewModelScope.launch {
+            preferencesRepository.observe().collect { preferences ->
+                _state.value = _state.value.copy(isReadingRulerEnabled = preferences.readingRulerEnabled)
+            }
+        }
+    }
+
     private var currentPublicationId: String? = null
     private val chapterPreloader = ChapterPreloader(viewModelScope)
     private val sentenceAudioBuffer = SentenceAudioBuffer(viewModelScope, ttsEngine)
     private val annotationSelectionHandler = AnnotationSelectionHandler()
+    private var sleepTimerJob: Job? = null
 
     fun onIntent(intent: ReaderIntent) {
         when (intent) {
@@ -105,6 +121,26 @@ class ReaderViewModel @Inject constructor(
             is ReaderIntent.DeleteBookmark -> viewModelScope.launch { deleteBookmark(intent.id) }
             is ReaderIntent.NavigateToLocator -> navigateToLocator(intent.locator)
             is ReaderIntent.SetOverrides -> setOverrides(intent.overrides)
+            is ReaderIntent.SetSleepTimer -> setSleepTimer(intent.minutes)
+        }
+    }
+
+    /**
+     * Tache 9bis.3.3 — minuteur de sommeil. Un seul job actif a la fois :
+     * une nouvelle duree (ou une desactivation) annule tout minuteur en
+     * cours, jamais deux qui coexistent.
+     */
+    private fun setSleepTimer(minutes: Int?) {
+        sleepTimerJob?.cancel()
+        if (minutes == null) {
+            _state.value = _state.value.copy(sleepTimer = null)
+            return
+        }
+        val remainingMs = minutes * 60_000L
+        _state.value = _state.value.copy(sleepTimer = SleepTimerState(remainingMs = remainingMs))
+        sleepTimerJob = viewModelScope.launch {
+            delay(remainingMs)
+            _state.value = _state.value.copy(isPlaying = false, sleepTimer = null)
         }
     }
 
