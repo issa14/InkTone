@@ -3,7 +3,9 @@ package com.inktone.infrastructure.parser
 import com.inktone.domain.model.Chapter
 import com.inktone.domain.model.DocumentModel
 import com.inktone.domain.model.Paragraph
+import com.inktone.domain.model.ParagraphStyle
 import com.inktone.domain.model.Sentence
+import com.inktone.domain.model.StructuralBlock
 import com.inktone.domain.model.TableOfContentsEntry
 import org.readium.r2.shared.ExperimentalReadiumApi
 import org.readium.r2.shared.publication.Link
@@ -105,33 +107,73 @@ class DocumentModelExtractor {
         // supplementaire a ecrire ici : ce serait redondant avec ce que
         // Readium fait deja.
         val chapterUrl = link.href.resolve()
-        val chapterTextElements = allElements
-            .filter { it.locator.href == chapterUrl }
-            .filterIsInstance<Content.TextElement>()
 
+        // Tache 1.3.3 — on itere TOUS les elements (pas seulement
+        // TextElement) pour collecter a la fois les paragraphes et les
+        // blocs structurels (images). L'ordre de Content.elements()
+        // est preserve — c'est l'ordre du document source, sur lequel
+        // on s'aligne pour intercaler correctement les blocs au rendu.
+        val chapterElements = allElements.filter { it.locator.href == chapterUrl }
+
+        val paragraphs = mutableListOf<Paragraph>()
+        val structuralBlocks = mutableListOf<StructuralBlock>()
         var runningOffset = 0
-        val sentences = mutableListOf<Sentence>()
+        var paragraphIndex = 0
         var sentenceIndex = 0
 
-        chapterTextElements.forEach { element ->
-            tokenizer.tokenize(element)
-                .filterIsInstance<Content.TextElement>()
-                .forEach { tokenizedElement ->
-                    tokenizedElement.segments.forEach { segment ->
-                        val text = segment.text
-                        if (text.isBlank()) return@forEach
-                        sentences += Sentence(
-                            index = sentenceIndex++,
-                            text = text,
-                            startOffset = runningOffset,
-                            endOffset = runningOffset + text.length,
-                        )
-                        runningOffset += text.length + 1 // +1 : separateur entre segments
+        chapterElements.forEach { element ->
+            when (element) {
+                is Content.TextElement -> {
+                    val sentences = mutableListOf<Sentence>()
+                    tokenizer.tokenize(element)
+                        .filterIsInstance<Content.TextElement>()
+                        .forEach { tokenizedElement ->
+                            tokenizedElement.segments.forEach { segment ->
+                                val text = segment.text
+                                if (text.isBlank()) return@forEach
+                                sentences += Sentence(
+                                    index = sentenceIndex++,
+                                    text = text,
+                                    startOffset = runningOffset,
+                                    endOffset = runningOffset + text.length,
+                                )
+                                runningOffset += text.length + 1 // +1 : separateur entre segments
+                            }
+                        }
+                    if (sentences.isNotEmpty()) {
+                        val style = when (element.role) {
+                            is Content.TextElement.Role.Heading -> ParagraphStyle.HEADING
+                            is Content.TextElement.Role.Quote -> ParagraphStyle.BLOCK_QUOTE
+                            // Role.Body, Role.Footnote -> NORMAL par defaut
+                            else -> ParagraphStyle.NORMAL
+                        }
+                        paragraphs += Paragraph(index = paragraphIndex++, sentences = sentences, style = style)
                     }
                 }
+
+                is Content.ImageElement -> {
+                    // Tache 1.3.1 — les images sont ancrees APRES le
+                    // dernier paragraphe extrait (meme logique que le
+                    // legacy computeStructuralBlockAnchors).
+                    structuralBlocks += StructuralBlock.EpubImage(
+                        anchorAfterParagraphIndex = (paragraphIndex - 1).coerceAtLeast(0),
+                        href = element.embeddedLink.href.toString(),
+                        altText = element.accessibilityLabel,
+                    )
+                }
+
+                // AudioElement, VideoElement : ignores pour l'instant
+                // (hors perimetre v1, Blueprint §7.5).
+                else -> { /* non traite */ }
+            }
         }
 
-        val paragraph = Paragraph(index = 0, sentences = sentences)
-        return Chapter(index = chapterIndex, href = link.href.toString(), title = null, paragraphs = listOf(paragraph))
+        return Chapter(
+            index = chapterIndex,
+            href = link.href.toString(),
+            title = null,
+            paragraphs = paragraphs,
+            structuralBlocks = structuralBlocks,
+        )
     }
 }

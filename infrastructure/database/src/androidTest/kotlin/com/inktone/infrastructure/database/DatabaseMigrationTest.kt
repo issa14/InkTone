@@ -150,6 +150,29 @@ class DatabaseMigrationTest {
         v5.close()
     }
 
+    @Test
+    fun migration_5_vers_6_conserve_les_donnees_et_ajoute_dailyGoalMinutes() {
+        val v5 = helper.createDatabase(TEST_DB_NAME, 5)
+        v5.execSQL(
+            """
+            INSERT INTO user_preferences (id, theme, fontSize, defaultTtsEngine, crashReportingEnabled, language, fontFamily, reduceMotion, dynamicColorEnabled, readingRulerEnabled)
+            VALUES (0, 'SYSTEM', 18, 'SHERPA_ONNX', 0, 'fr', 'DEFAULT', 0, 1, 0)
+            """.trimIndent(),
+        )
+        v5.close()
+
+        val v6 = helper.runMigrationsAndValidate(
+            TEST_DB_NAME, 6, true,
+            MIGRATION_2_3, MIGRATION_3_4, MIGRATION_4_5, MIGRATION_5_6,
+        )
+
+        v6.query("SELECT dailyGoalMinutes FROM user_preferences WHERE id = 0").use { cursor ->
+            assertEquals(true, cursor.moveToFirst())
+            assertEquals(20, cursor.getInt(0)) // valeur par defaut
+        }
+        v6.close()
+    }
+
     companion object {
         private const val TEST_DB_NAME = "migration-test"
     }
