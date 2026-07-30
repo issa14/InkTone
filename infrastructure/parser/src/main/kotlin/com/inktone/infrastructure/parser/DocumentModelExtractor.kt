@@ -12,6 +12,7 @@ import org.readium.r2.shared.publication.services.content.Content
 import org.readium.r2.shared.publication.services.content.TextContentTokenizer
 import org.readium.r2.shared.publication.services.content.content
 import org.readium.r2.shared.util.Language
+import org.readium.r2.shared.util.Url
 import org.readium.r2.shared.util.tokenizer.TextUnit
 
 /**
@@ -60,12 +61,30 @@ class DocumentModelExtractor {
         // href (sans fragment) contre readingOrder, comme extractChapter
         // le fait deja pour le filtrage des elements de contenu.
         val readingOrderUrls = publication.readingOrder.map { it.href.resolve().removeFragment() }
-        val toc = publication.tableOfContents.map { link ->
-            val chapterIndex = readingOrderUrls.indexOf(link.href.resolve().removeFragment())
-            TableOfContentsEntry(title = link.title ?: "", chapterIndex = chapterIndex.coerceAtLeast(0))
-        }
+        val toc = publication.tableOfContents.map { link -> toTocEntry(link, readingOrderUrls) }
 
         return DocumentModel(chapters = chapters, tableOfContents = toc, resources = emptyList())
+    }
+
+    /**
+     * Bug reel trouve en verifiant contre un vrai EPUB hierarchique
+     * (Gutenberg #17489, Les Miserables Tome I — la premiere verification
+     * en Tache 4.11 avait conclu a tort que le toc.ncx de ce livre etait
+     * plat ; il ne l'est pas, `TableOfContentsChildrenTest` le prouve) :
+     * `link.children` (Readium `Link`, Blueprint §7.5) n'etait JAMAIS lu,
+     * `TableOfContentsEntry.children` restait donc toujours vide quelle
+     * que soit la hierarchie NCX source. Recursion necessaire ici, pas
+     * juste sur le premier niveau — un NCX peut imbriquer sur plusieurs
+     * niveaux (Tome > Livre > Chapitre), pas seulement Chapitre > titre
+     * comme dans ce fixture precis.
+     */
+    private fun toTocEntry(link: Link, readingOrderUrls: List<Url>): TableOfContentsEntry {
+        val chapterIndex = readingOrderUrls.indexOf(link.href.resolve().removeFragment())
+        return TableOfContentsEntry(
+            title = link.title ?: "",
+            chapterIndex = chapterIndex.coerceAtLeast(0),
+            children = link.children.map { child -> toTocEntry(child, readingOrderUrls) },
+        )
     }
 
     private fun extractChapter(chapterIndex: Int, link: Link, allElements: List<Content.Element>): Chapter {
