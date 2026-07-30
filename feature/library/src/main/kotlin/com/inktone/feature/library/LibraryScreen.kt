@@ -255,10 +255,12 @@ private fun LibraryContent(state: LibraryUiState, onOpen: (String) -> Unit, onTo
             // Clé stable = id, jamais l'index — même leçon que la TOC
             // (Tâche 4.11, crash LazyColumn à clé non unique).
             gridItems(state.displayedPublications, key = { it.id }) { publication ->
-                PublicationCard(
+                BookCover(
                     publication = publication,
                     onClick = { onOpen(publication.id) },
                     onToggleFavorite = { onToggleFavorite(publication.id, !publication.isFavorite) },
+                    modifier = Modifier.padding(8.dp),
+                    // TODO: brancher ReadingState → progressPercent
                 )
             }
         }
@@ -268,10 +270,11 @@ private fun LibraryContent(state: LibraryUiState, onOpen: (String) -> Unit, onTo
                 item { ResumeReadingCard(resume, onClick = { onOpen(resume.id) }) }
             }
             listItems(state.displayedPublications, key = { it.id }) { publication ->
-                PublicationListRow(
+                BookCover(
                     publication = publication,
                     onClick = { onOpen(publication.id) },
                     onToggleFavorite = { onToggleFavorite(publication.id, !publication.isFavorite) },
+                    modifier = Modifier.padding(horizontal = 12.dp, vertical = 6.dp),
                 )
             }
         }
@@ -347,53 +350,6 @@ private fun FilterRow(active: FilterMode, onSelect: (FilterMode) -> Unit) {
     }
 }
 
-@Composable
-private fun PublicationCard(publication: Publication, onClick: () -> Unit, onToggleFavorite: () -> Unit) {
-    Box(
-        modifier = Modifier
-            .padding(8.dp)
-            .aspectRatio(0.7f)
-            .clickable(onClick = onClick)
-            .background(MaterialTheme.colorScheme.secondaryContainer),
-    ) {
-        Text(
-            text = publication.title,
-            modifier = Modifier
-                .align(Alignment.BottomStart)
-                .padding(8.dp),
-            color = MaterialTheme.colorScheme.onSecondaryContainer,
-            maxLines = 3,
-            overflow = TextOverflow.Ellipsis,
-            style = MaterialTheme.typography.bodyMedium,
-        )
-        IconButton(onClick = onToggleFavorite, modifier = Modifier.align(Alignment.TopEnd)) {
-            Icon(
-                if (publication.isFavorite) Icons.Filled.Star else Icons.Outlined.StarBorder,
-                contentDescription = if (publication.isFavorite) "Retirer des favoris" else "Ajouter aux favoris",
-                tint = if (publication.isFavorite) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSecondaryContainer,
-            )
-        }
-    }
-}
-
-@Composable
-private fun PublicationListRow(publication: Publication, onClick: () -> Unit, onToggleFavorite: () -> Unit) {
-    Row(
-        modifier = Modifier.fillMaxWidth().clickable(onClick = onClick).padding(horizontal = 16.dp, vertical = 12.dp),
-        verticalAlignment = Alignment.CenterVertically,
-    ) {
-        Column(Modifier.weight(1f)) {
-            Text(publication.title, style = MaterialTheme.typography.titleSmall, maxLines = 1, overflow = TextOverflow.Ellipsis)
-            if (publication.authors.isNotEmpty()) {
-                Text(publication.authors.joinToString(), style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
-            }
-        }
-        IconButton(onClick = onToggleFavorite) {
-            Icon(
-                if (publication.isFavorite) Icons.Filled.Star else Icons.Outlined.StarBorder,
-                contentDescription = if (publication.isFavorite) "Retirer des favoris" else "Ajouter aux favoris",
-                tint = if (publication.isFavorite) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurfaceVariant,
-            )
-        }
-    }
-}
+// PublicationCard et PublicationListRow remplacés par BookCover (Phase 1b).
+// Voir BookCover.kt pour le composant unifié avec Coil, dégradé de repli,
+// badge de progression et favori.
