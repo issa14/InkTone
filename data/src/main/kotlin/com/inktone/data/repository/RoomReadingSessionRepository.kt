@@ -14,4 +14,5 @@ class RoomReadingSessionRepository @Inject constructor(
     override suspend fun getAllForPublication(publicationId: String): List<ReadingSession> =
         dao.getAllForPublication(publicationId).map { it.toDomain() }
     override suspend fun getAll(): List<ReadingSession> = dao.getAll().map { it.toDomain() }
+    override suspend fun getTotalDurationForDate(date: String): Long = dao.getTotalDurationForDate(date)
 }

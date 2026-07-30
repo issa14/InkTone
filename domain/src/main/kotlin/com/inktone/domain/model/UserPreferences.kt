@@ -19,6 +19,9 @@ data class UserPreferences(
     // Tache 9bis.3.6 — reglage seul pour l'instant, ReaderScreen ne
     // consomme pas encore ce champ (voir TODO sur ReadingRuler.kt).
     val readingRulerEnabled: Boolean = false,
+    // Tache 1.4 (Partie 1) — objectif de lecture quotidien, valeur par
+    // defaut raisonnable (20 min), modifiable dans les reglages (Partie 4).
+    val dailyGoalMinutes: Int = 20,
 ) {
     init {
         require(fontSize > 0) { "fontSize doit être strictement positif" }

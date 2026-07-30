@@ -13,16 +13,49 @@ data class DocumentModel(
     val resources: List<Resource>,
 )
 
+/**
+ * Style de rendu d'un paragraphe — n'affecte JAMAIS le texte lu par le
+ * TTS, l'alignement CTC ou l'indexation FTS, uniquement l'affichage.
+ * Extension non cassante de [Paragraph] (Tâche 1.3.1, Partie 1) —
+ * valeur par défaut NORMAL, tout code existant continue de fonctionner
+ * sans modification.
+ */
+enum class ParagraphStyle { NORMAL, HEADING, BLOCK_QUOTE, POEM_LINE }
+
+/**
+ * Blocs purement structurels, SANS texte participant au flux de
+ * phrases — jamais vus par TTS/CTC/FTS, uniquement intercalés au rendu
+ * (même principe que le legacy `computeStructuralBlockAnchors`).
+ */
+sealed interface StructuralBlock {
+    /** Index du paragraphe APRÈS lequel ce bloc doit être intercalé. */
+    val anchorAfterParagraphIndex: Int
+
+    /** Image intercalée (EPUB `<img>`, etc.). */
+    data class EpubImage(
+        override val anchorAfterParagraphIndex: Int,
+        val href: String,
+        val altText: String?,
+    ) : StructuralBlock
+
+    /** Séparateur de section (ligne blanche, `* * *`, etc.). */
+    data class SectionBreak(
+        override val anchorAfterParagraphIndex: Int,
+    ) : StructuralBlock
+}
+
 data class Chapter(
     val index: Int,
     val href: String,
     val title: String?,
     val paragraphs: List<Paragraph>,
+    val structuralBlocks: List<StructuralBlock> = emptyList(), // NOUVEAU, défaut non cassant
 )
 
 data class Paragraph(
     val index: Int,
     val sentences: List<Sentence>,
+    val style: ParagraphStyle = ParagraphStyle.NORMAL, // NOUVEAU, défaut non cassant
 )
 
 /**
