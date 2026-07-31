@@ -12,7 +12,11 @@ import androidx.compose.material3.Text
 import androidx.compose.material3.TopAppBar
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.remember
 import androidx.compose.ui.Modifier
+import androidx.activity.compose.rememberLauncherForActivityResult
+import androidx.activity.result.contract.ActivityResultContracts
+import androidx.compose.ui.platform.LocalContext
 import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.navigation.NavHostController
 import androidx.navigation.compose.NavHost
@@ -21,6 +25,7 @@ import androidx.navigation.compose.rememberNavController
 import androidx.navigation.toRoute
 import com.inktone.core.ui.AboutScreen
 import com.inktone.feature.importer.ImportPickerButton
+import com.inktone.feature.importer.ImportViewModel
 import com.inktone.feature.library.GlobalBookmarksScreen
 import com.inktone.feature.library.LibraryScreen
 import com.inktone.feature.reader.ReaderIntent
@@ -46,13 +51,21 @@ import com.inktone.feature.statistics.StatisticsScreen
 fun InkToneNavHost(navController: NavHostController = rememberNavController()) {
     NavHost(navController = navController, startDestination = LibraryRoute) {
         composable<LibraryRoute> {
+            val importViewModel: ImportViewModel = hiltViewModel()
+            val importLauncher = rememberLauncherForActivityResult(
+                ActivityResultContracts.OpenMultipleDocuments(),
+            ) { uris ->
+                if (uris.isNotEmpty()) {
+                    importViewModel.enqueueImport(uris.map { it.toString() })
+                }
+            }
             LibraryScreen(
                 onNavigateToReader = { publicationId -> navController.navigate(ReaderRoute(publicationId)) },
                 onOpenBookmarks = { navController.navigate(BookmarksRoute) },
+                onOpenStats = { navController.navigate(StatisticsRoute) },
+                onImportClick = { importLauncher.launch(arrayOf("application/epub+zip", "text/plain")) },
                 // Tache 1.0 (Partie 1) : seul l'import reste dans le FAB.
-                // Search/Stats/Settings sont atteignables uniquement depuis
-                // le drawer (Partie 2) — c'est tout l'interet d'avoir un
-                // drawer plutot que des icones eparpillees.
+                // Menu 3-points a aussi Importer maintenant (Phase 3).
                 floatingActionButton = { ImportPickerButton() },
             )
         }

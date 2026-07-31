@@ -57,6 +57,10 @@ class LibraryViewModel @Inject constructor(
             is LibraryIntent.CycleLayout -> _state.value = _state.value.copy(
                 layoutMode = _state.value.layoutMode.next(),
             )
+            is LibraryIntent.Refresh -> observePublications(
+                _state.value.activeFilter,
+                _state.value.filterValue,
+            )
         }
     }
 

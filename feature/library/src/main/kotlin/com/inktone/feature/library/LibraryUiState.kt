@@ -68,6 +68,7 @@ sealed interface LibraryIntent {
     data class SetSearchQuery(val query: String) : LibraryIntent
     data class SetSortOrder(val order: LibrarySortOrder) : LibraryIntent
     data object CycleLayout : LibraryIntent
+    data object Refresh : LibraryIntent
 }
 
 /**
@@ -77,4 +78,5 @@ sealed interface LibraryIntent {
  */
 sealed interface LibraryEffect {
     data class NavigateToReader(val publicationId: String) : LibraryEffect
+    data object NavigateToStats : LibraryEffect
 }

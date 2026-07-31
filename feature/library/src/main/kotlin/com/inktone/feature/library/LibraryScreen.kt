@@ -23,9 +23,10 @@ import androidx.compose.foundation.lazy.items as listItems
 import androidx.compose.foundation.lazy.items as rowItems
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Star
+import androidx.compose.material.icons.outlined.MoreVert
+import androidx.compose.material.icons.outlined.Menu
 import androidx.compose.material.icons.outlined.Sort
 import androidx.compose.material.icons.outlined.StarBorder
-import androidx.compose.material.icons.outlined.Menu
 import androidx.compose.material3.DismissibleDrawerSheet
 import androidx.compose.material3.DismissibleNavigationDrawer
 import androidx.compose.material3.DropdownMenu
@@ -89,6 +90,8 @@ fun LibraryScreen(
     viewModel: LibraryViewModel = hiltViewModel(),
     floatingActionButton: @Composable () -> Unit = {},
     onOpenBookmarks: () -> Unit = {},
+    onOpenStats: () -> Unit = {},
+    onImportClick: () -> Unit = {},
 ) {
     val state by viewModel.state.collectAsState()
     val drawerState = rememberDrawerState(DrawerValue.Closed)
@@ -98,6 +101,7 @@ fun LibraryScreen(
         viewModel.effects.collect { effect ->
             when (effect) {
                 is LibraryEffect.NavigateToReader -> onNavigateToReader(effect.publicationId)
+                is LibraryEffect.NavigateToStats -> onOpenStats()
             }
         }
     }
@@ -116,6 +120,10 @@ fun LibraryScreen(
                         scope.launch { drawerState.close() }
                         onOpenBookmarks()
                     },
+                    onOpenStats = {
+                        scope.launch { drawerState.close() }
+                        onOpenStats()
+                    },
                 )
             }
         },
@@ -131,6 +139,8 @@ fun LibraryScreen(
                     onSortOrderChange = { viewModel.onIntent(LibraryIntent.SetSortOrder(it)) },
                     layoutMode = state.layoutMode,
                     onCycleLayout = { viewModel.onIntent(LibraryIntent.CycleLayout) },
+                    onRefresh = { viewModel.onIntent(LibraryIntent.Refresh) },
+                    onImportClick = onImportClick,
                 )
                 FilterRow(
                     active = state.activeFilter,
@@ -171,9 +181,9 @@ fun LibraryScreen(
 }
 
 @Composable
-private fun LibraryDrawerContent(state: LibraryUiState, onSelectFilter: (FilterMode, String?) -> Unit, onOpenBookmarks: () -> Unit) {
+private fun LibraryDrawerContent(state: LibraryUiState, onSelectFilter: (FilterMode, String?) -> Unit, onOpenBookmarks: () -> Unit, onOpenStats: () -> Unit) {
     Column(Modifier.padding(16.dp)) {
-        Text("Bibliothèque", style = MaterialTheme.typography.titleMedium, modifier = Modifier.padding(bottom = 8.dp))
+        Text("InkTone", style = MaterialTheme.typography.titleLarge, color = MaterialTheme.colorScheme.primary, modifier = Modifier.padding(bottom = 16.dp))
         SelectableFilters.forEach { filter ->
             NavigationDrawerItem(
                 label = { Text(filter.label()) },
@@ -181,6 +191,18 @@ private fun LibraryDrawerContent(state: LibraryUiState, onSelectFilter: (FilterM
                 onClick = { onSelectFilter(filter, null) },
             )
         }
+        NavigationDrawerItem(
+            label = { Text("Récents") },
+            icon = { Icon(AppIcons.Loading, contentDescription = null) },
+            selected = state.activeFilter == FilterMode.ALL && state.sortOrder == LibrarySortOrder.RECENTLY_OPENED,
+            onClick = { onSelectFilter(FilterMode.ALL, null) },
+        )
+        NavigationDrawerItem(
+            label = { Text("Statistiques") },
+            icon = { Icon(AppIcons.Stats, contentDescription = null) },
+            selected = false,
+            onClick = onOpenStats,
+        )
         NavigationDrawerItem(
             label = { Text("Signets") },
             icon = { Icon(AppIcons.Bookmark, contentDescription = null) },
@@ -231,8 +253,11 @@ private fun LibraryToolbar(
     onSortOrderChange: (LibrarySortOrder) -> Unit,
     layoutMode: LibraryLayoutMode,
     onCycleLayout: () -> Unit,
+    onRefresh: () -> Unit,
+    onImportClick: () -> Unit,
 ) {
     var isSortMenuExpanded by remember { mutableStateOf(false) }
+    var isActionsMenuExpanded by remember { mutableStateOf(false) }
 
     Row(Modifier.fillMaxWidth().padding(horizontal = 4.dp), verticalAlignment = Alignment.CenterVertically) {
         IconButton(onClick = onMenuClick) {
@@ -264,6 +289,23 @@ private fun LibraryToolbar(
                 imageVector = layoutMode.icon(),
                 contentDescription = layoutMode.label(),
             )
+        }
+        Box {
+            IconButton(onClick = { isActionsMenuExpanded = true }) {
+                Icon(Icons.Outlined.MoreVert, contentDescription = "Actions")
+            }
+            DropdownMenu(expanded = isActionsMenuExpanded, onDismissRequest = { isActionsMenuExpanded = false }) {
+                DropdownMenuItem(
+                    text = { Text("Importer") },
+                    onClick = { isActionsMenuExpanded = false; onImportClick() },
+                    leadingIcon = { Icon(AppIcons.Data, contentDescription = null) },
+                )
+                DropdownMenuItem(
+                    text = { Text("Actualiser") },
+                    onClick = { isActionsMenuExpanded = false; onRefresh() },
+                    leadingIcon = { Icon(AppIcons.Loading, contentDescription = null) },
+                )
+            }
         }
     }
 }
