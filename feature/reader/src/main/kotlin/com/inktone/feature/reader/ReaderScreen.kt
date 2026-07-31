@@ -13,6 +13,7 @@ import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.ExperimentalLayoutApi
 import androidx.compose.foundation.layout.FlowRow
 import androidx.compose.foundation.layout.fillMaxSize
+import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.RoundedCornerShape
@@ -27,14 +28,17 @@ import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
+import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.layout.onGloballyPositioned
 import androidx.compose.ui.layout.positionInParent
 import androidx.compose.ui.platform.LocalDensity
+import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.AnnotatedString
 import androidx.compose.ui.text.SpanStyle
 import androidx.compose.ui.text.buildAnnotatedString
+import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.withStyle
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
@@ -145,9 +149,7 @@ fun ReaderScreen(viewModel: ReaderViewModel = hiltViewModel(), onSearchClick: ()
         val selectedRange = state.selectedSentenceRange
         var pendingColor by remember { mutableStateOf(AnnotationColor.YELLOW) }
 
-        // A.1 / Tache 9bis.3.6 - position Y (relative au FlowRow
-        // scrollable) de la phrase en cours de lecture TTS, mise a jour
-        // par onGloballyPositioned sur la SentenceText active.
+        // A.1 / Tache 9bis.3.6 - position Y de la phrase active
         var currentLineYDp by remember { mutableStateOf(0.dp) }
         val density = LocalDensity.current
 
@@ -158,39 +160,111 @@ fun ReaderScreen(viewModel: ReaderViewModel = hiltViewModel(), onSearchClick: ()
             }
         }
 
+        // B.6 — ETA micro-indicateur quand HUD masqué
+        val etaText = state.etaText
+
         Box(modifier = Modifier.weight(1f)) {
             if (state.isReadingRulerEnabled) {
                 ReadingRuler(currentLineY = currentLineYDp, enabled = true)
             }
-            FlowRow(
-                modifier = Modifier.verticalScroll(scrollState),
-                horizontalArrangement = Arrangement.spacedBy(4.dp),
-            ) {
-                var globalIndex = 0
-                state.currentChapter?.paragraphs?.forEach { paragraph ->
-                    paragraph.sentences.forEach { sentence ->
-                        val index = globalIndex++
-                        val isCurrentlyPlaying = index == state.currentSentenceIndex
-                        SentenceText(
-                            sentence = sentence,
-                            paragraphStyle = paragraph.style,
-                            isCurrentlyPlaying = isCurrentlyPlaying,
-                            highlightedWordRange = state.highlightedWordRange,
-                            isSelected = selectedRange?.contains(index) == true,
-                            existingAnnotationColor = annotationColorFor(state.currentChapterIndex, sentence, state.annotations),
-                            fontSizeSp = state.effectiveSettings.fontSize,
-                            textColor = ThemeColors.text(state.effectiveSettings.theme),
-                            onLongClick = { viewModel.onIntent(ReaderIntent.BeginSentenceSelection(index)) },
-                            onClick = {
-                                if (selectedRange != null) viewModel.onIntent(ReaderIntent.ExtendSentenceSelection(index))
-                            },
-                            modifier = if (isCurrentlyPlaying) {
-                                Modifier.onGloballyPositioned { coordinates ->
-                                    currentLineYDp = with(density) { coordinates.positionInParent().y.toDp() }
+
+            when (state.readingMode) {
+                ReadingMode.SCROLL -> {
+                    FlowRow(
+                        modifier = Modifier.verticalScroll(scrollState),
+                        horizontalArrangement = Arrangement.spacedBy(4.dp),
+                    ) {
+                        var globalIndex = 0
+                        state.currentChapter?.paragraphs?.forEach { paragraph ->
+                            paragraph.sentences.forEach { sentence ->
+                                val index = globalIndex++
+                                val isCurrentlyPlaying = index == state.currentSentenceIndex
+                                // B.5 — piste de lecture : opacité différenciée
+                                val trailAlpha = when {
+                                    isCurrentlyPlaying -> 1.0f
+                                    index < state.currentSentenceIndex -> 0.40f
+                                    else -> 0.88f
                                 }
-                            } else {
-                                Modifier
-                            },
+                                SentenceText(
+                                    sentence = sentence,
+                                    paragraphStyle = paragraph.style,
+                                    isCurrentlyPlaying = isCurrentlyPlaying,
+                                    highlightedWordRange = state.highlightedWordRange,
+                                    isSelected = selectedRange?.contains(index) == true,
+                                    existingAnnotationColor = annotationColorFor(state.currentChapterIndex, sentence, state.annotations),
+                                    fontSizeSp = state.effectiveSettings.fontSize,
+                                    textColor = ThemeColors.text(state.effectiveSettings.theme).copy(alpha = trailAlpha),
+                                    onLongClick = { viewModel.onIntent(ReaderIntent.BeginSentenceSelection(index)) },
+                                    onClick = {
+                                        if (selectedRange != null) viewModel.onIntent(ReaderIntent.ExtendSentenceSelection(index))
+                                    },
+                                    modifier = if (isCurrentlyPlaying) {
+                                        Modifier.onGloballyPositioned { coordinates ->
+                                            currentLineYDp = with(density) { coordinates.positionInParent().y.toDp() }
+                                        }
+                                    } else {
+                                        Modifier
+                                    },
+                                )
+                            }
+                        }
+                    }
+                }
+                ReadingMode.PAGED -> {
+                    PagedChapterContent(
+                        sentences = sentences,
+                        currentSentenceIndex = state.currentSentenceIndex,
+                        highlightedWordRange = state.highlightedWordRange,
+                        selectedRange = selectedRange,
+                        annotations = state.annotations,
+                        currentChapterIndex = state.currentChapterIndex,
+                        fontSizeSp = state.effectiveSettings.fontSize,
+                        textColor = ThemeColors.text(state.effectiveSettings.theme),
+                        isPlaying = state.isPlaying,
+                        isReadingRulerEnabled = state.isReadingRulerEnabled,
+                        onSentenceLongClick = { index -> viewModel.onIntent(ReaderIntent.BeginSentenceSelection(index)) },
+                        onSentenceClick = { index ->
+                            if (selectedRange != null) viewModel.onIntent(ReaderIntent.ExtendSentenceSelection(index))
+                        },
+                        onNextChapter = { viewModel.onIntent(ReaderIntent.NextChapter) },
+                    )
+                }
+            }
+
+            // B.6 — Micro-indicateur ETA quand HUD masqué
+            if (!isHudVisible && etaText.isNotEmpty() && state.readingMode == ReadingMode.SCROLL) {
+                Box(
+                    modifier = Modifier
+                        .align(Alignment.BottomCenter)
+                        .padding(bottom = 24.dp)
+                        .background(Color.Black.copy(alpha = 0.35f), RoundedCornerShape(16.dp))
+                        .padding(horizontal = 12.dp, vertical = 4.dp),
+                ) {
+                    Text(
+                        text = etaText,
+                        color = Color.White.copy(alpha = 0.75f),
+                        style = MaterialTheme.typography.labelSmall,
+                    )
+                }
+            }
+
+            // B.7 — Captions TTS (overlay sous-titres)
+            if (state.isPlaying && selectedRange == null) {
+                val captionText = sentences.getOrNull(state.currentSentenceIndex)?.text
+                if (captionText != null) {
+                    Box(
+                        modifier = Modifier
+                            .align(Alignment.BottomCenter)
+                            .fillMaxWidth()
+                            .background(Color.Black.copy(alpha = 0.65f))
+                            .padding(horizontal = 16.dp, vertical = 12.dp)
+                            .semantics { /* liveRegion = LiveRegionMode.Polite */ },
+                    ) {
+                        Text(
+                            text = captionText,
+                            color = Color.White,
+                            style = MaterialTheme.typography.bodyMedium,
+                            textAlign = TextAlign.Center,
                         )
                     }
                 }
@@ -221,6 +295,7 @@ fun ReaderScreen(viewModel: ReaderViewModel = hiltViewModel(), onSearchClick: ()
                 onTocClick = { viewModel.onIntent(ReaderIntent.ToggleToc) },
                 onAaClick = { showSettingsPanel = true },
                 onTtsClick = { showTtsPanel = true },
+                onReadingModeClick = { viewModel.onIntent(ReaderIntent.ToggleReadingMode) },
             )
 
             FlowRow(horizontalArrangement = Arrangement.spacedBy(4.dp)) {
@@ -300,7 +375,7 @@ private fun nextSleepTimerMinutes(current: SleepTimerState?): Int? {
 
 @OptIn(ExperimentalFoundationApi::class)
 @Composable
-private fun SentenceText(
+internal fun SentenceText(
     sentence: Sentence,
     paragraphStyle: com.inktone.domain.model.ParagraphStyle = com.inktone.domain.model.ParagraphStyle.NORMAL,
     isCurrentlyPlaying: Boolean,

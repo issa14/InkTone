@@ -11,6 +11,9 @@ import com.inktone.domain.model.SleepTimerState
 import com.inktone.domain.model.TableOfContentsEntry
 import com.inktone.domain.valueobject.Locator
 
+/** B.1 — Mode de lecture : défilement vertical ou paginé horizontal. */
+enum class ReadingMode { SCROLL, PAGED }
+
 data class ReaderUiState(
     val chapters: List<Chapter> = emptyList(),
     val currentChapterIndex: Int = 0,
@@ -47,6 +50,8 @@ data class ReaderUiState(
     // A.3 — Message d'erreur surfacé quand le parsing ou l'ouverture
     // échoue. null = pas d'erreur, l'écran affiche le contenu normal.
     val errorMessage: String? = null,
+    // B.1 — Mode de lecture actif (scroll vertical ou paginé horizontal).
+    val readingMode: ReadingMode = ReadingMode.SCROLL,
 ) {
     val currentChapter: Chapter? get() = chapters.getOrNull(currentChapterIndex)
     val hasNextChapter: Boolean get() = currentChapterIndex < chapters.lastIndex
@@ -80,6 +85,24 @@ data class ReaderUiState(
             val anchor = selectionAnchorIndex ?: return null
             val focus = selectionFocusIndex ?: anchor
             return minOf(anchor, focus)..maxOf(anchor, focus)
+        }
+
+    /**
+     * B.6 — Temps de lecture restant estimé pour le chapitre en cours.
+     * Basé sur 250 WPM par défaut et 15 mots par phrase (estimation
+     * conservative). À remplacer par `ReadingSession.wpm` réel quand
+     * disponible.
+     */
+    val etaText: String
+        get() {
+            val remainingSentences = currentChapter?.paragraphs
+                ?.flatMap { it.sentences }?.drop(currentSentenceIndex)?.size ?: return ""
+            if (remainingSentences <= 0) return ""
+            val avgWordsPerSentence = 15
+            val wpm = 250
+            val remainingWords = remainingSentences * avgWordsPerSentence
+            val minutes = (remainingWords.toFloat() / wpm).toInt().coerceAtLeast(1)
+            return "~$minutes min"
         }
 }
 
@@ -154,4 +177,7 @@ sealed interface ReaderIntent {
 
     /** A.3 — Efface le message d'erreur affiché dans le Reader. */
     data object DismissError : ReaderIntent
+
+    /** B.1 — Bascule entre mode scroll et mode paginé. */
+    data object ToggleReadingMode : ReaderIntent
 }

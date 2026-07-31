@@ -113,6 +113,9 @@ class ReaderViewModel @Inject constructor(
             is ReaderIntent.PlayCurrentSentence -> playCurrentSentence()
             is ReaderIntent.Pause -> _state.value = _state.value.copy(isPlaying = false)
             is ReaderIntent.DismissError -> _state.value = _state.value.copy(errorMessage = null)
+            is ReaderIntent.ToggleReadingMode -> _state.value = _state.value.copy(
+                readingMode = if (_state.value.readingMode == ReadingMode.SCROLL) ReadingMode.PAGED else ReadingMode.SCROLL,
+            )
             is ReaderIntent.BeginSentenceSelection -> _state.value = _state.value.copy(
                 selectionAnchorIndex = intent.sentenceIndex, selectionFocusIndex = intent.sentenceIndex,
             )
