@@ -35,6 +35,8 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.layout.onGloballyPositioned
 import androidx.compose.ui.layout.positionInParent
 import androidx.compose.ui.platform.LocalDensity
+import androidx.compose.ui.semantics.LiveRegionMode
+import androidx.compose.ui.semantics.liveRegion
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.AnnotatedString
 import androidx.compose.ui.text.SpanStyle
@@ -267,10 +269,7 @@ fun ReaderScreen(viewModel: ReaderViewModel = hiltViewModel(), onSearchClick: ()
                             .fillMaxWidth()
                             .background(Color.Black.copy(alpha = 0.65f))
                             .padding(horizontal = 16.dp, vertical = 12.dp)
-                            .semantics {
-                                // B.7 — liveRegion indisponible dans Compose 1.7.2 (BOM 2024.09.02),
-                                // sera activé en Compose 1.8+ : liveRegion = LiveRegionMode.Polite
-                            },
+                            .semantics { liveRegion = LiveRegionMode.Polite },
                     ) {
                         Text(
                             text = captionText,
