@@ -22,6 +22,9 @@ data class UserPreferences(
     // Tache 1.4 (Partie 1) — objectif de lecture quotidien, valeur par
     // defaut raisonnable (20 min), modifiable dans les reglages (Partie 4).
     val dailyGoalMinutes: Int = 20,
+    // A.5 — profil vocal actif. null = utiliser la voix par defaut
+    // correspondant au moteur TTS selectionne.
+    val activeVoiceProfileId: String? = null,
 ) {
     init {
         require(fontSize > 0) { "fontSize doit être strictement positif" }

@@ -4,6 +4,7 @@ import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.inktone.domain.repository.PreferencesRepository
 import com.inktone.domain.usecase.ApplyAccessibilityPresetUseCase
+import com.inktone.domain.usecase.GetVoiceProfilesUseCase
 import dagger.hilt.android.lifecycle.HiltViewModel
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
@@ -21,6 +22,7 @@ import javax.inject.Inject
 class SettingsViewModel @Inject constructor(
     private val preferencesRepository: PreferencesRepository,
     private val applyAccessibilityPreset: ApplyAccessibilityPresetUseCase,
+    private val getVoiceProfiles: GetVoiceProfilesUseCase,
 ) : ViewModel() {
 
     private val _state = MutableStateFlow(SettingsUiState())
@@ -31,6 +33,11 @@ class SettingsViewModel @Inject constructor(
             preferencesRepository.observe().collect { preferences ->
                 _state.value = _state.value.copy(preferences = preferences)
             }
+        }
+        // A.5 — charge les profils vocaux une fois au démarrage
+        viewModelScope.launch {
+            val profiles = getVoiceProfiles()
+            _state.value = _state.value.copy(voiceProfiles = profiles)
         }
     }
 
@@ -52,6 +59,8 @@ class SettingsViewModel @Inject constructor(
                 is SettingsIntent.SetReadingRulerEnabled ->
                     preferencesRepository.update(current.copy(readingRulerEnabled = intent.enabled))
                 is SettingsIntent.ApplyAccessibilityPreset -> applyAccessibilityPreset()
+                is SettingsIntent.SetActiveVoiceProfile ->
+                    preferencesRepository.update(current.copy(activeVoiceProfileId = intent.profileId))
             }
         }
     }

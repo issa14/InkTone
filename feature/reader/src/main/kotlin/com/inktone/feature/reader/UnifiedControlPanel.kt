@@ -59,6 +59,8 @@ fun UnifiedControlPanel(
     onSearchClick: () -> Unit,
     onBookmarksClick: () -> Unit,
     onTocClick: () -> Unit,
+    onAaClick: () -> Unit = {},
+    onTtsClick: () -> Unit = {},
 ) {
     val haptic = LocalHapticFeedback.current
     val accentColor = MaterialTheme.colorScheme.primary
@@ -107,6 +109,8 @@ fun UnifiedControlPanel(
             Spacer(Modifier.height(8.dp))
 
             Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceEvenly, verticalAlignment = Alignment.CenterVertically) {
+                SecondaryAction(icon = AppIcons.Appearance, label = "Aa", tint = accentColor.copy(alpha = 0.5f), onClick = onAaClick)
+                SecondaryAction(icon = AppIcons.Speaking, label = "Voix", tint = accentColor.copy(alpha = 0.5f), onClick = onTtsClick)
                 SecondaryAction(icon = Icons.Filled.Timer, label = "Veille", tint = if (sleepTimerActive) accentColor else accentColor.copy(alpha = 0.5f), onClick = onSleepTimerClick)
                 SecondaryAction(icon = AppIcons.Search, label = "Recherche", tint = accentColor.copy(alpha = 0.5f), onClick = onSearchClick)
                 SecondaryAction(icon = AppIcons.Bookmark, label = "Signets", tint = accentColor.copy(alpha = 0.5f), onClick = onBookmarksClick)

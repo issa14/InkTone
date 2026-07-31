@@ -18,6 +18,7 @@ import com.inktone.domain.repository.AnnotationRepository
 import com.inktone.domain.repository.BookmarkRepository
 import com.inktone.domain.repository.PreferencesRepository
 import com.inktone.domain.repository.PublicationRepository
+import com.inktone.domain.repository.VoiceProfileRepository
 import com.inktone.domain.service.ParseResult
 import com.inktone.domain.service.PublicationParser
 import com.inktone.domain.service.TtsEngine
@@ -53,6 +54,7 @@ class ReaderViewModel @Inject constructor(
     private val getReadingState: GetReadingStateUseCase,
     private val publicationRepository: PublicationRepository,
     private val preferencesRepository: PreferencesRepository,
+    private val voiceProfileRepository: VoiceProfileRepository,
     private val annotationRepository: AnnotationRepository,
     private val addAnnotation: AddAnnotationUseCase,
     private val bookmarkRepository: BookmarkRepository,
@@ -410,10 +412,14 @@ class ReaderViewModel @Inject constructor(
             _state.value = _state.value.copy(isPlaying = true)
 
             val sentence = sentences[index]
-            val voiceProfile = VoiceProfile(
-                id = "vp-native-fr", engine = TtsEngineId.ANDROID_NATIVE,
-                voice = "fr-fr-default", language = "fr-FR",
-            )
+            // A.5 — résout le profil vocal actif depuis les préférences utilisateur
+            val prefs = preferencesRepository.get()
+            val voiceProfile = prefs.activeVoiceProfileId
+                ?.let { voiceProfileRepository.getById(it) }
+                ?: VoiceProfile(
+                    id = "vp-native-fr", engine = TtsEngineId.ANDROID_NATIVE,
+                    voice = "fr-fr-default", language = "fr-FR",
+                )
             val segment = sentenceAudioBuffer.get(sentence, voiceProfile)
             audioSegmentPlayer.play(segment)
 

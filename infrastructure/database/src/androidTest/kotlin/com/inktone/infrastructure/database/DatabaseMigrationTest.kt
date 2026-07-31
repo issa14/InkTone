@@ -173,6 +173,29 @@ class DatabaseMigrationTest {
         v6.close()
     }
 
+    @Test
+    fun migration_6_vers_7_conserve_les_donnees_et_ajoute_activeVoiceProfileId() {
+        val v6 = helper.createDatabase(TEST_DB_NAME, 6)
+        v6.execSQL(
+            """
+            INSERT INTO user_preferences (id, theme, fontSize, defaultTtsEngine, crashReportingEnabled, language, fontFamily, reduceMotion, dynamicColorEnabled, readingRulerEnabled, dailyGoalMinutes)
+            VALUES (0, 'SYSTEM', 18, 'SHERPA_ONNX', 0, 'fr', 'DEFAULT', 0, 1, 0, 20)
+            """.trimIndent(),
+        )
+        v6.close()
+
+        val v7 = helper.runMigrationsAndValidate(
+            TEST_DB_NAME, 7, true,
+            MIGRATION_2_3, MIGRATION_3_4, MIGRATION_4_5, MIGRATION_5_6, MIGRATION_6_7,
+        )
+
+        v7.query("SELECT activeVoiceProfileId FROM user_preferences WHERE id = 0").use { cursor ->
+            assertEquals(true, cursor.moveToFirst())
+            assertEquals(null, cursor.getString(0)) // null par defaut
+        }
+        v7.close()
+    }
+
     companion object {
         private const val TEST_DB_NAME = "migration-test"
     }

@@ -18,4 +18,5 @@ data class UserPreferencesEntity(
     val dynamicColorEnabled: Boolean = true,
     val readingRulerEnabled: Boolean = false,
     val dailyGoalMinutes: Int = 20, // Tache 1.4 (Partie 1)
+    val activeVoiceProfileId: String? = null, // A.5
 )

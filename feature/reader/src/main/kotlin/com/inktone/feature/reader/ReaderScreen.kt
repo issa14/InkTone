@@ -15,6 +15,7 @@ import androidx.compose.foundation.layout.FlowRow
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material3.Button
 import androidx.compose.material3.MaterialTheme
@@ -91,6 +92,10 @@ fun ReaderScreen(viewModel: ReaderViewModel = hiltViewModel(), onSearchClick: ()
     // sur la zone de lecture le fait reapparaitre.
     var isHudVisible by remember { mutableStateOf(true) }
 
+    // B.2/B.3 — états d'affichage des panneaux de réglages in-reader
+    var showSettingsPanel by remember { mutableStateOf(false) }
+    var showTtsPanel by remember { mutableStateOf(false) }
+
     ImmersiveReaderChrome(isHudVisible = isHudVisible, onAutoHide = { isHudVisible = false }) {
     Column(
         modifier = Modifier
@@ -161,28 +166,33 @@ fun ReaderScreen(viewModel: ReaderViewModel = hiltViewModel(), onSearchClick: ()
                 modifier = Modifier.verticalScroll(scrollState),
                 horizontalArrangement = Arrangement.spacedBy(4.dp),
             ) {
-                sentences.forEachIndexed { index, sentence ->
-                    val isCurrentlyPlaying = index == state.currentSentenceIndex
-                    SentenceText(
-                        sentence = sentence,
-                        isCurrentlyPlaying = isCurrentlyPlaying,
-                        highlightedWordRange = state.highlightedWordRange,
-                        isSelected = selectedRange?.contains(index) == true,
-                        existingAnnotationColor = annotationColorFor(state.currentChapterIndex, sentence, state.annotations),
-                        fontSizeSp = state.effectiveSettings.fontSize,
-                        textColor = ThemeColors.text(state.effectiveSettings.theme),
-                        onLongClick = { viewModel.onIntent(ReaderIntent.BeginSentenceSelection(index)) },
-                        onClick = {
-                            if (selectedRange != null) viewModel.onIntent(ReaderIntent.ExtendSentenceSelection(index))
-                        },
-                        modifier = if (isCurrentlyPlaying) {
-                            Modifier.onGloballyPositioned { coordinates ->
-                                currentLineYDp = with(density) { coordinates.positionInParent().y.toDp() }
-                            }
-                        } else {
-                            Modifier
-                        },
-                    )
+                var globalIndex = 0
+                state.currentChapter?.paragraphs?.forEach { paragraph ->
+                    paragraph.sentences.forEach { sentence ->
+                        val index = globalIndex++
+                        val isCurrentlyPlaying = index == state.currentSentenceIndex
+                        SentenceText(
+                            sentence = sentence,
+                            paragraphStyle = paragraph.style,
+                            isCurrentlyPlaying = isCurrentlyPlaying,
+                            highlightedWordRange = state.highlightedWordRange,
+                            isSelected = selectedRange?.contains(index) == true,
+                            existingAnnotationColor = annotationColorFor(state.currentChapterIndex, sentence, state.annotations),
+                            fontSizeSp = state.effectiveSettings.fontSize,
+                            textColor = ThemeColors.text(state.effectiveSettings.theme),
+                            onLongClick = { viewModel.onIntent(ReaderIntent.BeginSentenceSelection(index)) },
+                            onClick = {
+                                if (selectedRange != null) viewModel.onIntent(ReaderIntent.ExtendSentenceSelection(index))
+                            },
+                            modifier = if (isCurrentlyPlaying) {
+                                Modifier.onGloballyPositioned { coordinates ->
+                                    currentLineYDp = with(density) { coordinates.positionInParent().y.toDp() }
+                                }
+                            } else {
+                                Modifier
+                            },
+                        )
+                    }
                 }
             }
         }
@@ -209,6 +219,8 @@ fun ReaderScreen(viewModel: ReaderViewModel = hiltViewModel(), onSearchClick: ()
                 onSearchClick = onSearchClick,
                 onBookmarksClick = { viewModel.onIntent(ReaderIntent.ToggleBookmarkList) },
                 onTocClick = { viewModel.onIntent(ReaderIntent.ToggleToc) },
+                onAaClick = { showSettingsPanel = true },
+                onTtsClick = { showTtsPanel = true },
             )
 
             FlowRow(horizontalArrangement = Arrangement.spacedBy(4.dp)) {
@@ -216,32 +228,58 @@ fun ReaderScreen(viewModel: ReaderViewModel = hiltViewModel(), onSearchClick: ()
                     Text("+ Signet")
                 }
             }
+        }
 
-            ChapterOverrideMenu(
-                currentOverrides = state.currentOverrides,
-                onSetOverride = { viewModel.onIntent(ReaderIntent.SetOverrides(it)) },
+        // B.2 — Panneau réglages lecture in-reader
+        if (showSettingsPanel) {
+            ReaderSettingsPanel(
+                currentTheme = state.effectiveSettings.theme,
+                currentFontSize = state.effectiveSettings.fontSize,
+                onThemeChange = { theme ->
+                    val overrides = (state.currentOverrides ?: ReadingOverrides()).copy(theme = theme)
+                    viewModel.onIntent(ReaderIntent.SetOverrides(overrides))
+                },
+                onFontSizeChange = { size ->
+                    val overrides = (state.currentOverrides ?: ReadingOverrides()).copy(fontSize = size)
+                    viewModel.onIntent(ReaderIntent.SetOverrides(overrides))
+                },
+                onDismiss = { showSettingsPanel = false },
+            )
+        }
+
+        // B.3 — Panneau TTS in-reader
+        if (showTtsPanel) {
+            val sentences = state.currentChapter?.paragraphs?.flatMap { it.sentences } ?: emptyList()
+            ReaderTtsPanel(
+                isPlaying = state.isPlaying,
+                currentSentenceIndex = state.currentSentenceIndex,
+                totalSentences = sentences.size,
+                currentSpeed = 1.0f, // TODO: lire depuis preferences TTS speed
+                onPlayPause = {
+                    viewModel.onIntent(if (state.isPlaying) ReaderIntent.Pause else ReaderIntent.PlayCurrentSentence)
+                },
+                onStop = { viewModel.onIntent(ReaderIntent.Pause) },
+                onPreviousSentence = {
+                    if (state.currentSentenceIndex > 0) {
+                        viewModel.onIntent(ReaderIntent.Pause)
+                        viewModel.onIntent(ReaderIntent.PlayCurrentSentence) // déclenche la phrase précédente
+                    }
+                },
+                onNextSentence = {
+                    viewModel.onIntent(ReaderIntent.Pause)
+                    viewModel.onIntent(ReaderIntent.PlayCurrentSentence) // déclenche la phrase suivante
+                },
+                onSpeedChange = { /* TODO: UpdatePreferencesUseCase(speed) */ },
+                onSleepTimer = { minutes ->
+                    viewModel.onIntent(ReaderIntent.SetSleepTimer(minutes))
+                },
+                currentSleepTimerMinutes = state.sleepTimer?.let {
+                    ((it.remainingMs / 60_000L).toInt())
+                },
+                onDismiss = { showTtsPanel = false },
             )
         }
     }
-    }
-}
-
-/**
- * Tâche 8.2 — bascule "utiliser les réglages de ce livre" : écrit
- * `ReadingState.overrides` via `ReaderIntent.SetOverrides`
- * (`UpdateReadingStateUseCase`, Tâche 1.8, déjà complet). Aucune UI ne
- * permettait jusqu'ici de CRÉER une surcharge par publication — Tâche
- * 4.7 ne fait qu'appliquer `EffectiveReadingSettings` au rendu.
- */
-@Composable
-private fun ChapterOverrideMenu(currentOverrides: ReadingOverrides?, onSetOverride: (ReadingOverrides?) -> Unit) {
-    val hasOverride = currentOverrides != null
-    Button(
-        onClick = {
-            onSetOverride(if (hasOverride) null else ReadingOverrides(theme = ReadingTheme.DARK))
-        },
-    ) {
-        Text(if (hasOverride) "Reglages de ce livre : actifs" else "Utiliser les reglages de ce livre")
     }
 }
 
@@ -264,6 +302,7 @@ private fun nextSleepTimerMinutes(current: SleepTimerState?): Int? {
 @Composable
 private fun SentenceText(
     sentence: Sentence,
+    paragraphStyle: com.inktone.domain.model.ParagraphStyle = com.inktone.domain.model.ParagraphStyle.NORMAL,
     isCurrentlyPlaying: Boolean,
     highlightedWordRange: IntRange?,
     isSelected: Boolean,
@@ -278,6 +317,16 @@ private fun SentenceText(
         isSelected -> SelectionHighlightColor
         existingAnnotationColor != null -> existingAnnotationColor.toComposeColor()
         else -> Color.Transparent
+    }
+
+    // B.4 — Style enrichi selon le type de paragraphe
+    val styleModifier = when (paragraphStyle) {
+        com.inktone.domain.model.ParagraphStyle.HEADING -> Modifier.padding(top = 8.dp, bottom = 4.dp)
+        com.inktone.domain.model.ParagraphStyle.BLOCK_QUOTE -> Modifier
+            .padding(start = 8.dp)
+            .background(Color.Gray.copy(alpha = 0.1f), RoundedCornerShape(4.dp))
+        com.inktone.domain.model.ParagraphStyle.POEM_LINE -> Modifier.padding(start = 16.dp)
+        com.inktone.domain.model.ParagraphStyle.NORMAL -> Modifier
     }
 
     // Tache 9bis.3.5 — transition douce entre mots plutot qu'un changement
@@ -306,6 +355,7 @@ private fun SentenceText(
             AnnotatedString(sentence.text)
         },
         modifier = modifier
+            .then(styleModifier)
             .background(background)
             .combinedClickable(onClick = onClick, onLongClick = onLongClick),
         fontSize = fontSizeSp.sp,

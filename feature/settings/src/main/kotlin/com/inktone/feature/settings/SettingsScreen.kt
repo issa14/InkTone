@@ -33,6 +33,7 @@ import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.unit.dp
 import androidx.hilt.navigation.compose.hiltViewModel
 import com.inktone.domain.model.UserPreferences
+import com.inktone.domain.model.VoiceProfile
 
 /**
  * Fondation des reglages (Tache 8.1). Critere de validation : modifier
@@ -72,7 +73,7 @@ fun SettingsScreen(
         },
     ) { innerPadding ->
         Box(Modifier.padding(innerPadding)) {
-            SettingsContent(state.preferences, viewModel::onIntent, onOpenPronunciationRules, onOpenAbout)
+            SettingsContent(state.preferences, state.voiceProfiles, viewModel::onIntent, onOpenPronunciationRules, onOpenAbout)
         }
     }
 }
@@ -85,6 +86,7 @@ fun SettingsScreen(
 @Composable
 internal fun SettingsContent(
     preferences: UserPreferences,
+    voiceProfiles: List<VoiceProfile> = emptyList(),
     onIntent: (SettingsIntent) -> Unit,
     onOpenPronunciationRules: () -> Unit = {},
     onOpenAbout: () -> Unit = {},
@@ -110,6 +112,17 @@ internal fun SettingsContent(
         SectionGroup("Voix") {
             SettingRow("Moteur par defaut", preferences.defaultTtsEngine.name) {
                 onIntent(SettingsIntent.SetDefaultTtsEngine(nextEnumValue(preferences.defaultTtsEngine)))
+            }
+            // A.5 — picker de profil vocal
+            val activeVoiceName = voiceProfiles
+                .find { it.id == preferences.activeVoiceProfileId }
+                ?.voice ?: "Voix par defaut"
+            SettingRow("Voix", activeVoiceName) {
+                onIntent(
+                    SettingsIntent.SetActiveVoiceProfile(
+                        nextVoiceProfileId(preferences.activeVoiceProfileId, voiceProfiles),
+                    ),
+                )
             }
             SettingRow("Regles de prononciation", "Gerer") { onOpenPronunciationRules() }
         }
@@ -220,4 +233,19 @@ private fun SliderSetting(label: String, value: Float, range: ClosedFloatingPoin
 private inline fun <reified T : Enum<T>> nextEnumValue(current: T): T {
     val values = enumValues<T>()
     return values[(current.ordinal + 1) % values.size]
+}
+
+/**
+ * A.5 — cycle entre les profils vocaux disponibles.
+ * Si aucun profil n'est sélectionné, passe au premier. Si le dernier
+ * est atteint, revient à null (voix par défaut).
+ */
+private fun nextVoiceProfileId(currentId: String?, profiles: List<VoiceProfile>): String? {
+    if (profiles.isEmpty()) return null
+    val currentIndex = profiles.indexOfFirst { it.id == currentId }
+    return if (currentIndex < 0 || currentIndex >= profiles.lastIndex) {
+        null // retour à la voix par défaut
+    } else {
+        profiles[currentIndex + 1].id
+    }
 }
