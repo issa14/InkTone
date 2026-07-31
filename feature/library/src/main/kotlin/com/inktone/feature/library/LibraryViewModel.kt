@@ -12,6 +12,7 @@ import kotlinx.coroutines.channels.Channel
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
+import kotlinx.coroutines.flow.catch
 import kotlinx.coroutines.flow.receiveAsFlow
 import kotlinx.coroutines.launch
 import javax.inject.Inject
@@ -61,16 +62,39 @@ class LibraryViewModel @Inject constructor(
                 _state.value.activeFilter,
                 _state.value.filterValue,
             )
+            is LibraryIntent.DismissError -> _state.value = _state.value.copy(errorMessage = null)
         }
+    }
+
+    /**
+     * Appelé par [LibraryScreen] à chaque ON_RESUME du NavBackStackEntry
+     * (Phase 4 — rafraîchissement au retour du Reader). Force une
+     * ré-observation du filtre actif pour mettre à jour les badges de
+     * progression et la carte "Reprendre la lecture".
+     */
+    fun refreshOnResume() {
+        observePublications(_state.value.activeFilter, _state.value.filterValue)
     }
 
     private fun observePublications(filter: FilterMode, value: String? = null) {
         observeJob?.cancel()
-        _state.value = _state.value.copy(isLoading = true, activeFilter = filter, filterValue = value)
+        _state.value = _state.value.copy(
+            isLoading = true,
+            activeFilter = filter,
+            filterValue = value,
+            errorMessage = null,
+        )
         observeJob = viewModelScope.launch {
-            publicationRepository.observeFiltered(filter, value).collect { publications ->
-                _state.value = _state.value.copy(publications = publications, isLoading = false)
-            }
+            publicationRepository.observeFiltered(filter, value)
+                .catch { e ->
+                    _state.value = _state.value.copy(
+                        isLoading = false,
+                        errorMessage = e.message ?: "Erreur de chargement de la bibliothèque",
+                    )
+                }
+                .collect { publications ->
+                    _state.value = _state.value.copy(publications = publications, isLoading = false)
+                }
         }
     }
 }

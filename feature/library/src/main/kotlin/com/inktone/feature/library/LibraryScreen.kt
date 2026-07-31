@@ -39,12 +39,15 @@ import androidx.compose.material3.IconButton
 import androidx.compose.material3.LinearProgressIndicator
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.NavigationDrawerItem
+import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextField
+import androidx.compose.material3.Button
 import androidx.compose.material3.rememberDrawerState
 import androidx.compose.material3.DrawerValue
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
@@ -55,8 +58,12 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.platform.LocalLifecycleOwner
+import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
+import androidx.lifecycle.Lifecycle
+import androidx.lifecycle.LifecycleEventObserver
 import androidx.hilt.navigation.compose.hiltViewModel
 import com.inktone.core.designsystem.AppIcons
 import com.inktone.domain.model.FilterMode
@@ -96,6 +103,18 @@ fun LibraryScreen(
     val state by viewModel.state.collectAsState()
     val drawerState = rememberDrawerState(DrawerValue.Closed)
     val scope = rememberCoroutineScope()
+
+    // Phase 4 — rafraîchissement au retour du Reader (ON_RESUME)
+    val lifecycleOwner = LocalLifecycleOwner.current
+    DisposableEffect(lifecycleOwner) {
+        val observer = LifecycleEventObserver { _, event ->
+            if (event == Lifecycle.Event.ON_RESUME) {
+                viewModel.refreshOnResume()
+            }
+        }
+        lifecycleOwner.lifecycle.addObserver(observer)
+        onDispose { lifecycleOwner.lifecycle.removeObserver(observer) }
+    }
 
     LaunchedEffect(Unit) {
         viewModel.effects.collect { effect ->
@@ -155,9 +174,15 @@ fun LibraryScreen(
 
                 when {
                     state.isLoading -> LibraryShimmerGrid()
-                    state.displayedPublications.isEmpty() -> Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
-                        Text(if (state.searchQuery.isBlank()) "Bibliothèque vide — importez un EPUB pour commencer." else "Aucun résultat pour « ${state.searchQuery} ».")
-                    }
+                    state.errorMessage != null -> ErrorState(
+                        message = state.errorMessage!!,
+                        onRetry = { viewModel.onIntent(LibraryIntent.Refresh) },
+                        onDismiss = { viewModel.onIntent(LibraryIntent.DismissError) },
+                    )
+                    state.displayedPublications.isEmpty() -> EmptyState(
+                        hasActiveImport = state.importProgress.total > 0 || state.importProgress.hasQueuedChunks,
+                        onImportClick = onImportClick,
+                    )
                     else -> {
                         // Vue groupée par séries — uniquement en mode ALL
                         if (state.activeFilter == FilterMode.ALL && state.availableSeries.isNotEmpty()) {
@@ -503,6 +528,80 @@ private fun FilterRow(active: FilterMode, onSelect: (FilterMode) -> Unit) {
 // PublicationCard et PublicationListRow remplacés par BookCover (Phase 1b).
 // Voir BookCover.kt pour le composant unifié avec Coil, dégradé de repli,
 // badge de progression et favori.
+
+// ──── Phase 4 — États vide et erreur ────
+
+/**
+ * État bibliothèque vide avec illustration et bouton d'import direct.
+ * Texte différent si un import est en cours (l'utilisateur a déjà
+ * déclenché un import, pas besoin de lui redemander).
+ */
+@Composable
+private fun EmptyState(hasActiveImport: Boolean, onImportClick: () -> Unit) {
+    Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
+        Column(horizontalAlignment = Alignment.CenterHorizontally) {
+            Icon(
+                AppIcons.Reading,
+                contentDescription = null,
+                modifier = Modifier.size(64.dp),
+                tint = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.4f),
+            )
+            Text(
+                if (hasActiveImport) "Import en cours…" else "Bibliothèque vide",
+                style = MaterialTheme.typography.titleMedium,
+                modifier = Modifier.padding(top = 16.dp),
+            )
+            Text(
+                if (hasActiveImport) "Vos livres apparaîtront ici une fois l'import terminé."
+                else "Importez un EPUB pour commencer votre bibliothèque.",
+                style = MaterialTheme.typography.bodyMedium,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                textAlign = TextAlign.Center,
+                modifier = Modifier.padding(horizontal = 32.dp, vertical = 8.dp),
+            )
+            if (!hasActiveImport) {
+                Button(onClick = onImportClick, modifier = Modifier.padding(top = 16.dp)) {
+                    Text("Importer des livres")
+                }
+            }
+        }
+    }
+}
+
+/**
+ * Bannière d'erreur avec message et bouton « Réessayer ».
+ * Affichée quand [LibraryUiState.errorMessage] est non-null.
+ */
+@Composable
+private fun ErrorState(message: String, onRetry: () -> Unit, onDismiss: () -> Unit) {
+    Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
+        Column(horizontalAlignment = Alignment.CenterHorizontally) {
+            Icon(
+                AppIcons.Error,
+                contentDescription = null,
+                modifier = Modifier.size(48.dp),
+                tint = MaterialTheme.colorScheme.error,
+            )
+            Text(
+                "Erreur",
+                style = MaterialTheme.typography.titleMedium,
+                color = MaterialTheme.colorScheme.error,
+                modifier = Modifier.padding(top = 12.dp),
+            )
+            Text(
+                message,
+                style = MaterialTheme.typography.bodyMedium,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                textAlign = TextAlign.Center,
+                modifier = Modifier.padding(horizontal = 32.dp, vertical = 8.dp),
+            )
+            Row(horizontalArrangement = Arrangement.spacedBy(12.dp), modifier = Modifier.padding(top = 16.dp)) {
+                OutlinedButton(onClick = onDismiss) { Text("Ignorer") }
+                Button(onClick = onRetry) { Text("Réessayer") }
+            }
+        }
+    }
+}
 
 // ──── Phase 2 — Composants de navigation enrichie ────
 
