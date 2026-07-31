@@ -1,5 +1,6 @@
 package com.inktone.feature.library
 
+import android.net.Uri
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Box
@@ -65,18 +66,26 @@ fun BookCover(
     showTitle: Boolean = true,
 ) {
     val context = LocalContext.current
-    val coverFile = publication.coverUri?.let { File(it) }
-    val hasCover = coverFile != null && coverFile.exists()
+    // E.3 — Support content:// URI (SAF) en plus de file://
+    val coverModel: Any? = when {
+        publication.coverUri == null -> null
+        publication.coverUri!!.startsWith("content://") -> Uri.parse(publication.coverUri)
+        else -> File(publication.coverUri!!).takeIf { it.exists() }
+    }
+
+    // E.2 — contentDescription global pour TalkBack
+    val a11yLabel = "${publication.title}, ${if (progressPercent > 0) "$progressPercent% lu" else "Non commencé"}"
 
     Box(
         modifier = modifier
             .aspectRatio(0.7f)
+            .semantics { contentDescription = a11yLabel }
             .clickable(onClick = onClick),
     ) {
-        if (hasCover) {
+        if (coverModel != null) {
             SubcomposeAsyncImage(
                 model = ImageRequest.Builder(context)
-                    .data(coverFile)
+                    .data(coverModel)
                     .crossfade(true)
                     .build(),
                 contentDescription = publication.title,

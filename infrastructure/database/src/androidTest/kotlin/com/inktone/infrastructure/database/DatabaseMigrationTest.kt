@@ -196,6 +196,35 @@ class DatabaseMigrationTest {
         v7.close()
     }
 
+    @Test
+    fun migration_7_vers_8_ajoute_wordsRead_aux_reading_sessions() {
+        val v7 = helper.createDatabase(TEST_DB_NAME, 7)
+        v7.execSQL(
+            """
+            INSERT INTO publications (id, title, format, fileUri, fileHash, fileSize, chapterCount, importDate)
+            VALUES ('pub-d4', 'Test', 'EPUB', '/test.epub', 'hash-d4', 1024, 1, 0)
+            """.trimIndent(),
+        )
+        v7.execSQL(
+            """
+            INSERT INTO reading_sessions (id, publicationId, startedAt, mode, sentencesRead, durationMs)
+            VALUES ('s1', 'pub-d4', 0, 'SCROLL', 10, 60000)
+            """.trimIndent(),
+        )
+        v7.close()
+
+        val v8 = helper.runMigrationsAndValidate(
+            TEST_DB_NAME, 8, true,
+            MIGRATION_2_3, MIGRATION_3_4, MIGRATION_4_5, MIGRATION_5_6, MIGRATION_6_7, MIGRATION_7_8,
+        )
+
+        v8.query("SELECT wordsRead FROM reading_sessions WHERE id = 's1'").use { cursor ->
+            assertEquals(true, cursor.moveToFirst())
+            assertEquals(0, cursor.getInt(0)) // valeur par defaut
+        }
+        v8.close()
+    }
+
     companion object {
         private const val TEST_DB_NAME = "migration-test"
     }
