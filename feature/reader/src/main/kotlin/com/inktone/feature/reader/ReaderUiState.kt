@@ -44,6 +44,9 @@ data class ReaderUiState(
     // Tache 9bis.5), pas resolu une seule fois comme effectiveSettings :
     // c'est un reglage global, pas une cascade overrides/preferences.
     val isReadingRulerEnabled: Boolean = false,
+    // A.3 — Message d'erreur surfacé quand le parsing ou l'ouverture
+    // échoue. null = pas d'erreur, l'écran affiche le contenu normal.
+    val errorMessage: String? = null,
 ) {
     val currentChapter: Chapter? get() = chapters.getOrNull(currentChapterIndex)
     val hasNextChapter: Boolean get() = currentChapterIndex < chapters.lastIndex
@@ -148,4 +151,7 @@ sealed interface ReaderIntent {
      * `SleepTimerState.fadeOutEnabled`).
      */
     data class SetSleepTimer(val minutes: Int?) : ReaderIntent
+
+    /** A.3 — Efface le message d'erreur affiché dans le Reader. */
+    data object DismissError : ReaderIntent
 }

@@ -1,6 +1,7 @@
 package com.inktone.infrastructure.parser
 
 import android.content.Context
+import android.graphics.Bitmap
 import android.net.Uri
 import com.inktone.domain.model.PublicationFormat
 import com.inktone.domain.service.ParseResult
@@ -14,6 +15,7 @@ import org.readium.r2.shared.ExperimentalReadiumApi
 import org.readium.r2.shared.publication.services.content.DefaultContentService
 import org.readium.r2.shared.publication.services.content.contentServiceFactory
 import org.readium.r2.shared.publication.services.content.iterators.HtmlResourceContentIterator
+import org.readium.r2.shared.publication.services.cover
 import org.readium.r2.shared.publication.services.isProtected
 import org.readium.r2.shared.util.asset.AssetRetriever
 import org.readium.r2.shared.util.getOrElse
@@ -23,6 +25,7 @@ import org.readium.r2.shared.util.toUrl
 import org.readium.r2.streamer.PublicationOpener
 import org.readium.r2.streamer.parser.DefaultPublicationParser
 import java.io.File
+import java.io.FileOutputStream
 import javax.inject.Inject
 import javax.inject.Singleton
 
@@ -105,11 +108,45 @@ class ReadiumPublicationParser @Inject constructor(
         // sans module readium-lcp/adept integre des qu'un format LCP ou Adobe ADEPT
         // est detecte a la racine du conteneur. Suffisant pour K7 : detection, pas
         // dechiffrement (hors perimetre v1).
+        val metadata = publication.metadata.toDomain()
+        val coverUri = extractAndSaveCover(publication, fileUri)
+
         ParseResult.Success(
             documentModel = documentModelExtractor.extract(publication),
             isDrmProtected = publication.isProtected,
-            metadata = publication.metadata.toDomain(),
+            metadata = metadata.copy(coverUri = coverUri),
         )
+    }
+
+    /**
+     * Extrait la couverture depuis Readium et la sauvegarde dans le cache
+     * interne de l'app. Retourne le chemin local du fichier ou null.
+     *
+     * Readium 3.0.0 fournit [Publication.cover] qui retourne un [Bitmap]
+     * déjà décodé — [Publication.coverLink] est déprécié.
+     */
+    @OptIn(ExperimentalReadiumApi::class)
+    private suspend fun extractAndSaveCover(
+        publication: org.readium.r2.shared.publication.Publication,
+        fileUri: String,
+    ): String? = withContext(Dispatchers.IO) {
+        val bitmap = publication.cover() ?: return@withContext null
+
+        val coverDir = File(context.cacheDir, "covers")
+        coverDir.mkdirs()
+        val coverFile = File(coverDir, "${fileUri.hashCode().toUInt()}.jpg")
+
+        try {
+            FileOutputStream(coverFile).use { out ->
+                bitmap.compress(Bitmap.CompressFormat.JPEG, 85, out)
+            }
+            coverFile.absolutePath
+        } catch (e: Exception) {
+            android.util.Log.w("ReadiumParser", "Échec sauvegarde couverture pour $fileUri", e)
+            null
+        } finally {
+            bitmap.recycle()
+        }
     }
 
     /**

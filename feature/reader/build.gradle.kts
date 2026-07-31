@@ -4,6 +4,9 @@ plugins {
 
 android {
     namespace = "com.inktone.feature.reader"
+    buildFeatures {
+        buildConfig = true
+    }
 
     defaultConfig {
         // Tache 3.6 : tests instrumentes Hilt (@HiltAndroidTest) - exige
