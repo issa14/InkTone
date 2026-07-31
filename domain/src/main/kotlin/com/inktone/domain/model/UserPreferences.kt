@@ -27,6 +27,10 @@ data class UserPreferences(
     val activeVoiceProfileId: String? = null,
     // B.1 — mode de lecture (SCROLL ou PAGED), persisté pour reprise
     val readingMode: String = "SCROLL",
+    // D.3 — gain audio (1.0× = normal, jusqu'à 4.0×)
+    val audioGain: Float = 1.0f,
+    // D.3 — respecter le fontScale système Android au lieu du fontSize interne
+    val useSystemFontScale: Boolean = false,
 ) {
     init {
         require(fontSize > 0) { "fontSize doit être strictement positif" }

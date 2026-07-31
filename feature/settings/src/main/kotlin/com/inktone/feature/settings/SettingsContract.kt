@@ -25,4 +25,8 @@ sealed interface SettingsIntent {
     object ApplyAccessibilityPreset : SettingsIntent
     // A.5 — selection du profil vocal actif
     data class SetActiveVoiceProfile(val profileId: String?) : SettingsIntent
+    // D.3 — gain audio (1.0× à 4.0×)
+    data class SetAudioGain(val gain: Float) : SettingsIntent
+    // D.3 — respecter le fontScale système
+    data class SetUseSystemFontScale(val enabled: Boolean) : SettingsIntent
 }

@@ -190,6 +190,8 @@ fun LibraryScreen(
                     onImportClick = onImportClick,
                     onOpenAbout = onOpenAbout,
                     onOpenThemePicker = onOpenThemePicker,
+                    onRegenerateCovers = { viewModel.onIntent(LibraryIntent.RegenerateCovers) },
+                    onResetCovers = { viewModel.onIntent(LibraryIntent.ResetCovers) },
                     onMenuClick = { scope.launch { drawerState.open() } },
                 )
             },
@@ -377,6 +379,8 @@ private fun LibraryTopBar(
     onImportClick: () -> Unit,
     onOpenAbout: () -> Unit = {},
     onOpenThemePicker: () -> Unit = {},
+    onRegenerateCovers: () -> Unit = {},
+    onResetCovers: () -> Unit = {},
 ) {
     var isSearchActive by remember { mutableStateOf(false) }
     var isSortMenuExpanded by remember { mutableStateOf(false) }
@@ -466,11 +470,11 @@ private fun LibraryTopBar(
                 // C.3 — Régénérer et réinitialiser les couvertures
                 ActionSheetItem("Régénérer les couvertures", AppIcons.Hint) {
                     showActionsSheet = false
-                    // TODO: viewModel.onIntent(LibraryIntent.RegenerateCovers)
+                    onRegenerateCovers()
                 }
                 ActionSheetItem("Réinitialiser les couvertures", AppIcons.ErrorOutlined) {
                     showActionsSheet = false
-                    // TODO: dialogue confirmation + viewModel.onIntent(LibraryIntent.ResetCovers)
+                    onResetCovers()
                 }
                 // C.2 — À propos et Réglages du thème dans le menu 3-points
                 ActionSheetItem("À propos", AppIcons.Info) { showActionsSheet = false; onOpenAbout() }

@@ -61,6 +61,10 @@ class SettingsViewModel @Inject constructor(
                 is SettingsIntent.ApplyAccessibilityPreset -> applyAccessibilityPreset()
                 is SettingsIntent.SetActiveVoiceProfile ->
                     preferencesRepository.update(current.copy(activeVoiceProfileId = intent.profileId))
+                is SettingsIntent.SetAudioGain ->
+                    preferencesRepository.update(current.copy(audioGain = intent.gain))
+                is SettingsIntent.SetUseSystemFontScale ->
+                    preferencesRepository.update(current.copy(useSystemFontScale = intent.enabled))
             }
         }
     }

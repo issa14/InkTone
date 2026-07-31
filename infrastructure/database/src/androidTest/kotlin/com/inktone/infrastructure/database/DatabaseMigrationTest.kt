@@ -253,7 +253,28 @@ class DatabaseMigrationTest {
         }
         v9.close()
     }
+    @Test
+    fun migration_9_vers_10_ajoute_audioGain_et_useSystemFontScale() {
+        val v9 = helper.createDatabase(TEST_DB_NAME, 9)
+        v9.execSQL(
+            """
+            INSERT INTO user_preferences (id, theme, fontSize, defaultTtsEngine, crashReportingEnabled, language, fontFamily, reduceMotion, dynamicColorEnabled, readingRulerEnabled, dailyGoalMinutes, activeVoiceProfileId, readingMode)
+            VALUES (0, 'SYSTEM', 18, 'SHERPA_ONNX', 0, 'fr', 'DEFAULT', 0, 1, 0, 20, NULL, 'SCROLL')
+            """.trimIndent(),
+        )
+        v9.close()
 
+        val v10 = helper.runMigrationsAndValidate(
+            TEST_DB_NAME, 10, true,
+            MIGRATION_2_3, MIGRATION_3_4, MIGRATION_4_5, MIGRATION_5_6, MIGRATION_6_7, MIGRATION_7_8, MIGRATION_8_9, MIGRATION_9_10,
+        )
+        v10.query("SELECT audioGain, useSystemFontScale FROM user_preferences WHERE id = 0").use { cursor ->
+            assertEquals(true, cursor.moveToFirst())
+            assertEquals(1.0f, cursor.getFloat(0))
+            assertEquals(0, cursor.getInt(1))
+        }
+        v10.close()
+    }
     companion object {
         private const val TEST_DB_NAME = "migration-test"
     }
