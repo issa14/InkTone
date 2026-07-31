@@ -26,6 +26,7 @@ data class LibraryUiState(
     /** Tags distincts de la bibliotheque COMPLETE, pas seulement du filtre actif — le drawer doit pouvoir en changer. */
     val availableTags: List<String> get() = publications.flatMap { it.subjects }.distinct().sorted()
     val availableSeries: List<String> get() = publications.mapNotNull { it.seriesName }.distinct().sorted()
+    val availableAuthors: List<String> get() = publications.flatMap { it.authors }.distinct().sorted()
 
     /** Tache 9bis.4 — carte "reprendre la lecture" proeminente, pas seulement un FAB (amelioration legacy). */
     val resumeReadingPublication: Publication?

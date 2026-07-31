@@ -12,6 +12,7 @@ import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.LazyRow
 import androidx.compose.foundation.lazy.grid.GridCells
@@ -135,17 +136,34 @@ fun LibraryScreen(
                     active = state.activeFilter,
                     onSelect = { viewModel.onIntent(LibraryIntent.ChangeFilter(it)) },
                 )
+                TagsFilterBar(
+                    tags = state.availableTags,
+                    activeFilter = state.activeFilter,
+                    activeValue = state.filterValue,
+                    onSelect = { viewModel.onIntent(LibraryIntent.ChangeFilter(FilterMode.TAG, it)) },
+                )
 
                 when {
                     state.isLoading -> LibraryShimmerGrid()
                     state.displayedPublications.isEmpty() -> Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
                         Text(if (state.searchQuery.isBlank()) "Bibliothèque vide — importez un EPUB pour commencer." else "Aucun résultat pour « ${state.searchQuery} ».")
                     }
-                    else -> LibraryContent(
-                        state = state,
-                        onOpen = { id -> viewModel.onIntent(LibraryIntent.OpenPublication(id)) },
-                        onToggleFavorite = { id, isFavorite -> viewModel.onIntent(LibraryIntent.ToggleFavorite(id, isFavorite)) },
-                    )
+                    else -> {
+                        // Vue groupée par séries — uniquement en mode ALL
+                        if (state.activeFilter == FilterMode.ALL && state.availableSeries.isNotEmpty()) {
+                            SeriesGroupedView(
+                                publications = state.displayedPublications,
+                                onOpen = { id -> viewModel.onIntent(LibraryIntent.OpenPublication(id)) },
+                                onToggleFavorite = { id, fav -> viewModel.onIntent(LibraryIntent.ToggleFavorite(id, fav)) },
+                                onSelectSeries = { series -> viewModel.onIntent(LibraryIntent.ChangeFilter(FilterMode.SERIES, series)) },
+                            )
+                        }
+                        LibraryContent(
+                            state = state,
+                            onOpen = { id -> viewModel.onIntent(LibraryIntent.OpenPublication(id)) },
+                            onToggleFavorite = { id, isFavorite -> viewModel.onIntent(LibraryIntent.ToggleFavorite(id, isFavorite)) },
+                        )
+                    }
                 }
             }
         }
@@ -176,6 +194,16 @@ private fun LibraryDrawerContent(state: LibraryUiState, onSelectFilter: (FilterM
                     label = { Text(series) },
                     selected = state.activeFilter == FilterMode.SERIES && state.filterValue == series,
                     onClick = { onSelectFilter(FilterMode.SERIES, series) },
+                )
+            }
+        }
+        if (state.availableAuthors.isNotEmpty()) {
+            Text("Auteurs", style = MaterialTheme.typography.titleSmall, modifier = Modifier.padding(top = 16.dp, bottom = 4.dp))
+            state.availableAuthors.forEach { author ->
+                NavigationDrawerItem(
+                    label = { Text(author) },
+                    selected = state.activeFilter == FilterMode.BY_AUTHOR && state.filterValue == author,
+                    onClick = { onSelectFilter(FilterMode.BY_AUTHOR, author) },
                 )
             }
         }
@@ -433,3 +461,92 @@ private fun FilterRow(active: FilterMode, onSelect: (FilterMode) -> Unit) {
 // PublicationCard et PublicationListRow remplacés par BookCover (Phase 1b).
 // Voir BookCover.kt pour le composant unifié avec Coil, dégradé de repli,
 // badge de progression et favori.
+
+// ──── Phase 2 — Composants de navigation enrichie ────
+
+/**
+ * Barre de tags horizontale affichée sous la [FilterRow], hors du drawer.
+ * Visible uniquement si des tags existent (legacy : [TagsFilterBar]).
+ */
+@Composable
+private fun TagsFilterBar(
+    tags: List<String>,
+    activeFilter: FilterMode,
+    activeValue: String?,
+    onSelect: (String) -> Unit,
+) {
+    if (tags.isEmpty()) return
+    LazyRow(
+        horizontalArrangement = Arrangement.spacedBy(8.dp),
+        contentPadding = PaddingValues(horizontal = 8.dp, vertical = 4.dp),
+    ) {
+        rowItems(tags, key = { it }) { tag ->
+            FilterChip(
+                selected = activeFilter == FilterMode.TAG && activeValue == tag,
+                onClick = { onSelect(tag) },
+                label = { Text(tag) },
+            )
+        }
+    }
+}
+
+/**
+ * Vue groupée par séries — chaque série a un en-tête et une rangée
+ * horizontale scrollable de couvertures à largeur fixe (110dp).
+ * Affichée uniquement en mode ALL au-dessus de la grille principale.
+ */
+@Composable
+private fun SeriesGroupedView(
+    publications: List<Publication>,
+    onOpen: (String) -> Unit,
+    onToggleFavorite: (String, Boolean) -> Unit,
+    onSelectSeries: (String) -> Unit,
+) {
+    val grouped = publications
+        .filter { it.seriesName != null }
+        .groupBy { it.seriesName!! }
+
+    if (grouped.isEmpty()) return
+
+    LazyColumn(modifier = Modifier.padding(bottom = 8.dp)) {
+        grouped.forEach { (series, books) ->
+            item {
+                Row(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .clickable { onSelectSeries(series) }
+                        .padding(horizontal = 12.dp, vertical = 8.dp),
+                    horizontalArrangement = Arrangement.SpaceBetween,
+                    verticalAlignment = Alignment.CenterVertically,
+                ) {
+                    Text(
+                        series,
+                        style = MaterialTheme.typography.titleSmall,
+                        fontWeight = androidx.compose.ui.text.font.FontWeight.Bold,
+                    )
+                    Text(
+                        "${books.size}",
+                        style = MaterialTheme.typography.labelSmall,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    )
+                }
+            }
+            item {
+                LazyRow(
+                    horizontalArrangement = Arrangement.spacedBy(8.dp),
+                    contentPadding = PaddingValues(horizontal = 12.dp),
+                ) {
+                    rowItems(books, key = { "series-${it.id}" }) { book ->
+                        BookCover(
+                            publication = book,
+                            onClick = { onOpen(book.id) },
+                            onToggleFavorite = { onToggleFavorite(book.id, !book.isFavorite) },
+                            modifier = Modifier.width(110.dp),
+                            showTitle = true,
+                        )
+                    }
+                }
+            }
+        }
+    }
+}
