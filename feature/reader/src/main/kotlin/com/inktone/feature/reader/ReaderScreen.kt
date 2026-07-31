@@ -2,6 +2,7 @@ package com.inktone.feature.reader
 
 import androidx.compose.animation.core.animateIntAsState
 import androidx.compose.animation.core.tween
+import androidx.compose.animation.ExperimentalSharedTransitionApi
 import androidx.compose.foundation.ExperimentalFoundationApi
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
@@ -91,7 +92,7 @@ import com.inktone.domain.model.SleepTimerState
  * changement de chapitre. Un chapitre long avec lecture TTS active peut
  * donc surligner un mot hors de l'écran visible.
  */
-@OptIn(ExperimentalFoundationApi::class, ExperimentalLayoutApi::class)
+@OptIn(ExperimentalFoundationApi::class, ExperimentalLayoutApi::class, ExperimentalSharedTransitionApi::class)
 @Composable
 fun ReaderScreen(viewModel: ReaderViewModel = hiltViewModel(), onSearchClick: () -> Unit = {}) {
     val state by viewModel.state.collectAsState()
@@ -105,9 +106,26 @@ fun ReaderScreen(viewModel: ReaderViewModel = hiltViewModel(), onSearchClick: ()
     var showTtsPanel by remember { mutableStateOf(false) }
 
     ImmersiveReaderChrome(isHudVisible = isHudVisible, onAutoHide = { isHudVisible = false }) {
+    // C.5 — SharedTransition depuis la couverture de la bibliothèque
+    val sharedTransitionScope = runCatching {
+        com.inktone.core.designsystem.LocalSharedTransitionScope.current
+    }.getOrNull()
+    val animatedVisibilityScope = runCatching {
+        com.inktone.core.designsystem.LocalAnimatedVisibilityScope.current
+    }.getOrNull()
+    val sharedElementMod = if (sharedTransitionScope != null && animatedVisibilityScope != null) {
+        with(sharedTransitionScope) {
+            Modifier.sharedElement(
+                sharedContentState = rememberSharedContentState(key = "cover-${viewModel.currentPublicationId ?: ""}"),
+                animatedVisibilityScope = animatedVisibilityScope,
+            )
+        }
+    } else Modifier
+
     Column(
         modifier = Modifier
             .fillMaxSize()
+            .then(sharedElementMod)
             .background(ThemeColors.background(state.effectiveSettings.theme))
             .clickable(
                 interactionSource = remember { MutableInteractionSource() },

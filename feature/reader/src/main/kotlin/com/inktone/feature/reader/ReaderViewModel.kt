@@ -78,7 +78,8 @@ class ReaderViewModel @Inject constructor(
         }
     }
 
-    private var currentPublicationId: String? = null
+    // C.5 — exposé pour clé sharedElement dans ReaderScreen
+    internal var currentPublicationId: String? = null
     private val chapterPreloader = ChapterPreloader(viewModelScope)
     private val sentenceAudioBuffer = SentenceAudioBuffer(viewModelScope, ttsEngine)
     private val annotationSelectionHandler = AnnotationSelectionHandler()
