@@ -3,6 +3,7 @@ package com.inktone.core.designsystem
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.outlined.List
 import androidx.compose.material.icons.automirrored.outlined.MenuBook
+import androidx.compose.material.icons.automirrored.outlined.ViewList
 import androidx.compose.material.icons.automirrored.outlined.VolumeUp
 import androidx.compose.material.icons.filled.Bookmark
 import androidx.compose.material.icons.filled.CheckCircle
@@ -29,6 +30,7 @@ import androidx.compose.material.icons.outlined.Search
 import androidx.compose.material.icons.outlined.Smartphone
 import androidx.compose.material.icons.outlined.ViewDay
 import androidx.compose.material.icons.outlined.Warning
+import androidx.compose.material.icons.outlined.Widgets
 
 /**
  * Point d'entrée unique pour les icônes de l'app (Material Symbols,
@@ -69,4 +71,9 @@ object AppIcons {
     val Toc = Icons.AutoMirrored.Outlined.List
     val ReadingModePaged = Icons.Outlined.ViewDay
     val ReadingModeScroll = Icons.Outlined.ImportContacts
+
+    // Tâche 1c — icônes de disposition de bibliothèque
+    val ViewGrid = Icons.Outlined.Widgets
+    val ViewList = Icons.AutoMirrored.Outlined.ViewList
+    val CoverOnly = Icons.Outlined.ViewDay
 }

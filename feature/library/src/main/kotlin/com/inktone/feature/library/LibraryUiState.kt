@@ -19,7 +19,7 @@ data class LibraryUiState(
     val filterValue: String? = null,
     val searchQuery: String = "",
     val sortOrder: LibrarySortOrder = LibrarySortOrder.RECENTLY_ADDED,
-    val isGridLayout: Boolean = true,
+    val layoutMode: LibraryLayoutMode = LibraryLayoutMode.GRID,
     // Tache 6.8 — cache par defaut (total == 0 && !hasQueuedChunks).
     val importProgress: ImportProgress = ImportProgress(),
 ) {
@@ -51,13 +51,22 @@ data class LibraryUiState(
 
 enum class LibrarySortOrder { TITLE, RECENTLY_ADDED, RECENTLY_OPENED }
 
+/** Tâche 1c — 3 dispositions, pas 2 (legacy : Liste / Grille / Grille-couvertures-seules). */
+enum class LibraryLayoutMode { LIST, GRID, GRID_COVERS }
+
+fun LibraryLayoutMode.next(): LibraryLayoutMode = when (this) {
+    LibraryLayoutMode.LIST -> LibraryLayoutMode.GRID
+    LibraryLayoutMode.GRID -> LibraryLayoutMode.GRID_COVERS
+    LibraryLayoutMode.GRID_COVERS -> LibraryLayoutMode.LIST
+}
+
 sealed interface LibraryIntent {
     data class OpenPublication(val publicationId: String) : LibraryIntent
     data class ToggleFavorite(val publicationId: String, val isFavorite: Boolean) : LibraryIntent
     data class ChangeFilter(val filter: FilterMode, val value: String? = null) : LibraryIntent
     data class SetSearchQuery(val query: String) : LibraryIntent
     data class SetSortOrder(val order: LibrarySortOrder) : LibraryIntent
-    data object ToggleLayout : LibraryIntent
+    data object CycleLayout : LibraryIntent
 }
 
 /**

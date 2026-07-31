@@ -11,6 +11,7 @@ import androidx.compose.foundation.layout.aspectRatio
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.LazyRow
 import androidx.compose.foundation.lazy.grid.GridCells
@@ -23,7 +24,6 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Star
 import androidx.compose.material.icons.outlined.Sort
 import androidx.compose.material.icons.outlined.StarBorder
-import androidx.compose.material.icons.outlined.ViewList
 import androidx.compose.material.icons.outlined.Menu
 import androidx.compose.material3.DismissibleDrawerSheet
 import androidx.compose.material3.DismissibleNavigationDrawer
@@ -52,6 +52,7 @@ import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.hilt.navigation.compose.hiltViewModel
@@ -127,8 +128,8 @@ fun LibraryScreen(
                     onSearchQueryChange = { viewModel.onIntent(LibraryIntent.SetSearchQuery(it)) },
                     sortOrder = state.sortOrder,
                     onSortOrderChange = { viewModel.onIntent(LibraryIntent.SetSortOrder(it)) },
-                    isGridLayout = state.isGridLayout,
-                    onToggleLayout = { viewModel.onIntent(LibraryIntent.ToggleLayout) },
+                    layoutMode = state.layoutMode,
+                    onCycleLayout = { viewModel.onIntent(LibraryIntent.CycleLayout) },
                 )
                 FilterRow(
                     active = state.activeFilter,
@@ -200,8 +201,8 @@ private fun LibraryToolbar(
     onSearchQueryChange: (String) -> Unit,
     sortOrder: LibrarySortOrder,
     onSortOrderChange: (LibrarySortOrder) -> Unit,
-    isGridLayout: Boolean,
-    onToggleLayout: () -> Unit,
+    layoutMode: LibraryLayoutMode,
+    onCycleLayout: () -> Unit,
 ) {
     var isSortMenuExpanded by remember { mutableStateOf(false) }
 
@@ -230,10 +231,25 @@ private fun LibraryToolbar(
                 }
             }
         }
-        IconButton(onClick = onToggleLayout) {
-            Icon(if (isGridLayout) Icons.Outlined.ViewList else AppIcons.ReadingModePaged, contentDescription = "Changer la disposition")
+        IconButton(onClick = onCycleLayout) {
+            Icon(
+                imageVector = layoutMode.icon(),
+                contentDescription = layoutMode.label(),
+            )
         }
     }
+}
+
+private fun LibraryLayoutMode.icon() = when (this) {
+    LibraryLayoutMode.GRID -> AppIcons.ViewGrid
+    LibraryLayoutMode.GRID_COVERS -> AppIcons.CoverOnly
+    LibraryLayoutMode.LIST -> AppIcons.ViewList
+}
+
+private fun LibraryLayoutMode.label() = when (this) {
+    LibraryLayoutMode.GRID -> "Grille"
+    LibraryLayoutMode.GRID_COVERS -> "Couvertures seules"
+    LibraryLayoutMode.LIST -> "Liste"
 }
 
 private fun LibrarySortOrder.label() = when (this) {
@@ -243,40 +259,104 @@ private fun LibrarySortOrder.label() = when (this) {
 }
 
 @Composable
-private fun LibraryContent(state: LibraryUiState, onOpen: (String) -> Unit, onToggleFavorite: (String, Boolean) -> Unit) {
+private fun LibraryContent(
+    state: LibraryUiState,
+    onOpen: (String) -> Unit,
+    onToggleFavorite: (String, Boolean) -> Unit,
+) {
     val resume = state.resumeReadingPublication
-    if (state.isGridLayout) {
-        LazyVerticalGrid(columns = GridCells.Adaptive(minSize = 120.dp), contentPadding = PaddingValues(8.dp)) {
-            if (resume != null) {
-                gridItems(listOf(resume), key = { "resume-${it.id}" }, span = { GridItemSpan(maxLineSpan) }) { publication ->
-                    ResumeReadingCard(publication, onClick = { onOpen(publication.id) })
+
+    when (state.layoutMode) {
+        LibraryLayoutMode.GRID, LibraryLayoutMode.GRID_COVERS -> {
+            val showTitle = state.layoutMode == LibraryLayoutMode.GRID
+            LazyVerticalGrid(
+                columns = GridCells.Adaptive(minSize = 120.dp),
+                contentPadding = PaddingValues(8.dp),
+            ) {
+                if (resume != null) {
+                    gridItems(listOf(resume), key = { "resume-${it.id}" }, span = { GridItemSpan(maxLineSpan) }) { publication ->
+                        ResumeReadingCard(publication, onClick = { onOpen(publication.id) })
+                    }
+                }
+                gridItems(state.displayedPublications, key = { it.id }) { publication ->
+                    BookCover(
+                        publication = publication,
+                        onClick = { onOpen(publication.id) },
+                        onToggleFavorite = { onToggleFavorite(publication.id, !publication.isFavorite) },
+                        modifier = Modifier.padding(8.dp),
+                        showTitle = showTitle,
+                    )
                 }
             }
-            // Clé stable = id, jamais l'index — même leçon que la TOC
-            // (Tâche 4.11, crash LazyColumn à clé non unique).
-            gridItems(state.displayedPublications, key = { it.id }) { publication ->
-                BookCover(
-                    publication = publication,
-                    onClick = { onOpen(publication.id) },
-                    onToggleFavorite = { onToggleFavorite(publication.id, !publication.isFavorite) },
-                    modifier = Modifier.padding(8.dp),
-                    // TODO: brancher ReadingState → progressPercent
+        }
+
+        LibraryLayoutMode.LIST -> {
+            LazyColumn(contentPadding = PaddingValues(8.dp)) {
+                if (resume != null) {
+                    item { ResumeReadingCard(resume, onClick = { onOpen(resume.id) }) }
+                }
+                listItems(state.displayedPublications, key = { it.id }) { publication ->
+                    PublicationListRow(
+                        publication = publication,
+                        onClick = { onOpen(publication.id) },
+                        onToggleFavorite = { onToggleFavorite(publication.id, !publication.isFavorite) },
+                    )
+                }
+            }
+        }
+    }
+}
+
+/** Rangée compacte pour le mode Liste — couverture miniature à gauche, titre + auteur à droite. */
+@Composable
+private fun PublicationListRow(
+    publication: Publication,
+    onClick: () -> Unit,
+    onToggleFavorite: () -> Unit,
+) {
+    Row(
+        modifier = Modifier
+            .fillMaxWidth()
+            .clickable(onClick = onClick)
+            .padding(horizontal = 12.dp, vertical = 6.dp),
+        verticalAlignment = Alignment.CenterVertically,
+    ) {
+        // Couverture miniature — 48dp de large, ratio 0.7
+        Box(modifier = Modifier.size(width = 48.dp, height = 68.dp)) {
+            BookCover(
+                publication = publication,
+                onClick = {},
+                onToggleFavorite = {},
+                showTitle = false,
+            )
+        }
+        Column(
+            modifier = Modifier
+                .weight(1f)
+                .padding(horizontal = 12.dp),
+        ) {
+            Text(
+                publication.title,
+                style = MaterialTheme.typography.titleSmall,
+                maxLines = 1,
+                overflow = TextOverflow.Ellipsis,
+            )
+            if (publication.authors.isNotEmpty()) {
+                Text(
+                    publication.authors.joinToString(),
+                    style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    maxLines = 1,
+                    overflow = TextOverflow.Ellipsis,
                 )
             }
         }
-    } else {
-        LazyColumn(contentPadding = PaddingValues(8.dp)) {
-            if (resume != null) {
-                item { ResumeReadingCard(resume, onClick = { onOpen(resume.id) }) }
-            }
-            listItems(state.displayedPublications, key = { it.id }) { publication ->
-                BookCover(
-                    publication = publication,
-                    onClick = { onOpen(publication.id) },
-                    onToggleFavorite = { onToggleFavorite(publication.id, !publication.isFavorite) },
-                    modifier = Modifier.padding(horizontal = 12.dp, vertical = 6.dp),
-                )
-            }
+        IconButton(onClick = onToggleFavorite) {
+            Icon(
+                if (publication.isFavorite) Icons.Filled.Star else Icons.Outlined.StarBorder,
+                contentDescription = if (publication.isFavorite) "Retirer des favoris" else "Ajouter aux favoris",
+                tint = if (publication.isFavorite) Color(0xFFFFC107) else MaterialTheme.colorScheme.onSurfaceVariant,
+            )
         }
     }
 }

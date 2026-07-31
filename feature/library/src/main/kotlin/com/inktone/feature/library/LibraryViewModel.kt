@@ -54,7 +54,9 @@ class LibraryViewModel @Inject constructor(
             is LibraryIntent.ChangeFilter -> observePublications(intent.filter, intent.value)
             is LibraryIntent.SetSearchQuery -> _state.value = _state.value.copy(searchQuery = intent.query)
             is LibraryIntent.SetSortOrder -> _state.value = _state.value.copy(sortOrder = intent.order)
-            is LibraryIntent.ToggleLayout -> _state.value = _state.value.copy(isGridLayout = !_state.value.isGridLayout)
+            is LibraryIntent.CycleLayout -> _state.value = _state.value.copy(
+                layoutMode = _state.value.layoutMode.next(),
+            )
         }
     }
 
