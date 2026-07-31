@@ -19,6 +19,7 @@ import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material3.Button
+import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
@@ -43,6 +44,7 @@ import androidx.compose.ui.text.withStyle
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.hilt.navigation.compose.hiltViewModel
+import com.inktone.core.designsystem.AppIcons
 import com.inktone.core.designsystem.reducedMotionDuration
 import com.inktone.domain.model.Annotation
 import com.inktone.domain.model.AnnotationColor
@@ -206,6 +208,13 @@ fun ReaderScreen(viewModel: ReaderViewModel = hiltViewModel(), onSearchClick: ()
                                         Modifier
                                     },
                                 )
+                            }
+                            // B.4 — Images EPUB après le paragraphe
+                            val imagesAfterParagraph = state.currentChapter?.structuralBlocks
+                                ?.filterIsInstance<com.inktone.domain.model.StructuralBlock.EpubImage>()
+                                ?.filter { it.anchorAfterParagraphIndex == paragraph.index }
+                            imagesAfterParagraph?.forEach { image ->
+                                EpubImagePlaceholder(href = image.href, altText = image.altText)
                             }
                         }
                     }
@@ -463,6 +472,36 @@ private fun annotationColorFor(chapterIndex: Int, sentence: Sentence, annotation
             sentence.startOffset < annotation.endLocator.charOffset &&
             sentence.endOffset > annotation.startLocator.charOffset
     }?.color
+
+/**
+ * B.4 — Placeholder pour une image EPUB. En attendant l'intégration de
+ * Coil dans `feature/reader`, affiche l'alt text comme contenu de repli.
+ */
+@Composable
+private fun EpubImagePlaceholder(href: String, altText: String?) {
+    Box(
+        modifier = Modifier
+            .fillMaxWidth()
+            .background(Color.Gray.copy(alpha = 0.1f), RoundedCornerShape(8.dp))
+            .padding(16.dp),
+        contentAlignment = Alignment.Center,
+    ) {
+        Column(horizontalAlignment = Alignment.CenterHorizontally) {
+            Icon(
+                AppIcons.Reading,
+                contentDescription = altText ?: "Image",
+                tint = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.5f),
+            )
+            if (altText != null) {
+                Text(
+                    altText,
+                    style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                )
+            }
+        }
+    }
+}
 
 /**
  * A.3 — État d'erreur affiché quand le parsing ou l'ouverture d'une
