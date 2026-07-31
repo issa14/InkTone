@@ -113,9 +113,15 @@ class ReaderViewModel @Inject constructor(
             is ReaderIntent.PlayCurrentSentence -> playCurrentSentence()
             is ReaderIntent.Pause -> _state.value = _state.value.copy(isPlaying = false)
             is ReaderIntent.DismissError -> _state.value = _state.value.copy(errorMessage = null)
-            is ReaderIntent.ToggleReadingMode -> _state.value = _state.value.copy(
-                readingMode = if (_state.value.readingMode == ReadingMode.SCROLL) ReadingMode.PAGED else ReadingMode.SCROLL,
-            )
+            is ReaderIntent.ToggleReadingMode -> {
+                val newMode = if (_state.value.readingMode == ReadingMode.SCROLL) ReadingMode.PAGED else ReadingMode.SCROLL
+                _state.value = _state.value.copy(readingMode = newMode)
+                // B.1 — persiste le mode de lecture
+                viewModelScope.launch {
+                    val current = preferencesRepository.get()
+                    preferencesRepository.update(current.copy(readingMode = newMode.name))
+                }
+            }
             is ReaderIntent.BeginSentenceSelection -> _state.value = _state.value.copy(
                 selectionAnchorIndex = intent.sentenceIndex, selectionFocusIndex = intent.sentenceIndex,
             )
@@ -198,11 +204,14 @@ class ReaderViewModel @Inject constructor(
                         overrides = restored?.overrides,
                         global = preferencesRepository.get(),
                     )
+                    val prefs = preferencesRepository.get()
                     _state.value = ReaderUiState(
                         chapters = result.documentModel.chapters,
                         tableOfContents = result.documentModel.tableOfContents,
                         currentChapterIndex = restored?.locator?.chapterIndex ?: 0,
                         effectiveSettings = effectiveSettings,
+                        // B.1 — restaure le mode de lecture persisté
+                        readingMode = if (prefs.readingMode == "PAGED") ReadingMode.PAGED else ReadingMode.SCROLL,
                         currentOverrides = restored?.overrides,
                     )
                     triggerPreload(_state.value.currentChapterIndex)

@@ -25,6 +25,8 @@ data class UserPreferences(
     // A.5 — profil vocal actif. null = utiliser la voix par defaut
     // correspondant au moteur TTS selectionne.
     val activeVoiceProfileId: String? = null,
+    // B.1 — mode de lecture (SCROLL ou PAGED), persisté pour reprise
+    val readingMode: String = "SCROLL",
 ) {
     init {
         require(fontSize > 0) { "fontSize doit être strictement positif" }

@@ -267,7 +267,10 @@ fun ReaderScreen(viewModel: ReaderViewModel = hiltViewModel(), onSearchClick: ()
                             .fillMaxWidth()
                             .background(Color.Black.copy(alpha = 0.65f))
                             .padding(horizontal = 16.dp, vertical = 12.dp)
-                            .semantics { /* liveRegion non disponible dans Compose 1.7.2 */ },
+                            .semantics {
+                                // B.7 — liveRegion indisponible dans Compose 1.7.2 (BOM 2024.09.02),
+                                // sera activé en Compose 1.8+ : liveRegion = LiveRegionMode.Polite
+                            },
                     ) {
                         Text(
                             text = captionText,

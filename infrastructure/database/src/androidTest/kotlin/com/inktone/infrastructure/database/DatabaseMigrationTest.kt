@@ -225,6 +225,35 @@ class DatabaseMigrationTest {
         v8.close()
     }
 
+    @Test
+    fun migration_8_vers_9_ajoute_readingMode_aux_user_preferences() {
+        val v8 = helper.createDatabase(TEST_DB_NAME, 8)
+        v8.execSQL(
+            """
+            INSERT INTO publications (id, title, format, fileUri, fileHash, fileSize, chapterCount, importDate)
+            VALUES ('pub-b1', 'Test B1', 'EPUB', '/test-b1.epub', 'hash-b1', 1024, 1, 0)
+            """.trimIndent(),
+        )
+        v8.execSQL(
+            """
+            INSERT INTO user_preferences (id, theme, fontSize, defaultTtsEngine, crashReportingEnabled, language, fontFamily, reduceMotion, dynamicColorEnabled, readingRulerEnabled, dailyGoalMinutes, activeVoiceProfileId)
+            VALUES (0, 'SYSTEM', 18, 'SHERPA_ONNX', 0, 'fr', 'DEFAULT', 0, 1, 0, 20, NULL)
+            """.trimIndent(),
+        )
+        v8.close()
+
+        val v9 = helper.runMigrationsAndValidate(
+            TEST_DB_NAME, 9, true,
+            MIGRATION_2_3, MIGRATION_3_4, MIGRATION_4_5, MIGRATION_5_6, MIGRATION_6_7, MIGRATION_7_8, MIGRATION_8_9,
+        )
+
+        v9.query("SELECT readingMode FROM user_preferences WHERE id = 0").use { cursor ->
+            assertEquals(true, cursor.moveToFirst())
+            assertEquals("SCROLL", cursor.getString(0)) // valeur par defaut
+        }
+        v9.close()
+    }
+
     companion object {
         private const val TEST_DB_NAME = "migration-test"
     }

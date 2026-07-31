@@ -12,6 +12,7 @@ fun UserPreferences.toEntity(): UserPreferencesEntity = UserPreferencesEntity(
     fontFamily = fontFamily.name, reduceMotion = reduceMotion,
     dynamicColorEnabled = dynamicColorEnabled, readingRulerEnabled = readingRulerEnabled,
     dailyGoalMinutes = dailyGoalMinutes, activeVoiceProfileId = activeVoiceProfileId,
+    readingMode = readingMode,
 )
 
 fun UserPreferencesEntity.toDomain(): UserPreferences = UserPreferences(
@@ -21,4 +22,5 @@ fun UserPreferencesEntity.toDomain(): UserPreferences = UserPreferences(
     fontFamily = FontFamily.valueOf(fontFamily), reduceMotion = reduceMotion,
     dynamicColorEnabled = dynamicColorEnabled, readingRulerEnabled = readingRulerEnabled,
     dailyGoalMinutes = dailyGoalMinutes, activeVoiceProfileId = activeVoiceProfileId,
+    readingMode = readingMode,
 )
