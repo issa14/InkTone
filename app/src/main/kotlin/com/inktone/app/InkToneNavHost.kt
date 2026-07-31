@@ -65,7 +65,9 @@ fun InkToneNavHost(navController: NavHostController = rememberNavController()) {
                 onOpenStats = { navController.navigate(StatisticsRoute) },
                 onImportClick = { importLauncher.launch(arrayOf("application/epub+zip", "text/plain")) },
                 // Tache 1.0 (Partie 1) : seul l'import reste dans le FAB.
-                // Menu 3-points a aussi Importer maintenant (Phase 3).
+                // Search/Stats/Settings sont atteignables uniquement depuis
+                // le drawer (Partie 2) — c'est tout l'interet d'avoir un
+                // drawer plutot que des icones eparpillees.
                 floatingActionButton = { ImportPickerButton() },
             )
         }
