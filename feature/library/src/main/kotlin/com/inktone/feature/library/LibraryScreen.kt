@@ -730,6 +730,11 @@ private fun TagsFilterBar(
  * Vue groupée par séries — chaque série a un en-tête et une rangée
  * horizontale scrollable de couvertures à largeur fixe (110dp).
  * Affichée uniquement en mode ALL au-dessus de la grille principale.
+ *
+ * E.4 — N'utilise plus LazyColumn dans un Column scrollable (nested
+ * scroll non défini sur Android). Itère avec forEach dans un Column
+ * simple — la liste de séries est bornée, un LazyColumn n'est pas
+ * nécessaire.
  */
 @Composable
 private fun SeriesGroupedView(
@@ -744,43 +749,39 @@ private fun SeriesGroupedView(
 
     if (grouped.isEmpty()) return
 
-    LazyColumn(modifier = Modifier.padding(bottom = 8.dp)) {
+    Column(modifier = Modifier.padding(bottom = 8.dp)) {
         grouped.forEach { (series, books) ->
-            item {
-                Row(
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .clickable { onSelectSeries(series) }
-                        .padding(horizontal = 12.dp, vertical = 8.dp),
-                    horizontalArrangement = Arrangement.SpaceBetween,
-                    verticalAlignment = Alignment.CenterVertically,
-                ) {
-                    Text(
-                        series,
-                        style = MaterialTheme.typography.titleSmall,
-                        fontWeight = androidx.compose.ui.text.font.FontWeight.Bold,
-                    )
-                    Text(
-                        "${books.size}",
-                        style = MaterialTheme.typography.labelSmall,
-                        color = MaterialTheme.colorScheme.onSurfaceVariant,
-                    )
-                }
+            Row(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .clickable { onSelectSeries(series) }
+                    .padding(horizontal = 12.dp, vertical = 8.dp),
+                horizontalArrangement = Arrangement.SpaceBetween,
+                verticalAlignment = Alignment.CenterVertically,
+            ) {
+                Text(
+                    series,
+                    style = MaterialTheme.typography.titleSmall,
+                    fontWeight = androidx.compose.ui.text.font.FontWeight.Bold,
+                )
+                Text(
+                    "${books.size}",
+                    style = MaterialTheme.typography.labelSmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                )
             }
-            item {
-                LazyRow(
-                    horizontalArrangement = Arrangement.spacedBy(8.dp),
-                    contentPadding = PaddingValues(horizontal = 12.dp),
-                ) {
-                    rowItems(books, key = { "series-${it.id}" }) { book ->
-                        BookCover(
-                            publication = book,
-                            onClick = { onOpen(book.id) },
-                            onToggleFavorite = { onToggleFavorite(book.id, !book.isFavorite) },
-                            modifier = Modifier.width(110.dp),
-                            showTitle = true,
-                        )
-                    }
+            LazyRow(
+                horizontalArrangement = Arrangement.spacedBy(8.dp),
+                contentPadding = PaddingValues(horizontal = 12.dp),
+            ) {
+                rowItems(books, key = { "series-${it.id}" }) { book ->
+                    BookCover(
+                        publication = book,
+                        onClick = { onOpen(book.id) },
+                        onToggleFavorite = { onToggleFavorite(book.id, !book.isFavorite) },
+                        modifier = Modifier.width(110.dp),
+                        showTitle = true,
+                    )
                 }
             }
         }
