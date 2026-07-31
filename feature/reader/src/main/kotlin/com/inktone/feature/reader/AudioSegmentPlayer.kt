@@ -14,7 +14,10 @@ import javax.inject.Inject
  */
 class AudioSegmentPlayer @Inject constructor() {
 
+    private var currentTrack: AudioTrack? = null
+
     fun play(segment: AudioSegment) {
+        stop()
         val minBufferSize = AudioTrack.getMinBufferSize(
             segment.sampleRate,
             AudioFormat.CHANNEL_OUT_MONO,
@@ -34,18 +37,31 @@ class AudioSegmentPlayer @Inject constructor() {
             AudioTrack.MODE_STATIC,
             AudioManager.AUDIO_SESSION_ID_GENERATE,
         )
+        currentTrack = audioTrack
         audioTrack.write(segment.audioData, 0, segment.audioData.size)
         audioTrack.play()
 
-        // Liberation differee — laisse le temps a la lecture MODE_STATIC
-        // de se terminer avant de liberer le AudioTrack. Approche
-        // volontairement simple (Thread + sleep) pour cette tache de
-        // marche a blanc uniquement ; AudioPlaybackService (Phase 5)
-        // gerera ca correctement via des callbacks/coroutines.
         Thread {
             Thread.sleep(segment.durationMs + 200)
             audioTrack.stop()
             audioTrack.release()
         }.start()
+    }
+
+    /**
+     * A.2 — Arrêt propre du segment en cours. Appelé depuis
+     * [ReaderViewModel.onCleared] pour éviter qu'un audio survive
+     * à la destruction du ViewModel.
+     */
+    fun stop() {
+        currentTrack?.let { track ->
+            try {
+                track.stop()
+                track.release()
+            } catch (_: IllegalStateException) {
+                // déjà libéré, rien à faire
+            }
+        }
+        currentTrack = null
     }
 }

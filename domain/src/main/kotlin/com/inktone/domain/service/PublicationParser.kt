@@ -43,4 +43,5 @@ data class PublicationMetadata(
     val seriesName: String? = null,
     val seriesIndex: Float? = null,
     val subjects: List<String> = emptyList(),
+    val coverUri: String? = null,
 )

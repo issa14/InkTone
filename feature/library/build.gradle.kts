@@ -7,6 +7,7 @@ android {
 }
 
 dependencies {
+    implementation(libs.coil.compose)
     implementation("androidx.compose.foundation:foundation")
     implementation(libs.androidx.lifecycle.viewmodel.compose)
     implementation(libs.androidx.lifecycle.runtime.compose)

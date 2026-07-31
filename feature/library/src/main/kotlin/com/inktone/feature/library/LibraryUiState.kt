@@ -19,13 +19,16 @@ data class LibraryUiState(
     val filterValue: String? = null,
     val searchQuery: String = "",
     val sortOrder: LibrarySortOrder = LibrarySortOrder.RECENTLY_ADDED,
-    val isGridLayout: Boolean = true,
+    val layoutMode: LibraryLayoutMode = LibraryLayoutMode.GRID,
     // Tache 6.8 — cache par defaut (total == 0 && !hasQueuedChunks).
     val importProgress: ImportProgress = ImportProgress(),
+    val errorMessage: String? = null,
+    val progressMap: Map<String, Int> = emptyMap(),
 ) {
     /** Tags distincts de la bibliotheque COMPLETE, pas seulement du filtre actif — le drawer doit pouvoir en changer. */
     val availableTags: List<String> get() = publications.flatMap { it.subjects }.distinct().sorted()
     val availableSeries: List<String> get() = publications.mapNotNull { it.seriesName }.distinct().sorted()
+    val availableAuthors: List<String> get() = publications.flatMap { it.authors }.distinct().sorted()
 
     /** Tache 9bis.4 — carte "reprendre la lecture" proeminente, pas seulement un FAB (amelioration legacy). */
     val resumeReadingPublication: Publication?
@@ -51,13 +54,24 @@ data class LibraryUiState(
 
 enum class LibrarySortOrder { TITLE, RECENTLY_ADDED, RECENTLY_OPENED }
 
+/** Tâche 1c — 3 dispositions, pas 2 (legacy : Liste / Grille / Grille-couvertures-seules). */
+enum class LibraryLayoutMode { LIST, GRID, GRID_COVERS }
+
+fun LibraryLayoutMode.next(): LibraryLayoutMode = when (this) {
+    LibraryLayoutMode.LIST -> LibraryLayoutMode.GRID
+    LibraryLayoutMode.GRID -> LibraryLayoutMode.GRID_COVERS
+    LibraryLayoutMode.GRID_COVERS -> LibraryLayoutMode.LIST
+}
+
 sealed interface LibraryIntent {
     data class OpenPublication(val publicationId: String) : LibraryIntent
     data class ToggleFavorite(val publicationId: String, val isFavorite: Boolean) : LibraryIntent
     data class ChangeFilter(val filter: FilterMode, val value: String? = null) : LibraryIntent
     data class SetSearchQuery(val query: String) : LibraryIntent
     data class SetSortOrder(val order: LibrarySortOrder) : LibraryIntent
-    data object ToggleLayout : LibraryIntent
+    data object CycleLayout : LibraryIntent
+    data object Refresh : LibraryIntent
+    data object DismissError : LibraryIntent
 }
 
 /**
@@ -67,4 +81,5 @@ sealed interface LibraryIntent {
  */
 sealed interface LibraryEffect {
     data class NavigateToReader(val publicationId: String) : LibraryEffect
+    data object NavigateToStats : LibraryEffect
 }

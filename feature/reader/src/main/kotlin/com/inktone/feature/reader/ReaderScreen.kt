@@ -17,6 +17,7 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material3.Button
+import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
@@ -103,6 +104,17 @@ fun ReaderScreen(viewModel: ReaderViewModel = hiltViewModel(), onSearchClick: ()
     ) {
         BookProgressBar(progression = state.bookProgression)
 
+        // A.3 — État d'erreur : affiché quand le parsing ou l'ouverture
+        // échoue, avec boutons Réessayer et Retour.
+        val errorMessage = state.errorMessage
+        if (errorMessage != null) {
+            ErrorState(
+                message = errorMessage,
+                onRetry = { viewModel.onIntent(ReaderIntent.DismissError) },
+            )
+            return@Column
+        }
+
         if (state.isTocVisible) {
             TableOfContentsSheet(
                 entries = state.tableOfContents,
@@ -128,16 +140,22 @@ fun ReaderScreen(viewModel: ReaderViewModel = hiltViewModel(), onSearchClick: ()
         val selectedRange = state.selectedSentenceRange
         var pendingColor by remember { mutableStateOf(AnnotationColor.YELLOW) }
 
-        // Tache 9bis.3.6 - position (en Dp, relative au Box englobant) de
-        // la phrase en cours de lecture TTS, mise a jour par le
-        // Modifier.onGloballyPositioned de cette seule SentenceText
-        // (voir plus bas) - ReadingRuler s'overlaye dessus.
-        var currentLineY by remember { mutableStateOf(0.dp) }
+        // A.1 / Tache 9bis.3.6 - position Y (relative au FlowRow
+        // scrollable) de la phrase en cours de lecture TTS, mise a jour
+        // par onGloballyPositioned sur la SentenceText active.
+        var currentLineYDp by remember { mutableStateOf(0.dp) }
         val density = LocalDensity.current
+
+        // A.1 — Auto-scroll vers la phrase active pendant la lecture TTS
+        LaunchedEffect(state.currentSentenceIndex) {
+            if (state.isPlaying && currentLineYDp > 0.dp) {
+                scrollState.animateScrollTo(with(density) { currentLineYDp.roundToPx() })
+            }
+        }
 
         Box(modifier = Modifier.weight(1f)) {
             if (state.isReadingRulerEnabled) {
-                ReadingRuler(currentLineY = currentLineY, enabled = true)
+                ReadingRuler(currentLineY = currentLineYDp, enabled = true)
             }
             FlowRow(
                 modifier = Modifier.verticalScroll(scrollState),
@@ -157,9 +175,9 @@ fun ReaderScreen(viewModel: ReaderViewModel = hiltViewModel(), onSearchClick: ()
                         onClick = {
                             if (selectedRange != null) viewModel.onIntent(ReaderIntent.ExtendSentenceSelection(index))
                         },
-                        modifier = if (isCurrentlyPlaying && state.isReadingRulerEnabled) {
+                        modifier = if (isCurrentlyPlaying) {
                             Modifier.onGloballyPositioned { coordinates ->
-                                currentLineY = with(density) { coordinates.positionInParent().y.toDp() }
+                                currentLineYDp = with(density) { coordinates.positionInParent().y.toDp() }
                             }
                         } else {
                             Modifier
@@ -320,3 +338,28 @@ private fun annotationColorFor(chapterIndex: Int, sentence: Sentence, annotation
             sentence.startOffset < annotation.endLocator.charOffset &&
             sentence.endOffset > annotation.startLocator.charOffset
     }?.color
+
+/**
+ * A.3 — État d'erreur affiché quand le parsing ou l'ouverture d'une
+ * publication échoue. Affiche le message et un bouton pour réessayer
+ * (retour à la bibliothèque implicite via [onRetry]).
+ */
+@Composable
+private fun ErrorState(message: String, onRetry: () -> Unit) {
+    Column(
+        modifier = Modifier.fillMaxSize().padding(32.dp),
+        verticalArrangement = Arrangement.Center,
+    ) {
+        Text(
+            text = message,
+            style = MaterialTheme.typography.bodyLarge,
+            color = MaterialTheme.colorScheme.error,
+        )
+        Button(
+            onClick = onRetry,
+            modifier = Modifier.padding(top = 16.dp),
+        ) {
+            Text("Retour à la bibliothèque")
+        }
+    }
+}
