@@ -10,6 +10,11 @@ data class StatisticsUiState(
     val totalReadingTimeMs: Long = 0,
     val booksFinished: Int = 0,
     val currentStreakDays: Int = 0,
+    // D.4 — nouvelles métriques
+    val averageWpm: Int = 0,
+    val maxStreakDays: Int = 0,
+    val dailyGoalMinutes: Int = 20,
+    val todayReadingMinutes: Long = 0,
 )
 
 /**
@@ -30,7 +35,51 @@ class GetStatisticsUseCase(
 
         val streak = computeStreak(sessions.map { it.startedAt })
 
-        return StatisticsUiState(totalMs, finishedCount, streak)
+        // D.4 — WPM moyen sur les 30 dernières sessions avec mots lus
+        val sessionsWithWords = sessions
+            .filter { it.wordsRead > 0 && it.durationMs > 0 }
+            .sortedByDescending { it.startedAt }
+            .take(30)
+        val averageWpm = if (sessionsWithWords.isNotEmpty()) {
+            val totalWords = sessionsWithWords.sumOf { it.wordsRead }
+            val totalMinutes = sessionsWithWords.sumOf { it.durationMs } / 60_000.0
+            if (totalMinutes > 0) (totalWords / totalMinutes).toInt() else 0
+        } else 0
+
+        // D.4 — Record de série
+        val maxStreak = computeMaxStreak(sessions.map { it.startedAt })
+
+        // D.4 — Lecture du jour (aujourd'hui)
+        val todayStart = TimeUnit.MILLISECONDS.toDays(System.currentTimeMillis())
+        val todaySessions = sessions.filter {
+            TimeUnit.MILLISECONDS.toDays(it.startedAt) == todayStart
+        }
+        val todayReadingMinutes = todaySessions.sumOf { it.durationMs } / 60_000L
+
+        return StatisticsUiState(
+            totalReadingTimeMs = totalMs,
+            booksFinished = finishedCount,
+            currentStreakDays = streak,
+            averageWpm = averageWpm,
+            maxStreakDays = maxStreak,
+            todayReadingMinutes = todayReadingMinutes,
+        )
+    }
+
+    private fun computeMaxStreak(sessionStarts: List<Long>): Int {
+        if (sessionStarts.isEmpty()) return 0
+        val days = sessionStarts.map { TimeUnit.MILLISECONDS.toDays(it) }.distinct().sorted()
+        var maxStreak = 1
+        var currentStreak = 1
+        for (i in 1 until days.size) {
+            if (days[i] == days[i - 1] + 1) {
+                currentStreak++
+                maxStreak = maxOf(maxStreak, currentStreak)
+            } else {
+                currentStreak = 1
+            }
+        }
+        return maxStreak
     }
 
     private fun computeStreak(sessionStarts: List<Long>): Int {

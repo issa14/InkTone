@@ -21,4 +21,5 @@ data class ReadingSessionEntity(
     val mode: String,
     val sentencesRead: Int,
     val durationMs: Long,
+    val wordsRead: Int = 0, // D.4
 )

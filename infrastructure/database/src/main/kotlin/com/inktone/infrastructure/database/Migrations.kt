@@ -61,3 +61,32 @@ val MIGRATION_5_6 = object : Migration(5, 6) {
         db.execSQL("ALTER TABLE user_preferences ADD COLUMN dailyGoalMinutes INTEGER NOT NULL DEFAULT 20")
     }
 }
+
+/** A.5 : profil vocal actif. */
+val MIGRATION_6_7 = object : Migration(6, 7) {
+    override fun migrate(db: SupportSQLiteDatabase) {
+        db.execSQL("ALTER TABLE user_preferences ADD COLUMN activeVoiceProfileId TEXT DEFAULT NULL")
+    }
+}
+
+/** D.4 : compteur de mots lus pour les statistiques WPM. */
+val MIGRATION_7_8 = object : Migration(7, 8) {
+    override fun migrate(db: SupportSQLiteDatabase) {
+        db.execSQL("ALTER TABLE reading_sessions ADD COLUMN wordsRead INTEGER NOT NULL DEFAULT 0")
+    }
+}
+
+/** B.1 : persistance du mode de lecture (SCROLL / PAGED). */
+val MIGRATION_8_9 = object : Migration(8, 9) {
+    override fun migrate(db: SupportSQLiteDatabase) {
+        db.execSQL("ALTER TABLE user_preferences ADD COLUMN readingMode TEXT NOT NULL DEFAULT 'SCROLL'")
+    }
+}
+
+/** D.3 : gain audio et respect du fontScale système. */
+val MIGRATION_9_10 = object : Migration(9, 10) {
+    override fun migrate(db: SupportSQLiteDatabase) {
+        db.execSQL("ALTER TABLE user_preferences ADD COLUMN audioGain REAL NOT NULL DEFAULT 1.0")
+        db.execSQL("ALTER TABLE user_preferences ADD COLUMN useSystemFontScale INTEGER NOT NULL DEFAULT 0")
+    }
+}

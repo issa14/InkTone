@@ -173,6 +173,108 @@ class DatabaseMigrationTest {
         v6.close()
     }
 
+    @Test
+    fun migration_6_vers_7_conserve_les_donnees_et_ajoute_activeVoiceProfileId() {
+        val v6 = helper.createDatabase(TEST_DB_NAME, 6)
+        v6.execSQL(
+            """
+            INSERT INTO user_preferences (id, theme, fontSize, defaultTtsEngine, crashReportingEnabled, language, fontFamily, reduceMotion, dynamicColorEnabled, readingRulerEnabled, dailyGoalMinutes)
+            VALUES (0, 'SYSTEM', 18, 'SHERPA_ONNX', 0, 'fr', 'DEFAULT', 0, 1, 0, 20)
+            """.trimIndent(),
+        )
+        v6.close()
+
+        val v7 = helper.runMigrationsAndValidate(
+            TEST_DB_NAME, 7, true,
+            MIGRATION_2_3, MIGRATION_3_4, MIGRATION_4_5, MIGRATION_5_6, MIGRATION_6_7,
+        )
+
+        v7.query("SELECT activeVoiceProfileId FROM user_preferences WHERE id = 0").use { cursor ->
+            assertEquals(true, cursor.moveToFirst())
+            assertEquals(null, cursor.getString(0)) // null par defaut
+        }
+        v7.close()
+    }
+
+    @Test
+    fun migration_7_vers_8_ajoute_wordsRead_aux_reading_sessions() {
+        val v7 = helper.createDatabase(TEST_DB_NAME, 7)
+        v7.execSQL(
+            """
+            INSERT INTO publications (id, title, format, fileUri, fileHash, fileSize, chapterCount, importDate)
+            VALUES ('pub-d4', 'Test', 'EPUB', '/test.epub', 'hash-d4', 1024, 1, 0)
+            """.trimIndent(),
+        )
+        v7.execSQL(
+            """
+            INSERT INTO reading_sessions (id, publicationId, startedAt, mode, sentencesRead, durationMs)
+            VALUES ('s1', 'pub-d4', 0, 'SCROLL', 10, 60000)
+            """.trimIndent(),
+        )
+        v7.close()
+
+        val v8 = helper.runMigrationsAndValidate(
+            TEST_DB_NAME, 8, true,
+            MIGRATION_2_3, MIGRATION_3_4, MIGRATION_4_5, MIGRATION_5_6, MIGRATION_6_7, MIGRATION_7_8,
+        )
+
+        v8.query("SELECT wordsRead FROM reading_sessions WHERE id = 's1'").use { cursor ->
+            assertEquals(true, cursor.moveToFirst())
+            assertEquals(0, cursor.getInt(0)) // valeur par defaut
+        }
+        v8.close()
+    }
+
+    @Test
+    fun migration_8_vers_9_ajoute_readingMode_aux_user_preferences() {
+        val v8 = helper.createDatabase(TEST_DB_NAME, 8)
+        v8.execSQL(
+            """
+            INSERT INTO publications (id, title, format, fileUri, fileHash, fileSize, chapterCount, importDate)
+            VALUES ('pub-b1', 'Test B1', 'EPUB', '/test-b1.epub', 'hash-b1', 1024, 1, 0)
+            """.trimIndent(),
+        )
+        v8.execSQL(
+            """
+            INSERT INTO user_preferences (id, theme, fontSize, defaultTtsEngine, crashReportingEnabled, language, fontFamily, reduceMotion, dynamicColorEnabled, readingRulerEnabled, dailyGoalMinutes, activeVoiceProfileId)
+            VALUES (0, 'SYSTEM', 18, 'SHERPA_ONNX', 0, 'fr', 'DEFAULT', 0, 1, 0, 20, NULL)
+            """.trimIndent(),
+        )
+        v8.close()
+
+        val v9 = helper.runMigrationsAndValidate(
+            TEST_DB_NAME, 9, true,
+            MIGRATION_2_3, MIGRATION_3_4, MIGRATION_4_5, MIGRATION_5_6, MIGRATION_6_7, MIGRATION_7_8, MIGRATION_8_9,
+        )
+
+        v9.query("SELECT readingMode FROM user_preferences WHERE id = 0").use { cursor ->
+            assertEquals(true, cursor.moveToFirst())
+            assertEquals("SCROLL", cursor.getString(0)) // valeur par defaut
+        }
+        v9.close()
+    }
+    @Test
+    fun migration_9_vers_10_ajoute_audioGain_et_useSystemFontScale() {
+        val v9 = helper.createDatabase(TEST_DB_NAME, 9)
+        v9.execSQL(
+            """
+            INSERT INTO user_preferences (id, theme, fontSize, defaultTtsEngine, crashReportingEnabled, language, fontFamily, reduceMotion, dynamicColorEnabled, readingRulerEnabled, dailyGoalMinutes, activeVoiceProfileId, readingMode)
+            VALUES (0, 'SYSTEM', 18, 'SHERPA_ONNX', 0, 'fr', 'DEFAULT', 0, 1, 0, 20, NULL, 'SCROLL')
+            """.trimIndent(),
+        )
+        v9.close()
+
+        val v10 = helper.runMigrationsAndValidate(
+            TEST_DB_NAME, 10, true,
+            MIGRATION_2_3, MIGRATION_3_4, MIGRATION_4_5, MIGRATION_5_6, MIGRATION_6_7, MIGRATION_7_8, MIGRATION_8_9, MIGRATION_9_10,
+        )
+        v10.query("SELECT audioGain, useSystemFontScale FROM user_preferences WHERE id = 0").use { cursor ->
+            assertEquals(true, cursor.moveToFirst())
+            assertEquals(1.0f, cursor.getFloat(0))
+            assertEquals(0, cursor.getInt(1))
+        }
+        v10.close()
+    }
     companion object {
         private const val TEST_DB_NAME = "migration-test"
     }

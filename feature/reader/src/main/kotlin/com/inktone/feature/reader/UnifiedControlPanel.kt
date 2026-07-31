@@ -59,6 +59,11 @@ fun UnifiedControlPanel(
     onSearchClick: () -> Unit,
     onBookmarksClick: () -> Unit,
     onTocClick: () -> Unit,
+    onAaClick: () -> Unit = {},
+    onTtsClick: () -> Unit = {},
+    onReadingModeClick: () -> Unit = {},
+    hasPreviousChapter: Boolean = true,
+    hasNextChapter: Boolean = true,
 ) {
     val haptic = LocalHapticFeedback.current
     val accentColor = MaterialTheme.colorScheme.primary
@@ -77,8 +82,10 @@ fun UnifiedControlPanel(
                 horizontalArrangement = Arrangement.Center,
                 modifier = Modifier.fillMaxWidth(),
             ) {
-                IconButton(onClick = onPreviousChapter, modifier = Modifier.size(44.dp)) {
-                    Icon(Icons.Outlined.SkipPrevious, contentDescription = "Chapitre precedent", tint = accentColor.copy(alpha = 0.4f))
+                IconButton(onClick = onPreviousChapter, modifier = Modifier.size(44.dp), enabled = hasPreviousChapter) {
+                    Icon(Icons.Outlined.SkipPrevious,
+                        contentDescription = if (hasPreviousChapter) "Chapitre precedent" else "Pas de chapitre precedent",
+                        tint = accentColor.copy(alpha = if (hasPreviousChapter) 0.4f else 0.15f))
                 }
                 Spacer(Modifier.width(24.dp))
                 FilledIconButton(
@@ -97,8 +104,10 @@ fun UnifiedControlPanel(
                     )
                 }
                 Spacer(Modifier.width(24.dp))
-                IconButton(onClick = onNextChapter, modifier = Modifier.size(44.dp)) {
-                    Icon(Icons.Outlined.SkipNext, contentDescription = "Chapitre suivant", tint = accentColor.copy(alpha = 0.4f))
+                IconButton(onClick = onNextChapter, modifier = Modifier.size(44.dp), enabled = hasNextChapter) {
+                    Icon(Icons.Outlined.SkipNext,
+                        contentDescription = if (hasNextChapter) "Chapitre suivant" else "Pas de chapitre suivant",
+                        tint = accentColor.copy(alpha = if (hasNextChapter) 0.4f else 0.15f))
                 }
             }
 
@@ -107,6 +116,9 @@ fun UnifiedControlPanel(
             Spacer(Modifier.height(8.dp))
 
             Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceEvenly, verticalAlignment = Alignment.CenterVertically) {
+                SecondaryAction(icon = AppIcons.Appearance, label = "Aa", tint = accentColor.copy(alpha = 0.5f), onClick = onAaClick)
+                SecondaryAction(icon = AppIcons.Speaking, label = "Voix", tint = accentColor.copy(alpha = 0.5f), onClick = onTtsClick)
+                SecondaryAction(icon = AppIcons.ReadingModePaged, label = "Mode", tint = accentColor.copy(alpha = 0.5f), onClick = onReadingModeClick)
                 SecondaryAction(icon = Icons.Filled.Timer, label = "Veille", tint = if (sleepTimerActive) accentColor else accentColor.copy(alpha = 0.5f), onClick = onSleepTimerClick)
                 SecondaryAction(icon = AppIcons.Search, label = "Recherche", tint = accentColor.copy(alpha = 0.5f), onClick = onSearchClick)
                 SecondaryAction(icon = AppIcons.Bookmark, label = "Signets", tint = accentColor.copy(alpha = 0.5f), onClick = onBookmarksClick)

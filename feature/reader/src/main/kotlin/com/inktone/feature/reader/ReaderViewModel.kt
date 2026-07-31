@@ -18,6 +18,7 @@ import com.inktone.domain.repository.AnnotationRepository
 import com.inktone.domain.repository.BookmarkRepository
 import com.inktone.domain.repository.PreferencesRepository
 import com.inktone.domain.repository.PublicationRepository
+import com.inktone.domain.repository.VoiceProfileRepository
 import com.inktone.domain.service.ParseResult
 import com.inktone.domain.service.PublicationParser
 import com.inktone.domain.service.TtsEngine
@@ -53,6 +54,7 @@ class ReaderViewModel @Inject constructor(
     private val getReadingState: GetReadingStateUseCase,
     private val publicationRepository: PublicationRepository,
     private val preferencesRepository: PreferencesRepository,
+    private val voiceProfileRepository: VoiceProfileRepository,
     private val annotationRepository: AnnotationRepository,
     private val addAnnotation: AddAnnotationUseCase,
     private val bookmarkRepository: BookmarkRepository,
@@ -76,7 +78,8 @@ class ReaderViewModel @Inject constructor(
         }
     }
 
-    private var currentPublicationId: String? = null
+    // C.5 — exposé pour clé sharedElement dans ReaderScreen
+    internal var currentPublicationId: String? = null
     private val chapterPreloader = ChapterPreloader(viewModelScope)
     private val sentenceAudioBuffer = SentenceAudioBuffer(viewModelScope, ttsEngine)
     private val annotationSelectionHandler = AnnotationSelectionHandler()
@@ -111,6 +114,15 @@ class ReaderViewModel @Inject constructor(
             is ReaderIntent.PlayCurrentSentence -> playCurrentSentence()
             is ReaderIntent.Pause -> _state.value = _state.value.copy(isPlaying = false)
             is ReaderIntent.DismissError -> _state.value = _state.value.copy(errorMessage = null)
+            is ReaderIntent.ToggleReadingMode -> {
+                val newMode = if (_state.value.readingMode == ReadingMode.SCROLL) ReadingMode.PAGED else ReadingMode.SCROLL
+                _state.value = _state.value.copy(readingMode = newMode)
+                // B.1 — persiste le mode de lecture
+                viewModelScope.launch {
+                    val current = preferencesRepository.get()
+                    preferencesRepository.update(current.copy(readingMode = newMode.name))
+                }
+            }
             is ReaderIntent.BeginSentenceSelection -> _state.value = _state.value.copy(
                 selectionAnchorIndex = intent.sentenceIndex, selectionFocusIndex = intent.sentenceIndex,
             )
@@ -193,11 +205,14 @@ class ReaderViewModel @Inject constructor(
                         overrides = restored?.overrides,
                         global = preferencesRepository.get(),
                     )
+                    val prefs = preferencesRepository.get()
                     _state.value = ReaderUiState(
                         chapters = result.documentModel.chapters,
                         tableOfContents = result.documentModel.tableOfContents,
                         currentChapterIndex = restored?.locator?.chapterIndex ?: 0,
                         effectiveSettings = effectiveSettings,
+                        // B.1 — restaure le mode de lecture persisté
+                        readingMode = if (prefs.readingMode == "PAGED") ReadingMode.PAGED else ReadingMode.SCROLL,
                         currentOverrides = restored?.overrides,
                     )
                     triggerPreload(_state.value.currentChapterIndex)
@@ -410,10 +425,14 @@ class ReaderViewModel @Inject constructor(
             _state.value = _state.value.copy(isPlaying = true)
 
             val sentence = sentences[index]
-            val voiceProfile = VoiceProfile(
-                id = "vp-native-fr", engine = TtsEngineId.ANDROID_NATIVE,
-                voice = "fr-fr-default", language = "fr-FR",
-            )
+            // A.5 — résout le profil vocal actif depuis les préférences utilisateur
+            val prefs = preferencesRepository.get()
+            val voiceProfile = prefs.activeVoiceProfileId
+                ?.let { voiceProfileRepository.getById(it) }
+                ?: VoiceProfile(
+                    id = "vp-native-fr", engine = TtsEngineId.ANDROID_NATIVE,
+                    voice = "fr-fr-default", language = "fr-FR",
+                )
             val segment = sentenceAudioBuffer.get(sentence, voiceProfile)
             audioSegmentPlayer.play(segment)
 

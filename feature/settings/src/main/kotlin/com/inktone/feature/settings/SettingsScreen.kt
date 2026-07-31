@@ -1,22 +1,31 @@
 package com.inktone.feature.settings
 
+import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.ColumnScope
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.selection.toggleable
+import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material3.Button
+import androidx.compose.material3.Card
+import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.ExperimentalMaterial3Api
+import androidx.compose.material3.AlertDialog
+import androidx.compose.material3.RadioButton
+import androidx.compose.material3.TextButton
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.LargeTopAppBar
+import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Slider
 import androidx.compose.material3.Switch
@@ -25,14 +34,24 @@ import androidx.compose.material3.TopAppBarDefaults
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
+import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.input.nestedscroll.nestedScroll
 import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.semantics
+import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
+import androidx.compose.ui.unit.em
 import androidx.hilt.navigation.compose.hiltViewModel
+import com.inktone.domain.model.FontFamily
+import com.inktone.domain.model.ReadingTheme
+import com.inktone.domain.model.TtsEngineId
 import com.inktone.domain.model.UserPreferences
+import com.inktone.domain.model.VoiceProfile
 
 /**
  * Fondation des reglages (Tache 8.1). Critere de validation : modifier
@@ -72,7 +91,7 @@ fun SettingsScreen(
         },
     ) { innerPadding ->
         Box(Modifier.padding(innerPadding)) {
-            SettingsContent(state.preferences, viewModel::onIntent, onOpenPronunciationRules, onOpenAbout)
+            SettingsContent(state.preferences, state.voiceProfiles, viewModel::onIntent, onOpenPronunciationRules, onOpenAbout)
         }
     }
 }
@@ -85,6 +104,7 @@ fun SettingsScreen(
 @Composable
 internal fun SettingsContent(
     preferences: UserPreferences,
+    voiceProfiles: List<VoiceProfile> = emptyList(),
     onIntent: (SettingsIntent) -> Unit,
     onOpenPronunciationRules: () -> Unit = {},
     onOpenAbout: () -> Unit = {},
@@ -96,20 +116,30 @@ internal fun SettingsContent(
     // quoi accrocher son effet de collapse (aucun enfant scrollable ne
     // produit de delta de defilement).
     Column(modifier = Modifier.padding(16.dp).verticalScroll(rememberScrollState())) {
+        // D.1 — pickers dialog pour thème/police/moteur
+        var showThemePicker by remember { mutableStateOf(false) }
+        var showFontPicker by remember { mutableStateOf(false) }
+        var showEnginePicker by remember { mutableStateOf(false) }
+
         SectionGroup("Lecture") {
-            SettingRow("Theme", preferences.theme.name) {
-                onIntent(SettingsIntent.SetTheme(nextEnumValue(preferences.theme)))
-            }
+            SettingRow("Theme", preferences.theme.name) { showThemePicker = true }
             SliderSetting("Taille du texte", preferences.fontSize.toFloat(), 12f..32f) {
                 onIntent(SettingsIntent.SetFontSize(it.toInt()))
             }
-            SettingRow("Police", preferences.fontFamily.name) {
-                onIntent(SettingsIntent.SetFontFamily(nextEnumValue(preferences.fontFamily)))
-            }
+            SettingRow("Police", preferences.fontFamily.name) { showFontPicker = true }
         }
         SectionGroup("Voix") {
-            SettingRow("Moteur par defaut", preferences.defaultTtsEngine.name) {
-                onIntent(SettingsIntent.SetDefaultTtsEngine(nextEnumValue(preferences.defaultTtsEngine)))
+            SettingRow("Moteur par defaut", preferences.defaultTtsEngine.name) { showEnginePicker = true }
+            val activeVoiceName = voiceProfiles
+                .find { it.id == preferences.activeVoiceProfileId }
+                ?.voice ?: "Voix par defaut"
+            SettingRow("Voix", activeVoiceName) {
+                onIntent(SettingsIntent.SetActiveVoiceProfile(
+                    nextVoiceProfileId(preferences.activeVoiceProfileId, voiceProfiles)))
+            }
+            // D.3 — gain audio slider
+            SliderSetting("Gain audio", preferences.audioGain, 1.0f..4.0f) {
+                onIntent(SettingsIntent.SetAudioGain(it))
             }
             SettingRow("Regles de prononciation", "Gerer") { onOpenPronunciationRules() }
         }
@@ -139,13 +169,15 @@ internal fun SettingsContent(
                 "Reduire les animations",
                 preferences.reduceMotion,
             ) { onIntent(SettingsIntent.SetReduceMotion(it)) }
-            // Tache 9bis.3.6 - reglage seul pour l'instant, ReaderScreen ne
-            // consomme pas encore ce champ (voir TODO sur ReadingRuler.kt,
-            // feature/reader).
             ToggleSetting(
                 "Reglette de lecture",
                 preferences.readingRulerEnabled,
             ) { onIntent(SettingsIntent.SetReadingRulerEnabled(it)) }
+            // D.3 — respecter le fontScale système
+            ToggleSetting(
+                "Police adaptee au systeme",
+                preferences.useSystemFontScale,
+            ) { onIntent(SettingsIntent.SetUseSystemFontScale(it)) }
             Button(
                 onClick = { onIntent(SettingsIntent.ApplyAccessibilityPreset) },
                 modifier = Modifier.heightIn(min = 48.dp),
@@ -156,14 +188,45 @@ internal fun SettingsContent(
         SectionGroup("A propos") {
             SettingRow("InkTone", "Voir") { onOpenAbout() }
         }
-    }
+        // D.1 — Pickers dialog (remplacent les cycles d'enum)
+        if (showThemePicker) {
+            PickerDialog("Thème", ReadingTheme.entries.toList(), preferences.theme, { it.name },
+                onSelect = { onIntent(SettingsIntent.SetTheme(it)); showThemePicker = false },
+                onDismiss = { showThemePicker = false })
+        }
+        if (showFontPicker) {
+            PickerDialog("Police", FontFamily.entries.toList(), preferences.fontFamily, { it.name },
+                onSelect = { onIntent(SettingsIntent.SetFontFamily(it)); showFontPicker = false },
+                onDismiss = { showFontPicker = false })
+        }
+        if (showEnginePicker) {
+            PickerDialog("Moteur TTS", TtsEngineId.entries.toList(), preferences.defaultTtsEngine, { it.name },
+                onSelect = { onIntent(SettingsIntent.SetDefaultTtsEngine(it)); showEnginePicker = false },
+                onDismiss = { showEnginePicker = false })
+        }    }
 }
 
+/**
+ * D.2 — Section groupée avec titre coloré et carte visuelle.
+ */
 @Composable
-private fun SectionGroup(title: String, content: @Composable () -> Unit) {
+private fun SectionGroup(title: String, content: @Composable ColumnScope.() -> Unit) {
     Column(modifier = Modifier.fillMaxWidth().padding(vertical = 8.dp)) {
-        Text(title)
-        content()
+        Text(
+            text = title.uppercase(),
+            style = MaterialTheme.typography.labelSmall,
+            color = MaterialTheme.colorScheme.primary,
+            fontWeight = FontWeight.SemiBold,
+            letterSpacing = 0.1.em,
+            modifier = Modifier.padding(start = 16.dp, top = 16.dp, bottom = 8.dp),
+        )
+        Card(
+            shape = RoundedCornerShape(16.dp),
+            colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceVariant),
+            modifier = Modifier.fillMaxWidth(),
+        ) {
+            Column(modifier = Modifier.padding(horizontal = 16.dp), content = content)
+        }
     }
 }
 
@@ -220,4 +283,51 @@ private fun SliderSetting(label: String, value: Float, range: ClosedFloatingPoin
 private inline fun <reified T : Enum<T>> nextEnumValue(current: T): T {
     val values = enumValues<T>()
     return values[(current.ordinal + 1) % values.size]
+}
+
+/**
+ * A.5 — cycle entre les profils vocaux disponibles.
+ * Si aucun profil n'est sélectionné, passe au premier. Si le dernier
+ * est atteint, revient à null (voix par défaut).
+ */
+private fun nextVoiceProfileId(currentId: String?, profiles: List<VoiceProfile>): String? {
+    if (profiles.isEmpty()) return null
+    val currentIndex = profiles.indexOfFirst { it.id == currentId }
+    return if (currentIndex < 0 || currentIndex >= profiles.lastIndex) {
+        null // retour à la voix par défaut
+    } else {
+        profiles[currentIndex + 1].id
+    }
+}
+
+/**
+ * D.1 — Dialog de sélection générique remplaçant le cycle d'enum.
+ */
+@Composable
+private fun <T> PickerDialog(
+    title: String,
+    options: List<T>,
+    selected: T,
+    label: (T) -> String,
+    onSelect: (T) -> Unit,
+    onDismiss: () -> Unit,
+) {
+    AlertDialog(
+        onDismissRequest = onDismiss,
+        title = { Text(title) },
+        text = {
+            Column {
+                options.forEach { option ->
+                    Row(
+                        modifier = Modifier.fillMaxWidth().clickable { onSelect(option) }.padding(vertical = 6.dp),
+                        verticalAlignment = Alignment.CenterVertically,
+                    ) {
+                        RadioButton(selected = option == selected, onClick = { onSelect(option) })
+                        Text(label(option), modifier = Modifier.padding(start = 8.dp))
+                    }
+                }
+            }
+        },
+        confirmButton = { TextButton(onClick = onDismiss) { Text("Annuler") } },
+    )
 }
