@@ -18,4 +18,8 @@ data class UserPreferencesEntity(
     val dynamicColorEnabled: Boolean = true,
     val readingRulerEnabled: Boolean = false,
     val dailyGoalMinutes: Int = 20, // Tache 1.4 (Partie 1)
+    val activeVoiceProfileId: String? = null, // A.5
+    val readingMode: String = "SCROLL", // B.1
+    val audioGain: Float = 1.0f, // D.3
+    val useSystemFontScale: Boolean = false, // D.3
 )

@@ -66,7 +66,19 @@ class LibraryViewModel @Inject constructor(
                 _state.value.filterValue,
             )
             is LibraryIntent.DismissError -> _state.value = _state.value.copy(errorMessage = null)
+            is LibraryIntent.RegenerateCovers -> regenerateCovers()
+            is LibraryIntent.ResetCovers -> resetCovers()
         }
+    }
+
+    /** C.3 — Régénère toutes les couvertures (TODO: appel réel au repository). */
+    private fun regenerateCovers() {
+        // TODO: publicationRepository.regenerateAllCovers() avec progression
+    }
+
+    /** C.3 — Réinitialise les couvertures aux valeurs par défaut (TODO: dialogue confirmation). */
+    private fun resetCovers() {
+        // TODO: publicationRepository.resetCoversToDefault() avec dialogue confirmation
     }
 
     /**

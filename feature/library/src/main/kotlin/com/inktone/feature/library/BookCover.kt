@@ -1,5 +1,7 @@
 package com.inktone.feature.library
 
+import android.net.Uri
+import androidx.compose.animation.ExperimentalSharedTransitionApi
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Box
@@ -55,6 +57,7 @@ import java.io.File
  * @param showTitle  affiche le titre sous la couverture (désactivé
  *   en mode GRID_COVERS_ONLY)
  */
+@OptIn(ExperimentalSharedTransitionApi::class)
 @Composable
 fun BookCover(
     publication: Publication,
@@ -65,18 +68,43 @@ fun BookCover(
     showTitle: Boolean = true,
 ) {
     val context = LocalContext.current
-    val coverFile = publication.coverUri?.let { File(it) }
-    val hasCover = coverFile != null && coverFile.exists()
+    // E.3 — Support content:// URI (SAF) en plus de file://
+    val coverModel: Any? = when {
+        publication.coverUri == null -> null
+        publication.coverUri!!.startsWith("content://") -> Uri.parse(publication.coverUri)
+        else -> File(publication.coverUri!!).takeIf { it.exists() }
+    }
+
+    // E.2 — contentDescription global pour TalkBack
+    val a11yLabel = "${publication.title}, ${if (progressPercent > 0) "$progressPercent% lu" else "Non commencé"}"
+
+    // C.5 — SharedTransition couverture vers Reader
+    val sharedTransitionScope = runCatching {
+        com.inktone.core.designsystem.LocalSharedTransitionScope.current
+    }.getOrNull()
+    val animatedVisibilityScope = runCatching {
+        com.inktone.core.designsystem.LocalAnimatedVisibilityScope.current
+    }.getOrNull()
+    val sharedElementMod = if (sharedTransitionScope != null && animatedVisibilityScope != null) {
+        with(sharedTransitionScope) {
+            Modifier.sharedElement(
+                sharedContentState = rememberSharedContentState(key = "cover-${publication.id}"),
+                animatedVisibilityScope = animatedVisibilityScope,
+            )
+        }
+    } else Modifier
 
     Box(
         modifier = modifier
             .aspectRatio(0.7f)
+            .semantics { contentDescription = a11yLabel }
+            .then(sharedElementMod)
             .clickable(onClick = onClick),
     ) {
-        if (hasCover) {
+        if (coverModel != null) {
             SubcomposeAsyncImage(
                 model = ImageRequest.Builder(context)
-                    .data(coverFile)
+                    .data(coverModel)
                     .crossfade(true)
                     .build(),
                 contentDescription = publication.title,

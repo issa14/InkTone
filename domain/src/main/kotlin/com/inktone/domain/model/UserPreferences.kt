@@ -22,6 +22,15 @@ data class UserPreferences(
     // Tache 1.4 (Partie 1) — objectif de lecture quotidien, valeur par
     // defaut raisonnable (20 min), modifiable dans les reglages (Partie 4).
     val dailyGoalMinutes: Int = 20,
+    // A.5 — profil vocal actif. null = utiliser la voix par defaut
+    // correspondant au moteur TTS selectionne.
+    val activeVoiceProfileId: String? = null,
+    // B.1 — mode de lecture (SCROLL ou PAGED), persisté pour reprise
+    val readingMode: String = "SCROLL",
+    // D.3 — gain audio (1.0× = normal, jusqu'à 4.0×)
+    val audioGain: Float = 1.0f,
+    // D.3 — respecter le fontScale système Android au lieu du fontSize interne
+    val useSystemFontScale: Boolean = false,
 ) {
     init {
         require(fontSize > 0) { "fontSize doit être strictement positif" }

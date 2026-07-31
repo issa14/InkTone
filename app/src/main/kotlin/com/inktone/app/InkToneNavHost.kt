@@ -1,5 +1,7 @@
 package com.inktone.app
 
+import androidx.compose.animation.ExperimentalSharedTransitionApi
+import androidx.compose.animation.SharedTransitionLayout
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.padding
 import androidx.compose.material.icons.Icons
@@ -11,6 +13,7 @@ import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Text
 import androidx.compose.material3.TopAppBar
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.remember
 import androidx.compose.ui.Modifier
@@ -23,6 +26,8 @@ import androidx.navigation.compose.NavHost
 import androidx.navigation.compose.composable
 import androidx.navigation.compose.rememberNavController
 import androidx.navigation.toRoute
+import com.inktone.core.designsystem.LocalAnimatedVisibilityScope
+import com.inktone.core.designsystem.LocalSharedTransitionScope
 import com.inktone.core.ui.AboutScreen
 import com.inktone.feature.importer.ImportPickerButton
 import com.inktone.feature.importer.ImportViewModel
@@ -47,10 +52,14 @@ import com.inktone.feature.statistics.StatisticsScreen
  * écran ne consomme le geste retour lui-même (pas de swipe interne à
  * distinguer du retour système, contrairement à un pager ou un drawer).
  */
+@OptIn(ExperimentalSharedTransitionApi::class)
 @Composable
 fun InkToneNavHost(navController: NavHostController = rememberNavController()) {
-    NavHost(navController = navController, startDestination = LibraryRoute) {
+    SharedTransitionLayout {
+        CompositionLocalProvider(LocalSharedTransitionScope provides this@SharedTransitionLayout) {
+        NavHost(navController = navController, startDestination = LibraryRoute) {
         composable<LibraryRoute> {
+            CompositionLocalProvider(LocalAnimatedVisibilityScope provides this@composable) {
             val importViewModel: ImportViewModel = hiltViewModel()
             val importLauncher = rememberLauncherForActivityResult(
                 ActivityResultContracts.OpenMultipleDocuments(),
@@ -70,8 +79,10 @@ fun InkToneNavHost(navController: NavHostController = rememberNavController()) {
                 // drawer plutot que des icones eparpillees.
                 floatingActionButton = { ImportPickerButton() },
             )
+            } // CompositionLocalProvider
         }
         composable<ReaderRoute> { entry ->
+            CompositionLocalProvider(LocalAnimatedVisibilityScope provides this@composable) {
             val route = entry.toRoute<ReaderRoute>()
             val readerViewModel: ReaderViewModel = hiltViewModel()
             LaunchedEffect(route) {
@@ -85,6 +96,7 @@ fun InkToneNavHost(navController: NavHostController = rememberNavController()) {
                 )
             }
             ReaderScreen(viewModel = readerViewModel, onSearchClick = { navController.navigate(SearchRoute) })
+            } // CompositionLocalProvider
         }
         composable<SearchRoute> {
             BackScaffold(title = "Rechercher", onBack = navController::popBackStack) {
@@ -144,6 +156,8 @@ fun InkToneNavHost(navController: NavHostController = rememberNavController()) {
             }
         }
     }
+        } // CompositionLocalProvider (SharedTransitionScope)
+    } // SharedTransitionLayout
 }
 
 @OptIn(ExperimentalMaterial3Api::class)

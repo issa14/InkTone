@@ -29,7 +29,7 @@ import com.inktone.infrastructure.database.entity.VoiceProfileEntity
         BookmarkEntity::class, AnnotationEntity::class, VoiceProfileEntity::class,
         UserPreferencesEntity::class, SentenceFtsEntity::class, PronunciationRuleEntity::class,
     ],
-    version = 6, // Tache 1.4 : dailyGoalMinutes (MIGRATION_5_6)
+    version = 10, // D.3 : audioGain, useSystemFontScale (MIGRATION_9_10)
     exportSchema = true, // condition du harnais de migration — Tâche 2.4
 )
 @TypeConverters(StringListConverter::class)
