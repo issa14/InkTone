@@ -8,8 +8,10 @@ import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.aspectRatio
+import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
@@ -27,6 +29,8 @@ import androidx.compose.material.icons.outlined.MoreVert
 import androidx.compose.material.icons.outlined.Menu
 import androidx.compose.material.icons.outlined.Sort
 import androidx.compose.material.icons.outlined.StarBorder
+import androidx.compose.material.icons.outlined.Search
+import androidx.compose.material.icons.outlined.Close
 import androidx.compose.material3.DismissibleDrawerSheet
 import androidx.compose.material3.DismissibleNavigationDrawer
 import androidx.compose.material3.DropdownMenu
@@ -34,17 +38,23 @@ import androidx.compose.material3.DropdownMenuItem
 import androidx.compose.material3.ElevatedCard
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.FilterChip
+import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.LinearProgressIndicator
 import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.ModalBottomSheet
 import androidx.compose.material3.NavigationDrawerItem
 import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextField
+import androidx.compose.material3.TopAppBar
+import androidx.compose.material3.TopAppBarDefaults
 import androidx.compose.material3.Button
 import androidx.compose.material3.rememberDrawerState
+import androidx.compose.material3.rememberModalBottomSheetState
+import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material3.DrawerValue
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.DisposableEffect
@@ -96,6 +106,7 @@ fun LibraryScreen(
     onNavigateToReader: (String) -> Unit,
     viewModel: LibraryViewModel = hiltViewModel(),
     floatingActionButton: @Composable () -> Unit = {},
+    floatingAudioButton: @Composable () -> Unit = {},
     onOpenBookmarks: () -> Unit = {},
     onOpenStats: () -> Unit = {},
     onImportClick: () -> Unit = {},
@@ -147,11 +158,16 @@ fun LibraryScreen(
             }
         },
     ) {
-        Scaffold(floatingActionButton = floatingActionButton) { innerPadding ->
-            Column(Modifier.fillMaxSize().padding(innerPadding)) {
-                ImportProgressBanner(state.importProgress)
-                LibraryToolbar(
-                    onMenuClick = { scope.launch { drawerState.open() } },
+        Scaffold(
+            floatingActionButton = {
+                Row(verticalAlignment = Alignment.Bottom) {
+                    floatingAudioButton()
+                    Spacer(Modifier.width(12.dp))
+                    floatingActionButton()
+                }
+            },
+            topBar = {
+                LibraryTopBar(
                     searchQuery = state.searchQuery,
                     onSearchQueryChange = { viewModel.onIntent(LibraryIntent.SetSearchQuery(it)) },
                     sortOrder = state.sortOrder,
@@ -160,7 +176,12 @@ fun LibraryScreen(
                     onCycleLayout = { viewModel.onIntent(LibraryIntent.CycleLayout) },
                     onRefresh = { viewModel.onIntent(LibraryIntent.Refresh) },
                     onImportClick = onImportClick,
+                    onMenuClick = { scope.launch { drawerState.open() } },
                 )
+            },
+        ) { innerPadding ->
+            Column(Modifier.fillMaxSize().padding(innerPadding)) {
+                ImportProgressBanner(state.importProgress)
                 FilterRow(
                     active = state.activeFilter,
                     onSelect = { viewModel.onIntent(LibraryIntent.ChangeFilter(it)) },
@@ -266,11 +287,36 @@ private fun LibraryDrawerContent(state: LibraryUiState, onSelectFilter: (FilterM
                 }
             }
         }
+
+        // ──── #2 Footer drawer ────
+        Spacer(Modifier.height(24.dp))
+        HorizontalDivider()
+        Row(
+            modifier = Modifier.fillMaxWidth().padding(vertical = 12.dp),
+            horizontalArrangement = Arrangement.SpaceEvenly,
+        ) {
+            DrawerFooterItem("À propos", AppIcons.Info) { }
+            DrawerFooterItem("Thème", AppIcons.Appearance) { }
+        }
     }
 }
 
 @Composable
-private fun LibraryToolbar(
+private fun DrawerFooterItem(label: String, icon: androidx.compose.ui.graphics.vector.ImageVector, onClick: () -> Unit) {
+    Column(
+        horizontalAlignment = Alignment.CenterHorizontally,
+        modifier = Modifier.clickable(onClick = onClick).padding(8.dp),
+    ) {
+        Icon(icon, contentDescription = label, modifier = Modifier.size(18.dp), tint = MaterialTheme.colorScheme.onSurfaceVariant)
+        Text(label, style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+    }
+}
+
+// ──── #7 TopBar primary + #1 SearchBar collapsible + #4 BottomSheet ────
+
+@OptIn(ExperimentalMaterial3Api::class)
+@Composable
+private fun LibraryTopBar(
     onMenuClick: () -> Unit,
     searchQuery: String,
     onSearchQueryChange: (String) -> Unit,
@@ -281,57 +327,105 @@ private fun LibraryToolbar(
     onRefresh: () -> Unit,
     onImportClick: () -> Unit,
 ) {
+    var isSearchActive by remember { mutableStateOf(false) }
     var isSortMenuExpanded by remember { mutableStateOf(false) }
-    var isActionsMenuExpanded by remember { mutableStateOf(false) }
+    var showActionsSheet by remember { mutableStateOf(false) }
 
-    Row(Modifier.fillMaxWidth().padding(horizontal = 4.dp), verticalAlignment = Alignment.CenterVertically) {
-        IconButton(onClick = onMenuClick) {
-            Icon(Icons.Outlined.Menu, contentDescription = "Filtres et séries")
-        }
-        TextField(
-            value = searchQuery,
-            onValueChange = onSearchQueryChange,
-            modifier = Modifier.weight(1f),
-            placeholder = { Text("Rechercher titre ou auteur") },
-            leadingIcon = { Icon(AppIcons.Search, contentDescription = null) },
-            singleLine = true,
-        )
-        Box {
-            IconButton(onClick = { isSortMenuExpanded = true }) {
-                Icon(Icons.Outlined.Sort, contentDescription = "Trier")
-            }
-            DropdownMenu(expanded = isSortMenuExpanded, onDismissRequest = { isSortMenuExpanded = false }) {
-                LibrarySortOrder.entries.forEach { order ->
-                    DropdownMenuItem(
-                        text = { Text(order.label()) },
-                        onClick = { onSortOrderChange(order); isSortMenuExpanded = false },
-                    )
+    if (isSearchActive) {
+        // État recherche : SearchBar pleine largeur qui remplace la TopBar
+        TopAppBar(
+            title = {
+                TextField(
+                    value = searchQuery,
+                    onValueChange = onSearchQueryChange,
+                    modifier = Modifier.fillMaxWidth(),
+                    placeholder = { Text("Rechercher titre ou auteur") },
+                    singleLine = true,
+                )
+            },
+            navigationIcon = {
+                IconButton(onClick = {
+                    isSearchActive = false
+                    onSearchQueryChange("")
+                }) {
+                    Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = "Fermer")
                 }
+            },
+            colors = TopAppBarDefaults.topAppBarColors(
+                containerColor = MaterialTheme.colorScheme.primary,
+                titleContentColor = MaterialTheme.colorScheme.onPrimary,
+                navigationIconContentColor = MaterialTheme.colorScheme.onPrimary,
+            ),
+        )
+    } else {
+        // État normal : icônes d'action
+        TopAppBar(
+            title = { },
+            navigationIcon = {
+                IconButton(onClick = onMenuClick) {
+                    Icon(Icons.Outlined.Menu, contentDescription = "Menu")
+                }
+            },
+            actions = {
+                IconButton(onClick = { isSearchActive = true }) {
+                    Icon(Icons.Outlined.Search, contentDescription = "Rechercher")
+                }
+                Box {
+                    IconButton(onClick = { isSortMenuExpanded = true }) {
+                        Icon(Icons.Outlined.Sort, contentDescription = "Trier")
+                    }
+                    DropdownMenu(expanded = isSortMenuExpanded, onDismissRequest = { isSortMenuExpanded = false }) {
+                        LibrarySortOrder.entries.forEach { order ->
+                            DropdownMenuItem(
+                                text = { Text(order.label()) },
+                                onClick = { onSortOrderChange(order); isSortMenuExpanded = false },
+                            )
+                        }
+                    }
+                }
+                IconButton(onClick = onCycleLayout) {
+                    Icon(layoutMode.icon(), contentDescription = layoutMode.label())
+                }
+                IconButton(onClick = { showActionsSheet = true }) {
+                    Icon(Icons.Outlined.MoreVert, contentDescription = "Actions")
+                }
+            },
+            colors = TopAppBarDefaults.topAppBarColors(
+                containerColor = MaterialTheme.colorScheme.primary,
+                titleContentColor = MaterialTheme.colorScheme.onPrimary,
+                actionIconContentColor = MaterialTheme.colorScheme.onPrimary,
+                navigationIconContentColor = MaterialTheme.colorScheme.onPrimary,
+            ),
+        )
+    }
+
+    // ──── #4 Menu 3-points → ModalBottomSheet ────
+    if (showActionsSheet) {
+        val sheetState = rememberModalBottomSheetState()
+        ModalBottomSheet(
+            onDismissRequest = { showActionsSheet = false },
+            sheetState = sheetState,
+        ) {
+            Column(Modifier.padding(bottom = 32.dp)) {
+                Text("Bibliothèque", style = MaterialTheme.typography.labelLarge,
+                    modifier = Modifier.padding(horizontal = 24.dp, vertical = 8.dp),
+                    color = MaterialTheme.colorScheme.primary)
+                ActionSheetItem("Importer", AppIcons.Data) { showActionsSheet = false; onImportClick() }
+                ActionSheetItem("Actualiser", AppIcons.Loading) { showActionsSheet = false; onRefresh() }
             }
         }
-        IconButton(onClick = onCycleLayout) {
-            Icon(
-                imageVector = layoutMode.icon(),
-                contentDescription = layoutMode.label(),
-            )
-        }
-        Box {
-            IconButton(onClick = { isActionsMenuExpanded = true }) {
-                Icon(Icons.Outlined.MoreVert, contentDescription = "Actions")
-            }
-            DropdownMenu(expanded = isActionsMenuExpanded, onDismissRequest = { isActionsMenuExpanded = false }) {
-                DropdownMenuItem(
-                    text = { Text("Importer") },
-                    onClick = { isActionsMenuExpanded = false; onImportClick() },
-                    leadingIcon = { Icon(AppIcons.Data, contentDescription = null) },
-                )
-                DropdownMenuItem(
-                    text = { Text("Actualiser") },
-                    onClick = { isActionsMenuExpanded = false; onRefresh() },
-                    leadingIcon = { Icon(AppIcons.Loading, contentDescription = null) },
-                )
-            }
-        }
+    }
+}
+
+@Composable
+private fun ActionSheetItem(label: String, icon: androidx.compose.ui.graphics.vector.ImageVector, onClick: () -> Unit) {
+    Row(
+        modifier = Modifier.fillMaxWidth().clickable(onClick = onClick).padding(horizontal = 24.dp, vertical = 14.dp),
+        verticalAlignment = Alignment.CenterVertically,
+    ) {
+        Icon(icon, contentDescription = null, modifier = Modifier.size(22.dp))
+        Spacer(Modifier.width(16.dp))
+        Text(label, style = MaterialTheme.typography.bodyLarge)
     }
 }
 
@@ -380,6 +474,7 @@ private fun LibraryContent(
                         onToggleFavorite = { onToggleFavorite(publication.id, !publication.isFavorite) },
                         modifier = Modifier.padding(8.dp),
                         showTitle = showTitle,
+                        progressPercent = state.progressMap[publication.id] ?: 0,
                     )
                 }
             }

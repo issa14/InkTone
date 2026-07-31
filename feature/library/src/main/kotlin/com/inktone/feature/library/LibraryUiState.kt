@@ -23,6 +23,7 @@ data class LibraryUiState(
     // Tache 6.8 — cache par defaut (total == 0 && !hasQueuedChunks).
     val importProgress: ImportProgress = ImportProgress(),
     val errorMessage: String? = null,
+    val progressMap: Map<String, Int> = emptyMap(),
 ) {
     /** Tags distincts de la bibliotheque COMPLETE, pas seulement du filtre actif — le drawer doit pouvoir en changer. */
     val availableTags: List<String> get() = publications.flatMap { it.subjects }.distinct().sorted()

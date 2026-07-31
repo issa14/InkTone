@@ -3,7 +3,9 @@ package com.inktone.feature.library
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.inktone.domain.model.FilterMode
+import com.inktone.domain.model.ReadingState
 import com.inktone.domain.repository.PublicationRepository
+import com.inktone.domain.repository.ReadingStateRepository
 import com.inktone.domain.service.ImportProgressObserver
 import com.inktone.domain.usecase.ToggleFavoriteUseCase
 import dagger.hilt.android.lifecycle.HiltViewModel
@@ -13,6 +15,7 @@ import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.catch
+import kotlinx.coroutines.flow.combine
 import kotlinx.coroutines.flow.receiveAsFlow
 import kotlinx.coroutines.launch
 import javax.inject.Inject
@@ -20,6 +23,7 @@ import javax.inject.Inject
 @HiltViewModel
 class LibraryViewModel @Inject constructor(
     private val publicationRepository: PublicationRepository,
+    private val readingStateRepository: ReadingStateRepository,
     private val toggleFavorite: ToggleFavoriteUseCase,
     private val importProgressObserver: ImportProgressObserver,
 ) : ViewModel() {
@@ -93,7 +97,20 @@ class LibraryViewModel @Inject constructor(
                     )
                 }
                 .collect { publications ->
-                    _state.value = _state.value.copy(publications = publications, isLoading = false)
+                    val states = readingStateRepository.getAll()
+                    val stateMap = states.associateBy { it.publicationId }
+                    val progressMap = publications.associate { pub ->
+                        val rs = stateMap[pub.id]
+                        val pct = if (rs != null && pub.chapterCount > 1) {
+                            (rs.locator.chapterIndex * 100 / (pub.chapterCount - 1)).coerceIn(0, 100)
+                        } else 0
+                        pub.id to if (pct < 1 && pct > 0) 1 else pct  // ≥1% si lecture commencée
+                    }
+                    _state.value = _state.value.copy(
+                        publications = publications,
+                        progressMap = progressMap,
+                        isLoading = false,
+                    )
                 }
         }
     }

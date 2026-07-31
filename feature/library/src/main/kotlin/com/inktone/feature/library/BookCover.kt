@@ -3,10 +3,13 @@ package com.inktone.feature.library
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.aspectRatio
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Star
@@ -116,7 +119,8 @@ fun BookCover(
                     .padding(6.dp)
                     .size(32.dp)
                     .clip(CircleShape)
-                    .background(Color.Black.copy(alpha = 0.55f)),
+                    .background(Color.Black.copy(alpha = 0.55f))
+                    .semantics { contentDescription = "Progression $progressPercent%" },
                 contentAlignment = Alignment.Center,
             ) {
                 Text(
@@ -128,6 +132,9 @@ fun BookCover(
                 )
             }
         }
+
+        // #6 Dots décoratifs — coin inférieur gauche (legacy)
+        DecorativeDots(Modifier.align(Alignment.BottomStart).padding(6.dp))
 
         // Titre (optionnel — masqué en GRID_COVERS_ONLY)
         if (showTitle) {
@@ -189,4 +196,17 @@ private fun rememberCoverGradient(title: String): Brush {
     )
     val pair = colors[title.hashCode().mod(colors.size)]
     return Brush.verticalGradient(listOf(pair.first, pair.second))
+}
+
+// ──── #6 Dots décoratifs (legacy) ────
+
+@Composable
+private fun DecorativeDots(modifier: Modifier = Modifier) {
+    Row(modifier = modifier, verticalAlignment = Alignment.CenterVertically) {
+        Box(Modifier.size(4.dp).clip(CircleShape).background(Color.White.copy(alpha = 0.4f)))
+        Spacer(Modifier.width(3.dp))
+        Box(Modifier.size(4.dp).clip(CircleShape).background(Color.White.copy(alpha = 0.4f)))
+        Spacer(Modifier.width(3.dp))
+        Box(Modifier.size(4.dp).clip(CircleShape).background(Color.White.copy(alpha = 0.6f)))
+    }
 }
