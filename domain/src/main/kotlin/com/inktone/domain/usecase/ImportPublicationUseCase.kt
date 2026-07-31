@@ -119,6 +119,7 @@ class ImportPublicationUseCase(
             subjects = metadata.subjects,
             isDrmProtected = result.isDrmProtected,
             importDate = now,
+            coverUri = metadata.coverUri,
         )
     }
 

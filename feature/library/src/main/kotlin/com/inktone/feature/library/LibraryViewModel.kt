@@ -3,7 +3,9 @@ package com.inktone.feature.library
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.inktone.domain.model.FilterMode
+import com.inktone.domain.model.ReadingState
 import com.inktone.domain.repository.PublicationRepository
+import com.inktone.domain.repository.ReadingStateRepository
 import com.inktone.domain.service.ImportProgressObserver
 import com.inktone.domain.usecase.ToggleFavoriteUseCase
 import dagger.hilt.android.lifecycle.HiltViewModel
@@ -12,6 +14,7 @@ import kotlinx.coroutines.channels.Channel
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
+import kotlinx.coroutines.flow.catch
 import kotlinx.coroutines.flow.receiveAsFlow
 import kotlinx.coroutines.launch
 import javax.inject.Inject
@@ -19,6 +22,7 @@ import javax.inject.Inject
 @HiltViewModel
 class LibraryViewModel @Inject constructor(
     private val publicationRepository: PublicationRepository,
+    private val readingStateRepository: ReadingStateRepository,
     private val toggleFavorite: ToggleFavoriteUseCase,
     private val importProgressObserver: ImportProgressObserver,
 ) : ViewModel() {
@@ -54,17 +58,62 @@ class LibraryViewModel @Inject constructor(
             is LibraryIntent.ChangeFilter -> observePublications(intent.filter, intent.value)
             is LibraryIntent.SetSearchQuery -> _state.value = _state.value.copy(searchQuery = intent.query)
             is LibraryIntent.SetSortOrder -> _state.value = _state.value.copy(sortOrder = intent.order)
-            is LibraryIntent.ToggleLayout -> _state.value = _state.value.copy(isGridLayout = !_state.value.isGridLayout)
+            is LibraryIntent.CycleLayout -> _state.value = _state.value.copy(
+                layoutMode = _state.value.layoutMode.next(),
+            )
+            is LibraryIntent.Refresh -> observePublications(
+                _state.value.activeFilter,
+                _state.value.filterValue,
+            )
+            is LibraryIntent.DismissError -> _state.value = _state.value.copy(errorMessage = null)
         }
+    }
+
+    /**
+     * Appelé par [LibraryScreen] à chaque ON_RESUME du NavBackStackEntry
+     * (Phase 4 — rafraîchissement au retour du Reader). Force une
+     * ré-observation du filtre actif pour mettre à jour les badges de
+     * progression et la carte "Reprendre la lecture".
+     */
+    fun refreshOnResume() {
+        observePublications(_state.value.activeFilter, _state.value.filterValue)
     }
 
     private fun observePublications(filter: FilterMode, value: String? = null) {
         observeJob?.cancel()
-        _state.value = _state.value.copy(isLoading = true, activeFilter = filter, filterValue = value)
+        _state.value = _state.value.copy(
+            isLoading = true,
+            activeFilter = filter,
+            filterValue = value,
+            errorMessage = null,
+        )
         observeJob = viewModelScope.launch {
-            publicationRepository.observeFiltered(filter, value).collect { publications ->
-                _state.value = _state.value.copy(publications = publications, isLoading = false)
-            }
+            publicationRepository.observeFiltered(filter, value)
+                .catch { e ->
+                    _state.value = _state.value.copy(
+                        isLoading = false,
+                        errorMessage = e.message ?: "Erreur de chargement de la bibliothèque",
+                    )
+                }
+                .collect { publications ->
+                    val states = readingStateRepository.getAll()
+                    val stateMap = states.associateBy { it.publicationId }
+                    val progressMap = publications.associate { pub ->
+                        val rs = stateMap[pub.id]
+                        // A.4 — Progression basée sur chapterIndex / chapterCount,
+                        // avec garde-fou contre la division par zéro (EPUB à 1 chapitre).
+                        val pct = if (rs != null && pub.chapterCount > 0) {
+                            val divisor = (pub.chapterCount - 1).coerceAtLeast(1)
+                            (rs.locator.chapterIndex * 100 / divisor).coerceIn(0, 100)
+                        } else 0
+                        pub.id to if (pct < 1 && pct > 0) 1 else pct  // ≥1% si lecture commencée
+                    }
+                    _state.value = _state.value.copy(
+                        publications = publications,
+                        progressMap = progressMap,
+                        isLoading = false,
+                    )
+                }
         }
     }
 }

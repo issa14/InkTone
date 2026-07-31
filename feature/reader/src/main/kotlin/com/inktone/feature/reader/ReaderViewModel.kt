@@ -99,13 +99,18 @@ class ReaderViewModel @Inject constructor(
                 }
                 openPublication(intent.publicationId, targetLocator)
             }
-            is ReaderIntent.BootstrapAndOpenFixture -> bootstrapAndOpenFixture(intent.publicationId, intent.fileUri)
+            is ReaderIntent.BootstrapAndOpenFixture -> {
+                if (BuildConfig.DEBUG) {
+                    bootstrapAndOpenFixture(intent.publicationId, intent.fileUri)
+                }
+            }
             is ReaderIntent.NextChapter -> navigateToChapter(_state.value.currentChapterIndex + 1)
             is ReaderIntent.PreviousChapter -> navigateToChapter(_state.value.currentChapterIndex - 1)
             is ReaderIntent.JumpToChapter -> navigateToChapter(intent.chapterIndex)
             is ReaderIntent.ToggleToc -> _state.value = _state.value.copy(isTocVisible = !_state.value.isTocVisible)
             is ReaderIntent.PlayCurrentSentence -> playCurrentSentence()
             is ReaderIntent.Pause -> _state.value = _state.value.copy(isPlaying = false)
+            is ReaderIntent.DismissError -> _state.value = _state.value.copy(errorMessage = null)
             is ReaderIntent.BeginSentenceSelection -> _state.value = _state.value.copy(
                 selectionAnchorIndex = intent.sentenceIndex, selectionFocusIndex = intent.sentenceIndex,
             )
@@ -177,16 +182,13 @@ class ReaderViewModel @Inject constructor(
         viewModelScope.launch {
             val publication = publicationRepository.getById(publicationId) ?: run {
                 Log.w("ReaderViewModel", "openPublication: publication introuvable ($publicationId)")
+                _state.value = _state.value.copy(errorMessage = "Publication introuvable.")
                 return@launch
             }
             when (val result = publicationParser.parse(publication.fileUri)) {
                 is ParseResult.Success -> {
                     currentPublicationId = publicationId
                     val restored = getReadingState(publicationId)
-                    // Cascade de precedence (Blueprint §3.3, Tache 1.3) :
-                    // surcharge de publication (ReadingState.overrides) >
-                    // preferences globales. Resolue ici, jamais recalculee
-                    // dans ReaderScreen (Tache 4.7).
                     val effectiveSettings = EffectiveReadingSettings.resolve(
                         overrides = restored?.overrides,
                         global = preferencesRepository.get(),
@@ -201,14 +203,18 @@ class ReaderViewModel @Inject constructor(
                     triggerPreload(_state.value.currentChapterIndex)
                     observeAnnotations(publicationId)
                     observeBookmarks(publicationId)
-                    // Tache 7.5 : arrivee depuis un resultat de recherche -
-                    // appelee ICI (dans la meme coroutine, apres que
-                    // _state.value.chapters soit peuple), pas via un second
-                    // dispatch d'intent qui s'executerait avant que
-                    // l'ouverture asynchrone soit terminee.
                     if (targetLocator != null) navigateToLocator(targetLocator)
                 }
-                else -> Log.w("ReaderViewModel", "openPublication: echec de parsing ($result)")
+                else -> {
+                    val message = when (result) {
+                        is ParseResult.DrmProtected -> result.message
+                        is ParseResult.Corrupted -> result.message
+                        is ParseResult.UnsupportedFormat -> "Format non supporté : ${result.format}"
+                        else -> "Erreur de parsing inconnue."
+                    }
+                    Log.w("ReaderViewModel", "openPublication: echec de parsing ($result)")
+                    _state.value = _state.value.copy(errorMessage = message)
+                }
             }
         }
     }
@@ -372,28 +378,47 @@ class ReaderViewModel @Inject constructor(
         }
     }
 
+    /**
+     * A.1 — Lecture TTS continue phrase à phrase. Après avoir joué la
+     * phrase courante, avance automatiquement à la phrase suivante dans
+     * le même chapitre, puis au chapitre suivant si le chapitre en cours
+     * est terminé. La récursion est trampolinée par coroutine (pas de
+     * stack overflow).
+     *
+     * L'arrêt se fait via [ReaderIntent.Pause] qui positionne `isPlaying`
+     * à false — la boucle vérifie ce flag avant chaque avancement.
+     */
     private fun playCurrentSentence() {
-        val chapter = _state.value.currentChapter ?: return
-        val sentence = chapter.paragraphs.flatMap { it.sentences }.getOrNull(_state.value.currentSentenceIndex) ?: return
-        val publicationId = currentPublicationId ?: return
-
         viewModelScope.launch {
+            val chapter = _state.value.currentChapter ?: return@launch
+            val sentences = chapter.paragraphs.flatMap { it.sentences }
+            val index = _state.value.currentSentenceIndex
+            val publicationId = currentPublicationId ?: return@launch
+
+            if (index >= sentences.size) {
+                // Fin de chapitre → auto-avance chapitre suivant si possible
+                if (_state.value.hasNextChapter) {
+                    onIntent(ReaderIntent.NextChapter)
+                    delay(300) // laisse le chapitre se charger
+                    onIntent(ReaderIntent.PlayCurrentSentence)
+                } else {
+                    _state.value = _state.value.copy(isPlaying = false)
+                }
+                return@launch
+            }
+
             _state.value = _state.value.copy(isPlaying = true)
 
+            val sentence = sentences[index]
             val voiceProfile = VoiceProfile(
                 id = "vp-native-fr", engine = TtsEngineId.ANDROID_NATIVE,
                 voice = "fr-fr-default", language = "fr-FR",
             )
             val segment = sentenceAudioBuffer.get(sentence, voiceProfile)
-            audioSegmentPlayer.play(segment) // démarre en parallèle du surlignage ci-dessous — les deux dérivent leur timing du même événement de synthèse réel (Tâche 3.8)
+            audioSegmentPlayer.play(segment)
 
-            // Precharge la phrase suivante du meme chapitre pendant que
-            // celle-ci se joue (Tache 5.3) - beneficie pleinement une fois
-            // qu'une navigation phrase-a-phrase continue existe (Tache
-            // 5.4/5.5) ; pour l'instant, prepare le terrain sans changer
-            // le comportement observable (le Reader ne joue encore qu'une
-            // phrase a la fois, Tache 4.5).
-            chapter.paragraphs.flatMap { it.sentences }.getOrNull(_state.value.currentSentenceIndex + 1)?.let {
+            // Précharge la phrase suivante pendant que celle-ci se joue
+            sentences.getOrNull(index + 1)?.let {
                 sentenceAudioBuffer.preloadNext(it, voiceProfile)
             }
 
@@ -404,7 +429,7 @@ class ReaderViewModel @Inject constructor(
                 delay((wt.endMs - wt.startMs).coerceAtLeast(0L))
             }
 
-            _state.value = _state.value.copy(isPlaying = false, highlightedWordRange = null)
+            _state.value = _state.value.copy(highlightedWordRange = null)
 
             updateReadingState(
                 ReadingState(
@@ -413,6 +438,23 @@ class ReaderViewModel @Inject constructor(
                     lastReadAt = System.currentTimeMillis(),
                 ),
             )
+
+            // Avance à la phrase suivante UNIQUEMENT si toujours en lecture
+            if (_state.value.isPlaying) {
+                _state.value = _state.value.copy(currentSentenceIndex = index + 1)
+                playCurrentSentence()
+            }
         }
+    }
+
+    /**
+     * A.2 — Nettoyage des ressources audio et du minuteur de sommeil
+     * quand le ViewModel est détruit. Évite qu'un segment audio continue
+     * de jouer après la destruction de l'écran.
+     */
+    override fun onCleared() {
+        super.onCleared()
+        audioSegmentPlayer.stop()
+        sleepTimerJob?.cancel()
     }
 }
