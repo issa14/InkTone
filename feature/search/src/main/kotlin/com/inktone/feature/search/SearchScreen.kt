@@ -57,11 +57,12 @@ fun SearchScreen(
     }
 
     Column(Modifier.fillMaxSize().padding(16.dp)) {
-        // D.6 — champ de recherche avec bouton effacer
+        // D.6 / E.2 — champ de recherche avec bouton effacer et label accessible
         TextField(
             value = state.query,
             onValueChange = { viewModel.onIntent(SearchIntent.QueryChanged(it)) },
             placeholder = { Text("Rechercher...") },
+            label = { Text("Rechercher dans vos livres") },
             trailingIcon = {
                 if (state.query.isNotEmpty()) {
                     IconButton(onClick = { viewModel.onIntent(SearchIntent.QueryChanged("")) }) {

@@ -307,6 +307,8 @@ fun ReaderScreen(viewModel: ReaderViewModel = hiltViewModel(), onSearchClick: ()
                 onAaClick = { showSettingsPanel = true },
                 onTtsClick = { showTtsPanel = true },
                 onReadingModeClick = { viewModel.onIntent(ReaderIntent.ToggleReadingMode) },
+                hasPreviousChapter = state.hasPreviousChapter,
+                hasNextChapter = state.hasNextChapter,
             )
 
             FlowRow(horizontalArrangement = Arrangement.spacedBy(4.dp)) {

@@ -35,8 +35,11 @@ class GetStatisticsUseCase(
 
         val streak = computeStreak(sessions.map { it.startedAt })
 
-        // D.4 — WPM moyen sur les sessions avec mots lus
-        val sessionsWithWords = sessions.filter { it.wordsRead > 0 && it.durationMs > 0 }
+        // D.4 — WPM moyen sur les 30 dernières sessions avec mots lus
+        val sessionsWithWords = sessions
+            .filter { it.wordsRead > 0 && it.durationMs > 0 }
+            .sortedByDescending { it.startedAt }
+            .take(30)
         val averageWpm = if (sessionsWithWords.isNotEmpty()) {
             val totalWords = sessionsWithWords.sumOf { it.wordsRead }
             val totalMinutes = sessionsWithWords.sumOf { it.durationMs } / 60_000.0
