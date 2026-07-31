@@ -192,6 +192,9 @@ fun LibraryScreen(
                     onOpenThemePicker = onOpenThemePicker,
                     onRegenerateCovers = { viewModel.onIntent(LibraryIntent.RegenerateCovers) },
                     onResetCovers = { viewModel.onIntent(LibraryIntent.ResetCovers) },
+                    activeFilter = state.activeFilter,
+                    filterValue = state.filterValue,
+                    onSelectFilter = { filter, value -> viewModel.onIntent(LibraryIntent.ChangeFilter(filter, value)) },
                     onMenuClick = { scope.launch { drawerState.open() } },
                 )
             },
@@ -381,10 +384,15 @@ private fun LibraryTopBar(
     onOpenThemePicker: () -> Unit = {},
     onRegenerateCovers: () -> Unit = {},
     onResetCovers: () -> Unit = {},
+    // C.4 — filtre actif pour le titre cliquable
+    activeFilter: FilterMode = FilterMode.ALL,
+    filterValue: String? = null,
+    onSelectFilter: (FilterMode, String?) -> Unit = { _, _ -> },
 ) {
     var isSearchActive by remember { mutableStateOf(false) }
     var isSortMenuExpanded by remember { mutableStateOf(false) }
     var showActionsSheet by remember { mutableStateOf(false) }
+    var showNavPopup by remember { mutableStateOf(false) }
 
     if (isSearchActive) {
         // État recherche : SearchBar pleine largeur qui remplace la TopBar
@@ -413,9 +421,26 @@ private fun LibraryTopBar(
             ),
         )
     } else {
-        // État normal : icônes d'action
+        // C.4 — Titre cliquable avec le filtre actif
         TopAppBar(
-            title = { },
+            title = {
+                Row(
+                    modifier = Modifier.clickable { showNavPopup = true },
+                    verticalAlignment = Alignment.CenterVertically,
+                ) {
+                    Text(
+                        filterValue ?: activeFilter.label(),
+                        style = MaterialTheme.typography.titleMedium,
+                        color = MaterialTheme.colorScheme.onPrimary,
+                    )
+                    Icon(
+                        AppIcons.Loading, // flèche vers le bas via rotation
+                        contentDescription = "Changer de vue",
+                        tint = MaterialTheme.colorScheme.onPrimary.copy(alpha = 0.5f),
+                        modifier = Modifier.size(16.dp),
+                    )
+                }
+            },
             navigationIcon = {
                 IconButton(onClick = onMenuClick) {
                     Icon(Icons.Outlined.Menu, contentDescription = "Menu")
@@ -479,6 +504,27 @@ private fun LibraryTopBar(
                 // C.2 — À propos et Réglages du thème dans le menu 3-points
                 ActionSheetItem("À propos", AppIcons.Info) { showActionsSheet = false; onOpenAbout() }
                 ActionSheetItem("Thème", AppIcons.Appearance) { showActionsSheet = false; onOpenThemePicker() }
+            }
+        }
+    }
+
+    // C.4 — Popup de navigation (catégories)
+    if (showNavPopup) {
+        val sheetState = rememberModalBottomSheetState()
+        ModalBottomSheet(
+            onDismissRequest = { showNavPopup = false },
+            sheetState = sheetState,
+        ) {
+            Column(Modifier.padding(bottom = 32.dp)) {
+                Text("Navigation", style = MaterialTheme.typography.labelLarge,
+                    modifier = Modifier.padding(horizontal = 24.dp, vertical = 8.dp),
+                    color = MaterialTheme.colorScheme.primary)
+                SelectableFilters.forEach { filter ->
+                    ActionSheetItem(filter.label(), AppIcons.Reading) {
+                        showNavPopup = false
+                        onSelectFilter(filter, null)
+                    }
+                }
             }
         }
     }
