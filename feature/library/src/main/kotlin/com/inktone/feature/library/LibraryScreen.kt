@@ -68,7 +68,9 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.platform.LocalLifecycleOwner
+import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
@@ -110,6 +112,8 @@ fun LibraryScreen(
     onOpenBookmarks: () -> Unit = {},
     onOpenStats: () -> Unit = {},
     onImportClick: () -> Unit = {},
+    onOpenAbout: () -> Unit = {},
+    onOpenThemePicker: () -> Unit = {},
 ) {
     val state by viewModel.state.collectAsState()
     val drawerState = rememberDrawerState(DrawerValue.Closed)
@@ -154,6 +158,14 @@ fun LibraryScreen(
                         scope.launch { drawerState.close() }
                         onOpenStats()
                     },
+                    onOpenAbout = {
+                        scope.launch { drawerState.close() }
+                        onOpenAbout()
+                    },
+                    onOpenThemePicker = {
+                        scope.launch { drawerState.close() }
+                        onOpenThemePicker()
+                    },
                 )
             }
         },
@@ -176,6 +188,8 @@ fun LibraryScreen(
                     onCycleLayout = { viewModel.onIntent(LibraryIntent.CycleLayout) },
                     onRefresh = { viewModel.onIntent(LibraryIntent.Refresh) },
                     onImportClick = onImportClick,
+                    onOpenAbout = onOpenAbout,
+                    onOpenThemePicker = onOpenThemePicker,
                     onMenuClick = { scope.launch { drawerState.open() } },
                 )
             },
@@ -227,9 +241,39 @@ fun LibraryScreen(
 }
 
 @Composable
-private fun LibraryDrawerContent(state: LibraryUiState, onSelectFilter: (FilterMode, String?) -> Unit, onOpenBookmarks: () -> Unit, onOpenStats: () -> Unit) {
-    Column(Modifier.padding(16.dp)) {
-        Text("InkTone", style = MaterialTheme.typography.titleLarge, color = MaterialTheme.colorScheme.primary, modifier = Modifier.padding(bottom = 16.dp))
+private fun LibraryDrawerContent(
+    state: LibraryUiState,
+    onSelectFilter: (FilterMode, String?) -> Unit,
+    onOpenBookmarks: () -> Unit,
+    onOpenStats: () -> Unit,
+    onOpenAbout: () -> Unit = {},
+    onOpenThemePicker: () -> Unit = {},
+) {
+    Column {
+        // C.1 — Header avec dégradé brand (legacy §1.2)
+        Box(
+            modifier = Modifier
+                .fillMaxWidth()
+                .height(140.dp)
+                .background(
+                    Brush.verticalGradient(
+                        colors = listOf(
+                            MaterialTheme.colorScheme.primaryContainer,
+                            MaterialTheme.colorScheme.primary,
+                        )
+                    )
+                )
+                .padding(start = 24.dp, bottom = 24.dp),
+            contentAlignment = Alignment.BottomStart,
+        ) {
+            Text(
+                "InkTone",
+                style = MaterialTheme.typography.headlineMedium,
+                color = MaterialTheme.colorScheme.onPrimary,
+                fontWeight = FontWeight.Bold,
+            )
+        }
+        Column(Modifier.padding(16.dp)) {
         SelectableFilters.forEach { filter ->
             NavigationDrawerItem(
                 label = { Text(filter.label()) },
@@ -295,10 +339,15 @@ private fun LibraryDrawerContent(state: LibraryUiState, onSelectFilter: (FilterM
             modifier = Modifier.fillMaxWidth().padding(vertical = 12.dp),
             horizontalArrangement = Arrangement.SpaceEvenly,
         ) {
-            DrawerFooterItem("À propos", AppIcons.Info) { }
-            DrawerFooterItem("Thème", AppIcons.Appearance) { }
+            DrawerFooterItem("À propos", AppIcons.Info) { onOpenAbout() }
+            DrawerFooterItem("Thème", AppIcons.Appearance) { onOpenThemePicker() }
+            // C.2 — Debug conditionné (cohérent avec BootstrapAndOpenFixture, Phase 0)
+            if (BuildConfig.DEBUG) {
+                DrawerFooterItem("Debug", AppIcons.Data) { /* no-op pour l'instant */ }
+            }
         }
-    }
+        } // Column content
+    } // Column root
 }
 
 @Composable
@@ -326,6 +375,8 @@ private fun LibraryTopBar(
     onCycleLayout: () -> Unit,
     onRefresh: () -> Unit,
     onImportClick: () -> Unit,
+    onOpenAbout: () -> Unit = {},
+    onOpenThemePicker: () -> Unit = {},
 ) {
     var isSearchActive by remember { mutableStateOf(false) }
     var isSortMenuExpanded by remember { mutableStateOf(false) }
@@ -412,6 +463,18 @@ private fun LibraryTopBar(
                     color = MaterialTheme.colorScheme.primary)
                 ActionSheetItem("Importer", AppIcons.Data) { showActionsSheet = false; onImportClick() }
                 ActionSheetItem("Actualiser", AppIcons.Loading) { showActionsSheet = false; onRefresh() }
+                // C.3 — Régénérer et réinitialiser les couvertures
+                ActionSheetItem("Régénérer les couvertures", AppIcons.Hint) {
+                    showActionsSheet = false
+                    // TODO: viewModel.onIntent(LibraryIntent.RegenerateCovers)
+                }
+                ActionSheetItem("Réinitialiser les couvertures", AppIcons.ErrorOutlined) {
+                    showActionsSheet = false
+                    // TODO: dialogue confirmation + viewModel.onIntent(LibraryIntent.ResetCovers)
+                }
+                // C.2 — À propos et Réglages du thème dans le menu 3-points
+                ActionSheetItem("À propos", AppIcons.Info) { showActionsSheet = false; onOpenAbout() }
+                ActionSheetItem("Thème", AppIcons.Appearance) { showActionsSheet = false; onOpenThemePicker() }
             }
         }
     }

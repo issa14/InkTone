@@ -2,12 +2,19 @@ package com.inktone.feature.search
 
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
+import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.outlined.Close
+import androidx.compose.material.icons.outlined.SearchOff
 import androidx.compose.material3.CircularProgressIndicator
+import androidx.compose.material3.Icon
+import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextField
@@ -15,7 +22,12 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
+import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.text.AnnotatedString
+import androidx.compose.ui.text.SpanStyle
+import androidx.compose.ui.text.buildAnnotatedString
+import androidx.compose.ui.text.withStyle
 import androidx.compose.ui.unit.dp
 import androidx.hilt.navigation.compose.hiltViewModel
 import com.inktone.domain.service.SearchResult
@@ -45,37 +57,65 @@ fun SearchScreen(
     }
 
     Column(Modifier.fillMaxSize().padding(16.dp)) {
+        // D.6 — champ de recherche avec bouton effacer
         TextField(
             value = state.query,
             onValueChange = { viewModel.onIntent(SearchIntent.QueryChanged(it)) },
             placeholder = { Text("Rechercher...") },
+            trailingIcon = {
+                if (state.query.isNotEmpty()) {
+                    IconButton(onClick = { viewModel.onIntent(SearchIntent.QueryChanged("")) }) {
+                        Icon(Icons.Outlined.Close, contentDescription = "Effacer")
+                    }
+                }
+            },
             modifier = Modifier.fillMaxWidth(),
+            singleLine = true,
         )
 
         if (state.isSearching) {
             CircularProgressIndicator(modifier = Modifier.padding(16.dp))
         }
 
+        // D.6 — État vide quand la recherche ne donne rien
+        if (!state.isSearching && state.query.length >= 2 && state.results.isEmpty()) {
+            Column(
+                modifier = Modifier.fillMaxWidth().padding(top = 48.dp),
+                horizontalAlignment = Alignment.CenterHorizontally,
+            ) {
+                Icon(
+                    Icons.Outlined.SearchOff,
+                    contentDescription = null,
+                    tint = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.4f),
+                )
+                Spacer(Modifier.height(12.dp))
+                Text(
+                    "Aucun résultat pour « ${state.query} »",
+                    style = MaterialTheme.typography.bodyMedium,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                )
+            }
+        }
+
         LazyColumn {
-            // Cle = publicationId+locator, pas locator.hashCode() seul
-            // (collision possible entre deux publications au meme offset).
             items(state.results, key = { "${it.publicationId}:${it.locator.chapterIndex}:${it.locator.charOffset}" }) { result ->
-                SearchResultItem(result, onClick = { viewModel.onIntent(SearchIntent.NavigateToResult(result)) })
+                SearchResultItem(
+                    result = result,
+                    query = state.query,
+                    onClick = { viewModel.onIntent(SearchIntent.NavigateToResult(result)) },
+                )
             }
         }
     }
 }
 
 /**
- * N'affiche que l'extrait — pas le titre de la publication, qui exigerait
- * une jointure ou un appel `PublicationRepository.getById` par résultat
- * (anti-pattern N+1, K8). Limitation connue, pas cachée : à résoudre si
- * besoin par une jointure dédiée côté `SearchService`.
+ * D.6 — Snippet avec surlignage du terme recherché.
  */
 @Composable
-private fun SearchResultItem(result: SearchResult, onClick: () -> Unit) {
+private fun SearchResultItem(result: SearchResult, query: String, onClick: () -> Unit) {
     Text(
-        text = result.snippet,
+        text = highlightSnippet(result.snippet, query),
         modifier = Modifier
             .fillMaxWidth()
             .clickable(onClick = onClick)
@@ -83,4 +123,27 @@ private fun SearchResultItem(result: SearchResult, onClick: () -> Unit) {
         color = MaterialTheme.colorScheme.onSurface,
         style = MaterialTheme.typography.bodyMedium,
     )
+}
+
+/**
+ * D.6 — Surligne toutes les occurrences de [query] dans [snippet]
+ * (insensible à la casse).
+ */
+private fun highlightSnippet(snippet: String, query: String): AnnotatedString {
+    if (query.length < 2) return AnnotatedString(snippet)
+    return buildAnnotatedString {
+        val lower = snippet.lowercase()
+        val q = query.lowercase()
+        var start = 0
+        var idx = lower.indexOf(q, start)
+        while (idx >= 0) {
+            append(snippet.substring(start, idx))
+            withStyle(SpanStyle(background = androidx.compose.ui.graphics.Color(0x66FFEB3B))) {
+                append(snippet.substring(idx, idx + q.length))
+            }
+            start = idx + q.length
+            idx = lower.indexOf(q, start)
+        }
+        append(snippet.substring(start))
+    }
 }
