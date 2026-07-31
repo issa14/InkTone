@@ -10,6 +10,8 @@ import androidx.compose.material3.FilterChip
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.semantics.contentDescription
+import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.unit.dp
 import com.inktone.domain.model.AnnotationColor
@@ -42,9 +44,24 @@ fun AnnotationColorPicker(
         horizontalArrangement = Arrangement.spacedBy(4.dp),
     ) {
         AnnotationColor.entries.forEach { color ->
-            FilterChip(selected = color == selected, onClick = { onSelect(color) }, label = { Text(color.name) })
+            val label = color.label()
+            FilterChip(
+                selected = color == selected,
+                onClick = { onSelect(color) },
+                label = { Text(label) },
+                modifier = Modifier.semantics { contentDescription = "Couleur $label" },
+            )
         }
         Button(onClick = onConfirm) { Text("Surligner") }
         Button(onClick = onCancel) { Text("Annuler") }
     }
+}
+
+/** E.2 — Noms français pour les couleurs d'annotation (TalkBack). */
+private fun AnnotationColor.label(): String = when (this) {
+    AnnotationColor.YELLOW -> "Jaune"
+    AnnotationColor.GREEN -> "Vert"
+    AnnotationColor.BLUE -> "Bleu"
+    AnnotationColor.PINK -> "Rose"
+    AnnotationColor.ORANGE -> "Orange"
 }

@@ -18,7 +18,7 @@ class InkToneFeatureConventionPlugin : Plugin<Project> {
             pluginManager.apply("inktone.architecture.check")
 
             extensions.configure<LibraryExtension> {
-                compileSdk = 34
+                compileSdk = 35
                 defaultConfig {
                     minSdk = 26
                     testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
@@ -41,6 +41,9 @@ class InkToneFeatureConventionPlugin : Plugin<Project> {
                 add("implementation", "com.google.dagger:hilt-android:2.52")
                 add("ksp", "com.google.dagger:hilt-android-compiler:2.52")
                 add("implementation", platform("androidx.compose:compose-bom:2024.09.02"))
+                // C.5 — surcharge animation 1.8.0 pour SharedTransition
+                add("implementation", "androidx.compose.animation:animation:1.8.0")
+                add("implementation", "androidx.compose.animation:animation-core:1.8.0")
                 add("implementation", "androidx.compose.ui:ui")
                 add("implementation", "androidx.compose.ui:ui-tooling-preview")
                 add("implementation", "androidx.compose.material3:material3")

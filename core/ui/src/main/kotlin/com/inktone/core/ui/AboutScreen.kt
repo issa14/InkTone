@@ -1,5 +1,6 @@
 package com.inktone.core.ui
 
+import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
@@ -21,22 +22,21 @@ import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.platform.LocalUriHandler
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
+import androidx.compose.ui.text.style.TextDecoration
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 
 /**
- * Tache 9bis.6 — port direct de l'ecran legacy (structure identique :
- * en-tete, description, section confidentialite, section technique,
- * credits). Mentions de bibliotheques mises a jour pour refleter les
- * dependances REELLEMENT integrees a cette date, pas celles du legacy —
- * `Kokoro` (docs/execution/PROTOTYPE_SYNTHESE_KOKORO_ONNX.md) n'est qu'un
- * prototype documente, jamais integre au code de production, donc pas
- * cite ici (Blueprint §17.2, le code fait foi).
+ * D.5 — Version dynamique, liens cliquables, mentions techniques corrigées.
+ * [versionName] et [onOpenUrl] permettent au caller (module `app`) de
+ * fournir `BuildConfig.VERSION_NAME` et `LocalUriHandler`.
  */
 @Composable
-fun AboutScreen() {
+fun AboutScreen(versionName: String = "0.1.0", onOpenUrl: (String) -> Unit = {}) {
+    val uriHandler = LocalUriHandler.current
     Column(
         modifier = Modifier
             .fillMaxSize()
@@ -48,7 +48,7 @@ fun AboutScreen() {
         Icon(Icons.AutoMirrored.Outlined.MenuBook, null, tint = MaterialTheme.colorScheme.primary, modifier = Modifier.height(64.dp).width(64.dp))
         Spacer(Modifier.height(12.dp))
         Text("InkTone", color = MaterialTheme.colorScheme.onSurface, fontWeight = FontWeight.Bold, fontSize = 26.sp)
-        Text("Version 0.1.0", color = MaterialTheme.colorScheme.onSurfaceVariant, fontSize = 13.sp)
+        Text("Version $versionName", color = MaterialTheme.colorScheme.onSurfaceVariant, fontSize = 13.sp)
 
         Spacer(Modifier.height(20.dp))
 
@@ -60,7 +60,7 @@ fun AboutScreen() {
 
         Spacer(Modifier.height(12.dp))
         SectionHeader("Confidentialité")
-        InfoCard("Synthèse vocale et traitement du texte s'exécutent intégralement sur l'appareil (Sherpa-ONNX/onnxruntime) — aucun texte n'est envoyé à un serveur tiers.")
+        InfoCard("Synthèse vocale et traitement du texte s'exécutent intégralement sur l'appareil (Kokoro / ONNX Runtime) — aucun texte n'est envoyé à un serveur tiers.")
         InfoCard("Fonctionne hors ligne. Le rapport de plantage est opt-in et désactivé par défaut (voir Réglages > Confidentialité).")
 
         Spacer(Modifier.height(12.dp))
@@ -68,7 +68,7 @@ fun AboutScreen() {
         Card(colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface), shape = RoundedCornerShape(14.dp), modifier = Modifier.fillMaxWidth()) {
             Column(Modifier.padding(20.dp)) {
                 LicenseRow("Readium (parseur EPUB)", "BSD-3-Clause")
-                LicenseRow("Sherpa-ONNX / ONNX Runtime (synthèse vocale)", "Apache-2.0 / MIT")
+                LicenseRow("Kokoro / ONNX Runtime (synthèse vocale)", "Apache-2.0 / MIT")
                 LicenseRow("Jetpack Compose, Room, Hilt, Media3, WorkManager", "Apache-2.0")
                 LicenseRow("Police OpenDyslexic", "SIL Open Font License 1.1")
             }
@@ -76,7 +76,15 @@ fun AboutScreen() {
 
         Spacer(Modifier.height(12.dp))
         SectionHeader("Crédits")
-        InfoCard("Code source : github.com/issa14/InkTone")
+        Text(
+            "Code source : github.com/issa14/InkTone",
+            color = MaterialTheme.colorScheme.primary,
+            fontSize = 12.sp,
+            textDecoration = TextDecoration.Underline,
+            modifier = Modifier
+                .clickable { uriHandler.openUri("https://github.com/issa14/InkTone") }
+                .padding(14.dp),
+        )
 
         Spacer(Modifier.height(16.dp))
         Text("© 2026 InkTone.", color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.6f), fontSize = 11.sp, textAlign = TextAlign.Center)

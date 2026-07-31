@@ -72,6 +72,9 @@ sealed interface LibraryIntent {
     data object CycleLayout : LibraryIntent
     data object Refresh : LibraryIntent
     data object DismissError : LibraryIntent
+    // C.3 — Régénération et réinitialisation des couvertures
+    data object RegenerateCovers : LibraryIntent
+    data object ResetCovers : LibraryIntent
 }
 
 /**

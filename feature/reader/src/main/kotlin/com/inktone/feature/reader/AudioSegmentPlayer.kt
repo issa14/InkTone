@@ -41,10 +41,20 @@ class AudioSegmentPlayer @Inject constructor() {
         audioTrack.write(segment.audioData, 0, segment.audioData.size)
         audioTrack.play()
 
+        // Libération différée — ne nettoie QUE si ce track est toujours
+        // le currentTrack (évite de stopper un track déjà remplacé par
+        // l'auto-advance TTS : A.1 enchaîne les phrases, le stop() du
+        // prochain play() libère déjà l'ancien track).
         Thread {
             Thread.sleep(segment.durationMs + 200)
-            audioTrack.stop()
-            audioTrack.release()
+            if (currentTrack === audioTrack) {
+                try {
+                    audioTrack.stop()
+                    audioTrack.release()
+                } catch (_: IllegalStateException) {
+                    // déjà libéré, rien à faire
+                }
+            }
         }.start()
     }
 

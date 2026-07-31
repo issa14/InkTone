@@ -47,6 +47,7 @@ data class ReadingSession(
     val mode: ReadingMode,
     val sentencesRead: Int = 0,
     val durationMs: Long = 0,
+    val wordsRead: Int = 0, // D.4 — nécessaire pour WPM
 ) {
     init {
         require(publicationId.isNotBlank()) { "publicationId ne peut pas être vide" }
