@@ -111,14 +111,14 @@ fun BookCover(
                 contentScale = ContentScale.Crop,
                 modifier = Modifier.fillMaxSize(),
                 loading = {
-                    CoverPlaceholder(title = publication.title)
+                    CoverPlaceholder(title = publication.title, showTitle = !showTitle)
                 },
                 error = {
-                    CoverPlaceholder(title = publication.title)
+                    CoverPlaceholder(title = publication.title, showTitle = !showTitle)
                 },
             )
         } else {
-            CoverPlaceholder(title = publication.title)
+            CoverPlaceholder(title = publication.title, showTitle = !showTitle)
         }
 
         // Bouton favori — coin supérieur droit
@@ -184,9 +184,13 @@ fun BookCover(
  * Placeholder affiché pendant le chargement Coil ou quand aucune
  * couverture n'est disponible. Dégradé déterministe basé sur le hash
  * du titre — deux livres au même titre auront le même dégradé.
+ *
+ * [showTitle] contrôle le titre centré : masqué quand [BookCover] affiche
+ * déjà son propre libellé en bas, pour éviter la superposition des deux
+ * textes.
  */
 @Composable
-private fun CoverPlaceholder(title: String) {
+private fun CoverPlaceholder(title: String, showTitle: Boolean) {
     val gradient = rememberCoverGradient(title)
     Box(
         modifier = Modifier
@@ -194,15 +198,17 @@ private fun CoverPlaceholder(title: String) {
             .background(brush = gradient),
         contentAlignment = Alignment.Center,
     ) {
-        Text(
-            text = title,
-            modifier = Modifier.padding(8.dp),
-            color = Color.White.copy(alpha = 0.7f),
-            maxLines = 5,
-            overflow = TextOverflow.Ellipsis,
-            style = MaterialTheme.typography.bodySmall,
-            textAlign = TextAlign.Center,
-        )
+        if (showTitle) {
+            Text(
+                text = title,
+                modifier = Modifier.padding(8.dp),
+                color = Color.White.copy(alpha = 0.7f),
+                maxLines = 5,
+                overflow = TextOverflow.Ellipsis,
+                style = MaterialTheme.typography.bodySmall,
+                textAlign = TextAlign.Center,
+            )
+        }
     }
 }
 
