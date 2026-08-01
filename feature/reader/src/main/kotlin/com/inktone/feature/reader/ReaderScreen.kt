@@ -27,6 +27,7 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
@@ -100,12 +101,26 @@ fun ReaderScreen(viewModel: ReaderViewModel = hiltViewModel(), onSearchClick: ()
     // defaut, se masque seul apres 4s (ImmersiveReaderChrome), un appui
     // sur la zone de lecture le fait reapparaitre.
     var isHudVisible by remember { mutableStateOf(true) }
+    // Bug réel trouvé à l'audit : le délai de 4s ne redémarrait jamais
+    // pendant qu'on interagit avec le HUD (il se masquait sous les
+    // doigts de l'utilisateur au milieu d'une action) — ce compteur,
+    // incrémenté à chaque interaction, force ImmersiveReaderChrome à
+    // relancer son délai.
+    var hudActivityTick by remember { mutableIntStateOf(0) }
+    fun keepHudVisible() {
+        isHudVisible = true
+        hudActivityTick++
+    }
 
     // B.2/B.3 — états d'affichage des panneaux de réglages in-reader
     var showSettingsPanel by remember { mutableStateOf(false) }
     var showTtsPanel by remember { mutableStateOf(false) }
 
-    ImmersiveReaderChrome(isHudVisible = isHudVisible, onAutoHide = { isHudVisible = false }) {
+    ImmersiveReaderChrome(
+        isHudVisible = isHudVisible,
+        hudActivityTick = hudActivityTick,
+        onAutoHide = { isHudVisible = false },
+    ) {
     // C.5 — SharedTransition depuis la couverture de la bibliothèque
     val sharedTransitionScope = runCatching {
         com.inktone.core.designsystem.LocalSharedTransitionScope.current
@@ -130,7 +145,7 @@ fun ReaderScreen(viewModel: ReaderViewModel = hiltViewModel(), onSearchClick: ()
             .clickable(
                 interactionSource = remember { MutableInteractionSource() },
                 indication = null,
-            ) { isHudVisible = !isHudVisible }
+            ) { if (isHudVisible) isHudVisible = false else keepHudVisible() }
             .padding(16.dp),
     ) {
         BookProgressBar(progression = state.bookProgression)
@@ -218,7 +233,17 @@ fun ReaderScreen(viewModel: ReaderViewModel = hiltViewModel(), onSearchClick: ()
                                     textColor = ThemeColors.text(state.effectiveSettings.theme).copy(alpha = trailAlpha),
                                     onLongClick = { viewModel.onIntent(ReaderIntent.BeginSentenceSelection(index)) },
                                     onClick = {
-                                        if (selectedRange != null) viewModel.onIntent(ReaderIntent.ExtendSentenceSelection(index))
+                                        if (selectedRange != null) {
+                                            viewModel.onIntent(ReaderIntent.ExtendSentenceSelection(index))
+                                        } else {
+                                            // Le FlowRow couvre la quasi-totalité de la
+                                            // zone de lecture : sans ce relais, le tap est
+                                            // consommé par SentenceText et ne remonte
+                                            // jamais au Column parent, rendant le HUD
+                                            // quasiment impossible à rappeler une fois
+                                            // masqué (bug réel trouvé à l'audit).
+                                            if (isHudVisible) isHudVisible = false else keepHudVisible()
+                                        }
                                     },
                                     modifier = if (isCurrentlyPlaying) {
                                         Modifier.onGloballyPositioned { coordinates ->
@@ -253,7 +278,11 @@ fun ReaderScreen(viewModel: ReaderViewModel = hiltViewModel(), onSearchClick: ()
                         isReadingRulerEnabled = state.isReadingRulerEnabled,
                         onSentenceLongClick = { index -> viewModel.onIntent(ReaderIntent.BeginSentenceSelection(index)) },
                         onSentenceClick = { index ->
-                            if (selectedRange != null) viewModel.onIntent(ReaderIntent.ExtendSentenceSelection(index))
+                            if (selectedRange != null) {
+                                viewModel.onIntent(ReaderIntent.ExtendSentenceSelection(index))
+                            } else {
+                                if (isHudVisible) isHudVisible = false else keepHudVisible()
+                            }
                         },
                         onNextChapter = { viewModel.onIntent(ReaderIntent.NextChapter) },
                     )
@@ -314,23 +343,27 @@ fun ReaderScreen(viewModel: ReaderViewModel = hiltViewModel(), onSearchClick: ()
                 isPlaying = state.isPlaying,
                 sleepTimerActive = state.sleepTimer != null,
                 onPlayPause = {
+                    keepHudVisible()
                     viewModel.onIntent(if (state.isPlaying) ReaderIntent.Pause else ReaderIntent.PlayCurrentSentence)
                 },
-                onPreviousChapter = { viewModel.onIntent(ReaderIntent.PreviousChapter) },
-                onNextChapter = { viewModel.onIntent(ReaderIntent.NextChapter) },
-                onSleepTimerClick = { viewModel.onIntent(ReaderIntent.SetSleepTimer(nextSleepTimerMinutes(state.sleepTimer))) },
-                onSearchClick = onSearchClick,
-                onBookmarksClick = { viewModel.onIntent(ReaderIntent.ToggleBookmarkList) },
-                onTocClick = { viewModel.onIntent(ReaderIntent.ToggleToc) },
-                onAaClick = { showSettingsPanel = true },
-                onTtsClick = { showTtsPanel = true },
-                onReadingModeClick = { viewModel.onIntent(ReaderIntent.ToggleReadingMode) },
+                onPreviousChapter = { keepHudVisible(); viewModel.onIntent(ReaderIntent.PreviousChapter) },
+                onNextChapter = { keepHudVisible(); viewModel.onIntent(ReaderIntent.NextChapter) },
+                onSleepTimerClick = {
+                    keepHudVisible()
+                    viewModel.onIntent(ReaderIntent.SetSleepTimer(nextSleepTimerMinutes(state.sleepTimer)))
+                },
+                onSearchClick = { keepHudVisible(); onSearchClick() },
+                onBookmarksClick = { keepHudVisible(); viewModel.onIntent(ReaderIntent.ToggleBookmarkList) },
+                onTocClick = { keepHudVisible(); viewModel.onIntent(ReaderIntent.ToggleToc) },
+                onAaClick = { keepHudVisible(); showSettingsPanel = true },
+                onTtsClick = { keepHudVisible(); showTtsPanel = true },
+                onReadingModeClick = { keepHudVisible(); viewModel.onIntent(ReaderIntent.ToggleReadingMode) },
                 hasPreviousChapter = state.hasPreviousChapter,
                 hasNextChapter = state.hasNextChapter,
             )
 
             FlowRow(horizontalArrangement = Arrangement.spacedBy(4.dp)) {
-                Button(onClick = { viewModel.onIntent(ReaderIntent.CreateBookmark) }) {
+                Button(onClick = { keepHudVisible(); viewModel.onIntent(ReaderIntent.CreateBookmark) }) {
                     Text("+ Signet")
                 }
             }
@@ -365,16 +398,8 @@ fun ReaderScreen(viewModel: ReaderViewModel = hiltViewModel(), onSearchClick: ()
                     viewModel.onIntent(if (state.isPlaying) ReaderIntent.Pause else ReaderIntent.PlayCurrentSentence)
                 },
                 onStop = { viewModel.onIntent(ReaderIntent.Pause) },
-                onPreviousSentence = {
-                    if (state.currentSentenceIndex > 0) {
-                        viewModel.onIntent(ReaderIntent.Pause)
-                        viewModel.onIntent(ReaderIntent.PlayCurrentSentence) // déclenche la phrase précédente
-                    }
-                },
-                onNextSentence = {
-                    viewModel.onIntent(ReaderIntent.Pause)
-                    viewModel.onIntent(ReaderIntent.PlayCurrentSentence) // déclenche la phrase suivante
-                },
+                onPreviousSentence = { viewModel.onIntent(ReaderIntent.SkipToPreviousSentence) },
+                onNextSentence = { viewModel.onIntent(ReaderIntent.SkipToNextSentence) },
                 onSpeedChange = { /* TODO: UpdatePreferencesUseCase(speed) */ },
                 onSleepTimer = { minutes ->
                     viewModel.onIntent(ReaderIntent.SetSleepTimer(minutes))
