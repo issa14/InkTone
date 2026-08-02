@@ -166,6 +166,7 @@ fun ReaderScreen(viewModel: ReaderViewModel = hiltViewModel(), onSearchClick: ()
                 entries = state.tableOfContents,
                 currentChapterIndex = state.currentChapterIndex,
                 onEntryClick = { chapterIndex -> viewModel.onIntent(ReaderIntent.JumpToChapter(chapterIndex)) },
+                onClose = { viewModel.onIntent(ReaderIntent.ToggleToc) },
             )
             return@Column
         }
@@ -175,6 +176,7 @@ fun ReaderScreen(viewModel: ReaderViewModel = hiltViewModel(), onSearchClick: ()
                 bookmarks = state.bookmarks,
                 onBookmarkClick = { bookmark -> viewModel.onIntent(ReaderIntent.NavigateToLocator(bookmark.locator)) },
                 onBookmarkDelete = { bookmark -> viewModel.onIntent(ReaderIntent.DeleteBookmark(bookmark.id)) },
+                onClose = { viewModel.onIntent(ReaderIntent.ToggleBookmarkList) },
             )
             return@Column
         }

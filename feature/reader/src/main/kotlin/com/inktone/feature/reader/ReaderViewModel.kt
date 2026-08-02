@@ -166,7 +166,12 @@ class ReaderViewModel @Inject constructor(
         _state.value = _state.value.copy(sleepTimer = SleepTimerState(remainingMs = remainingMs))
         sleepTimerJob = viewModelScope.launch {
             delay(remainingMs)
-            _state.value = _state.value.copy(isPlaying = false, sleepTimer = null)
+            // Même bug que Pause avant correction (voir pausePlayback) :
+            // ne mettre isPlaying à false sans couper playbackJob/audio
+            // laissait la phrase en cours continuer à jouer après
+            // l'extinction du minuteur.
+            pausePlayback()
+            _state.value = _state.value.copy(sleepTimer = null)
         }
     }
 
@@ -333,12 +338,25 @@ class ReaderViewModel @Inject constructor(
         val sentences = chapters[locator.chapterIndex].paragraphs.flatMap { it.sentences }
         val sentenceIndex = sentences.indexOfFirst { locator.charOffset in it.startOffset..it.endOffset }.coerceAtLeast(0)
 
+        // Bug réel trouvé à l'audit, même famille que Pause avant
+        // correction : sans pausePlayback() ici, un saut vers un signet
+        // ou un résultat de recherche pendant une lecture TTS active
+        // laissait l'ancien AudioTrack jouer et la boucle d'auto-avance
+        // de playCurrentSentence() continuer sur les indices de l'ancien
+        // chapitre — désynchronisation audio/affichage, violation directe
+        // de K3 (chemins manuel et TTS jamais simultanés). Reprend la
+        // lecture sur la nouvelle position si elle était déjà active,
+        // même principe que skipSentence().
+        val wasPlaying = _state.value.isPlaying
+        pausePlayback()
+
         _state.value = _state.value.copy(
             currentChapterIndex = locator.chapterIndex, currentSentenceIndex = sentenceIndex,
             highlightedWordRange = null, isTocVisible = false, isBookmarkListVisible = false,
         )
         persistPosition(chapterIndex = locator.chapterIndex, sentenceIndex = sentenceIndex)
         triggerPreload(locator.chapterIndex)
+        if (wasPlaying) playCurrentSentence()
     }
 
     private fun bootstrapAndOpenFixture(publicationId: String, fileUri: String) {
@@ -369,12 +387,26 @@ class ReaderViewModel @Inject constructor(
     private fun navigateToChapter(targetIndex: Int) {
         val chapters = _state.value.chapters
         if (targetIndex !in chapters.indices) return // pas de navigation hors bornes silencieuse
+
+        // Même correction que navigateToLocator (bug réel trouvé à
+        // l'audit, K3) : couvre à la fois la navigation manuelle
+        // (chevrons, TOC) ET l'auto-avance interne de playCurrentSentence
+        // en fin de chapitre — dans ce dernier cas, pausePlayback()
+        // annule sa propre coroutine (playbackJob pointe déjà vers elle),
+        // mais playCurrentSentence() ci-dessous en relance aussitôt une
+        // nouvelle pour le chapitre suivant ; la coroutine d'origine se
+        // termine alors silencieusement à son prochain point de
+        // suspension (delay), sans rejouer la phrase en double.
+        val wasPlaying = _state.value.isPlaying
+        pausePlayback()
+
         _state.value = _state.value.copy(
             currentChapterIndex = targetIndex, currentSentenceIndex = 0,
             highlightedWordRange = null, isTocVisible = false,
         )
         persistPosition(chapterIndex = targetIndex, sentenceIndex = 0)
         triggerPreload(targetIndex)
+        if (wasPlaying) playCurrentSentence()
     }
 
     private fun triggerPreload(currentIndex: Int) {
@@ -409,8 +441,10 @@ class ReaderViewModel @Inject constructor(
      * est terminé. La récursion est trampolinée par coroutine (pas de
      * stack overflow).
      *
-     * L'arrêt se fait via [ReaderIntent.Pause] qui positionne `isPlaying`
-     * à false — la boucle vérifie ce flag avant chaque avancement.
+     * L'arrêt se fait via [ReaderIntent.Pause] → [pausePlayback], qui
+     * annule ce job et coupe l'audio — la boucle vérifie aussi `isPlaying`
+     * avant chaque avancement pour les cas où le job irait jusqu'au bout
+     * de la phrase en cours avant que l'annulation ne soit observée.
      */
     private fun playCurrentSentence() {
         playbackJob = viewModelScope.launch {
@@ -420,11 +454,15 @@ class ReaderViewModel @Inject constructor(
             val publicationId = currentPublicationId ?: return@launch
 
             if (index >= sentences.size) {
-                // Fin de chapitre → auto-avance chapitre suivant si possible
+                // Fin de chapitre → auto-avance chapitre suivant si possible.
+                // navigateToChapter() (appelée par NextChapter) relance elle-même
+                // playCurrentSentence() sur le nouveau chapitre puisque isPlaying
+                // est encore vrai ici — pas besoin de le refaire depuis ce
+                // point, qui de toute façon ne serait jamais atteint : cette
+                // coroutine est annulée par le pausePlayback() interne à
+                // navigateToChapter avant d'y revenir.
                 if (_state.value.hasNextChapter) {
                     onIntent(ReaderIntent.NextChapter)
-                    delay(300) // laisse le chapitre se charger
-                    onIntent(ReaderIntent.PlayCurrentSentence)
                 } else {
                     _state.value = _state.value.copy(isPlaying = false)
                 }
