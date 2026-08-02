@@ -1,6 +1,7 @@
 package com.inktone.feature.reader
 
 import androidx.compose.foundation.clickable
+import androidx.compose.foundation.horizontalScroll
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
@@ -10,6 +11,7 @@ import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
+import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Pause
@@ -115,7 +117,21 @@ fun UnifiedControlPanel(
             HorizontalDivider(color = accentColor.copy(alpha = 0.08f), thickness = 0.5.dp)
             Spacer(Modifier.height(8.dp))
 
-            Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceEvenly, verticalAlignment = Alignment.CenterVertically) {
+            // Bug réel trouvé à l'audit : 7 actions avec libelle sous
+            // Arrangement.SpaceEvenly ne tiennent pas sur la largeur d'un
+            // téléphone standard (~360-400dp) — "Signets" wrappait déjà
+            // sur deux lignes et "Sommaire" (le bouton TOC lui-même)
+            // sortait entièrement de l'écran, donc inatteignable au tap.
+            // horizontalScroll rend les 7 actions accessibles quelle que
+            // soit la largeur d'écran, au prix d'un défilement sur les
+            // plus étroits.
+            Row(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .horizontalScroll(rememberScrollState()),
+                horizontalArrangement = Arrangement.spacedBy(4.dp, Alignment.CenterHorizontally),
+                verticalAlignment = Alignment.CenterVertically,
+            ) {
                 SecondaryAction(icon = AppIcons.Appearance, label = "Aa", tint = accentColor.copy(alpha = 0.5f), onClick = onAaClick)
                 SecondaryAction(icon = AppIcons.Speaking, label = "Voix", tint = accentColor.copy(alpha = 0.5f), onClick = onTtsClick)
                 SecondaryAction(icon = AppIcons.ReadingModePaged, label = "Mode", tint = accentColor.copy(alpha = 0.5f), onClick = onReadingModeClick)
