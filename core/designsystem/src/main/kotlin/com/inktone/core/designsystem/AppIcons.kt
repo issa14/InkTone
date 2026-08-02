@@ -1,6 +1,7 @@
 package com.inktone.core.designsystem
 
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.automirrored.outlined.ArrowBack
 import androidx.compose.material.icons.automirrored.outlined.List
 import androidx.compose.material.icons.automirrored.outlined.MenuBook
 import androidx.compose.material.icons.automirrored.outlined.ViewList
@@ -69,6 +70,7 @@ object AppIcons {
 
     val Search = Icons.Outlined.Search
     val Toc = Icons.AutoMirrored.Outlined.List
+    val Back = Icons.AutoMirrored.Outlined.ArrowBack
     val ReadingModePaged = Icons.Outlined.ViewDay
     val ReadingModeScroll = Icons.Outlined.ImportContacts
 

@@ -2,19 +2,24 @@ package com.inktone.feature.reader
 
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
+import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.itemsIndexed
 import androidx.compose.foundation.lazy.rememberLazyListState
+import androidx.compose.material3.Icon
+import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.remember
+import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
+import com.inktone.core.designsystem.AppIcons
 import com.inktone.domain.model.TableOfContentsEntry
 
 /**
@@ -40,6 +45,7 @@ fun TableOfContentsSheet(
     entries: List<TableOfContentsEntry>,
     currentChapterIndex: Int,
     onEntryClick: (chapterIndex: Int) -> Unit,
+    onClose: () -> Unit,
 ) {
     val listState = rememberLazyListState()
     val flatEntries = remember(entries) { flattenWithDepth(entries) }
@@ -49,6 +55,21 @@ fun TableOfContentsSheet(
     LaunchedEffect(currentChapterIndex, flatEntries) {
         val targetIndex = flatEntries.indexOfFirst { it.entry.chapterIndex == currentChapterIndex }
         if (targetIndex >= 0) listState.scrollToItem(targetIndex)
+    }
+
+    // Bug réel trouvé à l'audit : ce panneau remplace tout l'écran
+    // (ReaderScreen fait `return@Column` quand isTocVisible), HUD inclus
+    // — sans ce bouton retour, rien dans l'UI ne permettait de refermer
+    // la TOC sans choisir une entrée. Le retour système, lui, quittait
+    // le Reader en entier (pas de BackHandler dédié à ce panneau).
+    Row(
+        modifier = Modifier.fillMaxWidth().padding(8.dp),
+        verticalAlignment = Alignment.CenterVertically,
+    ) {
+        IconButton(onClick = onClose) {
+            Icon(AppIcons.Back, contentDescription = "Fermer le sommaire")
+        }
+        Text("Sommaire", style = MaterialTheme.typography.titleMedium)
     }
 
     LazyColumn(state = listState, modifier = Modifier.fillMaxWidth()) {
