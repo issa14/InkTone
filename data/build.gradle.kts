@@ -5,6 +5,13 @@ plugins {
 
 android {
     namespace = "com.inktone.data"
+
+    // androidTest tire transitivement infrastructure/parser et
+    // infrastructure/worker (Readium), qui exigent le desugaring
+    // (meme raison que infrastructure/worker/build.gradle.kts).
+    compileOptions {
+        isCoreLibraryDesugaringEnabled = true
+    }
 }
 
 dependencies {
@@ -16,4 +23,5 @@ dependencies {
     implementation(project(":infrastructure:worker"))
     implementation(libs.kotlinx.serialization.json)
     testImplementation(libs.kotlinx.coroutines.test)
+    coreLibraryDesugaring(libs.desugar.jdk.libs)
 }

@@ -178,6 +178,15 @@ sealed interface ReaderIntent {
     /** A.3 — Efface le message d'erreur affiché dans le Reader. */
     data object DismissError : ReaderIntent
 
+    /**
+     * Panneau TTS (Tâche B.3) — recule/avance d'une phrase dans le
+     * chapitre courant. Coupe l'audio en cours ; reprend la lecture sur
+     * la nouvelle phrase seulement si elle était déjà en cours (sinon se
+     * contente de déplacer la position, sans déclencher l'audio).
+     */
+    data object SkipToPreviousSentence : ReaderIntent
+    data object SkipToNextSentence : ReaderIntent
+
     /** B.1 — Bascule entre mode scroll et mode paginé. */
     data object ToggleReadingMode : ReaderIntent
 }

@@ -85,6 +85,13 @@ class ReaderViewModel @Inject constructor(
     private val annotationSelectionHandler = AnnotationSelectionHandler()
     private var sleepTimerJob: Job? = null
 
+    // A.1bis — job de la coroutine de lecture TTS en cours (une phrase, ou
+    // la chaîne auto-avance). Annulé par pausePlayback()/skipSentence() en
+    // plus de audioSegmentPlayer.stop() : sans ça, la boucle de surlignage
+    // mot-à-mot de playCurrentSentence() continuait d'avancer silencieusement
+    // après une pause, seul le son s'arrêtait (bug réel trouvé à l'audit).
+    private var playbackJob: Job? = null
+
     fun onIntent(intent: ReaderIntent) {
         when (intent) {
             is ReaderIntent.OpenPublication -> {
@@ -112,7 +119,7 @@ class ReaderViewModel @Inject constructor(
             is ReaderIntent.JumpToChapter -> navigateToChapter(intent.chapterIndex)
             is ReaderIntent.ToggleToc -> _state.value = _state.value.copy(isTocVisible = !_state.value.isTocVisible)
             is ReaderIntent.PlayCurrentSentence -> playCurrentSentence()
-            is ReaderIntent.Pause -> _state.value = _state.value.copy(isPlaying = false)
+            is ReaderIntent.Pause -> pausePlayback()
             is ReaderIntent.DismissError -> _state.value = _state.value.copy(errorMessage = null)
             is ReaderIntent.ToggleReadingMode -> {
                 val newMode = if (_state.value.readingMode == ReadingMode.SCROLL) ReadingMode.PAGED else ReadingMode.SCROLL
@@ -139,6 +146,8 @@ class ReaderViewModel @Inject constructor(
             is ReaderIntent.NavigateToLocator -> navigateToLocator(intent.locator)
             is ReaderIntent.SetOverrides -> setOverrides(intent.overrides)
             is ReaderIntent.SetSleepTimer -> setSleepTimer(intent.minutes)
+            is ReaderIntent.SkipToPreviousSentence -> skipSentence(-1)
+            is ReaderIntent.SkipToNextSentence -> skipSentence(1)
         }
     }
 
@@ -404,7 +413,7 @@ class ReaderViewModel @Inject constructor(
      * à false — la boucle vérifie ce flag avant chaque avancement.
      */
     private fun playCurrentSentence() {
-        viewModelScope.launch {
+        playbackJob = viewModelScope.launch {
             val chapter = _state.value.currentChapter ?: return@launch
             val sentences = chapter.paragraphs.flatMap { it.sentences }
             val index = _state.value.currentSentenceIndex
@@ -464,6 +473,37 @@ class ReaderViewModel @Inject constructor(
                 playCurrentSentence()
             }
         }
+    }
+
+    /**
+     * Interrompt réellement la lecture en cours : annule la coroutine de
+     * [playCurrentSentence] (sinon la boucle de surlignage mot-à-mot
+     * continue d'avancer silencieusement) et coupe l'`AudioTrack` sous-
+     * jacent (sinon la phrase en cours continue de se faire entendre
+     * jusqu'à sa fin après un appui sur Pause).
+     */
+    private fun pausePlayback() {
+        playbackJob?.cancel()
+        audioSegmentPlayer.stop()
+        _state.value = _state.value.copy(isPlaying = false, highlightedWordRange = null)
+    }
+
+    /**
+     * Panneau TTS (Tâche B.3) — recule/avance d'une phrase dans le
+     * chapitre courant. Reprend immédiatement la lecture sur la nouvelle
+     * phrase si elle était déjà en cours ; sinon se contente de déplacer
+     * la position (mêmes règles K3 que la navigation manuelle).
+     */
+    private fun skipSentence(delta: Int) {
+        val chapter = _state.value.currentChapter ?: return
+        val sentences = chapter.paragraphs.flatMap { it.sentences }
+        if (sentences.isEmpty()) return
+        val wasPlaying = _state.value.isPlaying
+        pausePlayback()
+        val newIndex = (_state.value.currentSentenceIndex + delta).coerceIn(0, sentences.lastIndex)
+        _state.value = _state.value.copy(currentSentenceIndex = newIndex)
+        persistPosition(chapterIndex = chapter.index, sentenceIndex = newIndex)
+        if (wasPlaying) playCurrentSentence()
     }
 
     /**

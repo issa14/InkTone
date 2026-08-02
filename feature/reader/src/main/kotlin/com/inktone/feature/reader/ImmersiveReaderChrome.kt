@@ -22,7 +22,12 @@ import kotlinx.coroutines.delay
  * pilote son propre etat, ce composable ne fait que le delai).
  */
 @Composable
-fun ImmersiveReaderChrome(isHudVisible: Boolean, onAutoHide: () -> Unit, content: @Composable () -> Unit) {
+fun ImmersiveReaderChrome(
+    isHudVisible: Boolean,
+    onAutoHide: () -> Unit,
+    hudActivityTick: Int = 0,
+    content: @Composable () -> Unit,
+) {
     val view = LocalView.current
     DisposableEffect(Unit) {
         val activity = view.context as? Activity
@@ -33,7 +38,11 @@ fun ImmersiveReaderChrome(isHudVisible: Boolean, onAutoHide: () -> Unit, content
             controller?.show(WindowInsetsCompat.Type.systemBars())
         }
     }
-    LaunchedEffect(isHudVisible) {
+    // hudActivityTick (bug réel trouvé à l'audit) : sans lui, ce délai ne
+    // redémarre jamais tant qu'isHudVisible reste vrai — une interaction
+    // avec le HUD au bout de 3s ne l'empêchait pas de se masquer une
+    // seconde plus tard, sous les doigts de l'utilisateur.
+    LaunchedEffect(isHudVisible, hudActivityTick) {
         if (isHudVisible) {
             delay(4000)
             onAutoHide()
