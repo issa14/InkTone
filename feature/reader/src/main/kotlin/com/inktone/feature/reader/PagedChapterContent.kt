@@ -73,11 +73,20 @@ fun PagedChapterContent(
         result
     }
 
-    val pagerState = rememberPagerState(pageCount = { pages.size })
-
-    // Avance au chapitre suivant quand on swipe après la dernière page
+    // Une page fantôme au-delà de la dernière (pageCount = pages.size + 1,
+    // jamais rendue — `pages.getOrNull` la traite comme vide) : signal non
+    // ambigu d'un swipe VERS L'AVANT volontaire au-delà du chapitre.
+    //
+    // Bug réel trouvé à l'audit avec l'ancienne condition
+    // (`currentPage >= pages.size - 1 && isScrollInProgress`) : au moment
+    // exact où currentPage atteint la DERNIÈRE vraie page (simple arrivée
+    // par swipe avant, sans intention d'aller plus loin), le fling de
+    // settle a souvent encore isScrollInProgress=true — ça avançait au
+    // chapitre suivant sans que l'utilisateur l'ait demandé, lui faisant
+    // sauter le reste de la dernière page.
+    val pagerState = rememberPagerState(pageCount = { pages.size + 1 })
     LaunchedEffect(pagerState.currentPage) {
-        if (pagerState.currentPage >= pages.size - 1 && pagerState.isScrollInProgress) {
+        if (pagerState.currentPage >= pages.size) {
             onNextChapter()
         }
     }
