@@ -19,6 +19,7 @@ import androidx.compose.material.icons.outlined.CheckCircle
 import androidx.compose.material.icons.outlined.ContentCopy
 import androidx.compose.material.icons.outlined.EditNote
 import androidx.compose.material.icons.outlined.Error
+import androidx.compose.material.icons.outlined.FilterList
 import androidx.compose.material.icons.outlined.HourglassEmpty
 import androidx.compose.material.icons.outlined.ImportContacts
 import androidx.compose.material.icons.outlined.Info
@@ -76,6 +77,7 @@ object AppIcons {
     val Stats = Icons.Outlined.BarChart
 
     val Search = Icons.Outlined.Search
+    val Filter = Icons.Outlined.FilterList
     val Toc = Icons.AutoMirrored.Outlined.List
     val Back = Icons.AutoMirrored.Outlined.ArrowBack
     val ReadingModePaged = Icons.Outlined.ViewDay

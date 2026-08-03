@@ -33,8 +33,6 @@ import androidx.compose.material.icons.outlined.Search
 import androidx.compose.material.icons.outlined.Close
 import androidx.compose.material3.DismissibleDrawerSheet
 import androidx.compose.material3.DismissibleNavigationDrawer
-import androidx.compose.material3.DropdownMenu
-import androidx.compose.material3.DropdownMenuItem
 import androidx.compose.material3.ElevatedCard
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.FilterChip
@@ -185,10 +183,10 @@ fun LibraryScreen(
                     sortOrder = state.sortOrder,
                     onSortOrderChange = { viewModel.onIntent(LibraryIntent.SetSortOrder(it)) },
                     layoutMode = state.layoutMode,
-                    onCycleLayout = {
-                        val next = if (state.layoutMode == LibraryLayoutMode.LIST) LibraryLayoutMode.GRID_COVERS else LibraryLayoutMode.LIST
-                        viewModel.onIntent(LibraryIntent.SetLayoutMode(next))
-                    },
+                    onLayoutModeChange = { viewModel.onIntent(LibraryIntent.SetLayoutMode(it)) },
+                    selectedFormats = state.selectedFormats,
+                    onToggleFormat = { viewModel.onIntent(LibraryIntent.ToggleFileFormat(it)) },
+                    onClearFormats = { viewModel.onIntent(LibraryIntent.ClearFileFormats) },
                     onRefresh = { viewModel.onIntent(LibraryIntent.Refresh) },
                     onImportClick = onImportClick,
                     onRegenerateCovers = { viewModel.onIntent(LibraryIntent.RegenerateCovers) },
@@ -202,10 +200,6 @@ fun LibraryScreen(
         ) { innerPadding ->
             Column(Modifier.fillMaxSize().padding(innerPadding)) {
                 ImportProgressBanner(state.importProgress)
-                FilterRow(
-                    active = state.activeFilter,
-                    onSelect = { viewModel.onIntent(LibraryIntent.ChangeFilter(it)) },
-                )
                 TagsFilterBar(
                     tags = state.availableTags,
                     activeFilter = state.activeFilter,
@@ -378,7 +372,10 @@ private fun LibraryTopBar(
     sortOrder: LibrarySortOrder,
     onSortOrderChange: (LibrarySortOrder) -> Unit,
     layoutMode: LibraryLayoutMode,
-    onCycleLayout: () -> Unit,
+    onLayoutModeChange: (LibraryLayoutMode) -> Unit,
+    selectedFormats: Set<com.inktone.domain.model.PublicationFormat>,
+    onToggleFormat: (com.inktone.domain.model.PublicationFormat) -> Unit,
+    onClearFormats: () -> Unit,
     onRefresh: () -> Unit,
     onImportClick: () -> Unit,
     onRegenerateCovers: () -> Unit = {},
@@ -389,7 +386,7 @@ private fun LibraryTopBar(
     onSelectFilter: (FilterMode, String?) -> Unit = { _, _ -> },
 ) {
     var isSearchActive by remember { mutableStateOf(false) }
-    var isSortMenuExpanded by remember { mutableStateOf(false) }
+    var showFilterDialog by remember { mutableStateOf(false) }
     var showActionsSheet by remember { mutableStateOf(false) }
     var showNavPopup by remember { mutableStateOf(false) }
 
@@ -449,21 +446,8 @@ private fun LibraryTopBar(
                 IconButton(onClick = { isSearchActive = true }) {
                     Icon(Icons.Outlined.Search, contentDescription = "Rechercher")
                 }
-                Box {
-                    IconButton(onClick = { isSortMenuExpanded = true }) {
-                        Icon(Icons.Outlined.Sort, contentDescription = "Trier")
-                    }
-                    DropdownMenu(expanded = isSortMenuExpanded, onDismissRequest = { isSortMenuExpanded = false }) {
-                        LibrarySortOrder.entries.forEach { order ->
-                            DropdownMenuItem(
-                                text = { Text(order.label()) },
-                                onClick = { onSortOrderChange(order); isSortMenuExpanded = false },
-                            )
-                        }
-                    }
-                }
-                IconButton(onClick = onCycleLayout) {
-                    Icon(layoutMode.icon(), contentDescription = layoutMode.label())
+                IconButton(onClick = { showFilterDialog = true }) {
+                    Icon(AppIcons.Filter, contentDescription = "Filtrer")
                 }
                 IconButton(onClick = { showActionsSheet = true }) {
                     Icon(Icons.Outlined.MoreVert, contentDescription = "Actions")
@@ -475,6 +459,22 @@ private fun LibraryTopBar(
                 actionIconContentColor = MaterialTheme.colorScheme.onPrimary,
                 navigationIconContentColor = MaterialTheme.colorScheme.onPrimary,
             ),
+        )
+    }
+
+    // ──── Popup de filtrage (lot 2a.2) ────
+    if (showFilterDialog) {
+        LibraryFilterDialog(
+            sortOrder = sortOrder,
+            onSortOrderChange = onSortOrderChange,
+            statusFilter = activeFilter,
+            onStatusFilterChange = { onSelectFilter(it, null) },
+            layoutMode = layoutMode,
+            onLayoutModeChange = onLayoutModeChange,
+            selectedFormats = selectedFormats,
+            onToggleFormat = onToggleFormat,
+            onClearFormats = onClearFormats,
+            onDismiss = { showFilterDialog = false },
         )
     }
 
@@ -538,17 +538,17 @@ private fun ActionSheetItem(label: String, icon: androidx.compose.ui.graphics.ve
     }
 }
 
-private fun LibraryLayoutMode.icon() = when (this) {
+internal fun LibraryLayoutMode.icon() = when (this) {
     LibraryLayoutMode.GRID_COVERS -> AppIcons.CoverOnly
     LibraryLayoutMode.LIST -> AppIcons.ViewList
 }
 
-private fun LibraryLayoutMode.label() = when (this) {
+internal fun LibraryLayoutMode.label() = when (this) {
     LibraryLayoutMode.GRID_COVERS -> "Couvertures seules"
     LibraryLayoutMode.LIST -> "Liste"
 }
 
-private fun LibrarySortOrder.label() = when (this) {
+internal fun LibrarySortOrder.label() = when (this) {
     LibrarySortOrder.RECENTLY_ADDED -> "Date d'import"
     LibrarySortOrder.TITLE -> "Titre"
     LibrarySortOrder.AUTHOR -> "Auteur"
@@ -707,22 +707,6 @@ private fun ImportProgressBanner(progress: ImportProgress) {
         } else {
             LinearProgressIndicator(modifier = Modifier.fillMaxWidth())
             Text("Import en attente…")
-        }
-    }
-}
-
-@Composable
-private fun FilterRow(active: FilterMode, onSelect: (FilterMode) -> Unit) {
-    LazyRow(
-        horizontalArrangement = Arrangement.spacedBy(8.dp),
-        contentPadding = PaddingValues(horizontal = 8.dp, vertical = 4.dp),
-    ) {
-        rowItems(SelectableFilters, key = { it.name }) { filter ->
-            FilterChip(
-                selected = filter == active,
-                onClick = { onSelect(filter) },
-                label = { Text(filter.label()) },
-            )
         }
     }
 }
