@@ -114,7 +114,6 @@ fun LibraryScreen(
     onImportClick: () -> Unit = {},
     onOpenSettings: () -> Unit = {},
     onOpenAbout: () -> Unit = {},
-    onOpenThemePicker: () -> Unit = {},
 ) {
     val state by viewModel.state.collectAsState()
     val drawerState = rememberDrawerState(DrawerValue.Closed)
@@ -167,10 +166,6 @@ fun LibraryScreen(
                         scope.launch { drawerState.close() }
                         onOpenAbout()
                     },
-                    onOpenThemePicker = {
-                        scope.launch { drawerState.close() }
-                        onOpenThemePicker()
-                    },
                 )
             }
         },
@@ -193,8 +188,6 @@ fun LibraryScreen(
                     onCycleLayout = { viewModel.onIntent(LibraryIntent.CycleLayout) },
                     onRefresh = { viewModel.onIntent(LibraryIntent.Refresh) },
                     onImportClick = onImportClick,
-                    onOpenAbout = onOpenAbout,
-                    onOpenThemePicker = onOpenThemePicker,
                     onRegenerateCovers = { viewModel.onIntent(LibraryIntent.RegenerateCovers) },
                     onResetCovers = { viewModel.onIntent(LibraryIntent.ResetCovers) },
                     activeFilter = state.activeFilter,
@@ -258,7 +251,6 @@ internal fun LibraryDrawerContent(
     onOpenStats: () -> Unit,
     onOpenSettings: () -> Unit = {},
     onOpenAbout: () -> Unit = {},
-    onOpenThemePicker: () -> Unit = {},
 ) {
     Column {
         // C.1 — Header avec dégradé brand (legacy §1.2)
@@ -386,8 +378,6 @@ private fun LibraryTopBar(
     onCycleLayout: () -> Unit,
     onRefresh: () -> Unit,
     onImportClick: () -> Unit,
-    onOpenAbout: () -> Unit = {},
-    onOpenThemePicker: () -> Unit = {},
     onRegenerateCovers: () -> Unit = {},
     onResetCovers: () -> Unit = {},
     // C.4 — filtre actif pour le titre cliquable
@@ -507,9 +497,6 @@ private fun LibraryTopBar(
                     showActionsSheet = false
                     onResetCovers()
                 }
-                // C.2 — À propos et Réglages du thème dans le menu 3-points
-                ActionSheetItem("À propos", AppIcons.Info) { showActionsSheet = false; onOpenAbout() }
-                ActionSheetItem("Thème", AppIcons.Appearance) { showActionsSheet = false; onOpenThemePicker() }
             }
         }
     }
