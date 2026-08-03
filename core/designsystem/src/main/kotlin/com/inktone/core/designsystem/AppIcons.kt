@@ -28,6 +28,7 @@ import androidx.compose.material.icons.outlined.Palette
 import androidx.compose.material.icons.outlined.RecordVoiceOver
 import androidx.compose.material.icons.outlined.Save
 import androidx.compose.material.icons.outlined.Search
+import androidx.compose.material.icons.outlined.Settings
 import androidx.compose.material.icons.outlined.Smartphone
 import androidx.compose.material.icons.outlined.ViewDay
 import androidx.compose.material.icons.outlined.Warning
@@ -62,6 +63,7 @@ object AppIcons {
     val Accessibility = Icons.Outlined.Accessibility
     val Data = Icons.Outlined.Save
     val Pronunciation = Icons.Outlined.RecordVoiceOver
+    val Settings = Icons.Outlined.Settings
 
     val Mic = Icons.Outlined.Mic
     val Speaking = Icons.AutoMirrored.Outlined.VolumeUp

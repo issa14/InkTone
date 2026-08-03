@@ -251,7 +251,7 @@ fun LibraryScreen(
 }
 
 @Composable
-private fun LibraryDrawerContent(
+internal fun LibraryDrawerContent(
     state: LibraryUiState,
     onSelectFilter: (FilterMode, String?) -> Unit,
     onOpenBookmarks: () -> Unit,
@@ -285,6 +285,28 @@ private fun LibraryDrawerContent(
             )
         }
         Column(Modifier.padding(16.dp)) {
+        // Bibliotheque — destination a part entiere, toujours active par
+        // defaut : LibraryDrawerContent n'est monte que depuis l'ecran
+        // Bibliotheque lui-meme, il n'y a pas d'autre etat possible.
+        NavigationDrawerItem(
+            label = { Text("Bibliothèque") },
+            icon = { Icon(AppIcons.Reading, contentDescription = null) },
+            selected = true,
+            onClick = {},
+        )
+        NavigationDrawerItem(
+            label = { Text("Marque-pages et Notes") },
+            icon = { Icon(AppIcons.Bookmark, contentDescription = null) },
+            selected = false,
+            onClick = onOpenBookmarks,
+        )
+        NavigationDrawerItem(
+            label = { Text("Statistiques de lecture") },
+            icon = { Icon(AppIcons.Stats, contentDescription = null) },
+            selected = false,
+            onClick = onOpenStats,
+        )
+        // Transitoire, lot 1 : deplace vers le flyout du titre au lot 2 (UX §Menu deroulant du titre)
         SelectableFilters.forEach { filter ->
             NavigationDrawerItem(
                 label = { Text(filter.label()) },
@@ -292,24 +314,6 @@ private fun LibraryDrawerContent(
                 onClick = { onSelectFilter(filter, null) },
             )
         }
-        NavigationDrawerItem(
-            label = { Text("Récents") },
-            icon = { Icon(AppIcons.Loading, contentDescription = null) },
-            selected = state.activeFilter == FilterMode.ALL && state.sortOrder == LibrarySortOrder.RECENTLY_OPENED,
-            onClick = { onSelectFilter(FilterMode.ALL, null) },
-        )
-        NavigationDrawerItem(
-            label = { Text("Statistiques") },
-            icon = { Icon(AppIcons.Stats, contentDescription = null) },
-            selected = false,
-            onClick = onOpenStats,
-        )
-        NavigationDrawerItem(
-            label = { Text("Signets") },
-            icon = { Icon(AppIcons.Bookmark, contentDescription = null) },
-            selected = false,
-            onClick = onOpenBookmarks,
-        )
         if (state.availableSeries.isNotEmpty()) {
             Text("Séries", style = MaterialTheme.typography.titleSmall, modifier = Modifier.padding(top = 16.dp, bottom = 4.dp))
             state.availableSeries.forEach { series ->
@@ -350,12 +354,8 @@ private fun LibraryDrawerContent(
             modifier = Modifier.fillMaxWidth().padding(vertical = 12.dp),
             horizontalArrangement = Arrangement.SpaceEvenly,
         ) {
+            DrawerFooterItem("Paramètres", AppIcons.Settings) { onOpenSettings() }
             DrawerFooterItem("À propos", AppIcons.Info) { onOpenAbout() }
-            DrawerFooterItem("Thème", AppIcons.Appearance) { onOpenThemePicker() }
-            // C.2 — Debug conditionné (cohérent avec BootstrapAndOpenFixture, Phase 0)
-            if (BuildConfig.DEBUG) {
-                DrawerFooterItem("Debug", AppIcons.Data) { /* no-op pour l'instant */ }
-            }
         }
         } // Column content
     } // Column root
