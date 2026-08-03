@@ -37,6 +37,10 @@ data class LibraryUiState(
     val availableSeries: List<String> get() = publications.mapNotNull { it.seriesName }.distinct().sorted()
     val availableAuthors: List<String> get() = publications.flatMap { it.authors }.distinct().sorted()
 
+    /** Lot 2a.3 — compteurs du flyout du titre (ex. « Trilogie du Vide (3) »). */
+    val seriesCounts: Map<String, Int> get() = publications.mapNotNull { it.seriesName }.groupingBy { it }.eachCount()
+    val tagCounts: Map<String, Int> get() = publications.flatMap { it.subjects }.groupingBy { it }.eachCount()
+
     /** Tache 9bis.4 — carte "reprendre la lecture" proeminente, pas seulement un FAB (amelioration legacy). */
     val resumeReadingPublication: Publication?
         get() = publications.filter { it.lastOpened != null }.maxByOrNull { it.lastOpened!! }

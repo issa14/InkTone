@@ -112,6 +112,8 @@ fun LibraryScreen(
     onImportClick: () -> Unit = {},
     onOpenSettings: () -> Unit = {},
     onOpenAbout: () -> Unit = {},
+    onNavigateToSeriesDetail: (String) -> Unit = {},
+    onNavigateToTagDetail: (String) -> Unit = {},
 ) {
     val state by viewModel.state.collectAsState()
     val drawerState = rememberDrawerState(DrawerValue.Closed)
@@ -195,6 +197,12 @@ fun LibraryScreen(
                     filterValue = state.filterValue,
                     onSelectFilter = { filter, value -> viewModel.onIntent(LibraryIntent.ChangeFilter(filter, value)) },
                     onMenuClick = { scope.launch { drawerState.open() } },
+                    availableSeries = state.availableSeries,
+                    seriesCounts = state.seriesCounts,
+                    availableTags = state.availableTags,
+                    tagCounts = state.tagCounts,
+                    onNavigateToSeriesDetail = onNavigateToSeriesDetail,
+                    onNavigateToTagDetail = onNavigateToTagDetail,
                 )
             },
         ) { innerPadding ->
@@ -384,6 +392,13 @@ private fun LibraryTopBar(
     activeFilter: FilterMode = FilterMode.ALL,
     filterValue: String? = null,
     onSelectFilter: (FilterMode, String?) -> Unit = { _, _ -> },
+    // Lot 2a.3 — flyout du titre à deux colonnes
+    availableSeries: List<String> = emptyList(),
+    seriesCounts: Map<String, Int> = emptyMap(),
+    availableTags: List<String> = emptyList(),
+    tagCounts: Map<String, Int> = emptyMap(),
+    onNavigateToSeriesDetail: (String) -> Unit = {},
+    onNavigateToTagDetail: (String) -> Unit = {},
 ) {
     var isSearchActive by remember { mutableStateOf(false) }
     var showFilterDialog by remember { mutableStateOf(false) }
@@ -420,20 +435,34 @@ private fun LibraryTopBar(
         // C.4 — Titre cliquable avec le filtre actif
         TopAppBar(
             title = {
-                Row(
-                    modifier = Modifier.clickable { showNavPopup = true },
-                    verticalAlignment = Alignment.CenterVertically,
-                ) {
-                    Text(
-                        filterValue ?: activeFilter.label(),
-                        style = MaterialTheme.typography.titleMedium,
-                        color = MaterialTheme.colorScheme.onPrimary,
-                    )
-                    Icon(
-                        AppIcons.ChevronDown,
-                        contentDescription = "Changer de vue",
-                        tint = MaterialTheme.colorScheme.onPrimary.copy(alpha = 0.5f),
-                        modifier = Modifier.size(16.dp),
+                Box {
+                    Row(
+                        modifier = Modifier.clickable { showNavPopup = true },
+                        verticalAlignment = Alignment.CenterVertically,
+                    ) {
+                        Text(
+                            filterValue ?: activeFilter.label(),
+                            style = MaterialTheme.typography.titleMedium,
+                            color = MaterialTheme.colorScheme.onPrimary,
+                        )
+                        Icon(
+                            AppIcons.ChevronDown,
+                            contentDescription = "Changer de vue",
+                            tint = MaterialTheme.colorScheme.onPrimary.copy(alpha = 0.5f),
+                            modifier = Modifier.size(16.dp),
+                        )
+                    }
+                    LibraryTitleFlyout(
+                        expanded = showNavPopup,
+                        onDismiss = { showNavPopup = false },
+                        series = availableSeries,
+                        seriesCounts = seriesCounts,
+                        tags = availableTags,
+                        tagCounts = tagCounts,
+                        onSelectAll = { onSelectFilter(FilterMode.ALL, null) },
+                        onSelectFavorites = { onSelectFilter(FilterMode.FAVORITES, null) },
+                        onNavigateToSeriesDetail = onNavigateToSeriesDetail,
+                        onNavigateToTagDetail = onNavigateToTagDetail,
                     )
                 }
             },
@@ -499,27 +528,6 @@ private fun LibraryTopBar(
                 ActionSheetItem("Réinitialiser les couvertures", AppIcons.ErrorOutlined) {
                     showActionsSheet = false
                     onResetCovers()
-                }
-            }
-        }
-    }
-
-    // C.4 — Popup de navigation (catégories)
-    if (showNavPopup) {
-        val sheetState = rememberModalBottomSheetState()
-        ModalBottomSheet(
-            onDismissRequest = { showNavPopup = false },
-            sheetState = sheetState,
-        ) {
-            Column(Modifier.padding(bottom = 32.dp)) {
-                Text("Navigation", style = MaterialTheme.typography.labelLarge,
-                    modifier = Modifier.padding(horizontal = 24.dp, vertical = 8.dp),
-                    color = MaterialTheme.colorScheme.primary)
-                SelectableFilters.forEach { filter ->
-                    ActionSheetItem(filter.label(), AppIcons.Reading) {
-                        showNavPopup = false
-                        onSelectFilter(filter, null)
-                    }
                 }
             }
         }
