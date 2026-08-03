@@ -96,7 +96,7 @@ Premier lancement → Onboarding → Bibliothèque (centre de navigation)
 ### Éléments décrits par Issa, contenu actée à l'oral — **depuis entièrement maquettés** (§ Popup de filtrage, § Bottom sheet du menu 3-points)
 
 **Popup de filtrage (icône a3), deux colonnes :**
-- Colonne 1 — Trier par : Titre / Auteur / Date d'import (récemment importés d'abord) / Récents / Récemment lus
+- Colonne 1 — Trier par : Date d'import (récemment importés d'abord) / Titre / Auteur / Récents — **décision actée (lot 2a) : « Récents » et « Récemment lus » fusionnés en une seule entrée**, le domaine n'ayant qu'un seul champ `lastOpened` (pas de distinction possible entre les deux). 4 entrées, pas 5.
 - Colonne 2 — Filtrer par : Non lu / En cours de lecture / Lu-Terminé
 - Sous les deux colonnes, ligne 1 — Mise en page : deux icônes (mode liste / mode mosaïque)
 - Ligne 2 — Type de fichier : cases à cocher, **Tous / EPUB / TXT** (PDF mentionné à l'origine à titre indicatif seulement, pas retenu — cohérent avec ADR-017, qui différe le PDF à une v1.x ultérieure)
@@ -201,7 +201,7 @@ Un seul écran réutilisable pour les deux cas — seul le contenu de l'étiquet
 
 **Forme :** dialogue centré (pas un bottom sheet) — choix délibéré pour se distinguer visuellement du menu 3-points, qui lui en est un.
 
-- **Trier par** (sélection unique, ronds pleins) : Date d'import (par défaut, plus récent d'abord) / Titre / Auteur / Récents / Récemment lus
+- **Trier par** (sélection unique, ronds pleins) : Date d'import (par défaut, plus récent d'abord) / Titre / Auteur / Récents — 4 entrées (« Récents »/« Récemment lus » fusionnés, lot 2a, voir § Bibliothèque état vide)
 - **Filtrer par** (sélection unique) : Tous (par défaut) / Non lu / En cours / Terminé
 - **Mise en page** : deux icônes (liste / mosaïque), état actif visuellement distinct
 - **Type de fichier** (cases à cocher, **sélection multiple** — contrairement aux deux colonnes du dessus) : Tous / EPUB / TXT

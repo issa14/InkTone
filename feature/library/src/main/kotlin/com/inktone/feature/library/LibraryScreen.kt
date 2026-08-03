@@ -185,7 +185,10 @@ fun LibraryScreen(
                     sortOrder = state.sortOrder,
                     onSortOrderChange = { viewModel.onIntent(LibraryIntent.SetSortOrder(it)) },
                     layoutMode = state.layoutMode,
-                    onCycleLayout = { viewModel.onIntent(LibraryIntent.CycleLayout) },
+                    onCycleLayout = {
+                        val next = if (state.layoutMode == LibraryLayoutMode.LIST) LibraryLayoutMode.GRID_COVERS else LibraryLayoutMode.LIST
+                        viewModel.onIntent(LibraryIntent.SetLayoutMode(next))
+                    },
                     onRefresh = { viewModel.onIntent(LibraryIntent.Refresh) },
                     onImportClick = onImportClick,
                     onRegenerateCovers = { viewModel.onIntent(LibraryIntent.RegenerateCovers) },
@@ -536,21 +539,20 @@ private fun ActionSheetItem(label: String, icon: androidx.compose.ui.graphics.ve
 }
 
 private fun LibraryLayoutMode.icon() = when (this) {
-    LibraryLayoutMode.GRID -> AppIcons.ViewGrid
     LibraryLayoutMode.GRID_COVERS -> AppIcons.CoverOnly
     LibraryLayoutMode.LIST -> AppIcons.ViewList
 }
 
 private fun LibraryLayoutMode.label() = when (this) {
-    LibraryLayoutMode.GRID -> "Grille"
     LibraryLayoutMode.GRID_COVERS -> "Couvertures seules"
     LibraryLayoutMode.LIST -> "Liste"
 }
 
 private fun LibrarySortOrder.label() = when (this) {
+    LibrarySortOrder.RECENTLY_ADDED -> "Date d'import"
     LibrarySortOrder.TITLE -> "Titre"
-    LibrarySortOrder.RECENTLY_ADDED -> "Ajout récent"
-    LibrarySortOrder.RECENTLY_OPENED -> "Lecture récente"
+    LibrarySortOrder.AUTHOR -> "Auteur"
+    LibrarySortOrder.RECENTLY_OPENED -> "Récents"
 }
 
 @Composable
@@ -562,8 +564,7 @@ private fun LibraryContent(
     val resume = state.resumeReadingPublication
 
     when (state.layoutMode) {
-        LibraryLayoutMode.GRID, LibraryLayoutMode.GRID_COVERS -> {
-            val showTitle = state.layoutMode == LibraryLayoutMode.GRID
+        LibraryLayoutMode.GRID_COVERS -> {
             LazyVerticalGrid(
                 columns = GridCells.Adaptive(minSize = 120.dp),
                 contentPadding = PaddingValues(8.dp),
@@ -579,7 +580,7 @@ private fun LibraryContent(
                         onClick = { onOpen(publication.id) },
                         onToggleFavorite = { onToggleFavorite(publication.id, !publication.isFavorite) },
                         modifier = Modifier.padding(8.dp),
-                        showTitle = showTitle,
+                        showTitle = false,
                         progressPercent = state.progressMap[publication.id] ?: 0,
                     )
                 }

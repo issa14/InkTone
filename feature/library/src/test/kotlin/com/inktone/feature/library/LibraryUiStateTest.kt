@@ -57,4 +57,39 @@ class LibraryUiStateTest {
 
         assertEquals("2", state.resumeReadingPublication?.id)
     }
+
+    @Test
+    fun tri_par_auteur_ignore_la_casse_et_place_les_auteurs_absents_en_fin() {
+        val state = LibraryUiState(
+            publications = listOf(
+                publication("1", "A", "zola", importDate = 0L),
+                publication("2", "B", "Hugo", importDate = 0L),
+                publication("3", "C", "", importDate = 0L).copy(authors = emptyList()),
+            ),
+            sortOrder = LibrarySortOrder.AUTHOR,
+        )
+
+        assertEquals(listOf("2", "1", "3"), state.displayedPublications.map { it.id })
+    }
+
+    @Test
+    fun filtre_par_format_vide_n_exclut_rien() {
+        val epub = publication("1", "A", "X", importDate = 0L)
+        val txt = publication("2", "B", "X", importDate = 0L).copy(format = PublicationFormat.TXT)
+        val state = LibraryUiState(publications = listOf(epub, txt))
+
+        assertEquals(listOf("1", "2"), state.displayedPublications.map { it.id })
+    }
+
+    @Test
+    fun filtre_par_format_epub_seul_masque_les_txt() {
+        val epub = publication("1", "A", "X", importDate = 0L)
+        val txt = publication("2", "B", "X", importDate = 0L).copy(format = PublicationFormat.TXT)
+        val state = LibraryUiState(
+            publications = listOf(epub, txt),
+            selectedFormats = setOf(PublicationFormat.EPUB),
+        )
+
+        assertEquals(listOf("1"), state.displayedPublications.map { it.id })
+    }
 }

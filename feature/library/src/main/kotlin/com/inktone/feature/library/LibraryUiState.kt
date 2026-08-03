@@ -2,6 +2,7 @@ package com.inktone.feature.library
 
 import com.inktone.domain.model.FilterMode
 import com.inktone.domain.model.Publication
+import com.inktone.domain.model.PublicationFormat
 import com.inktone.domain.service.ImportProgress
 
 /**
@@ -11,6 +12,11 @@ import com.inktone.domain.service.ImportProgress
  * (titre/auteur) est plus simple que la recherche plein texte **dans un
  * livre** (`SearchService`/FTS, Phase 7) - ne pas reutiliser FTS pour un
  * filtrage de titres qui n'en a pas besoin, ne pas confondre les deux.
+ *
+ * `selectedFormats` (Lot 2a.1) suit le meme principe : filtre client-cote,
+ * pas une nouvelle requete. Ensemble vide = aucun filtre (« Tous »),
+ * cohabite avec `activeFilter`/`filterValue` qui restent le filtre
+ * serveur (statut, serie, tag, auteur).
  */
 data class LibraryUiState(
     val publications: List<Publication> = emptyList(),
@@ -19,7 +25,8 @@ data class LibraryUiState(
     val filterValue: String? = null,
     val searchQuery: String = "",
     val sortOrder: LibrarySortOrder = LibrarySortOrder.RECENTLY_ADDED,
-    val layoutMode: LibraryLayoutMode = LibraryLayoutMode.GRID,
+    val layoutMode: LibraryLayoutMode = LibraryLayoutMode.GRID_COVERS,
+    val selectedFormats: Set<PublicationFormat> = emptySet(),
     // Tache 6.8 — cache par defaut (total == 0 && !hasQueuedChunks).
     val importProgress: ImportProgress = ImportProgress(),
     val errorMessage: String? = null,
@@ -36,7 +43,7 @@ data class LibraryUiState(
 
     val displayedPublications: List<Publication>
         get() {
-            val filtered = if (searchQuery.isBlank()) {
+            val searched = if (searchQuery.isBlank()) {
                 publications
             } else {
                 publications.filter { publication ->
@@ -44,24 +51,25 @@ data class LibraryUiState(
                         publication.authors.any { it.contains(searchQuery, ignoreCase = true) }
                 }
             }
+            val filtered = if (selectedFormats.isEmpty()) {
+                searched
+            } else {
+                searched.filter { it.format in selectedFormats }
+            }
             return when (sortOrder) {
                 LibrarySortOrder.TITLE -> filtered.sortedBy { it.title.lowercase() }
+                LibrarySortOrder.AUTHOR -> filtered.sortedWith(compareBy(nullsLast()) { it.authors.firstOrNull()?.lowercase() })
                 LibrarySortOrder.RECENTLY_ADDED -> filtered.sortedByDescending { it.importDate }
                 LibrarySortOrder.RECENTLY_OPENED -> filtered.sortedByDescending { it.lastOpened ?: 0L }
             }
         }
 }
 
-enum class LibrarySortOrder { TITLE, RECENTLY_ADDED, RECENTLY_OPENED }
+/** Lot 2a.1 — « Récents » et « Récemment lus » fusionnés en RECENTLY_OPENED (decision actee, un seul `lastOpened` dans le domaine). */
+enum class LibrarySortOrder { RECENTLY_ADDED, TITLE, AUTHOR, RECENTLY_OPENED }
 
-/** Tâche 1c — 3 dispositions, pas 2 (legacy : Liste / Grille / Grille-couvertures-seules). */
-enum class LibraryLayoutMode { LIST, GRID, GRID_COVERS }
-
-fun LibraryLayoutMode.next(): LibraryLayoutMode = when (this) {
-    LibraryLayoutMode.LIST -> LibraryLayoutMode.GRID
-    LibraryLayoutMode.GRID -> LibraryLayoutMode.GRID_COVERS
-    LibraryLayoutMode.GRID_COVERS -> LibraryLayoutMode.LIST
-}
+/** Lot 2a.1 — 2 dispositions, pas 3 : GRID (couverture + titre) retiree, decision finale UX (grille couvertures seules). */
+enum class LibraryLayoutMode { LIST, GRID_COVERS }
 
 sealed interface LibraryIntent {
     data class OpenPublication(val publicationId: String) : LibraryIntent
@@ -69,7 +77,9 @@ sealed interface LibraryIntent {
     data class ChangeFilter(val filter: FilterMode, val value: String? = null) : LibraryIntent
     data class SetSearchQuery(val query: String) : LibraryIntent
     data class SetSortOrder(val order: LibrarySortOrder) : LibraryIntent
-    data object CycleLayout : LibraryIntent
+    data class SetLayoutMode(val mode: LibraryLayoutMode) : LibraryIntent
+    data class ToggleFileFormat(val format: PublicationFormat) : LibraryIntent
+    data object ClearFileFormats : LibraryIntent
     data object Refresh : LibraryIntent
     data object DismissError : LibraryIntent
     // C.3 — Régénération et réinitialisation des couvertures

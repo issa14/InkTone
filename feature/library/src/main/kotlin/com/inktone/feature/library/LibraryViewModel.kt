@@ -58,9 +58,13 @@ class LibraryViewModel @Inject constructor(
             is LibraryIntent.ChangeFilter -> observePublications(intent.filter, intent.value)
             is LibraryIntent.SetSearchQuery -> _state.value = _state.value.copy(searchQuery = intent.query)
             is LibraryIntent.SetSortOrder -> _state.value = _state.value.copy(sortOrder = intent.order)
-            is LibraryIntent.CycleLayout -> _state.value = _state.value.copy(
-                layoutMode = _state.value.layoutMode.next(),
+            is LibraryIntent.SetLayoutMode -> _state.value = _state.value.copy(layoutMode = intent.mode)
+            is LibraryIntent.ToggleFileFormat -> _state.value = _state.value.copy(
+                selectedFormats = _state.value.selectedFormats.let {
+                    if (intent.format in it) it - intent.format else it + intent.format
+                },
             )
+            is LibraryIntent.ClearFileFormats -> _state.value = _state.value.copy(selectedFormats = emptySet())
             is LibraryIntent.Refresh -> observePublications(
                 _state.value.activeFilter,
                 _state.value.filterValue,
