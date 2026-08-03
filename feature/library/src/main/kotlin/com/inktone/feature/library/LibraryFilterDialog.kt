@@ -35,8 +35,9 @@ import com.inktone.domain.model.PublicationFormat
  *
  * [showStatusFilter] = false depuis l'écran de détail Séries/Tags
  * (lot 2a.4) : y appliquer un changement de statut (ALL/UNREAD/...)
- * réinitialiserait le filtre serveur SERIES/TAG qui définit cet écran —
- * seuls tri, mise en page et type de fichier y ont un sens.
+ * réinitialiserait le filtre serveur SERIES/TAG qui définit cet écran.
+ * [showLayoutSection] = false au même endroit : cet écran est toujours
+ * en vue Liste (décision de la cible), pas de bascule à y proposer.
  */
 private val StatusFilterOptions = listOf(FilterMode.ALL, FilterMode.UNREAD, FilterMode.IN_PROGRESS, FilterMode.READ)
 
@@ -52,15 +53,16 @@ private fun FilterMode.statusLabel() = when (this) {
 fun LibraryFilterDialog(
     sortOrder: LibrarySortOrder,
     onSortOrderChange: (LibrarySortOrder) -> Unit,
-    statusFilter: FilterMode,
-    onStatusFilterChange: (FilterMode) -> Unit,
-    layoutMode: LibraryLayoutMode,
-    onLayoutModeChange: (LibraryLayoutMode) -> Unit,
+    statusFilter: FilterMode = FilterMode.ALL,
+    onStatusFilterChange: (FilterMode) -> Unit = {},
+    layoutMode: LibraryLayoutMode = LibraryLayoutMode.LIST,
+    onLayoutModeChange: (LibraryLayoutMode) -> Unit = {},
     selectedFormats: Set<PublicationFormat>,
     onToggleFormat: (PublicationFormat) -> Unit,
     onClearFormats: () -> Unit,
     onDismiss: () -> Unit,
     showStatusFilter: Boolean = true,
+    showLayoutSection: Boolean = true,
 ) {
     Dialog(onDismissRequest = onDismiss) {
         Surface(shape = RoundedCornerShape(20.dp), color = MaterialTheme.colorScheme.surface) {
@@ -89,26 +91,28 @@ fun LibraryFilterDialog(
                     }
                 }
 
-                FilterSectionTitle("Mise en page")
-                Row(
-                    horizontalArrangement = Arrangement.spacedBy(16.dp),
-                    modifier = Modifier.padding(vertical = 4.dp),
-                ) {
-                    LibraryLayoutMode.entries.forEach { mode ->
-                        val selected = layoutMode == mode
-                        IconButton(
-                            onClick = { onLayoutModeChange(mode) },
-                            modifier = Modifier
-                                .background(
-                                    color = if (selected) MaterialTheme.colorScheme.primaryContainer else MaterialTheme.colorScheme.surfaceVariant,
-                                    shape = RoundedCornerShape(12.dp),
-                                ),
-                        ) {
-                            Icon(
-                                mode.icon(),
-                                contentDescription = mode.label(),
-                                tint = if (selected) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurfaceVariant,
-                            )
+                if (showLayoutSection) {
+                    FilterSectionTitle("Mise en page")
+                    Row(
+                        horizontalArrangement = Arrangement.spacedBy(16.dp),
+                        modifier = Modifier.padding(vertical = 4.dp),
+                    ) {
+                        LibraryLayoutMode.entries.forEach { mode ->
+                            val selected = layoutMode == mode
+                            IconButton(
+                                onClick = { onLayoutModeChange(mode) },
+                                modifier = Modifier
+                                    .background(
+                                        color = if (selected) MaterialTheme.colorScheme.primaryContainer else MaterialTheme.colorScheme.surfaceVariant,
+                                        shape = RoundedCornerShape(12.dp),
+                                    ),
+                            ) {
+                                Icon(
+                                    mode.icon(),
+                                    contentDescription = mode.label(),
+                                    tint = if (selected) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurfaceVariant,
+                                )
+                            }
                         }
                     }
                 }

@@ -46,27 +46,38 @@ data class LibraryUiState(
         get() = publications.filter { it.lastOpened != null }.maxByOrNull { it.lastOpened!! }
 
     val displayedPublications: List<Publication>
-        get() {
-            val searched = if (searchQuery.isBlank()) {
-                publications
-            } else {
-                publications.filter { publication ->
-                    publication.title.contains(searchQuery, ignoreCase = true) ||
-                        publication.authors.any { it.contains(searchQuery, ignoreCase = true) }
-                }
-            }
-            val filtered = if (selectedFormats.isEmpty()) {
-                searched
-            } else {
-                searched.filter { it.format in selectedFormats }
-            }
-            return when (sortOrder) {
-                LibrarySortOrder.TITLE -> filtered.sortedBy { it.title.lowercase() }
-                LibrarySortOrder.AUTHOR -> filtered.sortedWith(compareBy(nullsLast()) { it.authors.firstOrNull()?.lowercase() })
-                LibrarySortOrder.RECENTLY_ADDED -> filtered.sortedByDescending { it.importDate }
-                LibrarySortOrder.RECENTLY_OPENED -> filtered.sortedByDescending { it.lastOpened ?: 0L }
-            }
+        get() = publications.filterAndSort(searchQuery, selectedFormats, sortOrder)
+}
+
+/**
+ * Lot 2a.4 — factorisé pour être partagé avec `LibraryDetailUiState`
+ * (écran de détail Séries/Tags), même filtre recherche/format/tri que
+ * la Bibliothèque, pas de logique dupliquée.
+ */
+internal fun List<Publication>.filterAndSort(
+    searchQuery: String,
+    selectedFormats: Set<PublicationFormat>,
+    sortOrder: LibrarySortOrder,
+): List<Publication> {
+    val searched = if (searchQuery.isBlank()) {
+        this
+    } else {
+        filter { publication ->
+            publication.title.contains(searchQuery, ignoreCase = true) ||
+                publication.authors.any { it.contains(searchQuery, ignoreCase = true) }
         }
+    }
+    val filtered = if (selectedFormats.isEmpty()) {
+        searched
+    } else {
+        searched.filter { it.format in selectedFormats }
+    }
+    return when (sortOrder) {
+        LibrarySortOrder.TITLE -> filtered.sortedBy { it.title.lowercase() }
+        LibrarySortOrder.AUTHOR -> filtered.sortedWith(compareBy(nullsLast()) { it.authors.firstOrNull()?.lowercase() })
+        LibrarySortOrder.RECENTLY_ADDED -> filtered.sortedByDescending { it.importDate }
+        LibrarySortOrder.RECENTLY_OPENED -> filtered.sortedByDescending { it.lastOpened ?: 0L }
+    }
 }
 
 /** Lot 2a.1 — « Récents » et « Récemment lus » fusionnés en RECENTLY_OPENED (decision actee, un seul `lastOpened` dans le domaine). */

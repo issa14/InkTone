@@ -612,9 +612,13 @@ private fun LibraryContent(
     }
 }
 
-/** Rangée compacte pour le mode Liste — couverture miniature à gauche, titre + auteur à droite. */
+/**
+ * Rangée compacte pour le mode Liste — couverture miniature à gauche,
+ * titre + auteur à droite. `internal` (lot 2a.4) : réutilisée telle
+ * quelle par l'écran de détail Séries/Tags, pas de duplication.
+ */
 @Composable
-private fun PublicationListRow(
+internal fun PublicationListRow(
     publication: Publication,
     onClick: () -> Unit,
     onToggleFavorite: () -> Unit,
