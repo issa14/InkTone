@@ -154,7 +154,7 @@ fun InkToneNavHost(navController: NavHostController = rememberNavController()) {
         }
         composable<AboutRoute> {
             BackScaffold(title = "A propos", onBack = navController::popBackStack) {
-                AboutScreen()
+                AboutScreen(versionName = BuildConfig.VERSION_NAME)
             }
         }
     }

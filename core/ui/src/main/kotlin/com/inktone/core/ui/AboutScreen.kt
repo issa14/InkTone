@@ -31,11 +31,11 @@ import androidx.compose.ui.unit.sp
 
 /**
  * D.5 — Version dynamique, liens cliquables, mentions techniques corrigées.
- * [versionName] et [onOpenUrl] permettent au caller (module `app`) de
- * fournir `BuildConfig.VERSION_NAME` et `LocalUriHandler`.
+ * [versionName] permet au caller (module `app`) de fournir
+ * `BuildConfig.VERSION_NAME` — `core:ui` n'a pas `buildConfig` activé.
  */
 @Composable
-fun AboutScreen(versionName: String = "0.1.0", onOpenUrl: (String) -> Unit = {}) {
+fun AboutScreen(versionName: String = "0.1.0") {
     val uriHandler = LocalUriHandler.current
     Column(
         modifier = Modifier
@@ -87,7 +87,7 @@ fun AboutScreen(versionName: String = "0.1.0", onOpenUrl: (String) -> Unit = {})
         )
 
         Spacer(Modifier.height(16.dp))
-        Text("© 2026 InkTone.", color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.6f), fontSize = 11.sp, textAlign = TextAlign.Center)
+        Text("© ${java.time.Year.now().value} InkTone.", color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.6f), fontSize = 11.sp, textAlign = TextAlign.Center)
         Spacer(Modifier.height(32.dp))
     }
 }
