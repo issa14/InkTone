@@ -16,7 +16,6 @@ import androidx.compose.foundation.layout.FlowRow
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
-import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
@@ -38,10 +37,6 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.layout.onGloballyPositioned
 import androidx.compose.ui.layout.positionInParent
 import androidx.compose.ui.platform.LocalDensity
-import androidx.compose.ui.semantics.LiveRegionMode
-import androidx.compose.ui.semantics.contentDescription
-import androidx.compose.ui.semantics.liveRegion
-import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.AnnotatedString
 import androidx.compose.ui.text.SpanStyle
 import androidx.compose.ui.text.buildAnnotatedString
@@ -311,22 +306,10 @@ fun ReaderScreen(viewModel: ReaderViewModel = hiltViewModel(), onSearchClick: ()
 
             // B.7 — Overlay visuel des captions retiré (UX §Lecture — couche
             // TTS : jugé trop encombrant, notamment sur les phrases longues).
-            // L'annonce TalkBack de la phrase en cours est conservée sur un
-            // nœud sémantique sans rendu visuel — signalé au rapport de
-            // livraison du lot, pas tranché silencieusement.
-            if (state.isPlaying && selectedRange == null) {
-                val captionText = sentences.getOrNull(state.currentSentenceIndex)?.text
-                if (captionText != null) {
-                    Box(
-                        modifier = Modifier
-                            .size(1.dp)
-                            .semantics {
-                                liveRegion = LiveRegionMode.Polite
-                                contentDescription = captionText
-                            },
-                    )
-                }
-            }
+            // L'annonce TalkBack par nœud liveRegion, ajoutée pour ne pas
+            // perdre l'accessibilité, a été retirée après vérification sur
+            // appareil (lot 1, point 11) : elle fait doublon avec la voix
+            // TTS déjà active et les deux se chevauchent à l'oreille.
         }
 
         if (selectedRange != null) {
