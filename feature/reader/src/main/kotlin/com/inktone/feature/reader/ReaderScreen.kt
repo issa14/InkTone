@@ -16,6 +16,7 @@ import androidx.compose.foundation.layout.FlowRow
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
@@ -38,12 +39,12 @@ import androidx.compose.ui.layout.onGloballyPositioned
 import androidx.compose.ui.layout.positionInParent
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.semantics.LiveRegionMode
+import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.liveRegion
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.AnnotatedString
 import androidx.compose.ui.text.SpanStyle
 import androidx.compose.ui.text.buildAnnotatedString
-import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.withStyle
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
@@ -308,25 +309,22 @@ fun ReaderScreen(viewModel: ReaderViewModel = hiltViewModel(), onSearchClick: ()
                 }
             }
 
-            // B.7 — Captions TTS (overlay sous-titres)
+            // B.7 — Overlay visuel des captions retiré (UX §Lecture — couche
+            // TTS : jugé trop encombrant, notamment sur les phrases longues).
+            // L'annonce TalkBack de la phrase en cours est conservée sur un
+            // nœud sémantique sans rendu visuel — signalé au rapport de
+            // livraison du lot, pas tranché silencieusement.
             if (state.isPlaying && selectedRange == null) {
                 val captionText = sentences.getOrNull(state.currentSentenceIndex)?.text
                 if (captionText != null) {
                     Box(
                         modifier = Modifier
-                            .align(Alignment.BottomCenter)
-                            .fillMaxWidth()
-                            .background(Color.Black.copy(alpha = 0.65f))
-                            .padding(horizontal = 16.dp, vertical = 12.dp)
-                            .semantics { liveRegion = LiveRegionMode.Polite },
-                    ) {
-                        Text(
-                            text = captionText,
-                            color = Color.White,
-                            style = MaterialTheme.typography.bodyMedium,
-                            textAlign = TextAlign.Center,
-                        )
-                    }
+                            .size(1.dp)
+                            .semantics {
+                                liveRegion = LiveRegionMode.Polite
+                                contentDescription = captionText
+                            },
+                    )
                 }
             }
         }
