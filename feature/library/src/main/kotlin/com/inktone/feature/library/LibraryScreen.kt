@@ -430,7 +430,7 @@ private fun LibraryTopBar(
                         color = MaterialTheme.colorScheme.onPrimary,
                     )
                     Icon(
-                        AppIcons.Loading, // flèche vers le bas via rotation
+                        AppIcons.ChevronDown,
                         contentDescription = "Changer de vue",
                         tint = MaterialTheme.colorScheme.onPrimary.copy(alpha = 0.5f),
                         modifier = Modifier.size(16.dp),
@@ -487,7 +487,7 @@ private fun LibraryTopBar(
                     modifier = Modifier.padding(horizontal = 24.dp, vertical = 8.dp),
                     color = MaterialTheme.colorScheme.primary)
                 ActionSheetItem("Importer", AppIcons.Data) { showActionsSheet = false; onImportClick() }
-                ActionSheetItem("Actualiser", AppIcons.Loading) { showActionsSheet = false; onRefresh() }
+                ActionSheetItem("Actualiser", AppIcons.Refresh) { showActionsSheet = false; onRefresh() }
                 // C.3 — Régénérer et réinitialiser les couvertures
                 ActionSheetItem("Régénérer les couvertures", AppIcons.Hint) {
                     showActionsSheet = false

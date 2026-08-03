@@ -22,10 +22,13 @@ import androidx.compose.material.icons.outlined.Error
 import androidx.compose.material.icons.outlined.HourglassEmpty
 import androidx.compose.material.icons.outlined.ImportContacts
 import androidx.compose.material.icons.outlined.Info
+import androidx.compose.material.icons.outlined.KeyboardArrowDown
 import androidx.compose.material.icons.outlined.Lightbulb
 import androidx.compose.material.icons.outlined.Mic
 import androidx.compose.material.icons.outlined.Palette
+import androidx.compose.material.icons.outlined.PhotoLibrary
 import androidx.compose.material.icons.outlined.RecordVoiceOver
+import androidx.compose.material.icons.outlined.Refresh
 import androidx.compose.material.icons.outlined.Save
 import androidx.compose.material.icons.outlined.Search
 import androidx.compose.material.icons.outlined.Settings
@@ -68,6 +71,8 @@ object AppIcons {
     val Mic = Icons.Outlined.Mic
     val Speaking = Icons.AutoMirrored.Outlined.VolumeUp
     val Loading = Icons.Outlined.HourglassEmpty
+    val Refresh = Icons.Outlined.Refresh
+    val ChevronDown = Icons.Outlined.KeyboardArrowDown
     val Stats = Icons.Outlined.BarChart
 
     val Search = Icons.Outlined.Search
@@ -79,5 +84,5 @@ object AppIcons {
     // Tâche 1c — icônes de disposition de bibliothèque
     val ViewGrid = Icons.Outlined.Widgets
     val ViewList = Icons.AutoMirrored.Outlined.ViewList
-    val CoverOnly = Icons.Outlined.ViewDay
+    val CoverOnly = Icons.Outlined.PhotoLibrary
 }
