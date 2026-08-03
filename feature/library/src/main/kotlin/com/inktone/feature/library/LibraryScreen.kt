@@ -319,7 +319,7 @@ private fun DrawerFooterItem(label: String, icon: androidx.compose.ui.graphics.v
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
-private fun LibraryTopBar(
+internal fun LibraryTopBar(
     onMenuClick: () -> Unit,
     searchQuery: String,
     onSearchQueryChange: (String) -> Unit,

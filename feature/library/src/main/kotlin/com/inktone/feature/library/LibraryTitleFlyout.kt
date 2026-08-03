@@ -3,10 +3,11 @@ package com.inktone.feature.library
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.width
-import androidx.compose.foundation.lazy.LazyColumn
-import androidx.compose.foundation.lazy.items
+import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.verticalScroll
 import androidx.compose.material3.DropdownMenu
 import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.MaterialTheme
@@ -78,8 +79,17 @@ fun LibraryTitleFlyout(
                     FlyoutCategory.TAGS -> onNavigateToTagDetail
                     null -> { _: String -> }
                 }
-                LazyColumn(Modifier.width(180.dp).padding(vertical = 4.dp)) {
-                    items(entries, key = { it.first }) { (name, count) ->
+                // Column simple, pas LazyColumn (SubcomposeLayout) : incompatible
+                // avec les mesures intrinsèques du contenu de DropdownMenu — même
+                // raisonnement que SeriesGroupedView (liste bornée en pratique).
+                Column(
+                    Modifier
+                        .width(180.dp)
+                        .heightIn(max = 280.dp)
+                        .verticalScroll(rememberScrollState())
+                        .padding(vertical = 4.dp),
+                ) {
+                    entries.forEach { (name, count) ->
                         FlyoutCategoryRow("$name ($count)") { onNavigate(name); onDismiss() }
                     }
                 }
