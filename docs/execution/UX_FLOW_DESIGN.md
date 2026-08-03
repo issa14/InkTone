@@ -88,10 +88,11 @@ Premier lancement → Onboarding → Bibliothèque (centre de navigation)
 5. Icône menu 3-points — ouvre un bottom sheet (contenu détaillé et **maquetté** plus loin, § Bottom sheet du menu 3-points).
 
 **Corps, état vide :**
-- Illustration : étagère avec emplacements de livres en pointillés (suggère l'absence de contenu plutôt qu'un vide complet).
-- Titre : « Votre bibliothèque est vide » (inventé par Claude, à valider).
-- Corps : « Importez votre premier livre pour commencer à lire et écouter avec InkTone. » (inventé par Claude, à valider).
+- Illustration : étagère avec emplacements de livres en pointillés (suggère l'absence de contenu plutôt qu'un vide complet). **Non produite au lot 2a** — asset vectoriel à créer, `AppIcons.Reading` (icône générique) reste en repli en attendant, signalé explicitement plutôt que présenté comme conforme.
+- Titre : « Votre bibliothèque est vide » — **textes validés** (lot 2a).
+- Corps : « Importez votre premier livre pour commencer à lire et écouter avec InkTone. » — **texte validé** (lot 2a).
 - Bouton central, icône + libellé : « Importer votre premier livre ».
+- **Ajout à la cible (lot 2a, non prévu à l'origine) :** variante affichée quand un import est déjà en cours (« Import en cours… », pas de bouton) — état réel et utile du code, conservé plutôt que perdu ; à arbitrer si une conception dédiée est souhaitée.
 
 ### Éléments décrits par Issa, contenu actée à l'oral — **depuis entièrement maquettés** (§ Popup de filtrage, § Bottom sheet du menu 3-points)
 

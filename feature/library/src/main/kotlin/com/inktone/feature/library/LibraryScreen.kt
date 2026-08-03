@@ -661,9 +661,19 @@ private fun ImportProgressBanner(progress: ImportProgress) {
 // ──── Phase 4 — États vide et erreur ────
 
 /**
- * État bibliothèque vide avec illustration et bouton d'import direct.
- * Texte différent si un import est en cours (l'utilisateur a déjà
- * déclenché un import, pas besoin de lui redemander).
+ * État bibliothèque vide, textes alignés sur la cible validée (UX
+ * §Bibliothèque état vide, lot 2a.6). Texte différent si un import est
+ * en cours (l'utilisateur a déjà déclenché un import, pas besoin de lui
+ * redemander) — cas absent de la cible, conservé et consigné dans
+ * UX_FLOW_DESIGN.md comme ajout plutôt que laissé en zone grise.
+ *
+ * Illustration cible : étagère avec emplacements de livres en
+ * pointillés (asset vectoriel dédié). **Non produite ce lot** — je n'ai
+ * pas d'outil de génération d'image fiable ici, et un `VectorDrawable`
+ * bricolé à la main aurait été de qualité douteuse sans validation
+ * visuelle possible (pas d'émulateur/device pour ce point précis).
+ * `AppIcons.Reading` reste un repli générique, pas présenté comme
+ * conforme — signalé au rapport de livraison.
  */
 @Composable
 private fun EmptyState(hasActiveImport: Boolean, onImportClick: () -> Unit) {
@@ -676,13 +686,13 @@ private fun EmptyState(hasActiveImport: Boolean, onImportClick: () -> Unit) {
                 tint = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.4f),
             )
             Text(
-                if (hasActiveImport) "Import en cours…" else "Bibliothèque vide",
+                if (hasActiveImport) "Import en cours…" else "Votre bibliothèque est vide",
                 style = MaterialTheme.typography.titleMedium,
                 modifier = Modifier.padding(top = 16.dp),
             )
             Text(
                 if (hasActiveImport) "Vos livres apparaîtront ici une fois l'import terminé."
-                else "Importez un EPUB pour commencer votre bibliothèque.",
+                else "Importez votre premier livre pour commencer à lire et écouter avec InkTone.",
                 style = MaterialTheme.typography.bodyMedium,
                 color = MaterialTheme.colorScheme.onSurfaceVariant,
                 textAlign = TextAlign.Center,
@@ -690,7 +700,7 @@ private fun EmptyState(hasActiveImport: Boolean, onImportClick: () -> Unit) {
             )
             if (!hasActiveImport) {
                 Button(onClick = onImportClick, modifier = Modifier.padding(top = 16.dp)) {
-                    Text("Importer des livres")
+                    Text("Importer votre premier livre")
                 }
             }
         }
