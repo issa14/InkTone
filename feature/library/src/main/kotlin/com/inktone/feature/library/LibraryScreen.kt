@@ -112,6 +112,7 @@ fun LibraryScreen(
     onOpenBookmarks: () -> Unit = {},
     onOpenStats: () -> Unit = {},
     onImportClick: () -> Unit = {},
+    onOpenSettings: () -> Unit = {},
     onOpenAbout: () -> Unit = {},
     onOpenThemePicker: () -> Unit = {},
 ) {
@@ -157,6 +158,10 @@ fun LibraryScreen(
                     onOpenStats = {
                         scope.launch { drawerState.close() }
                         onOpenStats()
+                    },
+                    onOpenSettings = {
+                        scope.launch { drawerState.close() }
+                        onOpenSettings()
                     },
                     onOpenAbout = {
                         scope.launch { drawerState.close() }
@@ -251,6 +256,7 @@ private fun LibraryDrawerContent(
     onSelectFilter: (FilterMode, String?) -> Unit,
     onOpenBookmarks: () -> Unit,
     onOpenStats: () -> Unit,
+    onOpenSettings: () -> Unit = {},
     onOpenAbout: () -> Unit = {},
     onOpenThemePicker: () -> Unit = {},
 ) {

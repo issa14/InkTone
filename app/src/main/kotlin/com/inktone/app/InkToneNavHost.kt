@@ -72,6 +72,8 @@ fun InkToneNavHost(navController: NavHostController = rememberNavController()) {
                 onNavigateToReader = { publicationId -> navController.navigate(ReaderRoute(publicationId)) },
                 onOpenBookmarks = { navController.navigate(BookmarksRoute) },
                 onOpenStats = { navController.navigate(StatisticsRoute) },
+                onOpenSettings = { navController.navigate(SettingsRoute) },
+                onOpenAbout = { navController.navigate(AboutRoute) },
                 onImportClick = { importLauncher.launch(arrayOf("application/epub+zip", "text/plain")) },
                 // Tache 1.0 (Partie 1) : seul l'import reste dans le FAB.
                 // Search/Stats/Settings sont atteignables uniquement depuis
