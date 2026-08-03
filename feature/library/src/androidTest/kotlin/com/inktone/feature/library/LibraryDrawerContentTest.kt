@@ -14,9 +14,12 @@ import org.junit.Rule
 import org.junit.Test
 
 /**
- * Lot 1 — garde-fou du critère « zéro décoration » : un item du drawer
- * qui n'appelle rien fait échouer ce test. `LibraryDrawerContent` est
- * sans état (pattern `SettingsContent`, `SettingsAccessibilityTest`).
+ * Lot 1/2a.5 — garde-fou du critère « zéro décoration » : un item du
+ * drawer qui n'appelle rien fait échouer ce test. `LibraryDrawerContent`
+ * est sans état (pattern `SettingsContent`, `SettingsAccessibilityTest`).
+ * Depuis 2a.5, ne porte plus que 3 destinations + 2 boutons de pied —
+ * les filtres/Séries/Auteurs/Tags transitoires du lot 1 sont retirés
+ * (déplacés vers le flyout du titre, 2a.3).
  */
 class LibraryDrawerContentTest {
 
@@ -24,13 +27,29 @@ class LibraryDrawerContentTest {
     val composeTestRule = createAndroidComposeRule<ComponentActivity>()
 
     @Test
+    fun bibliotheque_declenche_son_callback() {
+        var clicked = false
+        composeTestRule.setContent {
+            MaterialTheme {
+                LibraryDrawerContent(
+                    onSelectLibrary = { clicked = true },
+                    onOpenBookmarks = {},
+                    onOpenStats = {},
+                )
+            }
+        }
+
+        composeTestRule.onNodeWithText("Bibliothèque").performClick()
+
+        assertEquals(true, clicked)
+    }
+
+    @Test
     fun marque_pages_et_notes_declenche_son_callback() {
         var clicked = false
         composeTestRule.setContent {
             MaterialTheme {
                 LibraryDrawerContent(
-                    state = LibraryUiState(),
-                    onSelectFilter = { _, _ -> },
                     onOpenBookmarks = { clicked = true },
                     onOpenStats = {},
                 )
@@ -48,8 +67,6 @@ class LibraryDrawerContentTest {
         composeTestRule.setContent {
             MaterialTheme {
                 LibraryDrawerContent(
-                    state = LibraryUiState(),
-                    onSelectFilter = { _, _ -> },
                     onOpenBookmarks = {},
                     onOpenStats = { clicked = true },
                 )
@@ -67,8 +84,6 @@ class LibraryDrawerContentTest {
         composeTestRule.setContent {
             MaterialTheme {
                 LibraryDrawerContent(
-                    state = LibraryUiState(),
-                    onSelectFilter = { _, _ -> },
                     onOpenBookmarks = {},
                     onOpenStats = {},
                     onOpenSettings = { clicked = true },
@@ -87,8 +102,6 @@ class LibraryDrawerContentTest {
         composeTestRule.setContent {
             MaterialTheme {
                 LibraryDrawerContent(
-                    state = LibraryUiState(),
-                    onSelectFilter = { _, _ -> },
                     onOpenBookmarks = {},
                     onOpenStats = {},
                     onOpenAbout = { clicked = true },
@@ -102,12 +115,10 @@ class LibraryDrawerContentTest {
     }
 
     @Test
-    fun le_drawer_n_affiche_pas_recents_debug_ni_theme() {
+    fun le_drawer_n_affiche_plus_les_filtres_transitoires_du_lot_1() {
         composeTestRule.setContent {
             MaterialTheme {
                 LibraryDrawerContent(
-                    state = LibraryUiState(),
-                    onSelectFilter = { _, _ -> },
                     onOpenBookmarks = {},
                     onOpenStats = {},
                 )
@@ -117,6 +128,9 @@ class LibraryDrawerContentTest {
         composeTestRule.onAllNodesWithText("Récents").assertCountEquals(0)
         composeTestRule.onAllNodesWithText("Debug").assertCountEquals(0)
         composeTestRule.onAllNodesWithText("Thème").assertCountEquals(0)
+        composeTestRule.onAllNodesWithText("Favoris").assertCountEquals(0)
+        composeTestRule.onAllNodesWithText("Séries").assertCountEquals(0)
+        composeTestRule.onAllNodesWithText("Tags").assertCountEquals(0)
     }
 
     @Test
@@ -124,8 +138,6 @@ class LibraryDrawerContentTest {
         composeTestRule.setContent {
             MaterialTheme {
                 LibraryDrawerContent(
-                    state = LibraryUiState(),
-                    onSelectFilter = { _, _ -> },
                     onOpenBookmarks = {},
                     onOpenStats = {},
                 )

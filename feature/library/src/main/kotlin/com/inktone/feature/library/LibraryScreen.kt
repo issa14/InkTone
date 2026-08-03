@@ -35,7 +35,6 @@ import androidx.compose.material3.DismissibleDrawerSheet
 import androidx.compose.material3.DismissibleNavigationDrawer
 import androidx.compose.material3.ElevatedCard
 import androidx.compose.material3.ExperimentalMaterial3Api
-import androidx.compose.material3.FilterChip
 import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
@@ -145,11 +144,7 @@ fun LibraryScreen(
         drawerContent = {
             DismissibleDrawerSheet {
                 LibraryDrawerContent(
-                    state = state,
-                    onSelectFilter = { filter, value ->
-                        viewModel.onIntent(LibraryIntent.ChangeFilter(filter, value))
-                        scope.launch { drawerState.close() }
-                    },
+                    onSelectLibrary = { scope.launch { drawerState.close() } },
                     onOpenBookmarks = {
                         scope.launch { drawerState.close() }
                         onOpenBookmarks()
@@ -191,8 +186,6 @@ fun LibraryScreen(
                     onClearFormats = { viewModel.onIntent(LibraryIntent.ClearFileFormats) },
                     onRefresh = { viewModel.onIntent(LibraryIntent.Refresh) },
                     onImportClick = onImportClick,
-                    onRegenerateCovers = { viewModel.onIntent(LibraryIntent.RegenerateCovers) },
-                    onResetCovers = { viewModel.onIntent(LibraryIntent.ResetCovers) },
                     activeFilter = state.activeFilter,
                     filterValue = state.filterValue,
                     onSelectFilter = { filter, value -> viewModel.onIntent(LibraryIntent.ChangeFilter(filter, value)) },
@@ -208,12 +201,6 @@ fun LibraryScreen(
         ) { innerPadding ->
             Column(Modifier.fillMaxSize().padding(innerPadding)) {
                 ImportProgressBanner(state.importProgress)
-                TagsFilterBar(
-                    tags = state.availableTags,
-                    activeFilter = state.activeFilter,
-                    activeValue = state.filterValue,
-                    onSelect = { viewModel.onIntent(LibraryIntent.ChangeFilter(FilterMode.TAG, it)) },
-                )
 
                 when {
                     state.isLoading -> LibraryShimmerGrid()
@@ -250,10 +237,9 @@ fun LibraryScreen(
 
 @Composable
 internal fun LibraryDrawerContent(
-    state: LibraryUiState,
-    onSelectFilter: (FilterMode, String?) -> Unit,
     onOpenBookmarks: () -> Unit,
     onOpenStats: () -> Unit,
+    onSelectLibrary: () -> Unit = {},
     onOpenSettings: () -> Unit = {},
     onOpenAbout: () -> Unit = {},
 ) {
@@ -289,7 +275,7 @@ internal fun LibraryDrawerContent(
             label = { Text("Bibliothèque") },
             icon = { Icon(AppIcons.Reading, contentDescription = null) },
             selected = true,
-            onClick = {},
+            onClick = onSelectLibrary,
         )
         NavigationDrawerItem(
             label = { Text("Marque-pages et Notes") },
@@ -303,46 +289,6 @@ internal fun LibraryDrawerContent(
             selected = false,
             onClick = onOpenStats,
         )
-        // Transitoire, lot 1 : deplace vers le flyout du titre au lot 2 (UX §Menu deroulant du titre)
-        SelectableFilters.forEach { filter ->
-            NavigationDrawerItem(
-                label = { Text(filter.label()) },
-                selected = state.activeFilter == filter,
-                onClick = { onSelectFilter(filter, null) },
-            )
-        }
-        if (state.availableSeries.isNotEmpty()) {
-            Text("Séries", style = MaterialTheme.typography.titleSmall, modifier = Modifier.padding(top = 16.dp, bottom = 4.dp))
-            state.availableSeries.forEach { series ->
-                NavigationDrawerItem(
-                    label = { Text(series) },
-                    selected = state.activeFilter == FilterMode.SERIES && state.filterValue == series,
-                    onClick = { onSelectFilter(FilterMode.SERIES, series) },
-                )
-            }
-        }
-        if (state.availableAuthors.isNotEmpty()) {
-            Text("Auteurs", style = MaterialTheme.typography.titleSmall, modifier = Modifier.padding(top = 16.dp, bottom = 4.dp))
-            state.availableAuthors.forEach { author ->
-                NavigationDrawerItem(
-                    label = { Text(author) },
-                    selected = state.activeFilter == FilterMode.BY_AUTHOR && state.filterValue == author,
-                    onClick = { onSelectFilter(FilterMode.BY_AUTHOR, author) },
-                )
-            }
-        }
-        if (state.availableTags.isNotEmpty()) {
-            Text("Tags", style = MaterialTheme.typography.titleSmall, modifier = Modifier.padding(top = 16.dp, bottom = 4.dp))
-            LazyRow(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                rowItems(state.availableTags, key = { it }) { tag ->
-                    FilterChip(
-                        selected = state.activeFilter == FilterMode.TAG && state.filterValue == tag,
-                        onClick = { onSelectFilter(FilterMode.TAG, tag) },
-                        label = { Text(tag) },
-                    )
-                }
-            }
-        }
 
         // ──── #2 Footer drawer ────
         Spacer(Modifier.height(24.dp))
@@ -386,8 +332,6 @@ private fun LibraryTopBar(
     onClearFormats: () -> Unit,
     onRefresh: () -> Unit,
     onImportClick: () -> Unit,
-    onRegenerateCovers: () -> Unit = {},
-    onResetCovers: () -> Unit = {},
     // C.4 — filtre actif pour le titre cliquable
     activeFilter: FilterMode = FilterMode.ALL,
     filterValue: String? = null,
@@ -520,15 +464,6 @@ private fun LibraryTopBar(
                     color = MaterialTheme.colorScheme.primary)
                 ActionSheetItem("Importer", AppIcons.Data) { showActionsSheet = false; onImportClick() }
                 ActionSheetItem("Actualiser", AppIcons.Refresh) { showActionsSheet = false; onRefresh() }
-                // C.3 — Régénérer et réinitialiser les couvertures
-                ActionSheetItem("Régénérer les couvertures", AppIcons.Hint) {
-                    showActionsSheet = false
-                    onRegenerateCovers()
-                }
-                ActionSheetItem("Réinitialiser les couvertures", AppIcons.ErrorOutlined) {
-                    showActionsSheet = false
-                    onResetCovers()
-                }
             }
         }
     }
@@ -684,10 +619,6 @@ private fun ResumeReadingCard(publication: Publication, onClick: () -> Unit) {
     }
 }
 
-// Modes sans valeur associee uniquement (SERIES/TAG/BY_AUTHOR ont leur
-// propre point d'entree dans le drawer, avec la valeur exacte requise).
-private val SelectableFilters = listOf(FilterMode.ALL, FilterMode.FAVORITES, FilterMode.UNREAD, FilterMode.IN_PROGRESS, FilterMode.READ)
-
 private fun FilterMode.label() = when (this) {
     FilterMode.ALL -> "Tous"
     FilterMode.FAVORITES -> "Favoris"
@@ -797,34 +728,6 @@ private fun ErrorState(message: String, onRetry: () -> Unit, onDismiss: () -> Un
                 OutlinedButton(onClick = onDismiss) { Text("Ignorer") }
                 Button(onClick = onRetry) { Text("Réessayer") }
             }
-        }
-    }
-}
-
-// ──── Phase 2 — Composants de navigation enrichie ────
-
-/**
- * Barre de tags horizontale affichée sous la [FilterRow], hors du drawer.
- * Visible uniquement si des tags existent (legacy : [TagsFilterBar]).
- */
-@Composable
-private fun TagsFilterBar(
-    tags: List<String>,
-    activeFilter: FilterMode,
-    activeValue: String?,
-    onSelect: (String) -> Unit,
-) {
-    if (tags.isEmpty()) return
-    LazyRow(
-        horizontalArrangement = Arrangement.spacedBy(8.dp),
-        contentPadding = PaddingValues(horizontal = 8.dp, vertical = 4.dp),
-    ) {
-        rowItems(tags, key = { it }) { tag ->
-            FilterChip(
-                selected = activeFilter == FilterMode.TAG && activeValue == tag,
-                onClick = { onSelect(tag) },
-                label = { Text(tag) },
-            )
         }
     }
 }
