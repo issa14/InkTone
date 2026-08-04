@@ -570,11 +570,12 @@ internal fun PublicationListRow(
         modifier = Modifier
             .fillMaxWidth()
             .clickable(onClick = onClick)
-            .padding(horizontal = 12.dp, vertical = 6.dp),
+            .padding(horizontal = 12.dp, vertical = 9.dp),
     ) {
         Row(verticalAlignment = Alignment.CenterVertically) {
-            // Couverture miniature — 48dp de large, ratio 0.7
-            Box(modifier = Modifier.size(width = 48.dp, height = 68.dp)) {
+            // Couverture miniature — 72dp de large, ratio 0.7 (x1.5 — bloc par
+            // livre jugé trop étroit en vérification device, lot 2b)
+            Box(modifier = Modifier.size(width = 72.dp, height = 102.dp)) {
                 BookCover(
                     publication = publication,
                     onClick = {},
