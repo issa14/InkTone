@@ -46,14 +46,15 @@ import org.junit.Test
  * du surlignage lui-même, qu'une capture d'écran seule pourrait
  * atteindre mais de façon plus fragile.
  *
- * Écart déclaré : ce fichier compile mais n'a pas pu être exécuté sur
- * appareil au moment de son écriture — `:feature:reader:mergeDebugAndroidTestNativeLibs`
- * échoue avant même d'installer l'APK de test, `libonnxruntime.so`
- * présent en double (build CMake de `infrastructure:tts` + AAR
- * `onnxruntime-android`). Confirmé pré-existant et sans rapport avec ce
- * lot : `ReadingResumeTest`, déjà présent et inchangé, échoue à
- * l'identique. Hors périmètre de 3a — à corriger séparément avant de
- * pouvoir vérifier ces trois tests sur appareil.
+ * Vérifié sur appareil réel (V2206, Android 14) : 3/3 tests verts. A
+ * nécessité d'ajouter `packaging.jniLibs.pickFirsts` pour
+ * `libonnxruntime.so` dans `feature/reader/build.gradle.kts` — la même
+ * règle que `infrastructure/tts` avait déjà pour son propre packaging,
+ * mais qui ne se propage pas aux modules consommateurs
+ * (`androidTestImplementation(project(":infrastructure:tts"))` tire le
+ * doublon dans l'APK de test de ce module) ; bloquait tout test
+ * instrumenté du module, pas seulement ceux-ci (confirmé via
+ * `ReadingResumeTest`, préexistant et inchangé).
  */
 class PagedChapterContentTest {
 

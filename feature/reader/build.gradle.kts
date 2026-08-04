@@ -27,6 +27,20 @@ android {
     compileOptions {
         isCoreLibraryDesugaringEnabled = true
     }
+
+    // androidTestImplementation(project(":infrastructure:tts")) (ci-dessous)
+    // tire transitivement les deux sources de libonnxruntime.so (vendore
+    // par sherpa-onnx + AAR onnxruntime-android) dans l'APK de test de CE
+    // module. infrastructure/tts a deja tranche ce doublon pour son propre
+    // packaging (meme regle, voir son build.gradle.kts) mais packaging{}
+    // ne se propage pas aux modules consommateurs - repeter la regle ici
+    // est necessaire, pas redondant. Sans elle, mergeDebugAndroidTestNativeLibs
+    // echoue avant meme d'installer l'APK de test.
+    packaging {
+        jniLibs {
+            pickFirsts += "**/libonnxruntime.so"
+        }
+    }
 }
 
 dependencies {
