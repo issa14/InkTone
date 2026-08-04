@@ -322,6 +322,8 @@ Flèche de retour, puis titre du livre (plus grand) et nom de l'auteur en dessou
 
 **Chaque icône ouvre son propre écran/panneau** — à concevoir un par un dans un prochain palier, pas tous en même temps.
 
+**État d'implémentation (lot 3b).** Rangée 3 du panneau : **5 icônes** et non 4 — la Recherche dans le livre y est conservée, faute d'autre point d'entrée vers l'écran de recherche (décision actée). Luminosité absente jusqu'au lot 3c, son action n'existant pas encore. Navigation par chapitre retirée du panneau, en attente de la barre de contrôle TTS (lot 3d) ; entre-temps elle passe par le Sommaire. Micro-indicateur ETA retiré : absent de la cible.
+
 ---
 
 ## Écran : Lecture — popup de sélection de texte
