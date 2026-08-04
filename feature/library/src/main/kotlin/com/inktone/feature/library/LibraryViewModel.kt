@@ -7,6 +7,7 @@ import com.inktone.domain.model.ReadingState
 import com.inktone.domain.repository.PublicationRepository
 import com.inktone.domain.repository.ReadingStateRepository
 import com.inktone.domain.service.ImportProgressObserver
+import com.inktone.domain.usecase.DeletePublicationUseCase
 import com.inktone.domain.usecase.ToggleFavoriteUseCase
 import com.inktone.domain.usecase.TogglePinUseCase
 import dagger.hilt.android.lifecycle.HiltViewModel
@@ -26,6 +27,7 @@ class LibraryViewModel @Inject constructor(
     private val readingStateRepository: ReadingStateRepository,
     private val toggleFavorite: ToggleFavoriteUseCase,
     private val togglePin: TogglePinUseCase,
+    private val deletePublication: DeletePublicationUseCase,
     private val importProgressObserver: ImportProgressObserver,
 ) : ViewModel() {
 
@@ -59,6 +61,9 @@ class LibraryViewModel @Inject constructor(
             }
             is LibraryIntent.TogglePin -> viewModelScope.launch {
                 togglePin(intent.publicationId, intent.isPinned)
+            }
+            is LibraryIntent.DeletePublication -> viewModelScope.launch {
+                deletePublication(intent.publicationId)
             }
             is LibraryIntent.ChangeFilter -> observePublications(intent.filter, intent.value)
             is LibraryIntent.SetSearchQuery -> _state.value = _state.value.copy(searchQuery = intent.query)

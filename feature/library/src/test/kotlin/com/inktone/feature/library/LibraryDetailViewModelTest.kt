@@ -4,7 +4,9 @@ import com.inktone.core.testing.fake.FakePublicationRepository
 import com.inktone.core.testing.fake.FakeReadingStateRepository
 import com.inktone.domain.model.Publication
 import com.inktone.domain.model.PublicationFormat
+import com.inktone.domain.usecase.DeletePublicationUseCase
 import com.inktone.domain.usecase.ToggleFavoriteUseCase
+import com.inktone.domain.usecase.TogglePinUseCase
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.test.StandardTestDispatcher
@@ -40,7 +42,7 @@ class LibraryDetailViewModelTest {
         repository.insert(publication("1", seriesName = "Trilogie du Vide"))
         repository.insert(publication("2", seriesName = "Trilogie du Vide"))
         repository.insert(publication("3", seriesName = "Autre série"))
-        val viewModel = LibraryDetailViewModel(repository, FakeReadingStateRepository(), ToggleFavoriteUseCase(repository))
+        val viewModel = LibraryDetailViewModel(repository, FakeReadingStateRepository(), ToggleFavoriteUseCase(repository), TogglePinUseCase(repository), DeletePublicationUseCase(repository))
 
         viewModel.onIntent(LibraryDetailIntent.Load(LibraryDetailCategory.SERIES, "Trilogie du Vide"))
         dispatcher.scheduler.advanceUntilIdle()
@@ -53,7 +55,7 @@ class LibraryDetailViewModelTest {
         val repository = FakePublicationRepository()
         repository.insert(publication("1", subjects = listOf("Fantasy")))
         repository.insert(publication("2", subjects = listOf("SF")))
-        val viewModel = LibraryDetailViewModel(repository, FakeReadingStateRepository(), ToggleFavoriteUseCase(repository))
+        val viewModel = LibraryDetailViewModel(repository, FakeReadingStateRepository(), ToggleFavoriteUseCase(repository), TogglePinUseCase(repository), DeletePublicationUseCase(repository))
 
         viewModel.onIntent(LibraryDetailIntent.Load(LibraryDetailCategory.TAG, "Fantasy"))
         dispatcher.scheduler.advanceUntilIdle()

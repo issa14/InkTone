@@ -37,6 +37,8 @@ sealed interface LibraryDetailIntent {
     data class Load(val category: LibraryDetailCategory, val value: String) : LibraryDetailIntent
     data class OpenPublication(val publicationId: String) : LibraryDetailIntent
     data class ToggleFavorite(val publicationId: String, val isFavorite: Boolean) : LibraryDetailIntent
+    data class TogglePin(val publicationId: String, val isPinned: Boolean) : LibraryDetailIntent
+    data class DeletePublication(val publicationId: String) : LibraryDetailIntent
     data class SetSearchQuery(val query: String) : LibraryDetailIntent
     data class SetSortOrder(val order: LibrarySortOrder) : LibraryDetailIntent
     data class ToggleFileFormat(val format: PublicationFormat) : LibraryDetailIntent

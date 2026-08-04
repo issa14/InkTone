@@ -94,6 +94,7 @@ sealed interface LibraryIntent {
     data class OpenPublication(val publicationId: String) : LibraryIntent
     data class ToggleFavorite(val publicationId: String, val isFavorite: Boolean) : LibraryIntent
     data class TogglePin(val publicationId: String, val isPinned: Boolean) : LibraryIntent
+    data class DeletePublication(val publicationId: String) : LibraryIntent
     data class ChangeFilter(val filter: FilterMode, val value: String? = null) : LibraryIntent
     data class SetSearchQuery(val query: String) : LibraryIntent
     data class SetSortOrder(val order: LibrarySortOrder) : LibraryIntent

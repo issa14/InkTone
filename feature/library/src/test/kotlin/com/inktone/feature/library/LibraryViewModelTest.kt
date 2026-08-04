@@ -6,6 +6,7 @@ import com.inktone.core.testing.fake.FakeReadingStateRepository
 import com.inktone.domain.model.Publication
 import com.inktone.domain.model.PublicationFormat
 import com.inktone.domain.service.ImportProgress
+import com.inktone.domain.usecase.DeletePublicationUseCase
 import com.inktone.domain.usecase.ToggleFavoriteUseCase
 import com.inktone.domain.usecase.TogglePinUseCase
 import kotlinx.coroutines.Dispatchers
@@ -42,7 +43,7 @@ class LibraryViewModelTest {
     fun `expose les publications observees par le repository`() = runTest {
         val repository = FakePublicationRepository()
         repository.insert(publication("pub-1"))
-        val viewModel = LibraryViewModel(repository, FakeReadingStateRepository(), ToggleFavoriteUseCase(repository), TogglePinUseCase(repository), FakeImportProgressObserver())
+        val viewModel = LibraryViewModel(repository, FakeReadingStateRepository(), ToggleFavoriteUseCase(repository), TogglePinUseCase(repository), DeletePublicationUseCase(repository), FakeImportProgressObserver())
 
         dispatcher.scheduler.advanceUntilIdle()
 
@@ -54,7 +55,7 @@ class LibraryViewModelTest {
     fun `ouvrir une publication emet un effet de navigation`() = runTest {
         val repository = FakePublicationRepository()
         repository.insert(publication("pub-1"))
-        val viewModel = LibraryViewModel(repository, FakeReadingStateRepository(), ToggleFavoriteUseCase(repository), TogglePinUseCase(repository), FakeImportProgressObserver())
+        val viewModel = LibraryViewModel(repository, FakeReadingStateRepository(), ToggleFavoriteUseCase(repository), TogglePinUseCase(repository), DeletePublicationUseCase(repository), FakeImportProgressObserver())
         dispatcher.scheduler.advanceUntilIdle()
 
         var effect: LibraryEffect? = null
@@ -71,7 +72,7 @@ class LibraryViewModelTest {
     @Test
     fun `reflete la progression d'import observee`() = runTest {
         val importProgressObserver = FakeImportProgressObserver()
-        val viewModel = LibraryViewModel(FakePublicationRepository(), FakeReadingStateRepository(), ToggleFavoriteUseCase(FakePublicationRepository()), TogglePinUseCase(FakePublicationRepository()), importProgressObserver)
+        val viewModel = LibraryViewModel(FakePublicationRepository(), FakeReadingStateRepository(), ToggleFavoriteUseCase(FakePublicationRepository()), TogglePinUseCase(FakePublicationRepository()), DeletePublicationUseCase(FakePublicationRepository()), importProgressObserver)
         dispatcher.scheduler.advanceUntilIdle()
         assertEquals(ImportProgress(), viewModel.state.value.importProgress)
 

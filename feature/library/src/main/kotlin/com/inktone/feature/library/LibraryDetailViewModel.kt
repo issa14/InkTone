@@ -5,7 +5,9 @@ import androidx.lifecycle.viewModelScope
 import com.inktone.domain.model.FilterMode
 import com.inktone.domain.repository.PublicationRepository
 import com.inktone.domain.repository.ReadingStateRepository
+import com.inktone.domain.usecase.DeletePublicationUseCase
 import com.inktone.domain.usecase.ToggleFavoriteUseCase
+import com.inktone.domain.usecase.TogglePinUseCase
 import dagger.hilt.android.lifecycle.HiltViewModel
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.channels.Channel
@@ -27,6 +29,8 @@ class LibraryDetailViewModel @Inject constructor(
     private val publicationRepository: PublicationRepository,
     private val readingStateRepository: ReadingStateRepository,
     private val toggleFavorite: ToggleFavoriteUseCase,
+    private val togglePin: TogglePinUseCase,
+    private val deletePublication: DeletePublicationUseCase,
 ) : ViewModel() {
 
     private val _state = MutableStateFlow(LibraryDetailUiState())
@@ -45,6 +49,12 @@ class LibraryDetailViewModel @Inject constructor(
             }
             is LibraryDetailIntent.ToggleFavorite -> viewModelScope.launch {
                 toggleFavorite(intent.publicationId, intent.isFavorite)
+            }
+            is LibraryDetailIntent.TogglePin -> viewModelScope.launch {
+                togglePin(intent.publicationId, intent.isPinned)
+            }
+            is LibraryDetailIntent.DeletePublication -> viewModelScope.launch {
+                deletePublication(intent.publicationId)
             }
             is LibraryDetailIntent.SetSearchQuery -> _state.value = _state.value.copy(searchQuery = intent.query)
             is LibraryDetailIntent.SetSortOrder -> _state.value = _state.value.copy(sortOrder = intent.order)

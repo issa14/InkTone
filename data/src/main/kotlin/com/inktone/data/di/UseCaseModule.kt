@@ -20,6 +20,7 @@ import com.inktone.domain.usecase.GetStatisticsUseCase
 import com.inktone.domain.usecase.GetVoiceProfilesUseCase
 import com.inktone.domain.usecase.ImportPublicationUseCase
 import com.inktone.domain.usecase.SearchPublicationUseCase
+import com.inktone.domain.usecase.DeletePublicationUseCase
 import com.inktone.domain.usecase.ToggleFavoriteUseCase
 import com.inktone.domain.usecase.TogglePinUseCase
 import com.inktone.domain.usecase.UpdateReadingStateUseCase
@@ -84,6 +85,11 @@ object UseCaseModule {
     fun provideTogglePinUseCase(
         publicationRepository: PublicationRepository,
     ): TogglePinUseCase = TogglePinUseCase(publicationRepository)
+
+    @Provides
+    fun provideDeletePublicationUseCase(
+        publicationRepository: PublicationRepository,
+    ): DeletePublicationUseCase = DeletePublicationUseCase(publicationRepository)
 
     @Provides
     fun provideAddAnnotationUseCase(
