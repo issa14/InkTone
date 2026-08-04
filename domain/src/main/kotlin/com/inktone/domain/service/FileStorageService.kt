@@ -17,6 +17,16 @@ interface FileStorageService {
     suspend fun persistReadPermission(uri: String)
 
     /**
+     * Nom de fichier affichable (avec extension) résolu depuis une URI
+     * SAF `content://` — seule façon correcte de détecter un format par
+     * extension : l'URI elle-même est opaque, elle ne contient jamais le
+     * nom de fichier (bug réel trouvé lot 2a — le format TXT n'était
+     * jamais détecté sur un vrai fichier importé via SAF, seulement sur
+     * les URI de test qui se terminaient par hasard en `.txt`).
+     */
+    suspend fun getFileName(uri: String): String?
+
+    /**
      * Écrit [sourceFile] vers la destination SAF [uri] (Tâche 6.0 —
      * absent depuis la Phase 2 car rien n'écrivait de fichier utilisateur
      * jusqu'à l'export de la Phase 6). Retourne `false` sur tout échec
