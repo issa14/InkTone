@@ -385,7 +385,11 @@ internal fun LibraryTopBar(
                         verticalAlignment = Alignment.CenterVertically,
                     ) {
                         Text(
-                            filterValue ?: activeFilter.label(),
+                            // UX §Menu déroulant du titre : le titre adaptatif
+                            // affiche "Bibliothèque" à la racine (ALL sans
+                            // valeur), pas "Tous" — ce dernier reste le libellé
+                            // du filtre lui-même dans le flyout (2a.3).
+                            filterValue ?: if (activeFilter == FilterMode.ALL) "Bibliothèque" else activeFilter.label(),
                             style = MaterialTheme.typography.titleMedium,
                             color = MaterialTheme.colorScheme.onPrimary,
                         )
