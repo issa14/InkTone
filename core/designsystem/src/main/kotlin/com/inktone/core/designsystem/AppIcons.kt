@@ -20,6 +20,7 @@ import androidx.compose.material.icons.outlined.Bolt
 import androidx.compose.material.icons.outlined.BookmarkAdd
 import androidx.compose.material.icons.outlined.CheckCircle
 import androidx.compose.material.icons.outlined.ContentCopy
+import androidx.compose.material.icons.outlined.Contrast
 import androidx.compose.material.icons.outlined.Delete
 import androidx.compose.material.icons.outlined.EditNote
 import androidx.compose.material.icons.outlined.Error
@@ -94,6 +95,8 @@ object AppIcons {
     val Back = Icons.AutoMirrored.Outlined.ArrowBack
     val ReadingModePaged = Icons.Outlined.ViewDay
     val ReadingModeScroll = Icons.Outlined.ImportContacts
+    // Tache 3b.6 — bascule cyclique de theme (Clair -> Sombre -> Sepia).
+    val Theme = Icons.Outlined.Contrast
 
     // Tâche 1c — icônes de disposition de bibliothèque
     val ViewGrid = Icons.Outlined.Widgets

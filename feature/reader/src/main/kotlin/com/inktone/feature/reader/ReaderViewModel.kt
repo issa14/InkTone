@@ -221,6 +221,11 @@ class ReaderViewModel @Inject constructor(
                     )
                     val prefs = preferencesRepository.get()
                     _state.value = ReaderUiState(
+                        // 3b.3 — barre du haut (ReaderTopBar) : source
+                        // unique, jamais rechargé depuis un repository
+                        // dans le composable.
+                        title = publication.title,
+                        author = publication.authors.joinToString(", ").ifBlank { null },
                         chapters = result.documentModel.chapters,
                         tableOfContents = result.documentModel.tableOfContents,
                         currentChapterIndex = restored?.locator?.chapterIndex ?: 0,

@@ -15,6 +15,12 @@ import com.inktone.domain.valueobject.Locator
 enum class ReadingMode { SCROLL, PAGED }
 
 data class ReaderUiState(
+    // 3b.3 — titre/auteur du livre, alimentés à l'ouverture de la
+    // publication (ReaderViewModel.openPublication). Source unique pour
+    // la barre du haut (3b.5) : jamais rechargés depuis un repository
+    // dans le composable.
+    val title: String? = null,
+    val author: String? = null,
     val chapters: List<Chapter> = emptyList(),
     val currentChapterIndex: Int = 0,
     val tableOfContents: List<TableOfContentsEntry> = emptyList(),
@@ -87,23 +93,11 @@ data class ReaderUiState(
             return minOf(anchor, focus)..maxOf(anchor, focus)
         }
 
-    /**
-     * B.6 — Temps de lecture restant estimé pour le chapitre en cours.
-     * Basé sur 250 WPM par défaut et 15 mots par phrase (estimation
-     * conservative). À remplacer par `ReadingSession.wpm` réel quand
-     * disponible.
-     */
-    val etaText: String
-        get() {
-            val remainingSentences = currentChapter?.paragraphs
-                ?.flatMap { it.sentences }?.drop(currentSentenceIndex)?.size ?: return ""
-            if (remainingSentences <= 0) return ""
-            val avgWordsPerSentence = 15
-            val wpm = 250
-            val remainingWords = remainingSentences * avgWordsPerSentence
-            val minutes = (remainingWords.toFloat() / wpm).toInt().coerceAtLeast(1)
-            return "~$minutes min"
-        }
+    // 3b.4 — le micro-indicateur ETA (B.6) est retiré : absent de la
+    // cible, il occupait la même zone que StatusLineBar quand le HUD est
+    // masqué. Retrait consigné dans UX_FLOW_DESIGN.md (3b.8) : l'ETA
+    // était une information réelle, sa suppression est un choix
+    // d'alignement, pas une évidence.
 }
 
 private fun chapterCharCount(chapter: Chapter): Int =

@@ -41,6 +41,7 @@ import androidx.compose.ui.text.AnnotatedString
 import androidx.compose.ui.text.SpanStyle
 import androidx.compose.ui.text.buildAnnotatedString
 import androidx.compose.ui.text.withStyle
+import androidx.compose.ui.unit.IntSize
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.hilt.navigation.compose.hiltViewModel
@@ -52,6 +53,7 @@ import com.inktone.domain.model.ReadingOverrides
 import com.inktone.domain.model.ReadingTheme
 import com.inktone.domain.model.Sentence
 import com.inktone.domain.model.SleepTimerState
+import com.inktone.feature.reader.pagination.rememberChapterPaginationState
 
 /**
  * `effectiveSettings` (theme, taille de police) arrive déjà résolu dans
@@ -91,7 +93,11 @@ import com.inktone.domain.model.SleepTimerState
  */
 @OptIn(ExperimentalFoundationApi::class, ExperimentalLayoutApi::class, ExperimentalSharedTransitionApi::class)
 @Composable
-fun ReaderScreen(viewModel: ReaderViewModel = hiltViewModel(), onSearchClick: () -> Unit = {}) {
+fun ReaderScreen(
+    viewModel: ReaderViewModel = hiltViewModel(),
+    onSearchClick: () -> Unit = {},
+    onBack: () -> Unit = {},
+) {
     val state by viewModel.state.collectAsState()
     // Tache 9bis.3.1 : HUD (panneau de controle + boutons) visible par
     // defaut, se masque seul apres 4s (ImmersiveReaderChrome), un appui
@@ -144,8 +150,6 @@ fun ReaderScreen(viewModel: ReaderViewModel = hiltViewModel(), onSearchClick: ()
             ) { if (isHudVisible) isHudVisible = false else keepHudVisible() }
             .padding(16.dp),
     ) {
-        BookProgressBar(progression = state.bookProgression)
-
         // A.3 — État d'erreur : affiché quand le parsing ou l'ouverture
         // échoue, avec boutons Réessayer et Retour.
         val errorMessage = state.errorMessage
@@ -194,10 +198,34 @@ fun ReaderScreen(viewModel: ReaderViewModel = hiltViewModel(), onSearchClick: ()
             }
         }
 
-        // B.6 — ETA micro-indicateur quand HUD masqué
-        val etaText = state.etaText
+        // 3b.5 — barre du haut : appartient au HUD, apparaît/disparaît
+        // avec le panneau, jamais indépendamment (même gate isHudVisible).
+        if (isHudVisible) {
+            ReaderTopBar(title = state.title, author = state.author, onBack = onBack)
+        }
 
-        Box(modifier = Modifier.weight(1f)) {
+        // 3b.1 — état de pagination hissé au-dessus du choix de mode :
+        // sert la ligne de statut (3b.4, tous modes) ET PagedChapterContent
+        // (mode pagé), un seul calcul. Mesuré au même endroit de
+        // l'arborescence pour les deux modes (ce Box), formule unique de
+        // hauteur utile (voir ChapterPaginationState).
+        var readingAreaSize by remember { mutableStateOf(IntSize.Zero) }
+        val paginationPaddingPx = with(density) { 16.dp.roundToPx() }
+        val pagination = rememberChapterPaginationState(
+            chapter = state.currentChapter,
+            nextChapter = state.chapters.getOrNull(state.currentChapterIndex + 1),
+            currentSentenceIndex = state.currentSentenceIndex,
+            fontSizeSp = state.effectiveSettings.fontSize,
+            viewportWidthPx = readingAreaSize.width,
+            viewportHeightPx = readingAreaSize.height,
+            paddingPx = paginationPaddingPx,
+        )
+
+        Box(
+            modifier = Modifier
+                .weight(1f)
+                .onGloballyPositioned { coordinates -> readingAreaSize = coordinates.size },
+        ) {
             if (state.isReadingRulerEnabled) {
                 ReadingRuler(currentLineY = currentLineYDp, enabled = true)
             }
@@ -264,13 +292,12 @@ fun ReaderScreen(viewModel: ReaderViewModel = hiltViewModel(), onSearchClick: ()
                 ReadingMode.PAGED -> {
                     PagedChapterContent(
                         chapter = state.currentChapter,
-                        nextChapter = state.chapters.getOrNull(state.currentChapterIndex + 1),
+                        pagination = pagination,
                         currentSentenceIndex = state.currentSentenceIndex,
                         highlightedWordRange = state.highlightedWordRange,
                         selectedRange = selectedRange,
                         annotations = state.annotations,
                         currentChapterIndex = state.currentChapterIndex,
-                        fontSizeSp = state.effectiveSettings.fontSize,
                         textColor = ThemeColors.text(state.effectiveSettings.theme),
                         isReadingRulerEnabled = state.isReadingRulerEnabled,
                         onSentenceLongClick = { index -> viewModel.onIntent(ReaderIntent.BeginSentenceSelection(index)) },
@@ -283,23 +310,6 @@ fun ReaderScreen(viewModel: ReaderViewModel = hiltViewModel(), onSearchClick: ()
                         },
                         onNextChapter = { viewModel.onIntent(ReaderIntent.NextChapter) },
                         onCurrentLineY = { y -> currentLineYDp = y },
-                    )
-                }
-            }
-
-            // B.6 — Micro-indicateur ETA quand HUD masqué
-            if (!isHudVisible && etaText.isNotEmpty() && state.readingMode == ReadingMode.SCROLL) {
-                Box(
-                    modifier = Modifier
-                        .align(Alignment.BottomCenter)
-                        .padding(bottom = 24.dp)
-                        .background(Color.Black.copy(alpha = 0.35f), RoundedCornerShape(16.dp))
-                        .padding(horizontal = 12.dp, vertical = 4.dp),
-                ) {
-                    Text(
-                        text = etaText,
-                        color = Color.White.copy(alpha = 0.75f),
-                        style = MaterialTheme.typography.labelSmall,
                     )
                 }
             }
@@ -325,12 +335,11 @@ fun ReaderScreen(viewModel: ReaderViewModel = hiltViewModel(), onSearchClick: ()
             UnifiedControlPanel(
                 isPlaying = state.isPlaying,
                 sleepTimerActive = state.sleepTimer != null,
+                bookProgression = state.bookProgression,
                 onPlayPause = {
                     keepHudVisible()
                     viewModel.onIntent(if (state.isPlaying) ReaderIntent.Pause else ReaderIntent.PlayCurrentSentence)
                 },
-                onPreviousChapter = { keepHudVisible(); viewModel.onIntent(ReaderIntent.PreviousChapter) },
-                onNextChapter = { keepHudVisible(); viewModel.onIntent(ReaderIntent.NextChapter) },
                 onSleepTimerClick = {
                     keepHudVisible()
                     viewModel.onIntent(ReaderIntent.SetSleepTimer(nextSleepTimerMinutes(state.sleepTimer)))
@@ -338,18 +347,36 @@ fun ReaderScreen(viewModel: ReaderViewModel = hiltViewModel(), onSearchClick: ()
                 onSearchClick = { keepHudVisible(); onSearchClick() },
                 onBookmarksClick = { keepHudVisible(); viewModel.onIntent(ReaderIntent.ToggleBookmarkList) },
                 onTocClick = { keepHudVisible(); viewModel.onIntent(ReaderIntent.ToggleToc) },
+                onThemeCycle = {
+                    keepHudVisible()
+                    val overrides = (state.currentOverrides ?: ReadingOverrides())
+                        .copy(theme = nextReadingTheme(state.effectiveSettings.theme))
+                    viewModel.onIntent(ReaderIntent.SetOverrides(overrides))
+                },
                 onAaClick = { keepHudVisible(); showSettingsPanel = true },
                 onTtsClick = { keepHudVisible(); showTtsPanel = true },
                 onReadingModeClick = { keepHudVisible(); viewModel.onIntent(ReaderIntent.ToggleReadingMode) },
-                hasPreviousChapter = state.hasPreviousChapter,
-                hasNextChapter = state.hasNextChapter,
             )
 
+            // Transitoire : remplacé par le toggle du panneau Marque-pages au lot 3c.
             FlowRow(horizontalArrangement = Arrangement.spacedBy(4.dp)) {
                 Button(onClick = { keepHudVisible(); viewModel.onIntent(ReaderIntent.CreateBookmark) }) {
                     Text("+ Signet")
                 }
             }
+        }
+
+        // 3b.4 — ligne de statut persistante, hors HUD : visible en
+        // permanence, y compris panneau masqué. Le compteur de pages vient
+        // du contrat VirtualPagination (via l'état hissé ci-dessus),
+        // jamais d'un calcul local.
+        state.currentChapter?.let { chapter ->
+            StatusLineBar(
+                chapterNumber = state.currentChapterIndex + 1,
+                pageInChapter = pagination.pageIndexAt(chapter.index, state.currentSentenceIndex) + 1,
+                pageCountInChapter = pagination.pageCount(chapter.index),
+                bookProgression = state.bookProgression,
+            )
         }
 
         // B.2 — Panneau réglages lecture in-reader
@@ -398,6 +425,19 @@ fun ReaderScreen(viewModel: ReaderViewModel = hiltViewModel(), onSearchClick: ()
 }
 
 private val SLEEP_TIMER_OPTIONS_MINUTES = listOf(15, 30, 45, 60)
+
+/**
+ * Tâche 3b.6 — bascule cyclique du thème (icône Thème du panneau) : Clair
+ * → Sombre → Sépia → Clair, sans ouvrir de panneau, sans retour visuel
+ * autre que le changement lui-même. SYSTEM (jamais réglé par ce cycle,
+ * seulement possible comme état initial hérité des préférences globales)
+ * repart sur Clair plutôt que de rester coincé hors cycle.
+ */
+private fun nextReadingTheme(current: ReadingTheme): ReadingTheme = when (current) {
+    ReadingTheme.LIGHT -> ReadingTheme.DARK
+    ReadingTheme.DARK -> ReadingTheme.SEPIA
+    ReadingTheme.SEPIA, ReadingTheme.SYSTEM -> ReadingTheme.LIGHT
+}
 
 /**
  * Tache 9bis.3.3 — un appui sur l'icone Veille fait cycler les durees

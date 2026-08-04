@@ -101,7 +101,11 @@ fun InkToneNavHost(navController: NavHostController = rememberNavController()) {
                     ),
                 )
             }
-            ReaderScreen(viewModel = readerViewModel, onSearchClick = { navController.navigate(SearchRoute) })
+            ReaderScreen(
+                viewModel = readerViewModel,
+                onSearchClick = { navController.navigate(SearchRoute) },
+                onBack = { navController.popBackStack() },
+            )
             } // CompositionLocalProvider
         }
         composable<SearchRoute> {
