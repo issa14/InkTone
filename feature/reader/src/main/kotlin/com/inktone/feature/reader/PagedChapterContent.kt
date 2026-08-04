@@ -12,6 +12,7 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.State
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberUpdatedState
@@ -38,9 +39,12 @@ import com.inktone.domain.model.Annotation
 import com.inktone.domain.model.AnnotationColor
 import com.inktone.domain.model.Chapter
 import com.inktone.domain.model.Sentence
+import com.inktone.feature.reader.pagination.ChapterMeasurement
 import com.inktone.feature.reader.pagination.ChapterTextMeasurer
 import com.inktone.feature.reader.pagination.PaginationStyleKey
 import com.inktone.feature.reader.pagination.VirtualPaginationEngine
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.withContext
 
 /**
  * 3a.2 — Contenu paginé par swipe horizontal, rendu depuis le moteur de
@@ -64,11 +68,28 @@ import com.inktone.feature.reader.pagination.VirtualPaginationEngine
  * Le pager suit alors l'offset absolu du mot en cours (pas seulement
  * l'index de phrase) pour basculer automatiquement de page quand ce mot
  * est physiquement rendu sur la page suivante.
+ *
+ * **Mesure hors thread de composition, en deux temps (3a.3)** : la
+ * première page est mesurée sur un préfixe borné du chapitre
+ * (`ChapterTextMeasurer.measureFirstPage`, coût indépendant de la
+ * longueur du chapitre), affichée immédiatement dans sa mise en forme
+ * définitive — aucun repli sur le mode défilement, aucun squelette de
+ * chargement. Le reste du chapitre se mesure ensuite sur
+ * `Dispatchers.Default`. Si la phrase de reprise de lecture n'est pas
+ * couverte par le préfixe initial (reprise en milieu de chapitre), le
+ * préfixe est élargi par doublements successifs jusqu'à la couvrir ou
+ * jusqu'à épuiser le budget de tentatives — écart déclaré : dans ce
+ * dernier cas (reprise très profonde dans un chapitre inhabituellement
+ * long), un bref affichage de la première page peut précéder le saut
+ * vers la page réellement reprise, le temps que la mesure complète
+ * aboutisse. À vérifier sur appareil avec un chapitre long (point 9 de
+ * la checklist du lot).
  */
 @OptIn(ExperimentalFoundationApi::class)
 @Composable
 fun PagedChapterContent(
     chapter: Chapter?,
+    nextChapter: Chapter?,
     currentSentenceIndex: Int,
     highlightedWordRange: IntRange?,
     selectedRange: IntRange?,
@@ -99,17 +120,6 @@ fun PagedChapterContent(
     val sentences = chapter?.paragraphs?.flatMap { it.sentences } ?: emptyList()
 
     val contentWidthPx = viewportSize.width - paddingPx * 2
-    val measurement = if (chapter != null && contentWidthPx > 0) {
-        // Synchrone en composition pour l'instant — écart déclaré : la
-        // Tâche 3a.3 doit sortir ce calcul du thread de composition
-        // (mesure en deux temps, première page immédiate). Non traité ici
-        // pour respecter le séquencement du lot (3a.2 avant 3a.3).
-        remember(chapter.index, fontSizeSp, contentWidthPx) {
-            chapterTextMeasurer.measure(chapter, baseTextStyle, contentWidthPx)
-        }
-    } else {
-        null
-    }
 
     val styleKey = remember(fontSizeSp, viewportSize, paddingPx) {
         PaginationStyleKey(
@@ -122,15 +132,76 @@ fun PagedChapterContent(
         )
     }
 
-    // Recalcule la pagination (synchrone, cf. écart ci-dessus) si la clé
-    // de style a changé pour ce chapitre — no-op sinon (invalidation 3a.1).
-    if (chapter != null && measurement != null) {
-        remember(chapter.index, styleKey, measurement) {
-            paginationEngine.updateChapter(chapter.index, styleKey, measurement.lines, measurement.sentenceStartOffsets)
+    var measurement by remember(chapter?.index) { mutableStateOf<ChapterMeasurement?>(null) }
+    // Incrémenté à chaque mise à jour effective du cache du moteur : lui
+    // seul rend la pagination "observable" par Compose (le cache interne
+    // du moteur est une simple Map mutable, sa mutation ne déclenche pas
+    // de recomposition par elle-même).
+    var paginationVersion by remember { mutableIntStateOf(0) }
+    val currentSentenceIndexAtOpen = rememberUpdatedState(currentSentenceIndex)
+
+    LaunchedEffect(chapter?.index, styleKey) {
+        if (chapter == null || contentWidthPx <= 0) return@LaunchedEffect
+        val totalSentenceCount = sentences.size
+        val targetSentenceIndex = currentSentenceIndexAtOpen.value
+
+        // Première page : préfixe borné, coût indépendant de la longueur
+        // du chapitre — assez rapide pour rester sur le thread de
+        // composition (voir KDoc de la fonction).
+        var partial = chapterTextMeasurer.measureFirstPage(chapter, baseTextStyle, contentWidthPx)
+        measurement = partial
+        if (paginationEngine.updateChapter(chapter.index, styleKey, partial.lines, partial.sentenceStartOffsets, force = true)) {
+            paginationVersion++
+        }
+
+        // Reprise en milieu de chapitre : élargit le préfixe jusqu'à
+        // couvrir la phrase visée, plutôt que d'afficher la page 0 puis
+        // sauter brusquement une fois la mesure complète disponible.
+        var nextBudget = FIRST_PAGE_CHAR_BUDGET
+        var widenings = 0
+        while (
+            targetSentenceIndex >= partial.sentenceStartOffsets.size &&
+            partial.sentenceStartOffsets.size < totalSentenceCount &&
+            widenings < MAX_PROGRESSIVE_WIDENINGS
+        ) {
+            nextBudget *= 2
+            widenings++
+            partial = withContext(Dispatchers.Default) {
+                chapterTextMeasurer.measureFirstPage(chapter, baseTextStyle, contentWidthPx, nextBudget)
+            }
+            measurement = partial
+            if (paginationEngine.updateChapter(chapter.index, styleKey, partial.lines, partial.sentenceStartOffsets, force = true)) {
+                paginationVersion++
+            }
+        }
+
+        // Complète la pagination du reste du chapitre en arrière-plan —
+        // sauf si l'élargissement ci-dessus a déjà tout couvert.
+        val full = if (partial.sentenceStartOffsets.size >= totalSentenceCount) {
+            partial
+        } else {
+            withContext(Dispatchers.Default) { chapterTextMeasurer.measure(chapter, baseTextStyle, contentWidthPx) }
+        }
+        measurement = full
+        if (paginationEngine.updateChapter(chapter.index, styleKey, full.lines, full.sentenceStartOffsets, force = true)) {
+            paginationVersion++
+        }
+
+        // Préchargement du chapitre suivant (3a.3, évalué) : le chapitre
+        // affiché a priorité (mesuré en premier, ci-dessus) ; celui-ci ne
+        // fait que réchauffer le cache du moteur pour que le swipe vers
+        // le chapitre suivant trouve sa pagination déjà prête.
+        if (nextChapter != null) {
+            val nextMeasurement = withContext(Dispatchers.Default) {
+                chapterTextMeasurer.measure(nextChapter, baseTextStyle, contentWidthPx)
+            }
+            paginationEngine.updateChapter(nextChapter.index, styleKey, nextMeasurement.lines, nextMeasurement.sentenceStartOffsets)
         }
     }
 
-    val pageCount = if (chapter != null) paginationEngine.pageCount(chapter.index) else 1
+    val pageCount = remember(chapter?.index, paginationVersion) {
+        chapter?.let { paginationEngine.pageCount(it.index) } ?: 1
+    }
 
     // Page fantôme au-delà de la dernière (conservée telle quelle, 3a.1 —
     // ne pas refactoriser : c'est le correctif d'un bug réel déjà trouvé
@@ -155,11 +226,16 @@ fun PagedChapterContent(
         }
     }
 
+    // `measurement` (State déléguée par `by`) ne bénéficie pas du smart
+    // cast Kotlin après un null-check — capturer une copie locale non
+    // nullable partout où c'est nécessaire.
+    val currentMeasurement = measurement
+
     val absoluteHighlightedRange = if (
-        chapter != null && measurement != null && highlightedWordRange != null &&
-        currentSentenceIndex in measurement.sentenceStartOffsets.indices
+        chapter != null && currentMeasurement != null && highlightedWordRange != null &&
+        currentSentenceIndex in currentMeasurement.sentenceStartOffsets.indices
     ) {
-        val sentenceStart = measurement.sentenceStartOffsets[currentSentenceIndex]
+        val sentenceStart = currentMeasurement.sentenceStartOffsets[currentSentenceIndex]
         (sentenceStart + highlightedWordRange.first)..(sentenceStart + highlightedWordRange.last)
     } else {
         null
@@ -184,11 +260,17 @@ fun PagedChapterContent(
     // composable : un mot prononcé ne doit invalider que le dessin.
     val highlightedRangeState = rememberUpdatedState(absoluteHighlightedRange)
 
-    val absoluteSelectedRange = if (chapter != null && measurement != null && selectedRange != null && sentences.isNotEmpty()) {
-        val startSentence = selectedRange.first.coerceIn(sentences.indices)
-        val endSentence = selectedRange.last.coerceIn(sentences.indices)
-        val start = measurement.sentenceStartOffsets[startSentence]
-        val end = measurement.sentenceStartOffsets[endSentence] + sentences[endSentence].text.length - 1
+    // measurement.sentenceStartOffsets peut être plus court que sentences
+    // pendant la mesure en deux temps (3a.3, préfixe pas encore élargi) -
+    // borner sur ses propres indices, jamais sur ceux de sentences.
+    val absoluteSelectedRange = if (
+        chapter != null && currentMeasurement != null && selectedRange != null &&
+        currentMeasurement.sentenceStartOffsets.isNotEmpty()
+    ) {
+        val startSentence = selectedRange.first.coerceIn(currentMeasurement.sentenceStartOffsets.indices)
+        val endSentence = selectedRange.last.coerceIn(currentMeasurement.sentenceStartOffsets.indices)
+        val start = currentMeasurement.sentenceStartOffsets[startSentence]
+        val end = currentMeasurement.sentenceStartOffsets[endSentence] + sentences[endSentence].text.length - 1
         start..end
     } else {
         null
@@ -203,16 +285,16 @@ fun PagedChapterContent(
         beyondViewportPageCount = 1,
     ) { pageIndex ->
         Box(modifier = Modifier.fillMaxSize().padding(16.dp)) {
-            if (chapter != null && measurement != null && pageIndex < pageCount) {
+            if (chapter != null && currentMeasurement != null && pageIndex < pageCount) {
                 val pageOffsetRange = paginationEngine.pageOffsetRange(chapter.index, pageIndex)
                 val pageSentenceRange = paginationEngine.sentenceRangeOf(chapter.index, pageIndex)
                 if (!pageOffsetRange.isEmpty()) {
-                    val pageText = remember(measurement, pageOffsetRange, pageSentenceRange, annotations) {
+                    val pageText = remember(currentMeasurement, pageOffsetRange, pageSentenceRange, annotations) {
                         buildPageAnnotatedString(
-                            full = measurement.annotatedString,
+                            full = currentMeasurement.annotatedString,
                             pageOffsetRange = pageOffsetRange,
                             sentences = sentences,
-                            sentenceStartOffsets = measurement.sentenceStartOffsets,
+                            sentenceStartOffsets = currentMeasurement.sentenceStartOffsets,
                             pageSentenceRange = pageSentenceRange,
                             chapterIndex = currentChapterIndex,
                             annotations = annotations,
@@ -228,10 +310,10 @@ fun PagedChapterContent(
                         isReadingRulerEnabled = isReadingRulerEnabled,
                         onCurrentLineY = onCurrentLineY,
                         onOffsetLongPress = { absoluteOffset ->
-                            onSentenceLongClick(sentenceIndexForOffset(measurement.sentenceStartOffsets, absoluteOffset))
+                            onSentenceLongClick(sentenceIndexForOffset(currentMeasurement.sentenceStartOffsets, absoluteOffset))
                         },
                         onOffsetTap = { absoluteOffset ->
-                            onSentenceClick(sentenceIndexForOffset(measurement.sentenceStartOffsets, absoluteOffset))
+                            onSentenceClick(sentenceIndexForOffset(currentMeasurement.sentenceStartOffsets, absoluteOffset))
                         },
                     )
                 }
@@ -324,6 +406,12 @@ private fun DrawScope.drawAbsoluteRangeHighlight(
 
 private val WordHighlightColor = Color(0xFFFFEB3B)
 private val SelectionHighlightColor = Color(0x664FC3F7)
+
+/** Doit correspondre à la valeur par défaut de `ChapterTextMeasurer.measureFirstPage` — premier palier de la mesure en deux temps (3a.3). */
+private const val FIRST_PAGE_CHAR_BUDGET = 6000
+
+/** Nombre maximal de doublements du préfixe pour couvrir une reprise en milieu de chapitre (3a.3) — au-delà, on bascule sur la mesure complète sans attendre plus longtemps. */
+private const val MAX_PROGRESSIVE_WIDENINGS = 4
 
 /** Recherche linéaire volontaire : appelée uniquement sur tap/appui long, jamais par recomposition ni par mot prononcé — pas le O(n²) par page que corrige 3a.2. */
 private fun sentenceIndexForOffset(sentenceStartOffsets: List<Int>, absoluteOffset: Int): Int {

@@ -46,6 +46,13 @@ class VirtualPaginationEngine : VirtualPagination {
      * depuis le dernier appel. Aucun effet si le cache est déjà à jour
      * pour ce chapitre — c'est l'invalidation décrite en 3a.1.
      *
+     * [force] outrepasse ce court-circuit à clé de style égale — la
+     * mesure en deux temps de 3a.3 appelle plusieurs fois `updateChapter`
+     * pour le **même** chapitre et la **même** clé de style (page 1
+     * immédiate, puis chapitre complet une fois mesuré en arrière-plan) :
+     * sans `force`, le deuxième appel serait vu comme un cache hit et
+     * silencieusement ignoré.
+     *
      * Retourne `true` si un recalcul a effectivement eu lieu (utile pour
      * vérifier l'invalidation, Tâche 3a.4 test 7).
      */
@@ -54,9 +61,10 @@ class VirtualPaginationEngine : VirtualPagination {
         styleKey: PaginationStyleKey,
         lines: List<LineGeometry>,
         sentenceStartOffsets: List<Int>,
+        force: Boolean = false,
     ): Boolean {
         val existing = cache[chapterIndex]
-        if (existing != null && existing.styleKey == styleKey) return false
+        if (!force && existing != null && existing.styleKey == styleKey) return false
         val computed = computePages(lines, sentenceStartOffsets, styleKey.viewportHeightPx.toFloat())
         cache[chapterIndex] = ChapterEntry(styleKey, computed.sentenceRanges, computed.offsetRanges)
         return true

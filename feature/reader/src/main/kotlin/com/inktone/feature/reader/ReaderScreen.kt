@@ -264,6 +264,7 @@ fun ReaderScreen(viewModel: ReaderViewModel = hiltViewModel(), onSearchClick: ()
                 ReadingMode.PAGED -> {
                     PagedChapterContent(
                         chapter = state.currentChapter,
+                        nextChapter = state.chapters.getOrNull(state.currentChapterIndex + 1),
                         currentSentenceIndex = state.currentSentenceIndex,
                         highlightedWordRange = state.highlightedWordRange,
                         selectedRange = selectedRange,

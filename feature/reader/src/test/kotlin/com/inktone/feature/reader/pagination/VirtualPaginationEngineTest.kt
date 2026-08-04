@@ -212,6 +212,24 @@ class VirtualPaginationEngineTest {
     }
 
     @Test
+    fun `force outrepasse le court-circuit a cle de style egale`() {
+        val engine = VirtualPaginationEngine()
+        val (partialLines, partialOffsets) = uniformLines(3)
+        val (fullLines, fullOffsets) = uniformLines(10)
+
+        assertTrue(engine.updateChapter(0, defaultStyleKey, partialLines, partialOffsets))
+        assertEquals(2, engine.sentenceRangeOf(0, engine.pageCount(0) - 1).last)
+
+        // Même clé, force=false : ignoré, la pagination reste celle des 3 phrases.
+        assertFalse(engine.updateChapter(0, defaultStyleKey, fullLines, fullOffsets))
+
+        // Même clé, force=true : recalcule bel et bien avec les nouvelles données.
+        assertTrue(engine.updateChapter(0, defaultStyleKey, fullLines, fullOffsets, force = true))
+        val covered = (0 until engine.pageCount(0)).flatMap { engine.sentenceRangeOf(0, it).toList() }.toSet()
+        assertEquals(fullOffsets.indices.toSet(), covered)
+    }
+
+    @Test
     fun `hauteurs mixtes - un titre plus haut change le nombre de pages a texte egal`() {
         val engine = VirtualPaginationEngine()
 
