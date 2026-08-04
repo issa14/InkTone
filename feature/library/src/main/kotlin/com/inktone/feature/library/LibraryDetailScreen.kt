@@ -146,6 +146,11 @@ fun LibraryDetailScreen(
                         onToggleFavorite = {
                             viewModel.onIntent(LibraryDetailIntent.ToggleFavorite(publication.id, !publication.isFavorite))
                         },
+                        progressPercent = state.progressMap[publication.id] ?: 0,
+                        onTogglePin = {
+                            viewModel.onIntent(LibraryDetailIntent.TogglePin(publication.id, !publication.isPinned))
+                        },
+                        onDelete = { viewModel.onIntent(LibraryDetailIntent.DeletePublication(publication.id)) },
                     )
                 }
             }

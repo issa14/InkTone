@@ -10,9 +10,6 @@ import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.shape.CircleShape
-import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.filled.Star
-import androidx.compose.material.icons.outlined.StarBorder
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
@@ -140,13 +137,13 @@ fun BookCover(
                 modifier = Modifier.align(Alignment.TopEnd),
             ) {
                 Icon(
-                    if (publication.isFavorite) Icons.Filled.Star else Icons.Outlined.StarBorder,
+                    if (publication.isFavorite) AppIcons.Favorite else AppIcons.FavoriteBorder,
                     contentDescription = if (publication.isFavorite)
                         "Retirer des favoris"
                     else
                         "Ajouter aux favoris",
                     tint = if (publication.isFavorite)
-                        Color(0xFFFFC107) // Ambre — pas de rouge (rouge = suppression)
+                        MaterialTheme.colorScheme.primary
                     else
                         Color.White.copy(alpha = 0.85f),
                 )

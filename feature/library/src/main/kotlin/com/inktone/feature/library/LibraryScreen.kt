@@ -16,21 +16,15 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.LazyColumn
-import androidx.compose.foundation.lazy.LazyRow
 import androidx.compose.foundation.lazy.grid.GridCells
 import androidx.compose.foundation.lazy.grid.GridItemSpan
 import androidx.compose.foundation.lazy.grid.LazyVerticalGrid
 import androidx.compose.foundation.lazy.grid.items as gridItems
 import androidx.compose.foundation.lazy.items as listItems
-import androidx.compose.foundation.lazy.items as rowItems
 import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.filled.Star
 import androidx.compose.material.icons.outlined.MoreVert
 import androidx.compose.material.icons.outlined.Menu
-import androidx.compose.material.icons.outlined.Sort
-import androidx.compose.material.icons.outlined.StarBorder
 import androidx.compose.material.icons.outlined.Search
-import androidx.compose.material.icons.outlined.Close
 import androidx.compose.material3.DismissibleDrawerSheet
 import androidx.compose.material3.DismissibleNavigationDrawer
 import androidx.compose.material3.ElevatedCard
@@ -214,15 +208,6 @@ fun LibraryScreen(
                         onImportClick = onImportClick,
                     )
                     else -> {
-                        // Vue groupée par séries — uniquement en mode ALL
-                        if (state.activeFilter == FilterMode.ALL && state.availableSeries.isNotEmpty()) {
-                            SeriesGroupedView(
-                                publications = state.displayedPublications,
-                                onOpen = { id -> viewModel.onIntent(LibraryIntent.OpenPublication(id)) },
-                                onToggleFavorite = { id, fav -> viewModel.onIntent(LibraryIntent.ToggleFavorite(id, fav)) },
-                                onSelectSeries = { series -> viewModel.onIntent(LibraryIntent.ChangeFilter(FilterMode.SERIES, series)) },
-                            )
-                        }
                         LibraryContent(
                             state = state,
                             onOpen = { id -> viewModel.onIntent(LibraryIntent.OpenPublication(id)) },
@@ -550,6 +535,9 @@ private fun LibraryContent(
                         publication = publication,
                         onClick = { onOpen(publication.id) },
                         onToggleFavorite = { onToggleFavorite(publication.id, !publication.isFavorite) },
+                        progressPercent = state.progressMap[publication.id] ?: 0,
+                        onTogglePin = { onTogglePin(publication.id, !publication.isPinned) },
+                        onDelete = { onDelete(publication.id) },
                     )
                 }
             }
@@ -559,60 +547,111 @@ private fun LibraryContent(
 
 /**
  * Rangée compacte pour le mode Liste — couverture miniature à gauche,
- * titre + auteur à droite. `internal` (lot 2a.4) : réutilisée telle
- * quelle par l'écran de détail Séries/Tags, pas de duplication.
+ * titre + auteur à droite, cœur et 3-points côte à côte à l'extrême
+ * droite (pas empilés — décision affinée de la cible), barre de
+ * progression pleine largeur sous la rangée. `internal` (lot 2a.4) :
+ * réutilisée telle quelle par l'écran de détail Séries/Tags, pas de
+ * duplication.
  */
 @Composable
 internal fun PublicationListRow(
     publication: Publication,
     onClick: () -> Unit,
     onToggleFavorite: () -> Unit,
+    progressPercent: Int = 0,
+    onTogglePin: () -> Unit = {},
+    onDelete: () -> Unit = {},
 ) {
-    Row(
+    var showActionsSheet by remember { mutableStateOf(false) }
+    var showDetailsSheet by remember { mutableStateOf(false) }
+    var showDeleteConfirm by remember { mutableStateOf(false) }
+
+    Column(
         modifier = Modifier
             .fillMaxWidth()
             .clickable(onClick = onClick)
             .padding(horizontal = 12.dp, vertical = 6.dp),
-        verticalAlignment = Alignment.CenterVertically,
     ) {
-        // Couverture miniature — 48dp de large, ratio 0.7
-        Box(modifier = Modifier.size(width = 48.dp, height = 68.dp)) {
-            BookCover(
-                publication = publication,
-                onClick = {},
-                onToggleFavorite = {},
-                showTitle = false,
-                showOverlays = false,
-            )
-        }
-        Column(
-            modifier = Modifier
-                .weight(1f)
-                .padding(horizontal = 12.dp),
-        ) {
-            Text(
-                publication.title,
-                style = MaterialTheme.typography.titleSmall,
-                maxLines = 1,
-                overflow = TextOverflow.Ellipsis,
-            )
-            if (publication.authors.isNotEmpty()) {
+        Row(verticalAlignment = Alignment.CenterVertically) {
+            // Couverture miniature — 48dp de large, ratio 0.7
+            Box(modifier = Modifier.size(width = 48.dp, height = 68.dp)) {
+                BookCover(
+                    publication = publication,
+                    onClick = {},
+                    onToggleFavorite = {},
+                    showTitle = false,
+                    showOverlays = false,
+                )
+            }
+            Column(
+                modifier = Modifier
+                    .weight(1f)
+                    .padding(horizontal = 12.dp),
+            ) {
                 Text(
-                    publication.authors.joinToString(),
-                    style = MaterialTheme.typography.bodySmall,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    publication.title,
+                    style = MaterialTheme.typography.titleSmall,
                     maxLines = 1,
                     overflow = TextOverflow.Ellipsis,
                 )
+                if (publication.authors.isNotEmpty()) {
+                    Text(
+                        publication.authors.joinToString(),
+                        style = MaterialTheme.typography.bodySmall,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                        maxLines = 1,
+                        overflow = TextOverflow.Ellipsis,
+                    )
+                }
+            }
+            IconButton(onClick = onToggleFavorite) {
+                Icon(
+                    if (publication.isFavorite) AppIcons.Favorite else AppIcons.FavoriteBorder,
+                    contentDescription = if (publication.isFavorite) "Retirer des favoris" else "Ajouter aux favoris",
+                    tint = if (publication.isFavorite) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurfaceVariant,
+                )
+            }
+            IconButton(onClick = { showActionsSheet = true }) {
+                Icon(AppIcons.MoreActions, contentDescription = "Actions sur « ${publication.title} »", tint = MaterialTheme.colorScheme.onSurfaceVariant)
             }
         }
-        IconButton(onClick = onToggleFavorite) {
-            Icon(
-                if (publication.isFavorite) Icons.Filled.Star else Icons.Outlined.StarBorder,
-                contentDescription = if (publication.isFavorite) "Retirer des favoris" else "Ajouter aux favoris",
-                tint = if (publication.isFavorite) Color(0xFFFFC107) else MaterialTheme.colorScheme.onSurfaceVariant,
-            )
+        if (progressPercent > 0) {
+            Row(
+                modifier = Modifier.fillMaxWidth().padding(top = 4.dp),
+                verticalAlignment = Alignment.CenterVertically,
+            ) {
+                LinearProgressIndicator(
+                    progress = { progressPercent / 100f },
+                    modifier = Modifier.weight(1f),
+                )
+                Text(
+                    "$progressPercent%",
+                    style = MaterialTheme.typography.labelSmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    modifier = Modifier.padding(start = 8.dp),
+                )
+            }
         }
+    }
+
+    if (showActionsSheet) {
+        BookActionsSheet(
+            publication = publication,
+            onDismiss = { showActionsSheet = false },
+            onTogglePin = onTogglePin,
+            onShowDetails = { showDetailsSheet = true },
+            onRequestDelete = { showDeleteConfirm = true },
+        )
+    }
+    if (showDetailsSheet) {
+        BookDetailsSheet(publication = publication, onDismiss = { showDetailsSheet = false })
+    }
+    if (showDeleteConfirm) {
+        DeleteConfirmationDialog(
+            publicationTitle = publication.title,
+            onConfirm = { showDeleteConfirm = false; onDelete() },
+            onDismiss = { showDeleteConfirm = false },
+        )
     }
 }
 
@@ -753,64 +792,3 @@ private fun ErrorState(message: String, onRetry: () -> Unit, onDismiss: () -> Un
     }
 }
 
-/**
- * Vue groupée par séries — chaque série a un en-tête et une rangée
- * horizontale scrollable de couvertures à largeur fixe (110dp).
- * Affichée uniquement en mode ALL au-dessus de la grille principale.
- *
- * E.4 — N'utilise plus LazyColumn dans un Column scrollable (nested
- * scroll non défini sur Android). Itère avec forEach dans un Column
- * simple — la liste de séries est bornée, un LazyColumn n'est pas
- * nécessaire.
- */
-@Composable
-private fun SeriesGroupedView(
-    publications: List<Publication>,
-    onOpen: (String) -> Unit,
-    onToggleFavorite: (String, Boolean) -> Unit,
-    onSelectSeries: (String) -> Unit,
-) {
-    val grouped = publications
-        .filter { it.seriesName != null }
-        .groupBy { it.seriesName!! }
-
-    if (grouped.isEmpty()) return
-
-    Column(modifier = Modifier.padding(bottom = 8.dp)) {
-        grouped.forEach { (series, books) ->
-            Row(
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .clickable { onSelectSeries(series) }
-                    .padding(horizontal = 12.dp, vertical = 8.dp),
-                horizontalArrangement = Arrangement.SpaceBetween,
-                verticalAlignment = Alignment.CenterVertically,
-            ) {
-                Text(
-                    series,
-                    style = MaterialTheme.typography.titleSmall,
-                    fontWeight = androidx.compose.ui.text.font.FontWeight.Bold,
-                )
-                Text(
-                    "${books.size}",
-                    style = MaterialTheme.typography.labelSmall,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant,
-                )
-            }
-            LazyRow(
-                horizontalArrangement = Arrangement.spacedBy(8.dp),
-                contentPadding = PaddingValues(horizontal = 12.dp),
-            ) {
-                rowItems(books, key = { "series-${it.id}" }) { book ->
-                    BookCover(
-                        publication = book,
-                        onClick = { onOpen(book.id) },
-                        onToggleFavorite = { onToggleFavorite(book.id, !book.isFavorite) },
-                        modifier = Modifier.width(110.dp),
-                        showTitle = true,
-                    )
-                }
-            }
-        }
-    }
-}
