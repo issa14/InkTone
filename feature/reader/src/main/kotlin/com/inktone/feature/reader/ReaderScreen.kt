@@ -180,7 +180,6 @@ fun ReaderScreen(viewModel: ReaderViewModel = hiltViewModel(), onSearchClick: ()
         val scrollState = rememberScrollState()
         LaunchedEffect(state.currentChapterIndex) { scrollState.scrollTo(0) }
 
-        val sentences = state.currentChapter?.paragraphs?.flatMap { it.sentences } ?: emptyList()
         val selectedRange = state.selectedSentenceRange
         var pendingColor by remember { mutableStateOf(AnnotationColor.YELLOW) }
 
@@ -264,7 +263,7 @@ fun ReaderScreen(viewModel: ReaderViewModel = hiltViewModel(), onSearchClick: ()
                 }
                 ReadingMode.PAGED -> {
                     PagedChapterContent(
-                        sentences = sentences,
+                        chapter = state.currentChapter,
                         currentSentenceIndex = state.currentSentenceIndex,
                         highlightedWordRange = state.highlightedWordRange,
                         selectedRange = selectedRange,
@@ -272,7 +271,6 @@ fun ReaderScreen(viewModel: ReaderViewModel = hiltViewModel(), onSearchClick: ()
                         currentChapterIndex = state.currentChapterIndex,
                         fontSizeSp = state.effectiveSettings.fontSize,
                         textColor = ThemeColors.text(state.effectiveSettings.theme),
-                        isPlaying = state.isPlaying,
                         isReadingRulerEnabled = state.isReadingRulerEnabled,
                         onSentenceLongClick = { index -> viewModel.onIntent(ReaderIntent.BeginSentenceSelection(index)) },
                         onSentenceClick = { index ->
@@ -283,6 +281,7 @@ fun ReaderScreen(viewModel: ReaderViewModel = hiltViewModel(), onSearchClick: ()
                             }
                         },
                         onNextChapter = { viewModel.onIntent(ReaderIntent.NextChapter) },
+                        onCurrentLineY = { y -> currentLineYDp = y },
                     )
                 }
             }
