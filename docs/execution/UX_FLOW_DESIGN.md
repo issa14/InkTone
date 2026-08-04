@@ -292,6 +292,8 @@ Bibliothèque et Import sont maintenant complets. **Note historique, dépassée 
 
 « Redevenir prioritaire » pour la conception UX ne règle pas ces trois points — ils restent à corriger avant l'implémentation finale, pas juste à accepter parce que quelque chose existe déjà.
 
+**Mode pagé (lot 3a).** Les trois défauts signalés sont corrigés : pagination par mesure réelle du texte, plus par estimation au caractère ; recherche linéaire par phrase supprimée ; composant couvert par des tests. Un quatrième défaut trouvé à l'implémentation est corrigé au passage : le mode pagé forçait `ParagraphStyle.NORMAL`, rendant les titres de l'EPUB comme du texte courant — le respect des titres réels du fichier, acté au § Immersion, est rétabli. **Pages virtuelles disponibles dans les deux modes** ; leur affichage dans la ligne de statut arrive au lot 3b.
+
 ### Ligne de statut persistante (bas d'écran, toujours visible — y compris HUD masqué)
 
 Trois éléments sur une seule ligne, discrets mais lisibles :
