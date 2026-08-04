@@ -2,12 +2,15 @@ package com.inktone.feature.reader
 
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.size
+import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.layout.onGloballyPositioned
 import androidx.compose.ui.semantics.SemanticsNode
 import androidx.compose.ui.semantics.SemanticsProperties
 import androidx.compose.ui.test.SemanticsMatcher
@@ -21,11 +24,14 @@ import androidx.compose.ui.test.swipeLeft
 import androidx.compose.ui.text.AnnotatedString
 import androidx.compose.ui.text.SpanStyle
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.unit.IntSize
 import androidx.compose.ui.unit.dp
+import com.inktone.domain.model.Annotation
 import com.inktone.domain.model.Chapter
 import com.inktone.domain.model.Paragraph
 import com.inktone.domain.model.ParagraphStyle
 import com.inktone.domain.model.Sentence
+import com.inktone.feature.reader.pagination.rememberChapterPaginationState
 import org.junit.Assert.assertNotEquals
 import org.junit.Assert.assertTrue
 import org.junit.Rule
@@ -64,6 +70,53 @@ class PagedChapterContentTest {
     private fun sentence(index: Int, text: String, startOffset: Int): Sentence =
         Sentence(index = index, text = text, startOffset = startOffset, endOffset = startOffset + text.length)
 
+    /**
+     * Reproduit le hoisting de 3b.1 : mesure la zone réelle disponible
+     * (comme le `Box` partagé sous `ReaderScreen`) et hisse la pagination
+     * dessus, avant de rendre `PagedChapterContent` en pur consommateur —
+     * sinon la pagination calculée (viewport arbitraire) et le rendu
+     * effectif (taille réelle du `Box` de test) divergeraient.
+     */
+    @Composable
+    private fun PagedChapterContentHarness(
+        chapter: Chapter,
+        fontSizeSp: Int,
+        currentSentenceIndex: Int,
+        highlightedWordRange: IntRange?,
+        onSentenceLongClick: (Int) -> Unit,
+        onSentenceClick: (Int) -> Unit,
+    ) {
+        var areaSize by remember { mutableStateOf(IntSize.Zero) }
+        Box(
+            modifier = Modifier.size(320.dp, 160.dp).onGloballyPositioned { coordinates -> areaSize = coordinates.size },
+        ) {
+            val pagination = rememberChapterPaginationState(
+                chapter = chapter,
+                nextChapter = null,
+                currentSentenceIndex = currentSentenceIndex,
+                fontSizeSp = fontSizeSp,
+                viewportWidthPx = areaSize.width,
+                viewportHeightPx = areaSize.height,
+                paddingPx = 0,
+            )
+            PagedChapterContent(
+                chapter = chapter,
+                pagination = pagination,
+                currentSentenceIndex = currentSentenceIndex,
+                highlightedWordRange = highlightedWordRange,
+                selectedRange = null,
+                annotations = emptyList<Annotation>(),
+                currentChapterIndex = 0,
+                textColor = Color.Black,
+                isReadingRulerEnabled = false,
+                onSentenceLongClick = onSentenceLongClick,
+                onSentenceClick = onSentenceClick,
+                onNextChapter = {},
+                onCurrentLineY = {},
+            )
+        }
+    }
+
     /** N'importe quel nœud portant du texte Compose (`SemanticsProperties.Text`), sans exiger un contenu précis. */
     private val hasAnyText = SemanticsMatcher("hasAnyText") { it.config.contains(SemanticsProperties.Text) }
 
@@ -92,21 +145,13 @@ class PagedChapterContentTest {
         )
 
         composeTestRule.setContent {
-            PagedChapterContent(
+            PagedChapterContentHarness(
                 chapter = chapter,
-                nextChapter = null,
+                fontSizeSp = 18,
                 currentSentenceIndex = 0,
                 highlightedWordRange = null,
-                selectedRange = null,
-                annotations = emptyList(),
-                currentChapterIndex = 0,
-                fontSizeSp = 18,
-                textColor = Color.Black,
-                isReadingRulerEnabled = false,
                 onSentenceLongClick = {},
                 onSentenceClick = {},
-                onNextChapter = {},
-                onCurrentLineY = {},
             )
         }
 
@@ -134,24 +179,14 @@ class PagedChapterContentTest {
         var clickedIndex: Int? = null
 
         composeTestRule.setContent {
-            Box(modifier = Modifier.size(320.dp, 160.dp)) {
-                PagedChapterContent(
-                    chapter = chapter,
-                    nextChapter = null,
-                    currentSentenceIndex = 0,
-                    highlightedWordRange = null,
-                    selectedRange = null,
-                    annotations = emptyList(),
-                    currentChapterIndex = 0,
-                    fontSizeSp = 32,
-                    textColor = Color.Black,
-                    isReadingRulerEnabled = false,
-                    onSentenceLongClick = { index -> clickedIndex = index },
-                    onSentenceClick = {},
-                    onNextChapter = {},
-                    onCurrentLineY = {},
-                )
-            }
+            PagedChapterContentHarness(
+                chapter = chapter,
+                fontSizeSp = 32,
+                currentSentenceIndex = 0,
+                highlightedWordRange = null,
+                onSentenceLongClick = { index -> clickedIndex = index },
+                onSentenceClick = {},
+            )
         }
 
         composeTestRule.waitUntil(timeoutMillis = 5_000) { displayedTextNodes().isNotEmpty() }
@@ -192,24 +227,14 @@ class PagedChapterContentTest {
         var highlightedWordRange by mutableStateOf<IntRange?>(0..0)
 
         composeTestRule.setContent {
-            Box(modifier = Modifier.size(320.dp, 160.dp)) {
-                PagedChapterContent(
-                    chapter = chapter,
-                    nextChapter = null,
-                    currentSentenceIndex = currentSentenceIndex,
-                    highlightedWordRange = highlightedWordRange,
-                    selectedRange = null,
-                    annotations = emptyList(),
-                    currentChapterIndex = 0,
-                    fontSizeSp = 32,
-                    textColor = Color.Black,
-                    isReadingRulerEnabled = false,
-                    onSentenceLongClick = {},
-                    onSentenceClick = {},
-                    onNextChapter = {},
-                    onCurrentLineY = {},
-                )
-            }
+            PagedChapterContentHarness(
+                chapter = chapter,
+                fontSizeSp = 32,
+                currentSentenceIndex = currentSentenceIndex,
+                highlightedWordRange = highlightedWordRange,
+                onSentenceLongClick = {},
+                onSentenceClick = {},
+            )
         }
 
         composeTestRule.waitUntil(timeoutMillis = 5_000) { displayedTextNodes().isNotEmpty() }
