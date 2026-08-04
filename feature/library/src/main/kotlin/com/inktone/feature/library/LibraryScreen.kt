@@ -572,7 +572,11 @@ internal fun PublicationListRow(
             .clickable(onClick = onClick)
             .padding(horizontal = 12.dp, vertical = 9.dp),
     ) {
-        Row(verticalAlignment = Alignment.CenterVertically) {
+        // Alignement en haut, pas au centre : la couverture (102dp) est plus
+        // haute que le bloc titre/auteur/cœur/3-points depuis
+        // l'agrandissement x1.5 — centré, ce groupe paraissait tassé trop
+        // bas par rapport à la couverture (retour device, lot 2b).
+        Row(verticalAlignment = Alignment.Top) {
             // Couverture miniature — 72dp de large, ratio 0.7 (x1.5 — bloc par
             // livre jugé trop étroit en vérification device, lot 2b)
             Box(modifier = Modifier.size(width = 72.dp, height = 102.dp)) {
