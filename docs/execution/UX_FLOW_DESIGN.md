@@ -133,10 +133,9 @@ Premier lancement → Onboarding → Bibliothèque (centre de navigation)
 
 Couverture seule par livre — **aucun titre ni auteur visible** en mosaïque, contrairement à beaucoup d'apps de référence. Trois éléments superposés sur chaque couverture :
 - **Haut-droite :** cœur (toggle favori) — contour si non favori, plein/coloré si favori.
-- **Bas-gauche :** trois points empilés verticalement, sur un fond sombre semi-transparent — ouvre un popup d'actions propre au livre ciblé :
+- **Bas-gauche :** trois points empilés verticalement, sur un fond sombre semi-transparent — ouvre un popup d'actions propre au livre ciblé, **3 actions** (« Télécharger la couverture » retirée de la cible, décision actée lot 2b) :
   - Épingler
   - Détails du livre
-  - Télécharger la couverture
   - Retirer de la bibliothèque (**nécessite une confirmation** — action destructive, avertissement précisant que l'action est **irréversible** et supprime également les **marque-pages et notes associés** à ce livre)
 - **Bas-droite :** badge circulaire de progression, fond sombre semi-transparent, pourcentage arrondi en texte clair.
 
