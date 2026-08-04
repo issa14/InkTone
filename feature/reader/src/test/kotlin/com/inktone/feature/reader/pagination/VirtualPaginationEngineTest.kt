@@ -119,6 +119,14 @@ class VirtualPaginationEngineTest {
         assertTrue(engine.pageCount(1) < engine.pageCount(0))
     }
 
+    /**
+     * Vrai par construction de `computeSentenceRanges` (chaque phrase est
+     * affectée à la page où elle commence, sans recouvrement possible) —
+     * ce test ne peut plus échouer, ce n'est donc plus le garde-fou
+     * principal. Conservé car il ne coûte rien et documente le
+     * comportement observable ; le garde-fou réel est sur les lignes
+     * ci-dessous (`computePageLineRanges couvre exactement toutes les lignes`).
+     */
     @Test
     fun `aucune phrase perdue - union des pages couvre exactement toutes les phrases`() {
         val engine = VirtualPaginationEngine()
@@ -134,6 +142,58 @@ class VirtualPaginationEngineTest {
             }
         }
         assertEquals(offsets.indices.toSet(), covered)
+    }
+
+    // --- Garde-fou principal : le découpage en LIGNES, seul niveau où
+    // l'algorithme peut réellement produire une coupure ratée, une page
+    // trop pleine ou une page à moitié vide (voir computePageLineRanges).
+
+    @Test
+    fun `computePageLineRanges couvre exactement toutes les lignes, sans trou ni recouvrement`() {
+        val (lines, _) = uniformLines(53, lineHeight = 17f)
+        val ranges = computePageLineRanges(lines, viewportHeightPx = 100f)
+
+        val covered = mutableSetOf<Int>()
+        for (range in ranges) {
+            for (i in range) {
+                assertFalse("ligne $i couverte par plus d'une page", i in covered)
+                covered.add(i)
+            }
+        }
+        assertEquals(lines.indices.toSet(), covered)
+    }
+
+    @Test
+    fun `computePageLineRanges - chaque page tient dans la hauteur du viewport`() {
+        val (lines, _) = uniformLines(53, lineHeight = 17f)
+        val viewportHeightPx = 100f
+        val ranges = computePageLineRanges(lines, viewportHeightPx)
+
+        for (range in ranges) {
+            val pageHeight = range.sumOf { (lines[it].bottom - lines[it].top).toDouble() }
+            assertTrue(
+                "la page $range dépasse la hauteur du viewport ($pageHeight > $viewportHeightPx)",
+                pageHeight <= viewportHeightPx,
+            )
+        }
+    }
+
+    @Test
+    fun `computePageLineRanges - aucune page n est evitablement a moitie vide`() {
+        val (lines, _) = uniformLines(53, lineHeight = 17f)
+        val viewportHeightPx = 100f
+        val ranges = computePageLineRanges(lines, viewportHeightPx)
+
+        for (pageIndex in 0 until ranges.lastIndex) {
+            val range = ranges[pageIndex]
+            val nextLineIndex = range.last + 1
+            val pageTop = lines[range.first].top
+            val heightWithNextLine = lines[nextLineIndex].bottom - pageTop
+            assertTrue(
+                "la page $range aurait pu accueillir la ligne $nextLineIndex sans dépasser $viewportHeightPx",
+                heightWithNextLine > viewportHeightPx,
+            )
+        }
     }
 
     @Test

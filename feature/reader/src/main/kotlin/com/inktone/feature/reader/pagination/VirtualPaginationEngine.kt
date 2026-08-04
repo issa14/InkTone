@@ -24,15 +24,19 @@ package com.inktone.feature.reader.pagination
  * offsets de caractère, les phrases sont réparties par leur offset de
  * début : une phrase appartient entièrement à la page où elle commence,
  * même si son rendu visuel déborde sur la page suivante à cause d'une
- * coupure de ligne à l'intérieur de la phrase. C'est ce qui garantit une
- * partition stricte des phrases entre pages (Tâche 3a.4, test 6) —
- * l'ancrage de position (`pageIndexAt`) reste ainsi non ambigu.
+ * coupure de ligne à l'intérieur de la phrase. Cette règle d'affectation
+ * garantit *par construction* qu'il n'y a jamais de recouvrement entre
+ * pages au niveau des phrases — un test qui se contente de le vérifier
+ * est donc tautologique, pas un garde-fou. Le vrai garde-fou est sur les
+ * lignes, seul niveau où l'algorithme peut réellement se tromper : voir
+ * `computePageLineRanges`.
  */
 class VirtualPaginationEngine : VirtualPagination {
 
     private data class ChapterEntry(
         val styleKey: PaginationStyleKey,
         val pages: List<IntRange>,
+        val pageOffsetRanges: List<IntRange>,
     )
 
     private val cache = mutableMapOf<Int, ChapterEntry>()
@@ -53,8 +57,8 @@ class VirtualPaginationEngine : VirtualPagination {
     ): Boolean {
         val existing = cache[chapterIndex]
         if (existing != null && existing.styleKey == styleKey) return false
-        val pages = computePages(lines, sentenceStartOffsets, styleKey.viewportHeightPx.toFloat())
-        cache[chapterIndex] = ChapterEntry(styleKey, pages)
+        val computed = computePages(lines, sentenceStartOffsets, styleKey.viewportHeightPx.toFloat())
+        cache[chapterIndex] = ChapterEntry(styleKey, computed.sentenceRanges, computed.offsetRanges)
         return true
     }
 
@@ -72,32 +76,37 @@ class VirtualPaginationEngine : VirtualPagination {
     override fun sentenceRangeOf(chapterIndex: Int, pageIndex: Int): IntRange =
         cache[chapterIndex]?.pages?.getOrNull(pageIndex) ?: IntRange.EMPTY
 
+    /**
+     * Fenêtre de caractères `[start, end]`, dans le repère de
+     * l'`AnnotatedString` mesuré par `ChapterTextMeasurer`, couverte par
+     * cette page. Utilisée par le rendu (3a.2) pour trancher
+     * l'`AnnotatedString` du chapitre et pour déterminer, pendant le TTS,
+     * si le mot en cours de lecture est physiquement sur cette page —
+     * y compris quand sa phrase déborde sur la page suivante (voir la
+     * KDoc de classe).
+     */
+    fun pageOffsetRange(chapterIndex: Int, pageIndex: Int): IntRange =
+        cache[chapterIndex]?.pageOffsetRanges?.getOrNull(pageIndex) ?: IntRange.EMPTY
+
+    /** Index de la page dont la fenêtre d'offsets contient [charOffset], ou -1 si aucune. */
+    fun pageIndexAtOffset(chapterIndex: Int, charOffset: Int): Int =
+        cache[chapterIndex]?.pageOffsetRanges?.indexOfFirst { charOffset in it } ?: -1
+
+    private data class ComputedPages(val sentenceRanges: List<IntRange>, val offsetRanges: List<IntRange>)
+
     private fun computePages(
         lines: List<LineGeometry>,
         sentenceStartOffsets: List<Int>,
         viewportHeightPx: Float,
-    ): List<IntRange> {
-        if (lines.isEmpty() || sentenceStartOffsets.isEmpty()) return listOf(IntRange.EMPTY)
-        val pageEndOffsets = computePageEndOffsets(lines, viewportHeightPx)
-        return computeSentenceRanges(sentenceStartOffsets, pageEndOffsets)
-    }
-
-    private fun computePageEndOffsets(lines: List<LineGeometry>, viewportHeightPx: Float): List<Int> {
-        val boundaries = mutableListOf<Int>()
-        var pageTop = lines.first().top
-        var linesOnPage = 0
-        for (i in lines.indices) {
-            val line = lines[i]
-            val heightIfAdded = line.bottom - pageTop
-            if (heightIfAdded > viewportHeightPx && linesOnPage > 0) {
-                boundaries.add(lines[i - 1].endOffset)
-                pageTop = line.top
-                linesOnPage = 0
-            }
-            linesOnPage++
+    ): ComputedPages {
+        if (lines.isEmpty() || sentenceStartOffsets.isEmpty()) {
+            return ComputedPages(listOf(IntRange.EMPTY), listOf(IntRange.EMPTY))
         }
-        boundaries.add(lines.last().endOffset)
-        return boundaries
+        val pageLineRanges = computePageLineRanges(lines, viewportHeightPx)
+        val offsetRanges = pageLineRanges.map { range -> lines[range.first].startOffset..lines[range.last].endOffset }
+        val pageEndOffsets = offsetRanges.map { it.last }
+        val sentenceRanges = computeSentenceRanges(sentenceStartOffsets, pageEndOffsets)
+        return ComputedPages(sentenceRanges, offsetRanges)
     }
 
     private fun computeSentenceRanges(sentenceStartOffsets: List<Int>, pageEndOffsets: List<Int>): List<IntRange> {
@@ -128,4 +137,34 @@ class VirtualPaginationEngine : VirtualPagination {
         }
         return ranges
     }
+}
+
+/**
+ * Découpe les lignes mesurées en pages par accumulation de hauteur
+ * réelle (3a.1, point 3) — le cœur du moteur, isolé en fonction pure
+ * top-level pour être testé directement sur la géométrie de ligne, sans
+ * passer par la partition des phrases qui en découle. C'est le garde-fou
+ * principal du lot (Tâche 3a.4, test 6 révisé) : la partition des
+ * phrases par offset de début est correcte *par construction* de
+ * l'algorithme d'affectation, donc ne peut plus jamais échouer une fois
+ * qu'on lui fait confiance — un test qui ne porte que sur elle ne garde
+ * plus rien. Le découpage en lignes, lui, peut réellement se tromper
+ * (page trop pleine, page à moitié vide, ligne perdue) : c'est lui qu'il
+ * faut vérifier.
+ */
+internal fun computePageLineRanges(lines: List<LineGeometry>, viewportHeightPx: Float): List<IntRange> {
+    if (lines.isEmpty()) return emptyList()
+    val ranges = mutableListOf<IntRange>()
+    var pageStart = 0
+    var pageTop = lines[0].top
+    for (i in lines.indices) {
+        val heightIfAdded = lines[i].bottom - pageTop
+        if (heightIfAdded > viewportHeightPx && i > pageStart) {
+            ranges.add(pageStart until i)
+            pageStart = i
+            pageTop = lines[i].top
+        }
+    }
+    ranges.add(pageStart..lines.lastIndex)
+    return ranges
 }

@@ -14,6 +14,14 @@ android {
         testInstrumentationRunner = "com.inktone.feature.reader.HiltTestRunner"
     }
 
+    // Tache 3a.4 : Robolectric pour ChapterTextMeasurerTest - TextMeasurer
+    // exige une resolution de police reelle (android.graphics), impossible
+    // en JVM pur. isIncludeAndroidResources fournit les ressources/polices
+    // systeme necessaires au shadow de Robolectric.
+    testOptions {
+        unitTests.isIncludeAndroidResources = true
+    }
+
     // data (androidTest, ci-dessous) tire transitivement infrastructure/parser
     // et donc Readium, qui exige le desugaring (Tache 3.2) - propage jusqu'ici.
     compileOptions {
@@ -23,6 +31,11 @@ android {
 
 dependencies {
     testImplementation(libs.kotlinx.coroutines.test)
+    // Tache 3a.4 : ChapterTextMeasurerTest exige TextMeasurer (mesure de
+    // police Android reelle) - Robolectric est le seul moyen de l'executer
+    // en test JVM plutot qu'en instrumente (device/emulateur).
+    testImplementation(libs.robolectric)
+    testImplementation(libs.androidx.test.core)
     implementation(libs.androidx.lifecycle.viewmodel.compose)
     implementation(libs.androidx.lifecycle.runtime.compose)
     implementation(libs.androidx.hilt.navigation.compose)
