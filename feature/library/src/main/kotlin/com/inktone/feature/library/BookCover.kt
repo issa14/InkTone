@@ -5,13 +5,10 @@ import androidx.compose.animation.ExperimentalSharedTransitionApi
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Box
-import androidx.compose.foundation.layout.Row
-import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.aspectRatio
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
-import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Star
@@ -21,6 +18,10 @@ import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
@@ -37,6 +38,7 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import coil.compose.SubcomposeAsyncImage
 import coil.request.ImageRequest
+import com.inktone.core.designsystem.AppIcons
 import com.inktone.domain.model.Publication
 import java.io.File
 
@@ -56,6 +58,9 @@ import java.io.File
  *   [ReadingState]. Si 0, le badge est masqué.
  * @param showTitle  affiche le titre sous la couverture (désactivé
  *   en mode GRID_COVERS_ONLY)
+ * @param showOverlays  favori + menu 3-points superposés à la
+ *   couverture — désactivé pour la miniature du mode Liste
+ *   ([PublicationListRow] porte ses propres contrôles, lot 2b.4).
  */
 @OptIn(ExperimentalSharedTransitionApi::class)
 @Composable
@@ -66,7 +71,14 @@ fun BookCover(
     modifier: Modifier = Modifier,
     progressPercent: Int = 0,
     showTitle: Boolean = true,
+    showOverlays: Boolean = true,
+    onTogglePin: () -> Unit = {},
+    onDelete: () -> Unit = {},
 ) {
+    var showActionsSheet by remember { mutableStateOf(false) }
+    var showDetailsSheet by remember { mutableStateOf(false) }
+    var showDeleteConfirm by remember { mutableStateOf(false) }
+
     val context = LocalContext.current
     // E.3 — Support content:// URI (SAF) en plus de file://
     val coverModel: Any? = when {
@@ -122,21 +134,23 @@ fun BookCover(
         }
 
         // Bouton favori — coin supérieur droit
-        IconButton(
-            onClick = onToggleFavorite,
-            modifier = Modifier.align(Alignment.TopEnd),
-        ) {
-            Icon(
-                if (publication.isFavorite) Icons.Filled.Star else Icons.Outlined.StarBorder,
-                contentDescription = if (publication.isFavorite)
-                    "Retirer des favoris"
-                else
-                    "Ajouter aux favoris",
-                tint = if (publication.isFavorite)
-                    Color(0xFFFFC107) // Ambre — pas de rouge (rouge = suppression)
-                else
-                    Color.White.copy(alpha = 0.85f),
-            )
+        if (showOverlays) {
+            IconButton(
+                onClick = onToggleFavorite,
+                modifier = Modifier.align(Alignment.TopEnd),
+            ) {
+                Icon(
+                    if (publication.isFavorite) Icons.Filled.Star else Icons.Outlined.StarBorder,
+                    contentDescription = if (publication.isFavorite)
+                        "Retirer des favoris"
+                    else
+                        "Ajouter aux favoris",
+                    tint = if (publication.isFavorite)
+                        Color(0xFFFFC107) // Ambre — pas de rouge (rouge = suppression)
+                    else
+                        Color.White.copy(alpha = 0.85f),
+                )
+            }
         }
 
         // Badge de progression — coin inférieur droit
@@ -161,8 +175,21 @@ fun BookCover(
             }
         }
 
-        // #6 Dots décoratifs — coin inférieur gauche (legacy)
-        DecorativeDots(Modifier.align(Alignment.BottomStart).padding(6.dp))
+        // Menu 3-points — coin inférieur gauche, ouvre le popup d'actions
+        // (lot 2b.3 : remplace les points décoratifs sans logique)
+        if (showOverlays) {
+            IconButton(
+                onClick = { showActionsSheet = true },
+                modifier = Modifier
+                    .align(Alignment.BottomStart)
+                    .padding(4.dp)
+                    .size(32.dp)
+                    .clip(CircleShape)
+                    .background(Color.Black.copy(alpha = 0.55f)),
+            ) {
+                Icon(AppIcons.MoreActions, contentDescription = "Actions sur « ${publication.title} »", tint = Color.White)
+            }
+        }
 
         // Titre (optionnel — masqué en GRID_COVERS_ONLY)
         if (showTitle) {
@@ -177,6 +204,26 @@ fun BookCover(
                 style = MaterialTheme.typography.bodyMedium,
             )
         }
+    }
+
+    if (showActionsSheet) {
+        BookActionsSheet(
+            publication = publication,
+            onDismiss = { showActionsSheet = false },
+            onTogglePin = onTogglePin,
+            onShowDetails = { showDetailsSheet = true },
+            onRequestDelete = { showDeleteConfirm = true },
+        )
+    }
+    if (showDetailsSheet) {
+        BookDetailsSheet(publication = publication, onDismiss = { showDetailsSheet = false })
+    }
+    if (showDeleteConfirm) {
+        DeleteConfirmationDialog(
+            publicationTitle = publication.title,
+            onConfirm = { showDeleteConfirm = false; onDelete() },
+            onDismiss = { showDeleteConfirm = false },
+        )
     }
 }
 
@@ -232,15 +279,3 @@ private fun rememberCoverGradient(title: String): Brush {
     return Brush.verticalGradient(listOf(pair.first, pair.second))
 }
 
-// ──── #6 Dots décoratifs (legacy) ────
-
-@Composable
-private fun DecorativeDots(modifier: Modifier = Modifier) {
-    Row(modifier = modifier, verticalAlignment = Alignment.CenterVertically) {
-        Box(Modifier.size(4.dp).clip(CircleShape).background(Color.White.copy(alpha = 0.4f)))
-        Spacer(Modifier.width(3.dp))
-        Box(Modifier.size(4.dp).clip(CircleShape).background(Color.White.copy(alpha = 0.4f)))
-        Spacer(Modifier.width(3.dp))
-        Box(Modifier.size(4.dp).clip(CircleShape).background(Color.White.copy(alpha = 0.6f)))
-    }
-}

@@ -227,6 +227,8 @@ fun LibraryScreen(
                             state = state,
                             onOpen = { id -> viewModel.onIntent(LibraryIntent.OpenPublication(id)) },
                             onToggleFavorite = { id, isFavorite -> viewModel.onIntent(LibraryIntent.ToggleFavorite(id, isFavorite)) },
+                            onTogglePin = { id, isPinned -> viewModel.onIntent(LibraryIntent.TogglePin(id, isPinned)) },
+                            onDelete = { id -> viewModel.onIntent(LibraryIntent.DeletePublication(id)) },
                         )
                     }
                 }
@@ -507,6 +509,8 @@ private fun LibraryContent(
     state: LibraryUiState,
     onOpen: (String) -> Unit,
     onToggleFavorite: (String, Boolean) -> Unit,
+    onTogglePin: (String, Boolean) -> Unit,
+    onDelete: (String) -> Unit,
 ) {
     val resume = state.resumeReadingPublication
 
@@ -529,6 +533,8 @@ private fun LibraryContent(
                         modifier = Modifier.padding(8.dp),
                         showTitle = false,
                         progressPercent = state.progressMap[publication.id] ?: 0,
+                        onTogglePin = { onTogglePin(publication.id, !publication.isPinned) },
+                        onDelete = { onDelete(publication.id) },
                     )
                 }
             }
@@ -576,6 +582,7 @@ internal fun PublicationListRow(
                 onClick = {},
                 onToggleFavorite = {},
                 showTitle = false,
+                showOverlays = false,
             )
         }
         Column(

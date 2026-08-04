@@ -9,7 +9,10 @@ import androidx.compose.material.icons.automirrored.outlined.VolumeUp
 import androidx.compose.material.icons.filled.Bookmark
 import androidx.compose.material.icons.filled.CheckCircle
 import androidx.compose.material.icons.filled.Error
+import androidx.compose.material.icons.filled.Favorite
 import androidx.compose.material.icons.filled.Highlight
+import androidx.compose.material.icons.filled.MoreVert
+import androidx.compose.material.icons.filled.PushPin
 import androidx.compose.material.icons.filled.Warning
 import androidx.compose.material.icons.outlined.Accessibility
 import androidx.compose.material.icons.outlined.BarChart
@@ -17,8 +20,10 @@ import androidx.compose.material.icons.outlined.Bolt
 import androidx.compose.material.icons.outlined.BookmarkAdd
 import androidx.compose.material.icons.outlined.CheckCircle
 import androidx.compose.material.icons.outlined.ContentCopy
+import androidx.compose.material.icons.outlined.Delete
 import androidx.compose.material.icons.outlined.EditNote
 import androidx.compose.material.icons.outlined.Error
+import androidx.compose.material.icons.outlined.FavoriteBorder
 import androidx.compose.material.icons.outlined.FilterList
 import androidx.compose.material.icons.outlined.HourglassEmpty
 import androidx.compose.material.icons.outlined.ImportContacts
@@ -28,6 +33,7 @@ import androidx.compose.material.icons.outlined.Lightbulb
 import androidx.compose.material.icons.outlined.Mic
 import androidx.compose.material.icons.outlined.Palette
 import androidx.compose.material.icons.outlined.PhotoLibrary
+import androidx.compose.material.icons.outlined.PushPin
 import androidx.compose.material.icons.outlined.RecordVoiceOver
 import androidx.compose.material.icons.outlined.Refresh
 import androidx.compose.material.icons.outlined.Save
@@ -51,6 +57,12 @@ object AppIcons {
     val Copy = Icons.Outlined.ContentCopy
     val Highlight = Icons.Filled.Highlight
     val Hint = Icons.Outlined.Lightbulb
+    val Favorite = Icons.Filled.Favorite
+    val FavoriteBorder = Icons.Outlined.FavoriteBorder
+    val Pin = Icons.Filled.PushPin
+    val PinOutlined = Icons.Outlined.PushPin
+    val MoreActions = Icons.Filled.MoreVert
+    val Delete = Icons.Outlined.Delete
 
     val Success = Icons.Filled.CheckCircle
     val SuccessOutlined = Icons.Outlined.CheckCircle
