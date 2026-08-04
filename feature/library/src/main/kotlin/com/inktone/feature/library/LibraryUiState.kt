@@ -72,12 +72,16 @@ internal fun List<Publication>.filterAndSort(
     } else {
         searched.filter { it.format in selectedFormats }
     }
-    return when (sortOrder) {
+    val sorted = when (sortOrder) {
         LibrarySortOrder.TITLE -> filtered.sortedBy { it.title.lowercase() }
         LibrarySortOrder.AUTHOR -> filtered.sortedWith(compareBy(nullsLast()) { it.authors.firstOrNull()?.lowercase() })
         LibrarySortOrder.RECENTLY_ADDED -> filtered.sortedByDescending { it.importDate }
         LibrarySortOrder.RECENTLY_OPENED -> filtered.sortedByDescending { it.lastOpened ?: 0L }
     }
+    // Lot 2b.1 — les livres épinglés remontent en tête, quel que soit le
+    // tri actif. sortedByDescending est stable : l'ordre issu du tri
+    // ci-dessus est conservé au sein de chaque groupe (épinglé/non).
+    return sorted.sortedByDescending { it.isPinned }
 }
 
 /** Lot 2a.1 — « Récents » et « Récemment lus » fusionnés en RECENTLY_OPENED (decision actee, un seul `lastOpened` dans le domaine). */
@@ -89,6 +93,7 @@ enum class LibraryLayoutMode { LIST, GRID_COVERS }
 sealed interface LibraryIntent {
     data class OpenPublication(val publicationId: String) : LibraryIntent
     data class ToggleFavorite(val publicationId: String, val isFavorite: Boolean) : LibraryIntent
+    data class TogglePin(val publicationId: String, val isPinned: Boolean) : LibraryIntent
     data class ChangeFilter(val filter: FilterMode, val value: String? = null) : LibraryIntent
     data class SetSearchQuery(val query: String) : LibraryIntent
     data class SetSortOrder(val order: LibrarySortOrder) : LibraryIntent

@@ -21,6 +21,7 @@ import com.inktone.domain.usecase.GetVoiceProfilesUseCase
 import com.inktone.domain.usecase.ImportPublicationUseCase
 import com.inktone.domain.usecase.SearchPublicationUseCase
 import com.inktone.domain.usecase.ToggleFavoriteUseCase
+import com.inktone.domain.usecase.TogglePinUseCase
 import com.inktone.domain.usecase.UpdateReadingStateUseCase
 import dagger.Module
 import dagger.Provides
@@ -78,6 +79,11 @@ object UseCaseModule {
     fun provideToggleFavoriteUseCase(
         publicationRepository: PublicationRepository,
     ): ToggleFavoriteUseCase = ToggleFavoriteUseCase(publicationRepository)
+
+    @Provides
+    fun provideTogglePinUseCase(
+        publicationRepository: PublicationRepository,
+    ): TogglePinUseCase = TogglePinUseCase(publicationRepository)
 
     @Provides
     fun provideAddAnnotationUseCase(

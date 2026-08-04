@@ -29,7 +29,7 @@ import com.inktone.infrastructure.database.entity.VoiceProfileEntity
         BookmarkEntity::class, AnnotationEntity::class, VoiceProfileEntity::class,
         UserPreferencesEntity::class, SentenceFtsEntity::class, PronunciationRuleEntity::class,
     ],
-    version = 10, // D.3 : audioGain, useSystemFontScale (MIGRATION_9_10)
+    version = 11, // Lot 2b.1 : isPinned (MIGRATION_10_11)
     exportSchema = true, // condition du harnais de migration — Tâche 2.4
 )
 @TypeConverters(StringListConverter::class)

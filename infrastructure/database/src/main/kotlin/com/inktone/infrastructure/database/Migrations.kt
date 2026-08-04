@@ -90,3 +90,10 @@ val MIGRATION_9_10 = object : Migration(9, 10) {
         db.execSQL("ALTER TABLE user_preferences ADD COLUMN useSystemFontScale INTEGER NOT NULL DEFAULT 0")
     }
 }
+
+/** Lot 2b.1 : épinglage d'une publication (remontée en tête de la bibliothèque). */
+val MIGRATION_10_11 = object : Migration(10, 11) {
+    override fun migrate(db: SupportSQLiteDatabase) {
+        db.execSQL("ALTER TABLE publications ADD COLUMN isPinned INTEGER NOT NULL DEFAULT 0")
+    }
+}

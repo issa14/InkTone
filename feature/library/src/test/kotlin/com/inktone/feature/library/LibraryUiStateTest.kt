@@ -92,4 +92,18 @@ class LibraryUiStateTest {
 
         assertEquals(listOf("1"), state.displayedPublications.map { it.id })
     }
+
+    @Test
+    fun un_livre_epingle_remonte_en_tete_quel_que_soit_le_tri() {
+        val state = LibraryUiState(
+            publications = listOf(
+                publication("1", "A", "X", importDate = 300L),
+                publication("2", "B", "X", importDate = 200L).copy(isPinned = true),
+                publication("3", "C", "X", importDate = 100L),
+            ),
+            sortOrder = LibrarySortOrder.RECENTLY_ADDED,
+        )
+
+        assertEquals(listOf("2", "1", "3"), state.displayedPublications.map { it.id })
+    }
 }
