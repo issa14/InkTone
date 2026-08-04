@@ -198,6 +198,15 @@ fun ReaderScreen(
             }
         }
 
+        // 3b.4bis — bug réel trouvé sur appareil : le compteur de la
+        // ligne de statut restait figé à la page 1 pendant un scroll ou
+        // un swipe manuels (sans TTS), car currentSentenceIndex n'est
+        // mis à jour que par le TTS ou une navigation explicite — jamais
+        // par le simple geste de lecture. Page réellement affichée en
+        // mode pagé (swipe manuel inclus, remontée par PagedChapterContent) :
+        var pagedLivePageIndex by remember { mutableIntStateOf(0) }
+        LaunchedEffect(state.currentChapterIndex) { pagedLivePageIndex = 0 }
+
         // 3b.5 — barre du haut : appartient au HUD, apparaît/disparaît
         // avec le panneau, jamais indépendamment (même gate isHudVisible).
         if (isHudVisible) {
@@ -310,6 +319,7 @@ fun ReaderScreen(
                         },
                         onNextChapter = { viewModel.onIntent(ReaderIntent.NextChapter) },
                         onCurrentLineY = { y -> currentLineYDp = y },
+                        onPageChanged = { pageIndex -> pagedLivePageIndex = pageIndex },
                     )
                 }
             }
@@ -370,11 +380,35 @@ fun ReaderScreen(
         // permanence, y compris panneau masqué. Le compteur de pages vient
         // du contrat VirtualPagination (via l'état hissé ci-dessus),
         // jamais d'un calcul local.
+        //
+        // Bug réel trouvé sur appareil : dériver la page courante
+        // uniquement de currentSentenceIndex (via pageIndexAt) la laissait
+        // figée pendant un scroll/swipe manuel sans TTS, puisque
+        // currentSentenceIndex n'est mis à jour que par le TTS ou une
+        // navigation explicite. En pagé, on préfère désormais la page
+        // réellement affichée par le pager (pagedLivePageIndex, mise à
+        // jour aussi bien par un swipe manuel que par le suivi TTS — une
+        // seule source, jamais de divergence possible). En défilement, où
+        // il n'existe pas de pager dont dériver une page exacte, une
+        // estimation par fraction de défilement — seul le total de pages
+        // reste une valeur exacte du moteur, pas cette position courante.
         state.currentChapter?.let { chapter ->
+            val pageCountInChapter = pagination.pageCount(chapter.index)
+            val pageIndexInChapter = when (state.readingMode) {
+                ReadingMode.PAGED -> pagedLivePageIndex
+                ReadingMode.SCROLL -> {
+                    val scrollFraction = if (scrollState.maxValue > 0) {
+                        scrollState.value.toFloat() / scrollState.maxValue
+                    } else {
+                        0f
+                    }
+                    (scrollFraction * pageCountInChapter).toInt().coerceIn(0, (pageCountInChapter - 1).coerceAtLeast(0))
+                }
+            }
             StatusLineBar(
                 chapterNumber = state.currentChapterIndex + 1,
-                pageInChapter = pagination.pageIndexAt(chapter.index, state.currentSentenceIndex) + 1,
-                pageCountInChapter = pagination.pageCount(chapter.index),
+                pageInChapter = pageIndexInChapter + 1,
+                pageCountInChapter = pageCountInChapter,
                 bookProgression = state.bookProgression,
             )
         }

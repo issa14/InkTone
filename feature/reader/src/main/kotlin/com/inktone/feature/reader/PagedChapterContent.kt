@@ -83,6 +83,7 @@ fun PagedChapterContent(
     onSentenceClick: (Int) -> Unit,
     onNextChapter: () -> Unit,
     onCurrentLineY: (Dp) -> Unit,
+    onPageChanged: (Int) -> Unit = {},
     modifier: Modifier = Modifier,
 ) {
     val renderTextStyle = remember(pagination.baseTextStyle, textColor) {
@@ -101,6 +102,13 @@ fun PagedChapterContent(
     LaunchedEffect(pagerState.currentPage, pageCount) {
         if (pagerState.currentPage >= pageCount) {
             onNextChapter()
+        } else {
+            // Remonte la page réellement affichée — swipe manuel inclus,
+            // pas seulement la progression pilotée par le TTS. Bug réel
+            // trouvé sur appareil (lot 3b) : le compteur de la ligne de
+            // statut restait figé à 1 pendant un swipe manuel, puisque
+            // rien ne faisait remonter la position du pager avant ceci.
+            onPageChanged(pagerState.currentPage)
         }
     }
 

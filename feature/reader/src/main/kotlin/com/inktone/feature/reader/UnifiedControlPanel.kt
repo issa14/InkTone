@@ -1,7 +1,7 @@
 package com.inktone.feature.reader
 
 import androidx.compose.foundation.clickable
-import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
@@ -82,30 +82,46 @@ fun UnifiedControlPanel(
 
             Spacer(Modifier.height(12.dp))
 
+            // Bug réel trouvé sur appareil (lot 3b) : Arrangement.SpaceEvenly
+            // répartit l'espace ENTRE les bords des enfants, pas par largeur
+            // égale — "Marque-pages" (libellé plus long que les autres)
+            // élargit sa colonne et décale visuellement tout le reste, Play
+            // compris, hors du centre réel de la rangée. Modifier.weight(1f)
+            // sur chaque slot force des largeurs égales, jamais un décalage
+            // dépendant de la longueur du texte.
             Row(
                 modifier = Modifier.fillMaxWidth(),
-                horizontalArrangement = Arrangement.SpaceEvenly,
                 verticalAlignment = Alignment.CenterVertically,
             ) {
-                SecondaryAction(icon = AppIcons.Toc, label = "Sommaire", tint = iconTint, onClick = onTocClick)
-                SecondaryAction(icon = AppIcons.Bookmark, label = "Marque-pages", tint = iconTint, onClick = onBookmarksClick)
-                FilledIconButton(
-                    onClick = {
-                        haptic.performHapticFeedback(HapticFeedbackType.LongPress)
-                        onPlayPause()
-                    },
-                    modifier = Modifier.size(56.dp),
-                    colors = IconButtonDefaults.filledIconButtonColors(containerColor = accentColor),
-                    shape = InkToneShapes.large,
-                ) {
-                    Icon(
-                        if (isPlaying) Icons.Filled.Pause else Icons.Filled.PlayArrow,
-                        contentDescription = if (isPlaying) "Pause" else "Lire",
-                        tint = MaterialTheme.colorScheme.surface,
-                    )
+                Box(Modifier.weight(1f), contentAlignment = Alignment.Center) {
+                    SecondaryAction(icon = AppIcons.Toc, label = "Sommaire", tint = iconTint, onClick = onTocClick)
                 }
-                SecondaryAction(icon = AppIcons.Theme, label = "Thème", tint = iconTint, onClick = onThemeCycle)
-                SecondaryAction(icon = AppIcons.Appearance, label = "TT", tint = iconTint, onClick = onAaClick)
+                Box(Modifier.weight(1f), contentAlignment = Alignment.Center) {
+                    SecondaryAction(icon = AppIcons.Bookmark, label = "Marque-pages", tint = iconTint, onClick = onBookmarksClick)
+                }
+                Box(Modifier.weight(1f), contentAlignment = Alignment.Center) {
+                    FilledIconButton(
+                        onClick = {
+                            haptic.performHapticFeedback(HapticFeedbackType.LongPress)
+                            onPlayPause()
+                        },
+                        modifier = Modifier.size(56.dp),
+                        colors = IconButtonDefaults.filledIconButtonColors(containerColor = accentColor),
+                        shape = InkToneShapes.large,
+                    ) {
+                        Icon(
+                            if (isPlaying) Icons.Filled.Pause else Icons.Filled.PlayArrow,
+                            contentDescription = if (isPlaying) "Pause" else "Lire",
+                            tint = MaterialTheme.colorScheme.surface,
+                        )
+                    }
+                }
+                Box(Modifier.weight(1f), contentAlignment = Alignment.Center) {
+                    SecondaryAction(icon = AppIcons.Theme, label = "Thème", tint = iconTint, onClick = onThemeCycle)
+                }
+                Box(Modifier.weight(1f), contentAlignment = Alignment.Center) {
+                    SecondaryAction(icon = AppIcons.Appearance, label = "TT", tint = iconTint, onClick = onAaClick)
+                }
             }
 
             Spacer(Modifier.height(8.dp))
@@ -114,18 +130,25 @@ fun UnifiedControlPanel(
 
             Row(
                 modifier = Modifier.fillMaxWidth(),
-                horizontalArrangement = Arrangement.SpaceEvenly,
                 verticalAlignment = Alignment.CenterVertically,
             ) {
-                SecondaryAction(
-                    icon = Icons.Filled.Timer,
-                    label = "Minuteur",
-                    tint = if (sleepTimerActive) accentColor else iconTint,
-                    onClick = onSleepTimerClick,
-                )
-                SecondaryAction(icon = AppIcons.Speaking, label = "Haut-parleur", tint = iconTint, onClick = onTtsClick)
-                SecondaryAction(icon = AppIcons.ReadingModePaged, label = "Mode", tint = iconTint, onClick = onReadingModeClick)
-                SecondaryAction(icon = AppIcons.Search, label = "Recherche", tint = iconTint, onClick = onSearchClick)
+                Box(Modifier.weight(1f), contentAlignment = Alignment.Center) {
+                    SecondaryAction(
+                        icon = Icons.Filled.Timer,
+                        label = "Minuteur",
+                        tint = if (sleepTimerActive) accentColor else iconTint,
+                        onClick = onSleepTimerClick,
+                    )
+                }
+                Box(Modifier.weight(1f), contentAlignment = Alignment.Center) {
+                    SecondaryAction(icon = AppIcons.Speaking, label = "Haut-parleur", tint = iconTint, onClick = onTtsClick)
+                }
+                Box(Modifier.weight(1f), contentAlignment = Alignment.Center) {
+                    SecondaryAction(icon = AppIcons.ReadingModePaged, label = "Mode", tint = iconTint, onClick = onReadingModeClick)
+                }
+                Box(Modifier.weight(1f), contentAlignment = Alignment.Center) {
+                    SecondaryAction(icon = AppIcons.Search, label = "Recherche", tint = iconTint, onClick = onSearchClick)
+                }
             }
         }
     }
