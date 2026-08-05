@@ -22,6 +22,20 @@
         android:label="InkTone"
         android:theme="@android:style/Theme.Material.Light.NoActionBar">
 
+        <!-- K10/ADR-014 : le SDK Crashlytics collecte par defaut des son
+             initialisation si on ne le desactive pas explicitement — sans
+             cette meta-donnee, une fenetre entre le lancement du process
+             et InkToneApplication.onCreate() (qui observe
+             UserPreferences.crashReportingEnabled) pourrait collecter
+             avant tout consentement. Valeur statique a false ici,
+             inconditionnelle : sans effet si google-services.json est
+             absent (le plugin/SDK n'est alors pas configure), donc jamais
+             a rendre conditionnelle elle-meme. InkToneApplication bascule
+             ensuite ce flag au runtime selon le reglage utilisateur reel. -->
+        <meta-data
+            android:name="firebase_crashlytics_collection_enabled"
+            android:value="false" />
+
         <activity
             android:name=".MainActivity"
             android:exported="true"

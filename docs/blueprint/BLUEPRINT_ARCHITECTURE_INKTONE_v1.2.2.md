@@ -451,6 +451,7 @@ L'application est divisée en modules à responsabilité unique, interface publi
 | `infrastructure/tts` | Infra | Adaptateurs des moteurs TTS + gestion des modèles de voix | domain (TtsEngine) |
 | `infrastructure/media` | Infra | MediaSession, service de lecture en arrière-plan, notifications média | — |
 | `infrastructure/worker` | Infra | WorkManager : import par lot, tâches de fond | — |
+| `infrastructure/crashreporting` | Infra | Rapport de crash opt-in (Firebase Crashlytics), no-op gracieux sans identifiants Firebase (K10, ADR-014) | domain (CrashReporter) |
 | `infrastructure/sync` | Infra (futur) | Fournisseurs cloud derrière adaptateurs | domain (SyncService) |
 | `core/designsystem` | Core | Thème Material 3, typographie, `AppIcons` (Material Symbols — aucun emoji dans le code, K12) | — |
 | `core/ui` | Core | Composants Compose partagés | designsystem |
