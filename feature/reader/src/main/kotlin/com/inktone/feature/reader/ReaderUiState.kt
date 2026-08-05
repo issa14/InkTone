@@ -93,6 +93,25 @@ data class ReaderUiState(
             return minOf(anchor, focus)..maxOf(anchor, focus)
         }
 
+    /**
+     * Tâche 3c.3 — état du toggle « Marquer cette page » du panneau
+     * Marque-pages. Adressage par `Locator`/`Sentence` (Blueprint K3 :
+     * jamais de numéro de page pour un signet), pas par page virtuelle —
+     * un signet existe « à cette position » s'il tombe dans la phrase
+     * actuellement ciblée (`currentSentenceIndex`), source unique de
+     * position déjà utilisée par la création de signet et la persistance
+     * (voir `ReaderViewModel.persistPosition`).
+     */
+    val isCurrentPageBookmarked: Boolean
+        get() {
+            val chapter = currentChapter ?: return false
+            val sentence = chapter.paragraphs.flatMap { it.sentences }.getOrNull(currentSentenceIndex) ?: return false
+            return bookmarks.any { bookmark ->
+                bookmark.locator.chapterIndex == chapter.index &&
+                    bookmark.locator.charOffset in sentence.startOffset until sentence.endOffset
+            }
+        }
+
     // 3b.4 — le micro-indicateur ETA (B.6) est retiré : absent de la
     // cible, il occupait la même zone que StatusLineBar quand le HUD est
     // masqué. Retrait consigné dans UX_FLOW_DESIGN.md (3b.8) : l'ETA
@@ -145,10 +164,24 @@ sealed interface ReaderIntent {
     /** Appui simple sur une autre phrase pendant qu'une sélection est active : l'étend. */
     data class ExtendSentenceSelection(val sentenceIndex: Int) : ReaderIntent
     data object ClearSentenceSelection : ReaderIntent
-    data class ConfirmAnnotation(val color: AnnotationColor) : ReaderIntent
 
-    /** Tâche 7.2 — capture la position courante, pas de plage à résoudre (contrairement à l'annotation). */
-    data object CreateBookmark : ReaderIntent
+    /**
+     * Tâche 3c.4 — `content` : texte de la note associée (popup de
+     * sélection, action « Note »), `null` pour un simple surlignage
+     * (action « Surligner »). `Annotation.content` existe depuis la
+     * Tâche 7.1 (`content: String?`), jamais rempli avant ce lot — pas de
+     * migration Room nécessaire, `null` reste distinct d'une note vidée
+     * volontairement (voir `Annotation.kt`).
+     */
+    data class ConfirmAnnotation(val color: AnnotationColor, val content: String? = null) : ReaderIntent
+
+    /**
+     * Tâche 3c.3 — remplace `CreateBookmark` (Tâche 7.2) : le bouton du
+     * panneau Marque-pages est un **toggle**, pas un simple ajout — il
+     * retire le signet existant à la position courante s'il y en a déjà
+     * un, plutôt que d'en créer un doublon.
+     */
+    data object ToggleBookmarkAtCurrentPosition : ReaderIntent
     data object ToggleBookmarkList : ReaderIntent
     data class DeleteBookmark(val id: String) : ReaderIntent
 
@@ -183,4 +216,13 @@ sealed interface ReaderIntent {
 
     /** B.1 — Bascule entre mode scroll et mode paginé. */
     data object ToggleReadingMode : ReaderIntent
+
+    /**
+     * Tâche 3c.1 — remonte la phrase la plus haute visible pendant un
+     * défilement manuel (mode SCROLL). Source unique de `currentSentenceIndex`
+     * avec la navigation manuelle et le TTS : jamais un second système de
+     * position. `ReaderScreen` ne l'émet que pour un défilement d'origine
+     * utilisateur (jamais l'auto-scroll TTS, voir garde `isProgrammaticScroll`).
+     */
+    data class UpdateScrollPosition(val sentenceIndex: Int) : ReaderIntent
 }

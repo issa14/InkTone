@@ -137,8 +137,8 @@ class ReaderViewModel @Inject constructor(
             is ReaderIntent.ClearSentenceSelection -> _state.value = _state.value.copy(
                 selectionAnchorIndex = null, selectionFocusIndex = null,
             )
-            is ReaderIntent.ConfirmAnnotation -> confirmAnnotation(intent.color)
-            is ReaderIntent.CreateBookmark -> createBookmarkAtCurrentPosition()
+            is ReaderIntent.ConfirmAnnotation -> confirmAnnotation(intent.color, intent.content)
+            is ReaderIntent.ToggleBookmarkAtCurrentPosition -> toggleBookmarkAtCurrentPosition()
             is ReaderIntent.ToggleBookmarkList -> _state.value = _state.value.copy(
                 isBookmarkListVisible = !_state.value.isBookmarkListVisible,
             )
@@ -148,6 +148,37 @@ class ReaderViewModel @Inject constructor(
             is ReaderIntent.SetSleepTimer -> setSleepTimer(intent.minutes)
             is ReaderIntent.SkipToPreviousSentence -> skipSentence(-1)
             is ReaderIntent.SkipToNextSentence -> skipSentence(1)
+            is ReaderIntent.UpdateScrollPosition -> updateScrollPosition(intent.sentenceIndex)
+        }
+    }
+
+    private var scrollPersistJob: Job? = null
+
+    /**
+     * Tâche 3c.1 — antipattern legacy corrigé : la position de lecture en
+     * défilement silencieux (sans TTS) n'était jamais persistée avant ce
+     * lot. Écrit `currentSentenceIndex` immédiatement (pour que le
+     * pourcentage/la page dérivés dans `ReaderUiState`/`ReaderScreen`
+     * restent cohérents pendant le geste), mais débounce la persistance en
+     * base — un défilement rapide traverse potentiellement des dizaines de
+     * phrases par seconde, écrire à chaque changement d'index saturerait
+     * Room pour une position qui n'a d'intérêt qu'une fois le défilement
+     * stabilisé.
+     *
+     * Ignoré pendant le TTS (K3, chemins manuel et TTS jamais simultanés) :
+     * `playCurrentSentence` avance déjà `currentSentenceIndex` et persiste
+     * sa propre position, un second écrivain concurrent créerait la
+     * divergence que K3 interdit.
+     */
+    private fun updateScrollPosition(sentenceIndex: Int) {
+        if (_state.value.isPlaying) return
+        if (sentenceIndex == _state.value.currentSentenceIndex) return
+        val chapterIndex = _state.value.currentChapterIndex
+        _state.value = _state.value.copy(currentSentenceIndex = sentenceIndex)
+        scrollPersistJob?.cancel()
+        scrollPersistJob = viewModelScope.launch {
+            delay(SCROLL_PERSIST_DEBOUNCE_MS)
+            persistPosition(chapterIndex = chapterIndex, sentenceIndex = sentenceIndex)
         }
     }
 
@@ -273,7 +304,7 @@ class ReaderViewModel @Inject constructor(
      * connu par construction (sélection par phrase, voir
      * `AnnotationSelectionHandler`).
      */
-    private fun confirmAnnotation(color: AnnotationColor) {
+    private fun confirmAnnotation(color: AnnotationColor, content: String? = null) {
         val range = _state.value.selectedSentenceRange ?: return
         val chapter = _state.value.currentChapter ?: return
         val publicationId = currentPublicationId ?: return
@@ -291,6 +322,7 @@ class ReaderViewModel @Inject constructor(
                     startLocator = startLocator,
                     endLocator = endLocator,
                     color = color,
+                    content = content,
                     createdAt = now,
                     updatedAt = now,
                 ),
@@ -309,25 +341,35 @@ class ReaderViewModel @Inject constructor(
     }
 
     /**
-     * Capture la position courante (Tâche 7.2) — plus simple que
-     * [confirmAnnotation] : un seul `Locator`, pas de plage à résoudre.
-     * Réutilise `Sentence.startLocator`, déjà utilisé par
-     * [persistPosition]/[playCurrentSentence] pour la même conversion.
+     * Tâche 3c.3 — toggle « Marquer cette page » : retire le signet déjà
+     * présent à la position courante s'il existe (jamais de doublon,
+     * cible confirmée dans `UX_FLOW_DESIGN.md`), sinon en crée un. Même
+     * conversion `Sentence.startLocator` que [persistPosition]/
+     * [playCurrentSentence] — une seule source pour « la position
+     * courante », jamais un second calcul.
      */
-    private fun createBookmarkAtCurrentPosition() {
+    private fun toggleBookmarkAtCurrentPosition() {
         val chapter = _state.value.currentChapter ?: return
         val sentence = chapter.paragraphs.flatMap { it.sentences }.getOrNull(_state.value.currentSentenceIndex) ?: return
         val publicationId = currentPublicationId ?: return
+        val existing = _state.value.bookmarks.firstOrNull { bookmark ->
+            bookmark.locator.chapterIndex == chapter.index &&
+                bookmark.locator.charOffset in sentence.startOffset until sentence.endOffset
+        }
 
         viewModelScope.launch {
-            createBookmark(
-                Bookmark(
-                    id = UUID.randomUUID().toString(),
-                    publicationId = publicationId,
-                    locator = sentence.startLocator(chapterIndex = chapter.index, resourceHref = chapter.href),
-                    createdAt = System.currentTimeMillis(),
-                ),
-            )
+            if (existing != null) {
+                deleteBookmark(existing.id)
+            } else {
+                createBookmark(
+                    Bookmark(
+                        id = UUID.randomUUID().toString(),
+                        publicationId = publicationId,
+                        locator = sentence.startLocator(chapterIndex = chapter.index, resourceHref = chapter.href),
+                        createdAt = System.currentTimeMillis(),
+                    ),
+                )
+            }
         }
     }
 
@@ -558,5 +600,9 @@ class ReaderViewModel @Inject constructor(
         super.onCleared()
         audioSegmentPlayer.stop()
         sleepTimerJob?.cancel()
+        scrollPersistJob?.cancel()
     }
 }
+
+/** Tâche 3c.1 — au changement de phrase visible, pas à chaque pixel défilé. */
+private const val SCROLL_PERSIST_DEBOUNCE_MS = 400L

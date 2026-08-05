@@ -26,14 +26,18 @@ import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
+import androidx.compose.runtime.derivedStateOf
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableIntStateOf
+import androidx.compose.runtime.mutableStateMapOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.geometry.Rect
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.layout.boundsInWindow
 import androidx.compose.ui.layout.onGloballyPositioned
 import androidx.compose.ui.layout.positionInParent
 import androidx.compose.ui.platform.LocalDensity
@@ -161,40 +165,71 @@ fun ReaderScreen(
             return@Column
         }
 
-        if (state.isTocVisible) {
-            TableOfContentsSheet(
-                entries = state.tableOfContents,
-                currentChapterIndex = state.currentChapterIndex,
-                onEntryClick = { chapterIndex -> viewModel.onIntent(ReaderIntent.JumpToChapter(chapterIndex)) },
-                onClose = { viewModel.onIntent(ReaderIntent.ToggleToc) },
-            )
-            return@Column
-        }
-
-        if (state.isBookmarkListVisible) {
-            BookmarkListSheet(
-                bookmarks = state.bookmarks,
-                onBookmarkClick = { bookmark -> viewModel.onIntent(ReaderIntent.NavigateToLocator(bookmark.locator)) },
-                onBookmarkDelete = { bookmark -> viewModel.onIntent(ReaderIntent.DeleteBookmark(bookmark.id)) },
-                onClose = { viewModel.onIntent(ReaderIntent.ToggleBookmarkList) },
-            )
-            return@Column
-        }
-
         val scrollState = rememberScrollState()
         LaunchedEffect(state.currentChapterIndex) { scrollState.scrollTo(0) }
 
         val selectedRange = state.selectedSentenceRange
-        var pendingColor by remember { mutableStateOf(AnnotationColor.YELLOW) }
 
         // A.1 / Tache 9bis.3.6 - position Y de la phrase active
         var currentLineYDp by remember { mutableStateOf(0.dp) }
         val density = LocalDensity.current
 
+        // 3c.1 — drapeau posé explicitement autour du seul appel
+        // programmatique à scrollState (auto-scroll TTS), levé à sa fin.
+        // Discrimine l'origine réelle du défilement pour la détection de
+        // position ci-dessous : `ScrollableState.isScrollInProgress` vaut
+        // `true` pour CE défilement programmatique aussi bien que pour un
+        // drag utilisateur — il ne permet donc pas de distinguer les deux,
+        // contrairement à ce drapeau.
+        var isProgrammaticScroll by remember { mutableStateOf(false) }
+
         // A.1 — Auto-scroll vers la phrase active pendant la lecture TTS
         LaunchedEffect(state.currentSentenceIndex) {
             if (state.isPlaying && currentLineYDp > 0.dp) {
-                scrollState.animateScrollTo(with(density) { currentLineYDp.roundToPx() })
+                isProgrammaticScroll = true
+                try {
+                    scrollState.animateScrollTo(with(density) { currentLineYDp.roundToPx() })
+                } finally {
+                    isProgrammaticScroll = false
+                }
+            }
+        }
+
+        // 3c.1 — position en contenu (indépendante du défilement, voir
+        // currentLineYDp ci-dessus qui utilise déjà cette même valeur comme
+        // cible ABSOLUE de scrollTo) de chaque phrase rendue en mode
+        // SCROLL. Map ordinaire, pas un State Compose : ses écritures
+        // (onGloballyPositioned, une seule fois par phrase au layout, pas
+        // à chaque frame de défilement) n'ont pas besoin de déclencher de
+        // recomposition, seule la lecture dans le derivedStateOf ci-dessous
+        // compte, déjà réactive via scrollState.value.
+        val sentenceTopOffsetsPx = remember(state.currentChapterIndex) { mutableMapOf<Int, Int>() }
+
+        // 3c.1 — dérive la phrase la plus haute visible, mais ne propage
+        // qu'un changement de PHRASE, jamais de position brute : sans ce
+        // derivedStateOf, la lecture de scrollState.value à chaque pixel
+        // défilé recalculerait (et recomposerait) au même rythme.
+        val topmostVisibleSentenceIndex by remember(state.currentChapterIndex) {
+            derivedStateOf {
+                if (isProgrammaticScroll) return@derivedStateOf null
+                val scrollValue = scrollState.value
+                var result: Int? = null
+                for ((index, top) in sentenceTopOffsetsPx) {
+                    if (top <= scrollValue && (result == null || index > result!!)) result = index
+                }
+                result
+            }
+        }
+
+        // 3c.1 — antipattern legacy corrigé : en mode SCROLL, seuls le TTS
+        // ou une navigation explicite faisaient avancer currentSentenceIndex
+        // ; un défilement manuel silencieux n'était jamais reflété, ni
+        // persisté. Ignoré si `null` (aucune phrase encore mesurée) ou hors
+        // mode SCROLL (le pager pilote sa propre remontée en mode PAGED).
+        LaunchedEffect(topmostVisibleSentenceIndex, state.readingMode) {
+            val index = topmostVisibleSentenceIndex
+            if (index != null && state.readingMode == ReadingMode.SCROLL) {
+                viewModel.onIntent(ReaderIntent.UpdateScrollPosition(index))
             }
         }
 
@@ -206,6 +241,36 @@ fun ReaderScreen(
         // mode pagé (swipe manuel inclus, remontée par PagedChapterContent) :
         var pagedLivePageIndex by remember { mutableIntStateOf(0) }
         LaunchedEffect(state.currentChapterIndex) { pagedLivePageIndex = 0 }
+
+        // 3c.4 — bornes fenêtre de la sélection active, par mode. SCROLL :
+        // union des bornes des phrases sélectionnées (SnapshotStateMap,
+        // ses écritures DOIVENT être observables ici — contrairement à
+        // sentenceTopOffsetsPx en 3c.1, on veut justement que le popup
+        // suive un défilement pendant que la sélection reste active).
+        // PAGED : remonté par PagedChapterContent (conversion locale →
+        // fenêtre via TextLayoutResult, seul capable de la produire).
+        val scrollSelectionBoundsPx = remember(state.currentChapterIndex) {
+            mutableStateMapOf<Int, Rect>()
+        }
+        var pagedSelectionBounds by remember { mutableStateOf<Rect?>(null) }
+        val selectionBoundsInWindow = when (state.readingMode) {
+            ReadingMode.SCROLL -> selectedRange
+                ?.mapNotNull { scrollSelectionBoundsPx[it] }
+                ?.reduceOrNull { a, b ->
+                    Rect(
+                        left = minOf(a.left, b.left),
+                        top = minOf(a.top, b.top),
+                        right = maxOf(a.right, b.right),
+                        bottom = maxOf(a.bottom, b.bottom),
+                    )
+                }
+            ReadingMode.PAGED -> pagedSelectionBounds
+        }
+        val selectedText = remember(selectedRange, state.currentChapter) {
+            val range = selectedRange ?: return@remember ""
+            val sentences = state.currentChapter?.paragraphs?.flatMap { it.sentences } ?: emptyList()
+            range.mapNotNull { sentences.getOrNull(it)?.text }.joinToString(" ")
+        }
 
         // 3b.5 — barre du haut : appartient au HUD, apparaît/disparaît
         // avec le panneau, jamais indépendamment (même gate isHudVisible).
@@ -250,6 +315,7 @@ fun ReaderScreen(
                             paragraph.sentences.forEach { sentence ->
                                 val index = globalIndex++
                                 val isCurrentlyPlaying = index == state.currentSentenceIndex
+                                val isSentenceSelected = selectedRange?.contains(index) == true
                                 // B.5 — piste de lecture : opacité différenciée
                                 val trailAlpha = when {
                                     isCurrentlyPlaying -> 1.0f
@@ -261,7 +327,7 @@ fun ReaderScreen(
                                     paragraphStyle = paragraph.style,
                                     isCurrentlyPlaying = isCurrentlyPlaying,
                                     highlightedWordRange = state.highlightedWordRange,
-                                    isSelected = selectedRange?.contains(index) == true,
+                                    isSelected = isSentenceSelected,
                                     existingAnnotationColor = annotationColorFor(state.currentChapterIndex, sentence, state.annotations),
                                     fontSizeSp = state.effectiveSettings.fontSize,
                                     textColor = ThemeColors.text(state.effectiveSettings.theme).copy(alpha = trailAlpha),
@@ -279,12 +345,26 @@ fun ReaderScreen(
                                             if (isHudVisible) isHudVisible = false else keepHudVisible()
                                         }
                                     },
-                                    modifier = if (isCurrentlyPlaying) {
-                                        Modifier.onGloballyPositioned { coordinates ->
-                                            currentLineYDp = with(density) { coordinates.positionInParent().y.toDp() }
+                                    // 3c.1 — position de contenu (indépendante du défilement,
+                                    // stable tant que le texte ne se re-layoute pas) de
+                                    // CHAQUE phrase, pas seulement celle en cours de lecture
+                                    // TTS : nécessaire pour dériver la phrase la plus haute
+                                    // visible pendant un défilement manuel silencieux.
+                                    modifier = Modifier.onGloballyPositioned { coordinates ->
+                                        val topPx = coordinates.positionInParent().y
+                                        sentenceTopOffsetsPx[index] = topPx.toInt()
+                                        if (isCurrentlyPlaying) {
+                                            currentLineYDp = with(density) { topPx.toDp() }
                                         }
-                                    } else {
-                                        Modifier
+                                        // 3c.4 — bornes fenêtre, seulement pour les phrases
+                                        // sélectionnées (popup de sélection) ; suit le
+                                        // défilement puisque boundsInWindow() en dépend,
+                                        // contrairement à positionInParent() ci-dessus.
+                                        if (isSentenceSelected) {
+                                            scrollSelectionBoundsPx[index] = coordinates.boundsInWindow()
+                                        } else {
+                                            scrollSelectionBoundsPx.remove(index)
+                                        }
                                     },
                                 )
                             }
@@ -320,6 +400,7 @@ fun ReaderScreen(
                         onNextChapter = { viewModel.onIntent(ReaderIntent.NextChapter) },
                         onCurrentLineY = { y -> currentLineYDp = y },
                         onPageChanged = { pageIndex -> pagedLivePageIndex = pageIndex },
+                        onSelectionBoundsInWindow = { bounds -> pagedSelectionBounds = bounds },
                     )
                 }
             }
@@ -332,12 +413,20 @@ fun ReaderScreen(
             // TTS déjà active et les deux se chevauchent à l'oreille.
         }
 
+        // 3c.4 — remplace AnnotationColorPicker (position fixe basse
+        // d'écran, Confirmer/Annuler) par le popup Copier/Surligner/Note
+        // positionné près de la sélection réelle.
         if (selectedRange != null) {
-            AnnotationColorPicker(
-                selected = pendingColor,
-                onSelect = { pendingColor = it },
-                onConfirm = { viewModel.onIntent(ReaderIntent.ConfirmAnnotation(pendingColor)) },
-                onCancel = { viewModel.onIntent(ReaderIntent.ClearSentenceSelection) },
+            SelectionActionPopup(
+                selectedText = selectedText,
+                selectionBoundsInWindow = selectionBoundsInWindow,
+                onHighlight = { color ->
+                    viewModel.onIntent(ReaderIntent.ConfirmAnnotation(color))
+                },
+                onSaveNote = { content, color ->
+                    viewModel.onIntent(ReaderIntent.ConfirmAnnotation(color, content))
+                },
+                onDismiss = { viewModel.onIntent(ReaderIntent.ClearSentenceSelection) },
             )
         }
 
@@ -367,16 +456,9 @@ fun ReaderScreen(
                 onTtsClick = { keepHudVisible(); showTtsPanel = true },
                 onReadingModeClick = { keepHudVisible(); viewModel.onIntent(ReaderIntent.ToggleReadingMode) },
             )
-
-            // Transitoire : remplacé par le toggle du panneau Marque-pages au lot 3c.
-            FlowRow(horizontalArrangement = Arrangement.spacedBy(4.dp)) {
-                Button(onClick = { keepHudVisible(); viewModel.onIntent(ReaderIntent.CreateBookmark) }) {
-                    Text("+ Signet")
-                }
-            }
         }
 
-        // 3b.4 — ligne de statut persistante, hors HUD : visible en
+        // 3b.4/3c.1 — ligne de statut persistante, hors HUD : visible en
         // permanence, y compris panneau masqué. Le compteur de pages vient
         // du contrat VirtualPagination (via l'état hissé ci-dessus),
         // jamais d'un calcul local.
@@ -384,26 +466,20 @@ fun ReaderScreen(
         // Bug réel trouvé sur appareil : dériver la page courante
         // uniquement de currentSentenceIndex (via pageIndexAt) la laissait
         // figée pendant un scroll/swipe manuel sans TTS, puisque
-        // currentSentenceIndex n'est mis à jour que par le TTS ou une
-        // navigation explicite. En pagé, on préfère désormais la page
-        // réellement affichée par le pager (pagedLivePageIndex, mise à
-        // jour aussi bien par un swipe manuel que par le suivi TTS — une
-        // seule source, jamais de divergence possible). En défilement, où
-        // il n'existe pas de pager dont dériver une page exacte, une
-        // estimation par fraction de défilement — seul le total de pages
-        // reste une valeur exacte du moteur, pas cette position courante.
+        // currentSentenceIndex n'était mis à jour que par le TTS ou une
+        // navigation explicite. En pagé, la page réellement affichée par le
+        // pager (pagedLivePageIndex, mise à jour aussi bien par un swipe
+        // manuel que par le suivi TTS). En défilement, currentSentenceIndex
+        // est désormais tenu à jour par le défilement manuel lui-même
+        // (topmostVisibleSentenceIndex ci-dessus) : pageIndexAt en dérive
+        // donc une page EXACTE, la même source que le mode pagé — plus
+        // d'estimation par fraction de défilement, qui supposait à tort une
+        // densité de texte uniforme sur le chapitre.
         state.currentChapter?.let { chapter ->
             val pageCountInChapter = pagination.pageCount(chapter.index)
             val pageIndexInChapter = when (state.readingMode) {
                 ReadingMode.PAGED -> pagedLivePageIndex
-                ReadingMode.SCROLL -> {
-                    val scrollFraction = if (scrollState.maxValue > 0) {
-                        scrollState.value.toFloat() / scrollState.maxValue
-                    } else {
-                        0f
-                    }
-                    (scrollFraction * pageCountInChapter).toInt().coerceIn(0, (pageCountInChapter - 1).coerceAtLeast(0))
-                }
+                ReadingMode.SCROLL -> pagination.pageIndexAt(chapter.index, state.currentSentenceIndex)
             }
             StatusLineBar(
                 chapterNumber = state.currentChapterIndex + 1,
@@ -452,6 +528,35 @@ fun ReaderScreen(
                     ((it.remainingMs / 60_000L).toInt())
                 },
                 onDismiss = { showTtsPanel = false },
+            )
+        }
+
+        // 3c.2 — Sommaire en bottom sheet : superposé, ne démonte plus le
+        // lecteur (avant ce lot, `return@Column` remplaçait tout l'écran,
+        // HUD compris). Même pattern que ReaderSettingsPanel/ReaderTtsPanel
+        // ci-dessus : ModalBottomSheet se rend dans sa propre fenêtre, il
+        // ne consomme pas d'espace dans cette Column.
+        if (state.isTocVisible) {
+            TableOfContentsSheet(
+                entries = state.tableOfContents,
+                currentChapterIndex = state.currentChapterIndex,
+                onEntryClick = { chapterIndex -> viewModel.onIntent(ReaderIntent.JumpToChapter(chapterIndex)) },
+                onClose = { viewModel.onIntent(ReaderIntent.ToggleToc) },
+            )
+        }
+
+        // 3c.3 — Marque-pages en panneau latéral (≈85% de la largeur,
+        // depuis la gauche) : superposé, ne démonte plus le lecteur, même
+        // principe que le Sommaire ci-dessus.
+        if (state.isBookmarkListVisible) {
+            BookmarkPanel(
+                bookmarks = state.bookmarks,
+                annotations = state.annotations,
+                isCurrentPageBookmarked = state.isCurrentPageBookmarked,
+                onBookmarkClick = { bookmark -> viewModel.onIntent(ReaderIntent.NavigateToLocator(bookmark.locator)) },
+                onAnnotationClick = { annotation -> viewModel.onIntent(ReaderIntent.NavigateToLocator(annotation.startLocator)) },
+                onToggleBookmark = { viewModel.onIntent(ReaderIntent.ToggleBookmarkAtCurrentPosition) },
+                onClose = { viewModel.onIntent(ReaderIntent.ToggleBookmarkList) },
             )
         }
     }

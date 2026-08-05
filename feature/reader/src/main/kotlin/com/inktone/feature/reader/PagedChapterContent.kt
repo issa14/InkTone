@@ -10,6 +10,7 @@ import androidx.compose.foundation.pager.rememberPagerState
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.SideEffect
 import androidx.compose.runtime.State
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
@@ -18,9 +19,12 @@ import androidx.compose.runtime.rememberUpdatedState
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.drawWithContent
+import androidx.compose.ui.geometry.Rect
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.drawscope.DrawScope
 import androidx.compose.ui.input.pointer.pointerInput
+import androidx.compose.ui.layout.LayoutCoordinates
+import androidx.compose.ui.layout.onGloballyPositioned
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.text.AnnotatedString
 import androidx.compose.ui.text.SpanStyle
@@ -84,6 +88,7 @@ fun PagedChapterContent(
     onNextChapter: () -> Unit,
     onCurrentLineY: (Dp) -> Unit,
     onPageChanged: (Int) -> Unit = {},
+    onSelectionBoundsInWindow: (Rect?) -> Unit = {},
     modifier: Modifier = Modifier,
 ) {
     val renderTextStyle = remember(pagination.baseTextStyle, textColor) {
@@ -206,6 +211,7 @@ fun PagedChapterContent(
                         isDisplayedPage = pageIndex == pagerState.currentPage,
                         isReadingRulerEnabled = isReadingRulerEnabled,
                         onCurrentLineY = onCurrentLineY,
+                        onSelectionBoundsInWindow = onSelectionBoundsInWindow,
                         onOffsetLongPress = { absoluteOffset ->
                             onSentenceLongClick(sentenceIndexForOffset(currentMeasurement.sentenceStartOffsets, absoluteOffset))
                         },
@@ -236,11 +242,44 @@ private fun PageBlock(
     isDisplayedPage: Boolean,
     isReadingRulerEnabled: Boolean,
     onCurrentLineY: (Dp) -> Unit,
+    onSelectionBoundsInWindow: (Rect?) -> Unit,
     onOffsetLongPress: (Int) -> Unit,
     onOffsetTap: (Int) -> Unit,
 ) {
     var textLayoutResult by remember { mutableStateOf<TextLayoutResult?>(null) }
+    var textCoordinates by remember { mutableStateOf<LayoutCoordinates?>(null) }
     val density = LocalDensity.current
+
+    // 3c.4 — position du popup de sélection alimentée par les
+    // LayoutCoordinates réelles de la zone sélectionnée (contrainte
+    // d'implémentation retenue, pas des coordonnées calculées à la main) :
+    // convertit le rectangle LOCAL de la sélection (getPathForRange, même
+    // mécanisme que le dessin du surlignage ci-dessous) en coordonnées
+    // fenêtre via les coordonnées réelles du Text. Réévalué à chaque
+    // recomposition déclenchée par un changement de sélection ou de
+    // layout — suit donc un défilement (page suivante/précédente change
+    // isDisplayedPage) ou une rotation (changement de taille → nouveau
+    // TextLayoutResult) sans calcul séparé.
+    SideEffect {
+        val layout = textLayoutResult
+        val coords = textCoordinates
+        val absolute = selectedRange.value
+        if (!isDisplayedPage || layout == null || coords == null || absolute == null) {
+            if (!isDisplayedPage) onSelectionBoundsInWindow(null)
+            return@SideEffect
+        }
+        val textLength = layout.layoutInput.text.length
+        val localStart = (absolute.first - pageOffsetRange.first).coerceIn(0, textLength)
+        val localEndExclusive = (absolute.last + 1 - pageOffsetRange.first).coerceIn(localStart, textLength)
+        if (localStart >= localEndExclusive) {
+            onSelectionBoundsInWindow(null)
+        } else {
+            val localBounds = layout.getPathForRange(localStart, localEndExclusive).getBounds()
+            val topLeft = coords.localToWindow(localBounds.topLeft)
+            val bottomRight = coords.localToWindow(localBounds.bottomRight)
+            onSelectionBoundsInWindow(Rect(topLeft, bottomRight))
+        }
+    }
 
     Text(
         text = pageText,
@@ -260,6 +299,7 @@ private fun PageBlock(
         },
         modifier = Modifier
             .fillMaxSize()
+            .onGloballyPositioned { textCoordinates = it }
             .pointerInput(pageOffsetRange) {
                 detectTapGestures(
                     onLongPress = { position ->
@@ -313,7 +353,7 @@ private fun sentenceIndexForOffset(sentenceStartOffsets: List<Int>, absoluteOffs
     return result
 }
 
-private fun buildPageAnnotatedString(
+internal fun buildPageAnnotatedString(
     full: AnnotatedString,
     pageOffsetRange: IntRange,
     sentences: List<Sentence>,
@@ -322,8 +362,26 @@ private fun buildPageAnnotatedString(
     chapterIndex: Int,
     annotations: List<Annotation>,
 ): AnnotatedString {
-    val endExclusive = (pageOffsetRange.last + 1).coerceAtMost(full.length)
-    val base = full.subSequence(pageOffsetRange.first, endExclusive)
+    // Bug réel trouvé sur appareil (crash reproductible, plusieurs
+    // occurrences en logcat) : `pageOffsetRange` (versionné via
+    // `VirtualPaginationEngine`) et `full` (`currentMeasurement.annotatedString`,
+    // un `State` distinct sur `ChapterPaginationState`) sont écrits
+    // séparément par `rememberChapterPaginationState` pendant une mesure
+    // progressive (changement de chapitre, de taille de police...). Une
+    // recomposition transitoire peut donc lire un `pageOffsetRange` calculé
+    // pour une mesure plus longue que le `full` déjà retombé sur la mesure
+    // partielle du nouveau style — `pageOffsetRange.first` dépasse alors
+    // `full.length` et `subSequence(start, end)` lève
+    // IllegalArgumentException (start > end). Ce décalage d'une frame entre
+    // les deux `State` est accepté par la conception (mesure asynchrone) :
+    // borner aussi le DÉBUT, pas seulement la fin, rend cette frame
+    // transitoire silencieuse (page vide un instant) plutôt qu'un crash —
+    // la frame suivante, une fois les deux `State` synchronisés, affiche
+    // le contenu correct.
+    val startInclusive = pageOffsetRange.first.coerceIn(0, full.length)
+    val endExclusive = (pageOffsetRange.last + 1).coerceIn(startInclusive, full.length)
+    if (startInclusive >= endExclusive) return AnnotatedString("")
+    val base = full.subSequence(startInclusive, endExclusive)
     if (pageSentenceRange.isEmpty()) return base
 
     return buildAnnotatedString {
@@ -331,9 +389,9 @@ private fun buildPageAnnotatedString(
         for (sentenceIndex in pageSentenceRange) {
             if (sentenceIndex !in sentences.indices) continue
             val color = annotationColorFor(chapterIndex, sentences[sentenceIndex], annotations) ?: continue
-            val localStart = (sentenceStartOffsets[sentenceIndex] - pageOffsetRange.first).coerceAtLeast(0)
+            val localStart = (sentenceStartOffsets[sentenceIndex] - startInclusive).coerceAtLeast(0)
             val localEndExclusive =
-                (sentenceStartOffsets[sentenceIndex] + sentences[sentenceIndex].text.length - pageOffsetRange.first)
+                (sentenceStartOffsets[sentenceIndex] + sentences[sentenceIndex].text.length - startInclusive)
                     .coerceAtMost(base.length)
             if (localStart < localEndExclusive) {
                 addStyle(SpanStyle(background = color.toComposeColor()), localStart, localEndExclusive)
