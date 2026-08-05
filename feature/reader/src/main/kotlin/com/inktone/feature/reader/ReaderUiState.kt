@@ -218,11 +218,14 @@ sealed interface ReaderIntent {
     data object ToggleReadingMode : ReaderIntent
 
     /**
-     * Tâche 3c.1 — remonte la phrase la plus haute visible pendant un
-     * défilement manuel (mode SCROLL). Source unique de `currentSentenceIndex`
-     * avec la navigation manuelle et le TTS : jamais un second système de
-     * position. `ReaderScreen` ne l'émet que pour un défilement d'origine
-     * utilisateur (jamais l'auto-scroll TTS, voir garde `isProgrammaticScroll`).
+     * Tâche 3c.1/3c.1bis — remonte la position atteinte par un geste
+     * manuel : la phrase la plus haute visible pendant un défilement
+     * (mode SCROLL), ou la première phrase de la page affichée après un
+     * swipe (mode PAGED). Source unique de `currentSentenceIndex` avec la
+     * navigation manuelle et le TTS : jamais un second système de
+     * position. `ReaderScreen`/`PagedChapterContent` ne l'émettent que
+     * pour un geste d'origine utilisateur (jamais l'auto-scroll/auto-page
+     * TTS, voir gardes `isProgrammaticScroll`/`isProgrammaticPageChange`).
      */
     data class UpdateScrollPosition(val sentenceIndex: Int) : ReaderIntent
 }

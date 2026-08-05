@@ -10,13 +10,13 @@ import androidx.compose.foundation.pager.rememberPagerState
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
-import androidx.compose.runtime.SideEffect
 import androidx.compose.runtime.State
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberUpdatedState
 import androidx.compose.runtime.setValue
+import androidx.compose.runtime.snapshotFlow
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.drawWithContent
 import androidx.compose.ui.geometry.Rect
@@ -88,6 +88,7 @@ fun PagedChapterContent(
     onNextChapter: () -> Unit,
     onCurrentLineY: (Dp) -> Unit,
     onPageChanged: (Int) -> Unit = {},
+    onManualPageChange: (sentenceIndex: Int) -> Unit = {},
     onSelectionBoundsInWindow: (Rect?) -> Unit = {},
     modifier: Modifier = Modifier,
 ) {
@@ -104,6 +105,35 @@ fun PagedChapterContent(
     // à l'audit, signal non ambigu d'un swipe volontaire au-delà du
     // chapitre).
     val pagerState = rememberPagerState(pageCount = { pageCount + 1 })
+
+    // 3c.1bis — bug réel trouvé sur appareil pendant la vérification du
+    // lot 3c : le compteur de PAGE suit déjà le swipe manuel
+    // (onPageChanged ci-dessous, corrigé au lot 3b), mais le POURCENTAGE
+    // de progression (ReaderUiState.bookProgression) dérive de
+    // currentSentenceIndex, jamais mis à jour par un swipe — seuls le TTS
+    // ou une navigation explicite l'avancent. Même antipattern que celui
+    // corrigé en mode SCROLL (3c.1), pour le mode PAGED. Même garde
+    // anti-boucle : un drapeau posé explicitement autour des deux SEULS
+    // appels programmatiques au pager (restauration de position ci-dessous,
+    // suivi du mot prononcé plus bas), jamais isScrollInProgress qui ne
+    // distingue pas swipe manuel et scrollToPage/animateScrollToPage.
+    var isProgrammaticPageChange by remember { mutableStateOf(false) }
+
+    // Bug réel trouvé sur appareil (clignotement frénétique après 2-3
+    // swipes) : `onManualPageChange` pousse `sentenceRangeOf(page).first`
+    // vers `currentSentenceIndex`, qui redéclenche aussitôt l'effet
+    // d'ancrage ci-dessous (`pageIndexAt`, keyé sur currentSentenceIndex).
+    // Si `pageIndexAt(sentenceRangeOf(page).first)` ne redonne pas
+    // exactement `page` (une phrase à cheval sur deux pages, notamment),
+    // l'ancrage rescrolle vers une page légèrement différente, ce qui
+    // redéclenche `onManualPageChange` sur CETTE nouvelle page — boucle.
+    // Mémorise le dernier index émis PAR ce composable lui-même : quand
+    // `currentSentenceIndex` revient exactement à cette valeur, c'est cet
+    // écho, pas une navigation externe (TTS, signet, chapitre) — l'effet
+    // d'ancrage ne doit alors PAS re-scroller, il doit faire confiance au
+    // pager plutôt que de le contredire.
+    var lastManuallyEmittedSentenceIndex by remember { mutableStateOf<Int?>(null) }
+
     LaunchedEffect(pagerState.currentPage, pageCount) {
         if (pagerState.currentPage >= pageCount) {
             onNextChapter()
@@ -114,17 +144,46 @@ fun PagedChapterContent(
             // statut restait figé à 1 pendant un swipe manuel, puisque
             // rien ne faisait remonter la position du pager avant ceci.
             onPageChanged(pagerState.currentPage)
+
+            if (!isProgrammaticPageChange && chapter != null) {
+                val sentenceRange = pagination.sentenceRangeOf(chapter.index, pagerState.currentPage)
+                if (!sentenceRange.isEmpty()) {
+                    lastManuallyEmittedSentenceIndex = sentenceRange.first
+                    onManualPageChange(sentenceRange.first)
+                }
+            }
         }
     }
 
     // Ancrage de position (3a.1) : capturer currentSentenceIndex et
     // repositionner via pageIndexAt à chaque recalcul de pagination
     // (rotation, taille de police...) — jamais un index de page persisté.
+    //
+    // Régression connue, documentée, non corrigée (voir
+    // docs/execution/NOTE_REGRESSION_CLIGNOTEMENT_PAGE_HUD.md) : cet
+    // effet se relance à CHAQUE écriture intermédiaire de
+    // pagination.measurement pendant une mesure progressive (pas
+    // seulement la finale) — si currentSentenceIndex est profond dans le
+    // chapitre, pageIndexAt calculé contre une mesure encore partielle
+    // peut être transitoirement faux, causant un saut de page visible.
+    // Le HUD (ReaderScreen.readingAreaSize) redéclenche ce genre de
+    // remesure à chaque bascule visible/masqué.
     LaunchedEffect(chapter?.index, pagination.measurement, currentSentenceIndex) {
+        if (currentSentenceIndex == lastManuallyEmittedSentenceIndex) {
+            // Écho de notre propre swipe (voir commentaire ci-dessus) :
+            // le pager est déjà à la bonne page, ne pas le contredire.
+            lastManuallyEmittedSentenceIndex = null
+            return@LaunchedEffect
+        }
         if (chapter != null && pagination.measurement != null && pageCount > 0) {
             val targetPage = pagination.pageIndexAt(chapter.index, currentSentenceIndex)
             if (pagerState.currentPage != targetPage) {
-                pagerState.scrollToPage(targetPage)
+                isProgrammaticPageChange = true
+                try {
+                    pagerState.scrollToPage(targetPage)
+                } finally {
+                    isProgrammaticPageChange = false
+                }
             }
         }
     }
@@ -155,7 +214,12 @@ fun PagedChapterContent(
         if (chapter != null && absoluteHighlightedRange != null) {
             val wordPage = pagination.pageIndexAtOffset(chapter.index, absoluteHighlightedRange.first)
             if (wordPage >= 0 && wordPage != pagerState.currentPage) {
-                pagerState.animateScrollToPage(wordPage)
+                isProgrammaticPageChange = true
+                try {
+                    pagerState.animateScrollToPage(wordPage)
+                } finally {
+                    isProgrammaticPageChange = false
+                }
             }
         }
     }
@@ -255,29 +319,43 @@ private fun PageBlock(
     // d'implémentation retenue, pas des coordonnées calculées à la main) :
     // convertit le rectangle LOCAL de la sélection (getPathForRange, même
     // mécanisme que le dessin du surlignage ci-dessous) en coordonnées
-    // fenêtre via les coordonnées réelles du Text. Réévalué à chaque
-    // recomposition déclenchée par un changement de sélection ou de
-    // layout — suit donc un défilement (page suivante/précédente change
-    // isDisplayedPage) ou une rotation (changement de taille → nouveau
-    // TextLayoutResult) sans calcul séparé.
-    SideEffect {
-        val layout = textLayoutResult
-        val coords = textCoordinates
-        val absolute = selectedRange.value
-        if (!isDisplayedPage || layout == null || coords == null || absolute == null) {
-            if (!isDisplayedPage) onSelectionBoundsInWindow(null)
-            return@SideEffect
-        }
-        val textLength = layout.layoutInput.text.length
-        val localStart = (absolute.first - pageOffsetRange.first).coerceIn(0, textLength)
-        val localEndExclusive = (absolute.last + 1 - pageOffsetRange.first).coerceIn(localStart, textLength)
-        if (localStart >= localEndExclusive) {
+    // fenêtre via les coordonnées réelles du Text.
+    //
+    // Bug réel trouvé sur appareil (popup de sélection jamais affiché en
+    // mode PAGED) : un `SideEffect` ne se ré-exécute QUE quand ce
+    // composable (`PageBlock`) se recompose pour une AUTRE raison — lire
+    // `selectedRange.value` à l'intérieur ne l'abonne à rien (c'est
+    // volontaire pour `highlightedRange`, lu de la même façon en dessin
+    // via `drawWithContent`, qui a sa propre observation réactive du
+    // State — voir le commentaire de tête sur l'isolation du
+    // surlignage : « ne déclenche donc qu'un redessin, jamais... un
+    // replacement de la page »). Une sélection ne fait donc JAMAIS
+    // recomposer `PageBlock`, le `SideEffect` ne se relançait donc
+    // jamais après la sélection initiale. `snapshotFlow` observe l'État
+    // directement, indépendamment de toute recomposition.
+    LaunchedEffect(isDisplayedPage, pageOffsetRange) {
+        if (!isDisplayedPage) {
             onSelectionBoundsInWindow(null)
-        } else {
-            val localBounds = layout.getPathForRange(localStart, localEndExclusive).getBounds()
-            val topLeft = coords.localToWindow(localBounds.topLeft)
-            val bottomRight = coords.localToWindow(localBounds.bottomRight)
-            onSelectionBoundsInWindow(Rect(topLeft, bottomRight))
+            return@LaunchedEffect
+        }
+        snapshotFlow { selectedRange.value }.collect { absolute ->
+            val layout = textLayoutResult
+            val coords = textCoordinates
+            if (layout == null || coords == null || absolute == null) {
+                onSelectionBoundsInWindow(null)
+                return@collect
+            }
+            val textLength = layout.layoutInput.text.length
+            val localStart = (absolute.first - pageOffsetRange.first).coerceIn(0, textLength)
+            val localEndExclusive = (absolute.last + 1 - pageOffsetRange.first).coerceIn(localStart, textLength)
+            if (localStart >= localEndExclusive) {
+                onSelectionBoundsInWindow(null)
+            } else {
+                val localBounds = layout.getPathForRange(localStart, localEndExclusive).getBounds()
+                val topLeft = coords.localToWindow(localBounds.topLeft)
+                val bottomRight = coords.localToWindow(localBounds.bottomRight)
+                onSelectionBoundsInWindow(Rect(topLeft, bottomRight))
+            }
         }
     }
 

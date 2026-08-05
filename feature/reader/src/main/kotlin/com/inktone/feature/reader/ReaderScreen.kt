@@ -48,6 +48,8 @@ import androidx.compose.ui.text.withStyle
 import androidx.compose.ui.unit.IntSize
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import androidx.compose.ui.window.Dialog
+import androidx.compose.ui.window.DialogProperties
 import androidx.hilt.navigation.compose.hiltViewModel
 import com.inktone.core.designsystem.AppIcons
 import com.inktone.core.designsystem.reducedMotionDuration
@@ -283,6 +285,14 @@ fun ReaderScreen(
         // (mode pagé), un seul calcul. Mesuré au même endroit de
         // l'arborescence pour les deux modes (ce Box), formule unique de
         // hauteur utile (voir ChapterPaginationState).
+        //
+        // Régression connue, documentée, non corrigée (voir
+        // docs/execution/NOTE_REGRESSION_CLIGNOTEMENT_PAGE_HUD.md) :
+        // readingAreaSize dépend de isHudVisible (ReaderTopBar/
+        // UnifiedControlPanel montés/démontés redistribuent l'espace de
+        // ce Box weight(1f)) — chaque bascule du HUD redéclenche une
+        // remesure complète de la pagination en mode pagé, dont les
+        // étapes intermédiaires peuvent faire clignoter la page affichée.
         var readingAreaSize by remember { mutableStateOf(IntSize.Zero) }
         val paginationPaddingPx = with(density) { 16.dp.roundToPx() }
         val pagination = rememberChapterPaginationState(
@@ -400,6 +410,9 @@ fun ReaderScreen(
                         onNextChapter = { viewModel.onIntent(ReaderIntent.NextChapter) },
                         onCurrentLineY = { y -> currentLineYDp = y },
                         onPageChanged = { pageIndex -> pagedLivePageIndex = pageIndex },
+                        onManualPageChange = { sentenceIndex ->
+                            viewModel.onIntent(ReaderIntent.UpdateScrollPosition(sentenceIndex))
+                        },
                         onSelectionBoundsInWindow = { bounds -> pagedSelectionBounds = bounds },
                     )
                 }
@@ -548,16 +561,37 @@ fun ReaderScreen(
         // 3c.3 — Marque-pages en panneau latéral (≈85% de la largeur,
         // depuis la gauche) : superposé, ne démonte plus le lecteur, même
         // principe que le Sommaire ci-dessus.
+        //
+        // Bug réel trouvé sur appareil pendant la vérification du lot 3c :
+        // contrairement à TableOfContentsSheet (ModalBottomSheet, rendu
+        // dans sa propre fenêtre via Popup), BookmarkPanel était appelé
+        // directement comme enfant de cette Column. Une Column place ses
+        // enfants les uns SOUS les autres, elle ne les superpose jamais —
+        // un enfant `fillMaxSize()` en dernière position se voyait donc
+        // placé sous UnifiedControlPanel/StatusLineBar (toujours visibles
+        // pendant 4s, la ligne de statut apparaissant au-dessus du panneau)
+        // plutôt que par-dessus tout l'écran. `Dialog` (comme
+        // ModalBottomSheet en interne) rend dans une fenêtre séparée,
+        // superposée par construction, indépendamment de sa position dans
+        // cette Column.
         if (state.isBookmarkListVisible) {
-            BookmarkPanel(
-                bookmarks = state.bookmarks,
-                annotations = state.annotations,
-                isCurrentPageBookmarked = state.isCurrentPageBookmarked,
-                onBookmarkClick = { bookmark -> viewModel.onIntent(ReaderIntent.NavigateToLocator(bookmark.locator)) },
-                onAnnotationClick = { annotation -> viewModel.onIntent(ReaderIntent.NavigateToLocator(annotation.startLocator)) },
-                onToggleBookmark = { viewModel.onIntent(ReaderIntent.ToggleBookmarkAtCurrentPosition) },
-                onClose = { viewModel.onIntent(ReaderIntent.ToggleBookmarkList) },
-            )
+            Dialog(
+                onDismissRequest = { viewModel.onIntent(ReaderIntent.ToggleBookmarkList) },
+                properties = DialogProperties(
+                    usePlatformDefaultWidth = false,
+                    decorFitsSystemWindows = false,
+                ),
+            ) {
+                BookmarkPanel(
+                    bookmarks = state.bookmarks,
+                    annotations = state.annotations,
+                    isCurrentPageBookmarked = state.isCurrentPageBookmarked,
+                    onBookmarkClick = { bookmark -> viewModel.onIntent(ReaderIntent.NavigateToLocator(bookmark.locator)) },
+                    onAnnotationClick = { annotation -> viewModel.onIntent(ReaderIntent.NavigateToLocator(annotation.startLocator)) },
+                    onToggleBookmark = { viewModel.onIntent(ReaderIntent.ToggleBookmarkAtCurrentPosition) },
+                    onClose = { viewModel.onIntent(ReaderIntent.ToggleBookmarkList) },
+                )
+            }
         }
     }
     }

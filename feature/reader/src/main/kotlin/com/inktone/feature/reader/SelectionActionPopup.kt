@@ -17,15 +17,19 @@ import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.focus.FocusRequester
+import androidx.compose.ui.focus.focusRequester
 import androidx.compose.ui.geometry.Rect
 import androidx.compose.ui.platform.LocalClipboardManager
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalDensity
+import androidx.compose.ui.platform.LocalSoftwareKeyboardController
 import androidx.compose.ui.text.AnnotatedString
 import androidx.compose.ui.text.input.ImeAction
 import androidx.compose.ui.unit.IntOffset
@@ -33,6 +37,7 @@ import androidx.compose.ui.unit.IntSize
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.window.Popup
 import androidx.compose.ui.window.PopupPositionProvider
+import androidx.compose.ui.window.PopupProperties
 import com.inktone.core.designsystem.AppIcons
 import com.inktone.domain.model.AnnotationColor
 
@@ -70,12 +75,34 @@ fun SelectionActionPopup(
     val clipboardManager = LocalClipboardManager.current
     val context = LocalContext.current
     val density = LocalDensity.current
+    val noteFocusRequester = remember { FocusRequester() }
+    val keyboardController = LocalSoftwareKeyboardController.current
+
+    // Bug réel trouvé sur appareil pendant la vérification du lot 3c :
+    // cliquer sur le champ « Note » ne faisait pas apparaître le clavier.
+    // `Popup` est NON focusable par défaut (PopupProperties(focusable =
+    // false), pensé pour les tooltips/menus qui ne doivent pas voler le
+    // focus) — un OutlinedTextField à l'intérieur ne peut alors jamais
+    // recevoir le focus, donc jamais déclencher l'IME. `focusable = true`
+    // ci-dessous, plus une demande de focus explicite au passage en mode
+    // NOTE_INPUT (un TextField ne se focus jamais tout seul à sa
+    // composition).
+    LaunchedEffect(mode) {
+        if (mode == SelectionPopupMode.NOTE_INPUT) {
+            noteFocusRequester.requestFocus()
+            keyboardController?.show()
+        }
+    }
 
     val positionProvider = remember(selectionBoundsInWindow, density) {
         SelectionPopupPositionProvider(selectionBoundsInWindow, with(density) { 8.dp.roundToPx() })
     }
 
-    Popup(popupPositionProvider = positionProvider, onDismissRequest = onDismiss) {
+    Popup(
+        popupPositionProvider = positionProvider,
+        onDismissRequest = onDismiss,
+        properties = PopupProperties(focusable = true),
+    ) {
         Surface(
             shape = RoundedCornerShape(12.dp),
             color = MaterialTheme.colorScheme.surfaceContainerHigh,
@@ -108,6 +135,7 @@ fun SelectionActionPopup(
                         value = noteText,
                         onValueChange = { noteText = it },
                         label = { Text("Note") },
+                        modifier = Modifier.focusRequester(noteFocusRequester),
                         keyboardOptions = KeyboardOptions(imeAction = ImeAction.Done),
                         keyboardActions = KeyboardActions(onDone = {
                             if (noteText.isNotBlank()) onSaveNote(noteText, pendingColor)
