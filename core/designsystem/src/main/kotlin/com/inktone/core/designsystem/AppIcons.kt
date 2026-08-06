@@ -1,6 +1,8 @@
 package com.inktone.core.designsystem
 
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.automirrored.filled.NavigateBefore
+import androidx.compose.material.icons.automirrored.filled.NavigateNext
 import androidx.compose.material.icons.automirrored.outlined.ArrowBack
 import androidx.compose.material.icons.automirrored.outlined.List
 import androidx.compose.material.icons.automirrored.outlined.MenuBook
@@ -9,25 +11,40 @@ import androidx.compose.material.icons.automirrored.outlined.VolumeUp
 import androidx.compose.material.icons.filled.Bookmark
 import androidx.compose.material.icons.filled.CheckCircle
 import androidx.compose.material.icons.filled.Error
+import androidx.compose.material.icons.filled.Favorite
 import androidx.compose.material.icons.filled.Highlight
+import androidx.compose.material.icons.filled.MoreVert
+import androidx.compose.material.icons.filled.PushPin
+import androidx.compose.material.icons.filled.SkipNext
+import androidx.compose.material.icons.filled.SkipPrevious
 import androidx.compose.material.icons.filled.Warning
 import androidx.compose.material.icons.outlined.Accessibility
 import androidx.compose.material.icons.outlined.BarChart
 import androidx.compose.material.icons.outlined.Bolt
 import androidx.compose.material.icons.outlined.BookmarkAdd
+import androidx.compose.material.icons.outlined.BrightnessMedium
 import androidx.compose.material.icons.outlined.CheckCircle
 import androidx.compose.material.icons.outlined.ContentCopy
+import androidx.compose.material.icons.outlined.Contrast
+import androidx.compose.material.icons.outlined.Delete
 import androidx.compose.material.icons.outlined.EditNote
 import androidx.compose.material.icons.outlined.Error
+import androidx.compose.material.icons.outlined.FavoriteBorder
+import androidx.compose.material.icons.outlined.FilterList
 import androidx.compose.material.icons.outlined.HourglassEmpty
 import androidx.compose.material.icons.outlined.ImportContacts
 import androidx.compose.material.icons.outlined.Info
+import androidx.compose.material.icons.outlined.KeyboardArrowDown
 import androidx.compose.material.icons.outlined.Lightbulb
 import androidx.compose.material.icons.outlined.Mic
 import androidx.compose.material.icons.outlined.Palette
+import androidx.compose.material.icons.outlined.PhotoLibrary
+import androidx.compose.material.icons.outlined.PushPin
 import androidx.compose.material.icons.outlined.RecordVoiceOver
+import androidx.compose.material.icons.outlined.Refresh
 import androidx.compose.material.icons.outlined.Save
 import androidx.compose.material.icons.outlined.Search
+import androidx.compose.material.icons.outlined.Settings
 import androidx.compose.material.icons.outlined.Smartphone
 import androidx.compose.material.icons.outlined.ViewDay
 import androidx.compose.material.icons.outlined.Warning
@@ -46,6 +63,12 @@ object AppIcons {
     val Copy = Icons.Outlined.ContentCopy
     val Highlight = Icons.Filled.Highlight
     val Hint = Icons.Outlined.Lightbulb
+    val Favorite = Icons.Filled.Favorite
+    val FavoriteBorder = Icons.Outlined.FavoriteBorder
+    val Pin = Icons.Filled.PushPin
+    val PinOutlined = Icons.Outlined.PushPin
+    val MoreActions = Icons.Filled.MoreVert
+    val Delete = Icons.Outlined.Delete
 
     val Success = Icons.Filled.CheckCircle
     val SuccessOutlined = Icons.Outlined.CheckCircle
@@ -62,20 +85,35 @@ object AppIcons {
     val Accessibility = Icons.Outlined.Accessibility
     val Data = Icons.Outlined.Save
     val Pronunciation = Icons.Outlined.RecordVoiceOver
+    val Settings = Icons.Outlined.Settings
 
     val Mic = Icons.Outlined.Mic
     val Speaking = Icons.AutoMirrored.Outlined.VolumeUp
     val Loading = Icons.Outlined.HourglassEmpty
+    val Refresh = Icons.Outlined.Refresh
+    val ChevronDown = Icons.Outlined.KeyboardArrowDown
     val Stats = Icons.Outlined.BarChart
 
     val Search = Icons.Outlined.Search
+    val Filter = Icons.Outlined.FilterList
     val Toc = Icons.AutoMirrored.Outlined.List
     val Back = Icons.AutoMirrored.Outlined.ArrowBack
     val ReadingModePaged = Icons.Outlined.ViewDay
     val ReadingModeScroll = Icons.Outlined.ImportContacts
+    // Tache 3b.6 — bascule cyclique de theme (Clair -> Sombre -> Sepia).
+    val Theme = Icons.Outlined.Contrast
+    val Brightness = Icons.Outlined.BrightnessMedium
 
     // Tâche 1c — icônes de disposition de bibliothèque
     val ViewGrid = Icons.Outlined.Widgets
     val ViewList = Icons.AutoMirrored.Outlined.ViewList
-    val CoverOnly = Icons.Outlined.ViewDay
+    val CoverOnly = Icons.Outlined.PhotoLibrary
+
+    // Tâche 3e.1 — barre pilule TTS : chevron simple pour le chapitre
+    // (saut large), icône skip pour la phrase (saut fin) — deux glyphes
+    // distincts pour deux granularités différentes, jamais le même.
+    val ChapterPrevious = Icons.AutoMirrored.Filled.NavigateBefore
+    val ChapterNext = Icons.AutoMirrored.Filled.NavigateNext
+    val SentencePrevious = Icons.Filled.SkipPrevious
+    val SentenceNext = Icons.Filled.SkipNext
 }

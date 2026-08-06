@@ -14,15 +14,42 @@ android {
         testInstrumentationRunner = "com.inktone.feature.reader.HiltTestRunner"
     }
 
+    // Tache 3a.4 : Robolectric pour ChapterTextMeasurerTest - TextMeasurer
+    // exige une resolution de police reelle (android.graphics), impossible
+    // en JVM pur. isIncludeAndroidResources fournit les ressources/polices
+    // systeme necessaires au shadow de Robolectric.
+    testOptions {
+        unitTests.isIncludeAndroidResources = true
+    }
+
     // data (androidTest, ci-dessous) tire transitivement infrastructure/parser
     // et donc Readium, qui exige le desugaring (Tache 3.2) - propage jusqu'ici.
     compileOptions {
         isCoreLibraryDesugaringEnabled = true
     }
+
+    // androidTestImplementation(project(":infrastructure:tts")) (ci-dessous)
+    // tire transitivement les deux sources de libonnxruntime.so (vendore
+    // par sherpa-onnx + AAR onnxruntime-android) dans l'APK de test de CE
+    // module. infrastructure/tts a deja tranche ce doublon pour son propre
+    // packaging (meme regle, voir son build.gradle.kts) mais packaging{}
+    // ne se propage pas aux modules consommateurs - repeter la regle ici
+    // est necessaire, pas redondant. Sans elle, mergeDebugAndroidTestNativeLibs
+    // echoue avant meme d'installer l'APK de test.
+    packaging {
+        jniLibs {
+            pickFirsts += "**/libonnxruntime.so"
+        }
+    }
 }
 
 dependencies {
     testImplementation(libs.kotlinx.coroutines.test)
+    // Tache 3a.4 : ChapterTextMeasurerTest exige TextMeasurer (mesure de
+    // police Android reelle) - Robolectric est le seul moyen de l'executer
+    // en test JVM plutot qu'en instrumente (device/emulateur).
+    testImplementation(libs.robolectric)
+    testImplementation(libs.androidx.test.core)
     implementation(libs.androidx.lifecycle.viewmodel.compose)
     implementation(libs.androidx.lifecycle.runtime.compose)
     implementation(libs.androidx.hilt.navigation.compose)

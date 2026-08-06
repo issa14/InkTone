@@ -62,4 +62,8 @@ class FakePublicationRepository : PublicationRepository {
     override suspend fun setFavorite(id: String, isFavorite: Boolean) {
         state.value = state.value.map { if (it.id == id) it.copy(isFavorite = isFavorite) else it }
     }
+
+    override suspend fun setPinned(id: String, isPinned: Boolean) {
+        state.value = state.value.map { if (it.id == id) it.copy(isPinned = isPinned) else it }
+    }
 }

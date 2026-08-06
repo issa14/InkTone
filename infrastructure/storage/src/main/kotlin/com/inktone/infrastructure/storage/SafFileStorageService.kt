@@ -55,6 +55,22 @@ class SafFileStorageService @Inject constructor(
         }.getOrNull()
     }
 
+    override suspend fun getFileName(uri: String): String? = withContext(Dispatchers.IO) {
+        val parsed = Uri.parse(uri)
+        if (parsed.scheme == "file") {
+            // Meme repli qu'ailleurs dans ce fichier : file:// n'a pas de
+            // provider a interroger, le dernier segment du chemin est deja
+            // le nom reel (utilise en test, jamais en production SAF).
+            return@withContext parsed.lastPathSegment
+        }
+        runCatching {
+            resolver.query(parsed, null, null, null, null)?.use { cursor ->
+                val nameIndex = cursor.getColumnIndex(OpenableColumns.DISPLAY_NAME)
+                if (cursor.moveToFirst() && nameIndex >= 0) cursor.getString(nameIndex) else null
+            }
+        }.getOrNull()
+    }
+
     override suspend fun persistReadPermission(uri: String) = withContext(Dispatchers.IO) {
         runCatching {
             resolver.takePersistableUriPermission(Uri.parse(uri), Intent.FLAG_GRANT_READ_URI_PERMISSION)

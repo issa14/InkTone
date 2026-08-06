@@ -95,7 +95,8 @@ class ImportPublicationUseCase(
     ): Publication {
         val metadata: PublicationMetadata = result.metadata
         val size = fileStorageService.getFileSize(fileUri) ?: 0L
-        val format = formatOf(fileUri)
+        val fileName = fileStorageService.getFileName(fileUri) ?: fileUri
+        val format = formatOf(fileName)
         val now = System.currentTimeMillis()
 
         return Publication(
@@ -103,7 +104,7 @@ class ImportPublicationUseCase(
             // Titre jamais vide (invariant du domaine, Publication.init) —
             // repli sur le nom de fichier si le parseur n'a rien extrait
             // (ex. TXT sans metadonnees, ou EPUB au titre absent de l'OPF).
-            title = metadata.title?.takeIf { it.isNotBlank() } ?: fileUri.substringAfterLast('/'),
+            title = metadata.title?.takeIf { it.isNotBlank() } ?: fileName,
             subtitle = metadata.subtitle,
             authors = metadata.authors,
             publisher = metadata.publisher,
@@ -127,8 +128,10 @@ class ImportPublicationUseCase(
     // (infrastructure/parser) — coherence du choix de format entre
     // "quel parser appeler" et "quel PublicationFormat stocker" (PDF hors
     // perimetre v1, ADR-017 : ni l'un ni l'autre ne le distingue encore).
-    private fun formatOf(fileUri: String): PublicationFormat =
-        if (fileUri.endsWith(".txt", ignoreCase = true)) PublicationFormat.TXT else PublicationFormat.EPUB
+    // Prend le nom de fichier resolu (fileStorageService.getFileName),
+    // jamais l'URI SAF brute qui ne le contient pas (bug corrige lot 2a).
+    private fun formatOf(fileName: String): PublicationFormat =
+        if (fileName.endsWith(".txt", ignoreCase = true)) PublicationFormat.TXT else PublicationFormat.EPUB
 }
 
 sealed interface ImportResult {

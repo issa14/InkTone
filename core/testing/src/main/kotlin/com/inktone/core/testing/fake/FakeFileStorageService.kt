@@ -22,6 +22,8 @@ class FakeFileStorageService(
 
     override suspend fun getFileSize(uri: String): Long = fileSize
 
+    override suspend fun getFileName(uri: String): String? = uri.substringAfterLast('/')
+
     override suspend fun persistReadPermission(uri: String) = Unit
 
     override suspend fun writeToUri(uri: String, sourceFile: File): Boolean {

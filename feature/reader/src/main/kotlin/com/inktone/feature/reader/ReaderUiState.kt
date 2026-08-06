@@ -9,18 +9,32 @@ import com.inktone.domain.model.ReadingOverrides
 import com.inktone.domain.model.ReadingTheme
 import com.inktone.domain.model.SleepTimerState
 import com.inktone.domain.model.TableOfContentsEntry
+import com.inktone.domain.model.VoiceProfile
 import com.inktone.domain.valueobject.Locator
 
 /** B.1 — Mode de lecture : défilement vertical ou paginé horizontal. */
 enum class ReadingMode { SCROLL, PAGED }
 
 data class ReaderUiState(
+    // 3b.3 — titre/auteur du livre, alimentés à l'ouverture de la
+    // publication (ReaderViewModel.openPublication). Source unique pour
+    // la barre du haut (3b.5) : jamais rechargés depuis un repository
+    // dans le composable.
+    val title: String? = null,
+    val author: String? = null,
     val chapters: List<Chapter> = emptyList(),
     val currentChapterIndex: Int = 0,
     val tableOfContents: List<TableOfContentsEntry> = emptyList(),
     val currentSentenceIndex: Int = 0,
     val highlightedWordRange: IntRange? = null,
     val isPlaying: Boolean = false,
+    // 3e.3 — distinct de isPlaying : isPlaying passe à vrai avant la
+    // synthèse (ReaderViewModel.playCurrentSentence), isAudioActive ne
+    // l'est que pendant que l'AudioTrack de la phrase en cours joue
+    // réellement. Sert l'onde sonore de TtsPillBar — K « un moteur ne
+    // fait jamais semblant » : l'indicateur ne doit pas animer pendant un
+    // blanc de synthèse.
+    val isAudioActive: Boolean = false,
     val isTocVisible: Boolean = false,
     // Deja resolu via EffectiveReadingSettings.resolve() (Tache 1.3) au
     // moment de l'ouverture (Tache 4.7) - ReaderScreen ne connait jamais
@@ -52,6 +66,36 @@ data class ReaderUiState(
     val errorMessage: String? = null,
     // B.1 — Mode de lecture actif (scroll vertical ou paginé horizontal).
     val readingMode: ReadingMode = ReadingMode.SCROLL,
+    // 3d.1 — profil vocal actif résolu (même repli que playCurrentSentence,
+    // voir ReaderViewModel.resolveVoiceProfile) : source unique pour la
+    // vitesse affichée et le nom de voix, jamais recalculé localement dans
+    // ReaderTtsPanel.
+    val activeVoiceProfile: VoiceProfile? = null,
+    val availableVoiceProfiles: List<VoiceProfile> = emptyList(),
+    // 3d.2 — réglage global (UserPreferences.lineHeightMultiplier), observé
+    // en continu comme isReadingRulerEnabled : pas de surcharge par
+    // publication, voir doc du lot 3d.
+    val lineHeightMultiplier: Float = 1.4f,
+    // 3d.3 — réglage global (UserPreferences.readerBrightness), même
+    // patron d'observation continue que lineHeightMultiplier. null =
+    // valeur système, appliqué à la fenêtre par ReaderBrightnessEffect.
+    val readerBrightness: Float? = null,
+    // 3d.5 — rappel de repos oculaire, indépendant du minuteur de sommeil
+    // TTS (voir SleepTimerPanel, section 2). enabled/intervalMinutes :
+    // réglage global miroir de UserPreferences (même patron que
+    // lineHeightMultiplier/readerBrightness). isVisible/countdownS :
+    // état ponctuel du popup, jamais persisté.
+    val eyeRestReminderEnabled: Boolean = true,
+    val eyeRestReminderIntervalMinutes: Int = 60,
+    val isEyeRestReminderVisible: Boolean = false,
+    val eyeRestReminderCountdownS: Int = EYE_REST_REMINDER_COUNTDOWN_S,
+    // 3e.2 — réglage global (UserPreferences.reduceMotion), même patron
+    // d'observation continue que isReadingRulerEnabled/lineHeightMultiplier.
+    // Distinct de reducedMotionDuration() (core/designsystem) qui lit le
+    // réglage système d'accessibilité, pas ce réglage applicatif — les deux
+    // coexistent, le surlignage mot-à-mot ne respecte aujourd'hui que le
+    // premier.
+    val reduceMotion: Boolean = false,
 ) {
     val currentChapter: Chapter? get() = chapters.getOrNull(currentChapterIndex)
     val hasNextChapter: Boolean get() = currentChapterIndex < chapters.lastIndex
@@ -88,23 +132,33 @@ data class ReaderUiState(
         }
 
     /**
-     * B.6 — Temps de lecture restant estimé pour le chapitre en cours.
-     * Basé sur 250 WPM par défaut et 15 mots par phrase (estimation
-     * conservative). À remplacer par `ReadingSession.wpm` réel quand
-     * disponible.
+     * Tâche 3c.3 — état du toggle « Marquer cette page » du panneau
+     * Marque-pages. Adressage par `Locator`/`Sentence` (Blueprint K3 :
+     * jamais de numéro de page pour un signet), pas par page virtuelle —
+     * un signet existe « à cette position » s'il tombe dans la phrase
+     * actuellement ciblée (`currentSentenceIndex`), source unique de
+     * position déjà utilisée par la création de signet et la persistance
+     * (voir `ReaderViewModel.persistPosition`).
      */
-    val etaText: String
+    val isCurrentPageBookmarked: Boolean
         get() {
-            val remainingSentences = currentChapter?.paragraphs
-                ?.flatMap { it.sentences }?.drop(currentSentenceIndex)?.size ?: return ""
-            if (remainingSentences <= 0) return ""
-            val avgWordsPerSentence = 15
-            val wpm = 250
-            val remainingWords = remainingSentences * avgWordsPerSentence
-            val minutes = (remainingWords.toFloat() / wpm).toInt().coerceAtLeast(1)
-            return "~$minutes min"
+            val chapter = currentChapter ?: return false
+            val sentence = chapter.paragraphs.flatMap { it.sentences }.getOrNull(currentSentenceIndex) ?: return false
+            return bookmarks.any { bookmark ->
+                bookmark.locator.chapterIndex == chapter.index &&
+                    bookmark.locator.charOffset in sentence.startOffset until sentence.endOffset
+            }
         }
+
+    // 3b.4 — le micro-indicateur ETA (B.6) est retiré : absent de la
+    // cible, il occupait la même zone que StatusLineBar quand le HUD est
+    // masqué. Retrait consigné dans UX_FLOW_DESIGN.md (3b.8) : l'ETA
+    // était une information réelle, sa suppression est un choix
+    // d'alignement, pas une évidence.
 }
+
+/** 3d.5 — durée du compte à rebours du popup de repos oculaire (UX_FLOW_DESIGN.md §Minuteur). */
+const val EYE_REST_REMINDER_COUNTDOWN_S = 60
 
 private fun chapterCharCount(chapter: Chapter): Int =
     chapter.paragraphs.sumOf { paragraph -> paragraph.sentences.sumOf { it.text.length } }
@@ -151,10 +205,24 @@ sealed interface ReaderIntent {
     /** Appui simple sur une autre phrase pendant qu'une sélection est active : l'étend. */
     data class ExtendSentenceSelection(val sentenceIndex: Int) : ReaderIntent
     data object ClearSentenceSelection : ReaderIntent
-    data class ConfirmAnnotation(val color: AnnotationColor) : ReaderIntent
 
-    /** Tâche 7.2 — capture la position courante, pas de plage à résoudre (contrairement à l'annotation). */
-    data object CreateBookmark : ReaderIntent
+    /**
+     * Tâche 3c.4 — `content` : texte de la note associée (popup de
+     * sélection, action « Note »), `null` pour un simple surlignage
+     * (action « Surligner »). `Annotation.content` existe depuis la
+     * Tâche 7.1 (`content: String?`), jamais rempli avant ce lot — pas de
+     * migration Room nécessaire, `null` reste distinct d'une note vidée
+     * volontairement (voir `Annotation.kt`).
+     */
+    data class ConfirmAnnotation(val color: AnnotationColor, val content: String? = null) : ReaderIntent
+
+    /**
+     * Tâche 3c.3 — remplace `CreateBookmark` (Tâche 7.2) : le bouton du
+     * panneau Marque-pages est un **toggle**, pas un simple ajout — il
+     * retire le signet existant à la position courante s'il y en a déjà
+     * un, plutôt que d'en créer un doublon.
+     */
+    data object ToggleBookmarkAtCurrentPosition : ReaderIntent
     data object ToggleBookmarkList : ReaderIntent
     data class DeleteBookmark(val id: String) : ReaderIntent
 
@@ -189,4 +257,52 @@ sealed interface ReaderIntent {
 
     /** B.1 — Bascule entre mode scroll et mode paginé. */
     data object ToggleReadingMode : ReaderIntent
+
+    /**
+     * Tâche 3c.1/3c.1bis — remonte la position atteinte par un geste
+     * manuel : la phrase la plus haute visible pendant un défilement
+     * (mode SCROLL), ou la première phrase de la page affichée après un
+     * swipe (mode PAGED). Source unique de `currentSentenceIndex` avec la
+     * navigation manuelle et le TTS : jamais un second système de
+     * position. `ReaderScreen`/`PagedChapterContent` ne l'émettent que
+     * pour un geste d'origine utilisateur (jamais l'auto-scroll/auto-page
+     * TTS, voir gardes `isProgrammaticScroll`/`isProgrammaticPageChange`).
+     */
+    data class UpdateScrollPosition(val sentenceIndex: Int) : ReaderIntent
+
+    /**
+     * 3d.1 — écrit la vitesse sur le profil vocal actif (jamais sur
+     * `UserPreferences` : la vitesse appartient au profil, voir doc du lot
+     * 3d, tâche 3d.1). Persiste immédiatement, contrairement à l'ancien
+     * `onSpeedChange` vide.
+     */
+    data class SetTtsSpeed(val speed: Float) : ReaderIntent
+
+    /** 3d.1 — change le profil vocal actif (préférence globale). */
+    data class SetActiveVoiceProfile(val profileId: String) : ReaderIntent
+
+    /** 3d.2 — réglage global d'interligne, voir `ReaderUiState.lineHeightMultiplier`. */
+    data class SetLineHeight(val multiplier: Float) : ReaderIntent
+
+    /** 3d.3 — luminosité de la fenêtre du lecteur. `null` = valeur système. */
+    data class SetReaderBrightness(val value: Float?) : ReaderIntent
+
+    /** 3d.5 — active/désactive le rappel de repos oculaire (réglage global). */
+    data class SetEyeRestReminderEnabled(val enabled: Boolean) : ReaderIntent
+
+    /** 3d.5 — intervalle du rappel de repos oculaire, en minutes (stepper ±15min). */
+    data class SetEyeRestReminderInterval(val minutes: Int) : ReaderIntent
+
+    /**
+     * 3d.5 — « Reprendre » du popup de repos oculaire : reprend le TTS
+     * immédiatement s'il était actif, relance l'intervalle complet.
+     */
+    data object ResumeFromEyeRestReminder : ReaderIntent
+
+    /**
+     * 3d.5 — « Reporter » du popup de repos oculaire : ne reprend PAS le
+     * TTS, reprogramme l'échéance à +10 min (snooze court, distinct de
+     * l'intervalle configuré).
+     */
+    data object SnoozeEyeRestReminder : ReaderIntent
 }

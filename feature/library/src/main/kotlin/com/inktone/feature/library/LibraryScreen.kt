@@ -16,28 +16,19 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.LazyColumn
-import androidx.compose.foundation.lazy.LazyRow
 import androidx.compose.foundation.lazy.grid.GridCells
 import androidx.compose.foundation.lazy.grid.GridItemSpan
 import androidx.compose.foundation.lazy.grid.LazyVerticalGrid
 import androidx.compose.foundation.lazy.grid.items as gridItems
 import androidx.compose.foundation.lazy.items as listItems
-import androidx.compose.foundation.lazy.items as rowItems
 import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.filled.Star
 import androidx.compose.material.icons.outlined.MoreVert
 import androidx.compose.material.icons.outlined.Menu
-import androidx.compose.material.icons.outlined.Sort
-import androidx.compose.material.icons.outlined.StarBorder
 import androidx.compose.material.icons.outlined.Search
-import androidx.compose.material.icons.outlined.Close
 import androidx.compose.material3.DismissibleDrawerSheet
 import androidx.compose.material3.DismissibleNavigationDrawer
-import androidx.compose.material3.DropdownMenu
-import androidx.compose.material3.DropdownMenuItem
 import androidx.compose.material3.ElevatedCard
 import androidx.compose.material3.ExperimentalMaterial3Api
-import androidx.compose.material3.FilterChip
 import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
@@ -112,8 +103,10 @@ fun LibraryScreen(
     onOpenBookmarks: () -> Unit = {},
     onOpenStats: () -> Unit = {},
     onImportClick: () -> Unit = {},
+    onOpenSettings: () -> Unit = {},
     onOpenAbout: () -> Unit = {},
-    onOpenThemePicker: () -> Unit = {},
+    onNavigateToSeriesDetail: (String) -> Unit = {},
+    onNavigateToTagDetail: (String) -> Unit = {},
 ) {
     val state by viewModel.state.collectAsState()
     val drawerState = rememberDrawerState(DrawerValue.Closed)
@@ -145,11 +138,7 @@ fun LibraryScreen(
         drawerContent = {
             DismissibleDrawerSheet {
                 LibraryDrawerContent(
-                    state = state,
-                    onSelectFilter = { filter, value ->
-                        viewModel.onIntent(LibraryIntent.ChangeFilter(filter, value))
-                        scope.launch { drawerState.close() }
-                    },
+                    onSelectLibrary = { scope.launch { drawerState.close() } },
                     onOpenBookmarks = {
                         scope.launch { drawerState.close() }
                         onOpenBookmarks()
@@ -158,13 +147,13 @@ fun LibraryScreen(
                         scope.launch { drawerState.close() }
                         onOpenStats()
                     },
+                    onOpenSettings = {
+                        scope.launch { drawerState.close() }
+                        onOpenSettings()
+                    },
                     onOpenAbout = {
                         scope.launch { drawerState.close() }
                         onOpenAbout()
-                    },
-                    onOpenThemePicker = {
-                        scope.launch { drawerState.close() }
-                        onOpenThemePicker()
                     },
                 )
             }
@@ -185,32 +174,27 @@ fun LibraryScreen(
                     sortOrder = state.sortOrder,
                     onSortOrderChange = { viewModel.onIntent(LibraryIntent.SetSortOrder(it)) },
                     layoutMode = state.layoutMode,
-                    onCycleLayout = { viewModel.onIntent(LibraryIntent.CycleLayout) },
+                    onLayoutModeChange = { viewModel.onIntent(LibraryIntent.SetLayoutMode(it)) },
+                    selectedFormats = state.selectedFormats,
+                    onToggleFormat = { viewModel.onIntent(LibraryIntent.ToggleFileFormat(it)) },
+                    onClearFormats = { viewModel.onIntent(LibraryIntent.ClearFileFormats) },
                     onRefresh = { viewModel.onIntent(LibraryIntent.Refresh) },
                     onImportClick = onImportClick,
-                    onOpenAbout = onOpenAbout,
-                    onOpenThemePicker = onOpenThemePicker,
-                    onRegenerateCovers = { viewModel.onIntent(LibraryIntent.RegenerateCovers) },
-                    onResetCovers = { viewModel.onIntent(LibraryIntent.ResetCovers) },
                     activeFilter = state.activeFilter,
                     filterValue = state.filterValue,
                     onSelectFilter = { filter, value -> viewModel.onIntent(LibraryIntent.ChangeFilter(filter, value)) },
                     onMenuClick = { scope.launch { drawerState.open() } },
+                    availableSeries = state.availableSeries,
+                    seriesCounts = state.seriesCounts,
+                    availableTags = state.availableTags,
+                    tagCounts = state.tagCounts,
+                    onNavigateToSeriesDetail = onNavigateToSeriesDetail,
+                    onNavigateToTagDetail = onNavigateToTagDetail,
                 )
             },
         ) { innerPadding ->
             Column(Modifier.fillMaxSize().padding(innerPadding)) {
                 ImportProgressBanner(state.importProgress)
-                FilterRow(
-                    active = state.activeFilter,
-                    onSelect = { viewModel.onIntent(LibraryIntent.ChangeFilter(it)) },
-                )
-                TagsFilterBar(
-                    tags = state.availableTags,
-                    activeFilter = state.activeFilter,
-                    activeValue = state.filterValue,
-                    onSelect = { viewModel.onIntent(LibraryIntent.ChangeFilter(FilterMode.TAG, it)) },
-                )
 
                 when {
                     state.isLoading -> LibraryShimmerGrid()
@@ -224,19 +208,12 @@ fun LibraryScreen(
                         onImportClick = onImportClick,
                     )
                     else -> {
-                        // Vue groupée par séries — uniquement en mode ALL
-                        if (state.activeFilter == FilterMode.ALL && state.availableSeries.isNotEmpty()) {
-                            SeriesGroupedView(
-                                publications = state.displayedPublications,
-                                onOpen = { id -> viewModel.onIntent(LibraryIntent.OpenPublication(id)) },
-                                onToggleFavorite = { id, fav -> viewModel.onIntent(LibraryIntent.ToggleFavorite(id, fav)) },
-                                onSelectSeries = { series -> viewModel.onIntent(LibraryIntent.ChangeFilter(FilterMode.SERIES, series)) },
-                            )
-                        }
                         LibraryContent(
                             state = state,
                             onOpen = { id -> viewModel.onIntent(LibraryIntent.OpenPublication(id)) },
                             onToggleFavorite = { id, isFavorite -> viewModel.onIntent(LibraryIntent.ToggleFavorite(id, isFavorite)) },
+                            onTogglePin = { id, isPinned -> viewModel.onIntent(LibraryIntent.TogglePin(id, isPinned)) },
+                            onDelete = { id -> viewModel.onIntent(LibraryIntent.DeletePublication(id)) },
                         )
                     }
                 }
@@ -246,13 +223,12 @@ fun LibraryScreen(
 }
 
 @Composable
-private fun LibraryDrawerContent(
-    state: LibraryUiState,
-    onSelectFilter: (FilterMode, String?) -> Unit,
+internal fun LibraryDrawerContent(
     onOpenBookmarks: () -> Unit,
     onOpenStats: () -> Unit,
+    onSelectLibrary: () -> Unit = {},
+    onOpenSettings: () -> Unit = {},
     onOpenAbout: () -> Unit = {},
-    onOpenThemePicker: () -> Unit = {},
 ) {
     Column {
         // C.1 — Header avec dégradé brand (legacy §1.2)
@@ -279,63 +255,27 @@ private fun LibraryDrawerContent(
             )
         }
         Column(Modifier.padding(16.dp)) {
-        SelectableFilters.forEach { filter ->
-            NavigationDrawerItem(
-                label = { Text(filter.label()) },
-                selected = state.activeFilter == filter,
-                onClick = { onSelectFilter(filter, null) },
-            )
-        }
+        // Bibliotheque — destination a part entiere, toujours active par
+        // defaut : LibraryDrawerContent n'est monte que depuis l'ecran
+        // Bibliotheque lui-meme, il n'y a pas d'autre etat possible.
         NavigationDrawerItem(
-            label = { Text("Récents") },
-            icon = { Icon(AppIcons.Loading, contentDescription = null) },
-            selected = state.activeFilter == FilterMode.ALL && state.sortOrder == LibrarySortOrder.RECENTLY_OPENED,
-            onClick = { onSelectFilter(FilterMode.ALL, null) },
+            label = { Text("Bibliothèque") },
+            icon = { Icon(AppIcons.Reading, contentDescription = null) },
+            selected = true,
+            onClick = onSelectLibrary,
         )
         NavigationDrawerItem(
-            label = { Text("Statistiques") },
-            icon = { Icon(AppIcons.Stats, contentDescription = null) },
-            selected = false,
-            onClick = onOpenStats,
-        )
-        NavigationDrawerItem(
-            label = { Text("Signets") },
+            label = { Text("Marque-pages et Notes") },
             icon = { Icon(AppIcons.Bookmark, contentDescription = null) },
             selected = false,
             onClick = onOpenBookmarks,
         )
-        if (state.availableSeries.isNotEmpty()) {
-            Text("Séries", style = MaterialTheme.typography.titleSmall, modifier = Modifier.padding(top = 16.dp, bottom = 4.dp))
-            state.availableSeries.forEach { series ->
-                NavigationDrawerItem(
-                    label = { Text(series) },
-                    selected = state.activeFilter == FilterMode.SERIES && state.filterValue == series,
-                    onClick = { onSelectFilter(FilterMode.SERIES, series) },
-                )
-            }
-        }
-        if (state.availableAuthors.isNotEmpty()) {
-            Text("Auteurs", style = MaterialTheme.typography.titleSmall, modifier = Modifier.padding(top = 16.dp, bottom = 4.dp))
-            state.availableAuthors.forEach { author ->
-                NavigationDrawerItem(
-                    label = { Text(author) },
-                    selected = state.activeFilter == FilterMode.BY_AUTHOR && state.filterValue == author,
-                    onClick = { onSelectFilter(FilterMode.BY_AUTHOR, author) },
-                )
-            }
-        }
-        if (state.availableTags.isNotEmpty()) {
-            Text("Tags", style = MaterialTheme.typography.titleSmall, modifier = Modifier.padding(top = 16.dp, bottom = 4.dp))
-            LazyRow(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                rowItems(state.availableTags, key = { it }) { tag ->
-                    FilterChip(
-                        selected = state.activeFilter == FilterMode.TAG && state.filterValue == tag,
-                        onClick = { onSelectFilter(FilterMode.TAG, tag) },
-                        label = { Text(tag) },
-                    )
-                }
-            }
-        }
+        NavigationDrawerItem(
+            label = { Text("Statistiques de lecture") },
+            icon = { Icon(AppIcons.Stats, contentDescription = null) },
+            selected = false,
+            onClick = onOpenStats,
+        )
 
         // ──── #2 Footer drawer ────
         Spacer(Modifier.height(24.dp))
@@ -344,12 +284,8 @@ private fun LibraryDrawerContent(
             modifier = Modifier.fillMaxWidth().padding(vertical = 12.dp),
             horizontalArrangement = Arrangement.SpaceEvenly,
         ) {
+            DrawerFooterItem("Paramètres", AppIcons.Settings) { onOpenSettings() }
             DrawerFooterItem("À propos", AppIcons.Info) { onOpenAbout() }
-            DrawerFooterItem("Thème", AppIcons.Appearance) { onOpenThemePicker() }
-            // C.2 — Debug conditionné (cohérent avec BootstrapAndOpenFixture, Phase 0)
-            if (BuildConfig.DEBUG) {
-                DrawerFooterItem("Debug", AppIcons.Data) { /* no-op pour l'instant */ }
-            }
         }
         } // Column content
     } // Column root
@@ -370,27 +306,33 @@ private fun DrawerFooterItem(label: String, icon: androidx.compose.ui.graphics.v
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
-private fun LibraryTopBar(
+internal fun LibraryTopBar(
     onMenuClick: () -> Unit,
     searchQuery: String,
     onSearchQueryChange: (String) -> Unit,
     sortOrder: LibrarySortOrder,
     onSortOrderChange: (LibrarySortOrder) -> Unit,
     layoutMode: LibraryLayoutMode,
-    onCycleLayout: () -> Unit,
+    onLayoutModeChange: (LibraryLayoutMode) -> Unit,
+    selectedFormats: Set<com.inktone.domain.model.PublicationFormat>,
+    onToggleFormat: (com.inktone.domain.model.PublicationFormat) -> Unit,
+    onClearFormats: () -> Unit,
     onRefresh: () -> Unit,
     onImportClick: () -> Unit,
-    onOpenAbout: () -> Unit = {},
-    onOpenThemePicker: () -> Unit = {},
-    onRegenerateCovers: () -> Unit = {},
-    onResetCovers: () -> Unit = {},
     // C.4 — filtre actif pour le titre cliquable
     activeFilter: FilterMode = FilterMode.ALL,
     filterValue: String? = null,
     onSelectFilter: (FilterMode, String?) -> Unit = { _, _ -> },
+    // Lot 2a.3 — flyout du titre à deux colonnes
+    availableSeries: List<String> = emptyList(),
+    seriesCounts: Map<String, Int> = emptyMap(),
+    availableTags: List<String> = emptyList(),
+    tagCounts: Map<String, Int> = emptyMap(),
+    onNavigateToSeriesDetail: (String) -> Unit = {},
+    onNavigateToTagDetail: (String) -> Unit = {},
 ) {
     var isSearchActive by remember { mutableStateOf(false) }
-    var isSortMenuExpanded by remember { mutableStateOf(false) }
+    var showFilterDialog by remember { mutableStateOf(false) }
     var showActionsSheet by remember { mutableStateOf(false) }
     var showNavPopup by remember { mutableStateOf(false) }
 
@@ -424,20 +366,38 @@ private fun LibraryTopBar(
         // C.4 — Titre cliquable avec le filtre actif
         TopAppBar(
             title = {
-                Row(
-                    modifier = Modifier.clickable { showNavPopup = true },
-                    verticalAlignment = Alignment.CenterVertically,
-                ) {
-                    Text(
-                        filterValue ?: activeFilter.label(),
-                        style = MaterialTheme.typography.titleMedium,
-                        color = MaterialTheme.colorScheme.onPrimary,
-                    )
-                    Icon(
-                        AppIcons.Loading, // flèche vers le bas via rotation
-                        contentDescription = "Changer de vue",
-                        tint = MaterialTheme.colorScheme.onPrimary.copy(alpha = 0.5f),
-                        modifier = Modifier.size(16.dp),
+                Box {
+                    Row(
+                        modifier = Modifier.clickable { showNavPopup = true },
+                        verticalAlignment = Alignment.CenterVertically,
+                    ) {
+                        Text(
+                            // UX §Menu déroulant du titre : le titre adaptatif
+                            // affiche "Bibliothèque" à la racine (ALL sans
+                            // valeur), pas "Tous" — ce dernier reste le libellé
+                            // du filtre lui-même dans le flyout (2a.3).
+                            filterValue ?: if (activeFilter == FilterMode.ALL) "Bibliothèque" else activeFilter.label(),
+                            style = MaterialTheme.typography.titleMedium,
+                            color = MaterialTheme.colorScheme.onPrimary,
+                        )
+                        Icon(
+                            AppIcons.ChevronDown,
+                            contentDescription = "Changer de vue",
+                            tint = MaterialTheme.colorScheme.onPrimary.copy(alpha = 0.5f),
+                            modifier = Modifier.size(16.dp),
+                        )
+                    }
+                    LibraryTitleFlyout(
+                        expanded = showNavPopup,
+                        onDismiss = { showNavPopup = false },
+                        series = availableSeries,
+                        seriesCounts = seriesCounts,
+                        tags = availableTags,
+                        tagCounts = tagCounts,
+                        onSelectAll = { onSelectFilter(FilterMode.ALL, null) },
+                        onSelectFavorites = { onSelectFilter(FilterMode.FAVORITES, null) },
+                        onNavigateToSeriesDetail = onNavigateToSeriesDetail,
+                        onNavigateToTagDetail = onNavigateToTagDetail,
                     )
                 }
             },
@@ -450,21 +410,8 @@ private fun LibraryTopBar(
                 IconButton(onClick = { isSearchActive = true }) {
                     Icon(Icons.Outlined.Search, contentDescription = "Rechercher")
                 }
-                Box {
-                    IconButton(onClick = { isSortMenuExpanded = true }) {
-                        Icon(Icons.Outlined.Sort, contentDescription = "Trier")
-                    }
-                    DropdownMenu(expanded = isSortMenuExpanded, onDismissRequest = { isSortMenuExpanded = false }) {
-                        LibrarySortOrder.entries.forEach { order ->
-                            DropdownMenuItem(
-                                text = { Text(order.label()) },
-                                onClick = { onSortOrderChange(order); isSortMenuExpanded = false },
-                            )
-                        }
-                    }
-                }
-                IconButton(onClick = onCycleLayout) {
-                    Icon(layoutMode.icon(), contentDescription = layoutMode.label())
+                IconButton(onClick = { showFilterDialog = true }) {
+                    Icon(AppIcons.Filter, contentDescription = "Filtrer")
                 }
                 IconButton(onClick = { showActionsSheet = true }) {
                     Icon(Icons.Outlined.MoreVert, contentDescription = "Actions")
@@ -476,6 +423,22 @@ private fun LibraryTopBar(
                 actionIconContentColor = MaterialTheme.colorScheme.onPrimary,
                 navigationIconContentColor = MaterialTheme.colorScheme.onPrimary,
             ),
+        )
+    }
+
+    // ──── Popup de filtrage (lot 2a.2) ────
+    if (showFilterDialog) {
+        LibraryFilterDialog(
+            sortOrder = sortOrder,
+            onSortOrderChange = onSortOrderChange,
+            statusFilter = activeFilter,
+            onStatusFilterChange = { onSelectFilter(it, null) },
+            layoutMode = layoutMode,
+            onLayoutModeChange = onLayoutModeChange,
+            selectedFormats = selectedFormats,
+            onToggleFormat = onToggleFormat,
+            onClearFormats = onClearFormats,
+            onDismiss = { showFilterDialog = false },
         )
     }
 
@@ -491,40 +454,7 @@ private fun LibraryTopBar(
                     modifier = Modifier.padding(horizontal = 24.dp, vertical = 8.dp),
                     color = MaterialTheme.colorScheme.primary)
                 ActionSheetItem("Importer", AppIcons.Data) { showActionsSheet = false; onImportClick() }
-                ActionSheetItem("Actualiser", AppIcons.Loading) { showActionsSheet = false; onRefresh() }
-                // C.3 — Régénérer et réinitialiser les couvertures
-                ActionSheetItem("Régénérer les couvertures", AppIcons.Hint) {
-                    showActionsSheet = false
-                    onRegenerateCovers()
-                }
-                ActionSheetItem("Réinitialiser les couvertures", AppIcons.ErrorOutlined) {
-                    showActionsSheet = false
-                    onResetCovers()
-                }
-                // C.2 — À propos et Réglages du thème dans le menu 3-points
-                ActionSheetItem("À propos", AppIcons.Info) { showActionsSheet = false; onOpenAbout() }
-                ActionSheetItem("Thème", AppIcons.Appearance) { showActionsSheet = false; onOpenThemePicker() }
-            }
-        }
-    }
-
-    // C.4 — Popup de navigation (catégories)
-    if (showNavPopup) {
-        val sheetState = rememberModalBottomSheetState()
-        ModalBottomSheet(
-            onDismissRequest = { showNavPopup = false },
-            sheetState = sheetState,
-        ) {
-            Column(Modifier.padding(bottom = 32.dp)) {
-                Text("Navigation", style = MaterialTheme.typography.labelLarge,
-                    modifier = Modifier.padding(horizontal = 24.dp, vertical = 8.dp),
-                    color = MaterialTheme.colorScheme.primary)
-                SelectableFilters.forEach { filter ->
-                    ActionSheetItem(filter.label(), AppIcons.Reading) {
-                        showNavPopup = false
-                        onSelectFilter(filter, null)
-                    }
-                }
+                ActionSheetItem("Actualiser", AppIcons.Refresh) { showActionsSheet = false; onRefresh() }
             }
         }
     }
@@ -542,22 +472,21 @@ private fun ActionSheetItem(label: String, icon: androidx.compose.ui.graphics.ve
     }
 }
 
-private fun LibraryLayoutMode.icon() = when (this) {
-    LibraryLayoutMode.GRID -> AppIcons.ViewGrid
+internal fun LibraryLayoutMode.icon() = when (this) {
     LibraryLayoutMode.GRID_COVERS -> AppIcons.CoverOnly
     LibraryLayoutMode.LIST -> AppIcons.ViewList
 }
 
-private fun LibraryLayoutMode.label() = when (this) {
-    LibraryLayoutMode.GRID -> "Grille"
+internal fun LibraryLayoutMode.label() = when (this) {
     LibraryLayoutMode.GRID_COVERS -> "Couvertures seules"
     LibraryLayoutMode.LIST -> "Liste"
 }
 
-private fun LibrarySortOrder.label() = when (this) {
+internal fun LibrarySortOrder.label() = when (this) {
+    LibrarySortOrder.RECENTLY_ADDED -> "Date d'import"
     LibrarySortOrder.TITLE -> "Titre"
-    LibrarySortOrder.RECENTLY_ADDED -> "Ajout récent"
-    LibrarySortOrder.RECENTLY_OPENED -> "Lecture récente"
+    LibrarySortOrder.AUTHOR -> "Auteur"
+    LibrarySortOrder.RECENTLY_OPENED -> "Récents"
 }
 
 @Composable
@@ -565,12 +494,13 @@ private fun LibraryContent(
     state: LibraryUiState,
     onOpen: (String) -> Unit,
     onToggleFavorite: (String, Boolean) -> Unit,
+    onTogglePin: (String, Boolean) -> Unit,
+    onDelete: (String) -> Unit,
 ) {
     val resume = state.resumeReadingPublication
 
     when (state.layoutMode) {
-        LibraryLayoutMode.GRID, LibraryLayoutMode.GRID_COVERS -> {
-            val showTitle = state.layoutMode == LibraryLayoutMode.GRID
+        LibraryLayoutMode.GRID_COVERS -> {
             LazyVerticalGrid(
                 columns = GridCells.Adaptive(minSize = 120.dp),
                 contentPadding = PaddingValues(8.dp),
@@ -586,8 +516,10 @@ private fun LibraryContent(
                         onClick = { onOpen(publication.id) },
                         onToggleFavorite = { onToggleFavorite(publication.id, !publication.isFavorite) },
                         modifier = Modifier.padding(8.dp),
-                        showTitle = showTitle,
+                        showTitle = false,
                         progressPercent = state.progressMap[publication.id] ?: 0,
+                        onTogglePin = { onTogglePin(publication.id, !publication.isPinned) },
+                        onDelete = { onDelete(publication.id) },
                     )
                 }
             }
@@ -603,6 +535,9 @@ private fun LibraryContent(
                         publication = publication,
                         onClick = { onOpen(publication.id) },
                         onToggleFavorite = { onToggleFavorite(publication.id, !publication.isFavorite) },
+                        progressPercent = state.progressMap[publication.id] ?: 0,
+                        onTogglePin = { onTogglePin(publication.id, !publication.isPinned) },
+                        onDelete = { onDelete(publication.id) },
                     )
                 }
             }
@@ -610,57 +545,118 @@ private fun LibraryContent(
     }
 }
 
-/** Rangée compacte pour le mode Liste — couverture miniature à gauche, titre + auteur à droite. */
+/**
+ * Rangée compacte pour le mode Liste — couverture miniature à gauche,
+ * titre + auteur à droite, cœur et 3-points côte à côte à l'extrême
+ * droite (pas empilés — décision affinée de la cible), barre de
+ * progression pleine largeur sous la rangée. `internal` (lot 2a.4) :
+ * réutilisée telle quelle par l'écran de détail Séries/Tags, pas de
+ * duplication.
+ */
 @Composable
-private fun PublicationListRow(
+internal fun PublicationListRow(
     publication: Publication,
     onClick: () -> Unit,
     onToggleFavorite: () -> Unit,
+    progressPercent: Int = 0,
+    onTogglePin: () -> Unit = {},
+    onDelete: () -> Unit = {},
 ) {
-    Row(
+    var showActionsSheet by remember { mutableStateOf(false) }
+    var showDetailsSheet by remember { mutableStateOf(false) }
+    var showDeleteConfirm by remember { mutableStateOf(false) }
+
+    Column(
         modifier = Modifier
             .fillMaxWidth()
             .clickable(onClick = onClick)
-            .padding(horizontal = 12.dp, vertical = 6.dp),
-        verticalAlignment = Alignment.CenterVertically,
+            .padding(horizontal = 12.dp, vertical = 9.dp),
     ) {
-        // Couverture miniature — 48dp de large, ratio 0.7
-        Box(modifier = Modifier.size(width = 48.dp, height = 68.dp)) {
-            BookCover(
-                publication = publication,
-                onClick = {},
-                onToggleFavorite = {},
-                showTitle = false,
-            )
-        }
-        Column(
-            modifier = Modifier
-                .weight(1f)
-                .padding(horizontal = 12.dp),
-        ) {
-            Text(
-                publication.title,
-                style = MaterialTheme.typography.titleSmall,
-                maxLines = 1,
-                overflow = TextOverflow.Ellipsis,
-            )
-            if (publication.authors.isNotEmpty()) {
+        // Alignement en haut, pas au centre : la couverture (102dp) est plus
+        // haute que le bloc titre/auteur/cœur/3-points depuis
+        // l'agrandissement x1.5 — centré, ce groupe paraissait tassé trop
+        // bas par rapport à la couverture (retour device, lot 2b).
+        Row(verticalAlignment = Alignment.Top) {
+            // Couverture miniature — 72dp de large, ratio 0.7 (x1.5 — bloc par
+            // livre jugé trop étroit en vérification device, lot 2b)
+            Box(modifier = Modifier.size(width = 72.dp, height = 102.dp)) {
+                BookCover(
+                    publication = publication,
+                    onClick = {},
+                    onToggleFavorite = {},
+                    showTitle = false,
+                    showOverlays = false,
+                )
+            }
+            Column(
+                modifier = Modifier
+                    .weight(1f)
+                    .padding(horizontal = 12.dp),
+            ) {
                 Text(
-                    publication.authors.joinToString(),
-                    style = MaterialTheme.typography.bodySmall,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    publication.title,
+                    style = MaterialTheme.typography.titleSmall,
                     maxLines = 1,
                     overflow = TextOverflow.Ellipsis,
                 )
+                if (publication.authors.isNotEmpty()) {
+                    Text(
+                        publication.authors.joinToString(),
+                        style = MaterialTheme.typography.bodySmall,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                        maxLines = 1,
+                        overflow = TextOverflow.Ellipsis,
+                    )
+                }
+            }
+            IconButton(onClick = onToggleFavorite) {
+                Icon(
+                    if (publication.isFavorite) AppIcons.Favorite else AppIcons.FavoriteBorder,
+                    contentDescription = if (publication.isFavorite) "Retirer des favoris" else "Ajouter aux favoris",
+                    tint = if (publication.isFavorite) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurfaceVariant,
+                )
+            }
+            IconButton(onClick = { showActionsSheet = true }) {
+                Icon(AppIcons.MoreActions, contentDescription = "Actions sur « ${publication.title} »", tint = MaterialTheme.colorScheme.onSurfaceVariant)
             }
         }
-        IconButton(onClick = onToggleFavorite) {
-            Icon(
-                if (publication.isFavorite) Icons.Filled.Star else Icons.Outlined.StarBorder,
-                contentDescription = if (publication.isFavorite) "Retirer des favoris" else "Ajouter aux favoris",
-                tint = if (publication.isFavorite) Color(0xFFFFC107) else MaterialTheme.colorScheme.onSurfaceVariant,
-            )
+        if (progressPercent > 0) {
+            Row(
+                modifier = Modifier.fillMaxWidth().padding(top = 4.dp),
+                verticalAlignment = Alignment.CenterVertically,
+            ) {
+                LinearProgressIndicator(
+                    progress = { progressPercent / 100f },
+                    modifier = Modifier.weight(1f),
+                )
+                Text(
+                    "$progressPercent%",
+                    style = MaterialTheme.typography.labelSmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    modifier = Modifier.padding(start = 8.dp),
+                )
+            }
         }
+    }
+
+    if (showActionsSheet) {
+        BookActionsSheet(
+            publication = publication,
+            onDismiss = { showActionsSheet = false },
+            onTogglePin = onTogglePin,
+            onShowDetails = { showDetailsSheet = true },
+            onRequestDelete = { showDeleteConfirm = true },
+        )
+    }
+    if (showDetailsSheet) {
+        BookDetailsSheet(publication = publication, onDismiss = { showDetailsSheet = false })
+    }
+    if (showDeleteConfirm) {
+        DeleteConfirmationDialog(
+            publicationTitle = publication.title,
+            onConfirm = { showDeleteConfirm = false; onDelete() },
+            onDismiss = { showDeleteConfirm = false },
+        )
     }
 }
 
@@ -677,10 +673,6 @@ private fun ResumeReadingCard(publication: Publication, onClick: () -> Unit) {
         }
     }
 }
-
-// Modes sans valeur associee uniquement (SERIES/TAG/BY_AUTHOR ont leur
-// propre point d'entree dans le drawer, avec la valeur exacte requise).
-private val SelectableFilters = listOf(FilterMode.ALL, FilterMode.FAVORITES, FilterMode.UNREAD, FilterMode.IN_PROGRESS, FilterMode.READ)
 
 private fun FilterMode.label() = when (this) {
     FilterMode.ALL -> "Tous"
@@ -717,22 +709,6 @@ private fun ImportProgressBanner(progress: ImportProgress) {
     }
 }
 
-@Composable
-private fun FilterRow(active: FilterMode, onSelect: (FilterMode) -> Unit) {
-    LazyRow(
-        horizontalArrangement = Arrangement.spacedBy(8.dp),
-        contentPadding = PaddingValues(horizontal = 8.dp, vertical = 4.dp),
-    ) {
-        rowItems(SelectableFilters, key = { it.name }) { filter ->
-            FilterChip(
-                selected = filter == active,
-                onClick = { onSelect(filter) },
-                label = { Text(filter.label()) },
-            )
-        }
-    }
-}
-
 // PublicationCard et PublicationListRow remplacés par BookCover (Phase 1b).
 // Voir BookCover.kt pour le composant unifié avec Coil, dégradé de repli,
 // badge de progression et favori.
@@ -740,9 +716,19 @@ private fun FilterRow(active: FilterMode, onSelect: (FilterMode) -> Unit) {
 // ──── Phase 4 — États vide et erreur ────
 
 /**
- * État bibliothèque vide avec illustration et bouton d'import direct.
- * Texte différent si un import est en cours (l'utilisateur a déjà
- * déclenché un import, pas besoin de lui redemander).
+ * État bibliothèque vide, textes alignés sur la cible validée (UX
+ * §Bibliothèque état vide, lot 2a.6). Texte différent si un import est
+ * en cours (l'utilisateur a déjà déclenché un import, pas besoin de lui
+ * redemander) — cas absent de la cible, conservé et consigné dans
+ * UX_FLOW_DESIGN.md comme ajout plutôt que laissé en zone grise.
+ *
+ * Illustration cible : étagère avec emplacements de livres en
+ * pointillés (asset vectoriel dédié). **Non produite ce lot** — je n'ai
+ * pas d'outil de génération d'image fiable ici, et un `VectorDrawable`
+ * bricolé à la main aurait été de qualité douteuse sans validation
+ * visuelle possible (pas d'émulateur/device pour ce point précis).
+ * `AppIcons.Reading` reste un repli générique, pas présenté comme
+ * conforme — signalé au rapport de livraison.
  */
 @Composable
 private fun EmptyState(hasActiveImport: Boolean, onImportClick: () -> Unit) {
@@ -755,13 +741,13 @@ private fun EmptyState(hasActiveImport: Boolean, onImportClick: () -> Unit) {
                 tint = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.4f),
             )
             Text(
-                if (hasActiveImport) "Import en cours…" else "Bibliothèque vide",
+                if (hasActiveImport) "Import en cours…" else "Votre bibliothèque est vide",
                 style = MaterialTheme.typography.titleMedium,
                 modifier = Modifier.padding(top = 16.dp),
             )
             Text(
                 if (hasActiveImport) "Vos livres apparaîtront ici une fois l'import terminé."
-                else "Importez un EPUB pour commencer votre bibliothèque.",
+                else "Importez votre premier livre pour commencer à lire et écouter avec InkTone.",
                 style = MaterialTheme.typography.bodyMedium,
                 color = MaterialTheme.colorScheme.onSurfaceVariant,
                 textAlign = TextAlign.Center,
@@ -769,7 +755,7 @@ private fun EmptyState(hasActiveImport: Boolean, onImportClick: () -> Unit) {
             )
             if (!hasActiveImport) {
                 Button(onClick = onImportClick, modifier = Modifier.padding(top = 16.dp)) {
-                    Text("Importer des livres")
+                    Text("Importer votre premier livre")
                 }
             }
         }
@@ -811,92 +797,3 @@ private fun ErrorState(message: String, onRetry: () -> Unit, onDismiss: () -> Un
     }
 }
 
-// ──── Phase 2 — Composants de navigation enrichie ────
-
-/**
- * Barre de tags horizontale affichée sous la [FilterRow], hors du drawer.
- * Visible uniquement si des tags existent (legacy : [TagsFilterBar]).
- */
-@Composable
-private fun TagsFilterBar(
-    tags: List<String>,
-    activeFilter: FilterMode,
-    activeValue: String?,
-    onSelect: (String) -> Unit,
-) {
-    if (tags.isEmpty()) return
-    LazyRow(
-        horizontalArrangement = Arrangement.spacedBy(8.dp),
-        contentPadding = PaddingValues(horizontal = 8.dp, vertical = 4.dp),
-    ) {
-        rowItems(tags, key = { it }) { tag ->
-            FilterChip(
-                selected = activeFilter == FilterMode.TAG && activeValue == tag,
-                onClick = { onSelect(tag) },
-                label = { Text(tag) },
-            )
-        }
-    }
-}
-
-/**
- * Vue groupée par séries — chaque série a un en-tête et une rangée
- * horizontale scrollable de couvertures à largeur fixe (110dp).
- * Affichée uniquement en mode ALL au-dessus de la grille principale.
- *
- * E.4 — N'utilise plus LazyColumn dans un Column scrollable (nested
- * scroll non défini sur Android). Itère avec forEach dans un Column
- * simple — la liste de séries est bornée, un LazyColumn n'est pas
- * nécessaire.
- */
-@Composable
-private fun SeriesGroupedView(
-    publications: List<Publication>,
-    onOpen: (String) -> Unit,
-    onToggleFavorite: (String, Boolean) -> Unit,
-    onSelectSeries: (String) -> Unit,
-) {
-    val grouped = publications
-        .filter { it.seriesName != null }
-        .groupBy { it.seriesName!! }
-
-    if (grouped.isEmpty()) return
-
-    Column(modifier = Modifier.padding(bottom = 8.dp)) {
-        grouped.forEach { (series, books) ->
-            Row(
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .clickable { onSelectSeries(series) }
-                    .padding(horizontal = 12.dp, vertical = 8.dp),
-                horizontalArrangement = Arrangement.SpaceBetween,
-                verticalAlignment = Alignment.CenterVertically,
-            ) {
-                Text(
-                    series,
-                    style = MaterialTheme.typography.titleSmall,
-                    fontWeight = androidx.compose.ui.text.font.FontWeight.Bold,
-                )
-                Text(
-                    "${books.size}",
-                    style = MaterialTheme.typography.labelSmall,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant,
-                )
-            }
-            LazyRow(
-                horizontalArrangement = Arrangement.spacedBy(8.dp),
-                contentPadding = PaddingValues(horizontal = 12.dp),
-            ) {
-                rowItems(books, key = { "series-${it.id}" }) { book ->
-                    BookCover(
-                        publication = book,
-                        onClick = { onOpen(book.id) },
-                        onToggleFavorite = { onToggleFavorite(book.id, !book.isFavorite) },
-                        modifier = Modifier.width(110.dp),
-                        showTitle = true,
-                    )
-                }
-            }
-        }
-    }
-}

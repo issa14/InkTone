@@ -3,7 +3,6 @@ package com.inktone.feature.reader
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.ExperimentalLayoutApi
-import androidx.compose.foundation.layout.FlowRow
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxWidth
@@ -16,28 +15,51 @@ import androidx.compose.material.icons.filled.Pause
 import androidx.compose.material.icons.filled.PlayArrow
 import androidx.compose.material.icons.filled.SkipNext
 import androidx.compose.material.icons.filled.SkipPrevious
-import androidx.compose.material.icons.filled.Stop
+import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.FilledIconButton
-import androidx.compose.material3.FilterChip
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.IconButtonDefaults
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.ModalBottomSheet
+import androidx.compose.material3.OutlinedButton
+import androidx.compose.material3.RadioButton
 import androidx.compose.material3.Slider
 import androidx.compose.material3.Text
+import androidx.compose.material3.TextButton
 import androidx.compose.material3.rememberModalBottomSheetState
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import com.inktone.core.designsystem.InkToneShapes
+import com.inktone.domain.model.TtsEngineId
+import com.inktone.domain.model.VoiceProfile
 
 /**
- * B.3 — Panneau de contrôle TTS accessible depuis le Reader.
- * Navigation phrase à phrase, play/pause/stop, vitesse, minuteur.
+ * 3d.1 — Panneau de contrôle vocal accessible depuis le Reader. Navigation
+ * phrase à phrase, play/pause, vitesse (branchée sur le profil vocal actif,
+ * plus de curseur décoratif), sélecteur de voix, lien vers l'ajout d'une
+ * règle de prononciation.
+ *
+ * Le bouton Stop du B.3 d'origine est retiré : `ReaderViewModel.pausePlayback()`
+ * coupe déjà entièrement l'`AudioTrack` et annule la coroutine de lecture —
+ * il n'existe aucun pause/resume réel dans l'architecture actuelle
+ * (`AudioSegmentPlayer` en `MODE_STATIC`, pas de reprise à mi-phrase), donc
+ * aucun comportement distinct à donner à un second bouton. Un vrai Stop
+ * nécessiterait de migrer vers `AudioPlaybackService`/Media3 (déjà utilisé
+ * par `feature/player`), hors périmètre du lot 3d (voir doc, tâche 3d.1 et
+ * consignation 3d.7).
+ *
+ * Les puces de minuteur de sommeil, présentes ici avant ce lot, sont
+ * retirées : elles vivent désormais dans le panneau Minuteur dédié
+ * (`SleepTimerPanel`, tâche 3d.4).
  */
 @OptIn(ExperimentalMaterial3Api::class, ExperimentalLayoutApi::class)
 @Composable
@@ -45,17 +67,19 @@ fun ReaderTtsPanel(
     isPlaying: Boolean,
     currentSentenceIndex: Int,
     totalSentences: Int,
-    currentSpeed: Float,
+    activeVoiceProfile: VoiceProfile?,
+    availableVoiceProfiles: List<VoiceProfile>,
     onPlayPause: () -> Unit,
-    onStop: () -> Unit,
     onPreviousSentence: () -> Unit,
     onNextSentence: () -> Unit,
     onSpeedChange: (Float) -> Unit,
-    onSleepTimer: (Int?) -> Unit,
-    currentSleepTimerMinutes: Int?,
+    onSelectVoiceProfile: (String) -> Unit,
+    onOpenPronunciationRules: () -> Unit,
     onDismiss: () -> Unit,
 ) {
     val sheetState = rememberModalBottomSheetState(skipPartiallyExpanded = true)
+    var showVoicePicker by remember { mutableStateOf(false) }
+    val speed = activeVoiceProfile?.speed ?: 1.0f
 
     ModalBottomSheet(onDismissRequest = onDismiss, sheetState = sheetState) {
         Column(
@@ -90,7 +114,7 @@ fun ReaderTtsPanel(
 
             Spacer(Modifier.height(12.dp))
 
-            // ── Play/Pause/Stop ──
+            // ── Play/Pause ──
             Row(
                 modifier = Modifier.fillMaxWidth(),
                 horizontalArrangement = Arrangement.Center,
@@ -108,51 +132,117 @@ fun ReaderTtsPanel(
                         tint = MaterialTheme.colorScheme.surface,
                     )
                 }
-                Spacer(Modifier.width(24.dp))
-                IconButton(onClick = onStop, modifier = Modifier.size(44.dp)) {
-                    Icon(
-                        Icons.Filled.Stop,
-                        contentDescription = "Arrêter",
-                        tint = MaterialTheme.colorScheme.error,
-                    )
-                }
             }
 
             Spacer(Modifier.height(20.dp))
 
-            // ── Vitesse ──
-            Text("Vitesse (${"%.1f".format(currentSpeed)}×)", style = MaterialTheme.typography.labelLarge)
+            // ── Voix ──
+            Text("Voix", style = MaterialTheme.typography.labelLarge)
+            Spacer(Modifier.height(4.dp))
+            OutlinedButton(
+                onClick = { showVoicePicker = true },
+                modifier = Modifier.fillMaxWidth(),
+            ) {
+                Text(activeVoiceProfile?.let(::voiceDisplayName) ?: "Voix par défaut")
+            }
+
+            Spacer(Modifier.height(20.dp))
+
+            // ── Vitesse — 3d.1 : branchée sur VoiceProfile.speed, déjà
+            // consommée par les deux moteurs TTS (SherpaOnnxTtsEngine,
+            // AndroidNativeTtsEngine) ; ce curseur ne fait plus que
+            // refléter/écrire cette valeur, il n'y avait pas de chantier
+            // domaine à faire ici.
+            Text("Vitesse (${"%.1f".format(speed)}×)", style = MaterialTheme.typography.labelLarge)
             Slider(
-                value = currentSpeed,
+                value = speed,
                 onValueChange = onSpeedChange,
                 valueRange = 0.5f..3.0f,
                 steps = 9,
             )
 
-            Spacer(Modifier.height(20.dp))
+            Spacer(Modifier.height(12.dp))
 
-            // ── Minuteur de sommeil ──
-            Text("Veille", style = MaterialTheme.typography.labelLarge)
-            Spacer(Modifier.height(8.dp))
-            val sleepOptions = listOf(15, 30, 45, 60)
-            FlowRow(
-                horizontalArrangement = Arrangement.spacedBy(8.dp),
-            ) {
-                sleepOptions.forEach { minutes ->
-                    FilterChip(
-                        selected = currentSleepTimerMinutes == minutes,
-                        onClick = { onSleepTimer(minutes) },
-                        label = { Text("${minutes} min") },
-                    )
-                }
-                FilterChip(
-                    selected = currentSleepTimerMinutes == null,
-                    onClick = { onSleepTimer(null) },
-                    label = { Text("Off") },
-                )
+            TextButton(onClick = onOpenPronunciationRules, modifier = Modifier.fillMaxWidth()) {
+                Text("Ajouter une règle de prononciation")
             }
 
-            Spacer(Modifier.height(32.dp))
+            Spacer(Modifier.height(24.dp))
         }
     }
+
+    if (showVoicePicker) {
+        VoiceProfilePickerDialog(
+            profiles = availableVoiceProfiles,
+            activeProfileId = activeVoiceProfile?.id,
+            onSelect = { profileId ->
+                onSelectVoiceProfile(profileId)
+                showVoicePicker = false
+            },
+            onDismiss = { showVoicePicker = false },
+        )
+    }
+}
+
+@Composable
+private fun VoiceProfilePickerDialog(
+    profiles: List<VoiceProfile>,
+    activeProfileId: String?,
+    onSelect: (String) -> Unit,
+    onDismiss: () -> Unit,
+) {
+    AlertDialog(
+        onDismissRequest = onDismiss,
+        title = { Text("Choisir une voix") },
+        text = {
+            if (profiles.isEmpty()) {
+                Text("Aucune autre voix disponible pour le moteur sélectionné dans les Réglages.")
+            } else {
+                Column {
+                    profiles.forEach { profile ->
+                        Row(
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .padding(vertical = 4.dp),
+                            verticalAlignment = Alignment.CenterVertically,
+                        ) {
+                            RadioButton(
+                                selected = profile.id == activeProfileId,
+                                onClick = { onSelect(profile.id) },
+                            )
+                            Spacer(Modifier.width(8.dp))
+                            Text(voiceDisplayName(profile))
+                        }
+                    }
+                }
+            }
+        },
+        confirmButton = {
+            TextButton(onClick = onDismiss) { Text("Fermer") }
+        },
+    )
+}
+
+/**
+ * 3d.1 — format cible `ff_siwis · Kokoro · Français` (UX_FLOW_DESIGN.md
+ * §Haut-parleur), jamais un nom inventé : la voix et la langue viennent
+ * directement du `VoiceProfile`, seul le libellé de moteur est un mapping
+ * statique (aucun nom lisible n'existe ailleurs dans le domaine).
+ */
+internal fun voiceDisplayName(profile: VoiceProfile): String =
+    "${profile.voice} · ${engineDisplayName(profile.engine)} · ${languageDisplayName(profile.language)}"
+
+private fun engineDisplayName(engine: TtsEngineId): String = when (engine) {
+    TtsEngineId.SHERPA_ONNX -> "Kokoro"
+    TtsEngineId.ANDROID_NATIVE -> "Voix système"
+    TtsEngineId.PIPER -> "Piper"
+    TtsEngineId.EDGE_TTS -> "Edge"
+}
+
+private fun languageDisplayName(languageCode: String): String = when {
+    languageCode.startsWith("fr", ignoreCase = true) -> "Français"
+    languageCode.startsWith("en", ignoreCase = true) -> "English"
+    languageCode.startsWith("es", ignoreCase = true) -> "Español"
+    languageCode.startsWith("de", ignoreCase = true) -> "Deutsch"
+    else -> languageCode
 }

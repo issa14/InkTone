@@ -33,6 +33,7 @@ include(":infrastructure:parser")
 include(":infrastructure:tts")
 include(":infrastructure:media")
 include(":infrastructure:worker")
+include(":infrastructure:crashreporting")
 
 include(":feature:library")
 include(":feature:reader")

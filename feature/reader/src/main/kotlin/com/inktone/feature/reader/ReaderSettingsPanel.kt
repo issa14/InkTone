@@ -1,18 +1,11 @@
 package com.inktone.feature.reader
 
 import androidx.compose.foundation.background
-import androidx.compose.foundation.border
-import androidx.compose.foundation.clickable
-import androidx.compose.foundation.layout.Arrangement
-import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
-import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
-import androidx.compose.foundation.layout.size
-import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.MaterialTheme
@@ -21,30 +14,46 @@ import androidx.compose.material3.Slider
 import androidx.compose.material3.Text
 import androidx.compose.material3.rememberModalBottomSheetState
 import androidx.compose.runtime.Composable
-import androidx.compose.ui.Alignment
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableFloatStateOf
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
-import com.inktone.domain.model.FontFamily
-import com.inktone.domain.model.ReadingTheme
+import kotlin.math.roundToInt
 
 /**
- * B.2 — Panneau de réglages de lecture accessible depuis le Reader.
- * Thème, police, taille, interligne, marges — sans quitter la lecture.
+ * 3d.2 — Panneau de typographie seule (taille, interligne) : le thème n'y
+ * vit plus, la bascule cyclique du lot 3b (icône Thème du panneau unifié)
+ * l'a rendu redondant. Curseurs continus (`steps = 0`, avant : paliers de
+ * taille discrets) avec un aperçu en direct du texte RÉELLEMENT en cours
+ * de lecture — jamais un exemple statique, c'est l'intérêt de la cible
+ * (voir doc du lot 3d, tâche 3d.2, et `UX_FLOW_DESIGN.md` §TT).
+ *
+ * L'aperçu suit la valeur *en cours de drag* du slider (état local), pas
+ * seulement la valeur persistée : `onValueChangeFinished` déclenche
+ * l'intent réel (`SetOverrides`/`SetLineHeight`) au relâchement, pour ne
+ * pas spammer la persistance/la repagination à chaque pixel glissé.
  */
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun ReaderSettingsPanel(
-    currentTheme: ReadingTheme,
     currentFontSize: Int,
-    onThemeChange: (ReadingTheme) -> Unit,
+    currentLineHeightMultiplier: Float,
+    previewText: String,
+    previewTextColor: Color,
+    previewBackgroundColor: Color,
     onFontSizeChange: (Int) -> Unit,
+    onLineHeightChange: (Float) -> Unit,
     onDismiss: () -> Unit,
 ) {
     val sheetState = rememberModalBottomSheetState(skipPartiallyExpanded = true)
+
+    var fontSizeDraft by remember(currentFontSize) { mutableFloatStateOf(currentFontSize.toFloat()) }
+    var lineHeightDraft by remember(currentLineHeightMultiplier) { mutableFloatStateOf(currentLineHeightMultiplier) }
 
     ModalBottomSheet(onDismissRequest = onDismiss, sheetState = sheetState) {
         Column(
@@ -53,71 +62,50 @@ fun ReaderSettingsPanel(
                 .padding(horizontal = 24.dp, vertical = 16.dp),
         ) {
             Text(
-                "Réglages de lecture",
+                "Typographie",
                 style = MaterialTheme.typography.titleMedium,
                 fontWeight = FontWeight.Bold,
             )
-            Spacer(Modifier.height(20.dp))
+            Spacer(Modifier.height(16.dp))
 
-            // ── Thèmes (cartes visuelles) ──
-            Text("Thème", style = MaterialTheme.typography.labelLarge)
-            Spacer(Modifier.height(8.dp))
-            Row(
-                modifier = Modifier.fillMaxWidth(),
-                horizontalArrangement = Arrangement.spacedBy(8.dp),
-            ) {
-                ThemeCard("Clair", ThemeColors.background(ReadingTheme.LIGHT), ThemeColors.text(ReadingTheme.LIGHT), currentTheme == ReadingTheme.LIGHT) {
-                    onThemeChange(ReadingTheme.LIGHT)
-                }
-                ThemeCard("Sombre", ThemeColors.background(ReadingTheme.DARK), ThemeColors.text(ReadingTheme.DARK), currentTheme == ReadingTheme.DARK) {
-                    onThemeChange(ReadingTheme.DARK)
-                }
-                ThemeCard("Sépia", ThemeColors.background(ReadingTheme.SEPIA), ThemeColors.text(ReadingTheme.SEPIA), currentTheme == ReadingTheme.SEPIA) {
-                    onThemeChange(ReadingTheme.SEPIA)
-                }
-            }
+            // ── Aperçu en direct — le vrai texte du chapitre en cours ──
+            Text(
+                previewText,
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .background(previewBackgroundColor, RoundedCornerShape(12.dp))
+                    .padding(16.dp),
+                color = previewTextColor,
+                fontSize = fontSizeDraft.sp,
+                lineHeight = (fontSizeDraft * lineHeightDraft).sp,
+                maxLines = 5,
+            )
 
-            Spacer(Modifier.height(20.dp))
+            Spacer(Modifier.height(24.dp))
 
-            // ── Taille du texte ──
-            Text("Taille du texte (${currentFontSize}sp)", style = MaterialTheme.typography.labelLarge)
+            // ── Taille du texte — curseur continu (3d.2 : plus de paliers) ──
+            Text("Taille du texte (${fontSizeDraft.roundToInt()}sp)", style = MaterialTheme.typography.labelLarge)
             Slider(
-                value = currentFontSize.toFloat(),
-                onValueChange = { onFontSizeChange(it.toInt()) },
+                value = fontSizeDraft,
+                onValueChange = { fontSizeDraft = it },
+                onValueChangeFinished = { onFontSizeChange(fontSizeDraft.roundToInt()) },
                 valueRange = 12f..32f,
-                steps = 19,
+                steps = 0,
+            )
+
+            Spacer(Modifier.height(20.dp))
+
+            // ── Interligne — 3d.2 : seul vrai ajout de modèle du lot ──
+            Text("Interligne (${"%.1f".format(lineHeightDraft)}×)", style = MaterialTheme.typography.labelLarge)
+            Slider(
+                value = lineHeightDraft,
+                onValueChange = { lineHeightDraft = it },
+                onValueChangeFinished = { onLineHeightChange(lineHeightDraft) },
+                valueRange = 1.0f..2.0f,
+                steps = 0,
             )
 
             Spacer(Modifier.height(32.dp))
         }
-    }
-}
-
-@Composable
-private fun ThemeCard(label: String, bg: Color, textColor: Color, selected: Boolean, onClick: () -> Unit) {
-    val borderColor = if (selected) MaterialTheme.colorScheme.primary else Color.Transparent
-    Column(
-        modifier = Modifier
-            .width(100.dp)
-            .clip(RoundedCornerShape(12.dp))
-            .border(2.dp, borderColor, RoundedCornerShape(12.dp))
-            .clickable(onClick = onClick),
-        horizontalAlignment = Alignment.CenterHorizontally,
-    ) {
-        Box(
-            modifier = Modifier
-                .fillMaxWidth()
-                .height(56.dp)
-                .background(bg, RoundedCornerShape(topStart = 12.dp, topEnd = 12.dp)),
-            contentAlignment = Alignment.Center,
-        ) {
-            Text("Aa", color = textColor, fontSize = 18.sp, fontWeight = FontWeight.Medium)
-        }
-        Text(
-            label,
-            modifier = Modifier.padding(vertical = 6.dp),
-            style = MaterialTheme.typography.labelSmall,
-            color = if (selected) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurface,
-        )
     }
 }

@@ -80,9 +80,13 @@ class ReaderViewModelOverrideTest {
             createBookmark = CreateBookmarkUseCase(bookmarkRepository),
             deleteBookmark = DeleteBookmarkUseCase(bookmarkRepository),
             voiceProfileRepository = com.inktone.core.testing.fake.FakeVoiceProfileRepository(),
+            getVoiceProfiles = com.inktone.domain.usecase.GetVoiceProfilesUseCase(com.inktone.core.testing.fake.FakeVoiceProfileRepository()),
         )
 
-        preferencesRepository.update(UserPreferences(theme = ReadingTheme.LIGHT))
+        // 3d.5 — le rappel de repos oculaire (activé par défaut, recurrent)
+        // rendrait dispatcher.scheduler.advanceUntilIdle() non terminant ;
+        // ce test ne porte pas sur le repos oculaire, on le désactive.
+        preferencesRepository.update(UserPreferences(theme = ReadingTheme.LIGHT, eyeRestReminderEnabled = false))
         viewModel.onIntent(ReaderIntent.OpenPublication(publicationId))
         dispatcher.scheduler.advanceUntilIdle()
 

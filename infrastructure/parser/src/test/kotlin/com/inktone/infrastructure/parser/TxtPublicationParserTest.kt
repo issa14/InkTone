@@ -1,13 +1,36 @@
 package com.inktone.infrastructure.parser
 
+import com.inktone.domain.service.FileStorageService
 import com.inktone.domain.service.ParseResult
 import kotlinx.coroutines.test.runTest
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertTrue
 import org.junit.Test
 import java.io.File
+import java.io.InputStream
+
+/**
+ * Fake local backee par de vrais `java.io.File` — le fake partage
+ * (`core:testing`) simule le contenu a partir de l'URI elle-meme, pas
+ * adapte ici ou le test a besoin d'un vrai contenu texte lisible. `uri`
+ * est ici directement `file.absolutePath`, jamais une URI SAF reelle
+ * (androidTest de `infrastructure/storage` couvre deja `content://` via
+ * un vrai `ContentResolver`).
+ */
+private class LocalFileStorageService : FileStorageService {
+    override suspend fun openInputStream(uri: String): InputStream? =
+        File(uri).takeIf { it.exists() }?.inputStream()
+
+    override suspend fun computeSha256(uri: String): String? = null
+    override suspend fun getFileSize(uri: String): Long? = File(uri).takeIf { it.exists() }?.length()
+    override suspend fun getFileName(uri: String): String? = File(uri).name
+    override suspend fun persistReadPermission(uri: String) = Unit
+    override suspend fun writeToUri(uri: String, sourceFile: File): Boolean = false
+}
 
 class TxtPublicationParserTest {
+
+    private val parser = TxtPublicationParser(LocalFileStorageService())
 
     @Test
     fun decoupe_un_texte_simple_en_phrases() = runTest {
@@ -15,7 +38,7 @@ class TxtPublicationParserTest {
             writeText("Bonjour le monde. Ceci est un test. Il fonctionne !")
             deleteOnExit()
         }
-        val result = TxtPublicationParser().parse(file.absolutePath)
+        val result = parser.parse(file.absolutePath)
         check(result is ParseResult.Success)
 
         val sentences = result.documentModel.chapters.single().paragraphs.single().sentences
@@ -27,13 +50,13 @@ class TxtPublicationParserTest {
     @Test
     fun fichier_vide_renvoie_corrompu_pas_un_crash() = runTest {
         val file = File.createTempFile("empty", ".txt").apply { deleteOnExit() }
-        val result = TxtPublicationParser().parse(file.absolutePath)
+        val result = parser.parse(file.absolutePath)
         assertTrue(result is ParseResult.Corrupted)
     }
 
     @Test
     fun fichier_inexistant_renvoie_corrompu_pas_une_exception() = runTest {
-        val result = TxtPublicationParser().parse("/chemin/qui/n/existe/pas.txt")
+        val result = parser.parse("/chemin/qui/n/existe/pas.txt")
         assertTrue(result is ParseResult.Corrupted)
     }
 }

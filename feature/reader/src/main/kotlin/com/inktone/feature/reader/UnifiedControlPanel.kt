@@ -1,8 +1,7 @@
 package com.inktone.feature.reader
 
 import androidx.compose.foundation.clickable
-import androidx.compose.foundation.horizontalScroll
-import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
@@ -10,19 +9,14 @@ import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
-import androidx.compose.foundation.layout.width
-import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Pause
 import androidx.compose.material.icons.filled.PlayArrow
 import androidx.compose.material.icons.filled.Timer
-import androidx.compose.material.icons.outlined.SkipNext
-import androidx.compose.material.icons.outlined.SkipPrevious
 import androidx.compose.material3.FilledIconButton
 import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.Icon
-import androidx.compose.material3.IconButton
 import androidx.compose.material3.IconButtonDefaults
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Surface
@@ -41,34 +35,42 @@ import com.inktone.core.designsystem.AppIcons
 import com.inktone.core.designsystem.InkToneShapes
 
 /**
- * Tache 9bis.3.3 — panneau de controle unifie, porte la structure du
- * legacy (`ReaderBottomControls.UnifiedControlPanel`) : le legacy avait
- * deja resolu ici un vrai probleme d'UX (icones separees qui tronquaient
- * le titre — note trouvee dans le code), pas de retour en arriere sur
- * cette lecon. Sous-ensemble des actions legacy : Voix/Police/Theme
- * (`onTtsSettingsClick`/`onFontToggle`/`onThemeCycle`) n'ont pas
- * d'equivalent `ReaderIntent` aujourd'hui, pas de bouton qui ne ferait
- * rien - a ajouter quand ces reglages existeront (Tache 9bis.5).
+ * Tâche 3b.6 — panneau de contrôle unifié, trois rangées :
+ * 1. Barre de progression du livre (déplacée depuis le haut de l'écran —
+ *    elle cesse d'être persistante, c'est `StatusLineBar` (3b.4) qui
+ *    porte désormais l'information permanente).
+ * 2. 5 icônes, Play central proéminent : Sommaire · Marque-pages · Play ·
+ *    Thème · TT.
+ * 3. 5 icônes : Minuteur · Haut-parleur · Mode · Recherche · Luminosité
+ *    (3d.3 — dernière icône ajoutée avec son action, jamais avant :
+ *    laissée vide depuis le lot 3b faute d'action existante).
+ *
+ * Navigation par chapitre retirée de ce panneau (chevrons précédent/
+ * suivant) — la cible les place dans la barre de contrôle TTS (lot 3d) ;
+ * en attendant, elle reste accessible via le Sommaire (`onTocClick`,
+ * inchangé). `horizontalScroll` retiré avec elles : 7 actions sur une
+ * rangée ne tenaient pas sur un téléphone standard, mais 5 puis 4
+ * n'en ont plus besoin.
  */
 @Composable
 fun UnifiedControlPanel(
     isPlaying: Boolean,
     sleepTimerActive: Boolean,
+    bookProgression: Float,
     onPlayPause: () -> Unit,
-    onPreviousChapter: () -> Unit,
-    onNextChapter: () -> Unit,
     onSleepTimerClick: () -> Unit,
     onSearchClick: () -> Unit,
     onBookmarksClick: () -> Unit,
     onTocClick: () -> Unit,
+    onThemeCycle: () -> Unit,
     onAaClick: () -> Unit = {},
     onTtsClick: () -> Unit = {},
     onReadingModeClick: () -> Unit = {},
-    hasPreviousChapter: Boolean = true,
-    hasNextChapter: Boolean = true,
+    onBrightnessClick: () -> Unit = {},
 ) {
     val haptic = LocalHapticFeedback.current
     val accentColor = MaterialTheme.colorScheme.primary
+    val iconTint = accentColor.copy(alpha = 0.5f)
 
     Surface(
         modifier = Modifier.fillMaxWidth(),
@@ -79,37 +81,49 @@ fun UnifiedControlPanel(
             modifier = Modifier.fillMaxWidth().padding(horizontal = 20.dp, vertical = 12.dp),
             horizontalAlignment = Alignment.CenterHorizontally,
         ) {
+            BookProgressBar(progression = bookProgression)
+
+            Spacer(Modifier.height(12.dp))
+
+            // Bug réel trouvé sur appareil (lot 3b) : Arrangement.SpaceEvenly
+            // répartit l'espace ENTRE les bords des enfants, pas par largeur
+            // égale — "Marque-pages" (libellé plus long que les autres)
+            // élargit sa colonne et décale visuellement tout le reste, Play
+            // compris, hors du centre réel de la rangée. Modifier.weight(1f)
+            // sur chaque slot force des largeurs égales, jamais un décalage
+            // dépendant de la longueur du texte.
             Row(
-                verticalAlignment = Alignment.CenterVertically,
-                horizontalArrangement = Arrangement.Center,
                 modifier = Modifier.fillMaxWidth(),
+                verticalAlignment = Alignment.CenterVertically,
             ) {
-                IconButton(onClick = onPreviousChapter, modifier = Modifier.size(44.dp), enabled = hasPreviousChapter) {
-                    Icon(Icons.Outlined.SkipPrevious,
-                        contentDescription = if (hasPreviousChapter) "Chapitre precedent" else "Pas de chapitre precedent",
-                        tint = accentColor.copy(alpha = if (hasPreviousChapter) 0.4f else 0.15f))
+                Box(Modifier.weight(1f), contentAlignment = Alignment.Center) {
+                    SecondaryAction(icon = AppIcons.Toc, label = "Sommaire", tint = iconTint, onClick = onTocClick)
                 }
-                Spacer(Modifier.width(24.dp))
-                FilledIconButton(
-                    onClick = {
-                        haptic.performHapticFeedback(HapticFeedbackType.LongPress)
-                        onPlayPause()
-                    },
-                    modifier = Modifier.size(56.dp),
-                    colors = IconButtonDefaults.filledIconButtonColors(containerColor = accentColor),
-                    shape = InkToneShapes.large,
-                ) {
-                    Icon(
-                        if (isPlaying) Icons.Filled.Pause else Icons.Filled.PlayArrow,
-                        contentDescription = if (isPlaying) "Pause" else "Lire",
-                        tint = MaterialTheme.colorScheme.surface,
-                    )
+                Box(Modifier.weight(1f), contentAlignment = Alignment.Center) {
+                    SecondaryAction(icon = AppIcons.Bookmark, label = "Marque-pages", tint = iconTint, onClick = onBookmarksClick)
                 }
-                Spacer(Modifier.width(24.dp))
-                IconButton(onClick = onNextChapter, modifier = Modifier.size(44.dp), enabled = hasNextChapter) {
-                    Icon(Icons.Outlined.SkipNext,
-                        contentDescription = if (hasNextChapter) "Chapitre suivant" else "Pas de chapitre suivant",
-                        tint = accentColor.copy(alpha = if (hasNextChapter) 0.4f else 0.15f))
+                Box(Modifier.weight(1f), contentAlignment = Alignment.Center) {
+                    FilledIconButton(
+                        onClick = {
+                            haptic.performHapticFeedback(HapticFeedbackType.LongPress)
+                            onPlayPause()
+                        },
+                        modifier = Modifier.size(56.dp),
+                        colors = IconButtonDefaults.filledIconButtonColors(containerColor = accentColor),
+                        shape = InkToneShapes.large,
+                    ) {
+                        Icon(
+                            if (isPlaying) Icons.Filled.Pause else Icons.Filled.PlayArrow,
+                            contentDescription = if (isPlaying) "Pause" else "Lire",
+                            tint = MaterialTheme.colorScheme.surface,
+                        )
+                    }
+                }
+                Box(Modifier.weight(1f), contentAlignment = Alignment.Center) {
+                    SecondaryAction(icon = AppIcons.Theme, label = "Thème", tint = iconTint, onClick = onThemeCycle)
+                }
+                Box(Modifier.weight(1f), contentAlignment = Alignment.Center) {
+                    SecondaryAction(icon = AppIcons.Appearance, label = "TT", tint = iconTint, onClick = onAaClick)
                 }
             }
 
@@ -117,28 +131,30 @@ fun UnifiedControlPanel(
             HorizontalDivider(color = accentColor.copy(alpha = 0.08f), thickness = 0.5.dp)
             Spacer(Modifier.height(8.dp))
 
-            // Bug réel trouvé à l'audit : 7 actions avec libelle sous
-            // Arrangement.SpaceEvenly ne tiennent pas sur la largeur d'un
-            // téléphone standard (~360-400dp) — "Signets" wrappait déjà
-            // sur deux lignes et "Sommaire" (le bouton TOC lui-même)
-            // sortait entièrement de l'écran, donc inatteignable au tap.
-            // horizontalScroll rend les 7 actions accessibles quelle que
-            // soit la largeur d'écran, au prix d'un défilement sur les
-            // plus étroits.
             Row(
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .horizontalScroll(rememberScrollState()),
-                horizontalArrangement = Arrangement.spacedBy(4.dp, Alignment.CenterHorizontally),
+                modifier = Modifier.fillMaxWidth(),
                 verticalAlignment = Alignment.CenterVertically,
             ) {
-                SecondaryAction(icon = AppIcons.Appearance, label = "Aa", tint = accentColor.copy(alpha = 0.5f), onClick = onAaClick)
-                SecondaryAction(icon = AppIcons.Speaking, label = "Voix", tint = accentColor.copy(alpha = 0.5f), onClick = onTtsClick)
-                SecondaryAction(icon = AppIcons.ReadingModePaged, label = "Mode", tint = accentColor.copy(alpha = 0.5f), onClick = onReadingModeClick)
-                SecondaryAction(icon = Icons.Filled.Timer, label = "Veille", tint = if (sleepTimerActive) accentColor else accentColor.copy(alpha = 0.5f), onClick = onSleepTimerClick)
-                SecondaryAction(icon = AppIcons.Search, label = "Recherche", tint = accentColor.copy(alpha = 0.5f), onClick = onSearchClick)
-                SecondaryAction(icon = AppIcons.Bookmark, label = "Signets", tint = accentColor.copy(alpha = 0.5f), onClick = onBookmarksClick)
-                SecondaryAction(icon = AppIcons.Toc, label = "Sommaire", tint = accentColor.copy(alpha = 0.5f), onClick = onTocClick)
+                Box(Modifier.weight(1f), contentAlignment = Alignment.Center) {
+                    SecondaryAction(
+                        icon = Icons.Filled.Timer,
+                        label = "Minuteur",
+                        tint = if (sleepTimerActive) accentColor else iconTint,
+                        onClick = onSleepTimerClick,
+                    )
+                }
+                Box(Modifier.weight(1f), contentAlignment = Alignment.Center) {
+                    SecondaryAction(icon = AppIcons.Speaking, label = "Haut-parleur", tint = iconTint, onClick = onTtsClick)
+                }
+                Box(Modifier.weight(1f), contentAlignment = Alignment.Center) {
+                    SecondaryAction(icon = AppIcons.ReadingModePaged, label = "Mode", tint = iconTint, onClick = onReadingModeClick)
+                }
+                Box(Modifier.weight(1f), contentAlignment = Alignment.Center) {
+                    SecondaryAction(icon = AppIcons.Search, label = "Recherche", tint = iconTint, onClick = onSearchClick)
+                }
+                Box(Modifier.weight(1f), contentAlignment = Alignment.Center) {
+                    SecondaryAction(icon = AppIcons.Brightness, label = "Luminosité", tint = iconTint, onClick = onBrightnessClick)
+                }
             }
         }
     }
@@ -148,7 +164,7 @@ fun UnifiedControlPanel(
 private fun SecondaryAction(icon: ImageVector, label: String, tint: Color, onClick: () -> Unit) {
     Column(
         horizontalAlignment = Alignment.CenterHorizontally,
-        modifier = Modifier.clip(RoundedCornerShape(8.dp)).clickable(onClick = onClick).padding(horizontal = 12.dp, vertical = 6.dp),
+        modifier = Modifier.clip(RoundedCornerShape(8.dp)).clickable(onClick = onClick).padding(horizontal = 8.dp, vertical = 6.dp),
     ) {
         Icon(icon, contentDescription = label, tint = tint, modifier = Modifier.size(20.dp))
         Spacer(Modifier.height(3.dp))
