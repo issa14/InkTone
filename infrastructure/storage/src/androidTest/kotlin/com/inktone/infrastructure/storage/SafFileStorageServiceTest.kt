@@ -57,6 +57,13 @@ class SafFileStorageServiceTest {
     }
 
     @Test
+    fun resout_le_nom_de_fichier_reel() = runTest {
+        val file = tempFile("peu importe")
+        assertEquals(file.name, service.getFileName(Uri.fromFile(file).toString()))
+        file.delete()
+    }
+
+    @Test
     fun ecrit_puis_relit_le_meme_contenu() = runTest {
         val source = tempFile("contenu a exporter")
         val destination = File(context.cacheDir, "export-${System.nanoTime()}.txt")

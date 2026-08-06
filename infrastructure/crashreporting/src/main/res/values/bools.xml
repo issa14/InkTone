@@ -1,0 +1,15 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <!--
+        K10/ADR-014 — valeur par defaut, remplacee par `app` via
+        `resValue("bool", "firebase_crashlytics_configured", ...)`
+        (app/build.gradle.kts) selon la presence de google-services.json au
+        moment du build. Le module `app` n'a pas le droit de dependre de
+        `domain` (Blueprint §12.4, checkArchitectureRules) : cette valeur
+        est le seul canal par lequel il communique cette information a
+        CrashReporterModule (infrastructure/crashreporting), sans que
+        `app` ait besoin d'importer un seul type de `domain` ou de cet
+        infra module en Kotlin pour cela.
+    -->
+    <bool name="firebase_crashlytics_configured">false</bool>
+</resources>

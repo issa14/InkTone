@@ -201,8 +201,8 @@ class DatabaseMigrationTest {
         val v7 = helper.createDatabase(TEST_DB_NAME, 7)
         v7.execSQL(
             """
-            INSERT INTO publications (id, title, format, fileUri, fileHash, fileSize, chapterCount, importDate)
-            VALUES ('pub-d4', 'Test', 'EPUB', '/test.epub', 'hash-d4', 1024, 1, 0)
+            INSERT INTO publications (id, title, authors, format, fileUri, fileHash, fileSize, chapterCount, subjects, isFavorite, isDrmProtected, importDate)
+            VALUES ('pub-d4', 'Test', '', 'EPUB', '/test.epub', 'hash-d4', 1024, 1, '', 0, 0, 0)
             """.trimIndent(),
         )
         v7.execSQL(
@@ -230,8 +230,8 @@ class DatabaseMigrationTest {
         val v8 = helper.createDatabase(TEST_DB_NAME, 8)
         v8.execSQL(
             """
-            INSERT INTO publications (id, title, format, fileUri, fileHash, fileSize, chapterCount, importDate)
-            VALUES ('pub-b1', 'Test B1', 'EPUB', '/test-b1.epub', 'hash-b1', 1024, 1, 0)
+            INSERT INTO publications (id, title, authors, format, fileUri, fileHash, fileSize, chapterCount, subjects, isFavorite, isDrmProtected, importDate)
+            VALUES ('pub-b1', 'Test B1', '', 'EPUB', '/test-b1.epub', 'hash-b1', 1024, 1, '', 0, 0, 0)
             """.trimIndent(),
         )
         v8.execSQL(
@@ -275,6 +275,77 @@ class DatabaseMigrationTest {
         }
         v10.close()
     }
+    @Test
+    fun migration_10_vers_11_conserve_les_donnees_et_ajoute_isPinned() {
+        val v10 = helper.createDatabase(TEST_DB_NAME, 10)
+        v10.execSQL(
+            """
+            INSERT INTO publications (
+                id, title, subtitle, authors, publisher, language, description, coverUri,
+                format, fileUri, fileHash, fileSize, chapterCount, seriesName, seriesIndex,
+                isFavorite, subjects, isDrmProtected, importDate, lastOpened
+            ) VALUES (
+                'pub-2b1', 'Titre epinglable', NULL, '', NULL, NULL, NULL, NULL,
+                'EPUB', 'content://x/2b1', 'hash-2b1', 1000, 3, NULL, NULL,
+                0, '', 0, 0, NULL
+            )
+            """.trimIndent(),
+        )
+        v10.close()
+
+        val v11 = helper.runMigrationsAndValidate(
+            TEST_DB_NAME, 11, true,
+            MIGRATION_1_2, MIGRATION_2_3, MIGRATION_3_4, MIGRATION_4_5, MIGRATION_5_6,
+            MIGRATION_6_7, MIGRATION_7_8, MIGRATION_8_9, MIGRATION_9_10, MIGRATION_10_11,
+        )
+
+        v11.query("SELECT title, isPinned FROM publications WHERE id = 'pub-2b1'").use { cursor ->
+            assertEquals(true, cursor.moveToFirst())
+            assertEquals("Titre epinglable", cursor.getString(0))
+            assertEquals(0, cursor.getInt(1)) // valeur par defaut : pas epingle
+        }
+        v11.execSQL("UPDATE publications SET isPinned = 1 WHERE id = 'pub-2b1'")
+        v11.query("SELECT isPinned FROM publications WHERE id = 'pub-2b1'").use { cursor ->
+            assertEquals(true, cursor.moveToFirst())
+            assertEquals(1, cursor.getInt(0))
+        }
+        v11.close()
+    }
+
+    @Test
+    fun migration_11_vers_12_conserve_les_donnees_et_ajoute_interligne_luminosite_repos_oculaire() {
+        val v11 = helper.createDatabase(TEST_DB_NAME, 11)
+        v11.execSQL(
+            """
+            INSERT INTO user_preferences (id, theme, fontSize, defaultTtsEngine, crashReportingEnabled, language, fontFamily, reduceMotion, dynamicColorEnabled, readingRulerEnabled, dailyGoalMinutes, activeVoiceProfileId, readingMode, audioGain, useSystemFontScale)
+            VALUES (0, 'SYSTEM', 18, 'SHERPA_ONNX', 0, 'fr', 'DEFAULT', 0, 1, 0, 20, NULL, 'SCROLL', 1.0, 0)
+            """.trimIndent(),
+        )
+        v11.close()
+
+        val v12 = helper.runMigrationsAndValidate(
+            TEST_DB_NAME, 12, true,
+            MIGRATION_2_3, MIGRATION_3_4, MIGRATION_4_5, MIGRATION_5_6, MIGRATION_6_7,
+            MIGRATION_7_8, MIGRATION_8_9, MIGRATION_9_10, MIGRATION_10_11, MIGRATION_11_12,
+        )
+
+        v12.query(
+            "SELECT lineHeightMultiplier, readerBrightness, eyeRestReminderEnabled, eyeRestReminderIntervalMinutes FROM user_preferences WHERE id = 0",
+        ).use { cursor ->
+            assertEquals(true, cursor.moveToFirst())
+            assertEquals(1.4f, cursor.getFloat(0))
+            assertEquals(true, cursor.isNull(1)) // luminosité : valeur système par défaut
+            assertEquals(1, cursor.getInt(2))
+            assertEquals(60, cursor.getInt(3))
+        }
+        v12.execSQL("UPDATE user_preferences SET readerBrightness = 0.5 WHERE id = 0")
+        v12.query("SELECT readerBrightness FROM user_preferences WHERE id = 0").use { cursor ->
+            assertEquals(true, cursor.moveToFirst())
+            assertEquals(0.5f, cursor.getFloat(0))
+        }
+        v12.close()
+    }
+
     companion object {
         private const val TEST_DB_NAME = "migration-test"
     }

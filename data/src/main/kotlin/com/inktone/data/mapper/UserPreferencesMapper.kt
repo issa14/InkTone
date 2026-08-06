@@ -13,6 +13,9 @@ fun UserPreferences.toEntity(): UserPreferencesEntity = UserPreferencesEntity(
     dynamicColorEnabled = dynamicColorEnabled, readingRulerEnabled = readingRulerEnabled,
     dailyGoalMinutes = dailyGoalMinutes, activeVoiceProfileId = activeVoiceProfileId,
     readingMode = readingMode, audioGain = audioGain, useSystemFontScale = useSystemFontScale,
+    lineHeightMultiplier = lineHeightMultiplier, readerBrightness = readerBrightness,
+    eyeRestReminderEnabled = eyeRestReminderEnabled,
+    eyeRestReminderIntervalMinutes = eyeRestReminderIntervalMinutes,
 )
 
 fun UserPreferencesEntity.toDomain(): UserPreferences = UserPreferences(
@@ -23,4 +26,7 @@ fun UserPreferencesEntity.toDomain(): UserPreferences = UserPreferences(
     dynamicColorEnabled = dynamicColorEnabled, readingRulerEnabled = readingRulerEnabled,
     dailyGoalMinutes = dailyGoalMinutes, activeVoiceProfileId = activeVoiceProfileId,
     readingMode = readingMode, audioGain = audioGain, useSystemFontScale = useSystemFontScale,
+    lineHeightMultiplier = lineHeightMultiplier, readerBrightness = readerBrightness,
+    eyeRestReminderEnabled = eyeRestReminderEnabled,
+    eyeRestReminderIntervalMinutes = eyeRestReminderIntervalMinutes,
 )

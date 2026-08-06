@@ -44,3 +44,13 @@ object BookmarksRoute
 @Serializable
 object AboutRoute
 
+/**
+ * Lot 2a.4 — écran de détail Séries/Tags, un seul écran réutilisable
+ * pour les deux cas. `category` reste une chaîne brute ("series"/"tag")
+ * plutôt que l'enum `LibraryDetailCategory` de `feature:library` : ce
+ * module n'a pas le plugin kotlinx.serialization (seuls `app`/`data`
+ * l'ont), même raison que les primitifs de [ReaderRoute].
+ */
+@Serializable
+data class LibraryDetailRoute(val category: String, val value: String)
+

@@ -8,6 +8,13 @@ plugins {
     alias(libs.plugins.ksp) apply false
     alias(libs.plugins.room) apply false
     alias(libs.plugins.kover)
+    // K10/ADR-014 — resolus ici (classpath disponible pour tous les
+    // sous-projets) mais jamais appliques globalement : seul `app`
+    // les applique, et seulement si `google-services.json` est present
+    // au moment du build (voir app/build.gradle.kts). Un module sans ce
+    // fichier reste vert sans ces deux plugins.
+    alias(libs.plugins.google.services) apply false
+    alias(libs.plugins.firebase.crashlytics) apply false
 }
 
 // Tache 9.4.1 : couverture agregee de tous les modules de production

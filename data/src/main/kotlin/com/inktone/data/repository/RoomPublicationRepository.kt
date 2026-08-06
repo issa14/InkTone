@@ -32,4 +32,5 @@ class RoomPublicationRepository @Inject constructor(
     override suspend fun update(publication: Publication) = dao.update(publication.toEntity())
     override suspend fun delete(id: String) = dao.delete(id)
     override suspend fun setFavorite(id: String, isFavorite: Boolean) = dao.setFavorite(id, isFavorite)
+    override suspend fun setPinned(id: String, isPinned: Boolean) = dao.setPinned(id, isPinned)
 }

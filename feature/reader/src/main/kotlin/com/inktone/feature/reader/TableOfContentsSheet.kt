@@ -8,10 +8,13 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.itemsIndexed
 import androidx.compose.foundation.lazy.rememberLazyListState
+import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.ModalBottomSheet
 import androidx.compose.material3.Text
+import androidx.compose.material3.rememberModalBottomSheetState
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.remember
@@ -24,24 +27,48 @@ import com.inktone.domain.model.TableOfContentsEntry
 
 /**
  * Tache 9bis.3.2 — TOC hierarchique : `TableOfContentsEntry.children`
- * (domaine, jamais parcouru avant cette tache) est maintenant aplati par
- * [flattenWithDepth] pour l'indentation, au lieu d'ignorer silencieusement
- * les entrees imbriquees comme avant.
+ * (domaine) est aplati par [flattenWithDepth] pour l'indentation.
  *
- * TODO(verification avec fixture EPUB a hierarchie reelle type Tome/Livre
- * /Chapitre absente du jeu de tests actuel, Tache 9bis.3 restante) :
- * cet aplatissement est correct pour la forme des donnees telle que
- * `TableOfContentsEntry` la modelise, mais aucun parser EPUB reel du
- * projet n'a encore ete observe produire `children` non vide - a
- * verifier avant de clore la Phase 9bis (checklist #6).
+ * Verifie contre un vrai EPUB a hierarchie NCX imbriquee sur 2 niveaux
+ * (Tache 4.11, `TableOfContentsChildrenTest`, Gutenberg #17489 — Les
+ * Miserables Tome I) : `children` EST peuple par le parseur reel
+ * (`DocumentModelExtractor.toTocEntry`, recursif). L'ancien TODO
+ * signalant ce point comme jamais verifie est donc perime — l'aplatissement
+ * ci-dessous s'exerce sur de vraies donnees hierarchiques, pas seulement
+ * sur la forme du modele.
  */
 private data class FlatTocEntry(val entry: TableOfContentsEntry, val depth: Int)
 
 private fun flattenWithDepth(entries: List<TableOfContentsEntry>, depth: Int = 0): List<FlatTocEntry> =
     entries.flatMap { entry -> listOf(FlatTocEntry(entry, depth)) + flattenWithDepth(entry.children, depth + 1) }
 
+/**
+ * Tâche 3c.2 — bottom sheet (`skipPartiallyExpanded = true`, sans quoi la
+ * feuille s'ouvre à mi-écran et un sommaire hiérarchique long y est
+ * tronqué à l'ouverture) : ne démonte plus le lecteur (avant ce lot,
+ * `ReaderScreen` faisait `return@Column`, HUD compris, avant même
+ * d'atteindre ce composable). Titre cible confirmé
+ * (`UX_FLOW_DESIGN.md` § Sommaire) : « Table des matières », y compris
+ * pour un livre à hiérarchie (Tome/Livre/Chapitre) — pas de variante
+ * selon la structure du livre.
+ */
+@OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun TableOfContentsSheet(
+    entries: List<TableOfContentsEntry>,
+    currentChapterIndex: Int,
+    onEntryClick: (chapterIndex: Int) -> Unit,
+    onClose: () -> Unit,
+) {
+    val sheetState = rememberModalBottomSheetState(skipPartiallyExpanded = true)
+
+    ModalBottomSheet(onDismissRequest = onClose, sheetState = sheetState) {
+        TableOfContentsSheetContent(entries = entries, currentChapterIndex = currentChapterIndex, onEntryClick = onEntryClick, onClose = onClose)
+    }
+}
+
+@Composable
+private fun TableOfContentsSheetContent(
     entries: List<TableOfContentsEntry>,
     currentChapterIndex: Int,
     onEntryClick: (chapterIndex: Int) -> Unit,
@@ -57,11 +84,6 @@ fun TableOfContentsSheet(
         if (targetIndex >= 0) listState.scrollToItem(targetIndex)
     }
 
-    // Bug réel trouvé à l'audit : ce panneau remplace tout l'écran
-    // (ReaderScreen fait `return@Column` quand isTocVisible), HUD inclus
-    // — sans ce bouton retour, rien dans l'UI ne permettait de refermer
-    // la TOC sans choisir une entrée. Le retour système, lui, quittait
-    // le Reader en entier (pas de BackHandler dédié à ce panneau).
     Row(
         modifier = Modifier.fillMaxWidth().padding(8.dp),
         verticalAlignment = Alignment.CenterVertically,
@@ -69,7 +91,7 @@ fun TableOfContentsSheet(
         IconButton(onClick = onClose) {
             Icon(AppIcons.Back, contentDescription = "Fermer le sommaire")
         }
-        Text("Sommaire", style = MaterialTheme.typography.titleMedium)
+        Text("Table des matières", style = MaterialTheme.typography.titleMedium)
     }
 
     LazyColumn(state = listState, modifier = Modifier.fillMaxWidth()) {

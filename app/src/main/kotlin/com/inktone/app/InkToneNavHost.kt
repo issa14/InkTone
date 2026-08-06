@@ -32,6 +32,8 @@ import com.inktone.core.ui.AboutScreen
 import com.inktone.feature.importer.ImportPickerButton
 import com.inktone.feature.importer.ImportViewModel
 import com.inktone.feature.library.GlobalBookmarksScreen
+import com.inktone.feature.library.LibraryDetailCategory
+import com.inktone.feature.library.LibraryDetailScreen
 import com.inktone.feature.library.LibraryScreen
 import com.inktone.feature.reader.ReaderIntent
 import com.inktone.feature.reader.ReaderScreen
@@ -72,6 +74,10 @@ fun InkToneNavHost(navController: NavHostController = rememberNavController()) {
                 onNavigateToReader = { publicationId -> navController.navigate(ReaderRoute(publicationId)) },
                 onOpenBookmarks = { navController.navigate(BookmarksRoute) },
                 onOpenStats = { navController.navigate(StatisticsRoute) },
+                onOpenSettings = { navController.navigate(SettingsRoute) },
+                onOpenAbout = { navController.navigate(AboutRoute) },
+                onNavigateToSeriesDetail = { series -> navController.navigate(LibraryDetailRoute("series", series)) },
+                onNavigateToTagDetail = { tag -> navController.navigate(LibraryDetailRoute("tag", tag)) },
                 onImportClick = { importLauncher.launch(arrayOf("application/epub+zip", "text/plain")) },
                 // Tache 1.0 (Partie 1) : seul l'import reste dans le FAB.
                 // Search/Stats/Settings sont atteignables uniquement depuis
@@ -95,7 +101,12 @@ fun InkToneNavHost(navController: NavHostController = rememberNavController()) {
                     ),
                 )
             }
-            ReaderScreen(viewModel = readerViewModel, onSearchClick = { navController.navigate(SearchRoute) })
+            ReaderScreen(
+                viewModel = readerViewModel,
+                onSearchClick = { navController.navigate(SearchRoute) },
+                onBack = { navController.popBackStack() },
+                onOpenPronunciationRules = { navController.navigate(PronunciationRulesRoute) },
+            )
             } // CompositionLocalProvider
         }
         composable<SearchRoute> {
@@ -152,8 +163,20 @@ fun InkToneNavHost(navController: NavHostController = rememberNavController()) {
         }
         composable<AboutRoute> {
             BackScaffold(title = "A propos", onBack = navController::popBackStack) {
-                AboutScreen()
+                AboutScreen(versionName = BuildConfig.VERSION_NAME)
             }
+        }
+        composable<LibraryDetailRoute> { entry ->
+            val route = entry.toRoute<LibraryDetailRoute>()
+            // Tache 2a.4 : LibraryDetailScreen possede son propre Scaffold
+            // (titre a deux niveaux), pas de BackScaffold generique ici,
+            // meme raison que SettingsScreen.
+            LibraryDetailScreen(
+                category = if (route.category == "series") LibraryDetailCategory.SERIES else LibraryDetailCategory.TAG,
+                value = route.value,
+                onNavigateToReader = { publicationId -> navController.navigate(ReaderRoute(publicationId)) },
+                onBack = navController::popBackStack,
+            )
         }
     }
         } // CompositionLocalProvider (SharedTransitionScope)

@@ -5,10 +5,10 @@ import com.inktone.domain.model.DocumentModel
 import com.inktone.domain.model.Paragraph
 import com.inktone.domain.model.PublicationFormat
 import com.inktone.domain.model.Sentence
+import com.inktone.domain.service.FileStorageService
 import com.inktone.domain.service.ParseResult
 import com.inktone.domain.service.PublicationMetadata
 import com.inktone.domain.service.PublicationParser
-import java.io.File
 import javax.inject.Inject
 import javax.inject.Singleton
 
@@ -19,20 +19,26 @@ import javax.inject.Singleton
  * (gestion des abréviations "M.", "etc.") est le travail du pipeline TTS
  * (Blueprint §8.6), pas de ce parser. Ne pas complexifier ici tant qu'un
  * cas réel ne le justifie pas.
+ *
+ * Bug réel corrigé (lot 2a) : `fileUri` est une URI SAF `content://`, pas
+ * un chemin de fichier local — `java.io.File(fileUri)` ne l'ouvre jamais
+ * (`exists()` faux), donc tout TXT importé depuis le vrai sélecteur de
+ * fichiers échouait silencieusement en `Corrupted`. Passe désormais par
+ * [FileStorageService], seule voie correcte pour lire une URI SAF (K5).
  */
 @Singleton
-class TxtPublicationParser @Inject constructor() : PublicationParser {
+class TxtPublicationParser @Inject constructor(
+    private val fileStorageService: FileStorageService,
+) : PublicationParser {
 
     override val supportedFormats = listOf(PublicationFormat.TXT)
 
     private val sentenceBoundary = Regex("""(?<=[.!?])\s+""")
 
     override suspend fun parse(fileUri: String): ParseResult {
-        val file = File(fileUri)
-        if (!file.exists()) return ParseResult.Corrupted("Fichier introuvable: $fileUri")
-
-        val text = runCatching { file.readText(Charsets.UTF_8) }
-            .getOrElse { return ParseResult.Corrupted("Lecture impossible (encodage ?): ${it.message}") }
+        val text = fileStorageService.openInputStream(fileUri)
+            ?.use { stream -> runCatching { stream.readBytes().toString(Charsets.UTF_8) }.getOrNull() }
+            ?: return ParseResult.Corrupted("Fichier introuvable ou illisible (encodage ?): $fileUri")
 
         if (text.isBlank()) return ParseResult.Corrupted("Fichier TXT vide")
 
@@ -44,13 +50,15 @@ class TxtPublicationParser @Inject constructor() : PublicationParser {
             sentence
         }.filter { it.text.isNotBlank() }
 
-        val chapter = Chapter(index = 0, href = file.name, title = null, paragraphs = listOf(Paragraph(0, sentences)))
+        val fileName = fileStorageService.getFileName(fileUri) ?: fileUri.substringAfterLast('/')
+        val titleWithoutExtension = fileName.substringBeforeLast('.', fileName)
+        val chapter = Chapter(index = 0, href = fileName, title = null, paragraphs = listOf(Paragraph(0, sentences)))
         return ParseResult.Success(
             documentModel = DocumentModel(chapters = listOf(chapter), tableOfContents = emptyList(), resources = emptyList()),
             isDrmProtected = false, // TXT n'a jamais de DRM par définition
             // Un TXT n'a pas de metadonnees embarquees (pas d'OPF) — seul le
             // nom de fichier est disponible comme titre.
-            metadata = PublicationMetadata(title = file.nameWithoutExtension),
+            metadata = PublicationMetadata(title = titleWithoutExtension),
         )
     }
 }
