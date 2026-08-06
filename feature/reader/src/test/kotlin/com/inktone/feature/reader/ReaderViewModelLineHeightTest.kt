@@ -7,8 +7,7 @@ import com.inktone.core.testing.fake.FakePublicationParser
 import com.inktone.core.testing.fake.FakePublicationRepository
 import com.inktone.core.testing.fake.FakeReadingStateRepository
 import com.inktone.core.testing.fake.FakeTtsEngine
-import com.inktone.domain.model.Publication
-import com.inktone.domain.model.PublicationFormat
+import com.inktone.core.testing.fake.FakeVoiceProfileRepository
 import com.inktone.domain.model.ReadingOverrides
 import com.inktone.domain.model.ReadingTheme
 import com.inktone.domain.model.UserPreferences
@@ -16,6 +15,7 @@ import com.inktone.domain.usecase.AddAnnotationUseCase
 import com.inktone.domain.usecase.CreateBookmarkUseCase
 import com.inktone.domain.usecase.DeleteBookmarkUseCase
 import com.inktone.domain.usecase.GetReadingStateUseCase
+import com.inktone.domain.usecase.GetVoiceProfilesUseCase
 import com.inktone.domain.usecase.UpdateReadingStateUseCase
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.ExperimentalCoroutinesApi
@@ -29,42 +29,34 @@ import org.junit.Before
 import org.junit.Test
 
 /**
- * Tache 8.2 — verifie EffectiveReadingSettings.resolve() (Tache 1.3) en
- * conditions reelles : un vrai reglage global (Tache 8.1) ET une vraie
- * surcharge par publication (ReaderIntent.SetOverrides, Tache 8.2) en
- * interaction, via le ReaderViewModel complet plutot qu'en isolation.
+ * 3d.6, test 4 (moitié ViewModel — la moitié "styleKey pur" est déjà
+ * couverte par `ChapterPaginationStateTest`, posée en 3b.2/3b.7) :
+ * `ReaderUiState.lineHeightMultiplier` doit suivre `UserPreferences`
+ * (réglage global, même patron que `isReadingRulerEnabled`), et
+ * `SetOverrides` (thème) ne doit JAMAIS le faire varier — le thème est
+ * délibérément absent de `PaginationStyleKey` (voir
+ * `VirtualPagination.kt`), c'est exactement ce que ce test vérifie côté
+ * état exposé par le ViewModel.
  */
 @OptIn(ExperimentalCoroutinesApi::class)
-class ReaderViewModelOverrideTest {
+class ReaderViewModelLineHeightTest {
 
     private val dispatcher = StandardTestDispatcher()
 
     @Before
-    fun setUp() {
-        Dispatchers.setMain(dispatcher)
-    }
+    fun setUp() { Dispatchers.setMain(dispatcher) }
 
     @After
-    fun tearDown() {
-        Dispatchers.resetMain()
-    }
+    fun tearDown() { Dispatchers.resetMain() }
 
     @Test
-    fun surcharge_publication_prime_visiblement_sur_reglage_global() = runTest {
+    fun lineHeightMultiplier_suit_setLineHeight_mais_pas_un_changement_de_theme() = runTest {
         val preferencesRepository = FakePreferencesRepository()
         val readingStateRepository = FakeReadingStateRepository()
         val publicationRepository = FakePublicationRepository()
         val bookmarkRepository = FakeBookmarkRepository()
         val annotationRepository = FakeAnnotationRepository()
-
-        val publicationId = "pub-1"
-        publicationRepository.insert(
-            Publication(
-                id = publicationId, title = "Test", format = PublicationFormat.EPUB,
-                fileUri = "content://x", fileHash = "hash", fileSize = 10, chapterCount = 1,
-                importDate = 0L,
-            ),
-        )
+        val voiceProfileRepository = FakeVoiceProfileRepository()
 
         val viewModel = ReaderViewModel(
             ttsEngine = FakeTtsEngine(),
@@ -79,31 +71,31 @@ class ReaderViewModelOverrideTest {
             bookmarkRepository = bookmarkRepository,
             createBookmark = CreateBookmarkUseCase(bookmarkRepository),
             deleteBookmark = DeleteBookmarkUseCase(bookmarkRepository),
-            voiceProfileRepository = com.inktone.core.testing.fake.FakeVoiceProfileRepository(),
-            getVoiceProfiles = com.inktone.domain.usecase.GetVoiceProfilesUseCase(com.inktone.core.testing.fake.FakeVoiceProfileRepository()),
+            voiceProfileRepository = voiceProfileRepository,
+            getVoiceProfiles = GetVoiceProfilesUseCase(voiceProfileRepository),
         )
-
-        // 3d.5 — le rappel de repos oculaire (activé par défaut, recurrent)
-        // rendrait dispatcher.scheduler.advanceUntilIdle() non terminant ;
-        // ce test ne porte pas sur le repos oculaire, on le désactive.
-        preferencesRepository.update(UserPreferences(theme = ReadingTheme.LIGHT, eyeRestReminderEnabled = false))
-        viewModel.onIntent(ReaderIntent.OpenPublication(publicationId))
         dispatcher.scheduler.advanceUntilIdle()
 
-        // Sans surcharge : le theme global (LIGHT) s'applique.
-        assertEquals(ReadingTheme.LIGHT, viewModel.state.value.effectiveSettings.theme)
+        assertEquals(1.4f, viewModel.state.value.lineHeightMultiplier)
 
+        viewModel.onIntent(ReaderIntent.SetLineHeight(1.8f))
+        dispatcher.scheduler.advanceUntilIdle()
+
+        assertEquals(1.8f, viewModel.state.value.lineHeightMultiplier)
+        assertEquals(1.8f, preferencesRepository.get().lineHeightMultiplier)
+
+        // Changer le thème (surcharge par publication) ne doit JAMAIS
+        // faire varier l'interligne — pas de couplage accidentel.
         viewModel.onIntent(ReaderIntent.SetOverrides(ReadingOverrides(theme = ReadingTheme.DARK)))
         dispatcher.scheduler.advanceUntilIdle()
 
-        // La surcharge gagne, pas le reglage global.
-        assertEquals(ReadingTheme.DARK, viewModel.state.value.effectiveSettings.theme)
-        assertEquals(ReadingTheme.DARK, readingStateRepository.get(publicationId)?.overrides?.theme)
+        assertEquals(1.8f, viewModel.state.value.lineHeightMultiplier)
 
-        viewModel.onIntent(ReaderIntent.SetOverrides(null))
+        // Reflète aussi un changement externe des préférences (même
+        // patron d'observation continue que isReadingRulerEnabled).
+        preferencesRepository.update(UserPreferences(lineHeightMultiplier = 1.2f))
         dispatcher.scheduler.advanceUntilIdle()
 
-        // La surcharge effacee : le reglage global reprend la main.
-        assertEquals(ReadingTheme.LIGHT, viewModel.state.value.effectiveSettings.theme)
+        assertEquals(1.2f, viewModel.state.value.lineHeightMultiplier)
     }
 }

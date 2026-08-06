@@ -15,6 +15,7 @@ import com.inktone.domain.model.Paragraph
 import com.inktone.domain.model.Publication
 import com.inktone.domain.model.PublicationFormat
 import com.inktone.domain.model.Sentence
+import com.inktone.domain.model.UserPreferences
 import com.inktone.domain.service.ParseResult
 import com.inktone.domain.service.PublicationMetadata
 import com.inktone.domain.usecase.AddAnnotationUseCase
@@ -63,13 +64,17 @@ class ReaderViewModelBookmarkToggleTest {
         ),
     )
 
-    private fun buildViewModel(
+    private suspend fun buildViewModel(
         readingStateRepository: FakeReadingStateRepository,
         publicationRepository: FakePublicationRepository,
         bookmarkRepository: FakeBookmarkRepository,
         annotationRepository: FakeAnnotationRepository,
     ): ReaderViewModel {
+        // 3d.5 — voir même commentaire dans ReaderViewModelScrollPositionTest :
+        // le rappel de repos oculaire (activé par défaut, recurrent) rendrait
+        // dispatcher.scheduler.advanceUntilIdle() non terminant.
         val preferencesRepository = FakePreferencesRepository()
+        preferencesRepository.update(UserPreferences(eyeRestReminderEnabled = false))
         val parser = FakePublicationParser(
             result = ParseResult.Success(
                 documentModel = DocumentModel(

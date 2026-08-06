@@ -14,6 +14,7 @@ import com.inktone.domain.model.Paragraph
 import com.inktone.domain.model.Publication
 import com.inktone.domain.model.PublicationFormat
 import com.inktone.domain.model.Sentence
+import com.inktone.domain.model.UserPreferences
 import com.inktone.domain.service.ParseResult
 import com.inktone.domain.service.PublicationMetadata
 import com.inktone.domain.usecase.AddAnnotationUseCase
@@ -69,11 +70,18 @@ class ReaderViewModelScrollPositionTest {
         ),
     )
 
-    private fun buildViewModel(
+    private suspend fun buildViewModel(
         readingStateRepository: FakeReadingStateRepository,
         publicationRepository: FakePublicationRepository,
     ): ReaderViewModel {
+        // 3d.5 — le rappel de repos oculaire est activé par défaut et se
+        // reprogramme indéfiniment (voir ReaderViewModel.resumeFromEyeRestReminder) :
+        // laissé activé, dispatcher.scheduler.advanceUntilIdle() ci-dessous
+        // ne terminerait jamais (la file de délais virtuels ne se vide
+        // jamais). Ce test ne porte pas sur le repos oculaire, on le
+        // désactive pour ne pas coupler les deux.
         val preferencesRepository = FakePreferencesRepository()
+        preferencesRepository.update(UserPreferences(eyeRestReminderEnabled = false))
         val bookmarkRepository = FakeBookmarkRepository()
         val annotationRepository = FakeAnnotationRepository()
         val parser = FakePublicationParser(
