@@ -103,6 +103,7 @@ fun ReaderScreen(
     viewModel: ReaderViewModel = hiltViewModel(),
     onSearchClick: () -> Unit = {},
     onBack: () -> Unit = {},
+    onOpenPronunciationRules: () -> Unit = {},
 ) {
     val state by viewModel.state.collectAsState()
     // Tache 9bis.3.1 : HUD (panneau de controle + boutons) visible par
@@ -526,20 +527,16 @@ fun ReaderScreen(
                 isPlaying = state.isPlaying,
                 currentSentenceIndex = state.currentSentenceIndex,
                 totalSentences = sentences.size,
-                currentSpeed = 1.0f, // TODO: lire depuis preferences TTS speed
+                activeVoiceProfile = state.activeVoiceProfile,
+                availableVoiceProfiles = state.availableVoiceProfiles,
                 onPlayPause = {
                     viewModel.onIntent(if (state.isPlaying) ReaderIntent.Pause else ReaderIntent.PlayCurrentSentence)
                 },
-                onStop = { viewModel.onIntent(ReaderIntent.Pause) },
                 onPreviousSentence = { viewModel.onIntent(ReaderIntent.SkipToPreviousSentence) },
                 onNextSentence = { viewModel.onIntent(ReaderIntent.SkipToNextSentence) },
-                onSpeedChange = { /* TODO: UpdatePreferencesUseCase(speed) */ },
-                onSleepTimer = { minutes ->
-                    viewModel.onIntent(ReaderIntent.SetSleepTimer(minutes))
-                },
-                currentSleepTimerMinutes = state.sleepTimer?.let {
-                    ((it.remainingMs / 60_000L).toInt())
-                },
+                onSpeedChange = { speed -> viewModel.onIntent(ReaderIntent.SetTtsSpeed(speed)) },
+                onSelectVoiceProfile = { profileId -> viewModel.onIntent(ReaderIntent.SetActiveVoiceProfile(profileId)) },
+                onOpenPronunciationRules = onOpenPronunciationRules,
                 onDismiss = { showTtsPanel = false },
             )
         }

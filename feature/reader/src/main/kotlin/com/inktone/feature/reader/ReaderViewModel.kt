@@ -13,6 +13,7 @@ import com.inktone.domain.model.ReadingOverrides
 import com.inktone.domain.model.ReadingState
 import com.inktone.domain.model.SleepTimerState
 import com.inktone.domain.model.TtsEngineId
+import com.inktone.domain.model.UserPreferences
 import com.inktone.domain.model.VoiceProfile
 import com.inktone.domain.repository.AnnotationRepository
 import com.inktone.domain.repository.BookmarkRepository
@@ -26,6 +27,7 @@ import com.inktone.domain.usecase.AddAnnotationUseCase
 import com.inktone.domain.usecase.CreateBookmarkUseCase
 import com.inktone.domain.usecase.DeleteBookmarkUseCase
 import com.inktone.domain.usecase.GetReadingStateUseCase
+import com.inktone.domain.usecase.GetVoiceProfilesUseCase
 import com.inktone.domain.usecase.UpdateReadingStateUseCase
 import com.inktone.domain.valueobject.Locator
 import dagger.hilt.android.lifecycle.HiltViewModel
@@ -55,6 +57,7 @@ class ReaderViewModel @Inject constructor(
     private val publicationRepository: PublicationRepository,
     private val preferencesRepository: PreferencesRepository,
     private val voiceProfileRepository: VoiceProfileRepository,
+    private val getVoiceProfiles: GetVoiceProfilesUseCase,
     private val annotationRepository: AnnotationRepository,
     private val addAnnotation: AddAnnotationUseCase,
     private val bookmarkRepository: BookmarkRepository,
@@ -73,7 +76,10 @@ class ReaderViewModel @Inject constructor(
         // dans LibraryViewModel).
         viewModelScope.launch {
             preferencesRepository.observe().collect { preferences ->
-                _state.value = _state.value.copy(isReadingRulerEnabled = preferences.readingRulerEnabled)
+                _state.value = _state.value.copy(
+                    isReadingRulerEnabled = preferences.readingRulerEnabled,
+                    lineHeightMultiplier = preferences.lineHeightMultiplier,
+                )
             }
         }
     }
@@ -149,6 +155,9 @@ class ReaderViewModel @Inject constructor(
             is ReaderIntent.SkipToPreviousSentence -> skipSentence(-1)
             is ReaderIntent.SkipToNextSentence -> skipSentence(1)
             is ReaderIntent.UpdateScrollPosition -> updateScrollPosition(intent.sentenceIndex)
+            is ReaderIntent.SetTtsSpeed -> setTtsSpeed(intent.speed)
+            is ReaderIntent.SetActiveVoiceProfile -> setActiveVoiceProfile(intent.profileId)
+            is ReaderIntent.SetLineHeight -> setLineHeight(intent.multiplier)
         }
     }
 
@@ -229,6 +238,19 @@ class ReaderViewModel @Inject constructor(
     }
 
     /**
+     * A.5/3d.1 — résolution unique du profil vocal actif, partagée par
+     * `playCurrentSentence`, `openPublication` (état initial du panneau
+     * Voix) et `setTtsSpeed`/`setActiveVoiceProfile` : avant ce lot, le
+     * même repli (voix native française par défaut) était dupliqué en
+     * ligne dans `playCurrentSentence` uniquement, aucune autre fonction
+     * n'avait besoin de connaître le profil actif.
+     */
+    private suspend fun resolveVoiceProfile(prefs: UserPreferences): VoiceProfile =
+        prefs.activeVoiceProfileId
+            ?.let { voiceProfileRepository.getById(it) }
+            ?: DEFAULT_VOICE_PROFILE
+
+    /**
      * Ouvre une publication déjà importée : récupère son `fileUri` via
      * le repository, parse le contenu (CompositePublicationParser),
      * puis restaure la dernière position connue (K3) si elle existe.
@@ -251,6 +273,8 @@ class ReaderViewModel @Inject constructor(
                         global = preferencesRepository.get(),
                     )
                     val prefs = preferencesRepository.get()
+                    val activeVoiceProfile = resolveVoiceProfile(prefs)
+                    val availableVoiceProfiles = getVoiceProfiles()
                     _state.value = ReaderUiState(
                         // 3b.3 — barre du haut (ReaderTopBar) : source
                         // unique, jamais rechargé depuis un repository
@@ -264,6 +288,9 @@ class ReaderViewModel @Inject constructor(
                         // B.1 — restaure le mode de lecture persisté
                         readingMode = if (prefs.readingMode == "PAGED") ReadingMode.PAGED else ReadingMode.SCROLL,
                         currentOverrides = restored?.overrides,
+                        activeVoiceProfile = activeVoiceProfile,
+                        availableVoiceProfiles = availableVoiceProfiles,
+                        lineHeightMultiplier = prefs.lineHeightMultiplier,
                     )
                     triggerPreload(_state.value.currentChapterIndex)
                     observeAnnotations(publicationId)
@@ -520,13 +547,7 @@ class ReaderViewModel @Inject constructor(
 
             val sentence = sentences[index]
             // A.5 — résout le profil vocal actif depuis les préférences utilisateur
-            val prefs = preferencesRepository.get()
-            val voiceProfile = prefs.activeVoiceProfileId
-                ?.let { voiceProfileRepository.getById(it) }
-                ?: VoiceProfile(
-                    id = "vp-native-fr", engine = TtsEngineId.ANDROID_NATIVE,
-                    voice = "fr-fr-default", language = "fr-FR",
-                )
+            val voiceProfile = resolveVoiceProfile(preferencesRepository.get())
             val segment = sentenceAudioBuffer.get(sentence, voiceProfile)
             audioSegmentPlayer.play(segment)
 
@@ -592,6 +613,43 @@ class ReaderViewModel @Inject constructor(
     }
 
     /**
+     * 3d.1 — écrit la vitesse sur le profil vocal actif (jamais sur
+     * `UserPreferences`, voir doc du lot 3d tâche 3d.1). Si aucun profil
+     * n'était actif (repli natif par défaut, jamais persisté), ce premier
+     * réglage le persiste et l'active — sinon la vitesse choisie serait
+     * perdue à la prochaine résolution (`resolveVoiceProfile` retomberait
+     * sur le même repli non modifié).
+     */
+    private fun setTtsSpeed(speed: Float) {
+        viewModelScope.launch {
+            val prefs = preferencesRepository.get()
+            val updated = resolveVoiceProfile(prefs).copy(speed = speed)
+            voiceProfileRepository.save(updated)
+            if (prefs.activeVoiceProfileId != updated.id) {
+                preferencesRepository.update(prefs.copy(activeVoiceProfileId = updated.id))
+            }
+            _state.value = _state.value.copy(activeVoiceProfile = updated)
+        }
+    }
+
+    /** 3d.1 — change le profil vocal actif (préférence globale, panneau Voix). */
+    private fun setActiveVoiceProfile(profileId: String) {
+        viewModelScope.launch {
+            val prefs = preferencesRepository.get()
+            preferencesRepository.update(prefs.copy(activeVoiceProfileId = profileId))
+            _state.value = _state.value.copy(activeVoiceProfile = voiceProfileRepository.getById(profileId))
+        }
+    }
+
+    /** 3d.2 — réglage global d'interligne, voir `ReaderUiState.lineHeightMultiplier`. */
+    private fun setLineHeight(multiplier: Float) {
+        viewModelScope.launch {
+            val current = preferencesRepository.get()
+            preferencesRepository.update(current.copy(lineHeightMultiplier = multiplier))
+        }
+    }
+
+    /**
      * A.2 — Nettoyage des ressources audio et du minuteur de sommeil
      * quand le ViewModel est détruit. Évite qu'un segment audio continue
      * de jouer après la destruction de l'écran.
@@ -606,3 +664,9 @@ class ReaderViewModel @Inject constructor(
 
 /** Tâche 3c.1 — au changement de phrase visible, pas à chaque pixel défilé. */
 private const val SCROLL_PERSIST_DEBOUNCE_MS = 400L
+
+/** A.5 — repli quand `UserPreferences.activeVoiceProfileId` est `null`. */
+private val DEFAULT_VOICE_PROFILE = VoiceProfile(
+    id = "vp-native-fr", engine = TtsEngineId.ANDROID_NATIVE,
+    voice = "fr-fr-default", language = "fr-FR",
+)

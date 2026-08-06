@@ -80,6 +80,7 @@ class ReaderViewModelOverrideTest {
             createBookmark = CreateBookmarkUseCase(bookmarkRepository),
             deleteBookmark = DeleteBookmarkUseCase(bookmarkRepository),
             voiceProfileRepository = com.inktone.core.testing.fake.FakeVoiceProfileRepository(),
+            getVoiceProfiles = com.inktone.domain.usecase.GetVoiceProfilesUseCase(com.inktone.core.testing.fake.FakeVoiceProfileRepository()),
         )
 
         preferencesRepository.update(UserPreferences(theme = ReadingTheme.LIGHT))

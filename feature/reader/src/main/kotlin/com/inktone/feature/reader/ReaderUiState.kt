@@ -9,6 +9,7 @@ import com.inktone.domain.model.ReadingOverrides
 import com.inktone.domain.model.ReadingTheme
 import com.inktone.domain.model.SleepTimerState
 import com.inktone.domain.model.TableOfContentsEntry
+import com.inktone.domain.model.VoiceProfile
 import com.inktone.domain.valueobject.Locator
 
 /** B.1 — Mode de lecture : défilement vertical ou paginé horizontal. */
@@ -58,6 +59,16 @@ data class ReaderUiState(
     val errorMessage: String? = null,
     // B.1 — Mode de lecture actif (scroll vertical ou paginé horizontal).
     val readingMode: ReadingMode = ReadingMode.SCROLL,
+    // 3d.1 — profil vocal actif résolu (même repli que playCurrentSentence,
+    // voir ReaderViewModel.resolveVoiceProfile) : source unique pour la
+    // vitesse affichée et le nom de voix, jamais recalculé localement dans
+    // ReaderTtsPanel.
+    val activeVoiceProfile: VoiceProfile? = null,
+    val availableVoiceProfiles: List<VoiceProfile> = emptyList(),
+    // 3d.2 — réglage global (UserPreferences.lineHeightMultiplier), observé
+    // en continu comme isReadingRulerEnabled : pas de surcharge par
+    // publication, voir doc du lot 3d.
+    val lineHeightMultiplier: Float = 1.4f,
 ) {
     val currentChapter: Chapter? get() = chapters.getOrNull(currentChapterIndex)
     val hasNextChapter: Boolean get() = currentChapterIndex < chapters.lastIndex
@@ -228,4 +239,18 @@ sealed interface ReaderIntent {
      * TTS, voir gardes `isProgrammaticScroll`/`isProgrammaticPageChange`).
      */
     data class UpdateScrollPosition(val sentenceIndex: Int) : ReaderIntent
+
+    /**
+     * 3d.1 — écrit la vitesse sur le profil vocal actif (jamais sur
+     * `UserPreferences` : la vitesse appartient au profil, voir doc du lot
+     * 3d, tâche 3d.1). Persiste immédiatement, contrairement à l'ancien
+     * `onSpeedChange` vide.
+     */
+    data class SetTtsSpeed(val speed: Float) : ReaderIntent
+
+    /** 3d.1 — change le profil vocal actif (préférence globale). */
+    data class SetActiveVoiceProfile(val profileId: String) : ReaderIntent
+
+    /** 3d.2 — réglage global d'interligne, voir `ReaderUiState.lineHeightMultiplier`. */
+    data class SetLineHeight(val multiplier: Float) : ReaderIntent
 }

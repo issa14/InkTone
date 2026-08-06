@@ -21,6 +21,7 @@ import com.inktone.domain.usecase.AddAnnotationUseCase
 import com.inktone.domain.usecase.CreateBookmarkUseCase
 import com.inktone.domain.usecase.DeleteBookmarkUseCase
 import com.inktone.domain.usecase.GetReadingStateUseCase
+import com.inktone.domain.usecase.GetVoiceProfilesUseCase
 import com.inktone.domain.usecase.UpdateReadingStateUseCase
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.ExperimentalCoroutinesApi
@@ -95,6 +96,7 @@ class ReaderViewModelBookmarkToggleTest {
             createBookmark = CreateBookmarkUseCase(bookmarkRepository),
             deleteBookmark = DeleteBookmarkUseCase(bookmarkRepository),
             voiceProfileRepository = FakeVoiceProfileRepository(),
+            getVoiceProfiles = GetVoiceProfilesUseCase(FakeVoiceProfileRepository()),
         )
     }
 
