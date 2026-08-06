@@ -198,3 +198,11 @@ Panneau TT (aperçu live, interligne, curseur continu), Thème cyclique déjà l
 Barre pilule TTS, repli en FAB, onde sonore, swipe-down → **lot 3e**.
 
 Implémentation de la sélection au mot (poignées, auto-scroll pendant le glissement, sélection à cheval, sémantiques d'accessibilité, retrait de l'ancien modèle) → **lot 3f**, conditionné à la conclusion de la tâche 3c.5. Le lot 3c livre le popup Copier / Surligner / Note **sur la sélection par phrase existante** ; seul le mécanisme de sélection est en jeu au 3f, pas le popup.
+
+**Conclusion 3c.5** (voir `docs/execution/NOTE_3C5_PROTOTYPE_SELECTION_MOT.md`) : le prototype échoue sur le conflit de geste drag/pager, vérifié empiriquement sur appareil — la sélection par phrase est actée comme comportement définitif, le lot 3f n'est pas déclenché.
+
+---
+
+## Écart de périmètre signalé après coup
+
+Le commit `763aaa2 Ajoute le rapport de crash Firebase Crashlytics en opt-in (ADR-014)`, livré sur cette branche pendant ce lot, **ne relève pas du lot 3c** — c'est le consentement crash reporting, renvoyé par la cible à l'écran d'onboarding. L'implémentation technique a été vérifiée (build, architecture, lancement sur appareil), mais **le flux de consentement UX n'a pas été audité dans le cadre de ce lot** : ni checklist ni tâche 3c ne le couvraient. Inscrit au périmètre du lot Onboarding pour audit (`docs/execution/LOT_ONBOARDING_PERIMETRE.md`) — non retiré de la branche, retirer un commit isolé après coup créerait du remous pour rien.

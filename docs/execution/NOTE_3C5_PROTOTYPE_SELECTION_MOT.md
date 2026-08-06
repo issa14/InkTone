@@ -1,84 +1,131 @@
 # Note de conclusion — Tâche 3c.5, prototype de sélection sur-mesure au mot
 
-**Statut : prototype jetable, aucun code livré dans `main` depuis cette tâche**
-(conforme à la consigne du lot). Cette note documente la conclusion et les
-preuves d'analyse statique rassemblées ; elle ne remplace pas la
-vérification sur appareil listée en écart ci-dessous.
+**Statut : conclusion définitive, prototype jetable, aucun code livré dans
+`main`.** Les trois questions ont été tranchées — deux par lecture du code
+de production, une par test empirique sur appareil réel (V2206). Le
+prototype ayant échoué sur cette dernière, la sélection par phrase est
+actée comme comportement définitif (voir Conclusion).
 
-**Écart déclaré à l'ouverture** : la vérification empirique de cette tâche
-suppose un appareil connecté pour manipuler réellement un geste de
-sélection (`detectDragGesturesAfterLongPress`) et observer le conflit avec
-`HorizontalPager`. Cette session n'avait pas d'appareil/émulateur
-disponible. Les points 1 et 3 ci-dessous sont tranchés par lecture directe
-du code de production (mesure vérifiable, pas une supposition) ; le point 2
-reste **non vérifié empiriquement** et est donc traité comme un blocage
-ouvert, pas comme conclu favorablement par défaut.
+## Précédent — constats du spike `SelectableSentenceSpike` (Tâche 1.1.1)
+
+Avant de trancher les trois questions ci-dessous, un point d'histoire : un
+premier spike de sélection existait déjà dans le dépôt
+(`SelectableSentenceSpike.kt`, Partie 1 — Fondations UI, jamais référencé
+depuis, retiré dans le même commit que cette note). Il explorait une
+approche différente de celle retenue par ce lot — un `SelectionContainer`
+natif par phrase avec interception de `LocalTextToolbar`, plutôt que
+`pointerInput`/`getOffsetForPosition`/`getWordBoundary` — mais ses constats,
+validés sur device (V2206, 2026-07-30), restent des faits établis sur la
+plateforme, pertinents pour situer le risque des trois questions
+ci-dessous :
+
+- Sélection intra-phrase fonctionnelle (mot → phrase entière) avec
+  `SelectionContainer` natif.
+- Interception de `LocalTextToolbar` → callback applicatif fonctionnelle.
+- Recyclage `LazyColumn` : la sélection survit au cycle sortie d'écran →
+  recyclage → retour, sans décalage d'index ni de texte.
+- Limitation structurelle déjà identifiée à l'époque : pas de sélection
+  inter-phrases avec cette approche — c'est précisément la limite que ce
+  lot devait vérifier s'il était possible de lever autrement (via
+  `pointerInput` bas niveau plutôt que `SelectionContainer`). Conclusion
+  de la présente note : la lever proprement se heurte à un autre obstacle
+  (le conflit de geste, point 2), pas au même.
 
 ## Point 1 — Rendu du mode défilement
 
 **Tranché par lecture du code : un bloc mesuré unique n'est pas acquis
 gratuitement en mode SCROLL.**
 
-`ReaderScreen.kt`, bloc `ReadingMode.SCROLL` (voir aussi le lot 3c.1
-au-dessus) rend toujours un `FlowRow` de composables `SentenceText`
-distincts, un par phrase — pas un unique `Text`/`TextLayoutResult` comme en
-mode PAGED (`PagedChapterContent.kt`, un seul `Text` par page depuis le lot
-3a). Ce n'est pas un oubli : le lot 3a a délibérément choisi cette
-architecture pour PAGED (voir le commentaire de tête de
-`PagedChapterContent.kt`, "un seul bloc de texte tranché... plus le FlowRow
-de composables SentenceText séparés"), et le lot 3c.1 vient de s'appuyer
-explicitement sur le fait que chaque phrase reste un composable adressable
-individuellement en mode SCROLL (`onGloballyPositioned` par phrase, voir
-`sentenceTopOffsetsPx`).
+`ReaderScreen.kt`, bloc `ReadingMode.SCROLL` rend toujours un `FlowRow` de
+composables `SentenceText` distincts, un par phrase — pas un unique
+`Text`/`TextLayoutResult` comme en mode PAGED (`PagedChapterContent.kt`,
+un seul `Text` par page depuis le lot 3a). Ce n'est pas un oubli : le lot
+3a a délibérément choisi cette architecture pour PAGED, et le lot 3c.1
+s'appuie explicitement sur le fait que chaque phrase reste un composable
+adressable individuellement en mode SCROLL (`onGloballyPositioned` par
+phrase, voir `sentenceTopOffsetsPx`).
 
 **Option retenue : router le tap vers le `TextLayoutResult` de la phrase
-touchée puis convertir en offset de chapitre** (la seconde option du plan,
-pas l'unification sur un bloc mesuré unique) :
+touchée puis convertir en offset de chapitre** (la seconde option du
+plan, pas l'unification sur un bloc mesuré unique) :
 
-- Unifier le défilement sur un bloc mesuré unique demanderait de retirer le
-  point d'ancrage par phrase que 3c.1 vient d'introduire pour la position
-  de lecture (`sentenceTopOffsetsPx`, `currentLineYDp`) et de le
-  reconstruire différemment (offsets dans le bloc unique plutôt que
-  positions de composables) — un changement d'architecture du mode
-  SCROLL entier, pas une addition localisée à la sélection.
-- Le coût d'un `Text` unique portant tout un chapitre (romans longs,
-  plusieurs centaines de phrases) sur `verticalScroll` (pas
-  `LazyColumn`, choix déjà actif et documenté en tête de `ReaderScreen.kt`)
-  n'est pas mesuré dans ce dépôt — l'estimer sérieusement demande un test
-  sur un chapitre réel long, hors de portée de cette session sans appareil.
-- La route "par phrase" reste cohérente avec l'existant : chaque
+- Unifier le défilement sur un bloc mesuré unique demanderait de retirer
+  le point d'ancrage par phrase que 3c.1 a introduit pour la position de
+  lecture (`sentenceTopOffsetsPx`, `currentLineYDp`) et de le reconstruire
+  différemment — un changement d'architecture du mode SCROLL entier, pas
+  une addition localisée à la sélection.
+- Le coût d'un `Text` unique portant tout un chapitre sur `verticalScroll`
+  (pas `LazyColumn`, choix déjà actif et documenté en tête de
+  `ReaderScreen.kt`) n'a pas été mesuré sur un roman long dans le cadre de
+  cette note — la décision ne repose pas sur ce chiffrage, elle repose sur
+  le coût de reconstruction de l'ancrage de position (ci-dessus), plus
+  déterminant et déjà établi par simple lecture du code.
+- La route « par phrase » reste cohérente avec l'existant : chaque
   `SentenceText` a déjà son propre layout Compose ; lui ajouter un
   `TextLayoutResult` capté localement (`onTextLayout`) pour la conversion
   position→offset intra-phrase est une extension, pas une reconstruction.
 
-**Chiffrage de ce sous-point pour le lot 3f** : faible risque, coût
-d'implémentation proche de ce que PAGED a déjà (conversion locale→offset via
-`getOffsetForPosition`), addition à `SentenceText` plutôt que refonte du
-mode SCROLL. Estimé à environ un quart du lot 3f total (voir chiffrage
-global en fin de note).
+**Chiffrage de ce sous-point pour un éventuel lot 3f** (voir Conclusion :
+non déclenché) : coût proche de ce que PAGED a déjà (conversion
+locale→offset via `getOffsetForPosition`), addition à `SentenceText`
+plutôt que refonte du mode SCROLL.
 
 ## Point 2 — Conflit de gestes en mode pagé
 
-**Non vérifié empiriquement — reste un blocage ouvert, pas conclu.**
+**Vérifié empiriquement sur appareil réel (V2206, session courante) :
+conflit confirmé, et pire qu'un simple échec déterministe — c'est une
+course entre gestionnaires de gestes, à l'issue imprévisible.**
 
-Analyse statique : `PagedChapterContent.kt` compose `HorizontalPager` avec
-`PageBlock` dedans, et `PageBlock` attache déjà son propre
-`Modifier.pointerInput(pageOffsetRange) { detectTapGestures(onLongPress,
-onTap) }` (tap et appui long, pas de drag) sur le même `Text` que celui que
-`HorizontalPager` swipe horizontalement. `detectTapGestures` et le geste de
-swipe du pager coexistent aujourd'hui sans conflit documenté — mais
-`detectDragGesturesAfterLongPress` (le geste que la sélection au mot
-ajouterait) est structurellement différent : c'est un drag, pas un tap, et
-un drag horizontal après appui long sur la même zone que le `HorizontalPager`
-swipe est précisément le cas que le plan signale comme à vérifier "par la
-mesure, pas par préférence".
+**Méthode.** Spike jetable ajouté temporairement à `PageBlock`
+(`PagedChapterContent.kt`) : un second `Modifier.pointerInput`, sibling de
+celui portant `detectTapGestures` existant, avec
+`detectDragGesturesAfterLongPress` (`onDrag` appelant `change.consume()`
+— l'implémentation exacte que le plan prescrivait). Test par séquences
+`adb shell input touchscreen motionevent DOWN/MOVE.../UP` (contrôle
+précis du timing, contrairement à `input swipe` qui ne permet pas de tenir
+la position avant de glisser) : appui à position fixe pendant 700 ms
+(au-delà du seuil de long-press), puis glissement horizontal rapide vers
+la droite. Résultat lu directement dans l'état affiché — numéro de page
+(`StatusLineBar`, dump `uiautomator`) et présence du popup de sélection —
+pas dans les logs (`Log.d` du spike jamais capturé par `logcat` sur cet
+appareil malgré présence confirmée dans le dex de l'APK installée — cause
+non identifiée, non bloquante puisque l'état UI observé est une preuve
+plus directe que des lignes de log).
 
-Sans appareil pour jouer le geste réel, cette session ne peut pas trancher
-si `detectDragGesturesAfterLongPress` posé en plus de `detectTapGestures`
-sur le même `Text` laisse le `HorizontalPager` intercepter le swipe une
-fois le drag commencé, ou l'inverse (sélection qui tourne la page malgré
-elle). C'est exactement le risque que la tâche demande de vérifier avant
-d'écrire du code de production — il n'est pas résolu ici.
+**Contrôle préalable** : un swipe franc de même amplitude sans appui long
+préalable tourne bien la page à chaque fois (`input touchscreen swipe`,
+150 ms) — élimine l'hypothèse que le geste de test soit simplement trop
+faible pour déclencher le pager, ce qui aurait rendu un « pas de
+changement de page » non concluant.
+
+**Résultat sur 3 répétitions du geste appui-long-puis-glissement-rapide,
+mêmes paramètres** (position de départ, durée d'appui, vitesse de
+glissement) :
+
+| # | Résultat |
+|---|---|
+| 1 | La page tourne (le pager gagne) |
+| 2 | Inconclusive (déjà en butée de fin de chapitre) |
+| 3 | La sélection s'étend, popup affiché, la page NE tourne PAS (le geste de sélection gagne) |
+
+Le pager et le détecteur de glissement-après-appui-long réagissent tous
+deux au même flux d'événements tactiles, et lequel « gagne » dépend d'une
+course de timing sur laquelle `change.consume()` posé dans un
+`pointerInput` sibling n'a pas de prise déterministe — cohérent avec le
+modèle de Compose où `HorizontalPager` (via `Modifier.scrollable`/
+nested scroll) peut intercepter le geste à une passe antérieure
+(`PointerEventPass.Initial`, de l'extérieur vers l'intérieur) à celle où
+le `pointerInput` du contenu (`PointerEventPass.Main`) consomme
+l'événement — la consommation tardive ne peut pas revenir sur une
+interception déjà faite en amont.
+
+**Ce que ça signifie pour une implémentation de production** : le
+mécanisme prescrit par le plan (`pointerInput` sibling +
+`change.consume()`) ne suffit pas. Le fixer proprement demanderait de
+participer explicitement au protocole `NestedScrollConnection` du pager
+(intercepter/refuser le geste de scroll horizontal pendant une sélection
+active) — un mécanisme distinct, plus intrusif, non prévu par le plan
+d'origine et non chiffré ici.
 
 ## Point 3 — Conversion d'espace de coordonnées
 
@@ -97,35 +144,29 @@ existe déjà et est exercée en production, dans les deux sens.**
   testé (`AnnotationSelectionHandlerTest.kt`).
 - `Locator` → absolue (sens retour) : `ReaderViewModel.navigateToLocator`
   fait déjà cette conversion pour restaurer une position depuis un signet
-  ou un résultat de recherche — `locator.charOffset in
-  sentence.startOffset..sentence.endOffset`.
+  ou un résultat de recherche.
 
 Le point sensible signalé par le lot 3a (offsets locaux au texte mesuré,
-pas `Sentence.startOffset`, "pour éviter un bug d'espace silencieux") est
-donc déjà résolu et vérifié en production pour le mode PAGED — la même
-conversion s'applique sans changement pour une sélection au mot, seule la
-granularité (caractère plutôt que phrase entière) change à l'intérieur du
-même mécanisme. Aucun nouveau risque de conversion identifié sur ce point.
+pas `Sentence.startOffset`, « pour éviter un bug d'espace silencieux »)
+est donc déjà résolu et vérifié en production pour le mode PAGED — la
+même conversion s'applique sans changement pour une sélection au mot,
+seule la granularité (caractère plutôt que phrase entière) change à
+l'intérieur du même mécanisme. Aucun nouveau risque de conversion
+identifié sur ce point.
 
 ## Conclusion
 
-**Deux points sur trois sont tranchés favorablement par le code déjà en
-production** (1 et 3). **Le troisième (conflit de gestes en mode pagé)
-n'est pas vérifié** faute d'appareil dans cette session — la clause du plan
-("si le prototype échoue sur l'un des trois points, la sélection par
-phrase est actée dans la cible comme comportement définitif") s'applique
-donc par défaut tant que ce point n'est pas levé : le lot 3f **reste
-non déclenché**, la sélection par phrase reste le comportement définitif
-documenté (voir 3c.7 ci-dessous) jusqu'à ce qu'une session avec accès
-appareil vérifie le point 2 et rouvre la décision.
+**Le prototype échoue sur le point 2, vérifié empiriquement, pas
+supposé.** La clause du plan s'applique explicitement : *« si le
+prototype échoue sur l'un des trois points, la sélection par phrase est
+actée dans la cible comme comportement définitif — ce qui ferme le sujet
+aussi valablement »*.
 
-**Chiffrage indicatif du lot 3f, si le point 2 se vérifie favorable** :
-routage par phrase pour SCROLL (~1/4), poignées persistantes + auto-scroll
-pendant le glissement (~1/3, le plus gros morceau — composables de poignée
-dédiés, cible tactile 48 dp, pas de précédent dans le dépôt), sémantiques
-d'accessibilité TalkBack (~1/4, sensible — le lot 1 a déjà eu un correctif
-sur le chevauchement TalkBack/TTS, signal que ce point demande une passe
-dédiée plutôt qu'un ajout rapide), retrait de l'ancien modèle de sélection
-par phrase (~1/6, mécanique une fois le nouveau modèle en place). Estimation
-haute confiance sur la structure des postes, basse confiance sur la
-durée absolue faute de mesure sur device.
+**La sélection par phrase (appui long puis extension) est donc le
+comportement définitif d'InkTone v1**, consigné dans `UX_FLOW_DESIGN.md`
+(§ Lecture — HUD, état d'implémentation lot 3c). Le lot 3f (sélection
+libre au mot, poignées persistantes, auto-scroll pendant le glissement,
+sélection à cheval sur deux pages, sémantiques d'accessibilité) **ne sera
+pas déclenché** sur la base de ce plan — le rouvrir supposerait une
+approche différente sur le point 2 (participation explicite au
+`NestedScrollConnection` du pager), non chiffrée ici et non actée.
