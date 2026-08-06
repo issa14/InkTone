@@ -125,12 +125,20 @@ fun ReaderScreen(
     // B.2/B.3 — états d'affichage des panneaux de réglages in-reader
     var showSettingsPanel by remember { mutableStateOf(false) }
     var showTtsPanel by remember { mutableStateOf(false) }
+    // 3d.3 — visibilité locale de la barre de luminosité, même patron que
+    // les panneaux ci-dessus : purement une décision d'affichage, pas un
+    // état MVI (ReaderUiState.readerBrightness porte la vraie donnée).
+    var showBrightnessBar by remember { mutableStateOf(false) }
 
     ImmersiveReaderChrome(
         isHudVisible = isHudVisible,
         hudActivityTick = hudActivityTick,
         onAutoHide = { isHudVisible = false },
     ) {
+    // 3d.3 — applique la luminosité choisie à la fenêtre du lecteur
+    // seulement, restaurée à la sortie (voir ReaderBrightnessEffect).
+    ReaderBrightnessEffect(value = state.readerBrightness)
+
     // C.5 — SharedTransition depuis la couverture de la bibliothèque
     val sharedTransitionScope = runCatching {
         com.inktone.core.designsystem.LocalSharedTransitionScope.current
@@ -477,6 +485,16 @@ fun ReaderScreen(
                 onAaClick = { keepHudVisible(); showSettingsPanel = true },
                 onTtsClick = { keepHudVisible(); showTtsPanel = true },
                 onReadingModeClick = { keepHudVisible(); viewModel.onIntent(ReaderIntent.ToggleReadingMode) },
+                onBrightnessClick = { keepHudVisible(); showBrightnessBar = !showBrightnessBar },
+            )
+        }
+
+        // 3d.3 — barre flottante, overlay au-dessus du panneau unifié
+        // (pas un panneau séparé, voir UX_FLOW_DESIGN.md §Luminosité).
+        if (isHudVisible && showBrightnessBar) {
+            ReaderBrightnessBar(
+                value = state.readerBrightness,
+                onValueChange = { value -> viewModel.onIntent(ReaderIntent.SetReaderBrightness(value)) },
             )
         }
 

@@ -18,6 +18,7 @@ import androidx.compose.material.icons.outlined.Accessibility
 import androidx.compose.material.icons.outlined.BarChart
 import androidx.compose.material.icons.outlined.Bolt
 import androidx.compose.material.icons.outlined.BookmarkAdd
+import androidx.compose.material.icons.outlined.BrightnessMedium
 import androidx.compose.material.icons.outlined.CheckCircle
 import androidx.compose.material.icons.outlined.ContentCopy
 import androidx.compose.material.icons.outlined.Contrast
@@ -97,6 +98,7 @@ object AppIcons {
     val ReadingModeScroll = Icons.Outlined.ImportContacts
     // Tache 3b.6 — bascule cyclique de theme (Clair -> Sombre -> Sepia).
     val Theme = Icons.Outlined.Contrast
+    val Brightness = Icons.Outlined.BrightnessMedium
 
     // Tâche 1c — icônes de disposition de bibliothèque
     val ViewGrid = Icons.Outlined.Widgets

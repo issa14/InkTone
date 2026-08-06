@@ -8,11 +8,13 @@ import org.junit.Rule
 import org.junit.Test
 
 /**
- * Tâche 3b.7, test 4 — les 9 icônes des rangées 2 et 3 (+ Play) émettent
- * chacune leur intent, aucune n'a de callback vide. Non-régression :
- * pas d'icône Luminosité, pas de boutons chapitre précédent/suivant
- * (retirés en 3b.6, la navigation par chapitre passe désormais
- * uniquement par le Sommaire).
+ * Tâche 3b.7, test 4, révisé en 3d.3/3d.6 (test 8 du lot 3d) — les 10
+ * icônes des rangées 2 et 3 (+ Play) émettent chacune leur intent, aucune
+ * n'a de callback vide. Non-régression inverse de celle posée en 3b.7 :
+ * l'icône Luminosité DOIT désormais exister (rangée 3 à 5 icônes,
+ * ajoutée avec son action en 3d.3, jamais avant). Les boutons chapitre
+ * précédent/suivant restent absents (retirés en 3b.6, la navigation par
+ * chapitre passe uniquement par le Sommaire).
  */
 class UnifiedControlPanelTest {
 
@@ -37,12 +39,13 @@ class UnifiedControlPanelTest {
                 onAaClick = { clicked += "TT" },
                 onTtsClick = { clicked += "Haut-parleur" },
                 onReadingModeClick = { clicked += "Mode" },
+                onBrightnessClick = { clicked += "Luminosité" },
             )
         }
 
         val expectedActions = listOf(
             "Sommaire", "Marque-pages", "Lire", "Thème", "TT",
-            "Minuteur", "Haut-parleur", "Mode", "Recherche",
+            "Minuteur", "Haut-parleur", "Mode", "Recherche", "Luminosité",
         )
         for (action in expectedActions) {
             composeTestRule.onNodeWithContentDescription(action).performClick()
@@ -50,13 +53,13 @@ class UnifiedControlPanelTest {
 
         val expectedIntents = setOf(
             "Sommaire", "Marque-pages", "PlayPause", "Thème", "TT",
-            "Minuteur", "Haut-parleur", "Mode", "Recherche",
+            "Minuteur", "Haut-parleur", "Mode", "Recherche", "Luminosité",
         )
         assertEquals(expectedIntents, clicked)
     }
 
     @Test
-    fun pas_de_luminosite_ni_de_navigation_chapitre_dans_le_panneau() {
+    fun pas_de_navigation_chapitre_dans_le_panneau_mais_luminosite_presente() {
         composeTestRule.setContent {
             UnifiedControlPanel(
                 isPlaying = false,
@@ -71,7 +74,7 @@ class UnifiedControlPanelTest {
             )
         }
 
-        composeTestRule.onNodeWithContentDescription("Luminosité").assertDoesNotExist()
+        composeTestRule.onNodeWithContentDescription("Luminosité").assertExists()
         composeTestRule.onNodeWithContentDescription("Chapitre precedent").assertDoesNotExist()
         composeTestRule.onNodeWithContentDescription("Chapitre suivant").assertDoesNotExist()
         composeTestRule.onNodeWithContentDescription("Pas de chapitre precedent").assertDoesNotExist()

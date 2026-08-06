@@ -69,6 +69,10 @@ data class ReaderUiState(
     // en continu comme isReadingRulerEnabled : pas de surcharge par
     // publication, voir doc du lot 3d.
     val lineHeightMultiplier: Float = 1.4f,
+    // 3d.3 — réglage global (UserPreferences.readerBrightness), même
+    // patron d'observation continue que lineHeightMultiplier. null =
+    // valeur système, appliqué à la fenêtre par ReaderBrightnessEffect.
+    val readerBrightness: Float? = null,
 ) {
     val currentChapter: Chapter? get() = chapters.getOrNull(currentChapterIndex)
     val hasNextChapter: Boolean get() = currentChapterIndex < chapters.lastIndex
@@ -253,4 +257,7 @@ sealed interface ReaderIntent {
 
     /** 3d.2 — réglage global d'interligne, voir `ReaderUiState.lineHeightMultiplier`. */
     data class SetLineHeight(val multiplier: Float) : ReaderIntent
+
+    /** 3d.3 — luminosité de la fenêtre du lecteur. `null` = valeur système. */
+    data class SetReaderBrightness(val value: Float?) : ReaderIntent
 }

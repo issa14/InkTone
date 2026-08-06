@@ -41,7 +41,9 @@ import com.inktone.core.designsystem.InkToneShapes
  *    porte désormais l'information permanente).
  * 2. 5 icônes, Play central proéminent : Sommaire · Marque-pages · Play ·
  *    Thème · TT.
- * 3. 4 icônes : Minuteur · Haut-parleur · Mode · Recherche.
+ * 3. 5 icônes : Minuteur · Haut-parleur · Mode · Recherche · Luminosité
+ *    (3d.3 — dernière icône ajoutée avec son action, jamais avant :
+ *    laissée vide depuis le lot 3b faute d'action existante).
  *
  * Navigation par chapitre retirée de ce panneau (chevrons précédent/
  * suivant) — la cible les place dans la barre de contrôle TTS (lot 3d) ;
@@ -64,6 +66,7 @@ fun UnifiedControlPanel(
     onAaClick: () -> Unit = {},
     onTtsClick: () -> Unit = {},
     onReadingModeClick: () -> Unit = {},
+    onBrightnessClick: () -> Unit = {},
 ) {
     val haptic = LocalHapticFeedback.current
     val accentColor = MaterialTheme.colorScheme.primary
@@ -148,6 +151,9 @@ fun UnifiedControlPanel(
                 }
                 Box(Modifier.weight(1f), contentAlignment = Alignment.Center) {
                     SecondaryAction(icon = AppIcons.Search, label = "Recherche", tint = iconTint, onClick = onSearchClick)
+                }
+                Box(Modifier.weight(1f), contentAlignment = Alignment.Center) {
+                    SecondaryAction(icon = AppIcons.Brightness, label = "Luminosité", tint = iconTint, onClick = onBrightnessClick)
                 }
             }
         }

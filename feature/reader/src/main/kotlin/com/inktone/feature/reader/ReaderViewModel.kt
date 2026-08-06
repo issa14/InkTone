@@ -79,6 +79,7 @@ class ReaderViewModel @Inject constructor(
                 _state.value = _state.value.copy(
                     isReadingRulerEnabled = preferences.readingRulerEnabled,
                     lineHeightMultiplier = preferences.lineHeightMultiplier,
+                    readerBrightness = preferences.readerBrightness,
                 )
             }
         }
@@ -158,6 +159,7 @@ class ReaderViewModel @Inject constructor(
             is ReaderIntent.SetTtsSpeed -> setTtsSpeed(intent.speed)
             is ReaderIntent.SetActiveVoiceProfile -> setActiveVoiceProfile(intent.profileId)
             is ReaderIntent.SetLineHeight -> setLineHeight(intent.multiplier)
+            is ReaderIntent.SetReaderBrightness -> setReaderBrightness(intent.value)
         }
     }
 
@@ -646,6 +648,14 @@ class ReaderViewModel @Inject constructor(
         viewModelScope.launch {
             val current = preferencesRepository.get()
             preferencesRepository.update(current.copy(lineHeightMultiplier = multiplier))
+        }
+    }
+
+    /** 3d.3 — réglage global de luminosité, voir `ReaderUiState.readerBrightness`. */
+    private fun setReaderBrightness(value: Float?) {
+        viewModelScope.launch {
+            val current = preferencesRepository.get()
+            preferencesRepository.update(current.copy(readerBrightness = value))
         }
     }
 
