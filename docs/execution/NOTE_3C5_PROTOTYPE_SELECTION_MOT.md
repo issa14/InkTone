@@ -2,9 +2,19 @@
 
 **Statut : conclusion définitive, prototype jetable, aucun code livré dans
 `main`.** Les trois questions ont été tranchées — deux par lecture du code
-de production, une par test empirique sur appareil réel (V2206). Le
-prototype ayant échoué sur cette dernière, la sélection par phrase est
-actée comme comportement définitif (voir Conclusion).
+de production, une par test empirique sur appareil réel (V2206), **révisée
+une seconde fois** après un premier verdict qui s'est avéré reposer sur une
+mesure trop faible (voir Point 2 — Révision).
+
+**Verdict final : le point 2 est levable.** Le mécanisme prescrit par le
+plan (`pointerInput` sibling + `detectDragGesturesAfterLongPress` +
+`change.consume()`, sans mécanisme supplémentaire) évite le retournement
+de page de façon reproductible — 30 essais consécutifs sur trois
+configurations de geste, 30/30 en faveur de la sélection, zéro
+retournement. **La sélection par phrase reste néanmoins le comportement
+d'InkTone v1** — ce point rouvre la porte du lot 3f pour une décision
+future, il ne change pas le périmètre livré par le lot 3c (voir
+Conclusion).
 
 ## Précédent — constats du spike `SelectableSentenceSpike` (Tâche 1.1.1)
 
@@ -72,60 +82,80 @@ plutôt que refonte du mode SCROLL.
 
 ## Point 2 — Conflit de gestes en mode pagé
 
-**Vérifié empiriquement sur appareil réel (V2206, session courante) :
-conflit confirmé, et pire qu'un simple échec déterministe — c'est une
-course entre gestionnaires de gestes, à l'issue imprévisible.**
+**Verdict final, sur mesure statistiquement robuste : le conflit est
+évitable avec le mécanisme prescrit par le plan, tel quel — pas besoin de
+mécanisme supplémentaire.** Ce verdict inverse une première conclusion
+(« conflit confirmé, intermittent ») posée sur une mesure trop faible (3
+répétitions dont une inconcluante) — voir Révision ci-dessous pour
+l'historique complet, gardé volontairement plutôt qu'effacé.
 
-**Méthode.** Spike jetable ajouté temporairement à `PageBlock`
-(`PagedChapterContent.kt`) : un second `Modifier.pointerInput`, sibling de
-celui portant `detectTapGestures` existant, avec
-`detectDragGesturesAfterLongPress` (`onDrag` appelant `change.consume()`
-— l'implémentation exacte que le plan prescrivait). Test par séquences
-`adb shell input touchscreen motionevent DOWN/MOVE.../UP` (contrôle
-précis du timing, contrairement à `input swipe` qui ne permet pas de tenir
-la position avant de glisser) : appui à position fixe pendant 700 ms
-(au-delà du seuil de long-press), puis glissement horizontal rapide vers
-la droite. Résultat lu directement dans l'état affiché — numéro de page
-(`StatusLineBar`, dump `uiautomator`) et présence du popup de sélection —
-pas dans les logs (`Log.d` du spike jamais capturé par `logcat` sur cet
-appareil malgré présence confirmée dans le dex de l'APK installée — cause
-non identifiée, non bloquante puisque l'état UI observé est une preuve
-plus directe que des lignes de log).
+### Méthode (les deux passes)
 
-**Contrôle préalable** : un swipe franc de même amplitude sans appui long
-préalable tourne bien la page à chaque fois (`input touchscreen swipe`,
-150 ms) — élimine l'hypothèse que le geste de test soit simplement trop
-faible pour déclencher le pager, ce qui aurait rendu un « pas de
-changement de page » non concluant.
+Spike jetable ajouté temporairement à `PagedChapterContent.kt`/`PageBlock` :
+un second `Modifier.pointerInput`, sibling de celui portant
+`detectTapGestures` existant, avec `detectDragGesturesAfterLongPress`
+(`onDrag` appelant `change.consume()` — l'implémentation exacte prescrite
+par le plan). Test par séquences `adb shell input touchscreen motionevent
+DOWN/MOVE.../UP` (contrôle précis du timing, contrairement à `input swipe`
+qui ne permet pas de tenir la position avant de glisser). Résultat lu dans
+l'état affiché — numéro de page (`StatusLineBar`) et présence du popup de
+sélection (`text="Copier"`) — via dump `uiautomator`, pas les logs
+(`Log.d` du spike jamais capturé par `logcat` sur cet appareil malgré
+présence confirmée dans le dex de l'APK installée, cause non identifiée
+et non bloquante).
 
-**Résultat sur 3 répétitions du geste appui-long-puis-glissement-rapide,
-mêmes paramètres** (position de départ, durée d'appui, vitesse de
-glissement) :
+**Contrôle systématique** avant chaque série : un swipe franc de même
+forme (mêmes coordonnées, même vitesse) mais **sans** appui long
+préalable doit tourner la page à chaque fois — élimine l'hypothèse que le
+geste de test soit simplement trop faible pour déclencher le pager, ce
+qui rendrait un « pas de changement de page » non concluant. Vérifié
+positif avant chaque campagne de mesure ci-dessous.
 
-| # | Résultat |
-|---|---|
-| 1 | La page tourne (le pager gagne) |
-| 2 | Inconclusive (déjà en butée de fin de chapitre) |
-| 3 | La sélection s'étend, popup affiché, la page NE tourne PAS (le geste de sélection gagne) |
+### Révision — pourquoi la première conclusion est tombée
 
-Le pager et le détecteur de glissement-après-appui-long réagissent tous
-deux au même flux d'événements tactiles, et lequel « gagne » dépend d'une
-course de timing sur laquelle `change.consume()` posé dans un
-`pointerInput` sibling n'a pas de prise déterministe — cohérent avec le
-modèle de Compose où `HorizontalPager` (via `Modifier.scrollable`/
-nested scroll) peut intercepter le geste à une passe antérieure
-(`PointerEventPass.Initial`, de l'extérieur vers l'intérieur) à celle où
-le `pointerInput` du contenu (`PointerEventPass.Main`) consomme
-l'événement — la consommation tardive ne peut pas revenir sur une
-interception déjà faite en amont.
+La première passe (session précédente) reposait sur **3 répétitions
+manuelles, dont une inconcluante** (déjà en butée de fin de chapitre) —
+soit 2 mesures exploitables sur un phénomène qu'on soupçonnait aléatoire.
+Verdict à l'époque : 1 échec, 1 succès, conflit jugé « confirmé et
+intermittent ». Un second passage, avec un protocole renforcé demandé
+explicitement (10 répétitions minimum par condition, script automatisé
+plutôt que des appels `adb` manuels enchaînés à la main, mesure en milieu
+de chapitre), a entièrement renversé ce verdict — la variance observée la
+première fois était un artefact de la mesure (timing manuel peu
+reproductible entre appels `Bash` séparés), pas une propriété réelle du
+geste.
 
-**Ce que ça signifie pour une implémentation de production** : le
-mécanisme prescrit par le plan (`pointerInput` sibling +
-`change.consume()`) ne suffit pas. Le fixer proprement demanderait de
-participer explicitement au protocole `NestedScrollConnection` du pager
-(intercepter/refuser le geste de scroll horizontal pendant une sélection
-active) — un mécanisme distinct, plus intrusif, non prévu par le plan
-d'origine et non chiffré ici.
+### Mesure finale — harnais automatisé (script Python pilotant `adb`)
+
+Trois campagnes de 10 répétitions consécutives, réinitialisation de
+l'état entre chaque essai (fermeture du popup, retour à la même page
+médiane), toutes avec contrôle préalable positif :
+
+| Campagne | Paramètres du geste | Résultat |
+|---|---|---|
+| Référence 1 | DOWN (600,800), maintien 700 ms, 5×MOVE/25 ms vers (100,800), UP | **10/10 sélection**, 0/10 retournement |
+| Référence 2 (paramètres différents, contrôle de robustesse) | DOWN (650,1050), maintien 900 ms, 6×MOVE/15 ms vers (150,1050), UP | **10/10 sélection**, 0/10 retournement |
+| Condition A (`userScrollEnabled = false` posé dans `onDragStart`, en plus du mécanisme de référence) | Identique à Référence 1 | **10/10 sélection**, 0/10 retournement |
+
+**30 essais, 30 succès, 0 échec.** Conformément au protocole (« arrêter
+dès qu'une condition atteint 10/10 »), la mesure s'arrête ici — la
+Condition B (geste séparé) et la Condition C (consommation en
+`PointerEventPass.Initial`) n'ont pas été nécessaires.
+
+### Ce que ça signifie pour une implémentation de production
+
+Le mécanisme prescrit par le plan d'origine (`pointerInput` sibling +
+`detectDragGesturesAfterLongPress` + `change.consume()`, **sans**
+`userScrollEnabled` ni participation à `NestedScrollConnection`) suffit,
+sur la mesure disponible, à empêcher le pager de tourner la page pendant
+un glissement de sélection. L'hypothèse d'interception en
+`PointerEventPass.Initial` par le pager — qui aurait rendu la
+consommation tardive en `Main` sans effet — ne se vérifie pas dans les
+faits : soit le pager ne réclame pas le geste à cette passe dans ce cas
+précis, soit la consommation en `Main` suffit à l'en dissuader avant qu'il
+n'agisse. Le mécanisme exact reste à documenter précisément si le lot 3f
+est un jour lancé (voir Conclusion), mais son **effet observable** est
+net et reproductible.
 
 ## Point 3 — Conversion d'espace de coordonnées
 
@@ -156,17 +186,33 @@ identifié sur ce point.
 
 ## Conclusion
 
-**Le prototype échoue sur le point 2, vérifié empiriquement, pas
-supposé.** La clause du plan s'applique explicitement : *« si le
-prototype échoue sur l'un des trois points, la sélection par phrase est
-actée dans la cible comme comportement définitif — ce qui ferme le sujet
-aussi valablement »*.
+**Les trois points sont favorables.** Le prototype ne bute plus sur
+aucun des trois obstacles identifiés par le plan : le point 1 et le point
+3 étaient déjà tranchés par lecture du code, le point 2 — celui qui avait
+initialement fermé le sujet — est maintenant vérifié levable sur une
+mesure robuste (30/30, protocole renforcé). La clause d'arrêt du plan
+(« si le prototype échoue sur l'un des trois points, la sélection par
+phrase est actée comme définitif ») **ne s'applique donc plus**.
 
-**La sélection par phrase (appui long puis extension) est donc le
-comportement définitif d'InkTone v1**, consigné dans `UX_FLOW_DESIGN.md`
-(§ Lecture — HUD, état d'implémentation lot 3c). Le lot 3f (sélection
-libre au mot, poignées persistantes, auto-scroll pendant le glissement,
-sélection à cheval sur deux pages, sémantiques d'accessibilité) **ne sera
-pas déclenché** sur la base de ce plan — le rouvrir supposerait une
-approche différente sur le point 2 (participation explicite au
-`NestedScrollConnection` du pager), non chiffrée ici et non actée.
+**Ce que ça change, et ce que ça ne change pas.** Ceci rouvre la
+**décidabilité** du lot 3f — il redevient un choix produit légitime,
+chiffrable, plutôt qu'une porte fermée par une preuve d'échec. Ça **ne
+déclenche pas** le lot 3f pour autant, et ça **ne change rien** au
+périmètre livré par le lot 3c : **la sélection par phrase (appui long
+puis extension) reste le comportement d'InkTone v1**, tel que consigné
+dans `UX_FLOW_DESIGN.md` (§ Lecture — HUD, état d'implémentation lot 3c).
+Décider de lancer le lot 3f est une décision produit distincte, qui
+appartient à Issa — cette note fournit de quoi la prendre en connaissance
+de cause, elle ne la prend pas à sa place.
+
+**Chiffrage indicatif du lot 3f, si lancé** : routage par phrase pour
+SCROLL (~1/4, voir point 1), mécanisme drag/pager du point 2 déjà
+vérifié — retire l'inconnue la plus risquée du chiffrage initial —,
+poignées persistantes + auto-scroll pendant le glissement (~1/3, le plus
+gros morceau restant — composables de poignée dédiés, cible tactile
+48 dp, pas de précédent dans le dépôt), sémantiques d'accessibilité
+TalkBack (~1/4, sensible — le lot 1 a déjà eu un correctif sur le
+chevauchement TalkBack/TTS), retrait de l'ancien modèle de sélection par
+phrase (~1/6, mécanique une fois le nouveau modèle en place). Estimation
+de structure, pas de durée absolue — aucune mesure de temps de
+développement réel dans cette note.

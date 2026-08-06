@@ -199,7 +199,7 @@ Barre pilule TTS, repli en FAB, onde sonore, swipe-down → **lot 3e**.
 
 Implémentation de la sélection au mot (poignées, auto-scroll pendant le glissement, sélection à cheval, sémantiques d'accessibilité, retrait de l'ancien modèle) → **lot 3f**, conditionné à la conclusion de la tâche 3c.5. Le lot 3c livre le popup Copier / Surligner / Note **sur la sélection par phrase existante** ; seul le mécanisme de sélection est en jeu au 3f, pas le popup.
 
-**Conclusion 3c.5** (voir `docs/execution/NOTE_3C5_PROTOTYPE_SELECTION_MOT.md`) : le prototype échoue sur le conflit de geste drag/pager, vérifié empiriquement sur appareil — la sélection par phrase est actée comme comportement définitif, le lot 3f n'est pas déclenché.
+**Conclusion 3c.5** (voir `docs/execution/NOTE_3C5_PROTOTYPE_SELECTION_MOT.md`) : les trois points sont favorables, y compris le conflit de geste drag/pager — jugé bloquant sur une première mesure trop faible, levé sur mesure robuste (30/30, protocole renforcé). Ça rouvre la décidabilité du lot 3f sans le déclencher : la sélection par phrase reste le comportement livré par ce lot.
 
 ---
 
