@@ -144,6 +144,15 @@ fun ReaderScreen(
         }
     }
 
+    // 3e.1 (point A5) — pendant la lecture TTS, le panneau unifié est
+    // remplacé par la barre pilule (voir plus bas) ; ce drapeau local
+    // rappelle le panneau complet par-dessus la barre le temps d'un appui,
+    // pour atteindre Sommaire/TT/etc. sans interrompre la lecture.
+    var showFullPanelOverlay by remember { mutableStateOf(false) }
+    LaunchedEffect(state.isPlaying) {
+        if (!state.isPlaying) showFullPanelOverlay = false
+    }
+
     // Ferme la barre de luminosité si elle est ouverte, sinon applique le
     // basculement HUD habituel — un appui sur la zone de lecture pendant
     // l'ajustement de luminosité doit fermer la barre, pas rouvrir le HUD
@@ -151,6 +160,20 @@ fun ReaderScreen(
     fun handleReadingAreaTap() {
         if (showBrightnessBar) {
             showBrightnessBar = false
+        } else if (state.isPlaying) {
+            // Pendant le TTS, la barre pilule remplace le panneau unifié
+            // (retiré du HUD standard) : un premier appui rappelle le
+            // panneau complet, un second referme tout, un troisième
+            // ramène la barre pilule — le même rythme à trois temps que le
+            // cycle HUD habituel, appliqué à un état de plus.
+            if (showFullPanelOverlay) {
+                showFullPanelOverlay = false
+                isHudVisible = false
+            } else if (isHudVisible) {
+                showFullPanelOverlay = true
+            } else {
+                keepHudVisible()
+            }
         } else if (isHudVisible) {
             isHudVisible = false
         } else {
@@ -493,36 +516,57 @@ fun ReaderScreen(
         }
 
         if (isHudVisible) {
-            UnifiedControlPanel(
-                isPlaying = state.isPlaying,
-                sleepTimerActive = state.sleepTimer != null,
-                bookProgression = state.bookProgression,
-                onPlayPause = {
-                    keepHudVisible()
-                    viewModel.onIntent(if (state.isPlaying) ReaderIntent.Pause else ReaderIntent.PlayCurrentSentence)
-                },
-                onSleepTimerClick = { keepHudVisible(); showSleepTimerPanel = true },
-                onSearchClick = { keepHudVisible(); onSearchClick() },
-                onBookmarksClick = { keepHudVisible(); viewModel.onIntent(ReaderIntent.ToggleBookmarkList) },
-                onTocClick = { keepHudVisible(); viewModel.onIntent(ReaderIntent.ToggleToc) },
-                onThemeCycle = {
-                    keepHudVisible()
-                    val overrides = (state.currentOverrides ?: ReadingOverrides())
-                        .copy(theme = nextReadingTheme(state.effectiveSettings.theme))
-                    viewModel.onIntent(ReaderIntent.SetOverrides(overrides))
-                },
-                onAaClick = { keepHudVisible(); showSettingsPanel = true },
-                onTtsClick = { keepHudVisible(); showTtsPanel = true },
-                onReadingModeClick = { keepHudVisible(); viewModel.onIntent(ReaderIntent.ToggleReadingMode) },
-                onBrightnessClick = {
-                    // Bug réel corrigé (vérification device, lot 3d) : masque le
-                    // HUD au lieu de le garder visible — la barre prend sa place
-                    // plutôt que de s'empiler dessous.
-                    isHudVisible = false
-                    showBrightnessBar = true
-                    brightnessBarActivityTick++
-                },
-            )
+            // 3e.1 — pendant le TTS, la barre pilule remplace le panneau
+            // unifié (navigation par chapitre, retirée du panneau au lot
+            // 3b) ; le panneau complet ne revient que par l'overlay A5 ou
+            // à l'arrêt de la lecture.
+            if (state.isPlaying && !showFullPanelOverlay) {
+                TtsPillBar(
+                    modifier = Modifier.align(Alignment.CenterHorizontally),
+                    isPlaying = state.isPlaying,
+                    hasPreviousChapter = state.hasPreviousChapter,
+                    hasNextChapter = state.hasNextChapter,
+                    onPreviousChapter = { keepHudVisible(); viewModel.onIntent(ReaderIntent.PreviousChapter) },
+                    onPreviousSentence = { keepHudVisible(); viewModel.onIntent(ReaderIntent.SkipToPreviousSentence) },
+                    onPlayPause = {
+                        keepHudVisible()
+                        viewModel.onIntent(if (state.isPlaying) ReaderIntent.Pause else ReaderIntent.PlayCurrentSentence)
+                    },
+                    onNextSentence = { keepHudVisible(); viewModel.onIntent(ReaderIntent.SkipToNextSentence) },
+                    onNextChapter = { keepHudVisible(); viewModel.onIntent(ReaderIntent.NextChapter) },
+                )
+            } else {
+                UnifiedControlPanel(
+                    isPlaying = state.isPlaying,
+                    sleepTimerActive = state.sleepTimer != null,
+                    bookProgression = state.bookProgression,
+                    onPlayPause = {
+                        keepHudVisible()
+                        viewModel.onIntent(if (state.isPlaying) ReaderIntent.Pause else ReaderIntent.PlayCurrentSentence)
+                    },
+                    onSleepTimerClick = { keepHudVisible(); showSleepTimerPanel = true },
+                    onSearchClick = { keepHudVisible(); onSearchClick() },
+                    onBookmarksClick = { keepHudVisible(); viewModel.onIntent(ReaderIntent.ToggleBookmarkList) },
+                    onTocClick = { keepHudVisible(); viewModel.onIntent(ReaderIntent.ToggleToc) },
+                    onThemeCycle = {
+                        keepHudVisible()
+                        val overrides = (state.currentOverrides ?: ReadingOverrides())
+                            .copy(theme = nextReadingTheme(state.effectiveSettings.theme))
+                        viewModel.onIntent(ReaderIntent.SetOverrides(overrides))
+                    },
+                    onAaClick = { keepHudVisible(); showSettingsPanel = true },
+                    onTtsClick = { keepHudVisible(); showTtsPanel = true },
+                    onReadingModeClick = { keepHudVisible(); viewModel.onIntent(ReaderIntent.ToggleReadingMode) },
+                    onBrightnessClick = {
+                        // Bug réel corrigé (vérification device, lot 3d) : masque le
+                        // HUD au lieu de le garder visible — la barre prend sa place
+                        // plutôt que de s'empiler dessous.
+                        isHudVisible = false
+                        showBrightnessBar = true
+                        brightnessBarActivityTick++
+                    },
+                )
+            }
         }
 
         // 3d.3 — barre flottante à la place du panneau unifié (HUD masqué

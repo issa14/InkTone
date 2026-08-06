@@ -1,6 +1,8 @@
 package com.inktone.core.designsystem
 
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.automirrored.filled.NavigateBefore
+import androidx.compose.material.icons.automirrored.filled.NavigateNext
 import androidx.compose.material.icons.automirrored.outlined.ArrowBack
 import androidx.compose.material.icons.automirrored.outlined.List
 import androidx.compose.material.icons.automirrored.outlined.MenuBook
@@ -13,6 +15,8 @@ import androidx.compose.material.icons.filled.Favorite
 import androidx.compose.material.icons.filled.Highlight
 import androidx.compose.material.icons.filled.MoreVert
 import androidx.compose.material.icons.filled.PushPin
+import androidx.compose.material.icons.filled.SkipNext
+import androidx.compose.material.icons.filled.SkipPrevious
 import androidx.compose.material.icons.filled.Warning
 import androidx.compose.material.icons.outlined.Accessibility
 import androidx.compose.material.icons.outlined.BarChart
@@ -104,4 +108,12 @@ object AppIcons {
     val ViewGrid = Icons.Outlined.Widgets
     val ViewList = Icons.AutoMirrored.Outlined.ViewList
     val CoverOnly = Icons.Outlined.PhotoLibrary
+
+    // Tâche 3e.1 — barre pilule TTS : chevron simple pour le chapitre
+    // (saut large), icône skip pour la phrase (saut fin) — deux glyphes
+    // distincts pour deux granularités différentes, jamais le même.
+    val ChapterPrevious = Icons.AutoMirrored.Filled.NavigateBefore
+    val ChapterNext = Icons.AutoMirrored.Filled.NavigateNext
+    val SentencePrevious = Icons.Filled.SkipPrevious
+    val SentenceNext = Icons.Filled.SkipNext
 }
