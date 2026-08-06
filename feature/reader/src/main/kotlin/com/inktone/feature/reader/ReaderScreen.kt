@@ -577,6 +577,8 @@ fun ReaderScreen(
                         TtsPillBar(
                             modifier = Modifier.align(Alignment.Center).graphicsLayer(alpha = barAlpha),
                             isPlaying = state.isPlaying,
+                            isAudioActive = state.isAudioActive,
+                            reduceMotion = state.reduceMotion,
                             hasPreviousChapter = state.hasPreviousChapter,
                             hasNextChapter = state.hasNextChapter,
                             onPreviousChapter = { keepHudVisible(); viewModel.onIntent(ReaderIntent.PreviousChapter) },
@@ -587,15 +589,23 @@ fun ReaderScreen(
                             },
                             onNextSentence = { keepHudVisible(); viewModel.onIntent(ReaderIntent.SkipToNextSentence) },
                             onNextChapter = { keepHudVisible(); viewModel.onIntent(ReaderIntent.NextChapter) },
+                            // 3e.3 — balayage redéfini en pause (voir KDoc de
+                            // TtsPillBarCollapsed) : pas de keepHudVisible, le
+                            // passage à isPlaying=false referme déjà la barre
+                            // et fait revenir le panneau unifié.
+                            onSwipeDown = { viewModel.onIntent(ReaderIntent.Pause) },
                         )
                     }
                     if (fabAlpha > 0f) {
                         TtsPillBarCollapsed(
                             modifier = Modifier.align(Alignment.CenterEnd).graphicsLayer(alpha = fabAlpha),
+                            isAudioActive = state.isAudioActive,
+                            reduceMotion = state.reduceMotion,
                             onExpand = {
                                 isPillCollapsed = false
                                 keepHudVisible()
                             },
+                            onSwipeDown = { viewModel.onIntent(ReaderIntent.Pause) },
                         )
                     }
                 }

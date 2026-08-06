@@ -28,6 +28,13 @@ data class ReaderUiState(
     val currentSentenceIndex: Int = 0,
     val highlightedWordRange: IntRange? = null,
     val isPlaying: Boolean = false,
+    // 3e.3 — distinct de isPlaying : isPlaying passe à vrai avant la
+    // synthèse (ReaderViewModel.playCurrentSentence), isAudioActive ne
+    // l'est que pendant que l'AudioTrack de la phrase en cours joue
+    // réellement. Sert l'onde sonore de TtsPillBar — K « un moteur ne
+    // fait jamais semblant » : l'indicateur ne doit pas animer pendant un
+    // blanc de synthèse.
+    val isAudioActive: Boolean = false,
     val isTocVisible: Boolean = false,
     // Deja resolu via EffectiveReadingSettings.resolve() (Tache 1.3) au
     // moment de l'ouverture (Tache 4.7) - ReaderScreen ne connait jamais

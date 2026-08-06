@@ -408,16 +408,18 @@ Barre horizontale fine (cohérente avec tous les autres sliders de ce document),
 
 **Actions du pop-up, ordre confirmé :** chapitre précédent (cp) — phrase précédente (pp) — resume/play (r) — phrase suivante (ps) — chapitre suivant (cs). Soit `cp - pp - r - ps - cs`.
 
+**Accès aux autres fonctions du panneau pendant la lecture (lot 3e, tranché à la vérification device) :** un appui sur la zone de lecture rappelle le panneau unifié complet (Sommaire, TT, etc.) en overlay par-dessus la barre pilule, sans interrompre la lecture ni le surlignage. Un second appui referme tout, un troisième ramène la barre pilule — même rythme à trois temps que le cycle d'auto-masquage habituel du HUD, appliqué à un état de plus.
+
 **Repli automatique :** la barre complète se replie après **4 secondes** (ajusté depuis 5s) en un **FAB** unique, coin inférieur droit. Toute interaction avec la barre pendant qu'elle est ouverte (tap sur cp/pp/r/ps/cs) **relance** le compte à 4s.
 
 **FAB replié :**
-- Affiche l'état courant : icône Pause si lecture en cours, icône Play si en pause, avec un indicateur discret (petite onde sonore animée).
+- Affiche un indicateur discret (petite onde sonore animée, distincte de l'icône Lire/Pause de la barre déployée) qui reflète l'audio réellement en train de sortir — pas juste « TTS engagé » : elle s'arrête pendant un blanc de synthèse entre deux phrases.
 - Tap simple → rouvre la barre complète pour 4s.
-- Swipe vers le bas → stop immédiat du TTS et disparition complète du FAB. **Ce geste n'existe que sur le FAB replié**, pas sur la barre complète ouverte.
+- Swipe vers le bas → **met en pause et referme la barre** (le panneau unifié revient). **Écart tranché au lot 3e** : la cible d'origine prévoyait un « stop immédiat » distinct d'une pause, uniquement sur le FAB replié. `ReaderViewModel.pausePlayback()` reste le seul comportement disponible (pas de reprise ni de libération distincte — retrait du bouton Stop au lot 3d) ; un vrai Stop nécessiterait de migrer la lecture du Reader vers `AudioPlaybackService`/Media3, hors périmètre présentation de ce lot. Le geste est donc une pause honnêtement nommée, disponible aussi bien sur la barre déployée que sur le FAB replié (pas réservé au FAB replié comme prévu initialement).
 
 **Surlignage et captions :** le surlignage mot-à-mot du texte lu reste actif en permanence (barre ouverte ou FAB replié). Les captions sont **désactivées** — jugées trop encombrantes, notamment sur les phrases longues. Piste non tranchée pour une version 1+ : déplacer l'info de lecture dans la barre de notification système.
 
-**Mockup validé :** confirmé sans correction — barre pilule sombre flottante en bas (ordre des 5 actions), et FAB avec surlignage mot en cours visible en fond et petit indicateur d'onde sonore.
+**Mockup validé :** confirmé sans correction — barre pilule sombre flottante en bas (ordre des 5 actions), et FAB avec surlignage mot en cours visible en fond et petit indicateur d'onde sonore. Écarts par rapport au mockup, tranchés à la vérification device : accès aux fonctions du panneau et sort du swipe décrits ci-dessus.
 
 ---
 

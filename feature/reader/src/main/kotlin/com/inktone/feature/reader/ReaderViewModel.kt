@@ -557,18 +557,24 @@ class ReaderViewModel @Inject constructor(
                 if (_state.value.hasNextChapter) {
                     onIntent(ReaderIntent.NextChapter)
                 } else {
-                    _state.value = _state.value.copy(isPlaying = false)
+                    _state.value = _state.value.copy(isPlaying = false, isAudioActive = false)
                 }
                 return@launch
             }
 
-            _state.value = _state.value.copy(isPlaying = true)
+            // 3e.3 — isAudioActive reste faux pendant la synthèse
+            // (sentenceAudioBuffer.get, potentiellement lente si le
+            // segment n'est pas déjà préchargé) : isPlaying seul ne suffit
+            // pas à distinguer « TTS engagé » de « audio effectivement en
+            // train de sortir », voir ReaderUiState.isAudioActive.
+            _state.value = _state.value.copy(isPlaying = true, isAudioActive = false)
 
             val sentence = sentences[index]
             // A.5 — résout le profil vocal actif depuis les préférences utilisateur
             val voiceProfile = resolveVoiceProfile(preferencesRepository.get())
             val segment = sentenceAudioBuffer.get(sentence, voiceProfile)
             audioSegmentPlayer.play(segment)
+            _state.value = _state.value.copy(isAudioActive = true)
 
             // Précharge la phrase suivante pendant que celle-ci se joue
             sentences.getOrNull(index + 1)?.let {
@@ -582,7 +588,7 @@ class ReaderViewModel @Inject constructor(
                 delay((wt.endMs - wt.startMs).coerceAtLeast(0L))
             }
 
-            _state.value = _state.value.copy(highlightedWordRange = null)
+            _state.value = _state.value.copy(highlightedWordRange = null, isAudioActive = false)
 
             updateReadingState(
                 ReadingState(
@@ -610,7 +616,7 @@ class ReaderViewModel @Inject constructor(
     private fun pausePlayback() {
         playbackJob?.cancel()
         audioSegmentPlayer.stop()
-        _state.value = _state.value.copy(isPlaying = false, highlightedWordRange = null)
+        _state.value = _state.value.copy(isPlaying = false, isAudioActive = false, highlightedWordRange = null)
     }
 
     /**
