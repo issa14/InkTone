@@ -58,7 +58,6 @@ import com.inktone.domain.model.AnnotationColor
 import com.inktone.domain.model.ReadingOverrides
 import com.inktone.domain.model.ReadingTheme
 import com.inktone.domain.model.Sentence
-import com.inktone.domain.model.SleepTimerState
 import com.inktone.feature.reader.pagination.rememberChapterPaginationState
 import kotlin.math.roundToInt
 
@@ -129,6 +128,10 @@ fun ReaderScreen(
     // les panneaux ci-dessus : purement une décision d'affichage, pas un
     // état MVI (ReaderUiState.readerBrightness porte la vraie donnée).
     var showBrightnessBar by remember { mutableStateOf(false) }
+    // 3d.4 — remplace le cycle nextSleepTimerMinutes : le tap sur Veille
+    // ouvre désormais un panneau (puces + roue), au lieu de cycler
+    // silencieusement 15→30→45→60 sans rien afficher.
+    var showSleepTimerPanel by remember { mutableStateOf(false) }
 
     ImmersiveReaderChrome(
         isHudVisible = isHudVisible,
@@ -469,10 +472,7 @@ fun ReaderScreen(
                     keepHudVisible()
                     viewModel.onIntent(if (state.isPlaying) ReaderIntent.Pause else ReaderIntent.PlayCurrentSentence)
                 },
-                onSleepTimerClick = {
-                    keepHudVisible()
-                    viewModel.onIntent(ReaderIntent.SetSleepTimer(nextSleepTimerMinutes(state.sleepTimer)))
-                },
+                onSleepTimerClick = { keepHudVisible(); showSleepTimerPanel = true },
                 onSearchClick = { keepHudVisible(); onSearchClick() },
                 onBookmarksClick = { keepHudVisible(); viewModel.onIntent(ReaderIntent.ToggleBookmarkList) },
                 onTocClick = { keepHudVisible(); viewModel.onIntent(ReaderIntent.ToggleToc) },
@@ -577,6 +577,15 @@ fun ReaderScreen(
             )
         }
 
+        // 3d.4 — Panneau Minuteur (remplace le cycle sur l'icône Veille)
+        if (showSleepTimerPanel) {
+            SleepTimerPanel(
+                remainingMinutes = state.sleepTimer?.let { (it.remainingMs / 60_000L).toInt() },
+                onSetSleepTimer = { minutes -> viewModel.onIntent(ReaderIntent.SetSleepTimer(minutes)) },
+                onDismiss = { showSleepTimerPanel = false },
+            )
+        }
+
         // 3c.2 — Sommaire en bottom sheet : superposé, ne démonte plus le
         // lecteur (avant ce lot, `return@Column` remplaçait tout l'écran,
         // HUD compris). Même pattern que ReaderSettingsPanel/ReaderTtsPanel
@@ -630,8 +639,6 @@ fun ReaderScreen(
     }
 }
 
-private val SLEEP_TIMER_OPTIONS_MINUTES = listOf(15, 30, 45, 60)
-
 /**
  * Tâche 3b.6 — bascule cyclique du thème (icône Thème du panneau) : Clair
  * → Sombre → Sépia → Clair, sans ouvrir de panneau, sans retour visuel
@@ -643,19 +650,6 @@ private fun nextReadingTheme(current: ReadingTheme): ReadingTheme = when (curren
     ReadingTheme.LIGHT -> ReadingTheme.DARK
     ReadingTheme.DARK -> ReadingTheme.SEPIA
     ReadingTheme.SEPIA, ReadingTheme.SYSTEM -> ReadingTheme.LIGHT
-}
-
-/**
- * Tache 9bis.3.3 — un appui sur l'icone Veille fait cycler les durees
- * proposees puis desactive le minuteur (pas de sheet de selection dediee
- * pour l'instant, hors perimetre de cette tache).
- */
-private fun nextSleepTimerMinutes(current: SleepTimerState?): Int? {
-    if (current == null) return SLEEP_TIMER_OPTIONS_MINUTES.first()
-    val currentMinutes = (current.remainingMs / 60_000L).toInt()
-    val currentIndex = SLEEP_TIMER_OPTIONS_MINUTES.indexOf(currentMinutes)
-    val nextIndex = currentIndex + 1
-    return SLEEP_TIMER_OPTIONS_MINUTES.getOrNull(nextIndex)
 }
 
 @OptIn(ExperimentalFoundationApi::class)
