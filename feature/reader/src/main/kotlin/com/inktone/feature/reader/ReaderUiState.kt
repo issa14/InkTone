@@ -82,6 +82,13 @@ data class ReaderUiState(
     val eyeRestReminderIntervalMinutes: Int = 60,
     val isEyeRestReminderVisible: Boolean = false,
     val eyeRestReminderCountdownS: Int = EYE_REST_REMINDER_COUNTDOWN_S,
+    // 3e.2 — réglage global (UserPreferences.reduceMotion), même patron
+    // d'observation continue que isReadingRulerEnabled/lineHeightMultiplier.
+    // Distinct de reducedMotionDuration() (core/designsystem) qui lit le
+    // réglage système d'accessibilité, pas ce réglage applicatif — les deux
+    // coexistent, le surlignage mot-à-mot ne respecte aujourd'hui que le
+    // premier.
+    val reduceMotion: Boolean = false,
 ) {
     val currentChapter: Chapter? get() = chapters.getOrNull(currentChapterIndex)
     val hasNextChapter: Boolean get() = currentChapterIndex < chapters.lastIndex

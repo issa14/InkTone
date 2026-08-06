@@ -108,6 +108,33 @@ fun TtsPillBar(
     }
 }
 
+/**
+ * Tâche 3e.2 — état replié de [TtsPillBar] après 4 s d'inactivité (délai
+ * porté par `ImmersiveReaderChrome`, voir `ReaderScreen.onAutoHide`, pas
+ * un second minuteur). Même signature visuelle que le Play central de la
+ * barre déployée — un tap la redéploie, la lecture et le surlignage
+ * mot-à-mot ne sont jamais interrompus par le repli.
+ */
+@Composable
+fun TtsPillBarCollapsed(
+    onExpand: () -> Unit,
+    modifier: Modifier = Modifier,
+) {
+    val accentColor = MaterialTheme.colorScheme.primary
+    FilledIconButton(
+        onClick = onExpand,
+        modifier = modifier.size(56.dp),
+        colors = IconButtonDefaults.filledIconButtonColors(containerColor = accentColor),
+        shape = InkToneShapes.large,
+    ) {
+        Icon(
+            AppIcons.Speaking,
+            contentDescription = "Afficher les contrôles de lecture",
+            tint = MaterialTheme.colorScheme.surface,
+        )
+    }
+}
+
 @Composable
 private fun PillAction(
     icon: ImageVector,

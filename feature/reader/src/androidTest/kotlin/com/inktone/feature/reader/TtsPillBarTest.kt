@@ -92,4 +92,16 @@ class TtsPillBarTest {
 
         assertEquals(emptySet<String>(), clicked)
     }
+
+    @Test
+    fun le_bouton_replie_emet_l_intent_de_redeploiement() {
+        var expanded = false
+
+        composeTestRule.setContent {
+            TtsPillBarCollapsed(onExpand = { expanded = true })
+        }
+
+        composeTestRule.onNodeWithContentDescription("Afficher les contrôles de lecture").performClick()
+        assertEquals(true, expanded)
+    }
 }

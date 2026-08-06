@@ -82,6 +82,7 @@ class ReaderViewModel @Inject constructor(
                     readerBrightness = preferences.readerBrightness,
                     eyeRestReminderEnabled = preferences.eyeRestReminderEnabled,
                     eyeRestReminderIntervalMinutes = preferences.eyeRestReminderIntervalMinutes,
+                    reduceMotion = preferences.reduceMotion,
                 )
             }
         }

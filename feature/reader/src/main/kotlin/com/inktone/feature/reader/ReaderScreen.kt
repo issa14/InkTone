@@ -1,5 +1,6 @@
 package com.inktone.feature.reader
 
+import androidx.compose.animation.core.animateFloatAsState
 import androidx.compose.animation.core.animateIntAsState
 import androidx.compose.animation.core.tween
 import androidx.compose.animation.ExperimentalSharedTransitionApi
@@ -37,6 +38,7 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.geometry.Rect
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.layout.boundsInWindow
 import androidx.compose.ui.layout.onGloballyPositioned
 import androidx.compose.ui.layout.positionInParent
@@ -149,8 +151,17 @@ fun ReaderScreen(
     // rappelle le panneau complet par-dessus la barre le temps d'un appui,
     // pour atteindre Sommaire/TT/etc. sans interrompre la lecture.
     var showFullPanelOverlay by remember { mutableStateOf(false) }
+    // 3e.2 — repli de la barre pilule en bouton unique après 4s
+    // d'inactivité, réutilisant le délai d'ImmersiveReaderChrome
+    // (onAutoHide ci-dessous) : pas de second minuteur. isHudVisible
+    // reste vrai pendant le repli — seule la forme de son contenu change,
+    // ce n'est pas un masquage complet.
+    var isPillCollapsed by remember { mutableStateOf(false) }
     LaunchedEffect(state.isPlaying) {
-        if (!state.isPlaying) showFullPanelOverlay = false
+        if (!state.isPlaying) {
+            showFullPanelOverlay = false
+            isPillCollapsed = false
+        }
     }
 
     // Ferme la barre de luminosité si elle est ouverte, sinon applique le
@@ -171,8 +182,10 @@ fun ReaderScreen(
                 isHudVisible = false
             } else if (isHudVisible) {
                 showFullPanelOverlay = true
+                isPillCollapsed = false
             } else {
                 keepHudVisible()
+                isPillCollapsed = false
             }
         } else if (isHudVisible) {
             isHudVisible = false
@@ -188,7 +201,17 @@ fun ReaderScreen(
     ImmersiveReaderChrome(
         isHudVisible = isHudVisible,
         hudActivityTick = hudActivityTick,
-        onAutoHide = { isHudVisible = false },
+        onAutoHide = {
+            // 3e.2 — pendant le TTS (barre pilule affichée, pas l'overlay
+            // panneau complet), l'inactivité replie la barre au lieu de
+            // masquer tout le HUD : la lecture et le surlignage restent
+            // visibles en permanence via le bouton replié.
+            if (state.isPlaying && !showFullPanelOverlay) {
+                isPillCollapsed = true
+            } else {
+                isHudVisible = false
+            }
+        },
     ) {
     // 3d.3 — applique la luminosité choisie à la fenêtre du lecteur
     // seulement, restaurée à la sortie (voir ReaderBrightnessEffect).
@@ -521,20 +544,61 @@ fun ReaderScreen(
             // 3b) ; le panneau complet ne revient que par l'overlay A5 ou
             // à l'arrêt de la lecture.
             if (state.isPlaying && !showFullPanelOverlay) {
-                TtsPillBar(
-                    modifier = Modifier.align(Alignment.CenterHorizontally),
-                    isPlaying = state.isPlaying,
-                    hasPreviousChapter = state.hasPreviousChapter,
-                    hasNextChapter = state.hasNextChapter,
-                    onPreviousChapter = { keepHudVisible(); viewModel.onIntent(ReaderIntent.PreviousChapter) },
-                    onPreviousSentence = { keepHudVisible(); viewModel.onIntent(ReaderIntent.SkipToPreviousSentence) },
-                    onPlayPause = {
-                        keepHudVisible()
-                        viewModel.onIntent(if (state.isPlaying) ReaderIntent.Pause else ReaderIntent.PlayCurrentSentence)
-                    },
-                    onNextSentence = { keepHudVisible(); viewModel.onIntent(ReaderIntent.SkipToNextSentence) },
-                    onNextChapter = { keepHudVisible(); viewModel.onIntent(ReaderIntent.NextChapter) },
+                // 3e.2 — repli en bouton unique après 4s (isPillCollapsed,
+                // voir onAutoHide plus haut).
+                //
+                // Bug réel trouvé à la vérification device : un Crossfade
+                // partagé sur une seule position centrée faisait replier le
+                // FAB au centre au lieu du coin inférieur droit attendu, et
+                // le redéploiement se voyait glisser du centre vers la
+                // gauche — Crossfade redimensionne sa boîte interne vers la
+                // taille de la cible pendant la transition, donc un enfant
+                // bien plus étroit (le FAB, 56dp) que l'autre (la barre,
+                // ~250dp) décale visuellement le centrage réel en cours de
+                // fondu. Deux positions fixes dans un Box commun (Center
+                // pour la barre, CenterEnd — coin droit — pour le FAB),
+                // chacune animée en opacité seule via animateFloatAsState :
+                // aucune position n'est jamais interpolée, un pur fondu.
+                // AnimatedVisibility n'a pas d'overload BoxScope (seulement
+                // Column/RowScope) : inapplicable ici.
+                val fadeDuration = if (state.reduceMotion) 0 else 200
+                val barAlpha by animateFloatAsState(
+                    targetValue = if (isPillCollapsed) 0f else 1f,
+                    animationSpec = tween(fadeDuration),
+                    label = "TtsPillBarAlpha",
                 )
+                val fabAlpha by animateFloatAsState(
+                    targetValue = if (isPillCollapsed) 1f else 0f,
+                    animationSpec = tween(fadeDuration),
+                    label = "TtsPillBarCollapsedAlpha",
+                )
+                Box(modifier = Modifier.fillMaxWidth()) {
+                    if (barAlpha > 0f) {
+                        TtsPillBar(
+                            modifier = Modifier.align(Alignment.Center).graphicsLayer(alpha = barAlpha),
+                            isPlaying = state.isPlaying,
+                            hasPreviousChapter = state.hasPreviousChapter,
+                            hasNextChapter = state.hasNextChapter,
+                            onPreviousChapter = { keepHudVisible(); viewModel.onIntent(ReaderIntent.PreviousChapter) },
+                            onPreviousSentence = { keepHudVisible(); viewModel.onIntent(ReaderIntent.SkipToPreviousSentence) },
+                            onPlayPause = {
+                                keepHudVisible()
+                                viewModel.onIntent(if (state.isPlaying) ReaderIntent.Pause else ReaderIntent.PlayCurrentSentence)
+                            },
+                            onNextSentence = { keepHudVisible(); viewModel.onIntent(ReaderIntent.SkipToNextSentence) },
+                            onNextChapter = { keepHudVisible(); viewModel.onIntent(ReaderIntent.NextChapter) },
+                        )
+                    }
+                    if (fabAlpha > 0f) {
+                        TtsPillBarCollapsed(
+                            modifier = Modifier.align(Alignment.CenterEnd).graphicsLayer(alpha = fabAlpha),
+                            onExpand = {
+                                isPillCollapsed = false
+                                keepHudVisible()
+                            },
+                        )
+                    }
+                }
             } else {
                 UnifiedControlPanel(
                     isPlaying = state.isPlaying,
