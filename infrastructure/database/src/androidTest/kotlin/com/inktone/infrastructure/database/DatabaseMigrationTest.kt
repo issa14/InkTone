@@ -312,6 +312,40 @@ class DatabaseMigrationTest {
         v11.close()
     }
 
+    @Test
+    fun migration_11_vers_12_conserve_les_donnees_et_ajoute_interligne_luminosite_repos_oculaire() {
+        val v11 = helper.createDatabase(TEST_DB_NAME, 11)
+        v11.execSQL(
+            """
+            INSERT INTO user_preferences (id, theme, fontSize, defaultTtsEngine, crashReportingEnabled, language, fontFamily, reduceMotion, dynamicColorEnabled, readingRulerEnabled, dailyGoalMinutes, activeVoiceProfileId, readingMode, audioGain, useSystemFontScale)
+            VALUES (0, 'SYSTEM', 18, 'SHERPA_ONNX', 0, 'fr', 'DEFAULT', 0, 1, 0, 20, NULL, 'SCROLL', 1.0, 0)
+            """.trimIndent(),
+        )
+        v11.close()
+
+        val v12 = helper.runMigrationsAndValidate(
+            TEST_DB_NAME, 12, true,
+            MIGRATION_2_3, MIGRATION_3_4, MIGRATION_4_5, MIGRATION_5_6, MIGRATION_6_7,
+            MIGRATION_7_8, MIGRATION_8_9, MIGRATION_9_10, MIGRATION_10_11, MIGRATION_11_12,
+        )
+
+        v12.query(
+            "SELECT lineHeightMultiplier, readerBrightness, eyeRestReminderEnabled, eyeRestReminderIntervalMinutes FROM user_preferences WHERE id = 0",
+        ).use { cursor ->
+            assertEquals(true, cursor.moveToFirst())
+            assertEquals(1.4f, cursor.getFloat(0))
+            assertEquals(true, cursor.isNull(1)) // luminosité : valeur système par défaut
+            assertEquals(1, cursor.getInt(2))
+            assertEquals(60, cursor.getInt(3))
+        }
+        v12.execSQL("UPDATE user_preferences SET readerBrightness = 0.5 WHERE id = 0")
+        v12.query("SELECT readerBrightness FROM user_preferences WHERE id = 0").use { cursor ->
+            assertEquals(true, cursor.moveToFirst())
+            assertEquals(0.5f, cursor.getFloat(0))
+        }
+        v12.close()
+    }
+
     companion object {
         private const val TEST_DB_NAME = "migration-test"
     }

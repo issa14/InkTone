@@ -97,3 +97,13 @@ val MIGRATION_10_11 = object : Migration(10, 11) {
         db.execSQL("ALTER TABLE publications ADD COLUMN isPinned INTEGER NOT NULL DEFAULT 0")
     }
 }
+
+/** 3d.2/3d.3/3d.5 : interligne, luminosité du lecteur, rappel de repos oculaire. */
+val MIGRATION_11_12 = object : Migration(11, 12) {
+    override fun migrate(db: SupportSQLiteDatabase) {
+        db.execSQL("ALTER TABLE user_preferences ADD COLUMN lineHeightMultiplier REAL NOT NULL DEFAULT 1.4")
+        db.execSQL("ALTER TABLE user_preferences ADD COLUMN readerBrightness REAL DEFAULT NULL")
+        db.execSQL("ALTER TABLE user_preferences ADD COLUMN eyeRestReminderEnabled INTEGER NOT NULL DEFAULT 1")
+        db.execSQL("ALTER TABLE user_preferences ADD COLUMN eyeRestReminderIntervalMinutes INTEGER NOT NULL DEFAULT 60")
+    }
+}
