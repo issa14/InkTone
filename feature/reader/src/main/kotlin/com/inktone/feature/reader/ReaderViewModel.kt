@@ -80,6 +80,8 @@ class ReaderViewModel @Inject constructor(
                     isReadingRulerEnabled = preferences.readingRulerEnabled,
                     lineHeightMultiplier = preferences.lineHeightMultiplier,
                     readerBrightness = preferences.readerBrightness,
+                    eyeRestReminderEnabled = preferences.eyeRestReminderEnabled,
+                    eyeRestReminderIntervalMinutes = preferences.eyeRestReminderIntervalMinutes,
                 )
             }
         }
@@ -91,6 +93,15 @@ class ReaderViewModel @Inject constructor(
     private val sentenceAudioBuffer = SentenceAudioBuffer(viewModelScope, ttsEngine)
     private val annotationSelectionHandler = AnnotationSelectionHandler()
     private var sleepTimerJob: Job? = null
+
+    // 3d.5 — rappel de repos oculaire : eyeRestReminderJob porte le délai
+    // jusqu'à l'échéance (relancé à chaque reprise, jamais deux en
+    // parallèle comme sleepTimerJob) ; eyeRestCountdownJob porte le
+    // compte à rebours de 60s du popup une fois affiché ;
+    // wasPlayingBeforeEyeRest mémorise s'il faut reprendre le TTS.
+    private var eyeRestReminderJob: Job? = null
+    private var eyeRestCountdownJob: Job? = null
+    private var wasPlayingBeforeEyeRest: Boolean = false
 
     // A.1bis — job de la coroutine de lecture TTS en cours (une phrase, ou
     // la chaîne auto-avance). Annulé par pausePlayback()/skipSentence() en
@@ -160,6 +171,10 @@ class ReaderViewModel @Inject constructor(
             is ReaderIntent.SetActiveVoiceProfile -> setActiveVoiceProfile(intent.profileId)
             is ReaderIntent.SetLineHeight -> setLineHeight(intent.multiplier)
             is ReaderIntent.SetReaderBrightness -> setReaderBrightness(intent.value)
+            is ReaderIntent.SetEyeRestReminderEnabled -> setEyeRestReminderEnabled(intent.enabled)
+            is ReaderIntent.SetEyeRestReminderInterval -> setEyeRestReminderInterval(intent.minutes)
+            is ReaderIntent.ResumeFromEyeRestReminder -> resumeFromEyeRestReminder()
+            is ReaderIntent.SnoozeEyeRestReminder -> snoozeEyeRestReminder()
         }
     }
 
@@ -297,6 +312,7 @@ class ReaderViewModel @Inject constructor(
                     triggerPreload(_state.value.currentChapterIndex)
                     observeAnnotations(publicationId)
                     observeBookmarks(publicationId)
+                    if (prefs.eyeRestReminderEnabled) scheduleEyeRestReminder(prefs.eyeRestReminderIntervalMinutes)
                     if (targetLocator != null) navigateToLocator(targetLocator)
                 }
                 else -> {
@@ -660,6 +676,87 @@ class ReaderViewModel @Inject constructor(
     }
 
     /**
+     * 3d.5 — programme l'échéance du rappel de repos oculaire. Un seul job
+     * actif à la fois (même principe que `setSleepTimer`) : reprogrammer
+     * annule tout délai en cours plutôt que d'en laisser deux coexister.
+     */
+    private fun scheduleEyeRestReminder(afterMinutes: Int) {
+        eyeRestReminderJob?.cancel()
+        eyeRestReminderJob = viewModelScope.launch {
+            delay(afterMinutes * 60_000L)
+            triggerEyeRestReminder()
+        }
+    }
+
+    /**
+     * 3d.5 — à l'échéance : coupe le TTS s'il est actif (jamais
+     * silencieusement — le popup visible EST l'avertissement, voir doc du
+     * lot 3d tâche 3d.5 et consignation 3d.7 sur le comportement audio
+     * retenu), affiche le popup, démarre le compte à rebours de 60s.
+     */
+    private fun triggerEyeRestReminder() {
+        wasPlayingBeforeEyeRest = _state.value.isPlaying
+        if (wasPlayingBeforeEyeRest) pausePlayback()
+        _state.value = _state.value.copy(
+            isEyeRestReminderVisible = true,
+            eyeRestReminderCountdownS = EYE_REST_REMINDER_COUNTDOWN_S,
+        )
+        eyeRestCountdownJob?.cancel()
+        eyeRestCountdownJob = viewModelScope.launch {
+            repeat(EYE_REST_REMINDER_COUNTDOWN_S) {
+                delay(1_000L)
+                _state.value = _state.value.copy(
+                    eyeRestReminderCountdownS = (_state.value.eyeRestReminderCountdownS - 1).coerceAtLeast(0),
+                )
+            }
+            // Countdown écoulé sans action explicite : équivalent à
+            // "Reprendre" — l'audio ne doit jamais rester coupé
+            // indéfiniment sans action de l'utilisateur.
+            resumeFromEyeRestReminder()
+        }
+    }
+
+    /** 3d.5 — « Reprendre » (explicite ou countdown écoulé), voir `ReaderIntent.ResumeFromEyeRestReminder`. */
+    private fun resumeFromEyeRestReminder() {
+        eyeRestCountdownJob?.cancel()
+        _state.value = _state.value.copy(isEyeRestReminderVisible = false)
+        if (wasPlayingBeforeEyeRest) playCurrentSentence()
+        viewModelScope.launch {
+            val prefs = preferencesRepository.get()
+            if (prefs.eyeRestReminderEnabled) scheduleEyeRestReminder(prefs.eyeRestReminderIntervalMinutes)
+        }
+    }
+
+    /** 3d.5 — « Reporter », voir `ReaderIntent.SnoozeEyeRestReminder`. */
+    private fun snoozeEyeRestReminder() {
+        eyeRestCountdownJob?.cancel()
+        _state.value = _state.value.copy(isEyeRestReminderVisible = false)
+        scheduleEyeRestReminder(EYE_REST_REMINDER_SNOOZE_MINUTES)
+    }
+
+    /** 3d.5 — réglage global, voir `ReaderUiState.eyeRestReminderEnabled`. */
+    private fun setEyeRestReminderEnabled(enabled: Boolean) {
+        viewModelScope.launch {
+            val prefs = preferencesRepository.get()
+            preferencesRepository.update(prefs.copy(eyeRestReminderEnabled = enabled))
+            if (enabled) {
+                scheduleEyeRestReminder(prefs.eyeRestReminderIntervalMinutes)
+            } else {
+                eyeRestReminderJob?.cancel()
+            }
+        }
+    }
+
+    /** 3d.5 — réglage global, voir `ReaderUiState.eyeRestReminderIntervalMinutes`. */
+    private fun setEyeRestReminderInterval(minutes: Int) {
+        viewModelScope.launch {
+            val prefs = preferencesRepository.get()
+            preferencesRepository.update(prefs.copy(eyeRestReminderIntervalMinutes = minutes))
+            if (prefs.eyeRestReminderEnabled) scheduleEyeRestReminder(minutes)
+        }
+    }
+
+    /**
      * A.2 — Nettoyage des ressources audio et du minuteur de sommeil
      * quand le ViewModel est détruit. Évite qu'un segment audio continue
      * de jouer après la destruction de l'écran.
@@ -669,11 +766,16 @@ class ReaderViewModel @Inject constructor(
         audioSegmentPlayer.stop()
         sleepTimerJob?.cancel()
         scrollPersistJob?.cancel()
+        eyeRestReminderJob?.cancel()
+        eyeRestCountdownJob?.cancel()
     }
 }
 
 /** Tâche 3c.1 — au changement de phrase visible, pas à chaque pixel défilé. */
 private const val SCROLL_PERSIST_DEBOUNCE_MS = 400L
+
+/** 3d.5 — snooze court du popup de repos oculaire, distinct de l'intervalle configuré. */
+private const val EYE_REST_REMINDER_SNOOZE_MINUTES = 10
 
 /** A.5 — repli quand `UserPreferences.activeVoiceProfileId` est `null`. */
 private val DEFAULT_VOICE_PROFILE = VoiceProfile(

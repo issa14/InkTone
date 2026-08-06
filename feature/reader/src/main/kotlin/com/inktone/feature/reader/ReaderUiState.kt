@@ -73,6 +73,15 @@ data class ReaderUiState(
     // patron d'observation continue que lineHeightMultiplier. null =
     // valeur système, appliqué à la fenêtre par ReaderBrightnessEffect.
     val readerBrightness: Float? = null,
+    // 3d.5 — rappel de repos oculaire, indépendant du minuteur de sommeil
+    // TTS (voir SleepTimerPanel, section 2). enabled/intervalMinutes :
+    // réglage global miroir de UserPreferences (même patron que
+    // lineHeightMultiplier/readerBrightness). isVisible/countdownS :
+    // état ponctuel du popup, jamais persisté.
+    val eyeRestReminderEnabled: Boolean = true,
+    val eyeRestReminderIntervalMinutes: Int = 60,
+    val isEyeRestReminderVisible: Boolean = false,
+    val eyeRestReminderCountdownS: Int = EYE_REST_REMINDER_COUNTDOWN_S,
 ) {
     val currentChapter: Chapter? get() = chapters.getOrNull(currentChapterIndex)
     val hasNextChapter: Boolean get() = currentChapterIndex < chapters.lastIndex
@@ -133,6 +142,9 @@ data class ReaderUiState(
     // était une information réelle, sa suppression est un choix
     // d'alignement, pas une évidence.
 }
+
+/** 3d.5 — durée du compte à rebours du popup de repos oculaire (UX_FLOW_DESIGN.md §Minuteur). */
+const val EYE_REST_REMINDER_COUNTDOWN_S = 60
 
 private fun chapterCharCount(chapter: Chapter): Int =
     chapter.paragraphs.sumOf { paragraph -> paragraph.sentences.sumOf { it.text.length } }
@@ -260,4 +272,23 @@ sealed interface ReaderIntent {
 
     /** 3d.3 — luminosité de la fenêtre du lecteur. `null` = valeur système. */
     data class SetReaderBrightness(val value: Float?) : ReaderIntent
+
+    /** 3d.5 — active/désactive le rappel de repos oculaire (réglage global). */
+    data class SetEyeRestReminderEnabled(val enabled: Boolean) : ReaderIntent
+
+    /** 3d.5 — intervalle du rappel de repos oculaire, en minutes (stepper ±15min). */
+    data class SetEyeRestReminderInterval(val minutes: Int) : ReaderIntent
+
+    /**
+     * 3d.5 — « Reprendre » du popup de repos oculaire : reprend le TTS
+     * immédiatement s'il était actif, relance l'intervalle complet.
+     */
+    data object ResumeFromEyeRestReminder : ReaderIntent
+
+    /**
+     * 3d.5 — « Reporter » du popup de repos oculaire : ne reprend PAS le
+     * TTS, reprogramme l'échéance à +10 min (snooze court, distinct de
+     * l'intervalle configuré).
+     */
+    data object SnoozeEyeRestReminder : ReaderIntent
 }

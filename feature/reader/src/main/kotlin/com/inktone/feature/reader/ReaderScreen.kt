@@ -577,12 +577,28 @@ fun ReaderScreen(
             )
         }
 
-        // 3d.4 — Panneau Minuteur (remplace le cycle sur l'icône Veille)
+        // 3d.4/3d.5 — Panneau Minuteur (remplace le cycle sur l'icône Veille) + repos oculaire
         if (showSleepTimerPanel) {
             SleepTimerPanel(
                 remainingMinutes = state.sleepTimer?.let { (it.remainingMs / 60_000L).toInt() },
                 onSetSleepTimer = { minutes -> viewModel.onIntent(ReaderIntent.SetSleepTimer(minutes)) },
+                eyeRestReminderEnabled = state.eyeRestReminderEnabled,
+                eyeRestReminderIntervalMinutes = state.eyeRestReminderIntervalMinutes,
+                onSetEyeRestReminderEnabled = { enabled -> viewModel.onIntent(ReaderIntent.SetEyeRestReminderEnabled(enabled)) },
+                onSetEyeRestReminderInterval = { minutes -> viewModel.onIntent(ReaderIntent.SetEyeRestReminderInterval(minutes)) },
                 onDismiss = { showSleepTimerPanel = false },
+            )
+        }
+
+        // 3d.5 — popup de rappel de repos oculaire, indépendant du HUD :
+        // doit rester visible même si isHudVisible est déjà retombé à
+        // faux (contrairement aux panneaux ci-dessus, ouverts par une
+        // action HUD explicite).
+        if (state.isEyeRestReminderVisible) {
+            EyeRestReminderDialog(
+                countdownSeconds = state.eyeRestReminderCountdownS,
+                onResume = { viewModel.onIntent(ReaderIntent.ResumeFromEyeRestReminder) },
+                onSnooze = { viewModel.onIntent(ReaderIntent.SnoozeEyeRestReminder) },
             )
         }
 

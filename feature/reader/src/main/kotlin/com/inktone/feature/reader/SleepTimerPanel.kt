@@ -17,11 +17,17 @@ import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.FilterChip
 import androidx.compose.material3.HorizontalDivider
+import androidx.compose.material3.IconButton
+import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.ModalBottomSheet
+import androidx.compose.material3.Switch
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.material3.rememberModalBottomSheetState
+import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.Add
+import androidx.compose.material.icons.filled.Remove
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
@@ -51,6 +57,10 @@ import androidx.compose.ui.unit.dp
 fun SleepTimerPanel(
     remainingMinutes: Int?,
     onSetSleepTimer: (Int?) -> Unit,
+    eyeRestReminderEnabled: Boolean,
+    eyeRestReminderIntervalMinutes: Int,
+    onSetEyeRestReminderEnabled: (Boolean) -> Unit,
+    onSetEyeRestReminderInterval: (Int) -> Unit,
     onDismiss: () -> Unit,
 ) {
     val sheetState = rememberModalBottomSheetState(skipPartiallyExpanded = true)
@@ -96,7 +106,45 @@ fun SleepTimerPanel(
 
             Spacer(Modifier.height(24.dp))
             HorizontalDivider()
+            Spacer(Modifier.height(16.dp))
+
+            // ── Section 2 — Repos oculaire, indépendant du TTS (3d.5) ──
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.SpaceBetween,
+            ) {
+                Text("Rappel de repos oculaire", style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.Bold)
+                Switch(checked = eyeRestReminderEnabled, onCheckedChange = onSetEyeRestReminderEnabled)
+            }
+
+            if (eyeRestReminderEnabled) {
+                Spacer(Modifier.height(12.dp))
+                Text("Intervalle", style = MaterialTheme.typography.labelLarge)
+                Spacer(Modifier.height(4.dp))
+                Row(verticalAlignment = Alignment.CenterVertically) {
+                    IconButton(
+                        onClick = { onSetEyeRestReminderInterval((eyeRestReminderIntervalMinutes - 15).coerceAtLeast(15)) },
+                    ) { Icon(Icons.Filled.Remove, contentDescription = "Diminuer l'intervalle") }
+                    Text(formatEyeRestInterval(eyeRestReminderIntervalMinutes), style = MaterialTheme.typography.bodyLarge)
+                    IconButton(
+                        onClick = { onSetEyeRestReminderInterval(eyeRestReminderIntervalMinutes + 15) },
+                    ) { Icon(Icons.Filled.Add, contentDescription = "Augmenter l'intervalle") }
+                }
+            }
+
+            Spacer(Modifier.height(16.dp))
         }
+    }
+}
+
+/** 3d.5 — format `1h30`, pas seulement des heures rondes (UX_FLOW_DESIGN.md §Minuteur). */
+private fun formatEyeRestInterval(totalMinutes: Int): String {
+    val hours = totalMinutes / 60
+    val minutes = totalMinutes % 60
+    return when {
+        hours == 0 -> "${minutes}min"
+        minutes == 0 -> "${hours}h"
+        else -> "${hours}h$minutes"
     }
 }
 
