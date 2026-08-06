@@ -31,6 +31,7 @@ data class Publication(
     val seriesName: String? = null,
     val seriesIndex: Float? = null,
     val isFavorite: Boolean = false,
+    val isPinned: Boolean = false,
     val subjects: List<String> = emptyList(),
     val isDrmProtected: Boolean = false,
     val importDate: Long,

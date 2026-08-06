@@ -13,6 +13,7 @@ import com.inktone.domain.model.ReadingOverrides
 import com.inktone.domain.model.ReadingState
 import com.inktone.domain.model.SleepTimerState
 import com.inktone.domain.model.TtsEngineId
+import com.inktone.domain.model.UserPreferences
 import com.inktone.domain.model.VoiceProfile
 import com.inktone.domain.repository.AnnotationRepository
 import com.inktone.domain.repository.BookmarkRepository
@@ -26,6 +27,7 @@ import com.inktone.domain.usecase.AddAnnotationUseCase
 import com.inktone.domain.usecase.CreateBookmarkUseCase
 import com.inktone.domain.usecase.DeleteBookmarkUseCase
 import com.inktone.domain.usecase.GetReadingStateUseCase
+import com.inktone.domain.usecase.GetVoiceProfilesUseCase
 import com.inktone.domain.usecase.UpdateReadingStateUseCase
 import com.inktone.domain.valueobject.Locator
 import dagger.hilt.android.lifecycle.HiltViewModel
@@ -55,6 +57,7 @@ class ReaderViewModel @Inject constructor(
     private val publicationRepository: PublicationRepository,
     private val preferencesRepository: PreferencesRepository,
     private val voiceProfileRepository: VoiceProfileRepository,
+    private val getVoiceProfiles: GetVoiceProfilesUseCase,
     private val annotationRepository: AnnotationRepository,
     private val addAnnotation: AddAnnotationUseCase,
     private val bookmarkRepository: BookmarkRepository,
@@ -73,7 +76,14 @@ class ReaderViewModel @Inject constructor(
         // dans LibraryViewModel).
         viewModelScope.launch {
             preferencesRepository.observe().collect { preferences ->
-                _state.value = _state.value.copy(isReadingRulerEnabled = preferences.readingRulerEnabled)
+                _state.value = _state.value.copy(
+                    isReadingRulerEnabled = preferences.readingRulerEnabled,
+                    lineHeightMultiplier = preferences.lineHeightMultiplier,
+                    readerBrightness = preferences.readerBrightness,
+                    eyeRestReminderEnabled = preferences.eyeRestReminderEnabled,
+                    eyeRestReminderIntervalMinutes = preferences.eyeRestReminderIntervalMinutes,
+                    reduceMotion = preferences.reduceMotion,
+                )
             }
         }
     }
@@ -84,6 +94,15 @@ class ReaderViewModel @Inject constructor(
     private val sentenceAudioBuffer = SentenceAudioBuffer(viewModelScope, ttsEngine)
     private val annotationSelectionHandler = AnnotationSelectionHandler()
     private var sleepTimerJob: Job? = null
+
+    // 3d.5 — rappel de repos oculaire : eyeRestReminderJob porte le délai
+    // jusqu'à l'échéance (relancé à chaque reprise, jamais deux en
+    // parallèle comme sleepTimerJob) ; eyeRestCountdownJob porte le
+    // compte à rebours de 60s du popup une fois affiché ;
+    // wasPlayingBeforeEyeRest mémorise s'il faut reprendre le TTS.
+    private var eyeRestReminderJob: Job? = null
+    private var eyeRestCountdownJob: Job? = null
+    private var wasPlayingBeforeEyeRest: Boolean = false
 
     // A.1bis — job de la coroutine de lecture TTS en cours (une phrase, ou
     // la chaîne auto-avance). Annulé par pausePlayback()/skipSentence() en
@@ -137,8 +156,8 @@ class ReaderViewModel @Inject constructor(
             is ReaderIntent.ClearSentenceSelection -> _state.value = _state.value.copy(
                 selectionAnchorIndex = null, selectionFocusIndex = null,
             )
-            is ReaderIntent.ConfirmAnnotation -> confirmAnnotation(intent.color)
-            is ReaderIntent.CreateBookmark -> createBookmarkAtCurrentPosition()
+            is ReaderIntent.ConfirmAnnotation -> confirmAnnotation(intent.color, intent.content)
+            is ReaderIntent.ToggleBookmarkAtCurrentPosition -> toggleBookmarkAtCurrentPosition()
             is ReaderIntent.ToggleBookmarkList -> _state.value = _state.value.copy(
                 isBookmarkListVisible = !_state.value.isBookmarkListVisible,
             )
@@ -148,6 +167,45 @@ class ReaderViewModel @Inject constructor(
             is ReaderIntent.SetSleepTimer -> setSleepTimer(intent.minutes)
             is ReaderIntent.SkipToPreviousSentence -> skipSentence(-1)
             is ReaderIntent.SkipToNextSentence -> skipSentence(1)
+            is ReaderIntent.UpdateScrollPosition -> updateScrollPosition(intent.sentenceIndex)
+            is ReaderIntent.SetTtsSpeed -> setTtsSpeed(intent.speed)
+            is ReaderIntent.SetActiveVoiceProfile -> setActiveVoiceProfile(intent.profileId)
+            is ReaderIntent.SetLineHeight -> setLineHeight(intent.multiplier)
+            is ReaderIntent.SetReaderBrightness -> setReaderBrightness(intent.value)
+            is ReaderIntent.SetEyeRestReminderEnabled -> setEyeRestReminderEnabled(intent.enabled)
+            is ReaderIntent.SetEyeRestReminderInterval -> setEyeRestReminderInterval(intent.minutes)
+            is ReaderIntent.ResumeFromEyeRestReminder -> resumeFromEyeRestReminder()
+            is ReaderIntent.SnoozeEyeRestReminder -> snoozeEyeRestReminder()
+        }
+    }
+
+    private var scrollPersistJob: Job? = null
+
+    /**
+     * Tâche 3c.1 — antipattern legacy corrigé : la position de lecture en
+     * défilement silencieux (sans TTS) n'était jamais persistée avant ce
+     * lot. Écrit `currentSentenceIndex` immédiatement (pour que le
+     * pourcentage/la page dérivés dans `ReaderUiState`/`ReaderScreen`
+     * restent cohérents pendant le geste), mais débounce la persistance en
+     * base — un défilement rapide traverse potentiellement des dizaines de
+     * phrases par seconde, écrire à chaque changement d'index saturerait
+     * Room pour une position qui n'a d'intérêt qu'une fois le défilement
+     * stabilisé.
+     *
+     * Ignoré pendant le TTS (K3, chemins manuel et TTS jamais simultanés) :
+     * `playCurrentSentence` avance déjà `currentSentenceIndex` et persiste
+     * sa propre position, un second écrivain concurrent créerait la
+     * divergence que K3 interdit.
+     */
+    private fun updateScrollPosition(sentenceIndex: Int) {
+        if (_state.value.isPlaying) return
+        if (sentenceIndex == _state.value.currentSentenceIndex) return
+        val chapterIndex = _state.value.currentChapterIndex
+        _state.value = _state.value.copy(currentSentenceIndex = sentenceIndex)
+        scrollPersistJob?.cancel()
+        scrollPersistJob = viewModelScope.launch {
+            delay(SCROLL_PERSIST_DEBOUNCE_MS)
+            persistPosition(chapterIndex = chapterIndex, sentenceIndex = sentenceIndex)
         }
     }
 
@@ -198,6 +256,19 @@ class ReaderViewModel @Inject constructor(
     }
 
     /**
+     * A.5/3d.1 — résolution unique du profil vocal actif, partagée par
+     * `playCurrentSentence`, `openPublication` (état initial du panneau
+     * Voix) et `setTtsSpeed`/`setActiveVoiceProfile` : avant ce lot, le
+     * même repli (voix native française par défaut) était dupliqué en
+     * ligne dans `playCurrentSentence` uniquement, aucune autre fonction
+     * n'avait besoin de connaître le profil actif.
+     */
+    private suspend fun resolveVoiceProfile(prefs: UserPreferences): VoiceProfile =
+        prefs.activeVoiceProfileId
+            ?.let { voiceProfileRepository.getById(it) }
+            ?: DEFAULT_VOICE_PROFILE
+
+    /**
      * Ouvre une publication déjà importée : récupère son `fileUri` via
      * le repository, parse le contenu (CompositePublicationParser),
      * puis restaure la dernière position connue (K3) si elle existe.
@@ -220,7 +291,14 @@ class ReaderViewModel @Inject constructor(
                         global = preferencesRepository.get(),
                     )
                     val prefs = preferencesRepository.get()
+                    val activeVoiceProfile = resolveVoiceProfile(prefs)
+                    val availableVoiceProfiles = getVoiceProfiles()
                     _state.value = ReaderUiState(
+                        // 3b.3 — barre du haut (ReaderTopBar) : source
+                        // unique, jamais rechargé depuis un repository
+                        // dans le composable.
+                        title = publication.title,
+                        author = publication.authors.joinToString(", ").ifBlank { null },
                         chapters = result.documentModel.chapters,
                         tableOfContents = result.documentModel.tableOfContents,
                         currentChapterIndex = restored?.locator?.chapterIndex ?: 0,
@@ -228,10 +306,14 @@ class ReaderViewModel @Inject constructor(
                         // B.1 — restaure le mode de lecture persisté
                         readingMode = if (prefs.readingMode == "PAGED") ReadingMode.PAGED else ReadingMode.SCROLL,
                         currentOverrides = restored?.overrides,
+                        activeVoiceProfile = activeVoiceProfile,
+                        availableVoiceProfiles = availableVoiceProfiles,
+                        lineHeightMultiplier = prefs.lineHeightMultiplier,
                     )
                     triggerPreload(_state.value.currentChapterIndex)
                     observeAnnotations(publicationId)
                     observeBookmarks(publicationId)
+                    if (prefs.eyeRestReminderEnabled) scheduleEyeRestReminder(prefs.eyeRestReminderIntervalMinutes)
                     if (targetLocator != null) navigateToLocator(targetLocator)
                 }
                 else -> {
@@ -268,7 +350,7 @@ class ReaderViewModel @Inject constructor(
      * connu par construction (sélection par phrase, voir
      * `AnnotationSelectionHandler`).
      */
-    private fun confirmAnnotation(color: AnnotationColor) {
+    private fun confirmAnnotation(color: AnnotationColor, content: String? = null) {
         val range = _state.value.selectedSentenceRange ?: return
         val chapter = _state.value.currentChapter ?: return
         val publicationId = currentPublicationId ?: return
@@ -286,6 +368,7 @@ class ReaderViewModel @Inject constructor(
                     startLocator = startLocator,
                     endLocator = endLocator,
                     color = color,
+                    content = content,
                     createdAt = now,
                     updatedAt = now,
                 ),
@@ -304,25 +387,35 @@ class ReaderViewModel @Inject constructor(
     }
 
     /**
-     * Capture la position courante (Tâche 7.2) — plus simple que
-     * [confirmAnnotation] : un seul `Locator`, pas de plage à résoudre.
-     * Réutilise `Sentence.startLocator`, déjà utilisé par
-     * [persistPosition]/[playCurrentSentence] pour la même conversion.
+     * Tâche 3c.3 — toggle « Marquer cette page » : retire le signet déjà
+     * présent à la position courante s'il existe (jamais de doublon,
+     * cible confirmée dans `UX_FLOW_DESIGN.md`), sinon en crée un. Même
+     * conversion `Sentence.startLocator` que [persistPosition]/
+     * [playCurrentSentence] — une seule source pour « la position
+     * courante », jamais un second calcul.
      */
-    private fun createBookmarkAtCurrentPosition() {
+    private fun toggleBookmarkAtCurrentPosition() {
         val chapter = _state.value.currentChapter ?: return
         val sentence = chapter.paragraphs.flatMap { it.sentences }.getOrNull(_state.value.currentSentenceIndex) ?: return
         val publicationId = currentPublicationId ?: return
+        val existing = _state.value.bookmarks.firstOrNull { bookmark ->
+            bookmark.locator.chapterIndex == chapter.index &&
+                bookmark.locator.charOffset in sentence.startOffset until sentence.endOffset
+        }
 
         viewModelScope.launch {
-            createBookmark(
-                Bookmark(
-                    id = UUID.randomUUID().toString(),
-                    publicationId = publicationId,
-                    locator = sentence.startLocator(chapterIndex = chapter.index, resourceHref = chapter.href),
-                    createdAt = System.currentTimeMillis(),
-                ),
-            )
+            if (existing != null) {
+                deleteBookmark(existing.id)
+            } else {
+                createBookmark(
+                    Bookmark(
+                        id = UUID.randomUUID().toString(),
+                        publicationId = publicationId,
+                        locator = sentence.startLocator(chapterIndex = chapter.index, resourceHref = chapter.href),
+                        createdAt = System.currentTimeMillis(),
+                    ),
+                )
+            }
         }
     }
 
@@ -464,24 +557,24 @@ class ReaderViewModel @Inject constructor(
                 if (_state.value.hasNextChapter) {
                     onIntent(ReaderIntent.NextChapter)
                 } else {
-                    _state.value = _state.value.copy(isPlaying = false)
+                    _state.value = _state.value.copy(isPlaying = false, isAudioActive = false)
                 }
                 return@launch
             }
 
-            _state.value = _state.value.copy(isPlaying = true)
+            // 3e.3 — isAudioActive reste faux pendant la synthèse
+            // (sentenceAudioBuffer.get, potentiellement lente si le
+            // segment n'est pas déjà préchargé) : isPlaying seul ne suffit
+            // pas à distinguer « TTS engagé » de « audio effectivement en
+            // train de sortir », voir ReaderUiState.isAudioActive.
+            _state.value = _state.value.copy(isPlaying = true, isAudioActive = false)
 
             val sentence = sentences[index]
             // A.5 — résout le profil vocal actif depuis les préférences utilisateur
-            val prefs = preferencesRepository.get()
-            val voiceProfile = prefs.activeVoiceProfileId
-                ?.let { voiceProfileRepository.getById(it) }
-                ?: VoiceProfile(
-                    id = "vp-native-fr", engine = TtsEngineId.ANDROID_NATIVE,
-                    voice = "fr-fr-default", language = "fr-FR",
-                )
+            val voiceProfile = resolveVoiceProfile(preferencesRepository.get())
             val segment = sentenceAudioBuffer.get(sentence, voiceProfile)
             audioSegmentPlayer.play(segment)
+            _state.value = _state.value.copy(isAudioActive = true)
 
             // Précharge la phrase suivante pendant que celle-ci se joue
             sentences.getOrNull(index + 1)?.let {
@@ -495,7 +588,7 @@ class ReaderViewModel @Inject constructor(
                 delay((wt.endMs - wt.startMs).coerceAtLeast(0L))
             }
 
-            _state.value = _state.value.copy(highlightedWordRange = null)
+            _state.value = _state.value.copy(highlightedWordRange = null, isAudioActive = false)
 
             updateReadingState(
                 ReadingState(
@@ -523,7 +616,7 @@ class ReaderViewModel @Inject constructor(
     private fun pausePlayback() {
         playbackJob?.cancel()
         audioSegmentPlayer.stop()
-        _state.value = _state.value.copy(isPlaying = false, highlightedWordRange = null)
+        _state.value = _state.value.copy(isPlaying = false, isAudioActive = false, highlightedWordRange = null)
     }
 
     /**
@@ -545,6 +638,132 @@ class ReaderViewModel @Inject constructor(
     }
 
     /**
+     * 3d.1 — écrit la vitesse sur le profil vocal actif (jamais sur
+     * `UserPreferences`, voir doc du lot 3d tâche 3d.1). Si aucun profil
+     * n'était actif (repli natif par défaut, jamais persisté), ce premier
+     * réglage le persiste et l'active — sinon la vitesse choisie serait
+     * perdue à la prochaine résolution (`resolveVoiceProfile` retomberait
+     * sur le même repli non modifié).
+     */
+    private fun setTtsSpeed(speed: Float) {
+        viewModelScope.launch {
+            val prefs = preferencesRepository.get()
+            val updated = resolveVoiceProfile(prefs).copy(speed = speed)
+            voiceProfileRepository.save(updated)
+            if (prefs.activeVoiceProfileId != updated.id) {
+                preferencesRepository.update(prefs.copy(activeVoiceProfileId = updated.id))
+            }
+            _state.value = _state.value.copy(activeVoiceProfile = updated)
+        }
+    }
+
+    /** 3d.1 — change le profil vocal actif (préférence globale, panneau Voix). */
+    private fun setActiveVoiceProfile(profileId: String) {
+        viewModelScope.launch {
+            val prefs = preferencesRepository.get()
+            preferencesRepository.update(prefs.copy(activeVoiceProfileId = profileId))
+            _state.value = _state.value.copy(activeVoiceProfile = voiceProfileRepository.getById(profileId))
+        }
+    }
+
+    /** 3d.2 — réglage global d'interligne, voir `ReaderUiState.lineHeightMultiplier`. */
+    private fun setLineHeight(multiplier: Float) {
+        viewModelScope.launch {
+            val current = preferencesRepository.get()
+            preferencesRepository.update(current.copy(lineHeightMultiplier = multiplier))
+        }
+    }
+
+    /** 3d.3 — réglage global de luminosité, voir `ReaderUiState.readerBrightness`. */
+    private fun setReaderBrightness(value: Float?) {
+        viewModelScope.launch {
+            val current = preferencesRepository.get()
+            preferencesRepository.update(current.copy(readerBrightness = value))
+        }
+    }
+
+    /**
+     * 3d.5 — programme l'échéance du rappel de repos oculaire. Un seul job
+     * actif à la fois (même principe que `setSleepTimer`) : reprogrammer
+     * annule tout délai en cours plutôt que d'en laisser deux coexister.
+     */
+    private fun scheduleEyeRestReminder(afterMinutes: Int) {
+        eyeRestReminderJob?.cancel()
+        eyeRestReminderJob = viewModelScope.launch {
+            delay(afterMinutes * 60_000L)
+            triggerEyeRestReminder()
+        }
+    }
+
+    /**
+     * 3d.5 — à l'échéance : coupe le TTS s'il est actif (jamais
+     * silencieusement — le popup visible EST l'avertissement, voir doc du
+     * lot 3d tâche 3d.5 et consignation 3d.7 sur le comportement audio
+     * retenu), affiche le popup, démarre le compte à rebours de 60s.
+     */
+    private fun triggerEyeRestReminder() {
+        wasPlayingBeforeEyeRest = _state.value.isPlaying
+        if (wasPlayingBeforeEyeRest) pausePlayback()
+        _state.value = _state.value.copy(
+            isEyeRestReminderVisible = true,
+            eyeRestReminderCountdownS = EYE_REST_REMINDER_COUNTDOWN_S,
+        )
+        eyeRestCountdownJob?.cancel()
+        eyeRestCountdownJob = viewModelScope.launch {
+            repeat(EYE_REST_REMINDER_COUNTDOWN_S) {
+                delay(1_000L)
+                _state.value = _state.value.copy(
+                    eyeRestReminderCountdownS = (_state.value.eyeRestReminderCountdownS - 1).coerceAtLeast(0),
+                )
+            }
+            // Countdown écoulé sans action explicite : équivalent à
+            // "Reprendre" — l'audio ne doit jamais rester coupé
+            // indéfiniment sans action de l'utilisateur.
+            resumeFromEyeRestReminder()
+        }
+    }
+
+    /** 3d.5 — « Reprendre » (explicite ou countdown écoulé), voir `ReaderIntent.ResumeFromEyeRestReminder`. */
+    private fun resumeFromEyeRestReminder() {
+        eyeRestCountdownJob?.cancel()
+        _state.value = _state.value.copy(isEyeRestReminderVisible = false)
+        if (wasPlayingBeforeEyeRest) playCurrentSentence()
+        viewModelScope.launch {
+            val prefs = preferencesRepository.get()
+            if (prefs.eyeRestReminderEnabled) scheduleEyeRestReminder(prefs.eyeRestReminderIntervalMinutes)
+        }
+    }
+
+    /** 3d.5 — « Reporter », voir `ReaderIntent.SnoozeEyeRestReminder`. */
+    private fun snoozeEyeRestReminder() {
+        eyeRestCountdownJob?.cancel()
+        _state.value = _state.value.copy(isEyeRestReminderVisible = false)
+        scheduleEyeRestReminder(EYE_REST_REMINDER_SNOOZE_MINUTES)
+    }
+
+    /** 3d.5 — réglage global, voir `ReaderUiState.eyeRestReminderEnabled`. */
+    private fun setEyeRestReminderEnabled(enabled: Boolean) {
+        viewModelScope.launch {
+            val prefs = preferencesRepository.get()
+            preferencesRepository.update(prefs.copy(eyeRestReminderEnabled = enabled))
+            if (enabled) {
+                scheduleEyeRestReminder(prefs.eyeRestReminderIntervalMinutes)
+            } else {
+                eyeRestReminderJob?.cancel()
+            }
+        }
+    }
+
+    /** 3d.5 — réglage global, voir `ReaderUiState.eyeRestReminderIntervalMinutes`. */
+    private fun setEyeRestReminderInterval(minutes: Int) {
+        viewModelScope.launch {
+            val prefs = preferencesRepository.get()
+            preferencesRepository.update(prefs.copy(eyeRestReminderIntervalMinutes = minutes))
+            if (prefs.eyeRestReminderEnabled) scheduleEyeRestReminder(minutes)
+        }
+    }
+
+    /**
      * A.2 — Nettoyage des ressources audio et du minuteur de sommeil
      * quand le ViewModel est détruit. Évite qu'un segment audio continue
      * de jouer après la destruction de l'écran.
@@ -553,5 +772,20 @@ class ReaderViewModel @Inject constructor(
         super.onCleared()
         audioSegmentPlayer.stop()
         sleepTimerJob?.cancel()
+        scrollPersistJob?.cancel()
+        eyeRestReminderJob?.cancel()
+        eyeRestCountdownJob?.cancel()
     }
 }
+
+/** Tâche 3c.1 — au changement de phrase visible, pas à chaque pixel défilé. */
+private const val SCROLL_PERSIST_DEBOUNCE_MS = 400L
+
+/** 3d.5 — snooze court du popup de repos oculaire, distinct de l'intervalle configuré. */
+private const val EYE_REST_REMINDER_SNOOZE_MINUTES = 10
+
+/** A.5 — repli quand `UserPreferences.activeVoiceProfileId` est `null`. */
+private val DEFAULT_VOICE_PROFILE = VoiceProfile(
+    id = "vp-native-fr", engine = TtsEngineId.ANDROID_NATIVE,
+    voice = "fr-fr-default", language = "fr-FR",
+)

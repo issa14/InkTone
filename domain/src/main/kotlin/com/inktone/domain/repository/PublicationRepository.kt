@@ -19,4 +19,5 @@ interface PublicationRepository {
     suspend fun update(publication: Publication)
     suspend fun delete(id: String)
     suspend fun setFavorite(id: String, isFavorite: Boolean)
+    suspend fun setPinned(id: String, isPinned: Boolean)
 }

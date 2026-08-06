@@ -3,9 +3,33 @@ plugins {
     alias(libs.plugins.kotlin.serialization)
 }
 
+// K10/ADR-014 — le plugin Crashlytics (et google-services, qui genere les
+// valeurs d'initialisation FirebaseApp consommees au runtime) echoue le
+// build s'il est applique sans google-services.json. Application
+// CONDITIONNELLE : ce fichier est gitignore (jamais commis, voir
+// .gitignore et CLAUDE.md), donc absent par defaut pour quiconque clone
+// le depot — `./gradlew build` doit rester vert sans lui.
+val firebaseConfigured = file("google-services.json").exists()
+if (firebaseConfigured) {
+    pluginManager.apply(libs.plugins.google.services.get().pluginId)
+    pluginManager.apply(libs.plugins.firebase.crashlytics.get().pluginId)
+}
+
 android {
     compileOptions {
         isCoreLibraryDesugaringEnabled = true
+    }
+
+    defaultConfig {
+        // `app` n'a pas le droit de dépendre de `domain` (Blueprint
+        // §12.4) : ce booléen traverse la frontière de module vers
+        // `CrashReporterModule` (infrastructure/crashreporting, qui PEUT
+        // dépendre de domain) via une ressource Android plutôt qu'un
+        // BuildConfig — un BuildConfig aurait forcé du code Kotlin dans
+        // `app` pour le lire, l'aurait donc exposé à cette dépendance
+        // interdite par transitivité. Remplace la valeur par défaut
+        // (false) déclarée dans infrastructure/crashreporting/res.
+        resValue("bool", "firebase_crashlytics_configured", firebaseConfigured.toString())
     }
 
     // Tache 9.3 : trouve par la mesure reelle de la taille de l'AAB

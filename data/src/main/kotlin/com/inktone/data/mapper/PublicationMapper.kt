@@ -10,7 +10,7 @@ fun Publication.toEntity(): PublicationEntity = PublicationEntity(
     coverUri = coverUri, format = format.name, fileUri = fileUri,
     fileHash = fileHash, fileSize = fileSize, chapterCount = chapterCount,
     seriesName = seriesName, seriesIndex = seriesIndex, isFavorite = isFavorite,
-    subjects = subjects, isDrmProtected = isDrmProtected,
+    isPinned = isPinned, subjects = subjects, isDrmProtected = isDrmProtected,
     importDate = importDate, lastOpened = lastOpened,
 )
 
@@ -20,6 +20,6 @@ fun PublicationEntity.toDomain(): Publication = Publication(
     coverUri = coverUri, format = PublicationFormat.valueOf(format), fileUri = fileUri,
     fileHash = fileHash, fileSize = fileSize, chapterCount = chapterCount,
     seriesName = seriesName, seriesIndex = seriesIndex, isFavorite = isFavorite,
-    subjects = subjects, isDrmProtected = isDrmProtected,
+    isPinned = isPinned, subjects = subjects, isDrmProtected = isDrmProtected,
     importDate = importDate, lastOpened = lastOpened,
 )

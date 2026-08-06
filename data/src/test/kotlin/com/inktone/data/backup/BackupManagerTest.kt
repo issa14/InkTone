@@ -21,6 +21,7 @@ private class InMemoryFileStorageService : FileStorageService {
     override suspend fun openInputStream(uri: String): InputStream? = files[uri]?.byteInputStream()
     override suspend fun computeSha256(uri: String): String? = null
     override suspend fun getFileSize(uri: String): Long? = files[uri]?.length?.toLong()
+    override suspend fun getFileName(uri: String): String? = uri.substringAfterLast('/')
     override suspend fun persistReadPermission(uri: String) = Unit
     override suspend fun writeToUri(uri: String, sourceFile: File): Boolean {
         files[uri] = sourceFile.readText()

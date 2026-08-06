@@ -71,4 +71,7 @@ interface PublicationDao {
 
     @Query("UPDATE publications SET isFavorite = :isFavorite WHERE id = :id")
     suspend fun setFavorite(id: String, isFavorite: Boolean)
+
+    @Query("UPDATE publications SET isPinned = :isPinned WHERE id = :id")
+    suspend fun setPinned(id: String, isPinned: Boolean)
 }

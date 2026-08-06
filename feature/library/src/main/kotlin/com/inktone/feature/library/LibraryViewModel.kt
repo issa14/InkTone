@@ -7,7 +7,9 @@ import com.inktone.domain.model.ReadingState
 import com.inktone.domain.repository.PublicationRepository
 import com.inktone.domain.repository.ReadingStateRepository
 import com.inktone.domain.service.ImportProgressObserver
+import com.inktone.domain.usecase.DeletePublicationUseCase
 import com.inktone.domain.usecase.ToggleFavoriteUseCase
+import com.inktone.domain.usecase.TogglePinUseCase
 import dagger.hilt.android.lifecycle.HiltViewModel
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.channels.Channel
@@ -24,6 +26,8 @@ class LibraryViewModel @Inject constructor(
     private val publicationRepository: PublicationRepository,
     private val readingStateRepository: ReadingStateRepository,
     private val toggleFavorite: ToggleFavoriteUseCase,
+    private val togglePin: TogglePinUseCase,
+    private val deletePublication: DeletePublicationUseCase,
     private val importProgressObserver: ImportProgressObserver,
 ) : ViewModel() {
 
@@ -55,30 +59,28 @@ class LibraryViewModel @Inject constructor(
             is LibraryIntent.ToggleFavorite -> viewModelScope.launch {
                 toggleFavorite(intent.publicationId, intent.isFavorite)
             }
+            is LibraryIntent.TogglePin -> viewModelScope.launch {
+                togglePin(intent.publicationId, intent.isPinned)
+            }
+            is LibraryIntent.DeletePublication -> viewModelScope.launch {
+                deletePublication(intent.publicationId)
+            }
             is LibraryIntent.ChangeFilter -> observePublications(intent.filter, intent.value)
             is LibraryIntent.SetSearchQuery -> _state.value = _state.value.copy(searchQuery = intent.query)
             is LibraryIntent.SetSortOrder -> _state.value = _state.value.copy(sortOrder = intent.order)
-            is LibraryIntent.CycleLayout -> _state.value = _state.value.copy(
-                layoutMode = _state.value.layoutMode.next(),
+            is LibraryIntent.SetLayoutMode -> _state.value = _state.value.copy(layoutMode = intent.mode)
+            is LibraryIntent.ToggleFileFormat -> _state.value = _state.value.copy(
+                selectedFormats = _state.value.selectedFormats.let {
+                    if (intent.format in it) it - intent.format else it + intent.format
+                },
             )
+            is LibraryIntent.ClearFileFormats -> _state.value = _state.value.copy(selectedFormats = emptySet())
             is LibraryIntent.Refresh -> observePublications(
                 _state.value.activeFilter,
                 _state.value.filterValue,
             )
             is LibraryIntent.DismissError -> _state.value = _state.value.copy(errorMessage = null)
-            is LibraryIntent.RegenerateCovers -> regenerateCovers()
-            is LibraryIntent.ResetCovers -> resetCovers()
         }
-    }
-
-    /** C.3 — Régénère toutes les couvertures (TODO: appel réel au repository). */
-    private fun regenerateCovers() {
-        // TODO: publicationRepository.regenerateAllCovers() avec progression
-    }
-
-    /** C.3 — Réinitialise les couvertures aux valeurs par défaut (TODO: dialogue confirmation). */
-    private fun resetCovers() {
-        // TODO: publicationRepository.resetCoversToDefault() avec dialogue confirmation
     }
 
     /**
@@ -108,18 +110,7 @@ class LibraryViewModel @Inject constructor(
                     )
                 }
                 .collect { publications ->
-                    val states = readingStateRepository.getAll()
-                    val stateMap = states.associateBy { it.publicationId }
-                    val progressMap = publications.associate { pub ->
-                        val rs = stateMap[pub.id]
-                        // A.4 — Progression basée sur chapterIndex / chapterCount,
-                        // avec garde-fou contre la division par zéro (EPUB à 1 chapitre).
-                        val pct = if (rs != null && pub.chapterCount > 0) {
-                            val divisor = (pub.chapterCount - 1).coerceAtLeast(1)
-                            (rs.locator.chapterIndex * 100 / divisor).coerceIn(0, 100)
-                        } else 0
-                        pub.id to if (pct < 1 && pct > 0) 1 else pct  // ≥1% si lecture commencée
-                    }
+                    val progressMap = computeProgressMap(publications, readingStateRepository.getAll())
                     _state.value = _state.value.copy(
                         publications = publications,
                         progressMap = progressMap,

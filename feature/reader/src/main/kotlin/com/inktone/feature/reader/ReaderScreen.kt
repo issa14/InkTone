@@ -1,5 +1,6 @@
 package com.inktone.feature.reader
 
+import androidx.compose.animation.core.animateFloatAsState
 import androidx.compose.animation.core.animateIntAsState
 import androidx.compose.animation.core.tween
 import androidx.compose.animation.ExperimentalSharedTransitionApi
@@ -26,27 +27,31 @@ import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
+import androidx.compose.runtime.derivedStateOf
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableIntStateOf
+import androidx.compose.runtime.mutableStateMapOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.geometry.Rect
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.graphicsLayer
+import androidx.compose.ui.layout.boundsInWindow
 import androidx.compose.ui.layout.onGloballyPositioned
 import androidx.compose.ui.layout.positionInParent
 import androidx.compose.ui.platform.LocalDensity
-import androidx.compose.ui.semantics.LiveRegionMode
-import androidx.compose.ui.semantics.liveRegion
-import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.AnnotatedString
 import androidx.compose.ui.text.SpanStyle
 import androidx.compose.ui.text.buildAnnotatedString
-import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.withStyle
+import androidx.compose.ui.unit.IntSize
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import androidx.compose.ui.window.Dialog
+import androidx.compose.ui.window.DialogProperties
 import androidx.hilt.navigation.compose.hiltViewModel
 import com.inktone.core.designsystem.AppIcons
 import com.inktone.core.designsystem.reducedMotionDuration
@@ -55,7 +60,9 @@ import com.inktone.domain.model.AnnotationColor
 import com.inktone.domain.model.ReadingOverrides
 import com.inktone.domain.model.ReadingTheme
 import com.inktone.domain.model.Sentence
-import com.inktone.domain.model.SleepTimerState
+import com.inktone.feature.reader.pagination.rememberChapterPaginationState
+import kotlinx.coroutines.delay
+import kotlin.math.roundToInt
 
 /**
  * `effectiveSettings` (theme, taille de police) arrive déjà résolu dans
@@ -95,7 +102,12 @@ import com.inktone.domain.model.SleepTimerState
  */
 @OptIn(ExperimentalFoundationApi::class, ExperimentalLayoutApi::class, ExperimentalSharedTransitionApi::class)
 @Composable
-fun ReaderScreen(viewModel: ReaderViewModel = hiltViewModel(), onSearchClick: () -> Unit = {}) {
+fun ReaderScreen(
+    viewModel: ReaderViewModel = hiltViewModel(),
+    onSearchClick: () -> Unit = {},
+    onBack: () -> Unit = {},
+    onOpenPronunciationRules: () -> Unit = {},
+) {
     val state by viewModel.state.collectAsState()
     // Tache 9bis.3.1 : HUD (panneau de controle + boutons) visible par
     // defaut, se masque seul apres 4s (ImmersiveReaderChrome), un appui
@@ -115,12 +127,96 @@ fun ReaderScreen(viewModel: ReaderViewModel = hiltViewModel(), onSearchClick: ()
     // B.2/B.3 — états d'affichage des panneaux de réglages in-reader
     var showSettingsPanel by remember { mutableStateOf(false) }
     var showTtsPanel by remember { mutableStateOf(false) }
+    // 3d.3 — visibilité locale de la barre de luminosité, même patron que
+    // les panneaux ci-dessus : purement une décision d'affichage, pas un
+    // état MVI (ReaderUiState.readerBrightness porte la vraie donnée).
+    //
+    // Bug réel trouvé à la vérification device (lot 3d) : la barre ne
+    // disparaissait plus jamais une fois ouverte, y compris aux
+    // réapparitions ultérieures du HUD. Corrigé : ouvrir la barre masque
+    // le HUD (au lieu de le garder visible) et démarre un délai
+    // d'auto-masquage — même principe que hudActivityTick/ImmersiveReaderChrome,
+    // relancé à chaque ajustement (brightnessBarActivityTick).
+    var showBrightnessBar by remember { mutableStateOf(false) }
+    var brightnessBarActivityTick by remember { mutableIntStateOf(0) }
+    LaunchedEffect(showBrightnessBar, brightnessBarActivityTick) {
+        if (showBrightnessBar) {
+            delay(3000)
+            showBrightnessBar = false
+        }
+    }
+
+    // 3e.1 (point A5) — pendant la lecture TTS, le panneau unifié est
+    // remplacé par la barre pilule (voir plus bas) ; ce drapeau local
+    // rappelle le panneau complet par-dessus la barre le temps d'un appui,
+    // pour atteindre Sommaire/TT/etc. sans interrompre la lecture.
+    var showFullPanelOverlay by remember { mutableStateOf(false) }
+    // 3e.2 — repli de la barre pilule en bouton unique après 4s
+    // d'inactivité, réutilisant le délai d'ImmersiveReaderChrome
+    // (onAutoHide ci-dessous) : pas de second minuteur. isHudVisible
+    // reste vrai pendant le repli — seule la forme de son contenu change,
+    // ce n'est pas un masquage complet.
+    var isPillCollapsed by remember { mutableStateOf(false) }
+    LaunchedEffect(state.isPlaying) {
+        if (!state.isPlaying) {
+            showFullPanelOverlay = false
+            isPillCollapsed = false
+        }
+    }
+
+    // Ferme la barre de luminosité si elle est ouverte, sinon applique le
+    // basculement HUD habituel — un appui sur la zone de lecture pendant
+    // l'ajustement de luminosité doit fermer la barre, pas rouvrir le HUD
+    // par-dessus dans le même geste.
+    fun handleReadingAreaTap() {
+        if (showBrightnessBar) {
+            showBrightnessBar = false
+        } else if (state.isPlaying) {
+            // Pendant le TTS, la barre pilule remplace le panneau unifié
+            // (retiré du HUD standard) : un premier appui rappelle le
+            // panneau complet, un second referme tout, un troisième
+            // ramène la barre pilule — le même rythme à trois temps que le
+            // cycle HUD habituel, appliqué à un état de plus.
+            if (showFullPanelOverlay) {
+                showFullPanelOverlay = false
+                isHudVisible = false
+            } else if (isHudVisible) {
+                showFullPanelOverlay = true
+                isPillCollapsed = false
+            } else {
+                keepHudVisible()
+                isPillCollapsed = false
+            }
+        } else if (isHudVisible) {
+            isHudVisible = false
+        } else {
+            keepHudVisible()
+        }
+    }
+    // 3d.4 — remplace le cycle nextSleepTimerMinutes : le tap sur Veille
+    // ouvre désormais un panneau (puces + roue), au lieu de cycler
+    // silencieusement 15→30→45→60 sans rien afficher.
+    var showSleepTimerPanel by remember { mutableStateOf(false) }
 
     ImmersiveReaderChrome(
         isHudVisible = isHudVisible,
         hudActivityTick = hudActivityTick,
-        onAutoHide = { isHudVisible = false },
+        onAutoHide = {
+            // 3e.2 — pendant le TTS (barre pilule affichée, pas l'overlay
+            // panneau complet), l'inactivité replie la barre au lieu de
+            // masquer tout le HUD : la lecture et le surlignage restent
+            // visibles en permanence via le bouton replié.
+            if (state.isPlaying && !showFullPanelOverlay) {
+                isPillCollapsed = true
+            } else {
+                isHudVisible = false
+            }
+        },
     ) {
+    // 3d.3 — applique la luminosité choisie à la fenêtre du lecteur
+    // seulement, restaurée à la sortie (voir ReaderBrightnessEffect).
+    ReaderBrightnessEffect(value = state.readerBrightness)
+
     // C.5 — SharedTransition depuis la couverture de la bibliothèque
     val sharedTransitionScope = runCatching {
         com.inktone.core.designsystem.LocalSharedTransitionScope.current
@@ -145,11 +241,9 @@ fun ReaderScreen(viewModel: ReaderViewModel = hiltViewModel(), onSearchClick: ()
             .clickable(
                 interactionSource = remember { MutableInteractionSource() },
                 indication = null,
-            ) { if (isHudVisible) isHudVisible = false else keepHudVisible() }
+            ) { handleReadingAreaTap() }
             .padding(16.dp),
     ) {
-        BookProgressBar(progression = state.bookProgression)
-
         // A.3 — État d'erreur : affiché quand le parsing ou l'ouverture
         // échoue, avec boutons Réessayer et Retour.
         val errorMessage = state.errorMessage
@@ -161,48 +255,155 @@ fun ReaderScreen(viewModel: ReaderViewModel = hiltViewModel(), onSearchClick: ()
             return@Column
         }
 
-        if (state.isTocVisible) {
-            TableOfContentsSheet(
-                entries = state.tableOfContents,
-                currentChapterIndex = state.currentChapterIndex,
-                onEntryClick = { chapterIndex -> viewModel.onIntent(ReaderIntent.JumpToChapter(chapterIndex)) },
-                onClose = { viewModel.onIntent(ReaderIntent.ToggleToc) },
-            )
-            return@Column
-        }
-
-        if (state.isBookmarkListVisible) {
-            BookmarkListSheet(
-                bookmarks = state.bookmarks,
-                onBookmarkClick = { bookmark -> viewModel.onIntent(ReaderIntent.NavigateToLocator(bookmark.locator)) },
-                onBookmarkDelete = { bookmark -> viewModel.onIntent(ReaderIntent.DeleteBookmark(bookmark.id)) },
-                onClose = { viewModel.onIntent(ReaderIntent.ToggleBookmarkList) },
-            )
-            return@Column
-        }
-
         val scrollState = rememberScrollState()
         LaunchedEffect(state.currentChapterIndex) { scrollState.scrollTo(0) }
 
-        val sentences = state.currentChapter?.paragraphs?.flatMap { it.sentences } ?: emptyList()
         val selectedRange = state.selectedSentenceRange
-        var pendingColor by remember { mutableStateOf(AnnotationColor.YELLOW) }
 
         // A.1 / Tache 9bis.3.6 - position Y de la phrase active
         var currentLineYDp by remember { mutableStateOf(0.dp) }
         val density = LocalDensity.current
 
+        // 3c.1 — drapeau posé explicitement autour du seul appel
+        // programmatique à scrollState (auto-scroll TTS), levé à sa fin.
+        // Discrimine l'origine réelle du défilement pour la détection de
+        // position ci-dessous : `ScrollableState.isScrollInProgress` vaut
+        // `true` pour CE défilement programmatique aussi bien que pour un
+        // drag utilisateur — il ne permet donc pas de distinguer les deux,
+        // contrairement à ce drapeau.
+        var isProgrammaticScroll by remember { mutableStateOf(false) }
+
         // A.1 — Auto-scroll vers la phrase active pendant la lecture TTS
         LaunchedEffect(state.currentSentenceIndex) {
             if (state.isPlaying && currentLineYDp > 0.dp) {
-                scrollState.animateScrollTo(with(density) { currentLineYDp.roundToPx() })
+                isProgrammaticScroll = true
+                try {
+                    scrollState.animateScrollTo(with(density) { currentLineYDp.roundToPx() })
+                } finally {
+                    isProgrammaticScroll = false
+                }
             }
         }
 
-        // B.6 — ETA micro-indicateur quand HUD masqué
-        val etaText = state.etaText
+        // 3c.1 — position en contenu (indépendante du défilement, voir
+        // currentLineYDp ci-dessus qui utilise déjà cette même valeur comme
+        // cible ABSOLUE de scrollTo) de chaque phrase rendue en mode
+        // SCROLL. Map ordinaire, pas un State Compose : ses écritures
+        // (onGloballyPositioned, une seule fois par phrase au layout, pas
+        // à chaque frame de défilement) n'ont pas besoin de déclencher de
+        // recomposition, seule la lecture dans le derivedStateOf ci-dessous
+        // compte, déjà réactive via scrollState.value.
+        val sentenceTopOffsetsPx = remember(state.currentChapterIndex) { mutableMapOf<Int, Int>() }
 
-        Box(modifier = Modifier.weight(1f)) {
+        // 3c.1 — dérive la phrase la plus haute visible, mais ne propage
+        // qu'un changement de PHRASE, jamais de position brute : sans ce
+        // derivedStateOf, la lecture de scrollState.value à chaque pixel
+        // défilé recalculerait (et recomposerait) au même rythme.
+        val topmostVisibleSentenceIndex by remember(state.currentChapterIndex) {
+            derivedStateOf {
+                if (isProgrammaticScroll) return@derivedStateOf null
+                val scrollValue = scrollState.value
+                var result: Int? = null
+                for ((index, top) in sentenceTopOffsetsPx) {
+                    if (top <= scrollValue && (result == null || index > result!!)) result = index
+                }
+                result
+            }
+        }
+
+        // 3c.1 — antipattern legacy corrigé : en mode SCROLL, seuls le TTS
+        // ou une navigation explicite faisaient avancer currentSentenceIndex
+        // ; un défilement manuel silencieux n'était jamais reflété, ni
+        // persisté. Ignoré si `null` (aucune phrase encore mesurée) ou hors
+        // mode SCROLL (le pager pilote sa propre remontée en mode PAGED).
+        LaunchedEffect(topmostVisibleSentenceIndex, state.readingMode) {
+            val index = topmostVisibleSentenceIndex
+            if (index != null && state.readingMode == ReadingMode.SCROLL) {
+                viewModel.onIntent(ReaderIntent.UpdateScrollPosition(index))
+            }
+        }
+
+        // 3b.4bis — bug réel trouvé sur appareil : le compteur de la
+        // ligne de statut restait figé à la page 1 pendant un scroll ou
+        // un swipe manuels (sans TTS), car currentSentenceIndex n'est
+        // mis à jour que par le TTS ou une navigation explicite — jamais
+        // par le simple geste de lecture. Page réellement affichée en
+        // mode pagé (swipe manuel inclus, remontée par PagedChapterContent) :
+        var pagedLivePageIndex by remember { mutableIntStateOf(0) }
+        LaunchedEffect(state.currentChapterIndex) { pagedLivePageIndex = 0 }
+
+        // 3c.4 — bornes fenêtre de la sélection active, par mode. SCROLL :
+        // union des bornes des phrases sélectionnées (SnapshotStateMap,
+        // ses écritures DOIVENT être observables ici — contrairement à
+        // sentenceTopOffsetsPx en 3c.1, on veut justement que le popup
+        // suive un défilement pendant que la sélection reste active).
+        // PAGED : remonté par PagedChapterContent (conversion locale →
+        // fenêtre via TextLayoutResult, seul capable de la produire).
+        val scrollSelectionBoundsPx = remember(state.currentChapterIndex) {
+            mutableStateMapOf<Int, Rect>()
+        }
+        var pagedSelectionBounds by remember { mutableStateOf<Rect?>(null) }
+        val selectionBoundsInWindow = when (state.readingMode) {
+            ReadingMode.SCROLL -> selectedRange
+                ?.mapNotNull { scrollSelectionBoundsPx[it] }
+                ?.reduceOrNull { a, b ->
+                    Rect(
+                        left = minOf(a.left, b.left),
+                        top = minOf(a.top, b.top),
+                        right = maxOf(a.right, b.right),
+                        bottom = maxOf(a.bottom, b.bottom),
+                    )
+                }
+            ReadingMode.PAGED -> pagedSelectionBounds
+        }
+        val selectedText = remember(selectedRange, state.currentChapter) {
+            val range = selectedRange ?: return@remember ""
+            val sentences = state.currentChapter?.paragraphs?.flatMap { it.sentences } ?: emptyList()
+            range.mapNotNull { sentences.getOrNull(it)?.text }.joinToString(" ")
+        }
+
+        // 3b.5 — barre du haut : appartient au HUD, apparaît/disparaît
+        // avec le panneau, jamais indépendamment (même gate isHudVisible).
+        if (isHudVisible) {
+            ReaderTopBar(title = state.title, author = state.author, onBack = onBack)
+        }
+
+        // 3b.1 — état de pagination hissé au-dessus du choix de mode :
+        // sert la ligne de statut (3b.4, tous modes) ET PagedChapterContent
+        // (mode pagé), un seul calcul. Mesuré au même endroit de
+        // l'arborescence pour les deux modes (ce Box), formule unique de
+        // hauteur utile (voir ChapterPaginationState).
+        //
+        // Régression connue, documentée, non corrigée (voir
+        // docs/execution/NOTE_REGRESSION_CLIGNOTEMENT_PAGE_HUD.md) :
+        // readingAreaSize dépend de isHudVisible (ReaderTopBar/
+        // UnifiedControlPanel montés/démontés redistribuent l'espace de
+        // ce Box weight(1f)) — chaque bascule du HUD redéclenche une
+        // remesure complète de la pagination en mode pagé, dont les
+        // étapes intermédiaires peuvent faire clignoter la page affichée.
+        var readingAreaSize by remember { mutableStateOf(IntSize.Zero) }
+        val paginationPaddingPx = with(density) { 16.dp.roundToPx() }
+        // 3d.2 — interligne en sp, combiné à fontSize (multiplicateur
+        // global, voir UserPreferences.lineHeightMultiplier) : seul point de
+        // calcul, consommé à la fois par la mesure de pagination et par le
+        // rendu en mode SCROLL (SentenceText) ci-dessous.
+        val lineHeightSp = (state.effectiveSettings.fontSize * state.lineHeightMultiplier).roundToInt()
+        val pagination = rememberChapterPaginationState(
+            chapter = state.currentChapter,
+            nextChapter = state.chapters.getOrNull(state.currentChapterIndex + 1),
+            currentSentenceIndex = state.currentSentenceIndex,
+            fontSizeSp = state.effectiveSettings.fontSize,
+            lineHeightSp = lineHeightSp,
+            viewportWidthPx = readingAreaSize.width,
+            viewportHeightPx = readingAreaSize.height,
+            paddingPx = paginationPaddingPx,
+        )
+
+        Box(
+            modifier = Modifier
+                .weight(1f)
+                .onGloballyPositioned { coordinates -> readingAreaSize = coordinates.size },
+        ) {
             if (state.isReadingRulerEnabled) {
                 ReadingRuler(currentLineY = currentLineYDp, enabled = true)
             }
@@ -218,6 +419,7 @@ fun ReaderScreen(viewModel: ReaderViewModel = hiltViewModel(), onSearchClick: ()
                             paragraph.sentences.forEach { sentence ->
                                 val index = globalIndex++
                                 val isCurrentlyPlaying = index == state.currentSentenceIndex
+                                val isSentenceSelected = selectedRange?.contains(index) == true
                                 // B.5 — piste de lecture : opacité différenciée
                                 val trailAlpha = when {
                                     isCurrentlyPlaying -> 1.0f
@@ -229,9 +431,10 @@ fun ReaderScreen(viewModel: ReaderViewModel = hiltViewModel(), onSearchClick: ()
                                     paragraphStyle = paragraph.style,
                                     isCurrentlyPlaying = isCurrentlyPlaying,
                                     highlightedWordRange = state.highlightedWordRange,
-                                    isSelected = selectedRange?.contains(index) == true,
+                                    isSelected = isSentenceSelected,
                                     existingAnnotationColor = annotationColorFor(state.currentChapterIndex, sentence, state.annotations),
                                     fontSizeSp = state.effectiveSettings.fontSize,
+                                    lineHeightSp = lineHeightSp,
                                     textColor = ThemeColors.text(state.effectiveSettings.theme).copy(alpha = trailAlpha),
                                     onLongClick = { viewModel.onIntent(ReaderIntent.BeginSentenceSelection(index)) },
                                     onClick = {
@@ -244,15 +447,29 @@ fun ReaderScreen(viewModel: ReaderViewModel = hiltViewModel(), onSearchClick: ()
                                             // jamais au Column parent, rendant le HUD
                                             // quasiment impossible à rappeler une fois
                                             // masqué (bug réel trouvé à l'audit).
-                                            if (isHudVisible) isHudVisible = false else keepHudVisible()
+                                            handleReadingAreaTap()
                                         }
                                     },
-                                    modifier = if (isCurrentlyPlaying) {
-                                        Modifier.onGloballyPositioned { coordinates ->
-                                            currentLineYDp = with(density) { coordinates.positionInParent().y.toDp() }
+                                    // 3c.1 — position de contenu (indépendante du défilement,
+                                    // stable tant que le texte ne se re-layoute pas) de
+                                    // CHAQUE phrase, pas seulement celle en cours de lecture
+                                    // TTS : nécessaire pour dériver la phrase la plus haute
+                                    // visible pendant un défilement manuel silencieux.
+                                    modifier = Modifier.onGloballyPositioned { coordinates ->
+                                        val topPx = coordinates.positionInParent().y
+                                        sentenceTopOffsetsPx[index] = topPx.toInt()
+                                        if (isCurrentlyPlaying) {
+                                            currentLineYDp = with(density) { topPx.toDp() }
                                         }
-                                    } else {
-                                        Modifier
+                                        // 3c.4 — bornes fenêtre, seulement pour les phrases
+                                        // sélectionnées (popup de sélection) ; suit le
+                                        // défilement puisque boundsInWindow() en dépend,
+                                        // contrairement à positionInParent() ci-dessus.
+                                        if (isSentenceSelected) {
+                                            scrollSelectionBoundsPx[index] = coordinates.boundsInWindow()
+                                        } else {
+                                            scrollSelectionBoundsPx.remove(index)
+                                        }
                                     },
                                 )
                             }
@@ -268,122 +485,232 @@ fun ReaderScreen(viewModel: ReaderViewModel = hiltViewModel(), onSearchClick: ()
                 }
                 ReadingMode.PAGED -> {
                     PagedChapterContent(
-                        sentences = sentences,
+                        chapter = state.currentChapter,
+                        pagination = pagination,
                         currentSentenceIndex = state.currentSentenceIndex,
                         highlightedWordRange = state.highlightedWordRange,
                         selectedRange = selectedRange,
                         annotations = state.annotations,
                         currentChapterIndex = state.currentChapterIndex,
-                        fontSizeSp = state.effectiveSettings.fontSize,
                         textColor = ThemeColors.text(state.effectiveSettings.theme),
-                        isPlaying = state.isPlaying,
                         isReadingRulerEnabled = state.isReadingRulerEnabled,
                         onSentenceLongClick = { index -> viewModel.onIntent(ReaderIntent.BeginSentenceSelection(index)) },
                         onSentenceClick = { index ->
                             if (selectedRange != null) {
                                 viewModel.onIntent(ReaderIntent.ExtendSentenceSelection(index))
                             } else {
-                                if (isHudVisible) isHudVisible = false else keepHudVisible()
+                                handleReadingAreaTap()
                             }
                         },
                         onNextChapter = { viewModel.onIntent(ReaderIntent.NextChapter) },
+                        onCurrentLineY = { y -> currentLineYDp = y },
+                        onPageChanged = { pageIndex -> pagedLivePageIndex = pageIndex },
+                        onManualPageChange = { sentenceIndex ->
+                            viewModel.onIntent(ReaderIntent.UpdateScrollPosition(sentenceIndex))
+                        },
+                        onSelectionBoundsInWindow = { bounds -> pagedSelectionBounds = bounds },
                     )
                 }
             }
 
-            // B.6 — Micro-indicateur ETA quand HUD masqué
-            if (!isHudVisible && etaText.isNotEmpty() && state.readingMode == ReadingMode.SCROLL) {
-                Box(
-                    modifier = Modifier
-                        .align(Alignment.BottomCenter)
-                        .padding(bottom = 24.dp)
-                        .background(Color.Black.copy(alpha = 0.35f), RoundedCornerShape(16.dp))
-                        .padding(horizontal = 12.dp, vertical = 4.dp),
-                ) {
-                    Text(
-                        text = etaText,
-                        color = Color.White.copy(alpha = 0.75f),
-                        style = MaterialTheme.typography.labelSmall,
-                    )
-                }
-            }
-
-            // B.7 — Captions TTS (overlay sous-titres)
-            if (state.isPlaying && selectedRange == null) {
-                val captionText = sentences.getOrNull(state.currentSentenceIndex)?.text
-                if (captionText != null) {
-                    Box(
-                        modifier = Modifier
-                            .align(Alignment.BottomCenter)
-                            .fillMaxWidth()
-                            .background(Color.Black.copy(alpha = 0.65f))
-                            .padding(horizontal = 16.dp, vertical = 12.dp)
-                            .semantics { liveRegion = LiveRegionMode.Polite },
-                    ) {
-                        Text(
-                            text = captionText,
-                            color = Color.White,
-                            style = MaterialTheme.typography.bodyMedium,
-                            textAlign = TextAlign.Center,
-                        )
-                    }
-                }
-            }
+            // B.7 — Overlay visuel des captions retiré (UX §Lecture — couche
+            // TTS : jugé trop encombrant, notamment sur les phrases longues).
+            // L'annonce TalkBack par nœud liveRegion, ajoutée pour ne pas
+            // perdre l'accessibilité, a été retirée après vérification sur
+            // appareil (lot 1, point 11) : elle fait doublon avec la voix
+            // TTS déjà active et les deux se chevauchent à l'oreille.
         }
 
+        // 3c.4 — remplace AnnotationColorPicker (position fixe basse
+        // d'écran, Confirmer/Annuler) par le popup Copier/Surligner/Note
+        // positionné près de la sélection réelle.
         if (selectedRange != null) {
-            AnnotationColorPicker(
-                selected = pendingColor,
-                onSelect = { pendingColor = it },
-                onConfirm = { viewModel.onIntent(ReaderIntent.ConfirmAnnotation(pendingColor)) },
-                onCancel = { viewModel.onIntent(ReaderIntent.ClearSentenceSelection) },
+            SelectionActionPopup(
+                selectedText = selectedText,
+                selectionBoundsInWindow = selectionBoundsInWindow,
+                onHighlight = { color ->
+                    viewModel.onIntent(ReaderIntent.ConfirmAnnotation(color))
+                },
+                onSaveNote = { content, color ->
+                    viewModel.onIntent(ReaderIntent.ConfirmAnnotation(color, content))
+                },
+                onDismiss = { viewModel.onIntent(ReaderIntent.ClearSentenceSelection) },
             )
         }
 
         if (isHudVisible) {
-            UnifiedControlPanel(
-                isPlaying = state.isPlaying,
-                sleepTimerActive = state.sleepTimer != null,
-                onPlayPause = {
-                    keepHudVisible()
-                    viewModel.onIntent(if (state.isPlaying) ReaderIntent.Pause else ReaderIntent.PlayCurrentSentence)
-                },
-                onPreviousChapter = { keepHudVisible(); viewModel.onIntent(ReaderIntent.PreviousChapter) },
-                onNextChapter = { keepHudVisible(); viewModel.onIntent(ReaderIntent.NextChapter) },
-                onSleepTimerClick = {
-                    keepHudVisible()
-                    viewModel.onIntent(ReaderIntent.SetSleepTimer(nextSleepTimerMinutes(state.sleepTimer)))
-                },
-                onSearchClick = { keepHudVisible(); onSearchClick() },
-                onBookmarksClick = { keepHudVisible(); viewModel.onIntent(ReaderIntent.ToggleBookmarkList) },
-                onTocClick = { keepHudVisible(); viewModel.onIntent(ReaderIntent.ToggleToc) },
-                onAaClick = { keepHudVisible(); showSettingsPanel = true },
-                onTtsClick = { keepHudVisible(); showTtsPanel = true },
-                onReadingModeClick = { keepHudVisible(); viewModel.onIntent(ReaderIntent.ToggleReadingMode) },
-                hasPreviousChapter = state.hasPreviousChapter,
-                hasNextChapter = state.hasNextChapter,
-            )
-
-            FlowRow(horizontalArrangement = Arrangement.spacedBy(4.dp)) {
-                Button(onClick = { keepHudVisible(); viewModel.onIntent(ReaderIntent.CreateBookmark) }) {
-                    Text("+ Signet")
+            // 3e.1 — pendant le TTS, la barre pilule remplace le panneau
+            // unifié (navigation par chapitre, retirée du panneau au lot
+            // 3b) ; le panneau complet ne revient que par l'overlay A5 ou
+            // à l'arrêt de la lecture.
+            if (state.isPlaying && !showFullPanelOverlay) {
+                // 3e.2 — repli en bouton unique après 4s (isPillCollapsed,
+                // voir onAutoHide plus haut).
+                //
+                // Bug réel trouvé à la vérification device : un Crossfade
+                // partagé sur une seule position centrée faisait replier le
+                // FAB au centre au lieu du coin inférieur droit attendu, et
+                // le redéploiement se voyait glisser du centre vers la
+                // gauche — Crossfade redimensionne sa boîte interne vers la
+                // taille de la cible pendant la transition, donc un enfant
+                // bien plus étroit (le FAB, 56dp) que l'autre (la barre,
+                // ~250dp) décale visuellement le centrage réel en cours de
+                // fondu. Deux positions fixes dans un Box commun (Center
+                // pour la barre, CenterEnd — coin droit — pour le FAB),
+                // chacune animée en opacité seule via animateFloatAsState :
+                // aucune position n'est jamais interpolée, un pur fondu.
+                // AnimatedVisibility n'a pas d'overload BoxScope (seulement
+                // Column/RowScope) : inapplicable ici.
+                val fadeDuration = if (state.reduceMotion) 0 else 200
+                val barAlpha by animateFloatAsState(
+                    targetValue = if (isPillCollapsed) 0f else 1f,
+                    animationSpec = tween(fadeDuration),
+                    label = "TtsPillBarAlpha",
+                )
+                val fabAlpha by animateFloatAsState(
+                    targetValue = if (isPillCollapsed) 1f else 0f,
+                    animationSpec = tween(fadeDuration),
+                    label = "TtsPillBarCollapsedAlpha",
+                )
+                Box(modifier = Modifier.fillMaxWidth()) {
+                    if (barAlpha > 0f) {
+                        TtsPillBar(
+                            modifier = Modifier.align(Alignment.Center).graphicsLayer(alpha = barAlpha),
+                            isPlaying = state.isPlaying,
+                            isAudioActive = state.isAudioActive,
+                            reduceMotion = state.reduceMotion,
+                            hasPreviousChapter = state.hasPreviousChapter,
+                            hasNextChapter = state.hasNextChapter,
+                            onPreviousChapter = { keepHudVisible(); viewModel.onIntent(ReaderIntent.PreviousChapter) },
+                            onPreviousSentence = { keepHudVisible(); viewModel.onIntent(ReaderIntent.SkipToPreviousSentence) },
+                            onPlayPause = {
+                                keepHudVisible()
+                                viewModel.onIntent(if (state.isPlaying) ReaderIntent.Pause else ReaderIntent.PlayCurrentSentence)
+                            },
+                            onNextSentence = { keepHudVisible(); viewModel.onIntent(ReaderIntent.SkipToNextSentence) },
+                            onNextChapter = { keepHudVisible(); viewModel.onIntent(ReaderIntent.NextChapter) },
+                            // 3e.3 — balayage redéfini en pause (voir KDoc de
+                            // TtsPillBarCollapsed) : pas de keepHudVisible, le
+                            // passage à isPlaying=false referme déjà la barre
+                            // et fait revenir le panneau unifié.
+                            onSwipeDown = { viewModel.onIntent(ReaderIntent.Pause) },
+                        )
+                    }
+                    if (fabAlpha > 0f) {
+                        TtsPillBarCollapsed(
+                            modifier = Modifier.align(Alignment.CenterEnd).graphicsLayer(alpha = fabAlpha),
+                            isAudioActive = state.isAudioActive,
+                            reduceMotion = state.reduceMotion,
+                            onExpand = {
+                                isPillCollapsed = false
+                                keepHudVisible()
+                            },
+                            onSwipeDown = { viewModel.onIntent(ReaderIntent.Pause) },
+                        )
+                    }
                 }
+            } else {
+                UnifiedControlPanel(
+                    isPlaying = state.isPlaying,
+                    sleepTimerActive = state.sleepTimer != null,
+                    bookProgression = state.bookProgression,
+                    onPlayPause = {
+                        keepHudVisible()
+                        viewModel.onIntent(if (state.isPlaying) ReaderIntent.Pause else ReaderIntent.PlayCurrentSentence)
+                    },
+                    onSleepTimerClick = { keepHudVisible(); showSleepTimerPanel = true },
+                    onSearchClick = { keepHudVisible(); onSearchClick() },
+                    onBookmarksClick = { keepHudVisible(); viewModel.onIntent(ReaderIntent.ToggleBookmarkList) },
+                    onTocClick = { keepHudVisible(); viewModel.onIntent(ReaderIntent.ToggleToc) },
+                    onThemeCycle = {
+                        keepHudVisible()
+                        val overrides = (state.currentOverrides ?: ReadingOverrides())
+                            .copy(theme = nextReadingTheme(state.effectiveSettings.theme))
+                        viewModel.onIntent(ReaderIntent.SetOverrides(overrides))
+                    },
+                    onAaClick = { keepHudVisible(); showSettingsPanel = true },
+                    onTtsClick = { keepHudVisible(); showTtsPanel = true },
+                    onReadingModeClick = { keepHudVisible(); viewModel.onIntent(ReaderIntent.ToggleReadingMode) },
+                    onBrightnessClick = {
+                        // Bug réel corrigé (vérification device, lot 3d) : masque le
+                        // HUD au lieu de le garder visible — la barre prend sa place
+                        // plutôt que de s'empiler dessous.
+                        isHudVisible = false
+                        showBrightnessBar = true
+                        brightnessBarActivityTick++
+                    },
+                )
             }
         }
 
-        // B.2 — Panneau réglages lecture in-reader
-        if (showSettingsPanel) {
-            ReaderSettingsPanel(
-                currentTheme = state.effectiveSettings.theme,
-                currentFontSize = state.effectiveSettings.fontSize,
-                onThemeChange = { theme ->
-                    val overrides = (state.currentOverrides ?: ReadingOverrides()).copy(theme = theme)
-                    viewModel.onIntent(ReaderIntent.SetOverrides(overrides))
+        // 3d.3 — barre flottante à la place du panneau unifié (HUD masqué
+        // pendant l'ajustement), pas un panneau séparé (UX_FLOW_DESIGN.md
+        // §Luminosité). S'auto-masque après 3s d'inactivité (voir
+        // LaunchedEffect ci-dessus), relancé à chaque ajustement.
+        if (showBrightnessBar) {
+            ReaderBrightnessBar(
+                value = state.readerBrightness,
+                onValueChange = { value ->
+                    viewModel.onIntent(ReaderIntent.SetReaderBrightness(value))
+                    brightnessBarActivityTick++
                 },
+            )
+        }
+
+        // 3b.4/3c.1 — ligne de statut persistante, hors HUD : visible en
+        // permanence, y compris panneau masqué. Le compteur de pages vient
+        // du contrat VirtualPagination (via l'état hissé ci-dessus),
+        // jamais d'un calcul local.
+        //
+        // Bug réel trouvé sur appareil : dériver la page courante
+        // uniquement de currentSentenceIndex (via pageIndexAt) la laissait
+        // figée pendant un scroll/swipe manuel sans TTS, puisque
+        // currentSentenceIndex n'était mis à jour que par le TTS ou une
+        // navigation explicite. En pagé, la page réellement affichée par le
+        // pager (pagedLivePageIndex, mise à jour aussi bien par un swipe
+        // manuel que par le suivi TTS). En défilement, currentSentenceIndex
+        // est désormais tenu à jour par le défilement manuel lui-même
+        // (topmostVisibleSentenceIndex ci-dessus) : pageIndexAt en dérive
+        // donc une page EXACTE, la même source que le mode pagé — plus
+        // d'estimation par fraction de défilement, qui supposait à tort une
+        // densité de texte uniforme sur le chapitre.
+        state.currentChapter?.let { chapter ->
+            val pageCountInChapter = pagination.pageCount(chapter.index)
+            val pageIndexInChapter = when (state.readingMode) {
+                ReadingMode.PAGED -> pagedLivePageIndex
+                ReadingMode.SCROLL -> pagination.pageIndexAt(chapter.index, state.currentSentenceIndex)
+            }
+            StatusLineBar(
+                chapterNumber = state.currentChapterIndex + 1,
+                pageInChapter = pageIndexInChapter + 1,
+                pageCountInChapter = pageCountInChapter,
+                bookProgression = state.bookProgression,
+            )
+        }
+
+        // B.2/3d.2 — Panneau réglages de typographie in-reader (TT). Le
+        // thème n'y vit plus (bascule cyclique du lot 3b, cartes devenues
+        // redondantes) — seuls taille et interligne restent, avec un
+        // aperçu du texte RÉELLEMENT en cours de lecture, pas un exemple
+        // inventé.
+        if (showSettingsPanel) {
+            val previewSentences = state.currentChapter?.paragraphs?.flatMap { it.sentences }.orEmpty()
+            val previewText = previewSentences
+                .drop(state.currentSentenceIndex)
+                .ifEmpty { previewSentences }
+                .take(3)
+                .joinToString(" ") { it.text }
+            ReaderSettingsPanel(
+                currentFontSize = state.effectiveSettings.fontSize,
+                currentLineHeightMultiplier = state.lineHeightMultiplier,
+                previewText = previewText,
+                previewTextColor = ThemeColors.text(state.effectiveSettings.theme),
+                previewBackgroundColor = ThemeColors.background(state.effectiveSettings.theme),
                 onFontSizeChange = { size ->
                     val overrides = (state.currentOverrides ?: ReadingOverrides()).copy(fontSize = size)
                     viewModel.onIntent(ReaderIntent.SetOverrides(overrides))
                 },
+                onLineHeightChange = { multiplier -> viewModel.onIntent(ReaderIntent.SetLineHeight(multiplier)) },
                 onDismiss = { showSettingsPanel = false },
             )
         }
@@ -395,40 +722,109 @@ fun ReaderScreen(viewModel: ReaderViewModel = hiltViewModel(), onSearchClick: ()
                 isPlaying = state.isPlaying,
                 currentSentenceIndex = state.currentSentenceIndex,
                 totalSentences = sentences.size,
-                currentSpeed = 1.0f, // TODO: lire depuis preferences TTS speed
+                activeVoiceProfile = state.activeVoiceProfile,
+                availableVoiceProfiles = state.availableVoiceProfiles,
                 onPlayPause = {
                     viewModel.onIntent(if (state.isPlaying) ReaderIntent.Pause else ReaderIntent.PlayCurrentSentence)
                 },
-                onStop = { viewModel.onIntent(ReaderIntent.Pause) },
                 onPreviousSentence = { viewModel.onIntent(ReaderIntent.SkipToPreviousSentence) },
                 onNextSentence = { viewModel.onIntent(ReaderIntent.SkipToNextSentence) },
-                onSpeedChange = { /* TODO: UpdatePreferencesUseCase(speed) */ },
-                onSleepTimer = { minutes ->
-                    viewModel.onIntent(ReaderIntent.SetSleepTimer(minutes))
-                },
-                currentSleepTimerMinutes = state.sleepTimer?.let {
-                    ((it.remainingMs / 60_000L).toInt())
-                },
+                onSpeedChange = { speed -> viewModel.onIntent(ReaderIntent.SetTtsSpeed(speed)) },
+                onSelectVoiceProfile = { profileId -> viewModel.onIntent(ReaderIntent.SetActiveVoiceProfile(profileId)) },
+                onOpenPronunciationRules = onOpenPronunciationRules,
                 onDismiss = { showTtsPanel = false },
             )
+        }
+
+        // 3d.4/3d.5 — Panneau Minuteur (remplace le cycle sur l'icône Veille) + repos oculaire
+        if (showSleepTimerPanel) {
+            SleepTimerPanel(
+                remainingMinutes = state.sleepTimer?.let { (it.remainingMs / 60_000L).toInt() },
+                onSetSleepTimer = { minutes -> viewModel.onIntent(ReaderIntent.SetSleepTimer(minutes)) },
+                eyeRestReminderEnabled = state.eyeRestReminderEnabled,
+                eyeRestReminderIntervalMinutes = state.eyeRestReminderIntervalMinutes,
+                onSetEyeRestReminderEnabled = { enabled -> viewModel.onIntent(ReaderIntent.SetEyeRestReminderEnabled(enabled)) },
+                onSetEyeRestReminderInterval = { minutes -> viewModel.onIntent(ReaderIntent.SetEyeRestReminderInterval(minutes)) },
+                onDismiss = { showSleepTimerPanel = false },
+            )
+        }
+
+        // 3d.5 — popup de rappel de repos oculaire, indépendant du HUD :
+        // doit rester visible même si isHudVisible est déjà retombé à
+        // faux (contrairement aux panneaux ci-dessus, ouverts par une
+        // action HUD explicite).
+        if (state.isEyeRestReminderVisible) {
+            EyeRestReminderDialog(
+                countdownSeconds = state.eyeRestReminderCountdownS,
+                onResume = { viewModel.onIntent(ReaderIntent.ResumeFromEyeRestReminder) },
+                onSnooze = { viewModel.onIntent(ReaderIntent.SnoozeEyeRestReminder) },
+            )
+        }
+
+        // 3c.2 — Sommaire en bottom sheet : superposé, ne démonte plus le
+        // lecteur (avant ce lot, `return@Column` remplaçait tout l'écran,
+        // HUD compris). Même pattern que ReaderSettingsPanel/ReaderTtsPanel
+        // ci-dessus : ModalBottomSheet se rend dans sa propre fenêtre, il
+        // ne consomme pas d'espace dans cette Column.
+        if (state.isTocVisible) {
+            TableOfContentsSheet(
+                entries = state.tableOfContents,
+                currentChapterIndex = state.currentChapterIndex,
+                onEntryClick = { chapterIndex -> viewModel.onIntent(ReaderIntent.JumpToChapter(chapterIndex)) },
+                onClose = { viewModel.onIntent(ReaderIntent.ToggleToc) },
+            )
+        }
+
+        // 3c.3 — Marque-pages en panneau latéral (≈85% de la largeur,
+        // depuis la gauche) : superposé, ne démonte plus le lecteur, même
+        // principe que le Sommaire ci-dessus.
+        //
+        // Bug réel trouvé sur appareil pendant la vérification du lot 3c :
+        // contrairement à TableOfContentsSheet (ModalBottomSheet, rendu
+        // dans sa propre fenêtre via Popup), BookmarkPanel était appelé
+        // directement comme enfant de cette Column. Une Column place ses
+        // enfants les uns SOUS les autres, elle ne les superpose jamais —
+        // un enfant `fillMaxSize()` en dernière position se voyait donc
+        // placé sous UnifiedControlPanel/StatusLineBar (toujours visibles
+        // pendant 4s, la ligne de statut apparaissant au-dessus du panneau)
+        // plutôt que par-dessus tout l'écran. `Dialog` (comme
+        // ModalBottomSheet en interne) rend dans une fenêtre séparée,
+        // superposée par construction, indépendamment de sa position dans
+        // cette Column.
+        if (state.isBookmarkListVisible) {
+            Dialog(
+                onDismissRequest = { viewModel.onIntent(ReaderIntent.ToggleBookmarkList) },
+                properties = DialogProperties(
+                    usePlatformDefaultWidth = false,
+                    decorFitsSystemWindows = false,
+                ),
+            ) {
+                BookmarkPanel(
+                    bookmarks = state.bookmarks,
+                    annotations = state.annotations,
+                    isCurrentPageBookmarked = state.isCurrentPageBookmarked,
+                    onBookmarkClick = { bookmark -> viewModel.onIntent(ReaderIntent.NavigateToLocator(bookmark.locator)) },
+                    onAnnotationClick = { annotation -> viewModel.onIntent(ReaderIntent.NavigateToLocator(annotation.startLocator)) },
+                    onToggleBookmark = { viewModel.onIntent(ReaderIntent.ToggleBookmarkAtCurrentPosition) },
+                    onClose = { viewModel.onIntent(ReaderIntent.ToggleBookmarkList) },
+                )
+            }
         }
     }
     }
 }
 
-private val SLEEP_TIMER_OPTIONS_MINUTES = listOf(15, 30, 45, 60)
-
 /**
- * Tache 9bis.3.3 — un appui sur l'icone Veille fait cycler les durees
- * proposees puis desactive le minuteur (pas de sheet de selection dediee
- * pour l'instant, hors perimetre de cette tache).
+ * Tâche 3b.6 — bascule cyclique du thème (icône Thème du panneau) : Clair
+ * → Sombre → Sépia → Clair, sans ouvrir de panneau, sans retour visuel
+ * autre que le changement lui-même. SYSTEM (jamais réglé par ce cycle,
+ * seulement possible comme état initial hérité des préférences globales)
+ * repart sur Clair plutôt que de rester coincé hors cycle.
  */
-private fun nextSleepTimerMinutes(current: SleepTimerState?): Int? {
-    if (current == null) return SLEEP_TIMER_OPTIONS_MINUTES.first()
-    val currentMinutes = (current.remainingMs / 60_000L).toInt()
-    val currentIndex = SLEEP_TIMER_OPTIONS_MINUTES.indexOf(currentMinutes)
-    val nextIndex = currentIndex + 1
-    return SLEEP_TIMER_OPTIONS_MINUTES.getOrNull(nextIndex)
+private fun nextReadingTheme(current: ReadingTheme): ReadingTheme = when (current) {
+    ReadingTheme.LIGHT -> ReadingTheme.DARK
+    ReadingTheme.DARK -> ReadingTheme.SEPIA
+    ReadingTheme.SEPIA, ReadingTheme.SYSTEM -> ReadingTheme.LIGHT
 }
 
 @OptIn(ExperimentalFoundationApi::class)
@@ -441,6 +837,7 @@ internal fun SentenceText(
     isSelected: Boolean,
     existingAnnotationColor: AnnotationColor?,
     fontSizeSp: Int,
+    lineHeightSp: Int = fontSizeSp,
     textColor: Color,
     onLongClick: () -> Unit,
     onClick: () -> Unit,
@@ -492,6 +889,7 @@ internal fun SentenceText(
             .background(background)
             .combinedClickable(onClick = onClick, onLongClick = onLongClick),
         fontSize = fontSizeSp.sp,
+        lineHeight = lineHeightSp.sp,
         color = textColor,
     )
 }

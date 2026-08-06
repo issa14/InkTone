@@ -22,4 +22,8 @@ data class UserPreferencesEntity(
     val readingMode: String = "SCROLL", // B.1
     val audioGain: Float = 1.0f, // D.3
     val useSystemFontScale: Boolean = false, // D.3
+    val lineHeightMultiplier: Float = 1.4f, // 3d.2
+    val readerBrightness: Float? = null, // 3d.3
+    val eyeRestReminderEnabled: Boolean = true, // 3d.5
+    val eyeRestReminderIntervalMinutes: Int = 60, // 3d.5
 )

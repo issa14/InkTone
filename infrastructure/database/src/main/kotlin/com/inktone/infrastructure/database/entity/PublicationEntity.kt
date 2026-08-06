@@ -28,6 +28,7 @@ data class PublicationEntity(
     val seriesName: String?,
     val seriesIndex: Float?,
     val isFavorite: Boolean,
+    val isPinned: Boolean = false,
     val subjects: List<String>,
     val isDrmProtected: Boolean,
     val importDate: Long,

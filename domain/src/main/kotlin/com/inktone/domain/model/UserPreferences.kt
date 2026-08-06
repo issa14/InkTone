@@ -31,9 +31,23 @@ data class UserPreferences(
     val audioGain: Float = 1.0f,
     // D.3 — respecter le fontScale système Android au lieu du fontSize interne
     val useSystemFontScale: Boolean = false,
+    // 3d.2 — multiplicateur d'interligne (1.0 = pas d'espacement supplémentaire),
+    // combiné à fontSize pour rester en sp cohérent avec PaginationStyleKey.
+    val lineHeightMultiplier: Float = 1.4f,
+    // 3d.3 — luminosité de l'écran de lecture seulement (WindowManager.LayoutParams.screenBrightness).
+    // null = valeur système, sinon 0.01..1.0.
+    val readerBrightness: Float? = null,
+    // 3d.5 — rappel de repos oculaire, indépendant du minuteur de sommeil TTS.
+    val eyeRestReminderEnabled: Boolean = true,
+    val eyeRestReminderIntervalMinutes: Int = 60,
 ) {
     init {
         require(fontSize > 0) { "fontSize doit être strictement positif" }
+        require(lineHeightMultiplier > 0f) { "lineHeightMultiplier doit être strictement positif" }
+        require(readerBrightness == null || readerBrightness in 0.01f..1.0f) {
+            "readerBrightness doit être compris entre 0.01 et 1.0, ou null"
+        }
+        require(eyeRestReminderIntervalMinutes > 0) { "eyeRestReminderIntervalMinutes doit être strictement positif" }
     }
 }
 
