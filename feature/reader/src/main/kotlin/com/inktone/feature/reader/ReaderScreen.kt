@@ -59,6 +59,7 @@ import com.inktone.domain.model.ReadingOverrides
 import com.inktone.domain.model.ReadingTheme
 import com.inktone.domain.model.Sentence
 import com.inktone.feature.reader.pagination.rememberChapterPaginationState
+import kotlinx.coroutines.delay
 import kotlin.math.roundToInt
 
 /**
@@ -127,7 +128,35 @@ fun ReaderScreen(
     // 3d.3 — visibilité locale de la barre de luminosité, même patron que
     // les panneaux ci-dessus : purement une décision d'affichage, pas un
     // état MVI (ReaderUiState.readerBrightness porte la vraie donnée).
+    //
+    // Bug réel trouvé à la vérification device (lot 3d) : la barre ne
+    // disparaissait plus jamais une fois ouverte, y compris aux
+    // réapparitions ultérieures du HUD. Corrigé : ouvrir la barre masque
+    // le HUD (au lieu de le garder visible) et démarre un délai
+    // d'auto-masquage — même principe que hudActivityTick/ImmersiveReaderChrome,
+    // relancé à chaque ajustement (brightnessBarActivityTick).
     var showBrightnessBar by remember { mutableStateOf(false) }
+    var brightnessBarActivityTick by remember { mutableIntStateOf(0) }
+    LaunchedEffect(showBrightnessBar, brightnessBarActivityTick) {
+        if (showBrightnessBar) {
+            delay(3000)
+            showBrightnessBar = false
+        }
+    }
+
+    // Ferme la barre de luminosité si elle est ouverte, sinon applique le
+    // basculement HUD habituel — un appui sur la zone de lecture pendant
+    // l'ajustement de luminosité doit fermer la barre, pas rouvrir le HUD
+    // par-dessus dans le même geste.
+    fun handleReadingAreaTap() {
+        if (showBrightnessBar) {
+            showBrightnessBar = false
+        } else if (isHudVisible) {
+            isHudVisible = false
+        } else {
+            keepHudVisible()
+        }
+    }
     // 3d.4 — remplace le cycle nextSleepTimerMinutes : le tap sur Veille
     // ouvre désormais un panneau (puces + roue), au lieu de cycler
     // silencieusement 15→30→45→60 sans rien afficher.
@@ -166,7 +195,7 @@ fun ReaderScreen(
             .clickable(
                 interactionSource = remember { MutableInteractionSource() },
                 indication = null,
-            ) { if (isHudVisible) isHudVisible = false else keepHudVisible() }
+            ) { handleReadingAreaTap() }
             .padding(16.dp),
     ) {
         // A.3 — État d'erreur : affiché quand le parsing ou l'ouverture
@@ -372,7 +401,7 @@ fun ReaderScreen(
                                             // jamais au Column parent, rendant le HUD
                                             // quasiment impossible à rappeler une fois
                                             // masqué (bug réel trouvé à l'audit).
-                                            if (isHudVisible) isHudVisible = false else keepHudVisible()
+                                            handleReadingAreaTap()
                                         }
                                     },
                                     // 3c.1 — position de contenu (indépendante du défilement,
@@ -424,7 +453,7 @@ fun ReaderScreen(
                             if (selectedRange != null) {
                                 viewModel.onIntent(ReaderIntent.ExtendSentenceSelection(index))
                             } else {
-                                if (isHudVisible) isHudVisible = false else keepHudVisible()
+                                handleReadingAreaTap()
                             }
                         },
                         onNextChapter = { viewModel.onIntent(ReaderIntent.NextChapter) },
@@ -485,16 +514,28 @@ fun ReaderScreen(
                 onAaClick = { keepHudVisible(); showSettingsPanel = true },
                 onTtsClick = { keepHudVisible(); showTtsPanel = true },
                 onReadingModeClick = { keepHudVisible(); viewModel.onIntent(ReaderIntent.ToggleReadingMode) },
-                onBrightnessClick = { keepHudVisible(); showBrightnessBar = !showBrightnessBar },
+                onBrightnessClick = {
+                    // Bug réel corrigé (vérification device, lot 3d) : masque le
+                    // HUD au lieu de le garder visible — la barre prend sa place
+                    // plutôt que de s'empiler dessous.
+                    isHudVisible = false
+                    showBrightnessBar = true
+                    brightnessBarActivityTick++
+                },
             )
         }
 
-        // 3d.3 — barre flottante, overlay au-dessus du panneau unifié
-        // (pas un panneau séparé, voir UX_FLOW_DESIGN.md §Luminosité).
-        if (isHudVisible && showBrightnessBar) {
+        // 3d.3 — barre flottante à la place du panneau unifié (HUD masqué
+        // pendant l'ajustement), pas un panneau séparé (UX_FLOW_DESIGN.md
+        // §Luminosité). S'auto-masque après 3s d'inactivité (voir
+        // LaunchedEffect ci-dessus), relancé à chaque ajustement.
+        if (showBrightnessBar) {
             ReaderBrightnessBar(
                 value = state.readerBrightness,
-                onValueChange = { value -> viewModel.onIntent(ReaderIntent.SetReaderBrightness(value)) },
+                onValueChange = { value ->
+                    viewModel.onIntent(ReaderIntent.SetReaderBrightness(value))
+                    brightnessBarActivityTick++
+                },
             )
         }
 
