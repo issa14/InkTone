@@ -127,6 +127,7 @@ fun rememberChapterPaginationState(
     nextChapter: Chapter?,
     currentSentenceIndex: Int,
     fontSizeSp: Int,
+    lineHeightSp: Int,
     viewportWidthPx: Int,
     viewportHeightPx: Int,
     paddingPx: Int,
@@ -137,7 +138,13 @@ fun rememberChapterPaginationState(
     // Aucune couleur ici : elle ne déplace jamais le texte (3a.1), donc
     // n'a pas sa place dans le style de MESURE. Chaque consommateur
     // (PagedChapterContent) applique sa propre couleur au rendu.
-    val baseTextStyle = remember(fontSizeSp) { TextStyle(fontSize = fontSizeSp.sp) }
+    // 3d.2 — lineHeight fait maintenant partie du style de MESURE réel
+    // (au lieu d'être absent) : paginationStyleKeyFrom le lit directement
+    // sur ce TextStyle, garde-fou posé en 3b.2 pour que changer
+    // l'interligne redéclenche automatiquement la pagination.
+    val baseTextStyle = remember(fontSizeSp, lineHeightSp) {
+        TextStyle(fontSize = fontSizeSp.sp, lineHeight = lineHeightSp.sp)
+    }
     val state = remember(engine, baseTextStyle) { ChapterPaginationState(engine, baseTextStyle) }
 
     val contentWidthPx = viewportWidthPx - paddingPx * 2

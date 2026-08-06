@@ -95,6 +95,7 @@ class PagedChapterContentTest {
                 nextChapter = null,
                 currentSentenceIndex = currentSentenceIndex,
                 fontSizeSp = fontSizeSp,
+                lineHeightSp = fontSizeSp,
                 viewportWidthPx = areaSize.width,
                 viewportHeightPx = areaSize.height,
                 paddingPx = 0,

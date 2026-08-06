@@ -60,6 +60,7 @@ import com.inktone.domain.model.ReadingTheme
 import com.inktone.domain.model.Sentence
 import com.inktone.domain.model.SleepTimerState
 import com.inktone.feature.reader.pagination.rememberChapterPaginationState
+import kotlin.math.roundToInt
 
 /**
  * `effectiveSettings` (theme, taille de police) arrive déjà résolu dans
@@ -296,11 +297,17 @@ fun ReaderScreen(
         // étapes intermédiaires peuvent faire clignoter la page affichée.
         var readingAreaSize by remember { mutableStateOf(IntSize.Zero) }
         val paginationPaddingPx = with(density) { 16.dp.roundToPx() }
+        // 3d.2 — interligne en sp, combiné à fontSize (multiplicateur
+        // global, voir UserPreferences.lineHeightMultiplier) : seul point de
+        // calcul, consommé à la fois par la mesure de pagination et par le
+        // rendu en mode SCROLL (SentenceText) ci-dessous.
+        val lineHeightSp = (state.effectiveSettings.fontSize * state.lineHeightMultiplier).roundToInt()
         val pagination = rememberChapterPaginationState(
             chapter = state.currentChapter,
             nextChapter = state.chapters.getOrNull(state.currentChapterIndex + 1),
             currentSentenceIndex = state.currentSentenceIndex,
             fontSizeSp = state.effectiveSettings.fontSize,
+            lineHeightSp = lineHeightSp,
             viewportWidthPx = readingAreaSize.width,
             viewportHeightPx = readingAreaSize.height,
             paddingPx = paginationPaddingPx,
@@ -341,6 +348,7 @@ fun ReaderScreen(
                                     isSelected = isSentenceSelected,
                                     existingAnnotationColor = annotationColorFor(state.currentChapterIndex, sentence, state.annotations),
                                     fontSizeSp = state.effectiveSettings.fontSize,
+                                    lineHeightSp = lineHeightSp,
                                     textColor = ThemeColors.text(state.effectiveSettings.theme).copy(alpha = trailAlpha),
                                     onLongClick = { viewModel.onIntent(ReaderIntent.BeginSentenceSelection(index)) },
                                     onClick = {
@@ -503,19 +511,29 @@ fun ReaderScreen(
             )
         }
 
-        // B.2 — Panneau réglages lecture in-reader
+        // B.2/3d.2 — Panneau réglages de typographie in-reader (TT). Le
+        // thème n'y vit plus (bascule cyclique du lot 3b, cartes devenues
+        // redondantes) — seuls taille et interligne restent, avec un
+        // aperçu du texte RÉELLEMENT en cours de lecture, pas un exemple
+        // inventé.
         if (showSettingsPanel) {
+            val previewSentences = state.currentChapter?.paragraphs?.flatMap { it.sentences }.orEmpty()
+            val previewText = previewSentences
+                .drop(state.currentSentenceIndex)
+                .ifEmpty { previewSentences }
+                .take(3)
+                .joinToString(" ") { it.text }
             ReaderSettingsPanel(
-                currentTheme = state.effectiveSettings.theme,
                 currentFontSize = state.effectiveSettings.fontSize,
-                onThemeChange = { theme ->
-                    val overrides = (state.currentOverrides ?: ReadingOverrides()).copy(theme = theme)
-                    viewModel.onIntent(ReaderIntent.SetOverrides(overrides))
-                },
+                currentLineHeightMultiplier = state.lineHeightMultiplier,
+                previewText = previewText,
+                previewTextColor = ThemeColors.text(state.effectiveSettings.theme),
+                previewBackgroundColor = ThemeColors.background(state.effectiveSettings.theme),
                 onFontSizeChange = { size ->
                     val overrides = (state.currentOverrides ?: ReadingOverrides()).copy(fontSize = size)
                     viewModel.onIntent(ReaderIntent.SetOverrides(overrides))
                 },
+                onLineHeightChange = { multiplier -> viewModel.onIntent(ReaderIntent.SetLineHeight(multiplier)) },
                 onDismiss = { showSettingsPanel = false },
             )
         }
@@ -632,6 +650,7 @@ internal fun SentenceText(
     isSelected: Boolean,
     existingAnnotationColor: AnnotationColor?,
     fontSizeSp: Int,
+    lineHeightSp: Int = fontSizeSp,
     textColor: Color,
     onLongClick: () -> Unit,
     onClick: () -> Unit,
@@ -683,6 +702,7 @@ internal fun SentenceText(
             .background(background)
             .combinedClickable(onClick = onClick, onLongClick = onLongClick),
         fontSize = fontSizeSp.sp,
+        lineHeight = lineHeightSp.sp,
         color = textColor,
     )
 }
