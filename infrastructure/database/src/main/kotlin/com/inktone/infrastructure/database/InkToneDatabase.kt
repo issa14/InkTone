@@ -35,7 +35,7 @@ import com.inktone.infrastructure.database.entity.VoiceProfileEntity
         ImportResultEntity::class,
     ],
     views = [LibraryItemView::class],
-    version = 14, // Lot 5 : table import_results (MIGRATION_13_14)
+    version = 16, // Lot 6 : libraryLayoutMode (MIGRATION_15_16)
     exportSchema = true, // condition du harnais de migration — Tâche 2.4
 )
 @TypeConverters(StringListConverter::class)

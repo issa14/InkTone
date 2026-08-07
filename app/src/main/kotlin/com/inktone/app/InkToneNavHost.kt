@@ -15,6 +15,8 @@ import androidx.compose.material3.TopAppBar
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.collectAsState
+import androidx.compose.runtime.getValue
 import androidx.compose.runtime.remember
 import androidx.compose.ui.Modifier
 import androidx.activity.compose.rememberLauncherForActivityResult
@@ -130,10 +132,30 @@ fun InkToneNavHost(navController: NavHostController = rememberNavController()) {
             // Tache 9bis.5 : SettingsScreen possede desormais son propre
             // Scaffold/LargeTopAppBar (effet de collapse), pas de BackScaffold
             // generique ici contrairement aux autres destinations.
+            //
+            // Lot 6, Palier B — carte Données : BackupManager vit dans :data,
+            // invisible depuis feature/settings (Blueprint §12.4). Ce
+            // ViewModel et les deux lanceurs SAF (CreateDocument/OpenDocument,
+            // meme pattern que ImportPickerButton) restent donc ici, dans app.
+            val backupViewModel: BackupViewModel = hiltViewModel()
+            val dataOperationResult by backupViewModel.lastResult.collectAsState()
+            val exportLauncher = rememberLauncherForActivityResult(
+                ActivityResultContracts.CreateDocument("application/json"),
+            ) { uri -> uri?.let { backupViewModel.exportTo(it.toString()) } }
+            val importBackupLauncher = rememberLauncherForActivityResult(
+                ActivityResultContracts.OpenDocument(),
+            ) { uri -> uri?.let { backupViewModel.importFrom(it.toString()) } }
+
             SettingsScreen(
-                onOpenPronunciationRules = { navController.navigate(PronunciationRulesRoute) },
                 onOpenAbout = { navController.navigate(AboutRoute) },
                 onBack = navController::popBackStack,
+                modelsFolderInfo = backupViewModel.modelsFolderInfo,
+                dataOperationResult = dataOperationResult,
+                onDismissDataOperationResult = backupViewModel::dismissResult,
+                onExportData = {
+                    exportLauncher.launch("inktone-backup-${java.time.LocalDate.now()}.json")
+                },
+                onImportData = { importBackupLauncher.launch(arrayOf("application/json")) },
             )
         }
         composable<PronunciationRulesRoute> {

@@ -2,6 +2,8 @@ package com.inktone.feature.settings
 
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
+import com.inktone.core.designsystem.AppThemeMode
+import com.inktone.domain.model.AppTheme
 import com.inktone.domain.repository.PreferencesRepository
 import dagger.hilt.android.lifecycle.HiltViewModel
 import kotlinx.coroutines.flow.SharingStarted
@@ -11,7 +13,7 @@ import kotlinx.coroutines.flow.stateIn
 import javax.inject.Inject
 
 /**
- * Tache 9bis.1.2/9bis.5 — expose uniquement `useDynamicColor` a
+ * Tache 9bis.1.2/9bis.5 — expose `useDynamicColor` et `appTheme` a
  * `MainActivity` (module `app`), qui n'a pas le droit de dependre de
  * `domain`/`PreferencesRepository` directement (Blueprint §12.4).
  * `InkToneTheme` s'applique avant `InkToneNavHost` dans `MainActivity`,
@@ -26,4 +28,20 @@ class AppThemeViewModel @Inject constructor(
     val useDynamicColor: StateFlow<Boolean> = preferencesRepository.observe()
         .map { it.dynamicColorEnabled }
         .stateIn(viewModelScope, SharingStarted.Eagerly, true)
+
+    /**
+     * Lot 6 — thème système Système/Clair/Sombre, exposé à MainActivity en
+     * `AppThemeMode` (core:designsystem) : la conversion depuis `domain.AppTheme`
+     * se fait ici, dans le seul module autorisé à voir les deux types (Blueprint
+     * §12.4 — `app` ne peut dépendre ni de `domain` ni directement de ce mapping).
+     */
+    val appTheme: StateFlow<AppThemeMode> = preferencesRepository.observe()
+        .map {
+            when (it.appTheme) {
+                AppTheme.SYSTEM -> AppThemeMode.SYSTEM
+                AppTheme.LIGHT -> AppThemeMode.LIGHT
+                AppTheme.DARK -> AppThemeMode.DARK
+            }
+        }
+        .stateIn(viewModelScope, SharingStarted.Eagerly, AppThemeMode.SYSTEM)
 }

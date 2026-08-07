@@ -1,5 +1,6 @@
 package com.inktone.data.mapper
 
+import com.inktone.domain.model.AppTheme
 import com.inktone.domain.model.FontFamily
 import com.inktone.domain.model.ReadingTheme
 import com.inktone.domain.model.TtsEngineId
@@ -16,6 +17,8 @@ fun UserPreferences.toEntity(): UserPreferencesEntity = UserPreferencesEntity(
     lineHeightMultiplier = lineHeightMultiplier, readerBrightness = readerBrightness,
     eyeRestReminderEnabled = eyeRestReminderEnabled,
     eyeRestReminderIntervalMinutes = eyeRestReminderIntervalMinutes,
+    appTheme = appTheme.name,
+    libraryLayoutMode = libraryLayoutMode,
 )
 
 fun UserPreferencesEntity.toDomain(): UserPreferences = UserPreferences(
@@ -29,4 +32,6 @@ fun UserPreferencesEntity.toDomain(): UserPreferences = UserPreferences(
     lineHeightMultiplier = lineHeightMultiplier, readerBrightness = readerBrightness,
     eyeRestReminderEnabled = eyeRestReminderEnabled,
     eyeRestReminderIntervalMinutes = eyeRestReminderIntervalMinutes,
+    appTheme = AppTheme.valueOf(appTheme),
+    libraryLayoutMode = libraryLayoutMode,
 )
