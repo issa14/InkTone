@@ -19,4 +19,7 @@ interface BookmarkDao {
 
     @Query("DELETE FROM bookmarks WHERE id = :id")
     suspend fun delete(id: String)
+
+    @Query("UPDATE bookmarks SET isPinned = :isPinned WHERE id = :id")
+    suspend fun setPinned(id: String, isPinned: Boolean)
 }

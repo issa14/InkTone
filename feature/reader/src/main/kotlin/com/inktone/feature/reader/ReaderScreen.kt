@@ -399,6 +399,23 @@ fun ReaderScreen(
             paddingPx = paginationPaddingPx,
         )
 
+        // Lot 4, tâche 4.7 — signale la fin de mise en page du chapitre
+        // affiché seulement quand la mesure couvre la totalité de ses
+        // phrases (pas seulement la première page, mesurée en priorité —
+        // voir ChapterPaginationState) : c'est ce qui rend le flash fiable
+        // même sur un chapitre long où la mesure complète prend du temps.
+        val pendingHighlightTarget = state.pendingHighlightTarget
+        LaunchedEffect(pendingHighlightTarget, pagination.measurement, state.currentChapterIndex) {
+            val target = pendingHighlightTarget ?: return@LaunchedEffect
+            val chapter = state.currentChapter ?: return@LaunchedEffect
+            if (chapter.index != target.chapterIndex) return@LaunchedEffect
+            val totalSentences = chapter.paragraphs.sumOf { it.sentences.size }
+            val measuredSentences = pagination.measurement?.sentenceStartOffsets?.size ?: 0
+            if (measuredSentences >= totalSentences) {
+                viewModel.onIntent(ReaderIntent.ChapterLayoutCompleted(chapter.index))
+            }
+        }
+
         Box(
             modifier = Modifier
                 .weight(1f)

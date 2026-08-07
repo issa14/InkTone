@@ -6,6 +6,7 @@ import androidx.room.TypeConverters
 import com.inktone.infrastructure.database.converter.StringListConverter
 import com.inktone.infrastructure.database.dao.AnnotationDao
 import com.inktone.infrastructure.database.dao.BookmarkDao
+import com.inktone.infrastructure.database.dao.LibraryItemDao
 import com.inktone.infrastructure.database.dao.PronunciationRuleDao
 import com.inktone.infrastructure.database.dao.PublicationDao
 import com.inktone.infrastructure.database.dao.ReadingSessionDao
@@ -15,6 +16,7 @@ import com.inktone.infrastructure.database.dao.UserPreferencesDao
 import com.inktone.infrastructure.database.dao.VoiceProfileDao
 import com.inktone.infrastructure.database.entity.AnnotationEntity
 import com.inktone.infrastructure.database.entity.BookmarkEntity
+import com.inktone.infrastructure.database.entity.LibraryItemView
 import com.inktone.infrastructure.database.entity.PronunciationRuleEntity
 import com.inktone.infrastructure.database.entity.PublicationEntity
 import com.inktone.infrastructure.database.entity.ReadingSessionEntity
@@ -29,7 +31,8 @@ import com.inktone.infrastructure.database.entity.VoiceProfileEntity
         BookmarkEntity::class, AnnotationEntity::class, VoiceProfileEntity::class,
         UserPreferencesEntity::class, SentenceFtsEntity::class, PronunciationRuleEntity::class,
     ],
-    version = 12, // 3d.2/3d.3/3d.5 : interligne, luminosité, repos oculaire (MIGRATION_11_12)
+    views = [LibraryItemView::class],
+    version = 13, // Lot 4.1/4.2/4.3 : extrait, épinglage, vue globale marque-pages + annotations (MIGRATION_12_13)
     exportSchema = true, // condition du harnais de migration — Tâche 2.4
 )
 @TypeConverters(StringListConverter::class)
@@ -43,4 +46,5 @@ abstract class InkToneDatabase : RoomDatabase() {
     abstract fun userPreferencesDao(): UserPreferencesDao
     abstract fun sentenceFtsDao(): SentenceFtsDao
     abstract fun pronunciationRuleDao(): PronunciationRuleDao
+    abstract fun libraryItemDao(): LibraryItemDao
 }

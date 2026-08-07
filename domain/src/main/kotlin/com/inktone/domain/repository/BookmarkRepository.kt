@@ -10,4 +10,7 @@ interface BookmarkRepository {
     fun observeAll(): Flow<List<Bookmark>>
     suspend fun insert(bookmark: Bookmark)
     suspend fun delete(id: String)
+
+    /** Lot 4, tâche 4.3 — même patron que Publication.isPinned. */
+    suspend fun setPinned(id: String, isPinned: Boolean)
 }

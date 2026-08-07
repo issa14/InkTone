@@ -107,3 +107,67 @@ val MIGRATION_11_12 = object : Migration(11, 12) {
         db.execSQL("ALTER TABLE user_preferences ADD COLUMN eyeRestReminderIntervalMinutes INTEGER NOT NULL DEFAULT 60")
     }
 }
+
+/**
+ * Lot 4.2/4.3/4.4 : extrait de texte persisté et épinglage sur les
+ * marque-pages et annotations, plus la vue UNION `library_items` qui
+ * fusionne les deux sources pour la vue globale « Marque-pages et
+ * notes » (recherche/tri entièrement SQL, tâche 4.4).
+ */
+val MIGRATION_12_13 = object : Migration(12, 13) {
+    override fun migrate(db: SupportSQLiteDatabase) {
+        db.execSQL("ALTER TABLE bookmarks ADD COLUMN excerpt TEXT DEFAULT NULL")
+        db.execSQL("ALTER TABLE bookmarks ADD COLUMN isPinned INTEGER NOT NULL DEFAULT 0")
+        db.execSQL("ALTER TABLE annotations ADD COLUMN excerpt TEXT DEFAULT NULL")
+        db.execSQL("ALTER TABLE annotations ADD COLUMN isPinned INTEGER NOT NULL DEFAULT 0")
+        db.execSQL("DROP VIEW IF EXISTS `library_items`")
+        // Le texte SQL ci-dessous doit être byte pour byte celui que Room
+        // génère depuis LibraryItemView (@DatabaseView) : la validation de
+        // migration (MigrationTestHelper) compare le SQL normalisé de la
+        // vue trouvée en base à celui attendu par le schéma exporté — un
+        // simple écart d'indentation ou de saut de ligne fait échouer
+        // runMigrationsAndValidate. Ne pas reformater sans reexporter le
+        // schéma et comparer.
+        db.execSQL(
+            "CREATE VIEW `library_items` AS SELECT\n" +
+                "            'bookmark' AS type,\n" +
+                "            b.id AS id,\n" +
+                "            b.publicationId AS publicationId,\n" +
+                "            p.title AS publicationTitle,\n" +
+                "            b.resourceHref AS resourceHref,\n" +
+                "            b.chapterIndex AS chapterIndex,\n" +
+                "            b.paragraphIndex AS paragraphIndex,\n" +
+                "            b.charOffset AS charOffset,\n" +
+                "            NULL AS endResourceHref,\n" +
+                "            NULL AS endChapterIndex,\n" +
+                "            NULL AS endParagraphIndex,\n" +
+                "            NULL AS endCharOffset,\n" +
+                "            NULL AS color,\n" +
+                "            b.excerpt AS excerpt,\n" +
+                "            b.note AS note,\n" +
+                "            b.isPinned AS isPinned,\n" +
+                "            b.createdAt AS createdAt\n" +
+                "        FROM bookmarks b LEFT JOIN publications p ON p.id = b.publicationId\n" +
+                "        UNION ALL\n" +
+                "        SELECT\n" +
+                "            'annotation' AS type,\n" +
+                "            a.id AS id,\n" +
+                "            a.publicationId AS publicationId,\n" +
+                "            p.title AS publicationTitle,\n" +
+                "            a.startResourceHref AS resourceHref,\n" +
+                "            a.startChapterIndex AS chapterIndex,\n" +
+                "            a.startParagraphIndex AS paragraphIndex,\n" +
+                "            a.startCharOffset AS charOffset,\n" +
+                "            a.endResourceHref AS endResourceHref,\n" +
+                "            a.endChapterIndex AS endChapterIndex,\n" +
+                "            a.endParagraphIndex AS endParagraphIndex,\n" +
+                "            a.endCharOffset AS endCharOffset,\n" +
+                "            a.color AS color,\n" +
+                "            a.excerpt AS excerpt,\n" +
+                "            a.content AS note,\n" +
+                "            a.isPinned AS isPinned,\n" +
+                "            a.createdAt AS createdAt\n" +
+                "        FROM annotations a LEFT JOIN publications p ON p.id = a.publicationId",
+        )
+    }
+}
