@@ -8,6 +8,7 @@ import com.inktone.domain.repository.ReadingSessionRepository
 import com.inktone.domain.repository.ReadingStateRepository
 import com.inktone.domain.repository.VoiceProfileRepository
 import com.inktone.domain.service.FileStorageService
+import com.inktone.domain.service.ImportSessionStore
 import com.inktone.domain.service.PublicationParser
 import com.inktone.domain.service.SearchService
 import com.inktone.domain.usecase.AddAnnotationUseCase
@@ -31,6 +32,7 @@ import dagger.Module
 import dagger.Provides
 import dagger.hilt.InstallIn
 import dagger.hilt.components.SingletonComponent
+import javax.inject.Singleton
 
 /**
  * Fournit les Use Cases du domaine a constructeur simple (Tache 1.8 :
@@ -49,6 +51,10 @@ import dagger.hilt.components.SingletonComponent
 @Module
 @InstallIn(SingletonComponent::class)
 object UseCaseModule {
+    @Provides
+    @Singleton
+    fun provideImportSessionStore(): ImportSessionStore = ImportSessionStore()
+
     @Provides
     fun provideUpdateReadingStateUseCase(
         readingStateRepository: ReadingStateRepository,

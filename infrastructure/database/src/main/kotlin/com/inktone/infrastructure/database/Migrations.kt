@@ -171,3 +171,23 @@ val MIGRATION_12_13 = object : Migration(12, 13) {
         )
     }
 }
+
+/** Lot 5 : table des résultats d'import par session. */
+val MIGRATION_13_14 = object : Migration(13, 14) {
+    override fun migrate(db: SupportSQLiteDatabase) {
+        db.execSQL(
+            """
+            CREATE TABLE IF NOT EXISTS import_results (
+                id INTEGER PRIMARY KEY AUTOINCREMENT NOT NULL,
+                session_id TEXT NOT NULL,
+                file_name TEXT NOT NULL,
+                result_type TEXT NOT NULL,
+                message TEXT,
+                existing_publication_id TEXT
+            )
+            """.trimIndent(),
+        )
+        db.execSQL("CREATE INDEX IF NOT EXISTS index_import_results_session_id ON import_results (session_id)")
+        db.execSQL("CREATE UNIQUE INDEX IF NOT EXISTS index_import_results_session_id_file_name ON import_results (session_id, file_name)")
+    }
+}

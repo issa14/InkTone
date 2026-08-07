@@ -6,6 +6,7 @@ import androidx.work.OneTimeWorkRequestBuilder
 import androidx.work.WorkManager
 import androidx.work.workDataOf
 import com.inktone.domain.service.ImportScheduler
+import java.util.UUID
 import javax.inject.Inject
 import javax.inject.Singleton
 
@@ -20,18 +21,28 @@ import javax.inject.Singleton
  * (`WorkContinuation.then`) — résout la limite documentée dans
  * `ImportWorker` : `Data` sérialise sur ~10 Ko max, dépassé autour de
  * ~70-90 URI SAF, bien en-dessous des 500 EPUB du budget §11.2.
+ *
+ * Génère un [sessionId] UUID au moment de `enqueue` et le transmet à
+ * chaque `WorkRequest` via `KEY_SESSION_ID` — permet à
+ * [ImportResultsStore] d'agréger les résultats sur toute la chaîne
+ * (Palier A, Lot 5).
  */
 @Singleton
 class WorkManagerImportScheduler @Inject constructor(
     private val workManager: WorkManager,
 ) : ImportScheduler {
 
-    override fun enqueue(fileUris: List<String>) {
-        if (fileUris.isEmpty()) return
+    override fun enqueue(fileUris: List<String>): String {
+        if (fileUris.isEmpty()) return ""
+
+        val sessionId = UUID.randomUUID().toString()
 
         val requests = fileUris.chunked(MAX_URIS_PER_CHUNK).map { chunk ->
             OneTimeWorkRequestBuilder<ImportWorker>()
-                .setInputData(workDataOf(ImportWorker.KEY_URIS to chunk.toTypedArray()))
+                .setInputData(workDataOf(
+                    ImportWorker.KEY_URIS to chunk.toTypedArray(),
+                    ImportWorker.KEY_SESSION_ID to sessionId,
+                ))
                 .setConstraints(Constraints.Builder().setRequiresStorageNotLow(true).build())
                 .build()
         }
@@ -41,6 +52,8 @@ class WorkManagerImportScheduler @Inject constructor(
             continuation = continuation.then(requests[index])
         }
         continuation.enqueue()
+
+        return sessionId
     }
 
     companion object {

@@ -456,6 +456,58 @@ class DatabaseMigrationTest {
         v13.close()
     }
 
+    @Test
+    fun migration_13_vers_14_cree_la_table_import_results_utilisable() {
+        val v13 = helper.createDatabase(TEST_DB_NAME, 13)
+        v13.close()
+
+        val v14 = helper.runMigrationsAndValidate(
+            TEST_DB_NAME, 14, true,
+            MIGRATION_1_2, MIGRATION_2_3, MIGRATION_3_4, MIGRATION_4_5, MIGRATION_5_6, MIGRATION_6_7,
+            MIGRATION_7_8, MIGRATION_8_9, MIGRATION_9_10, MIGRATION_10_11, MIGRATION_11_12, MIGRATION_12_13,
+            MIGRATION_13_14,
+        )
+
+        v14.execSQL(
+            "INSERT INTO import_results (session_id, file_name, result_type, message, existing_publication_id) " +
+                "VALUES ('s1', 'test.epub', 'success', NULL, NULL)",
+        )
+        v14.execSQL(
+            "INSERT INTO import_results (session_id, file_name, result_type, message, existing_publication_id) " +
+                "VALUES ('s1', 'corrompu.epub', 'corrupted', 'Fichier illisible', NULL)",
+        )
+        v14.execSQL(
+            "INSERT INTO import_results (session_id, file_name, result_type, message, existing_publication_id) " +
+                "VALUES ('s2', 'autre.epub', 'duplicate', NULL, 'pub-123')",
+        )
+
+        // Tri : échecs d'abord, puis doublons, puis succès
+        v14.query(
+            "SELECT file_name, result_type FROM import_results WHERE session_id = 's1' " +
+                "ORDER BY CASE WHEN result_type IN ('corrupted','drm_protected','unsupported_format') THEN 0 WHEN result_type='duplicate' THEN 1 ELSE 2 END, file_name ASC",
+        ).use { cursor ->
+            assertEquals(2, cursor.count)
+            assertEquals(true, cursor.moveToFirst())
+            assertEquals("corrompu.epub", cursor.getString(0))
+            assertEquals("corrupted", cursor.getString(1))
+            assertEquals(true, cursor.moveToNext())
+            assertEquals("test.epub", cursor.getString(0))
+        }
+
+        v14.query("SELECT existing_publication_id FROM import_results WHERE session_id = 's2'").use { cursor ->
+            assertEquals(true, cursor.moveToFirst())
+            assertEquals("pub-123", cursor.getString(0))
+        }
+
+        // DELETE ALL purge toutes les sessions
+        v14.execSQL("DELETE FROM import_results")
+        v14.query("SELECT count(*) FROM import_results").use { cursor ->
+            cursor.moveToFirst()
+            assertEquals(0, cursor.getInt(0))
+        }
+        v14.close()
+    }
+
     companion object {
         private const val TEST_DB_NAME = "migration-test"
     }

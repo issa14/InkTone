@@ -4,6 +4,7 @@ import com.inktone.domain.model.FilterMode
 import com.inktone.domain.model.Publication
 import com.inktone.domain.model.PublicationFormat
 import com.inktone.domain.service.ImportProgress
+import com.inktone.domain.service.ImportResultEntry
 
 /**
  * Tache 9bis.4 — tri et recherche titre/auteur en derive du `publications`
@@ -31,6 +32,10 @@ data class LibraryUiState(
     val importProgress: ImportProgress = ImportProgress(),
     val errorMessage: String? = null,
     val progressMap: Map<String, Int> = emptyMap(),
+    // Lot 5 — résultats d'import consultables après la fin du worker
+    val importResults: List<ImportResultEntry> = emptyList(),
+    val showImportDetails: Boolean = false,
+    val importSessionId: String? = null,
 ) {
     /** Tags distincts de la bibliotheque COMPLETE, pas seulement du filtre actif — le drawer doit pouvoir en changer. */
     val availableTags: List<String> get() = publications.flatMap { it.subjects }.distinct().sorted()
@@ -103,6 +108,8 @@ sealed interface LibraryIntent {
     data object ClearFileFormats : LibraryIntent
     data object Refresh : LibraryIntent
     data object DismissError : LibraryIntent
+    data object DismissImportResults : LibraryIntent
+    data object OpenImportDetails : LibraryIntent
 }
 
 /**

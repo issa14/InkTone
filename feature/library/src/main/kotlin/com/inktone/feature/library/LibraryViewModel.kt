@@ -7,6 +7,8 @@ import com.inktone.domain.model.ReadingState
 import com.inktone.domain.repository.PublicationRepository
 import com.inktone.domain.repository.ReadingStateRepository
 import com.inktone.domain.service.ImportProgressObserver
+import com.inktone.domain.service.ImportResultsStore
+import com.inktone.domain.service.ImportSessionStore
 import com.inktone.domain.usecase.DeletePublicationUseCase
 import com.inktone.domain.usecase.ToggleFavoriteUseCase
 import com.inktone.domain.usecase.TogglePinUseCase
@@ -29,6 +31,8 @@ class LibraryViewModel @Inject constructor(
     private val togglePin: TogglePinUseCase,
     private val deletePublication: DeletePublicationUseCase,
     private val importProgressObserver: ImportProgressObserver,
+    private val importResultsStore: ImportResultsStore,
+    private val importSessionStore: ImportSessionStore,
 ) : ViewModel() {
 
     private val _state = MutableStateFlow(LibraryUiState())
@@ -45,8 +49,25 @@ class LibraryViewModel @Inject constructor(
         // filtre ne doit jamais interrompre l'observation de la
         // progression d'import, les deux sont sans rapport.
         viewModelScope.launch {
+            var previousTotal = 0
             importProgressObserver.observe().collect { progress ->
                 _state.value = _state.value.copy(importProgress = progress)
+
+                // Lot 5 — détection de fin d'import : quand le total
+                // passe de >0 à 0 et qu'aucun lot n'est en attente,
+                // l'import est terminé — charger les résultats.
+                val wasActive = previousTotal > 0 || _state.value.importProgress.hasQueuedChunks
+                val isDone = progress.total == 0 && !progress.hasQueuedChunks
+                if (wasActive && isDone) {
+                    loadImportResults()
+                }
+                previousTotal = progress.total
+            }
+        }
+        // Lot 5 — observer le sessionId partagé avec ImportViewModel
+        viewModelScope.launch {
+            importSessionStore.sessionId.collect { sessionId ->
+                _state.value = _state.value.copy(importSessionId = sessionId)
             }
         }
     }
@@ -80,6 +101,17 @@ class LibraryViewModel @Inject constructor(
                 _state.value.filterValue,
             )
             is LibraryIntent.DismissError -> _state.value = _state.value.copy(errorMessage = null)
+            is LibraryIntent.DismissImportResults -> {
+                _state.value = _state.value.copy(importResults = emptyList(), showImportDetails = false)
+                val sessionId = _state.value.importSessionId
+                if (sessionId != null) {
+                    viewModelScope.launch { importResultsStore.clearSession(sessionId) }
+                    importSessionStore.clear()
+                }
+            }
+            is LibraryIntent.OpenImportDetails -> {
+                _state.value = _state.value.copy(showImportDetails = true)
+            }
         }
     }
 
@@ -91,6 +123,18 @@ class LibraryViewModel @Inject constructor(
      */
     fun refreshOnResume() {
         observePublications(_state.value.activeFilter, _state.value.filterValue)
+    }
+
+    /**
+     * Charge les résultats d'import depuis [ImportResultsStore] pour
+     * la session en cours (Lot 5). Appelé quand l'import se termine.
+     */
+    private fun loadImportResults() {
+        val sessionId = _state.value.importSessionId ?: return
+        viewModelScope.launch {
+            val results = importResultsStore.getResults(sessionId)
+            _state.value = _state.value.copy(importResults = results)
+        }
     }
 
     private fun observePublications(filter: FilterMode, value: String? = null) {
