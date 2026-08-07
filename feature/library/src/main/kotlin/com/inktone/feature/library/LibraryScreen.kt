@@ -194,14 +194,17 @@ fun LibraryScreen(
             },
         ) { innerPadding ->
             Column(Modifier.fillMaxSize().padding(innerPadding)) {
-                // Lot 5 — résumé de fin d'import ou bannière de progression
-                if (state.importResults.isNotEmpty()) {
+                // Lot 5 — résumé de fin d'import ou bannière de progression.
+                // Pas de résumé ici quand les détails sont ouverts :
+                // ImportResultDetail affiche déjà son propre en-tête résumé
+                // (double affichage sinon).
+                if (state.importResults.isNotEmpty() && !state.showImportDetails) {
                     ImportResultSummary(
                         results = state.importResults,
                         onDetailsClick = { viewModel.onIntent(LibraryIntent.OpenImportDetails) },
                         onDismiss = { viewModel.onIntent(LibraryIntent.DismissImportResults) },
                     )
-                } else {
+                } else if (state.importResults.isEmpty()) {
                     ImportProgressBanner(state.importProgress)
                 }
 

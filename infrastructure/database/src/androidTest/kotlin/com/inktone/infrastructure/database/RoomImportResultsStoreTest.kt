@@ -76,6 +76,7 @@ class RoomImportResultsStoreTest {
 
         val unsupported = results.first { it.fileName == "d.epub" }
         assertEquals("unsupported_format", unsupported.resultType)
+        assertEquals("Format non pris en charge : PDF", unsupported.message)
 
         val success = results.first { it.fileName == "e.epub" }
         assertEquals("success", success.resultType)
@@ -127,18 +128,31 @@ class RoomImportResultsStoreTest {
     }
 
     @Test
-    fun les_resultats_survivent_a_une_reconstruction_du_store() = runTest {
-        val store = newStore()
-        store.recordResult("session-1", "a.epub", ImportResult.Corrupted("Echec"))
+    fun les_resultats_survivent_a_la_mort_du_processus() = runTest {
+        // Base sur fichier (pas en mémoire) : fermer la connexion puis en
+        // rouvrir une nouvelle sur le même fichier simule fidèlement un
+        // kill de process, contrairement à une simple reconstruction du
+        // store sur une base en mémoire qui ne prouve rien de tel.
+        val context = ApplicationProvider.getApplicationContext<Context>()
+        val dbName = "import-results-process-death-test.db"
+        context.deleteDatabase(dbName)
 
-        // Reconstruit un nouveau store sur la même base — simule la survie
-        // à la mort du processus (la base est en mémoire ici, mais le
-        // contrat de persistance Room est le même).
-        val storeReloaded = newStore()
-        val results = storeReloaded.getResults("session-1")
+        try {
+            val firstProcessDb = Room.databaseBuilder(context, InkToneDatabase::class.java, dbName).build()
+            RoomImportResultsStore(firstProcessDb.importResultDao())
+                .recordResult("session-1", "a.epub", ImportResult.Corrupted("Echec"))
+            firstProcessDb.close()
 
-        assertEquals(1, results.size)
-        assertEquals("a.epub", results.first().fileName)
-        assertEquals("Echec", results.first().message)
+            // Le process est mort : nouvelle instance de base, nouveau store.
+            val secondProcessDb = Room.databaseBuilder(context, InkToneDatabase::class.java, dbName).build()
+            val results = RoomImportResultsStore(secondProcessDb.importResultDao()).getResults("session-1")
+            secondProcessDb.close()
+
+            assertEquals(1, results.size)
+            assertEquals("a.epub", results.first().fileName)
+            assertEquals("Echec", results.first().message)
+        } finally {
+            context.deleteDatabase(dbName)
+        }
     }
 }
