@@ -46,7 +46,7 @@ class CascadeDeleteTest {
             )
         )
         db.readingStateDao().save(ReadingStateEntity(pubId, "ch1.xhtml", 0, null, 0, 0L, null, null, null))
-        db.bookmarkDao().insert(BookmarkEntity("bm-1", pubId, "ch1.xhtml", 0, null, 0, null, null, 0L))
+        db.bookmarkDao().insert(BookmarkEntity("bm-1", pubId, "ch1.xhtml", 0, null, 0, null, null, createdAt = 0L))
 
         db.publicationDao().delete(pubId)
 

@@ -8,4 +8,7 @@ interface AnnotationRepository {
     suspend fun insert(annotation: Annotation)
     suspend fun update(annotation: Annotation)
     suspend fun delete(id: String)
+
+    /** Lot 4, tâche 4.3 — même patron que Publication.isPinned. */
+    suspend fun setPinned(id: String, isPinned: Boolean)
 }

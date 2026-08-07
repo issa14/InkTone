@@ -22,5 +22,7 @@ data class BookmarkEntity(
     val charOffset: Int,
     val title: String?,
     val note: String?,
+    val excerpt: String? = null,
+    val isPinned: Boolean = false,
     val createdAt: Long,
 )

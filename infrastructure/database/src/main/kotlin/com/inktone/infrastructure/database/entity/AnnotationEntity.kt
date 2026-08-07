@@ -27,6 +27,8 @@ data class AnnotationEntity(
     val endCharOffset: Int,
     val color: String,
     val content: String?,
+    val excerpt: String? = null,
+    val isPinned: Boolean = false,
     val createdAt: Long,
     val updatedAt: Long,
 )

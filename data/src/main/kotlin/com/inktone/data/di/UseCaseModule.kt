@@ -13,7 +13,9 @@ import com.inktone.domain.service.SearchService
 import com.inktone.domain.usecase.AddAnnotationUseCase
 import com.inktone.domain.usecase.ApplyAccessibilityPresetUseCase
 import com.inktone.domain.usecase.CreateBookmarkUseCase
+import com.inktone.domain.usecase.DeleteAnnotationUseCase
 import com.inktone.domain.usecase.DeleteBookmarkUseCase
+import com.inktone.domain.usecase.DeleteLibraryItemUseCase
 import com.inktone.domain.usecase.ExportLibraryUseCase
 import com.inktone.domain.usecase.GetReadingStateUseCase
 import com.inktone.domain.usecase.GetStatisticsUseCase
@@ -22,6 +24,7 @@ import com.inktone.domain.usecase.ImportPublicationUseCase
 import com.inktone.domain.usecase.SearchPublicationUseCase
 import com.inktone.domain.usecase.DeletePublicationUseCase
 import com.inktone.domain.usecase.ToggleFavoriteUseCase
+import com.inktone.domain.usecase.ToggleLibraryItemPinUseCase
 import com.inktone.domain.usecase.TogglePinUseCase
 import com.inktone.domain.usecase.UpdateReadingStateUseCase
 import dagger.Module
@@ -105,6 +108,23 @@ object UseCaseModule {
     fun provideDeleteBookmarkUseCase(
         bookmarkRepository: BookmarkRepository,
     ): DeleteBookmarkUseCase = DeleteBookmarkUseCase(bookmarkRepository)
+
+    @Provides
+    fun provideDeleteAnnotationUseCase(
+        annotationRepository: AnnotationRepository,
+    ): DeleteAnnotationUseCase = DeleteAnnotationUseCase(annotationRepository)
+
+    @Provides
+    fun provideToggleLibraryItemPinUseCase(
+        annotationRepository: AnnotationRepository,
+        bookmarkRepository: BookmarkRepository,
+    ): ToggleLibraryItemPinUseCase = ToggleLibraryItemPinUseCase(annotationRepository, bookmarkRepository)
+
+    @Provides
+    fun provideDeleteLibraryItemUseCase(
+        annotationRepository: AnnotationRepository,
+        bookmarkRepository: BookmarkRepository,
+    ): DeleteLibraryItemUseCase = DeleteLibraryItemUseCase(annotationRepository, bookmarkRepository)
 
     @Provides
     fun provideSearchPublicationUseCase(

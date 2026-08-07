@@ -45,14 +45,14 @@ class BookmarkDaoTest {
     @Test
     fun insert_puis_observeForPublication_retrouve_le_signet() = runTest {
         insertPublication("pub-1")
-        db.bookmarkDao().insert(BookmarkEntity("bm-1", "pub-1", "ch1.xhtml", 0, null, 10, null, null, 0L))
+        db.bookmarkDao().insert(BookmarkEntity("bm-1", "pub-1", "ch1.xhtml", 0, null, 10, null, null, createdAt = 0L))
         assertEquals(1, db.bookmarkDao().observeForPublication("pub-1").first().size)
     }
 
     @Test
     fun delete_retire_le_signet() = runTest {
         insertPublication("pub-1")
-        db.bookmarkDao().insert(BookmarkEntity("bm-1", "pub-1", "ch1.xhtml", 0, null, 10, null, null, 0L))
+        db.bookmarkDao().insert(BookmarkEntity("bm-1", "pub-1", "ch1.xhtml", 0, null, 10, null, null, createdAt = 0L))
         db.bookmarkDao().delete("bm-1")
         assertTrue(db.bookmarkDao().observeForPublication("pub-1").first().isEmpty())
     }

@@ -172,4 +172,92 @@ class ReaderViewModelBookmarkToggleTest {
         val withNote = viewModel.state.value.annotations.first { it.content != null }
         assertEquals("Ma note de lecture", withNote.content)
     }
+
+    /** Lot 4, tâche 4.2 — l'extrait vient du texte réellement affiché, pas d'un offset EPUB. */
+    @Test
+    fun toggle_persiste_l_extrait_du_texte_affiche_sur_le_signet() = runTest {
+        val readingStateRepository = FakeReadingStateRepository()
+        val publicationRepository = FakePublicationRepository()
+        val bookmarkRepository = FakeBookmarkRepository()
+        val annotationRepository = FakeAnnotationRepository()
+        publicationRepository.insert(
+            Publication(
+                id = "pub-1", title = "Test", format = PublicationFormat.EPUB,
+                fileUri = "content://x", fileHash = "hash", fileSize = 10, chapterCount = 1,
+                importDate = 0L,
+            ),
+        )
+        val viewModel = buildViewModel(readingStateRepository, publicationRepository, bookmarkRepository, annotationRepository)
+        viewModel.onIntent(ReaderIntent.OpenPublication("pub-1"))
+        dispatcher.scheduler.advanceUntilIdle()
+
+        viewModel.onIntent(ReaderIntent.ToggleBookmarkAtCurrentPosition)
+        dispatcher.scheduler.advanceUntilIdle()
+
+        assertEquals("Phrase unique.", viewModel.state.value.bookmarks.single().excerpt)
+    }
+
+    /** Lot 4, tâche 4.2 — un extrait trop long est tronqué à la création, pas à l'affichage. */
+    @Test
+    fun confirmAnnotation_tronque_l_extrait_au_dela_de_la_borne() = runTest {
+        val longText = "a".repeat(400)
+        val longChapter = Chapter(
+            index = 0, href = "OEBPS/chapter1.xhtml", title = null,
+            paragraphs = listOf(
+                Paragraph(
+                    index = 0,
+                    sentences = listOf(Sentence(index = 0, text = longText, startOffset = 0, endOffset = longText.length)),
+                ),
+            ),
+        )
+        val readingStateRepository = FakeReadingStateRepository()
+        val publicationRepository = FakePublicationRepository()
+        val bookmarkRepository = FakeBookmarkRepository()
+        val annotationRepository = FakeAnnotationRepository()
+        publicationRepository.insert(
+            Publication(
+                id = "pub-1", title = "Test", format = PublicationFormat.EPUB,
+                fileUri = "content://x", fileHash = "hash", fileSize = 10, chapterCount = 1,
+                importDate = 0L,
+            ),
+        )
+        val preferencesRepository = FakePreferencesRepository()
+        preferencesRepository.update(UserPreferences(eyeRestReminderEnabled = false))
+        val parser = FakePublicationParser(
+            result = ParseResult.Success(
+                documentModel = DocumentModel(
+                    chapters = listOf(longChapter),
+                    tableOfContents = emptyList(),
+                    resources = emptyList(),
+                ),
+                isDrmProtected = false,
+                metadata = PublicationMetadata(title = "Titre de test"),
+            ),
+        )
+        val viewModel = ReaderViewModel(
+            ttsEngine = FakeTtsEngine(),
+            audioSegmentPlayer = AudioSegmentPlayer(),
+            publicationParser = parser,
+            updateReadingState = UpdateReadingStateUseCase(readingStateRepository),
+            getReadingState = GetReadingStateUseCase(readingStateRepository),
+            publicationRepository = publicationRepository,
+            preferencesRepository = preferencesRepository,
+            annotationRepository = annotationRepository,
+            addAnnotation = AddAnnotationUseCase(annotationRepository),
+            bookmarkRepository = bookmarkRepository,
+            createBookmark = CreateBookmarkUseCase(bookmarkRepository),
+            deleteBookmark = DeleteBookmarkUseCase(bookmarkRepository),
+            voiceProfileRepository = FakeVoiceProfileRepository(),
+            getVoiceProfiles = GetVoiceProfilesUseCase(FakeVoiceProfileRepository()),
+        )
+        viewModel.onIntent(ReaderIntent.OpenPublication("pub-1"))
+        dispatcher.scheduler.advanceUntilIdle()
+
+        viewModel.onIntent(ReaderIntent.BeginSentenceSelection(0))
+        viewModel.onIntent(ReaderIntent.ConfirmAnnotation(AnnotationColor.YELLOW))
+        dispatcher.scheduler.advanceUntilIdle()
+
+        val excerpt = viewModel.state.value.annotations.single().excerpt
+        assertEquals(com.inktone.domain.model.Annotation.MAX_EXCERPT_LENGTH, excerpt?.length)
+    }
 }

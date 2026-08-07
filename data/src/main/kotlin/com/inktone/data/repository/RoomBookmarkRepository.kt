@@ -18,4 +18,5 @@ class RoomBookmarkRepository @Inject constructor(
         dao.observeAll().map { list -> list.map { it.toDomain() } }
     override suspend fun insert(bookmark: Bookmark) = dao.insert(bookmark.toEntity())
     override suspend fun delete(id: String) = dao.delete(id)
+    override suspend fun setPinned(id: String, isPinned: Boolean) = dao.setPinned(id, isPinned)
 }
