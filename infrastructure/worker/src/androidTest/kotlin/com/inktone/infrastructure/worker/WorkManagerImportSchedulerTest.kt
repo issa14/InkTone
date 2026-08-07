@@ -8,6 +8,7 @@ import androidx.work.WorkInfo
 import androidx.work.WorkManager
 import androidx.work.testing.SynchronousExecutor
 import androidx.work.testing.WorkManagerTestInitHelper
+import androidx.work.impl.WorkManagerImpl
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertTrue
 import org.junit.Before
@@ -48,6 +49,31 @@ class WorkManagerImportSchedulerTest {
         val infos = workManager.getWorkInfosForUniqueWork(WorkManagerImportScheduler.WORK_NAME_IMPORT).get()
         // 120 URI / 50 par lot = 3 WorkRequest chainees.
         assertEquals(3, infos.size)
+    }
+
+    @Test
+    fun enqueue_de_60_uri_partage_le_meme_session_id_sur_toute_la_chaine() {
+        val scheduler = WorkManagerImportScheduler(workManager)
+        val uris = (1..60).map { "content://fake/$it.epub" }
+
+        val sessionId = scheduler.enqueue(uris)
+
+        // La session est generee et retournee a l'appelant
+        assertTrue(sessionId.isNotEmpty())
+
+        val infos = workManager.getWorkInfosForUniqueWork(WorkManagerImportScheduler.WORK_NAME_IMPORT).get()
+        // 60 / 50 = 2 WorkRequest chainees.
+        assertEquals(2, infos.size)
+
+        // Chaque maillon porte le meme sessionId dans sa Data d'entree :
+        // c'est ce qui permet d'agreger les resultats sur toute la chaine
+        // (Tache 5.2, Lot 5).
+        val context = ApplicationProvider.getApplicationContext<Context>()
+        val workDatabase = WorkManagerImpl.getInstance(context).workDatabase
+        infos.forEach { info ->
+            val spec = workDatabase.workSpecDao().getWorkSpec(info.id.toString())
+            assertEquals(sessionId, spec!!.input.getString(ImportWorker.KEY_SESSION_ID))
+        }
     }
 
     @Test
