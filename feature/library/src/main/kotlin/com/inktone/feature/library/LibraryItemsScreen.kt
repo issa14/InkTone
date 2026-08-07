@@ -10,6 +10,7 @@ import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
+import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.automirrored.filled.Sort
@@ -42,6 +43,7 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.text.font.FontStyle
 import androidx.compose.ui.text.style.TextOverflow
@@ -133,7 +135,7 @@ fun LibraryItemsScreen(
                         modifier = Modifier.padding(24.dp),
                     )
                 }
-                else -> LazyColumn(Modifier.fillMaxSize().padding(horizontal = 16.dp)) {
+                else -> LazyColumn(Modifier.fillMaxSize().padding(horizontal = 8.dp)) {
                     items(state.items, key = { it.id }) { item ->
                         LibraryItemRow(
                             item = item,
@@ -222,14 +224,27 @@ private fun LibraryItemRow(
             false
         },
     )
+    // Même forme que la carte : sans ce .clip(), les coins carrés de
+    // l'arrière-plan de balayage dépassaient derrière les coins arrondis
+    // de la carte au repos (artefact rouge visible même sans swiper).
+    val cardShape = RoundedCornerShape(12.dp)
 
     SwipeToDismissBox(
         state = dismissState,
+        modifier = Modifier.padding(vertical = 4.dp).clip(cardShape),
         backgroundContent = {
+            // Transparent tant que la carte est au repos : sinon le
+            // rectangle rouge reste visible en permanence sous la carte,
+            // pas seulement pendant le balayage.
+            val backgroundColor = if (dismissState.targetValue == SwipeToDismissBoxValue.Settled) {
+                Color.Transparent
+            } else {
+                MaterialTheme.colorScheme.errorContainer
+            }
             Box(
                 Modifier
                     .fillMaxSize()
-                    .background(MaterialTheme.colorScheme.errorContainer)
+                    .background(backgroundColor)
                     .padding(horizontal = 20.dp),
                 contentAlignment = Alignment.CenterEnd,
             ) {
@@ -239,7 +254,8 @@ private fun LibraryItemRow(
     ) {
         Card(
             onClick = onClick,
-            modifier = Modifier.fillMaxWidth().padding(vertical = 4.dp),
+            modifier = Modifier.fillMaxWidth(),
+            shape = cardShape,
             colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceVariant),
         ) {
             Row(Modifier.padding(12.dp), verticalAlignment = Alignment.Top) {
@@ -249,24 +265,35 @@ private fun LibraryItemRow(
                     tint = colorFor(item) ?: MaterialTheme.colorScheme.primary,
                 )
                 Column(Modifier.weight(1f).padding(start = 12.dp)) {
+                    // Ligne 1 — extrait / note : le contenu, prioritaire.
                     item.excerpt?.let { excerpt ->
-                        Text(excerpt, style = MaterialTheme.typography.bodyMedium, maxLines = 2, overflow = TextOverflow.Ellipsis)
+                        Text(excerpt, style = MaterialTheme.typography.bodyMedium, maxLines = 4, overflow = TextOverflow.Ellipsis)
                     }
                     item.note?.let { note ->
                         Text(
                             note,
                             style = MaterialTheme.typography.bodySmall.copy(fontStyle = FontStyle.Italic),
-                            maxLines = 2,
+                            maxLines = 3,
                             overflow = TextOverflow.Ellipsis,
                             color = MaterialTheme.colorScheme.onSurfaceVariant,
                         )
                     }
+                    // Ligne 2 — titre de l'ouvrage, seul sur sa ligne : peut
+                    // être tronqué sans jamais pousser le chapitre hors champ.
                     Text(
-                        "${item.publicationTitle ?: "Ouvrage supprimé"} · Chapitre ${item.startLocator.chapterIndex + 1} · ${formatItemDate(item.createdAt)}",
-                        style = MaterialTheme.typography.labelSmall,
+                        item.publicationTitle ?: "Ouvrage supprimé",
+                        style = MaterialTheme.typography.bodySmall,
                         color = MaterialTheme.colorScheme.onSurfaceVariant,
                         maxLines = 1,
                         overflow = TextOverflow.Ellipsis,
+                        modifier = Modifier.padding(top = 4.dp),
+                    )
+                    // Ligne 3 — chapitre + date, toujours entièrement visibles
+                    // (jamais concaténés avec le titre, qui peut être long).
+                    Text(
+                        "Chapitre ${item.startLocator.chapterIndex + 1} · ${formatItemDate(item.createdAt)}",
+                        style = MaterialTheme.typography.labelSmall,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
                     )
                 }
                 IconButton(onClick = onTogglePin) {
