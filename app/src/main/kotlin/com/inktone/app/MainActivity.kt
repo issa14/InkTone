@@ -50,7 +50,8 @@ class MainActivity : ComponentActivity() {
             CompositionLocalProvider(LocalWindowSizeClass provides windowSizeClass) {
                 val appThemeViewModel: AppThemeViewModel = hiltViewModel()
                 val useDynamicColor by appThemeViewModel.useDynamicColor.collectAsState()
-                InkToneTheme(useDynamicColor = useDynamicColor) {
+                val appTheme by appThemeViewModel.appTheme.collectAsState()
+                InkToneTheme(useDynamicColor = useDynamicColor, appTheme = appTheme) {
                     Surface {
                         if (BuildConfig.DEBUG) {
                             val bootstrapViewModel: ReaderViewModel = hiltViewModel()
