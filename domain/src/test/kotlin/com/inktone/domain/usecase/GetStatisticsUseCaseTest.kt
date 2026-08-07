@@ -38,7 +38,7 @@ class GetStatisticsUseCaseTest {
         readingSessionRepository.insert(
             ReadingSession(
                 id = "s1", publicationId = "pub-1", startedAt = 0L, endedAt = 1000L,
-                mode = ReadingMode.VISUAL, durationMs = 1000L,
+                mode = ReadingMode.VISUAL, visualDurationMs = 1000L,
             ),
         )
 
@@ -60,13 +60,13 @@ class GetStatisticsUseCaseTest {
         readingSessionRepository.insert(
             ReadingSession(
                 id = "s1", publicationId = "p", startedAt = now, endedAt = now,
-                mode = ReadingMode.AUDIO, durationMs = 0L,
+                mode = ReadingMode.AUDIO, ttsDurationMs = 0L,
             ),
         )
         readingSessionRepository.insert(
             ReadingSession(
                 id = "s2", publicationId = "p", startedAt = now - oneDayMs, endedAt = now - oneDayMs,
-                mode = ReadingMode.AUDIO, durationMs = 0L,
+                mode = ReadingMode.AUDIO, ttsDurationMs = 0L,
             ),
         )
 
