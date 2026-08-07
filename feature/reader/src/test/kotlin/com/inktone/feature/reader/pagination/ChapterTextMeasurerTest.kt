@@ -19,6 +19,7 @@ import org.junit.Before
 import org.junit.Test
 import org.junit.runner.RunWith
 import org.robolectric.RobolectricTestRunner
+import org.robolectric.annotation.GraphicsMode
 
 /**
  * Couvre `ChapterTextMeasurer` directement (Tâche 3a, révision post-3a.1) :
@@ -31,19 +32,20 @@ import org.robolectric.RobolectricTestRunner
  * Compose de 3a.4.
  *
  * Nécessite Robolectric : `TextMeasurer` mesure avec de vraies métriques
- * de police Android, indisponibles en JVM pur.
- *
- * Écart déclaré : dans le sandbox où cette suite a été écrite, le
- * chargement de la lib native Robolectric semble restreint et les
- * métriques de police y sont dégénérées (constantes, indépendantes de la
- * taille demandée — vérifié directement sur `android.graphics.Paint`,
- * hors Compose). Les tests qui ne dépendent que de la construction du
- * texte (concaténation, offsets) restent valides. Celui qui dépend d'une
- * vraie mesure (hauteur de ligne HEADING vs NORMAL) est correct en
- * principe mais doit être vérifié vert sur une machine sans cette
- * restriction avant de considérer la tâche close — voir son KDoc.
+ * de police Android, indisponibles en JVM pur — d'où
+ * `@GraphicsMode(NATIVE)` explicite : le mode par défaut de ce projet
+ * (`LEGACY`, ni déclaré en dur ni documenté ailleurs) stub
+ * `Paint.measureText()` sur une valeur constante, indépendante de la
+ * taille de police demandée. Un ancien diagnostic (session précédente)
+ * avait conclu à tort à une restriction de chargement de bibliothèque
+ * native propre au bac à sable d'exécution — infirmé : la lib native et
+ * les données ICU se chargent normalement, `@GraphicsMode(NATIVE)` seul
+ * suffit à obtenir des métriques réelles (vérifié directement sur
+ * `android.graphics.Paint.measureText()`, hors Compose : constant sans
+ * l'annotation, proportionnel à la taille avec).
  */
 @RunWith(RobolectricTestRunner::class)
+@GraphicsMode(GraphicsMode.Mode.NATIVE)
 class ChapterTextMeasurerTest {
 
     private lateinit var measurer: ChapterTextMeasurer
@@ -125,26 +127,6 @@ class ChapterTextMeasurerTest {
         assertNotEquals(resourceOffsets, result.sentenceStartOffsets)
     }
 
-    /**
-     * Écart déclaré (revue du lot, post-3a.1) : dans le sandbox où cette
-     * tâche a été développée, `android.graphics.Paint().measureText()`
-     * renvoie une valeur **constante quelle que soit `textSize`**, et
-     * `Paint().typeface` est `null` — vérifié en descendant sous Compose,
-     * directement sur l'API Android brute. La lib native Robolectric
-     * (`librobolectric-nativeruntime.so`, présente et de la bonne
-     * architecture dans le jar `nativeruntime-dist-compat`) ne s'active
-     * donc pas dans cet environnement précis, probablement une
-     * restriction de chargement de bibliothèque native propre au
-     * bac à sable d'exécution de l'agent — pas une machine de
-     * développement ni une CI standard.
-     *
-     * Ce test est donc correct en principe et **doit être vérifié vert
-     * sur une machine où le chargement natif n'est pas restreint** avant
-     * de considérer la tâche 3a.1/3a.2 close — décision actée : le garder
-     * actif plutôt que l'ignorer silencieusement, pour qu'un environnement
-     * fonctionnel le fasse échouer bruyamment s'il régresse un jour, au
-     * lieu de rester invisible.
-     */
     @Test
     fun `un titre HEADING produit une ligne plus haute qu un paragraphe NORMAL a texte egal`() {
         val text = "Un texte assez long pour occuper une ligne entiere."
