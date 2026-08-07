@@ -31,9 +31,9 @@ import com.inktone.core.designsystem.LocalSharedTransitionScope
 import com.inktone.core.ui.AboutScreen
 import com.inktone.feature.importer.ImportPickerButton
 import com.inktone.feature.importer.ImportViewModel
-import com.inktone.feature.library.GlobalBookmarksScreen
 import com.inktone.feature.library.LibraryDetailCategory
 import com.inktone.feature.library.LibraryDetailScreen
+import com.inktone.feature.library.LibraryItemsScreen
 import com.inktone.feature.library.LibraryScreen
 import com.inktone.feature.reader.ReaderIntent
 import com.inktone.feature.reader.ReaderScreen
@@ -98,6 +98,7 @@ fun InkToneNavHost(navController: NavHostController = rememberNavController()) {
                         targetResourceHref = route.targetResourceHref,
                         targetChapterIndex = route.targetChapterIndex,
                         targetCharOffset = route.targetCharOffset,
+                        flashOnArrival = route.flashOnArrival,
                     ),
                 )
             }
@@ -146,20 +147,21 @@ fun InkToneNavHost(navController: NavHostController = rememberNavController()) {
             }
         }
         composable<BookmarksRoute> {
-            BackScaffold(title = "Signets", onBack = navController::popBackStack) {
-                GlobalBookmarksScreen(
-                    onNavigateToReader = { publicationId, resourceHref, chapterIndex, charOffset ->
-                        navController.navigate(
-                            ReaderRoute(
-                                publicationId = publicationId,
-                                targetResourceHref = resourceHref,
-                                targetChapterIndex = chapterIndex,
-                                targetCharOffset = charOffset,
-                            ),
-                        )
-                    },
-                )
-            }
+            LibraryItemsScreen(
+                onBack = navController::popBackStack,
+                onNavigateToReader = { publicationId, resourceHref, chapterIndex, charOffset ->
+                    navController.navigate(
+                        ReaderRoute(
+                            publicationId = publicationId,
+                            targetResourceHref = resourceHref,
+                            targetChapterIndex = chapterIndex,
+                            targetCharOffset = charOffset,
+                            // Lot 4, tâche 4.7 — flash différé du passage visé.
+                            flashOnArrival = true,
+                        ),
+                    )
+                },
+            )
         }
         composable<AboutRoute> {
             BackScaffold(title = "A propos", onBack = navController::popBackStack) {

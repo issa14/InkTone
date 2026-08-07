@@ -23,4 +23,7 @@ interface AnnotationDao {
 
     @Query("DELETE FROM annotations WHERE id = :id")
     suspend fun delete(id: String)
+
+    @Query("UPDATE annotations SET isPinned = :isPinned WHERE id = :id")
+    suspend fun setPinned(id: String, isPinned: Boolean)
 }

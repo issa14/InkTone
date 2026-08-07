@@ -9,12 +9,12 @@ fun Bookmark.toEntity(): BookmarkEntity {
         id = id, publicationId = publicationId,
         resourceHref = cols.resourceHref, chapterIndex = cols.chapterIndex,
         paragraphIndex = cols.paragraphIndex, charOffset = cols.charOffset,
-        title = title, note = note, createdAt = createdAt,
+        title = title, note = note, excerpt = excerpt, isPinned = isPinned, createdAt = createdAt,
     )
 }
 
 fun BookmarkEntity.toDomain(): Bookmark = Bookmark(
     id = id, publicationId = publicationId,
     locator = LocatorColumns(resourceHref, chapterIndex, paragraphIndex, charOffset).toLocator(),
-    title = title, note = note, createdAt = createdAt,
+    title = title, note = note, excerpt = excerpt, isPinned = isPinned, createdAt = createdAt,
 )

@@ -78,7 +78,7 @@ fun Locator.toBackup(): LocatorBackup = LocatorBackup(resourceHref, chapterIndex
 fun LocatorBackup.toDomain(): Locator = Locator(resourceHref, chapterIndex, paragraphIndex, charOffset)
 
 fun Bookmark.toBackup(): BookmarkBackup = BookmarkBackup(id, publicationId, locator.toBackup(), title, note, createdAt)
-fun BookmarkBackup.toDomain(): Bookmark = Bookmark(id, publicationId, locator.toDomain(), title, note, createdAt)
+fun BookmarkBackup.toDomain(): Bookmark = Bookmark(id, publicationId, locator.toDomain(), title, note, createdAt = createdAt)
 
 fun PronunciationRule.toBackup(): PronunciationRuleBackup =
     PronunciationRuleBackup(id, originalText, replacementText, isRegex, isEnabled)

@@ -111,6 +111,13 @@ class ReaderViewModel @Inject constructor(
     // après une pause, seul le son s'arrêtait (bug réel trouvé à l'audit).
     private var playbackJob: Job? = null
 
+    // Lot 4, tâche 4.7 — flash différé : pendingHighlightTimeoutJob est la
+    // sortie de secours (mise en page qui n'aboutit jamais) ; flashClearJob
+    // efface le flash affiché après un court délai. Un seul de chaque à la
+    // fois, même discipline que sleepTimerJob.
+    private var pendingHighlightTimeoutJob: Job? = null
+    private var flashClearJob: Job? = null
+
     fun onIntent(intent: ReaderIntent) {
         when (intent) {
             is ReaderIntent.OpenPublication -> {
@@ -126,7 +133,7 @@ class ReaderViewModel @Inject constructor(
                 } else {
                     null
                 }
-                openPublication(intent.publicationId, targetLocator)
+                openPublication(intent.publicationId, targetLocator, intent.flashOnArrival)
             }
             is ReaderIntent.BootstrapAndOpenFixture -> {
                 if (BuildConfig.DEBUG) {
@@ -163,6 +170,7 @@ class ReaderViewModel @Inject constructor(
             )
             is ReaderIntent.DeleteBookmark -> viewModelScope.launch { deleteBookmark(intent.id) }
             is ReaderIntent.NavigateToLocator -> navigateToLocator(intent.locator)
+            is ReaderIntent.ChapterLayoutCompleted -> onChapterLayoutCompleted(intent.chapterIndex)
             is ReaderIntent.SetOverrides -> setOverrides(intent.overrides)
             is ReaderIntent.SetSleepTimer -> setSleepTimer(intent.minutes)
             is ReaderIntent.SkipToPreviousSentence -> skipSentence(-1)
@@ -275,7 +283,7 @@ class ReaderViewModel @Inject constructor(
      * Les cas d'erreur de parsing (Corrompu, DRM, format non supporté)
      * ne sont pas encore reflétés dans `ReaderUiState` — Tâche 4.8.
      */
-    private fun openPublication(publicationId: String, targetLocator: Locator? = null) {
+    private fun openPublication(publicationId: String, targetLocator: Locator? = null, flashOnArrival: Boolean = false) {
         viewModelScope.launch {
             val publication = publicationRepository.getById(publicationId) ?: run {
                 Log.w("ReaderViewModel", "openPublication: publication introuvable ($publicationId)")
@@ -314,7 +322,7 @@ class ReaderViewModel @Inject constructor(
                     observeAnnotations(publicationId)
                     observeBookmarks(publicationId)
                     if (prefs.eyeRestReminderEnabled) scheduleEyeRestReminder(prefs.eyeRestReminderIntervalMinutes)
-                    if (targetLocator != null) navigateToLocator(targetLocator)
+                    if (targetLocator != null) navigateToLocator(targetLocator, flashOnArrival)
                 }
                 else -> {
                     val message = when (result) {
@@ -359,6 +367,10 @@ class ReaderViewModel @Inject constructor(
             sentences, range.first, range.last, chapter.index, chapter.href,
         ) ?: return
 
+        val excerpt = sentences.subList(range.first, range.last + 1)
+            .joinToString(separator = " ") { it.text }
+            .take(Annotation.MAX_EXCERPT_LENGTH)
+
         viewModelScope.launch {
             val now = System.currentTimeMillis()
             addAnnotation(
@@ -369,6 +381,7 @@ class ReaderViewModel @Inject constructor(
                     endLocator = endLocator,
                     color = color,
                     content = content,
+                    excerpt = excerpt,
                     createdAt = now,
                     updatedAt = now,
                 ),
@@ -412,6 +425,7 @@ class ReaderViewModel @Inject constructor(
                         id = UUID.randomUUID().toString(),
                         publicationId = publicationId,
                         locator = sentence.startLocator(chapterIndex = chapter.index, resourceHref = chapter.href),
+                        excerpt = sentence.text.take(Bookmark.MAX_EXCERPT_LENGTH),
                         createdAt = System.currentTimeMillis(),
                     ),
                 )
@@ -425,7 +439,7 @@ class ReaderViewModel @Inject constructor(
      * `charOffset`, contrairement à `navigateToChapter` seul qui repositionne
      * toujours à l'index 0.
      */
-    private fun navigateToLocator(locator: Locator) {
+    private fun navigateToLocator(locator: Locator, flashOnArrival: Boolean = false) {
         val chapters = _state.value.chapters
         if (locator.chapterIndex !in chapters.indices) return
         val sentences = chapters[locator.chapterIndex].paragraphs.flatMap { it.sentences }
@@ -450,6 +464,49 @@ class ReaderViewModel @Inject constructor(
         persistPosition(chapterIndex = locator.chapterIndex, sentenceIndex = sentenceIndex)
         triggerPreload(locator.chapterIndex)
         if (wasPlaying) playCurrentSentence()
+        if (flashOnArrival) armPendingHighlight(PendingHighlightTarget(locator.chapterIndex, sentenceIndex))
+    }
+
+    /**
+     * Lot 4, tâche 4.7 — arme la cible en attente et sa sortie de secours :
+     * si `ChapterLayoutCompleted` n'arrive jamais (chapitre en erreur,
+     * livre refermé avant la fin de la mesure), la cible est abandonnée
+     * plutôt que de rester en attente indéfiniment.
+     */
+    private fun armPendingHighlight(target: PendingHighlightTarget) {
+        pendingHighlightTimeoutJob?.cancel()
+        _state.value = _state.value.copy(pendingHighlightTarget = target)
+        pendingHighlightTimeoutJob = viewModelScope.launch {
+            delay(PENDING_HIGHLIGHT_TIMEOUT_MS)
+            if (_state.value.pendingHighlightTarget == target) {
+                _state.value = _state.value.copy(pendingHighlightTarget = null)
+            }
+        }
+    }
+
+    /**
+     * Lot 4, tâche 4.7 — déclenché par `ReaderScreen` une fois la mise en
+     * page du chapitre confirmée complète. Consommation unique : la cible
+     * est effacée immédiatement, une mesure suivante (changement de taille
+     * de police, par exemple) ne peut donc pas rejouer le flash.
+     */
+    private fun onChapterLayoutCompleted(chapterIndex: Int) {
+        val target = _state.value.pendingHighlightTarget ?: return
+        if (target.chapterIndex != chapterIndex) return
+        pendingHighlightTimeoutJob?.cancel()
+        val sentence = _state.value.chapters.getOrNull(chapterIndex)
+            ?.paragraphs?.flatMap { it.sentences }?.getOrNull(target.sentenceIndex)
+        _state.value = _state.value.copy(
+            pendingHighlightTarget = null,
+            highlightedWordRange = sentence?.let { 0 until it.text.length },
+        )
+        flashClearJob?.cancel()
+        flashClearJob = viewModelScope.launch {
+            delay(FLASH_HIGHLIGHT_DURATION_MS)
+            if (_state.value.currentSentenceIndex == target.sentenceIndex && !_state.value.isPlaying) {
+                _state.value = _state.value.copy(highlightedWordRange = null)
+            }
+        }
     }
 
     private fun bootstrapAndOpenFixture(publicationId: String, fileUri: String) {
@@ -780,6 +837,12 @@ class ReaderViewModel @Inject constructor(
 
 /** Tâche 3c.1 — au changement de phrase visible, pas à chaque pixel défilé. */
 private const val SCROLL_PERSIST_DEBOUNCE_MS = 400L
+
+/** Lot 4, tâche 4.7 — sortie de secours si la mise en page n'aboutit jamais. */
+private const val PENDING_HIGHLIGHT_TIMEOUT_MS = 8_000L
+
+/** Lot 4, tâche 4.7 — durée d'affichage du flash avant effacement automatique. */
+private const val FLASH_HIGHLIGHT_DURATION_MS = 2_500L
 
 /** 3d.5 — snooze court du popup de repos oculaire, distinct de l'intervalle configuré. */
 private const val EYE_REST_REMINDER_SNOOZE_MINUTES = 10

@@ -16,11 +16,21 @@ data class Annotation(
     val endLocator: Locator,
     val color: AnnotationColor,
     val content: String? = null,
+    val excerpt: String? = null,
+    val isPinned: Boolean = false,
     val createdAt: Long,
     val updatedAt: Long,
 ) {
     init {
         require(publicationId.isNotBlank()) { "publicationId ne peut pas être vide" }
         require(endLocator >= startLocator) { "endLocator doit être postérieur ou égal à startLocator" }
+        require(excerpt == null || excerpt.length <= MAX_EXCERPT_LENGTH) {
+            "excerpt ne doit pas dépasser $MAX_EXCERPT_LENGTH caractères"
+        }
+    }
+
+    companion object {
+        /** Borne fixée à la création (Lot 4, tâche 4.2) — la carte cible affiche un extrait, pas un passage entier. */
+        const val MAX_EXCERPT_LENGTH = 280
     }
 }
