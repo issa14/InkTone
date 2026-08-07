@@ -11,9 +11,11 @@ import javax.inject.Singleton
 /**
  * Implémente [ImportResultsStore] via Room (Palier A, Lot 5).
  *
- * Les résultats d'une session précédente sont supprimés au démarrage
- * d'une nouvelle session ([beginSession]). La consultation ([getResults])
- * survit à la mort du processus.
+ * Les résultats des sessions précédentes sont supprimés au démarrage
+ * d'une nouvelle session ([beginSession]) — uniquement les sessions
+ * AUTRES que la courante, pour rester sûr même si le worker a déjà
+ * commencé à écrire les résultats de la nouvelle session (race-safe).
+ * La consultation ([getResults]) survit à la mort du processus.
  */
 @Singleton
 class RoomImportResultsStore @Inject constructor(
@@ -21,7 +23,7 @@ class RoomImportResultsStore @Inject constructor(
 ) : ImportResultsStore {
 
     override suspend fun beginSession(sessionId: String) {
-        dao.deleteAll()
+        dao.deleteExcept(sessionId)
     }
 
     override suspend fun recordResult(sessionId: String, fileName: String, result: ImportResult) {
