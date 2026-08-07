@@ -96,6 +96,23 @@ class RoomImportResultsStoreTest {
     }
 
     @Test
+    fun beginSession_ne_efface_jamais_la_session_courante_meme_en_retard() = runTest {
+        val store = newStore()
+        // Le worker a déjà commencé à écrire les résultats de la
+        // nouvelle session (race : beginSession appelé en parallèle,
+        // après le démarrage de WorkManager).
+        store.recordResult("session-3", "a.epub", ImportResult.Corrupted("Echec"))
+
+        store.beginSession("session-3")
+
+        // La session courante reste intacte — un deleteAll aveugle
+        // l'aurait effacée.
+        val results = store.getResults("session-3")
+        assertEquals(1, results.size)
+        assertEquals("a.epub", results.first().fileName)
+    }
+
+    @Test
     fun un_import_reussi_ferme_ne_laisse_aucun_residu_a_consulter() = runTest {
         val store = newStore()
         store.recordResult("session-1", "a.epub", success("a.epub"))

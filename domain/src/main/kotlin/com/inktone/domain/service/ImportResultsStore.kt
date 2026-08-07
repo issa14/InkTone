@@ -17,7 +17,12 @@ import com.inktone.domain.usecase.ImportResult
 interface ImportResultsStore {
     /**
      * Démarre une nouvelle session d'import — supprime les résultats
-     * des sessions précédentes pour ne conserver que la session active.
+     * des sessions précédentes, jamais ceux de [sessionId] elle-même.
+     *
+     * La purge est délibérément limitée aux AUTRES sessions : appelée
+     * de façon asynchrone au démarrage (en parallèle de WorkManager),
+     * elle ne doit jamais effacer les résultats que le worker est en
+     * train d'écrire pour la session courante (race-safe).
      */
     suspend fun beginSession(sessionId: String)
 
