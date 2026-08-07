@@ -90,6 +90,53 @@ class BackupManagerTest {
     }
 
     @Test
+    fun exportTo_puis_importFrom_restitue_les_donnees_aller_retour_complet() = runTest {
+        // Contrat Lot 6 (B1/B2) : pas seulement l'appel, un vrai aller-retour
+        // via exportTo() (pas une construction manuelle de BackupPayload).
+        val fileStorageService = InMemoryFileStorageService()
+        val bookmarkRepository = FakeBookmarkRepository()
+        val pronunciationRuleRepository = FakePronunciationRuleRepository()
+        val readingStateRepository = FakeReadingStateRepository()
+        val readingSessionRepository = FakeReadingSessionRepository()
+        val publicationRepository = FakePublicationRepository()
+
+        publicationRepository.insert(
+            Publication(
+                id = "pub-1", title = "Existe", format = PublicationFormat.EPUB,
+                fileUri = "content://x", fileHash = "hash", fileSize = 10, chapterCount = 1, importDate = 0L,
+            ),
+        )
+        bookmarkRepository.insert(
+            com.inktone.domain.model.Bookmark(
+                id = "b1", publicationId = "pub-1",
+                locator = com.inktone.domain.valueobject.Locator(resourceHref = "ch1.xhtml", chapterIndex = 0, charOffset = 0),
+                createdAt = 0L,
+            ),
+        )
+
+        val exportManager = BackupManager(
+            fileStorageService, bookmarkRepository, pronunciationRuleRepository,
+            readingStateRepository, readingSessionRepository, publicationRepository,
+        )
+
+        val exported = exportManager.exportTo("backup://roundtrip", appVersion = "1.2.3")
+        assertTrue(exported)
+
+        // Importe dans des repositories fraîchement vides — prouve que les
+        // données proviennent bien du fichier exporté, pas d'un état partagé.
+        val importManager = BackupManager(
+            fileStorageService, FakeBookmarkRepository(), FakePronunciationRuleRepository(),
+            FakeReadingStateRepository(), FakeReadingSessionRepository(), publicationRepository,
+        )
+        val result = importManager.importFrom("backup://roundtrip")
+
+        assertTrue(result is ImportBackupResult.Success)
+        result as ImportBackupResult.Success
+        assertEquals(1, result.restored)
+        assertEquals(0, result.skippedOrphans)
+    }
+
+    @Test
     fun import_d_un_fichier_corrompu_echoue_proprement() = runTest {
         val fileStorageService = InMemoryFileStorageService()
         val backupFile = File.createTempFile("corrupted", ".json")

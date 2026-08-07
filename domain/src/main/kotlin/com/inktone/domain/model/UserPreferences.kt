@@ -16,6 +16,8 @@ data class UserPreferences(
     // Tache 9bis.1.2 — s'applique uniquement au chrome de l'app
     // (InkToneTheme), jamais aux ReadingTheme de lecture.
     val dynamicColorEnabled: Boolean = true,
+    // Lot 6 — thème système de l'app (Système/Clair/Sombre), distinct du thème de lecture.
+    val appTheme: AppTheme = AppTheme.SYSTEM,
     // Tache 9bis.3.6 — reglage seul pour l'instant, ReaderScreen ne
     // consomme pas encore ce champ (voir TODO sur ReadingRuler.kt).
     val readingRulerEnabled: Boolean = false,
@@ -40,6 +42,10 @@ data class UserPreferences(
     // 3d.5 — rappel de repos oculaire, indépendant du minuteur de sommeil TTS.
     val eyeRestReminderEnabled: Boolean = true,
     val eyeRestReminderIntervalMinutes: Int = 60,
+    // Lot 6 — disposition de la bibliothèque ("LIST" ou "GRID_COVERS"), persistée pour
+    // que le préréglage d'accessibilité (Tâche 8.4) puisse la piloter. Stockée en String
+    // (comme readingMode) : LibraryLayoutMode vit dans feature/library, hors de portée du domaine.
+    val libraryLayoutMode: String = "GRID_COVERS",
 ) {
     init {
         require(fontSize > 0) { "fontSize doit être strictement positif" }

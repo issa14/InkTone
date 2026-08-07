@@ -2,6 +2,7 @@ package com.inktone.feature.library
 
 import com.inktone.core.testing.fake.FakeImportProgressObserver
 import com.inktone.core.testing.fake.FakeImportResultsStore
+import com.inktone.core.testing.fake.FakePreferencesRepository
 import com.inktone.core.testing.fake.FakePublicationRepository
 import com.inktone.core.testing.fake.FakeReadingStateRepository
 import com.inktone.domain.model.Publication
@@ -45,7 +46,7 @@ class LibraryViewModelTest {
     fun `expose les publications observees par le repository`() = runTest {
         val repository = FakePublicationRepository()
         repository.insert(publication("pub-1"))
-        val viewModel = LibraryViewModel(repository, FakeReadingStateRepository(), ToggleFavoriteUseCase(repository), TogglePinUseCase(repository), DeletePublicationUseCase(repository), FakeImportProgressObserver(), FakeImportResultsStore(), ImportSessionStore())
+        val viewModel = LibraryViewModel(repository, FakeReadingStateRepository(), ToggleFavoriteUseCase(repository), TogglePinUseCase(repository), DeletePublicationUseCase(repository), FakeImportProgressObserver(), FakeImportResultsStore(), ImportSessionStore(), FakePreferencesRepository())
 
         dispatcher.scheduler.advanceUntilIdle()
 
@@ -57,7 +58,7 @@ class LibraryViewModelTest {
     fun `ouvrir une publication emet un effet de navigation`() = runTest {
         val repository = FakePublicationRepository()
         repository.insert(publication("pub-1"))
-        val viewModel = LibraryViewModel(repository, FakeReadingStateRepository(), ToggleFavoriteUseCase(repository), TogglePinUseCase(repository), DeletePublicationUseCase(repository), FakeImportProgressObserver(), FakeImportResultsStore(), ImportSessionStore())
+        val viewModel = LibraryViewModel(repository, FakeReadingStateRepository(), ToggleFavoriteUseCase(repository), TogglePinUseCase(repository), DeletePublicationUseCase(repository), FakeImportProgressObserver(), FakeImportResultsStore(), ImportSessionStore(), FakePreferencesRepository())
         dispatcher.scheduler.advanceUntilIdle()
 
         var effect: LibraryEffect? = null
@@ -74,7 +75,7 @@ class LibraryViewModelTest {
     @Test
     fun `reflete la progression d'import observee`() = runTest {
         val importProgressObserver = FakeImportProgressObserver()
-        val viewModel = LibraryViewModel(FakePublicationRepository(), FakeReadingStateRepository(), ToggleFavoriteUseCase(FakePublicationRepository()), TogglePinUseCase(FakePublicationRepository()), DeletePublicationUseCase(FakePublicationRepository()), importProgressObserver, FakeImportResultsStore(), ImportSessionStore())
+        val viewModel = LibraryViewModel(FakePublicationRepository(), FakeReadingStateRepository(), ToggleFavoriteUseCase(FakePublicationRepository()), TogglePinUseCase(FakePublicationRepository()), DeletePublicationUseCase(FakePublicationRepository()), importProgressObserver, FakeImportResultsStore(), ImportSessionStore(), FakePreferencesRepository())
         dispatcher.scheduler.advanceUntilIdle()
         assertEquals(ImportProgress(), viewModel.state.value.importProgress)
 
@@ -82,5 +83,25 @@ class LibraryViewModelTest {
         dispatcher.scheduler.advanceUntilIdle()
 
         assertEquals(ImportProgress(current = 3, total = 10, hasQueuedChunks = true), viewModel.state.value.importProgress)
+    }
+
+    @Test
+    fun `la disposition suit les preferences persistees et s y reecrit`() = runTest {
+        val preferencesRepository = FakePreferencesRepository()
+        val viewModel = LibraryViewModel(FakePublicationRepository(), FakeReadingStateRepository(), ToggleFavoriteUseCase(FakePublicationRepository()), TogglePinUseCase(FakePublicationRepository()), DeletePublicationUseCase(FakePublicationRepository()), FakeImportProgressObserver(), FakeImportResultsStore(), ImportSessionStore(), preferencesRepository)
+        dispatcher.scheduler.advanceUntilIdle()
+        assertEquals(LibraryLayoutMode.GRID_COVERS, viewModel.state.value.layoutMode)
+
+        // Un préréglage externe (Lot 6 — préréglage d'accessibilité) qui écrit
+        // dans les préférences doit se refléter dans l'état de l'écran.
+        preferencesRepository.update(preferencesRepository.get().copy(libraryLayoutMode = "LIST"))
+        dispatcher.scheduler.advanceUntilIdle()
+        assertEquals(LibraryLayoutMode.LIST, viewModel.state.value.layoutMode)
+
+        // Un changement manuel se réécrit dans les préférences — même source
+        // de vérité que le préréglage, pas un second emplacement.
+        viewModel.onIntent(LibraryIntent.SetLayoutMode(LibraryLayoutMode.GRID_COVERS))
+        dispatcher.scheduler.advanceUntilIdle()
+        assertEquals("GRID_COVERS", preferencesRepository.get().libraryLayoutMode)
     }
 }

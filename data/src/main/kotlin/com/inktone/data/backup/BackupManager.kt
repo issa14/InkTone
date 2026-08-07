@@ -33,7 +33,8 @@ class BackupManager @Inject constructor(
     private val readingSessionRepository: ReadingSessionRepository,
     private val publicationRepository: PublicationRepository,
 ) {
-    suspend fun exportTo(destinationUri: String, appVersion: String) {
+    /** @return `true` si l'écriture a réussi — le résultat doit remonter à l'appelant, pas être avalé. */
+    suspend fun exportTo(destinationUri: String, appVersion: String): Boolean {
         val payload = BackupPayload(
             appVersion = appVersion,
             createdAt = System.currentTimeMillis(),
@@ -44,7 +45,7 @@ class BackupManager @Inject constructor(
         )
         val json = Json.encodeToString(payload)
         val tempFile = File.createTempFile("inktone-backup", ".json")
-        try {
+        return try {
             tempFile.writeText(json)
             fileStorageService.writeToUri(destinationUri, tempFile)
         } finally {

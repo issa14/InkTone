@@ -191,3 +191,17 @@ val MIGRATION_13_14 = object : Migration(13, 14) {
         db.execSQL("CREATE UNIQUE INDEX IF NOT EXISTS index_import_results_session_id_file_name ON import_results (session_id, file_name)")
     }
 }
+
+/** Lot 6 : thème système de l'application (SYSTEM/LIGHT/DARK). */
+val MIGRATION_14_15 = object : Migration(14, 15) {
+    override fun migrate(db: SupportSQLiteDatabase) {
+        db.execSQL("ALTER TABLE user_preferences ADD COLUMN appTheme TEXT NOT NULL DEFAULT 'SYSTEM'")
+    }
+}
+
+/** Lot 6 : disposition de la bibliothèque (LIST/GRID_COVERS), pilotée par le préréglage d'accessibilité. */
+val MIGRATION_15_16 = object : Migration(15, 16) {
+    override fun migrate(db: SupportSQLiteDatabase) {
+        db.execSQL("ALTER TABLE user_preferences ADD COLUMN libraryLayoutMode TEXT NOT NULL DEFAULT 'GRID_COVERS'")
+    }
+}

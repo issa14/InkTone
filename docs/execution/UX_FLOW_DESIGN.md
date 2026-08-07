@@ -520,6 +520,97 @@ Mockup validé sans correction.
 
 **Écran Réglages : 6 cartes au total désormais.**
 
+### État réel — Lot 6, Palier A (livré, non déclaré terminé — voir `docs/execution/LOT_6_REGLAGES.md`)
+
+Les 6 cartes existent dans `SettingsScreen.kt`, branchées sur `SettingsViewModel`
+et testées (`SettingsViewModelTest`, `DatabaseMigrationTest`). Écarts assumés
+par rapport à cette section, à vérifier sur appareil avant clôture :
+
+- **Langue et Confidentialité** : pas de place dans les 6 cartes cibles —
+  rattachées comme sous-sections de la carte **Appareil** plutôt que
+  supprimées (le consentement Crashlytics doit rester accessible).
+- **Désapplication des présets** : approche « retour aux valeurs par défaut »
+  retenue plutôt que la mémoire de l'état antérieur — plus simple et
+  prévisible, ne surprend pas un utilisateur qui aurait modifié des réglages
+  entre l'activation et la désactivation d'un préset.
+- **Nommage du thème sombre** : cette section nomme le préset `OBSIDIAN`/
+  `NIGHT` (galerie de thèmes, hors périmètre du Lot 6). Le code actuel n'a que
+  `ReadingTheme.LIGHT/DARK/SEPIA/SYSTEM` et `AppTheme.SYSTEM/LIGHT/DARK` — le
+  préset Mode sombre applique `AppTheme.DARK` + `ReadingTheme.DARK`, pas les
+  valeurs nommées ici. À réconcilier quand la galerie de thèmes sera traitée.
+- **Préset Accessibilité → mode Liste** : la disposition de la bibliothèque
+  (`LibraryLayoutMode`, `feature/library`) est désormais persistée dans
+  `UserPreferences.libraryLayoutMode` (migration 15→16) pour que ce préset
+  puisse la piloter, comme tranché lot 2b — ce n'était pas encore le cas
+  avant ce lot (`LibraryViewModel` gardait la disposition en mémoire
+  seulement).
+- **Objectif quotidien — valeur par défaut** : cette section documente 30 min
+  par défaut ; `UserPreferences.dailyGoalMinutes` vaut 20 min depuis le Lot 1
+  (`MIGRATION_5_6`, couvert par un test qui fige cette valeur). Écart non
+  résolu dans ce palier — changer la valeur par défaut affecterait des
+  installations existantes sans migration dédiée.
+### État réel — Lot 6, Palier B (livré, non déclaré terminé)
+
+Carte Données et carte Prononciation inline ajoutées. Écarts et points à
+vérifier sur appareil avant clôture :
+
+- **Frontière `BackupManager`** : vit dans `:data`, invisible depuis
+  `feature/settings` (Blueprint §12.4 — feature ne dépend que de
+  domain/core). L'export/import (choix SAF, appel à `BackupManager`,
+  lecture de `BuildConfig.VERSION_NAME`) est donc piloté par un
+  `BackupViewModel` dédié dans le module `app`
+  (`app/src/main/kotlin/com/inktone/app/BackupViewModel.kt`), câblé au
+  `composable<SettingsRoute>` d'`InkToneNavHost`. Le reste de la carte
+  (cache, dossier des modèles, réinitialisation des préférences) reste
+  dans `SettingsViewModel`, qui n'a besoin que de `Context` et de
+  `domain` pour ça.
+- **`BackupManager.exportTo` retourne maintenant un `Boolean`** (succès
+  d'écriture) au lieu d'avaler silencieusement l'échec de
+  `FileStorageService.writeToUri` — corrigé dans ce palier, testé par
+  `exportTo_puis_importFrom_restitue_les_donnees_aller_retour_complet`
+  (`BackupManagerTest`), qui fait un vrai aller-retour via `BackupManager`
+  plutôt que de ne construire qu'un `BackupPayload` à la main.
+- **Dossier des modèles** : chemin fixe (`filesDir/voices`, même
+  convention que `SherpaOnnxModelPaths`/`VoiceModelDownloader` dans
+  `infrastructure/tts`), toujours en lecture seule — aucune capacité de
+  déplacement n'existe dans ce lot, signalé via une icône cadenas plutôt
+  que masqué.
+- **Vider le cache** : taille réellement calculée (`Context.cacheDir`,
+  parcours récursif des fichiers), pas estimée — testé avec un vrai
+  fichier temporaire (`SettingsViewModelTest`, Robolectric — un
+  `Context.cacheDir` exige un environnement Android, indisponible en JVM
+  pur). `IoDispatcher` (qualifieur Hilt dédié,
+  `feature/settings/di/IoDispatcher.kt`) rend ce calcul substituable en
+  test : un premier essai avec `Dispatchers.IO` en dur produisait un test
+  intermittent (`advanceUntilIdle()` ne voit pas une coroutine qui a
+  sauté sur un vrai pool de threads).
+- **Bug réel trouvé et corrigé sur appareil** : la ligne « Dossier des
+  modèles » plaçait le chemin absolu (`/data/user/0/...`) à côté du
+  libellé sur la même `Row` — le chemin, non borné, écrasait le libellé
+  caractère par caractère sur écran étroit (même classe de bug que le
+  Stepper « Intervalle de pause » du palier précédent : un
+  `Modifier.weight(1f)` seul ne protège pas contre un voisin qui grandit
+  librement). Corrigé en mettant le chemin sur sa propre ligne, ellipsé à
+  une seule ligne (`TextOverflow.Ellipsis`), sous le libellé plutôt qu'à
+  côté.
+- **Prononciation inline** : carte avec en-tête « Dictionnaire phonétique
+  (n) » + bouton `+`, liste des règles, dialogue modal d'ajout/édition.
+  L'écran séparé (`PronunciationRulesRoute`/`PronunciationRulesScreen`)
+  est **conservé tel quel** — plus lié depuis les Réglages, mais toujours
+  la cible du lien « Ajouter une règle de prononciation » du panneau Voix
+  du lecteur (`ReaderTtsPanel`), vérifié non cassé (chemin de navigation
+  inchangé dans `InkToneNavHost.kt`).
+- **Édition d'une règle préserve `isEnabled`** : reconstruire un
+  `PronunciationRule` par défaut sur une édition aurait silencieusement
+  réactivé une règle désactivée par l'utilisateur — l'état existant est
+  relu avant reconstruction (`SettingsViewModel.savePronunciationRule`),
+  testé.
+- **Non vérifié sur appareil** (nécessite un geste humain — sélection SAF,
+  confirmation de dialogue) : aller-retour export → réinstallation →
+  import complet (B2 dans `LOT_6_REGLAGES.md`), comportement sur fichier
+  de sauvegarde invalide (B3), confirmations des trois actions
+  destructives jusqu'au bout (B5).
+
 ---
 
 ## Écran : Marque-pages et notes — vue globale (drawer, b3)

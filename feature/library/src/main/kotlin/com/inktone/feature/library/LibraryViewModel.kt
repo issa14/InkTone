@@ -4,6 +4,7 @@ import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.inktone.domain.model.FilterMode
 import com.inktone.domain.model.ReadingState
+import com.inktone.domain.repository.PreferencesRepository
 import com.inktone.domain.repository.PublicationRepository
 import com.inktone.domain.repository.ReadingStateRepository
 import com.inktone.domain.service.ImportProgressObserver
@@ -19,6 +20,7 @@ import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.catch
+import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.flow.receiveAsFlow
 import kotlinx.coroutines.launch
 import javax.inject.Inject
@@ -33,6 +35,7 @@ class LibraryViewModel @Inject constructor(
     private val importProgressObserver: ImportProgressObserver,
     private val importResultsStore: ImportResultsStore,
     private val importSessionStore: ImportSessionStore,
+    private val preferencesRepository: PreferencesRepository,
 ) : ViewModel() {
 
     private val _state = MutableStateFlow(LibraryUiState())
@@ -64,6 +67,19 @@ class LibraryViewModel @Inject constructor(
                 previousTotal = progress.total
             }
         }
+        // Lot 6 — la disposition est persistée pour que le préréglage
+        // d'accessibilité (SettingsViewModel) puisse la piloter à distance ;
+        // toute modification manuelle (SetLayoutMode) est réécrite dans les
+        // préférences pour rester la même source de vérité que le préréglage.
+        viewModelScope.launch {
+            preferencesRepository.observe().collect { prefs ->
+                val mode = runCatching { LibraryLayoutMode.valueOf(prefs.libraryLayoutMode) }
+                    .getOrDefault(LibraryLayoutMode.GRID_COVERS)
+                if (mode != _state.value.layoutMode) {
+                    _state.value = _state.value.copy(layoutMode = mode)
+                }
+            }
+        }
         // Lot 5 — observer le sessionId partagé avec ImportViewModel
         viewModelScope.launch {
             importSessionStore.sessionId.collect { sessionId ->
@@ -89,7 +105,13 @@ class LibraryViewModel @Inject constructor(
             is LibraryIntent.ChangeFilter -> observePublications(intent.filter, intent.value)
             is LibraryIntent.SetSearchQuery -> _state.value = _state.value.copy(searchQuery = intent.query)
             is LibraryIntent.SetSortOrder -> _state.value = _state.value.copy(sortOrder = intent.order)
-            is LibraryIntent.SetLayoutMode -> _state.value = _state.value.copy(layoutMode = intent.mode)
+            is LibraryIntent.SetLayoutMode -> {
+                _state.value = _state.value.copy(layoutMode = intent.mode)
+                viewModelScope.launch {
+                    val current = preferencesRepository.observe().first()
+                    preferencesRepository.update(current.copy(libraryLayoutMode = intent.mode.name))
+                }
+            }
             is LibraryIntent.ToggleFileFormat -> _state.value = _state.value.copy(
                 selectedFormats = _state.value.selectedFormats.let {
                     if (intent.format in it) it - intent.format else it + intent.format

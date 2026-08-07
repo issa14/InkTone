@@ -508,6 +508,66 @@ class DatabaseMigrationTest {
         v14.close()
     }
 
+    @Test
+    fun migration_14_vers_15_conserve_les_donnees_et_ajoute_appTheme() {
+        val v14 = helper.createDatabase(TEST_DB_NAME, 14)
+        v14.execSQL(
+            """
+            INSERT INTO user_preferences (id, theme, fontSize, defaultTtsEngine, crashReportingEnabled, language, fontFamily, reduceMotion, dynamicColorEnabled, readingRulerEnabled, dailyGoalMinutes, activeVoiceProfileId, readingMode, audioGain, useSystemFontScale)
+            VALUES (0, 'SYSTEM', 18, 'SHERPA_ONNX', 0, 'fr', 'DEFAULT', 0, 1, 0, 20, NULL, 'SCROLL', 1.0, 0)
+            """.trimIndent(),
+        )
+        v14.close()
+
+        val v15 = helper.runMigrationsAndValidate(
+            TEST_DB_NAME, 15, true,
+            MIGRATION_1_2, MIGRATION_2_3, MIGRATION_3_4, MIGRATION_4_5, MIGRATION_5_6, MIGRATION_6_7,
+            MIGRATION_7_8, MIGRATION_8_9, MIGRATION_9_10, MIGRATION_10_11, MIGRATION_11_12, MIGRATION_12_13,
+            MIGRATION_13_14, MIGRATION_14_15,
+        )
+
+        v15.query("SELECT appTheme FROM user_preferences WHERE id = 0").use { cursor ->
+            assertEquals(true, cursor.moveToFirst())
+            assertEquals("SYSTEM", cursor.getString(0)) // valeur par defaut
+        }
+        v15.execSQL("UPDATE user_preferences SET appTheme = 'DARK' WHERE id = 0")
+        v15.query("SELECT appTheme FROM user_preferences WHERE id = 0").use { cursor ->
+            assertEquals(true, cursor.moveToFirst())
+            assertEquals("DARK", cursor.getString(0))
+        }
+        v15.close()
+    }
+
+    @Test
+    fun migration_15_vers_16_conserve_les_donnees_et_ajoute_libraryLayoutMode() {
+        val v15 = helper.createDatabase(TEST_DB_NAME, 15)
+        v15.execSQL(
+            """
+            INSERT INTO user_preferences (id, theme, fontSize, defaultTtsEngine, crashReportingEnabled, language, fontFamily, reduceMotion, dynamicColorEnabled, readingRulerEnabled, dailyGoalMinutes, activeVoiceProfileId, readingMode, audioGain, useSystemFontScale, appTheme)
+            VALUES (0, 'SYSTEM', 18, 'SHERPA_ONNX', 0, 'fr', 'DEFAULT', 0, 1, 0, 20, NULL, 'SCROLL', 1.0, 0, 'SYSTEM')
+            """.trimIndent(),
+        )
+        v15.close()
+
+        val v16 = helper.runMigrationsAndValidate(
+            TEST_DB_NAME, 16, true,
+            MIGRATION_1_2, MIGRATION_2_3, MIGRATION_3_4, MIGRATION_4_5, MIGRATION_5_6, MIGRATION_6_7,
+            MIGRATION_7_8, MIGRATION_8_9, MIGRATION_9_10, MIGRATION_10_11, MIGRATION_11_12, MIGRATION_12_13,
+            MIGRATION_13_14, MIGRATION_14_15, MIGRATION_15_16,
+        )
+
+        v16.query("SELECT libraryLayoutMode FROM user_preferences WHERE id = 0").use { cursor ->
+            assertEquals(true, cursor.moveToFirst())
+            assertEquals("GRID_COVERS", cursor.getString(0)) // valeur par defaut
+        }
+        v16.execSQL("UPDATE user_preferences SET libraryLayoutMode = 'LIST' WHERE id = 0")
+        v16.query("SELECT libraryLayoutMode FROM user_preferences WHERE id = 0").use { cursor ->
+            assertEquals(true, cursor.moveToFirst())
+            assertEquals("LIST", cursor.getString(0))
+        }
+        v16.close()
+    }
+
     companion object {
         private const val TEST_DB_NAME = "migration-test"
     }
