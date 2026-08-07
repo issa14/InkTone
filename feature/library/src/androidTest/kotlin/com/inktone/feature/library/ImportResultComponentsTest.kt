@@ -132,7 +132,7 @@ class ImportResultComponentsTest {
             ImportResultDetail(
                 results = listOf(
                     entry("drm.epub", "drm_protected", message = "Protégé par DRM"),
-                    entry("inconnu.xyz", "unsupported_format"),
+                    entry("inconnu.xyz", "unsupported_format", message = "Format non pris en charge : XYZ"),
                     entry("corrompu.epub", "corrupted", message = "Echec"),
                 ),
                 onOpenPublication = {},
@@ -143,5 +143,8 @@ class ImportResultComponentsTest {
         // Ni "Ouvrir" ni "Réessayer" sur des cas qui échoueront à l'identique
         composeTestRule.onNodeWithText("Ouvrir").assertDoesNotExist()
         composeTestRule.onNodeWithText("Réessayer").assertDoesNotExist()
+
+        // La raison reste lisible même sur un cas non réessayable
+        composeTestRule.onNodeWithText("Format non pris en charge : XYZ").assertIsDisplayed()
     }
 }
