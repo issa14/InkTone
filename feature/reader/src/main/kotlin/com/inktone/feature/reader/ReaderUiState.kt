@@ -96,6 +96,11 @@ data class ReaderUiState(
     // coexistent, le surlignage mot-à-mot ne respecte aujourd'hui que le
     // premier.
     val reduceMotion: Boolean = false,
+    // Lot 4, tâche 4.7 — cible de flash en attente de la fin de mise en
+    // page du chapitre visé (la mesure est asynchrone depuis 3a, voir
+    // ChapterPaginationState). Consommée une seule fois par
+    // ReaderViewModel.onChapterLayoutCompleted, jamais rejouée ensuite.
+    val pendingHighlightTarget: PendingHighlightTarget? = null,
 ) {
     val currentChapter: Chapter? get() = chapters.getOrNull(currentChapterIndex)
     val hasNextChapter: Boolean get() = currentChapterIndex < chapters.lastIndex
@@ -160,6 +165,14 @@ data class ReaderUiState(
 /** 3d.5 — durée du compte à rebours du popup de repos oculaire (UX_FLOW_DESIGN.md §Minuteur). */
 const val EYE_REST_REMINDER_COUNTDOWN_S = 60
 
+/**
+ * Lot 4, tâche 4.7 — cible exprimée en [Locator], jamais en index de page
+ * (un index de page ne vaut que pour un couple style/viewport donné,
+ * invariant posé au lot 3b). `sentenceIndex` est déjà résolu par
+ * `navigateToLocator` au moment de la navigation, pas recalculé ici.
+ */
+data class PendingHighlightTarget(val chapterIndex: Int, val sentenceIndex: Int)
+
 private fun chapterCharCount(chapter: Chapter): Int =
     chapter.paragraphs.sumOf { paragraph -> paragraph.sentences.sumOf { it.text.length } }
 
@@ -178,6 +191,8 @@ sealed interface ReaderIntent {
         val targetResourceHref: String? = null,
         val targetChapterIndex: Int? = null,
         val targetCharOffset: Int? = null,
+        /** Lot 4, tâche 4.7 — arrivée depuis « Marque-pages et notes » : flash différé du passage visé. */
+        val flashOnArrival: Boolean = false,
     ) : ReaderIntent
 
     /**
@@ -228,6 +243,14 @@ sealed interface ReaderIntent {
 
     /** Navigue vers un `Locator` arbitraire — signet (Tâche 7.2) ou résultat de recherche (Tâche 7.5). */
     data class NavigateToLocator(val locator: Locator) : ReaderIntent
+
+    /**
+     * Lot 4, tâche 4.7 — envoyé par `ReaderScreen` quand la mise en page du
+     * chapitre [chapterIndex] est confirmée complète (voir
+     * `ChapterPaginationState.measurement`). Ne déclenche le flash que si
+     * une cible en attente vise ce chapitre précis.
+     */
+    data class ChapterLayoutCompleted(val chapterIndex: Int) : ReaderIntent
 
     /**
      * Tâche 8.2 — écrit la surcharge par publication (`ReadingState.overrides`)

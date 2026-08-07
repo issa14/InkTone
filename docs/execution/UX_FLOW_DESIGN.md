@@ -538,6 +538,8 @@ Distinct du panneau par livre (§ Marque-pages — panneau latéral) : cet écra
 
 Mockup validé sans correction après un ajustement (retrait du pourcentage entre parenthèses à côté du chapitre, jugé surchargé).
 
+**État réel (Lot 4, code fait foi) :** écran implémenté (`LibraryItemsScreen`/`LibraryItemsUiState`/`LibraryItemsViewModel`, `feature/library`) — **remplace** `GlobalBookmarksScreen`/`GlobalBookmarksUiState`/`GlobalBookmarksViewModel` (Phase 9bis.6, signets seuls), supprimés dans ce lot plutôt que conservés en parallèle. Un audit qui cherche encore `GlobalBookmarksScreen` ne trouvera rien : c'est attendu, pas un fichier perdu. Adossé à une vue SQL `library_items` (`UNION` marque-pages + annotations, jointure sur `publications` pour le titre, `infrastructure/database`). L'**extrait de texte n'est disponible que pour les éléments créés après ce lot** — `Annotation.excerpt`/`Bookmark.excerpt` sont des colonnes nullables ajoutées par `MIGRATION_12_13` ; l'historique importé avant cette migration n'a pas d'extrait et la carte affiche alors le titre d'ouvrage et le chapitre seuls, sans blanc ni troncature visible (couvert par `LibraryItemDaoTest`/`DatabaseMigrationTest`). Le **flash à l'arrivée** dans le lecteur est différé jusqu'à confirmation de fin de mise en page du chapitre visé (`PendingHighlightTarget`, `ReaderViewModel`/`ReaderScreen`) — jamais émis avant, y compris sur un chapitre long où la mesure asynchrone prend le plus de temps.
+
 ---
 
 ## Écran : Statistiques de lecture (drawer, b6)

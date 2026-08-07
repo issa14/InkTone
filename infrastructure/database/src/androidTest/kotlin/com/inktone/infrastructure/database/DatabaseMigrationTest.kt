@@ -346,6 +346,116 @@ class DatabaseMigrationTest {
         v12.close()
     }
 
+    @Test
+    fun migration_12_vers_13_conserve_les_donnees_ajoute_extrait_epinglage_et_la_vue_library_items() {
+        val v12 = helper.createDatabase(TEST_DB_NAME, 12)
+        v12.execSQL(
+            """
+            INSERT INTO publications (
+                id, title, subtitle, authors, publisher, language, description, coverUri,
+                format, fileUri, fileHash, fileSize, chapterCount, seriesName, seriesIndex,
+                isFavorite, isPinned, subjects, isDrmProtected, importDate, lastOpened
+            ) VALUES (
+                'pub-l4', 'Titre avant lot 4', NULL, '', NULL, NULL, NULL, NULL,
+                'EPUB', 'content://x/l4', 'hash-l4', 1000, 3, NULL, NULL,
+                0, 0, '', 0, 0, NULL
+            )
+            """.trimIndent(),
+        )
+        v12.execSQL(
+            """
+            INSERT INTO bookmarks (id, publicationId, resourceHref, chapterIndex, paragraphIndex, charOffset, title, note, createdAt)
+            VALUES ('bm-l4', 'pub-l4', 'ch1.xhtml', 0, NULL, 10, NULL, NULL, 100)
+            """.trimIndent(),
+        )
+        v12.execSQL(
+            """
+            INSERT INTO annotations (
+                id, publicationId, startResourceHref, startChapterIndex, startParagraphIndex, startCharOffset,
+                endResourceHref, endChapterIndex, endParagraphIndex, endCharOffset, color, content, createdAt, updatedAt
+            ) VALUES (
+                'an-l4', 'pub-l4', 'ch1.xhtml', 0, NULL, 20, 'ch1.xhtml', 0, NULL, 40, 'YELLOW', NULL, 200, 200
+            )
+            """.trimIndent(),
+        )
+        v12.close()
+
+        val v13 = helper.runMigrationsAndValidate(
+            TEST_DB_NAME, 13, true,
+            MIGRATION_1_2, MIGRATION_2_3, MIGRATION_3_4, MIGRATION_4_5, MIGRATION_5_6, MIGRATION_6_7,
+            MIGRATION_7_8, MIGRATION_8_9, MIGRATION_9_10, MIGRATION_10_11, MIGRATION_11_12, MIGRATION_12_13,
+        )
+
+        // Les enregistrements pré-existants (avant ce lot) n'ont pas d'extrait,
+        // et ne sont pas épinglés par défaut — tâche 4.2/4.3.
+        v13.query("SELECT excerpt, isPinned FROM bookmarks WHERE id = 'bm-l4'").use { cursor ->
+            assertEquals(true, cursor.moveToFirst())
+            assertEquals(true, cursor.isNull(0))
+            assertEquals(0, cursor.getInt(1))
+        }
+        v13.query("SELECT excerpt, isPinned FROM annotations WHERE id = 'an-l4'").use { cursor ->
+            assertEquals(true, cursor.moveToFirst())
+            assertEquals(true, cursor.isNull(0))
+            assertEquals(0, cursor.getInt(1))
+        }
+
+        // La vue library_items existe, est utilisable, et résout le titre par jointure.
+        v13.query("SELECT type, publicationTitle, note FROM library_items ORDER BY type").use { cursor ->
+            assertEquals(2, cursor.count)
+            assertEquals(true, cursor.moveToFirst())
+            assertEquals("annotation", cursor.getString(0))
+            assertEquals("Titre avant lot 4", cursor.getString(1))
+            assertEquals(true, cursor.moveToNext())
+            assertEquals("bookmark", cursor.getString(0))
+            assertEquals("Titre avant lot 4", cursor.getString(1))
+        }
+
+        v13.execSQL("UPDATE bookmarks SET isPinned = 1 WHERE id = 'bm-l4'")
+        v13.query("SELECT isPinned FROM library_items WHERE id = 'bm-l4'").use { cursor ->
+            assertEquals(true, cursor.moveToFirst())
+            assertEquals(1, cursor.getInt(0))
+        }
+        v13.close()
+    }
+
+    @Test
+    fun migration_12_vers_13_le_renommage_dune_publication_se_reflete_dans_library_items_sans_redemarrage() {
+        val v12 = helper.createDatabase(TEST_DB_NAME, 12)
+        v12.execSQL(
+            """
+            INSERT INTO publications (
+                id, title, subtitle, authors, publisher, language, description, coverUri,
+                format, fileUri, fileHash, fileSize, chapterCount, seriesName, seriesIndex,
+                isFavorite, isPinned, subjects, isDrmProtected, importDate, lastOpened
+            ) VALUES (
+                'pub-rename', 'Ancien titre', NULL, '', NULL, NULL, NULL, NULL,
+                'EPUB', 'content://x/rename', 'hash-rename', 1000, 3, NULL, NULL,
+                0, 0, '', 0, 0, NULL
+            )
+            """.trimIndent(),
+        )
+        v12.execSQL(
+            """
+            INSERT INTO bookmarks (id, publicationId, resourceHref, chapterIndex, paragraphIndex, charOffset, title, note, createdAt)
+            VALUES ('bm-rename', 'pub-rename', 'ch1.xhtml', 0, NULL, 10, NULL, NULL, 100)
+            """.trimIndent(),
+        )
+        v12.close()
+
+        val v13 = helper.runMigrationsAndValidate(
+            TEST_DB_NAME, 13, true,
+            MIGRATION_1_2, MIGRATION_2_3, MIGRATION_3_4, MIGRATION_4_5, MIGRATION_5_6, MIGRATION_6_7,
+            MIGRATION_7_8, MIGRATION_8_9, MIGRATION_9_10, MIGRATION_10_11, MIGRATION_11_12, MIGRATION_12_13,
+        )
+
+        v13.execSQL("UPDATE publications SET title = 'Nouveau titre' WHERE id = 'pub-rename'")
+        v13.query("SELECT publicationTitle FROM library_items WHERE id = 'bm-rename'").use { cursor ->
+            assertEquals(true, cursor.moveToFirst())
+            assertEquals("Nouveau titre", cursor.getString(0))
+        }
+        v13.close()
+    }
+
     companion object {
         private const val TEST_DB_NAME = "migration-test"
     }

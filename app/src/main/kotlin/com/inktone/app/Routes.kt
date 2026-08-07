@@ -21,6 +21,8 @@ data class ReaderRoute(
     val targetResourceHref: String? = null,
     val targetChapterIndex: Int? = null,
     val targetCharOffset: Int? = null,
+    /** Lot 4, tâche 4.7 — arrivée depuis « Marque-pages et notes » : flash différé du passage visé. */
+    val flashOnArrival: Boolean = false,
 )
 
 @Serializable
