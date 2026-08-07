@@ -64,7 +64,7 @@ class ImportWorker @AssistedInject constructor(
         val completedCount = AtomicInteger(0)
 
         val semaphore = Semaphore(permits = MAX_CONCURRENT_IMPORTS)
-        uris.mapIndexed { index, uri ->
+        uris.map { uri ->
             async {
                 semaphore.withPermit {
                     val fileName = resolveFileName(uri)
