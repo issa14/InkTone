@@ -73,6 +73,9 @@ class ImportWorker @AssistedInject constructor(
                     // Persister le résultat par fichier (Palier A, Lot 5)
                     importResultsStore.recordResult(sessionId, fileName, result)
 
+                    // Compteurs agrégés à titre diagnostique uniquement (sortie `Data`,
+                    // non consommée par l'UI) : le détail par cas d'échec, lui, ne
+                    // fusionne rien et vit dans importResultsStore ci-dessus.
                     when (result) {
                         is ImportResult.Success -> successCount.incrementAndGet()
                         is ImportResult.Duplicate -> duplicateCount.incrementAndGet()
@@ -88,11 +91,20 @@ class ImportWorker @AssistedInject constructor(
             }
         }.awaitAll()
 
+        // KEY_SESSION_ID n'est PAS renvoyé ici : WorkManager chaîne les
+        // imports successifs sur le même nom de travail unique
+        // (APPEND_OR_REPLACE, cf. WorkManagerImportScheduler), et son
+        // InputMerger par défaut fusionne la sortie d'un maillon dans
+        // l'entrée du suivant. Réutiliser la même clé "session_id" en
+        // sortie faisait fuiter l'ancien sessionId d'un import vers le
+        // suivant, écrasant le sessionId fraîchement généré à chaque
+        // enqueue() — bug reproduit sur appareil : tout import après le
+        // tout premier enregistrait ses résultats sous le sessionId
+        // du tout premier import, jamais retrouvé par l'UI.
         val output = Data.Builder()
             .putInt(KEY_RESULT_SUCCESS, successCount.get())
             .putInt(KEY_RESULT_DUPLICATE, duplicateCount.get())
             .putInt(KEY_RESULT_FAILURE, failureCount.get())
-            .putString(KEY_SESSION_ID, sessionId)
             .build()
         Result.success(output)
     }

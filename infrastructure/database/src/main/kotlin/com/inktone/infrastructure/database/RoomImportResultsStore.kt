@@ -34,6 +34,7 @@ class RoomImportResultsStore @Inject constructor(
             message = when (result) {
                 is ImportResult.Corrupted -> result.message
                 is ImportResult.DrmProtected -> result.message
+                is ImportResult.UnsupportedFormat -> "Format non pris en charge : ${result.format}"
                 else -> null
             },
             existingPublicationId = (result as? ImportResult.Duplicate)?.existingPublicationId,
