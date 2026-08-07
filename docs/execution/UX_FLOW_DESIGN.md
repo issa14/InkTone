@@ -269,6 +269,15 @@ Tous les éléments décrits initialement sont maintenant conçus et consignés 
 
 Correspond directement aux cas déjà gérés par le domaine depuis la Phase 6 (`ImportResult.Success/Duplicate/Corrupted/DrmProtected/UnsupportedFormat`) — l'habillage visuel closer ce qui manquait, pas la logique.
 
+### Comportement consigné — Lot 5
+
+- **Lots > 50 fichiers :** `WorkManagerImportScheduler` découpe l'import en `WorkRequest` chaînées de 50 URI max. Tous les lots partagent le même `sessionId` UUID → les résultats sont agrégés sur la chaîne complète dans la table Room `import_results`, jamais partiels.
+- **Persistance des résultats :** table Room `import_results` (créée par `MIGRATION_13_14`). Les résultats survivent à la mort du processus et à un redémarrage. Ils sont purgés quand l'utilisateur ferme le résumé (bouton « OK » ou `DismissImportResults`).
+- **Résolution du nom de fichier :** via `ContentResolver` + `OpenableColumns.DISPLAY_NAME` au moment de l'import, avec fallback `uri.lastPathSegment ?: "Fichier inconnu"`. Le nom est stocké avec le résultat — l'URI SAF peut ne plus être résoluble après coup.
+- **Pas de « Réessayer » sur DRM / format non supporté :** ces erreurs ne sont pas résolubles par une nouvelle tentative. Seul `Duplicate` propose une action (« Ouvrir » vers la publication existante).
+- **Catégories vides non affichées :** un lot 100% réussi affiche « 12 importés », pas « 12 importés · 0 doublon · 0 corrompu ».
+- **ImportSessionStore :** singleton domaine partagé entre `ImportViewModel` (écrit le `sessionId`) et `LibraryViewModel` (lit pour charger les résultats en fin d'import). Introduit pour le Lot 5 — deux ViewModels distincts ne peuvent pas partager d'état directement.
+
 ---
 
 ## Flux de niveau 1 : Import entièrement couvert

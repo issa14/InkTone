@@ -194,9 +194,27 @@ fun LibraryScreen(
             },
         ) { innerPadding ->
             Column(Modifier.fillMaxSize().padding(innerPadding)) {
-                ImportProgressBanner(state.importProgress)
+                // Lot 5 — résumé de fin d'import ou bannière de progression
+                if (state.importResults.isNotEmpty()) {
+                    ImportResultSummary(
+                        results = state.importResults,
+                        onDetailsClick = { viewModel.onIntent(LibraryIntent.OpenImportDetails) },
+                        onDismiss = { viewModel.onIntent(LibraryIntent.DismissImportResults) },
+                    )
+                } else {
+                    ImportProgressBanner(state.importProgress)
+                }
 
-                when {
+                // Lot 5 — détail des résultats d'import
+                if (state.showImportDetails && state.importResults.isNotEmpty()) {
+                    ImportResultDetail(
+                        results = state.importResults,
+                        onOpenPublication = { id ->
+                            viewModel.onIntent(LibraryIntent.OpenPublication(id))
+                        },
+                        onDismiss = { viewModel.onIntent(LibraryIntent.DismissImportResults) },
+                    )
+                } else when {
                     state.isLoading -> LibraryShimmerGrid()
                     state.errorMessage != null -> ErrorState(
                         message = state.errorMessage!!,

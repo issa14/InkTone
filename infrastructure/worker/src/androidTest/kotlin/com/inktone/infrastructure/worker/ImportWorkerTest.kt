@@ -9,9 +9,11 @@ import androidx.work.WorkerParameters
 import androidx.work.testing.TestListenableWorkerBuilder
 import androidx.work.workDataOf
 import com.inktone.core.testing.fake.FakeFileStorageService
+import com.inktone.core.testing.fake.FakeImportResultsStore
 import com.inktone.core.testing.fake.FakePublicationParser
 import com.inktone.core.testing.fake.FakePublicationRepository
 import com.inktone.core.testing.fake.FakeSearchService
+import com.inktone.domain.service.ImportResultsStore
 import com.inktone.domain.usecase.ImportPublicationUseCase
 import kotlinx.coroutines.test.runTest
 import org.junit.Assert.assertEquals
@@ -30,12 +32,15 @@ class ImportWorkerTest {
 
     private val context = ApplicationProvider.getApplicationContext<Context>()
 
-    private fun workerFactory(importPublication: ImportPublicationUseCase) = object : WorkerFactory() {
+    private fun workerFactory(
+        importPublication: ImportPublicationUseCase,
+        importResultsStore: ImportResultsStore,
+    ) = object : WorkerFactory() {
         override fun createWorker(
             appContext: Context,
             workerClassName: String,
             workerParameters: WorkerParameters,
-        ): ListenableWorker = ImportWorker(appContext, workerParameters, importPublication)
+        ): ListenableWorker = ImportWorker(appContext, workerParameters, importPublication, importResultsStore)
     }
 
     @Test
@@ -49,7 +54,7 @@ class ImportWorkerTest {
         )
 
         val worker = TestListenableWorkerBuilder<ImportWorker>(context)
-            .setWorkerFactory(workerFactory(importPublication))
+            .setWorkerFactory(workerFactory(importPublication, FakeImportResultsStore()))
             .setInputData(
                 workDataOf(
                     ImportWorker.KEY_URIS to arrayOf(
@@ -71,6 +76,36 @@ class ImportWorkerTest {
     }
 
     @Test
+    fun persiste_un_resultat_par_fichier_avec_une_session_unique() = runTest {
+        val importResultsStore = FakeImportResultsStore()
+        val publicationRepository = FakePublicationRepository()
+        val importPublication = ImportPublicationUseCase(
+            publicationParser = FakePublicationParser(),
+            publicationRepository = publicationRepository,
+            fileStorageService = FakeFileStorageService(),
+            searchService = FakeSearchService(),
+        )
+
+        val worker = TestListenableWorkerBuilder<ImportWorker>(context)
+            .setWorkerFactory(workerFactory(importPublication, importResultsStore))
+            .setInputData(
+                workDataOf(
+                    ImportWorker.KEY_URIS to arrayOf("content://fake/1.epub"),
+                    ImportWorker.KEY_SESSION_ID to "session-42",
+                ),
+            )
+            .build()
+
+        val result = worker.doWork()
+
+        assertTrue(result is ListenableWorker.Result.Success)
+        assertEquals(1, importResultsStore.entries.size)
+        assertEquals("1.epub", importResultsStore.entries.first().fileName)
+        assertEquals("success", importResultsStore.entries.first().resultType)
+        assertEquals("session-42", importResultsStore.recordedSessionIds.firstOrNull())
+    }
+
+    @Test
     fun sans_uris_en_entree_echoue_immediatement() = runTest {
         val importPublication = ImportPublicationUseCase(
             publicationParser = FakePublicationParser(),
@@ -80,7 +115,7 @@ class ImportWorkerTest {
         )
 
         val worker = TestListenableWorkerBuilder<ImportWorker>(context)
-            .setWorkerFactory(workerFactory(importPublication))
+            .setWorkerFactory(workerFactory(importPublication, FakeImportResultsStore()))
             .build()
 
         val result = worker.doWork()

@@ -1,19 +1,24 @@
 package com.inktone.infrastructure.worker
 
 import android.content.Context
+import android.net.Uri
+import android.provider.OpenableColumns
 import androidx.hilt.work.HiltWorker
 import androidx.work.CoroutineWorker
 import androidx.work.Data
 import androidx.work.WorkerParameters
+import com.inktone.domain.service.ImportResultsStore
 import com.inktone.domain.usecase.ImportPublicationUseCase
 import com.inktone.domain.usecase.ImportResult
 import dagger.assisted.Assisted
 import dagger.assisted.AssistedInject
+import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.async
 import kotlinx.coroutines.awaitAll
 import kotlinx.coroutines.coroutineScope
 import kotlinx.coroutines.sync.Semaphore
 import kotlinx.coroutines.sync.withPermit
+import kotlinx.coroutines.withContext
 import java.util.concurrent.atomic.AtomicInteger
 
 /**
@@ -44,10 +49,12 @@ class ImportWorker @AssistedInject constructor(
     @Assisted context: Context,
     @Assisted params: WorkerParameters,
     private val importPublication: ImportPublicationUseCase,
+    private val importResultsStore: ImportResultsStore,
 ) : CoroutineWorker(context, params) {
 
     override suspend fun doWork(): Result = coroutineScope {
         val uris = inputData.getStringArray(KEY_URIS) ?: return@coroutineScope Result.failure()
+        val sessionId = inputData.getString(KEY_SESSION_ID) ?: "unknown"
 
         // Compteurs partages entre coroutines concurrentes (Dispatchers.Default,
         // plusieurs threads reels) - AtomicInteger, pas de var+= non protege.
@@ -57,14 +64,16 @@ class ImportWorker @AssistedInject constructor(
         val completedCount = AtomicInteger(0)
 
         val semaphore = Semaphore(permits = MAX_CONCURRENT_IMPORTS)
-        uris.map { uri ->
+        uris.mapIndexed { index, uri ->
             async {
                 semaphore.withPermit {
-                    // Chaque appel importPublication() -> publicationParser.parse()
-                    // ouvre le ZIP UNE FOIS (ReadiumPublicationParser, Tache 3.2 -
-                    // AssetRetriever.retrieve() une seule fois par appel, pas de
-                    // reouverture repetee comme le legacy le faisait, K2).
-                    when (importPublication(uri)) {
+                    val fileName = resolveFileName(uri)
+                    val result = importPublication(uri)
+
+                    // Persister le résultat par fichier (Palier A, Lot 5)
+                    importResultsStore.recordResult(sessionId, fileName, result)
+
+                    when (result) {
                         is ImportResult.Success -> successCount.incrementAndGet()
                         is ImportResult.Duplicate -> duplicateCount.incrementAndGet()
                         else -> failureCount.incrementAndGet()
@@ -83,12 +92,37 @@ class ImportWorker @AssistedInject constructor(
             .putInt(KEY_RESULT_SUCCESS, successCount.get())
             .putInt(KEY_RESULT_DUPLICATE, duplicateCount.get())
             .putInt(KEY_RESULT_FAILURE, failureCount.get())
+            .putString(KEY_SESSION_ID, sessionId)
             .build()
         Result.success(output)
     }
 
+    /**
+     * Résout le nom affichable du fichier depuis l'URI SAF via
+     * [OpenableColumns.DISPLAY_NAME], avec fallback sur
+     * `uri.lastPathSegment` si la requête renvoie `null`.
+     */
+    private suspend fun resolveFileName(uriString: String): String = withContext(Dispatchers.IO) {
+        try {
+            val uri = Uri.parse(uriString)
+            applicationContext.contentResolver.query(uri, null, null, null, null)?.use { cursor ->
+                if (cursor.moveToFirst()) {
+                    val nameIndex = cursor.getColumnIndex(OpenableColumns.DISPLAY_NAME)
+                    if (nameIndex >= 0) {
+                        val name = cursor.getString(nameIndex)
+                        if (!name.isNullOrBlank()) return@withContext name
+                    }
+                }
+            }
+        } catch (_: Exception) {
+            // Fallback : l'URI peut ne plus être résoluble
+        }
+        Uri.parse(uriString).lastPathSegment ?: "Fichier inconnu"
+    }
+
     companion object {
         const val KEY_URIS = "uris"
+        const val KEY_SESSION_ID = "session_id"
         const val KEY_PROGRESS_CURRENT = "progress_current"
         const val KEY_PROGRESS_TOTAL = "progress_total"
         const val KEY_RESULT_SUCCESS = "result_success"
