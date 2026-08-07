@@ -13,4 +13,9 @@ dependencies {
     implementation(libs.androidx.hilt.navigation.compose)
 
     testImplementation(libs.kotlinx.coroutines.test)
+    // Lot 6, Palier B — SettingsViewModel injecte Context (cache Vider le
+    // cache/taille) : Robolectric fournit un vrai Context.cacheDir en test
+    // JVM plutôt qu'un test instrumenté (même pattern que feature/reader).
+    testImplementation(libs.robolectric)
+    testImplementation(libs.androidx.test.core)
 }
