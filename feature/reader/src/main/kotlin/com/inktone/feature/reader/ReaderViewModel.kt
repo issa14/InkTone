@@ -874,12 +874,23 @@ class ReaderViewModel @Inject constructor(
     // ═══════════════════════════════════════════════
 
     /**
-     * Appelé par [ReaderScreen] quand l'activité passe en arrière-plan
-     * (ON_STOP). Sauve un fragment sans pauser le tracker — les rotations
-     * d'écran n'interrompent pas le tracking continu.
+     * Appelé par [ReaderScreen] sur ON_STOP. Sauve un fragment
+     * et met le tracker en pause — le temps en background ne doit
+     * pas être comptabilisé comme du temps de lecture.
      */
     fun onAppBackground() {
         saveCurrentFragment()
+        sessionTracker?.pause()
+    }
+
+    /**
+     * Appelé par [ReaderScreen] sur ON_START. Reprend le tracker
+     * dans le mode dicté par l'état TTS courant.
+     */
+    fun onAppForeground() {
+        val tracker = sessionTracker ?: return
+        val mode = if (_state.value.isPlaying) DomainReadingMode.AUDIO else DomainReadingMode.VISUAL
+        tracker.resume(mode)
     }
 
     /** Timer de checkpoint : sauve un fragment toutes les 5 minutes. */

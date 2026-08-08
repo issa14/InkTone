@@ -114,12 +114,14 @@ fun ReaderScreen(
 ) {
     val state by viewModel.state.collectAsState()
 
-    // ───── Lot Sessions : sauvegarde checkpoint quand l'app passe en arrière-plan ─────
+    // ───── Lot Sessions : pause/reprise sur changement de visibilité ─────
     val lifecycleOwner = LocalLifecycleOwner.current
     DisposableEffect(lifecycleOwner) {
         val observer = LifecycleEventObserver { _, event ->
-            if (event == Lifecycle.Event.ON_STOP) {
-                viewModel.onAppBackground()
+            when (event) {
+                Lifecycle.Event.ON_STOP -> viewModel.onAppBackground()
+                Lifecycle.Event.ON_START -> viewModel.onAppForeground()
+                else -> {}
             }
         }
         lifecycleOwner.lifecycle.addObserver(observer)
