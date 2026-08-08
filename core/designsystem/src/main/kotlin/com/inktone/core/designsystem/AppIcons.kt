@@ -32,6 +32,7 @@ import androidx.compose.material.icons.outlined.Error
 import androidx.compose.material.icons.outlined.FavoriteBorder
 import androidx.compose.material.icons.outlined.FilterList
 import androidx.compose.material.icons.outlined.Headphones
+import androidx.compose.material.icons.outlined.History
 import androidx.compose.material.icons.outlined.HourglassEmpty
 import androidx.compose.material.icons.outlined.ImportContacts
 import androidx.compose.material.icons.outlined.Info
@@ -96,6 +97,9 @@ object AppIcons {
     val Refresh = Icons.Outlined.Refresh
     val ChevronDown = Icons.Outlined.KeyboardArrowDown
     val Stats = Icons.Outlined.BarChart
+    // Lot 8 — item de drawer Récents. Distinct de `Loading` (sablier,
+    // défaut historique corrigé au lot 1, ne pas réintroduire).
+    val Recents = Icons.Outlined.History
 
     // Tache 7.3/7.2 — statistiques : modes de session (historique par
     // ouvrage) et carte objectif du jour (série avec flamme).

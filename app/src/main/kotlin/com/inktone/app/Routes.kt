@@ -28,6 +28,10 @@ data class ReaderRoute(
 @Serializable
 object LibraryRoute
 
+/** Lot 8 — item de drawer Récents, en première position des destinations. */
+@Serializable
+object RecentsRoute
+
 @Serializable
 object SearchRoute
 
