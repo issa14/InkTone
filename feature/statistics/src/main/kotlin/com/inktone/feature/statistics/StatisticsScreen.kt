@@ -70,12 +70,15 @@ import com.inktone.domain.model.DailyReadingStats
  */
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
-fun StatisticsScreen(viewModel: StatisticsViewModel = hiltViewModel()) {
+fun StatisticsScreen(
+    onNavigateToBookDetail: (String) -> Unit = {},
+    viewModel: StatisticsViewModel = hiltViewModel(),
+) {
     val state by viewModel.state.collectAsStateWithLifecycle()
 
     when (val s = state) {
         is com.inktone.domain.usecase.StatisticsUiState.Loading -> LoadingContent()
-        is com.inktone.domain.usecase.StatisticsUiState.Ready -> DashboardContent(s)
+        is com.inktone.domain.usecase.StatisticsUiState.Ready -> DashboardContent(s, onNavigateToBookDetail)
     }
 }
 
@@ -91,7 +94,7 @@ private fun LoadingContent() {
 // ───── Dashboard ─────
 
 @Composable
-private fun DashboardContent(state: com.inktone.domain.usecase.StatisticsUiState.Ready) {
+private fun DashboardContent(state: com.inktone.domain.usecase.StatisticsUiState.Ready, onNavigateToBookDetail: (String) -> Unit) {
     LazyColumn(
         modifier = Modifier
             .fillMaxSize()
@@ -104,7 +107,7 @@ private fun DashboardContent(state: com.inktone.domain.usecase.StatisticsUiState
         item { Section1Kpis(state.kpi) }
         item { Section2Charts(state.activity) }
         if (state.currentBook != null) {
-            item { Section3CurrentBook(state.currentBook!!) }
+            item { Section3CurrentBook(state.currentBook!!, onNavigateToBookDetail) }
         }
         item { ExportButton() }
     }
@@ -381,12 +384,12 @@ private fun HistogramChart(dailyStats: List<DailyReadingStats>) {
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
-private fun Section3CurrentBook(book: com.inktone.domain.usecase.CurrentBookState) {
+private fun Section3CurrentBook(book: com.inktone.domain.usecase.CurrentBookState, onNavigate: (String) -> Unit) {
     Column(verticalArrangement = Arrangement.spacedBy(InkToneSpacing.md)) {
         Text("Livre en cours", style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.SemiBold)
 
         ElevatedCard(
-            onClick = { /* Navigation vers le Reader — TODO */ },
+            onClick = { onNavigate(book.id) },
             shape = RoundedCornerShape(16.dp),
             modifier = Modifier.fillMaxWidth(),
         ) {

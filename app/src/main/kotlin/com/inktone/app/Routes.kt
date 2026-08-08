@@ -41,6 +41,9 @@ object PronunciationRulesRoute
 object StatisticsRoute
 
 @Serializable
+data class BookStatisticsRoute(val bookId: String)
+
+@Serializable
 object BookmarksRoute
 
 @Serializable
