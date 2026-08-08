@@ -140,18 +140,18 @@ private fun Section1Kpis(kpi: com.inktone.domain.usecase.KpiState) {
             )
             StatCard(
                 icon = Icons.Outlined.Speed, label = "WPM",
-                value = kpi.averageWpm.toString(), modifier = Modifier.weight(1f),
+                value = "${kpi.averageWpm} WPM", modifier = Modifier.weight(1f),
             )
         }
 
         Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(InkToneSpacing.md)) {
             StatCard(
-                icon = Icons.Outlined.CalendarMonth, label = "Série",
-                value = "${kpi.currentStreakDays} j", modifier = Modifier.weight(1f),
-            )
-            StatCard(
                 icon = Icons.Outlined.TrendingUp, label = "Record",
                 value = "${kpi.maxStreakDays} j", modifier = Modifier.weight(1f),
+            )
+            StatCard(
+                icon = Icons.Outlined.CalendarMonth, label = "Série",
+                value = "${kpi.currentStreakDays} j", modifier = Modifier.weight(1f),
             )
         }
     }
@@ -235,33 +235,34 @@ private fun Section2Charts(activity: com.inktone.domain.usecase.ActivityChartSta
 
 @Composable
 private fun HeatmapChart(slots: List<com.inktone.domain.usecase.HeatmapSlot>) {
-    // 0=Dim, 1=Lun, 2=Mar, 3=Mer, 4=Jeu, 5=Ven, 6=Sam (strftime %w)
-    // Affichage : L Ma Me J V | S D
     val dayLabels = listOf("L", "Ma", "Me", "J", "V", "S", "D")
-    // Shift : Sunday (0) → index 6, Monday (1) → index 0
     fun displayIndex(sqlDay: Int) = if (sqlDay == 0) 6 else sqlDay - 1
+
+    // Pic horaire : créneau le plus actif
+    val peakSlot = slots.maxByOrNull { it.intensity }
+    val slotNames = listOf("6h", "10h", "14h", "18h", "22h")
+    val peakLabel = if (peakSlot != null) "Pic : ${slotNames[peakSlot.slotIndex]}" else ""
 
     ElevatedCard(shape = RoundedCornerShape(16.dp), modifier = Modifier.fillMaxWidth()) {
         Column(modifier = Modifier.padding(InkToneSpacing.cardPadding)) {
-            Text("Habitudes de lecture", style = MaterialTheme.typography.labelLarge, color = MaterialTheme.colorScheme.onSurfaceVariant)
+            Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
+                Text("Habitudes de lecture", style = MaterialTheme.typography.labelLarge, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                if (peakLabel.isNotEmpty()) {
+                    Text(peakLabel, style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.primary)
+                }
+            }
             Spacer(Modifier.height(8.dp))
 
             val accent = MaterialTheme.colorScheme.primary
 
-            Canvas(modifier = Modifier.fillMaxWidth().height(180.dp)) {
+            Canvas(modifier = Modifier.fillMaxWidth().height(150.dp)) {
                 val cols = 7
                 val rows = 5
                 val cellW = size.width / cols
                 val cellH = size.height / rows
 
-                // Séparateur visuel week-end (entre V et S)
                 val sepX = 5 * cellW
-                drawLine(
-                    color = accent.copy(alpha = 0.15f),
-                    start = Offset(sepX, 0f),
-                    end = Offset(sepX, size.height),
-                    strokeWidth = 2.dp.toPx(),
-                )
+                drawLine(accent.copy(alpha = 0.15f), Offset(sepX, 0f), Offset(sepX, size.height), strokeWidth = 2.dp.toPx())
 
                 for (slot in slots) {
                     val x = displayIndex(slot.dayOfWeek) * cellW
@@ -285,6 +286,20 @@ private fun HeatmapChart(slots: List<com.inktone.domain.usecase.HeatmapSlot>) {
                 Text("Matin", style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
                 Text("Soir", style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
             }
+            Spacer(Modifier.height(4.dp))
+            // Légende d'intensité
+            Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.Center, verticalAlignment = Alignment.CenterVertically) {
+                Text("Inactif", style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                Spacer(Modifier.width(4.dp))
+                for (i in 0..4) {
+                    Canvas(Modifier.size(10.dp)) {
+                        drawRoundRect(accent.copy(alpha = (i + 1) / 5f), cornerRadius = CornerRadius(2.dp.toPx()))
+                    }
+                    if (i < 4) Spacer(Modifier.width(2.dp))
+                }
+                Spacer(Modifier.width(4.dp))
+                Text("Très actif", style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+            }
         }
     }
 }
@@ -295,7 +310,6 @@ private fun HeatmapChart(slots: List<com.inktone.domain.usecase.HeatmapSlot>) {
 private fun HistogramChart(dailyStats: List<DailyReadingStats>) {
     val visualColor = MaterialTheme.colorScheme.primary
     val ttsColor = MaterialTheme.colorScheme.tertiary
-    val todayIndex = dailyStats.size - 1 // dernière barre = aujourd'hui
 
     ElevatedCard(shape = RoundedCornerShape(16.dp), modifier = Modifier.fillMaxWidth()) {
         Column(modifier = Modifier.padding(InkToneSpacing.cardPadding)) {
