@@ -5,6 +5,7 @@ import androidx.lifecycle.viewModelScope
 import com.inktone.domain.model.Publication
 import com.inktone.domain.repository.PublicationRepository
 import com.inktone.domain.repository.ReadingSessionRepository
+import com.inktone.domain.repository.ReadingStateRepository
 import com.inktone.domain.usecase.ActivityChartState
 import com.inktone.domain.usecase.CurrentBookState
 import com.inktone.domain.usecase.GetStatisticsUseCase
@@ -41,6 +42,7 @@ class StatisticsViewModel @Inject constructor(
     private val getStatistics: GetStatisticsUseCase,
     private val readingSessionRepository: ReadingSessionRepository,
     private val publicationRepository: PublicationRepository,
+    private val readingStateRepository: ReadingStateRepository,
 ) : ViewModel() {
 
     val state: StateFlow<StatisticsUiState> = combine(
@@ -51,7 +53,7 @@ class StatisticsViewModel @Inject constructor(
             StatisticsUiState.Ready(
                 kpi = rawStats.toKpiState(),
                 activity = rawStats.toActivityState(),
-                currentBook = book,
+                currentBook = book?.withRemainingTime(rawStats.averageWpm),
             )
         }
     }.flowOn(Dispatchers.Default)
@@ -103,16 +105,36 @@ class StatisticsViewModel @Inject constructor(
     private suspend fun currentBook(): CurrentBookState? {
         val publicationId = readingSessionRepository.getLastReadPublicationId() ?: return null
         val publication = publicationRepository.getById(publicationId) ?: return null
-        return buildCurrentBookState(publication)
-    }
+        val readingState = readingStateRepository.get(publicationId)
 
-    private fun buildCurrentBookState(publication: Publication): CurrentBookState {
+        val progressPercent = if (readingState != null && publication.chapterCount > 0) {
+            (readingState.locator.chapterIndex.toFloat() / publication.chapterCount).coerceIn(0f, 1f)
+        } else 0f
+
+        // Temps total passé sur ce livre pour l'estimation du temps restant
+        val sessions = readingSessionRepository.getByPublicationId(publicationId)
+        val totalBookTimeMs = sessions.sumOf { it.durationMs }
+
         return CurrentBookState(
             id = publication.id,
             title = publication.title,
             coverUri = publication.coverUri,
-            progressPercent = 0f,
-            remainingTimeFormatted = null,
+            progressPercent = progressPercent,
+            totalBookTimeMs = totalBookTimeMs,
+            remainingTimeFormatted = null, // rempli par withRemainingTime
         )
+    }
+
+    /**
+     * Estime le temps restant pour ce livre à partir du WPM moyen
+     * et du temps déjà passé.
+     *
+     * Formule (cible UX) : temps restant ≈ tempsTotal / progression * (1 - progression).
+     */
+    private fun CurrentBookState.withRemainingTime(averageWpm: Int): CurrentBookState {
+        if (progressPercent <= 0f || totalBookTimeMs <= 0L) return this
+        val estimatedTotalMs = (totalBookTimeMs / progressPercent).toLong()
+        val remainingMs = estimatedTotalMs - totalBookTimeMs
+        return copy(remainingTimeFormatted = if (remainingMs > 0) formatDuration(remainingMs) else null)
     }
 }
