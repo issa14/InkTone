@@ -98,7 +98,11 @@ class BookStatisticsViewModel @Inject constructor(
 
         // KPIs
         val wpm = computeWpm(sessions)
-        val remainingFormatted = computeRemaining(sessions, publication?.chapterCount ?: 0)
+        val remainingFormatted = if (wpm > 0 && (publication?.chapterCount ?: 0) > 0) {
+            val estimatedWordsRemaining = publication!!.chapterCount * 3000L
+            val minutesRemaining = estimatedWordsRemaining / wpm
+            formatDuration(TimeUnit.MINUTES.toMillis(minutesRemaining))
+        } else "—"
 
         // Historique
         val dateFmt = SimpleDateFormat("d MMMM yyyy", Locale.FRENCH)
@@ -135,15 +139,6 @@ class BookStatisticsViewModel @Inject constructor(
         val totalWords = withWords.sumOf { it.wordsRead }
         val totalMinutes = withWords.sumOf { it.durationMs } / 60_000.0
         return if (totalMinutes > 0) (totalWords / totalMinutes).toInt() else 0
-    }
-
-    private fun computeRemaining(sessions: List<ReadingSession>, chapterCount: Int): String {
-        val wpm = computeWpm(sessions)
-        if (wpm <= 0 || chapterCount <= 0) return "—"
-        // Estimation grossière : ~3000 mots par chapitre
-        val estimatedWordsRemaining = chapterCount * 3000L
-        val minutesRemaining = estimatedWordsRemaining / wpm
-        return formatDuration(TimeUnit.MINUTES.toMillis(minutesRemaining))
     }
 
     private fun formatDuration(ms: Long): String {

@@ -88,7 +88,6 @@ fun BookStatisticsScreen(
                 colors = TopAppBarDefaults.centerAlignedTopAppBarColors(),
             )
         },
-        contentWindowInsets = WindowInsets.navigationBars,
     ) { innerPadding ->
         when (val s = state) {
             is BookDetailUiState.Loading -> {
@@ -176,7 +175,7 @@ private fun BookSelectorTitle(
                     text = { Text(book.title, maxLines = 1, overflow = TextOverflow.Ellipsis) },
                     onClick = {
                         expanded = false
-                        if (book.id != null) onSelect(book.id)
+                        onSelect(book.id)
                     },
                 )
             }
