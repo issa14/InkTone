@@ -513,8 +513,8 @@ class DatabaseMigrationTest {
         val v14 = helper.createDatabase(TEST_DB_NAME, 14)
         v14.execSQL(
             """
-            INSERT INTO user_preferences (id, theme, fontSize, defaultTtsEngine, crashReportingEnabled, language, fontFamily, reduceMotion, dynamicColorEnabled, readingRulerEnabled, dailyGoalMinutes, activeVoiceProfileId, readingMode, audioGain, useSystemFontScale)
-            VALUES (0, 'SYSTEM', 18, 'SHERPA_ONNX', 0, 'fr', 'DEFAULT', 0, 1, 0, 20, NULL, 'SCROLL', 1.0, 0)
+            INSERT INTO user_preferences (id, theme, fontSize, defaultTtsEngine, crashReportingEnabled, language, fontFamily, reduceMotion, dynamicColorEnabled, readingRulerEnabled, dailyGoalMinutes, activeVoiceProfileId, readingMode, audioGain, useSystemFontScale, lineHeightMultiplier, readerBrightness, eyeRestReminderEnabled, eyeRestReminderIntervalMinutes)
+            VALUES (0, 'SYSTEM', 18, 'SHERPA_ONNX', 0, 'fr', 'DEFAULT', 0, 1, 0, 20, NULL, 'SCROLL', 1.0, 0, 1.4, NULL, 1, 60)
             """.trimIndent(),
         )
         v14.close()
@@ -543,8 +543,8 @@ class DatabaseMigrationTest {
         val v15 = helper.createDatabase(TEST_DB_NAME, 15)
         v15.execSQL(
             """
-            INSERT INTO user_preferences (id, theme, fontSize, defaultTtsEngine, crashReportingEnabled, language, fontFamily, reduceMotion, dynamicColorEnabled, readingRulerEnabled, dailyGoalMinutes, activeVoiceProfileId, readingMode, audioGain, useSystemFontScale, appTheme)
-            VALUES (0, 'SYSTEM', 18, 'SHERPA_ONNX', 0, 'fr', 'DEFAULT', 0, 1, 0, 20, NULL, 'SCROLL', 1.0, 0, 'SYSTEM')
+            INSERT INTO user_preferences (id, theme, fontSize, defaultTtsEngine, crashReportingEnabled, language, fontFamily, reduceMotion, dynamicColorEnabled, readingRulerEnabled, dailyGoalMinutes, activeVoiceProfileId, readingMode, audioGain, useSystemFontScale, appTheme, lineHeightMultiplier, readerBrightness, eyeRestReminderEnabled, eyeRestReminderIntervalMinutes)
+            VALUES (0, 'SYSTEM', 18, 'SHERPA_ONNX', 0, 'fr', 'DEFAULT', 0, 1, 0, 20, NULL, 'SCROLL', 1.0, 0, 'SYSTEM', 1.4, NULL, 1, 60)
             """.trimIndent(),
         )
         v15.close()
@@ -566,6 +566,72 @@ class DatabaseMigrationTest {
             assertEquals("LIST", cursor.getString(0))
         }
         v16.close()
+    }
+
+    @Test
+    fun migration_16_vers_17_ajoute_visualDurationMs_et_ttsDurationMs_et_migre_les_donnees() {
+        val v16 = helper.createDatabase(TEST_DB_NAME, 16)
+        v16.execSQL(
+            """
+            INSERT INTO publications (id, title, authors, format, fileUri, fileHash, fileSize, chapterCount, subjects, isFavorite, isPinned, isDrmProtected, importDate)
+            VALUES ('pub-stats', 'Stats Book', '', 'EPUB', '/stats.epub', 'hash-stats', 1024, 1, '', 0, 0, 0, 0)
+            """.trimIndent(),
+        )
+        // Session sans mots lus (pre-D.4, durationMs seul)
+        v16.execSQL(
+            """
+            INSERT INTO reading_sessions (id, publicationId, startedAt, endedAt, mode, sentencesRead, durationMs, wordsRead)
+            VALUES ('s1', 'pub-stats', 1000000, 1005000, 'VISUAL', 0, 5000, 0)
+            """.trimIndent(),
+        )
+        // Session avec mots lus (post-D.4)
+        v16.execSQL(
+            """
+            INSERT INTO reading_sessions (id, publicationId, startedAt, endedAt, mode, sentencesRead, durationMs, wordsRead)
+            VALUES ('s2', 'pub-stats', 2000000, 2003000, 'AUDIO', 10, 3000, 100)
+            """.trimIndent(),
+        )
+        v16.close()
+
+        val v17 = helper.runMigrationsAndValidate(
+            TEST_DB_NAME, 17, true,
+            MIGRATION_1_2, MIGRATION_2_3, MIGRATION_3_4, MIGRATION_4_5, MIGRATION_5_6, MIGRATION_6_7,
+            MIGRATION_7_8, MIGRATION_8_9, MIGRATION_9_10, MIGRATION_10_11, MIGRATION_11_12, MIGRATION_12_13,
+            MIGRATION_13_14, MIGRATION_14_15, MIGRATION_15_16, MIGRATION_16_17,
+        )
+
+        // Les nouvelles colonnes existent et sont peuplées depuis durationMs
+        v17.query(
+            "SELECT id, durationMs, visualDurationMs, ttsDurationMs FROM reading_sessions ORDER BY id",
+        ).use { cursor ->
+            assertEquals(2, cursor.count)
+
+            // s1 : durationMs = 5000, migré vers visualDurationMs
+            assertEquals(true, cursor.moveToFirst())
+            assertEquals("s1", cursor.getString(0))
+            assertEquals(5000, cursor.getInt(1))
+            assertEquals(5000, cursor.getInt(2))
+            assertEquals(0, cursor.getInt(3))
+
+            // s2 : durationMs = 3000, migré vers visualDurationMs, mode AUDIO
+            assertEquals(true, cursor.moveToNext())
+            assertEquals("s2", cursor.getString(0))
+            assertEquals(3000, cursor.getInt(1))
+            assertEquals(3000, cursor.getInt(2))
+            assertEquals(0, cursor.getInt(3))
+        }
+
+        // La table est encore utilisable : insertion avec les nouveaux champs
+        v17.execSQL(
+            "INSERT INTO reading_sessions (id, publicationId, startedAt, endedAt, mode, sentencesRead, durationMs, wordsRead, visualDurationMs, ttsDurationMs) " +
+                "VALUES ('s3', 'pub-stats', 3000000, 3004000, 'AUDIO', 0, 4000, 0, 0, 4000)",
+        )
+        v17.query("SELECT visualDurationMs, ttsDurationMs FROM reading_sessions WHERE id = 's3'").use { cursor ->
+            assertEquals(true, cursor.moveToFirst())
+            assertEquals(0, cursor.getInt(0))
+            assertEquals(4000, cursor.getInt(1))
+        }
+        v17.close()
     }
 
     companion object {

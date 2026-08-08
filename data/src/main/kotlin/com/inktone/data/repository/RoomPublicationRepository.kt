@@ -33,4 +33,8 @@ class RoomPublicationRepository @Inject constructor(
     override suspend fun delete(id: String) = dao.delete(id)
     override suspend fun setFavorite(id: String, isFavorite: Boolean) = dao.setFavorite(id, isFavorite)
     override suspend fun setPinned(id: String, isPinned: Boolean) = dao.setPinned(id, isPinned)
+
+    // ───── Audit fix : COUNT pour le dashboard ─────
+    override suspend fun countFiltered(mode: FilterMode): Int =
+        dao.countFiltered(mode.name)
 }

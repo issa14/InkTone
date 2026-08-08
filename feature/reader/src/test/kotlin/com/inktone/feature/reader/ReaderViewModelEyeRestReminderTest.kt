@@ -5,6 +5,7 @@ import com.inktone.core.testing.fake.FakeBookmarkRepository
 import com.inktone.core.testing.fake.FakePreferencesRepository
 import com.inktone.core.testing.fake.FakePublicationParser
 import com.inktone.core.testing.fake.FakePublicationRepository
+import com.inktone.core.testing.fake.FakeReadingSessionRepository
 import com.inktone.core.testing.fake.FakeReadingStateRepository
 import com.inktone.core.testing.fake.FakeTtsEngine
 import com.inktone.core.testing.fake.FakeVoiceProfileRepository
@@ -66,6 +67,7 @@ class ReaderViewModelEyeRestReminderTest {
             deleteBookmark = DeleteBookmarkUseCase(bookmarkRepository),
             voiceProfileRepository = voiceProfileRepository,
             getVoiceProfiles = GetVoiceProfilesUseCase(voiceProfileRepository),
+            readingSessionRepository = FakeReadingSessionRepository(),
         )
     }
 
@@ -117,6 +119,13 @@ class ReaderViewModelEyeRestReminderTest {
         // ViewModel réel détruit par le framework, onCleared()) :
         viewModel.onIntent(ReaderIntent.SetEyeRestReminderEnabled(false))
         dispatcher.scheduler.runCurrent()
+
+        // Le timer de checkpoint de session (Lot Sessions) est lui aussi
+        // auto-récurrent et démarre inconditionnellement à l'ouverture
+        // d'une publication, indépendamment du rappel de repos oculaire —
+        // même raison de le casser explicitement ici.
+        viewModel.cancelCheckpointTimerForTest()
+        dispatcher.scheduler.runCurrent()
     }
 
     @Test
@@ -144,5 +153,10 @@ class ReaderViewModelEyeRestReminderTest {
         dispatcher.scheduler.runCurrent()
 
         assertFalse(viewModel.state.value.isEyeRestReminderVisible)
+
+        // Timer de checkpoint de session, auto-récurrent — même raison
+        // que dans le test précédent.
+        viewModel.cancelCheckpointTimerForTest()
+        dispatcher.scheduler.runCurrent()
     }
 }

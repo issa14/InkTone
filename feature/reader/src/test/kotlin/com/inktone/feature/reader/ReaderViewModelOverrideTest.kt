@@ -81,29 +81,39 @@ class ReaderViewModelOverrideTest {
             deleteBookmark = DeleteBookmarkUseCase(bookmarkRepository),
             voiceProfileRepository = com.inktone.core.testing.fake.FakeVoiceProfileRepository(),
             getVoiceProfiles = com.inktone.domain.usecase.GetVoiceProfilesUseCase(com.inktone.core.testing.fake.FakeVoiceProfileRepository()),
+            readingSessionRepository = com.inktone.core.testing.fake.FakeReadingSessionRepository(),
         )
 
         // 3d.5 — le rappel de repos oculaire (activé par défaut, recurrent)
         // rendrait dispatcher.scheduler.advanceUntilIdle() non terminant ;
         // ce test ne porte pas sur le repos oculaire, on le désactive.
+        // Même raison pour utiliser runCurrent() plutôt qu'advanceUntilIdle()
+        // ci-dessous : le timer de checkpoint de session démarre lui aussi
+        // inconditionnellement à l'ouverture d'une publication.
         preferencesRepository.update(UserPreferences(theme = ReadingTheme.LIGHT, eyeRestReminderEnabled = false))
         viewModel.onIntent(ReaderIntent.OpenPublication(publicationId))
-        dispatcher.scheduler.advanceUntilIdle()
+        dispatcher.scheduler.runCurrent()
 
         // Sans surcharge : le theme global (LIGHT) s'applique.
         assertEquals(ReadingTheme.LIGHT, viewModel.state.value.effectiveSettings.theme)
 
         viewModel.onIntent(ReaderIntent.SetOverrides(ReadingOverrides(theme = ReadingTheme.DARK)))
-        dispatcher.scheduler.advanceUntilIdle()
+        dispatcher.scheduler.runCurrent()
 
         // La surcharge gagne, pas le reglage global.
         assertEquals(ReadingTheme.DARK, viewModel.state.value.effectiveSettings.theme)
         assertEquals(ReadingTheme.DARK, readingStateRepository.get(publicationId)?.overrides?.theme)
 
         viewModel.onIntent(ReaderIntent.SetOverrides(null))
-        dispatcher.scheduler.advanceUntilIdle()
+        dispatcher.scheduler.runCurrent()
 
         // La surcharge effacee : le reglage global reprend la main.
         assertEquals(ReadingTheme.LIGHT, viewModel.state.value.effectiveSettings.theme)
+
+        // Casse le timer de checkpoint (auto-récurrent) comme le ferait
+        // onCleared() sur un vrai ViewModel détruit — sinon le drain
+        // implicite de fin de runTest boucle indéfiniment.
+        viewModel.cancelCheckpointTimerForTest()
+        dispatcher.scheduler.runCurrent()
     }
 }

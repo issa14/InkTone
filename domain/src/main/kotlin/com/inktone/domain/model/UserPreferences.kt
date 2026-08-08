@@ -22,8 +22,9 @@ data class UserPreferences(
     // consomme pas encore ce champ (voir TODO sur ReadingRuler.kt).
     val readingRulerEnabled: Boolean = false,
     // Tache 1.4 (Partie 1) — objectif de lecture quotidien, valeur par
-    // defaut raisonnable (20 min), modifiable dans les reglages (Partie 4).
-    val dailyGoalMinutes: Int = 20,
+    // defaut alignee sur la cible UX (Lot 7, tache 7.1), modifiable dans
+    // les reglages (Partie 4).
+    val dailyGoalMinutes: Int = 30,
     // A.5 — profil vocal actif. null = utiliser la voix par defaut
     // correspondant au moteur TTS selectionne.
     val activeVoiceProfileId: String? = null,
