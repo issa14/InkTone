@@ -35,18 +35,32 @@ data class KpiState(
     val todayReadingMinutes: Long,
     val todayReadingMinutesFormatted: String,
     val dailyGoalMinutes: Int,
+    // Tache 7.2 — bloc "Volumes parcourus" et libellé de régularité de la
+    // carte objectif du jour.
+    val totalWordsReadFormatted: String,
+    val totalPagesReadFormatted: String,
+    val regularityLabel: String,
 )
+
+/**
+ * Sélecteur de période pour la carte "Activité" (Tache 7.4).
+ */
+enum class StatsPeriod { WEEK, MONTH }
 
 /**
  * Section 2 — Graphiques d'Activité.
  *
  * [variationPercent] : "+12%" en cas de hausse par rapport à la
- * période précédente, "—" si aucune variation calculable.
+ * période équivalente précédente (calculée sur [period]), "—" si
+ * aucune variation calculable. [periodTotalFormatted] est le total de
+ * la période sélectionnée (ex. "6h 25m").
  */
 data class ActivityChartState(
     val dailyStats: List<DailyReadingStats>,
     val variationPercent: String,
     val heatmapSlots: List<HeatmapSlot>,
+    val period: StatsPeriod,
+    val periodTotalFormatted: String,
 )
 
 /**

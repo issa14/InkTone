@@ -7,6 +7,7 @@ import com.inktone.domain.model.Publication
 import com.inktone.domain.model.PublicationFormat
 import com.inktone.domain.model.ReadingMode
 import com.inktone.domain.model.ReadingSession
+import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.test.runTest
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertTrue
@@ -45,7 +46,7 @@ class GetStatisticsUseCaseTest {
         )
 
         val useCase = GetStatisticsUseCase(readingSessionRepository, publicationRepository)
-        val result = useCase()
+        val result = useCase().first()
 
         assertEquals(1, result.booksFinished)
         assertEquals(1000L, result.totalVisualMs)
@@ -73,7 +74,7 @@ class GetStatisticsUseCaseTest {
         )
 
         val useCase = GetStatisticsUseCase(readingSessionRepository, publicationRepository)
-        val result = useCase()
+        val result = useCase().first()
 
         assertEquals(2, result.currentStreakDays)
         assertEquals(2, result.maxStreakDays) // pas plus de 2 jours dans le fake
@@ -97,7 +98,7 @@ class GetStatisticsUseCaseTest {
             ),
         )
 
-        val result = GetStatisticsUseCase(readingSessionRepository, publicationRepository)()
+        val result = GetStatisticsUseCase(readingSessionRepository, publicationRepository)().first()
 
         assertEquals(500L, result.totalVisualMs)
         assertEquals(300L, result.totalTtsMs)

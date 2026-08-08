@@ -137,6 +137,12 @@ class ReaderViewModelPendingHighlightTest {
         assertEquals(0, pending!!.chapterIndex)
         assertEquals(1, pending.sentenceIndex)
         assertNull("pas de flash tant que la mise en page n'est pas confirmée", viewModel.state.value.highlightedWordRange)
+
+        // Casse le timer de checkpoint de session (Lot Sessions), démarré
+        // inconditionnellement à l'ouverture, auto-récurrent — sinon le
+        // drain implicite de fin de runTest boucle indéfiniment.
+        viewModel.cancelCheckpointTimerForTest()
+        dispatcher.scheduler.runCurrent()
     }
 
     @Test
@@ -177,6 +183,9 @@ class ReaderViewModelPendingHighlightTest {
         dispatcher.scheduler.advanceTimeBy(10_000)
         dispatcher.scheduler.runCurrent()
         assertNull(viewModel.state.value.highlightedWordRange)
+
+        viewModel.cancelCheckpointTimerForTest()
+        dispatcher.scheduler.runCurrent()
     }
 
     @Test
@@ -208,5 +217,8 @@ class ReaderViewModelPendingHighlightTest {
 
         assertNull(viewModel.state.value.pendingHighlightTarget)
         assertNull(viewModel.state.value.highlightedWordRange)
+
+        viewModel.cancelCheckpointTimerForTest()
+        dispatcher.scheduler.runCurrent()
     }
 }

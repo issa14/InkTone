@@ -1,6 +1,7 @@
 package com.inktone.feature.reader
 
 import android.util.Log
+import androidx.annotation.VisibleForTesting
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.inktone.domain.model.Annotation
@@ -891,6 +892,19 @@ class ReaderViewModel @Inject constructor(
         val tracker = sessionTracker ?: return
         val mode = if (_state.value.isPlaying) DomainReadingMode.AUDIO else DomainReadingMode.VISUAL
         tracker.resume(mode)
+    }
+
+    /**
+     * Annule le timer de checkpoint depuis un test JVM. `ViewModel.clear()`
+     * et `onCleared()` sont respectivement `internal` et `protected` dans
+     * androidx.lifecycle et donc inaccessibles depuis les classes de test
+     * (ni sous-classes, ni même module externe) — ce timer étant
+     * auto-récurrent (`while(true) { delay(...) }`), l'oublier annuler
+     * ferait boucler indéfiniment le drain implicite de fin de `runTest`.
+     */
+    @VisibleForTesting
+    internal fun cancelCheckpointTimerForTest() {
+        checkpointJob?.cancel()
     }
 
     /** Timer de checkpoint : sauve un fragment toutes les 5 minutes. */

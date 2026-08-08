@@ -91,7 +91,10 @@ class ReaderViewModelVoiceSpeedTest {
     fun deplacer_le_curseur_ecrit_la_vitesse_sur_le_profil_actif_et_pas_sur_userPreferences() = runTest {
         // 3d.5 — le rappel de repos oculaire (activé par défaut, recurrent)
         // rendrait dispatcher.scheduler.advanceUntilIdle() non terminant ;
-        // ce test ne porte pas sur le repos oculaire, on le désactive.
+        // ce test ne porte pas sur le repos oculaire, on le désactive. Même
+        // raison pour runCurrent() plutôt qu'advanceUntilIdle() ci-dessous :
+        // le timer de checkpoint de session démarre lui aussi
+        // inconditionnellement à l'ouverture d'une publication.
         val preferencesRepository = FakePreferencesRepository()
         preferencesRepository.update(UserPreferences(eyeRestReminderEnabled = false))
         val voiceProfileRepository = FakeVoiceProfileRepository()
@@ -101,13 +104,13 @@ class ReaderViewModelVoiceSpeedTest {
 
         val viewModel = buildViewModel(preferencesRepository, voiceProfileRepository, publicationRepository)
         viewModel.onIntent(ReaderIntent.OpenPublication(publicationId))
-        dispatcher.scheduler.advanceUntilIdle()
+        dispatcher.scheduler.runCurrent()
 
         // Antipattern décoratif d'origine : le curseur affichait 1.0x en dur.
         assertEquals(1.0f, viewModel.state.value.activeVoiceProfile?.speed)
 
         viewModel.onIntent(ReaderIntent.SetTtsSpeed(1.8f))
-        dispatcher.scheduler.advanceUntilIdle()
+        dispatcher.scheduler.runCurrent()
 
         assertEquals(1.8f, viewModel.state.value.activeVoiceProfile?.speed)
         // La vitesse appartient au profil de voix, jamais à UserPreferences
@@ -116,13 +119,22 @@ class ReaderViewModelVoiceSpeedTest {
         val savedProfile = viewModel.state.value.activeVoiceProfile
         assertNotNull(savedProfile)
         assertEquals(savedProfile, voiceProfileRepository.getById(savedProfile!!.id))
+
+        // Casse le timer de checkpoint (auto-récurrent) comme le ferait
+        // onCleared() sur un vrai ViewModel détruit — sinon le drain
+        // implicite de fin de runTest boucle indéfiniment.
+        viewModel.cancelCheckpointTimerForTest()
+        dispatcher.scheduler.runCurrent()
     }
 
     @Test
     fun rouvrir_le_panneau_restitue_la_vitesse_persistee_pas_1_0x() = runTest {
         // 3d.5 — le rappel de repos oculaire (activé par défaut, recurrent)
         // rendrait dispatcher.scheduler.advanceUntilIdle() non terminant ;
-        // ce test ne porte pas sur le repos oculaire, on le désactive.
+        // ce test ne porte pas sur le repos oculaire, on le désactive. Même
+        // raison pour runCurrent() plutôt qu'advanceUntilIdle() ci-dessous :
+        // le timer de checkpoint de session démarre lui aussi
+        // inconditionnellement à l'ouverture d'une publication.
         val preferencesRepository = FakePreferencesRepository()
         preferencesRepository.update(UserPreferences(eyeRestReminderEnabled = false))
         val voiceProfileRepository = FakeVoiceProfileRepository()
@@ -132,24 +144,35 @@ class ReaderViewModelVoiceSpeedTest {
 
         val viewModel = buildViewModel(preferencesRepository, voiceProfileRepository, publicationRepository)
         viewModel.onIntent(ReaderIntent.OpenPublication(publicationId))
-        dispatcher.scheduler.advanceUntilIdle()
+        dispatcher.scheduler.runCurrent()
         viewModel.onIntent(ReaderIntent.SetTtsSpeed(2.4f))
-        dispatcher.scheduler.advanceUntilIdle()
+        dispatcher.scheduler.runCurrent()
 
         // Simule une réouverture de publication (ex. relancer l'app) :
         // reconstruit un ViewModel à partir des MÊMES repositories.
         val reopened = buildViewModel(preferencesRepository, voiceProfileRepository, publicationRepository)
         reopened.onIntent(ReaderIntent.OpenPublication(publicationId))
-        dispatcher.scheduler.advanceUntilIdle()
+        dispatcher.scheduler.runCurrent()
 
         assertEquals(2.4f, reopened.state.value.activeVoiceProfile?.speed)
+
+        // Casse les timers de checkpoint (auto-récurrents) des deux
+        // ViewModels comme le ferait onCleared() sur de vrais ViewModels
+        // détruits — sinon le drain implicite de fin de runTest boucle
+        // indéfiniment.
+        viewModel.cancelCheckpointTimerForTest()
+        reopened.cancelCheckpointTimerForTest()
+        dispatcher.scheduler.runCurrent()
     }
 
     @Test
     fun selectionner_une_voix_met_a_jour_le_profil_actif_et_les_preferences() = runTest {
         // 3d.5 — le rappel de repos oculaire (activé par défaut, recurrent)
         // rendrait dispatcher.scheduler.advanceUntilIdle() non terminant ;
-        // ce test ne porte pas sur le repos oculaire, on le désactive.
+        // ce test ne porte pas sur le repos oculaire, on le désactive. Même
+        // raison pour runCurrent() plutôt qu'advanceUntilIdle() ci-dessous :
+        // le timer de checkpoint de session démarre lui aussi
+        // inconditionnellement à l'ouverture d'une publication.
         val preferencesRepository = FakePreferencesRepository()
         preferencesRepository.update(UserPreferences(eyeRestReminderEnabled = false))
         val voiceProfileRepository = FakeVoiceProfileRepository()
@@ -161,12 +184,15 @@ class ReaderViewModelVoiceSpeedTest {
 
         val viewModel = buildViewModel(preferencesRepository, voiceProfileRepository, publicationRepository)
         viewModel.onIntent(ReaderIntent.OpenPublication(publicationId))
-        dispatcher.scheduler.advanceUntilIdle()
+        dispatcher.scheduler.runCurrent()
 
         viewModel.onIntent(ReaderIntent.SetActiveVoiceProfile(otherProfile.id))
-        dispatcher.scheduler.advanceUntilIdle()
+        dispatcher.scheduler.runCurrent()
 
         assertEquals(otherProfile, viewModel.state.value.activeVoiceProfile)
         assertEquals(otherProfile.id, preferencesRepository.get().activeVoiceProfileId)
+
+        viewModel.cancelCheckpointTimerForTest()
+        dispatcher.scheduler.runCurrent()
     }
 }

@@ -27,6 +27,7 @@ data class StatisticsResult(
     val averageWpm: Int,
     val maxStreakDays: Int,
     val todayReadingMinutes: Long,
+    val totalWordsRead: Long,
     val dailyStats: List<com.inktone.domain.model.DailyReadingStats>,
     val heatmapSlots: List<HeatmapSlot>,
 )
@@ -56,10 +57,13 @@ class GetStatisticsUseCase(
     operator fun invoke(): Flow<StatisticsResult> = flow {
         val result = coroutineScope {
             val thirtyDaysAgo = System.currentTimeMillis() - TimeUnit.DAYS.toMillis(30)
+            // Tache 7.4 — 60 jours pour permettre la comparaison mois courant / mois
+            // precedent (30 vs 30) en plus de la comparaison semaine (7 vs 7).
+            val sixtyDaysAgo = System.currentTimeMillis() - TimeUnit.DAYS.toMillis(60)
             val totalsDeferred = async { readingSessionRepository.getTotalStats() }
             val finishedDeferred = async { publicationRepository.countFiltered(FilterMode.READ) }
             val distinctDaysDeferred = async { readingSessionRepository.getDistinctReadingDays() }
-            val dailyStatsDeferred = async { readingSessionRepository.getDailyStatsSince(thirtyDaysAgo) }
+            val dailyStatsDeferred = async { readingSessionRepository.getDailyStatsSince(sixtyDaysAgo) }
             val heatmapDeferred = async { readingSessionRepository.getHeatmapStatsSince(thirtyDaysAgo) }
 
             val totals = totalsDeferred.await()
@@ -95,6 +99,7 @@ class GetStatisticsUseCase(
                 averageWpm = averageWpm,
                 maxStreakDays = maxStreak,
                 todayReadingMinutes = todayReadingMinutes,
+                totalWordsRead = totals.totalWordsRead,
                 dailyStats = dailyStats,
                 heatmapSlots = heatmapSlots,
             )

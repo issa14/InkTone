@@ -73,7 +73,11 @@ class ReaderViewModelBookmarkToggleTest {
     ): ReaderViewModel {
         // 3d.5 — voir même commentaire dans ReaderViewModelScrollPositionTest :
         // le rappel de repos oculaire (activé par défaut, recurrent) rendrait
-        // dispatcher.scheduler.advanceUntilIdle() non terminant.
+        // dispatcher.scheduler.advanceUntilIdle() non terminant. Même raison
+        // pour utiliser runCurrent() plutôt qu'advanceUntilIdle() partout
+        // dans ce fichier : le timer de checkpoint de session (Lot Sessions,
+        // `startCheckpointTimer`) est lui aussi auto-récurrent et démarre
+        // inconditionnellement dès qu'une publication est ouverte.
         val preferencesRepository = FakePreferencesRepository()
         preferencesRepository.update(UserPreferences(eyeRestReminderEnabled = false))
         val parser = FakePublicationParser(
@@ -122,22 +126,28 @@ class ReaderViewModelBookmarkToggleTest {
         )
         val viewModel = buildViewModel(readingStateRepository, publicationRepository, bookmarkRepository, annotationRepository)
         viewModel.onIntent(ReaderIntent.OpenPublication("pub-1"))
-        dispatcher.scheduler.advanceUntilIdle()
+        dispatcher.scheduler.runCurrent()
 
         assertEquals(false, viewModel.state.value.isCurrentPageBookmarked)
 
         viewModel.onIntent(ReaderIntent.ToggleBookmarkAtCurrentPosition)
-        dispatcher.scheduler.advanceUntilIdle()
+        dispatcher.scheduler.runCurrent()
 
         assertEquals(1, viewModel.state.value.bookmarks.size)
         assertTrue("le toggle reflete l'etat de la page courante", viewModel.state.value.isCurrentPageBookmarked)
 
         // Jamais de doublon : un second appel retire, n'ajoute pas.
         viewModel.onIntent(ReaderIntent.ToggleBookmarkAtCurrentPosition)
-        dispatcher.scheduler.advanceUntilIdle()
+        dispatcher.scheduler.runCurrent()
 
         assertEquals(0, viewModel.state.value.bookmarks.size)
         assertEquals(false, viewModel.state.value.isCurrentPageBookmarked)
+
+        // Casse le timer de checkpoint (auto-récurrent) comme le ferait
+        // onCleared() sur un vrai ViewModel détruit — sinon le drain
+        // implicite de fin de runTest boucle indéfiniment.
+        viewModel.cancelCheckpointTimerForTest()
+        dispatcher.scheduler.runCurrent()
     }
 
     @Test
@@ -155,12 +165,12 @@ class ReaderViewModelBookmarkToggleTest {
         )
         val viewModel = buildViewModel(readingStateRepository, publicationRepository, bookmarkRepository, annotationRepository)
         viewModel.onIntent(ReaderIntent.OpenPublication("pub-1"))
-        dispatcher.scheduler.advanceUntilIdle()
+        dispatcher.scheduler.runCurrent()
 
         // Surlignage sans note (action « Surligner » du popup 3c.4).
         viewModel.onIntent(ReaderIntent.BeginSentenceSelection(0))
         viewModel.onIntent(ReaderIntent.ConfirmAnnotation(AnnotationColor.YELLOW))
-        dispatcher.scheduler.advanceUntilIdle()
+        dispatcher.scheduler.runCurrent()
 
         val highlightOnly = viewModel.state.value.annotations.single()
         assertNull("un surlignage sans note reste content = null", highlightOnly.content)
@@ -169,10 +179,13 @@ class ReaderViewModelBookmarkToggleTest {
         // et relu depuis l'etat observe.
         viewModel.onIntent(ReaderIntent.BeginSentenceSelection(0))
         viewModel.onIntent(ReaderIntent.ConfirmAnnotation(AnnotationColor.GREEN, "Ma note de lecture"))
-        dispatcher.scheduler.advanceUntilIdle()
+        dispatcher.scheduler.runCurrent()
 
         val withNote = viewModel.state.value.annotations.first { it.content != null }
         assertEquals("Ma note de lecture", withNote.content)
+
+        viewModel.cancelCheckpointTimerForTest()
+        dispatcher.scheduler.runCurrent()
     }
 
     /** Lot 4, tâche 4.2 — l'extrait vient du texte réellement affiché, pas d'un offset EPUB. */
@@ -191,12 +204,15 @@ class ReaderViewModelBookmarkToggleTest {
         )
         val viewModel = buildViewModel(readingStateRepository, publicationRepository, bookmarkRepository, annotationRepository)
         viewModel.onIntent(ReaderIntent.OpenPublication("pub-1"))
-        dispatcher.scheduler.advanceUntilIdle()
+        dispatcher.scheduler.runCurrent()
 
         viewModel.onIntent(ReaderIntent.ToggleBookmarkAtCurrentPosition)
-        dispatcher.scheduler.advanceUntilIdle()
+        dispatcher.scheduler.runCurrent()
 
         assertEquals("Phrase unique.", viewModel.state.value.bookmarks.single().excerpt)
+
+        viewModel.cancelCheckpointTimerForTest()
+        dispatcher.scheduler.runCurrent()
     }
 
     /** Lot 4, tâche 4.2 — un extrait trop long est tronqué à la création, pas à l'affichage. */
@@ -254,13 +270,16 @@ class ReaderViewModelBookmarkToggleTest {
             readingSessionRepository = FakeReadingSessionRepository(),
         )
         viewModel.onIntent(ReaderIntent.OpenPublication("pub-1"))
-        dispatcher.scheduler.advanceUntilIdle()
+        dispatcher.scheduler.runCurrent()
 
         viewModel.onIntent(ReaderIntent.BeginSentenceSelection(0))
         viewModel.onIntent(ReaderIntent.ConfirmAnnotation(AnnotationColor.YELLOW))
-        dispatcher.scheduler.advanceUntilIdle()
+        dispatcher.scheduler.runCurrent()
 
         val excerpt = viewModel.state.value.annotations.single().excerpt
         assertEquals(com.inktone.domain.model.Annotation.MAX_EXCERPT_LENGTH, excerpt?.length)
+
+        viewModel.cancelCheckpointTimerForTest()
+        dispatcher.scheduler.runCurrent()
     }
 }

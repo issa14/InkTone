@@ -22,10 +22,11 @@ interface ReadingSessionDao {
     // ───── KPIs Globaux ─────
 
     @Query("""
-        SELECT 
+        SELECT
             SUM(visualDurationMs) as totalVisualMs,
             SUM(ttsDurationMs) as totalTtsMs,
-            COUNT(DISTINCT publicationId) as booksInteracted
+            COUNT(DISTINCT publicationId) as booksInteracted,
+            COALESCE(SUM(wordsRead), 0) as totalWordsRead
         FROM reading_sessions
     """)
     suspend fun getTotalStats(): TotalStatsProjection

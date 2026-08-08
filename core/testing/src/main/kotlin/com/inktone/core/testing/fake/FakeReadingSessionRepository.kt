@@ -39,6 +39,7 @@ class FakeReadingSessionRepository : ReadingSessionRepository {
             totalVisualMs = sessions.sumOf { it.visualDurationMs },
             totalTtsMs = sessions.sumOf { it.ttsDurationMs },
             booksInteracted = sessions.map { it.publicationId }.distinct().size,
+            totalWordsRead = sessions.sumOf { it.wordsRead.toLong() },
         )
     }
 

@@ -1,6 +1,7 @@
 package com.inktone.feature.statistics
 
 import android.content.Intent
+import android.net.Uri
 import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.isSystemInDarkTheme
@@ -22,16 +23,12 @@ import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.outlined.Article
 import androidx.compose.material.icons.outlined.BarChart
-import androidx.compose.material.icons.outlined.CalendarMonth
 import androidx.compose.material.icons.outlined.CheckCircle
 import androidx.compose.material.icons.outlined.ChevronRight
 import androidx.compose.material.icons.outlined.Download
-import androidx.compose.material.icons.outlined.Headphones
-import androidx.compose.material.icons.outlined.MenuBook
-import androidx.compose.material.icons.outlined.Speed
 import androidx.compose.material.icons.outlined.TrendingUp
-import androidx.compose.material.icons.outlined.Visibility
 import androidx.compose.material.icons.outlined.ImportContacts
 import androidx.compose.material3.Button
 import androidx.compose.material3.CircularProgressIndicator
@@ -41,6 +38,9 @@ import androidx.compose.material3.Icon
 import androidx.compose.material3.ListItem
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.ModalBottomSheet
+import androidx.compose.material3.SegmentedButton
+import androidx.compose.material3.SegmentedButtonDefaults
+import androidx.compose.material3.SingleChoiceSegmentedButtonRow
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
@@ -49,11 +49,14 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.clip
 import androidx.compose.ui.geometry.CornerRadius
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.geometry.Size
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.StrokeCap
+import androidx.compose.ui.graphics.vector.ImageVector
+import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
@@ -62,11 +65,16 @@ import androidx.compose.ui.unit.dp
 import androidx.core.content.FileProvider
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.hilt.navigation.compose.hiltViewModel
+import coil.compose.SubcomposeAsyncImage
+import coil.request.ImageRequest
+import com.inktone.core.designsystem.AppIcons
 import com.inktone.core.designsystem.InkToneSpacing
 import com.inktone.domain.model.DailyReadingStats
 import com.inktone.domain.service.ExportFormat
+import com.inktone.domain.usecase.StatsPeriod
 import androidx.compose.runtime.LaunchedEffect
 import kotlinx.coroutines.flow.collectLatest
+import java.io.File
 
 /**
  * Tableau de bord statistiques (Lot Statistiques Palier 3).
@@ -136,7 +144,7 @@ private fun DashboardContent(state: com.inktone.domain.usecase.StatisticsUiState
         ),
     ) {
         item { Section1Kpis(state.kpi) }
-        item { Section2Charts(state.activity) }
+        item { Section2Charts(state.activity, onPeriodSelected = viewModel::onPeriodSelected) }
         if (state.currentBook != null) {
             item { Section3CurrentBook(state.currentBook!!, onNavigateToBookDetail) }
         }
@@ -153,40 +161,38 @@ private fun Section1Kpis(kpi: com.inktone.domain.usecase.KpiState) {
     Column(verticalArrangement = Arrangement.spacedBy(InkToneSpacing.md)) {
         Text("Objectifs & KPIs", style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.SemiBold)
 
-        // Jauge circulaire + streak
+        // Bloc 1 — Objectif du jour : jauge circulaire, Série et Record en
+        // regard, libellé de régularité (Tache 7.2).
         DailyGoalGauge(kpi)
 
-        // Cartes de volumes : visuel, TTS, livres, streak max
+        // Bloc 2 — Ventilation : Lecture visuelle · Écoute TTS (conforme à la
+        // cible, inchangé depuis le palier précédent).
         Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(InkToneSpacing.md)) {
             StatCard(
-                icon = Icons.Outlined.Visibility, label = "Visuel",
+                icon = AppIcons.VisualReading, label = "Visuel",
                 value = kpi.totalVisualTimeFormatted, modifier = Modifier.weight(1f),
             )
             StatCard(
-                icon = Icons.Outlined.Headphones, label = "TTS",
+                icon = AppIcons.TtsListening, label = "TTS",
                 value = kpi.totalTtsTimeFormatted, modifier = Modifier.weight(1f),
             )
         }
 
+        // Bloc 3 — Volumes parcourus : Livres finis · Pages lues · Mots
+        // parcourus (format abrégé). Le WPM sort du tableau de bord — il
+        // vit désormais uniquement au niveau de l'ouvrage (Section 4).
         Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(InkToneSpacing.md)) {
             StatCard(
                 icon = Icons.Outlined.CheckCircle, label = "Livres finis",
                 value = kpi.booksFinished.toString(), modifier = Modifier.weight(1f),
             )
             StatCard(
-                icon = Icons.Outlined.Speed, label = "WPM",
-                value = "${kpi.averageWpm} WPM", modifier = Modifier.weight(1f),
-            )
-        }
-
-        Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(InkToneSpacing.md)) {
-            StatCard(
-                icon = Icons.Outlined.TrendingUp, label = "Record",
-                value = "${kpi.maxStreakDays} j", modifier = Modifier.weight(1f),
+                icon = AppIcons.Reading, label = "Pages lues",
+                value = kpi.totalPagesReadFormatted, modifier = Modifier.weight(1f),
             )
             StatCard(
-                icon = Icons.Outlined.CalendarMonth, label = "Série",
-                value = "${kpi.currentStreakDays} j", modifier = Modifier.weight(1f),
+                icon = Icons.Outlined.Article, label = "Mots parcourus",
+                value = kpi.totalWordsReadFormatted, modifier = Modifier.weight(1f),
             )
         }
     }
@@ -231,6 +237,29 @@ private fun DailyGoalGauge(kpi: com.inktone.domain.usecase.KpiState) {
                     )
                 }
             }
+            Spacer(Modifier.height(16.dp))
+            Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceEvenly) {
+                GoalStreakItem(icon = Icons.Outlined.TrendingUp, label = "Record", value = "${kpi.maxStreakDays} j")
+                GoalStreakItem(icon = AppIcons.Streak, label = "Série", value = "${kpi.currentStreakDays} j")
+            }
+            Spacer(Modifier.height(8.dp))
+            Text(
+                kpi.regularityLabel,
+                style = MaterialTheme.typography.labelSmall,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+            )
+        }
+    }
+}
+
+@Composable
+private fun GoalStreakItem(icon: ImageVector, label: String, value: String) {
+    Row(verticalAlignment = Alignment.CenterVertically) {
+        Icon(icon, contentDescription = null, tint = MaterialTheme.colorScheme.primary, modifier = Modifier.size(18.dp))
+        Spacer(Modifier.width(6.dp))
+        Column {
+            Text(value, style = MaterialTheme.typography.titleSmall, fontWeight = FontWeight.SemiBold)
+            Text(label, style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
         }
     }
 }
@@ -240,23 +269,34 @@ private fun DailyGoalGauge(kpi: com.inktone.domain.usecase.KpiState) {
 // ═══════════════════════════════════════════════
 
 @Composable
-private fun Section2Charts(activity: com.inktone.domain.usecase.ActivityChartState) {
+private fun Section2Charts(activity: com.inktone.domain.usecase.ActivityChartState, onPeriodSelected: (StatsPeriod) -> Unit) {
     Column(verticalArrangement = Arrangement.spacedBy(InkToneSpacing.md)) {
-        // En-tête avec variation
+        // En-tête : titre + total de la période + variation, sélecteur Semaine/Mois (Tache 7.4)
         Row(
             modifier = Modifier.fillMaxWidth(),
             horizontalArrangement = Arrangement.SpaceBetween,
             verticalAlignment = Alignment.CenterVertically,
         ) {
-            Text("Activité", style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.SemiBold)
-            val isPositive = activity.variationPercent.startsWith("+")
-            val positiveGreen = if (isSystemInDarkTheme()) Color(0xFF81C784) else Color(0xFF2E7D32)
-            val varColor = when {
-                activity.variationPercent == "—" -> MaterialTheme.colorScheme.onSurfaceVariant
-                isPositive -> positiveGreen
-                else -> MaterialTheme.colorScheme.error
+            Column {
+                Text("Activité", style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.SemiBold)
+                Row(verticalAlignment = Alignment.CenterVertically) {
+                    Text(
+                        activity.periodTotalFormatted,
+                        style = MaterialTheme.typography.bodyMedium,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    )
+                    Spacer(Modifier.width(6.dp))
+                    val isPositive = activity.variationPercent.startsWith("+")
+                    val positiveGreen = if (isSystemInDarkTheme()) Color(0xFF81C784) else Color(0xFF2E7D32)
+                    val varColor = when {
+                        activity.variationPercent == "—" -> MaterialTheme.colorScheme.onSurfaceVariant
+                        isPositive -> positiveGreen
+                        else -> MaterialTheme.colorScheme.error
+                    }
+                    Text(activity.variationPercent, style = MaterialTheme.typography.labelLarge, color = varColor)
+                }
             }
-            Text(activity.variationPercent, style = MaterialTheme.typography.labelLarge, color = varColor)
+            PeriodSelector(selected = activity.period, onSelected = onPeriodSelected)
         }
 
         // Heatmap
@@ -264,6 +304,25 @@ private fun Section2Charts(activity: com.inktone.domain.usecase.ActivityChartSta
 
         // Histogramme
         HistogramChart(activity.dailyStats)
+    }
+}
+
+@OptIn(ExperimentalMaterial3Api::class)
+@Composable
+private fun PeriodSelector(selected: StatsPeriod, onSelected: (StatsPeriod) -> Unit) {
+    SingleChoiceSegmentedButtonRow {
+        SegmentedButton(
+            selected = selected == StatsPeriod.WEEK,
+            onClick = { onSelected(StatsPeriod.WEEK) },
+            shape = SegmentedButtonDefaults.itemShape(index = 0, count = 2),
+            label = { Text("Semaine") },
+        )
+        SegmentedButton(
+            selected = selected == StatsPeriod.MONTH,
+            onClick = { onSelected(StatsPeriod.MONTH) },
+            shape = SegmentedButtonDefaults.itemShape(index = 1, count = 2),
+            label = { Text("Mois") },
+        )
     }
 }
 
@@ -432,7 +491,7 @@ private fun Section3CurrentBook(book: com.inktone.domain.usecase.CurrentBookStat
                 modifier = Modifier.padding(InkToneSpacing.cardPadding).fillMaxWidth(),
                 verticalAlignment = Alignment.CenterVertically,
             ) {
-                Icon(Icons.Outlined.MenuBook, contentDescription = null, tint = MaterialTheme.colorScheme.primary)
+                CurrentBookCoverThumbnail(book.coverUri)
                 Spacer(Modifier.width(12.dp))
                 Column(Modifier.weight(1f)) {
                     Text(book.title, style = MaterialTheme.typography.titleSmall, maxLines = 1)
@@ -447,6 +506,45 @@ private fun Section3CurrentBook(book: com.inktone.domain.usecase.CurrentBookStat
             }
         }
     }
+}
+
+// Tache 7.5 — miniature de couverture réelle, repli sur l'icône générique
+// si `coverUri` est absent ou si le décodage échoue (même résolution
+// URI que `BookCover` de `feature/library`, dupliquée ici car les modules
+// de feature ne dépendent pas les uns des autres).
+@Composable
+private fun CurrentBookCoverThumbnail(coverUri: String?) {
+    val context = LocalContext.current
+    val coverModel: Any? = remember(coverUri) {
+        when {
+            coverUri == null -> null
+            coverUri.startsWith("content://") -> Uri.parse(coverUri)
+            else -> File(coverUri).takeIf { it.exists() }
+        }
+    }
+
+    if (coverModel == null) {
+        Icon(
+            AppIcons.Reading, contentDescription = null,
+            tint = MaterialTheme.colorScheme.primary,
+            modifier = Modifier.size(40.dp),
+        )
+        return
+    }
+
+    SubcomposeAsyncImage(
+        model = ImageRequest.Builder(context).data(coverModel).crossfade(true).build(),
+        contentDescription = null,
+        contentScale = ContentScale.Crop,
+        modifier = Modifier.size(width = 40.dp, height = 56.dp).clip(RoundedCornerShape(6.dp)),
+        error = {
+            Icon(
+                AppIcons.Reading, contentDescription = null,
+                tint = MaterialTheme.colorScheme.primary,
+                modifier = Modifier.size(40.dp),
+            )
+        },
+    )
 }
 
 @OptIn(ExperimentalMaterial3Api::class)

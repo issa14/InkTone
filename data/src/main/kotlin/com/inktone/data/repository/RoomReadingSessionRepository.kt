@@ -22,7 +22,7 @@ class RoomReadingSessionRepository @Inject constructor(
     // Lot Statistiques Palier 1 — délégation directe aux projections DAO
     override suspend fun getTotalStats(): GlobalReadingStats {
         val p = dao.getTotalStats()
-        return GlobalReadingStats(p.totalVisualMs, p.totalTtsMs, p.booksInteracted)
+        return GlobalReadingStats(p.totalVisualMs, p.totalTtsMs, p.booksInteracted, p.totalWordsRead)
     }
 
     override suspend fun getDailyStatsSince(sinceTimestamp: Long): List<DailyReadingStats> =

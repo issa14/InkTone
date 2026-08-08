@@ -56,7 +56,16 @@ data class SessionHistoryItem(
     val durationFormatted: String,
     val isVisual: Boolean,
     val isTts: Boolean,
-)
+    // Tache 7.3 — ventilation par mode pour les sessions mixtes. Arrondies
+    // à partir du total (jamais indépendamment) pour garantir
+    // visualMinutes + ttsMinutes == totalMinutes.
+    val totalMinutes: Int,
+    val visualMinutes: Int,
+    val ttsMinutes: Int,
+    val accessibilityLabel: String,
+) {
+    val isMixed: Boolean get() = isVisual && isTts
+}
 
 /**
  * État de l'écran de détail par ouvrage (Palier 4).
@@ -112,13 +121,32 @@ class BookStatisticsViewModel @Inject constructor(
         val history = sessions.sortedByDescending { it.startedAt }.map { session ->
             val start = Instant.ofEpochMilli(session.startedAt).atZone(zone)
             val end = session.endedAt?.let { Instant.ofEpochMilli(it).atZone(zone) }
+            val isVisual = session.visualDurationMs > 0
+            val isTts = session.ttsDurationMs > 0
+
+            // Tache 7.3 — arrondir le total puis répartir, jamais arrondir
+            // les trois indépendamment (sinon 30 + 15 peut afficher 46).
+            val totalMinutes = TimeUnit.MILLISECONDS.toMinutes(session.durationMs + 30_000L).toInt()
+            val visualMinutes = if (session.durationMs > 0) {
+                Math.round(session.visualDurationMs.toDouble() / session.durationMs * totalMinutes).toInt()
+            } else 0
+            val ttsMinutes = totalMinutes - visualMinutes
+
             SessionHistoryItem(
                 dateFormatted = dateFmt.format(start),
                 timeRange = if (end != null) "${timeFmt.format(start)} - ${timeFmt.format(end)}"
                 else timeFmt.format(start),
                 durationFormatted = formatDuration(session.durationMs),
-                isVisual = session.visualDurationMs > 0,
-                isTts = session.ttsDurationMs > 0,
+                isVisual = isVisual,
+                isTts = isTts,
+                totalMinutes = totalMinutes,
+                visualMinutes = visualMinutes,
+                ttsMinutes = ttsMinutes,
+                accessibilityLabel = when {
+                    isVisual && isTts -> "$totalMinutes minutes, dont $visualMinutes en lecture et $ttsMinutes en écoute"
+                    isVisual -> "$totalMinutes minutes de lecture visuelle"
+                    else -> "$totalMinutes minutes d'écoute audio"
+                },
             )
         }
 

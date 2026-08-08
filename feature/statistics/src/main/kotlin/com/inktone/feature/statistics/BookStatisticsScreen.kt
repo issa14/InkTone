@@ -20,10 +20,8 @@ import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
-import androidx.compose.material.icons.outlined.Headphones
 import androidx.compose.material.icons.outlined.Speed
 import androidx.compose.material.icons.outlined.Timer
-import androidx.compose.material.icons.outlined.Visibility
 import androidx.compose.material3.CenterAlignedTopAppBar
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.DropdownMenuItem
@@ -45,11 +43,14 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.semantics.clearAndSetSemantics
+import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
+import com.inktone.core.designsystem.AppIcons
 import com.inktone.core.designsystem.InkToneSpacing
 
 /**
@@ -213,20 +214,44 @@ private fun SessionHistoryRow(item: SessionHistoryItem) {
         headlineContent = { Text(item.dateFormatted) },
         supportingContent = { Text(item.timeRange) },
         leadingContent = {
-            if (item.isVisual && item.isTts) {
+            // Tache 7.3 — icône(s) de mode à taille pleine (24 dp, taille par
+            // défaut d'Icon) : une session mixte affiche les deux icônes,
+            // sans réduction — pas de notion de "mode dominant".
+            if (item.isMixed) {
                 Row {
-                    Icon(Icons.Outlined.Visibility, contentDescription = null, modifier = Modifier.size(16.dp), tint = MaterialTheme.colorScheme.primary)
-                    Spacer(Modifier.width(2.dp))
-                    Icon(Icons.Outlined.Headphones, contentDescription = null, modifier = Modifier.size(16.dp), tint = MaterialTheme.colorScheme.tertiary)
+                    Icon(AppIcons.VisualReading, contentDescription = null, tint = MaterialTheme.colorScheme.primary)
+                    Spacer(Modifier.width(4.dp))
+                    Icon(AppIcons.TtsListening, contentDescription = null, tint = MaterialTheme.colorScheme.tertiary)
                 }
             } else if (item.isVisual) {
-                Icon(Icons.Outlined.Visibility, contentDescription = null, tint = MaterialTheme.colorScheme.primary)
+                Icon(AppIcons.VisualReading, contentDescription = null, tint = MaterialTheme.colorScheme.primary)
             } else {
-                Icon(Icons.Outlined.Headphones, contentDescription = null, tint = MaterialTheme.colorScheme.tertiary)
+                Icon(AppIcons.TtsListening, contentDescription = null, tint = MaterialTheme.colorScheme.tertiary)
             }
         },
         trailingContent = {
-            Text(item.durationFormatted, style = MaterialTheme.typography.labelMedium, color = MaterialTheme.colorScheme.onSurfaceVariant)
+            // Durée totale au-dessus, ventilation par mode en dessous pour
+            // les sessions mixtes. `clearAndSetSemantics` remplace
+            // l'annonce TalkBack morcelée (nombres nus) par une phrase
+            // unique — ex. "45 minutes, dont 30 en lecture et 15 en écoute".
+            Column(
+                horizontalAlignment = Alignment.End,
+                modifier = Modifier.clearAndSetSemantics { contentDescription = item.accessibilityLabel },
+            ) {
+                Text(item.durationFormatted, style = MaterialTheme.typography.labelMedium, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                if (item.isMixed) {
+                    Spacer(Modifier.height(2.dp))
+                    Row(verticalAlignment = Alignment.CenterVertically) {
+                        Text("${item.visualMinutes} min", style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                        Spacer(Modifier.width(2.dp))
+                        Icon(AppIcons.VisualReading, contentDescription = null, modifier = Modifier.size(14.dp), tint = MaterialTheme.colorScheme.primary)
+                        Spacer(Modifier.width(6.dp))
+                        Text("${item.ttsMinutes} min", style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                        Spacer(Modifier.width(2.dp))
+                        Icon(AppIcons.TtsListening, contentDescription = null, modifier = Modifier.size(14.dp), tint = MaterialTheme.colorScheme.tertiary)
+                    }
+                }
+            }
         },
         modifier = Modifier.fillMaxWidth(),
     )

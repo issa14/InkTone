@@ -8,4 +8,5 @@ data class GlobalReadingStats(
     val totalVisualMs: Long,
     val totalTtsMs: Long,
     val booksInteracted: Int,
+    val totalWordsRead: Long,
 )

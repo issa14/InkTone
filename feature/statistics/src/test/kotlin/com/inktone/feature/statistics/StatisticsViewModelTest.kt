@@ -1,5 +1,6 @@
 package com.inktone.feature.statistics
 
+import com.inktone.core.testing.fake.FakePreferencesRepository
 import com.inktone.core.testing.fake.FakePublicationRepository
 import com.inktone.core.testing.fake.FakeReadingSessionRepository
 import com.inktone.core.testing.fake.FakeReadingStateRepository
@@ -10,6 +11,7 @@ import com.inktone.domain.model.ReadingMode
 import com.inktone.domain.model.ReadingSession
 import com.inktone.domain.usecase.GetCurrentBookUseCase
 import com.inktone.domain.usecase.GetStatisticsUseCase
+import com.inktone.domain.usecase.StatsPeriod
 import com.inktone.domain.usecase.StatisticsUiState
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.ExperimentalCoroutinesApi
@@ -20,10 +22,12 @@ import kotlinx.coroutines.test.runTest
 import kotlinx.coroutines.test.setMain
 import org.junit.After
 import org.junit.Assert.assertEquals
+import org.junit.Assert.assertNotEquals
 import org.junit.Assert.assertNotNull
 import org.junit.Assert.assertTrue
 import org.junit.Before
 import org.junit.Test
+import java.util.concurrent.TimeUnit
 
 @OptIn(ExperimentalCoroutinesApi::class)
 class StatisticsViewModelTest {
@@ -42,11 +46,19 @@ class StatisticsViewModelTest {
         chapterCount = chapterCount, importDate = 0L,
     )
 
+    private fun session(id: String, publicationId: String, startedAt: Long, wordsRead: Int = 0, visualMs: Long = 0, ttsMs: Long = 0) =
+        ReadingSession(
+            id = id, publicationId = publicationId, startedAt = startedAt, endedAt = startedAt + visualMs + ttsMs,
+            mode = if (ttsMs > 0) ReadingMode.AUDIO else ReadingMode.VISUAL,
+            wordsRead = wordsRead, visualDurationMs = visualMs, ttsDurationMs = ttsMs,
+        )
+
     @Test
     fun etat_initial_est_Loading() = runTest {
         val vm = StatisticsViewModel(
             getStatistics = GetStatisticsUseCase(FakeReadingSessionRepository(), FakePublicationRepository()),
             getCurrentBook = GetCurrentBookUseCase(FakeReadingSessionRepository(), FakePublicationRepository(), FakeReadingStateRepository()),
+            preferencesRepository = FakePreferencesRepository(),
             exportService = FakeStatisticsExportService(),
         )
 
@@ -67,6 +79,7 @@ class StatisticsViewModelTest {
         val vm = StatisticsViewModel(
             getStatistics = GetStatisticsUseCase(readingSessionRepo, FakePublicationRepository()),
             getCurrentBook = GetCurrentBookUseCase(readingSessionRepo, FakePublicationRepository(), FakeReadingStateRepository()),
+            preferencesRepository = FakePreferencesRepository(),
             exportService = FakeStatisticsExportService(),
         )
 
@@ -85,6 +98,7 @@ class StatisticsViewModelTest {
         val vm = StatisticsViewModel(
             getStatistics = GetStatisticsUseCase(FakeReadingSessionRepository(), FakePublicationRepository()),
             getCurrentBook = GetCurrentBookUseCase(FakeReadingSessionRepository(), FakePublicationRepository(), FakeReadingStateRepository()),
+            preferencesRepository = FakePreferencesRepository(),
             exportService = FakeStatisticsExportService(),
         )
 
@@ -108,6 +122,7 @@ class StatisticsViewModelTest {
         val vm = StatisticsViewModel(
             getStatistics = GetStatisticsUseCase(FakeReadingSessionRepository(), publicationRepo),
             getCurrentBook = GetCurrentBookUseCase(readingSessionRepo, publicationRepo, FakeReadingStateRepository()),
+            preferencesRepository = FakePreferencesRepository(),
             exportService = FakeStatisticsExportService(),
         )
 
@@ -131,6 +146,7 @@ class StatisticsViewModelTest {
         val vm = StatisticsViewModel(
             getStatistics = GetStatisticsUseCase(readingSessionRepo, FakePublicationRepository()),
             getCurrentBook = GetCurrentBookUseCase(readingSessionRepo, FakePublicationRepository(), FakeReadingStateRepository()),
+            preferencesRepository = FakePreferencesRepository(),
             exportService = FakeStatisticsExportService(),
         )
 
@@ -139,5 +155,126 @@ class StatisticsViewModelTest {
 
         assertEquals("1h 0m", ready.kpi.totalVisualTimeFormatted)
         assertEquals("0h 30m", ready.kpi.totalTtsTimeFormatted)
+    }
+
+    // ───── Tache 7.1 — objectif quotidien branché sur les préférences ─────
+
+    @Test
+    fun objectif_quotidien_utilise_la_preference_et_pas_la_valeur_en_dur() = runTest {
+        val prefsRepo = FakePreferencesRepository()
+        prefsRepo.update(prefsRepo.get().copy(dailyGoalMinutes = 45))
+
+        val vm = StatisticsViewModel(
+            getStatistics = GetStatisticsUseCase(FakeReadingSessionRepository(), FakePublicationRepository()),
+            getCurrentBook = GetCurrentBookUseCase(FakeReadingSessionRepository(), FakePublicationRepository(), FakeReadingStateRepository()),
+            preferencesRepository = prefsRepo,
+            exportService = FakeStatisticsExportService(),
+        )
+
+        val state = vm.state.first { it is StatisticsUiState.Ready }
+        val ready = state as StatisticsUiState.Ready
+
+        assertEquals(45, ready.kpi.dailyGoalMinutes)
+    }
+
+    @Test
+    fun objectif_quotidien_se_recalibre_sans_redemarrage_quand_la_preference_change() = runTest {
+        val prefsRepo = FakePreferencesRepository()
+
+        val vm = StatisticsViewModel(
+            getStatistics = GetStatisticsUseCase(FakeReadingSessionRepository(), FakePublicationRepository()),
+            getCurrentBook = GetCurrentBookUseCase(FakeReadingSessionRepository(), FakePublicationRepository(), FakeReadingStateRepository()),
+            preferencesRepository = prefsRepo,
+            exportService = FakeStatisticsExportService(),
+        )
+
+        val initial = vm.state.first { it is StatisticsUiState.Ready } as StatisticsUiState.Ready
+        assertEquals(30, initial.kpi.dailyGoalMinutes)
+
+        // L'utilisateur règle 45 min dans les Réglages, sans redémarrer l'app :
+        // le même ViewModel doit refléter le changement.
+        prefsRepo.update(prefsRepo.get().copy(dailyGoalMinutes = 45))
+
+        val updated = vm.state.first { (it as? StatisticsUiState.Ready)?.kpi?.dailyGoalMinutes == 45 } as StatisticsUiState.Ready
+        assertEquals(45, updated.kpi.dailyGoalMinutes)
+    }
+
+    // ───── Tache 7.2 — volumes parcourus, format abrégé, régularité ─────
+
+    @Test
+    fun mots_parcourus_sont_formates_en_abrege_pour_les_grands_nombres() = runTest {
+        val readingSessionRepo = FakeReadingSessionRepository()
+        readingSessionRepo.insert(session("s1", "pub-1", 0L, wordsRead = 1_250_000, visualMs = 1_000L))
+
+        val vm = StatisticsViewModel(
+            getStatistics = GetStatisticsUseCase(readingSessionRepo, FakePublicationRepository()),
+            getCurrentBook = GetCurrentBookUseCase(readingSessionRepo, FakePublicationRepository(), FakeReadingStateRepository()),
+            preferencesRepository = FakePreferencesRepository(),
+            exportService = FakeStatisticsExportService(),
+        )
+
+        val ready = vm.state.first { it is StatisticsUiState.Ready } as StatisticsUiState.Ready
+
+        // Jamais la forme brute "1250000"
+        assertTrue(ready.kpi.totalWordsReadFormatted.endsWith("M"))
+        assertTrue(!ready.kpi.totalWordsReadFormatted.contains("1250000"))
+    }
+
+    @Test
+    fun libelle_de_regularite_reflete_l_assiduite_reelle() = runTest {
+        val noStreak = FakeReadingSessionRepository()
+        val vmNoStreak = StatisticsViewModel(
+            getStatistics = GetStatisticsUseCase(noStreak, FakePublicationRepository()),
+            getCurrentBook = GetCurrentBookUseCase(noStreak, FakePublicationRepository(), FakeReadingStateRepository()),
+            preferencesRepository = FakePreferencesRepository(),
+            exportService = FakeStatisticsExportService(),
+        )
+        val readyNoStreak = vmNoStreak.state.first { it is StatisticsUiState.Ready } as StatisticsUiState.Ready
+
+        val longStreak = FakeReadingSessionRepository()
+        val now = System.currentTimeMillis()
+        val oneDayMs = TimeUnit.DAYS.toMillis(1)
+        for (i in 0 until 8) {
+            longStreak.insert(session("streak-$i", "pub-1", now - i * oneDayMs, visualMs = 1_000L))
+        }
+        val vmLongStreak = StatisticsViewModel(
+            getStatistics = GetStatisticsUseCase(longStreak, FakePublicationRepository()),
+            getCurrentBook = GetCurrentBookUseCase(longStreak, FakePublicationRepository(), FakeReadingStateRepository()),
+            preferencesRepository = FakePreferencesRepository(),
+            exportService = FakeStatisticsExportService(),
+        )
+        val readyLongStreak = vmLongStreak.state.first { it is StatisticsUiState.Ready } as StatisticsUiState.Ready
+
+        // Le libellé n'est pas constant : il varie avec la série réelle.
+        assertNotEquals(readyNoStreak.kpi.regularityLabel, readyLongStreak.kpi.regularityLabel)
+    }
+
+    // ───── Tache 7.4 — sélecteur Semaine/Mois ─────
+
+    @Test
+    fun changer_de_periode_change_le_total_et_potentiellement_la_variation() = runTest {
+        val readingSessionRepo = FakeReadingSessionRepository()
+        val now = System.currentTimeMillis()
+        val oneDayMs = TimeUnit.DAYS.toMillis(1)
+        // 20 jours d'activité récente, au-delà de la semaine mais dans le mois.
+        for (i in 0 until 20) {
+            readingSessionRepo.insert(session("d-$i", "pub-1", now - i * oneDayMs, visualMs = 60_000L))
+        }
+
+        val vm = StatisticsViewModel(
+            getStatistics = GetStatisticsUseCase(readingSessionRepo, FakePublicationRepository()),
+            getCurrentBook = GetCurrentBookUseCase(readingSessionRepo, FakePublicationRepository(), FakeReadingStateRepository()),
+            preferencesRepository = FakePreferencesRepository(),
+            exportService = FakeStatisticsExportService(),
+        )
+
+        val monthState = vm.state.first { it is StatisticsUiState.Ready } as StatisticsUiState.Ready
+        assertEquals(StatsPeriod.MONTH, monthState.activity.period)
+
+        vm.onPeriodSelected(StatsPeriod.WEEK)
+        val weekState = vm.state.first { (it as? StatisticsUiState.Ready)?.activity?.period == StatsPeriod.WEEK } as StatisticsUiState.Ready
+
+        // Le mois (20 jours d'activité) cumule strictement plus que la semaine (7 jours).
+        assertNotEquals(monthState.activity.periodTotalFormatted, weekState.activity.periodTotalFormatted)
     }
 }

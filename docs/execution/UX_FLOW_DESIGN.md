@@ -695,7 +695,15 @@ Mockup validé — version d'Issa retenue telle quelle, avec confirmation sur le
 
 **Historique des sessions** : liste chronologique, chaque ligne = icône de mode (œil pour lecture visuelle, casque pour écoute TTS) + date + chapitres parcourus, durée affichée à droite.
 
-Mockup validé sans correction. **Point ouvert, non tranché** : l'affichage d'une session mixte (lecture visuelle **et** TTS dans la même session) n'a pas été abordé — icône double, icône dédiée « mixte », ou autre traitement à définir si le cas se présente en pratique.
+Mockup validé sans correction. **Point tranché (Lot 7, tâche 7.3)** : une session mixte affiche les deux icônes de mode côte à côte, à taille pleine (24 dp, pas de « mode dominant » — un ratio 26/24 avec une seule icône mentirait), avec la ventilation par mode (minutes + icône réduite 14–16 dp, car accolée à un nombre) sous la durée totale. Somme toujours cohérente (arrondi du total puis répartition, jamais des trois valeurs indépendamment) et annonce TalkBack unique (« 45 minutes, dont 30 en lecture et 15 en écoute »).
+
+### Écarts assumés
+
+Trois écarts délibérés entre cette cible et l'implémentation réelle, consignés ici pour qu'un audit futur les retrouve sans avoir à fouiller les KDoc du code (Lot 7, tâche 7.6) :
+
+- **Chapitres parcourus absents de l'historique par ouvrage** (Section 4), alors que le libellé ci-dessus les mentionne. Trois raisons : l'instabilité structurelle des chapitres dans les EPUB mal formés ou les PDF (un `chapterIndex` peut pointer vers une ressource inexistante ou un découpage arbitraire selon le parseur) ; les micro-sessions TTS qui n'avancent pas l'index de chapitre, donnant l'illusion d'un blocage alors que l'utilisateur progresse ; et la séparation des responsabilités entre `ReadingState` (où reprendre) et `ReadingSession` (quand et combien de temps a-t-on lu). L'historique reste donc purement temporel (dates, durées) — voir `BookStatisticsViewModel.kt`, KDoc de `SessionHistoryItem`.
+- **Heatmap à 5 créneaux** (6h/10h/14h/18h/22h) plutôt qu'une grille à 24 créneaux horaires bruts — choix d'implémentation non spécifié par cette cible, retenu pour la lisibilité de la grille 7×5.
+- **Session mixte** : traitement tranché ci-dessus (tâche 7.3), referme le point resté ouvert depuis la conception initiale de cet écran.
 
 **Écran Statistiques de lecture entièrement conçu — 4 sections validées.**
 
