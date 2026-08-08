@@ -8,9 +8,12 @@ import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
+import androidx.compose.foundation.layout.WindowInsets
+import androidx.compose.foundation.layout.asPaddingValues
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.navigationBars
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
@@ -53,6 +56,7 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
+import androidx.hilt.navigation.compose.hiltViewModel
 import com.inktone.core.designsystem.InkToneSpacing
 import com.inktone.domain.model.DailyReadingStats
 
@@ -65,7 +69,7 @@ import com.inktone.domain.model.DailyReadingStats
  */
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
-fun StatisticsScreen(viewModel: StatisticsViewModel = androidx.hilt.navigation.compose.hiltViewModel()) {
+fun StatisticsScreen(viewModel: StatisticsViewModel = hiltViewModel()) {
     val state by viewModel.state.collectAsStateWithLifecycle()
 
     when (val s = state) {
@@ -92,7 +96,9 @@ private fun DashboardContent(state: com.inktone.domain.usecase.StatisticsUiState
             .fillMaxSize()
             .padding(horizontal = InkToneSpacing.screenHorizontal),
         verticalArrangement = Arrangement.spacedBy(InkToneSpacing.md),
-        contentPadding = PaddingValues(bottom = 80.dp),
+        contentPadding = PaddingValues(
+            bottom = WindowInsets.navigationBars.asPaddingValues().calculateBottomPadding(),
+        ),
     ) {
         item { Section1Kpis(state.kpi) }
         item { Section2Charts(state.activity) }
@@ -184,14 +190,9 @@ private fun DailyGoalGauge(kpi: com.inktone.domain.usecase.KpiState) {
                 )
                 Column(horizontalAlignment = Alignment.CenterHorizontally) {
                     Text(
-                        kpi.todayReadingMinutesFormatted,
+                        "${kpi.todayReadingMinutes} / ${kpi.dailyGoalMinutes} min",
                         style = MaterialTheme.typography.headlineSmall,
                         fontWeight = FontWeight.Bold,
-                    )
-                    Text(
-                        "sur ${kpi.dailyGoalMinutes} min",
-                        style = MaterialTheme.typography.bodySmall,
-                        color = MaterialTheme.colorScheme.onSurfaceVariant,
                     )
                 }
             }
@@ -234,8 +235,11 @@ private fun Section2Charts(activity: com.inktone.domain.usecase.ActivityChartSta
 
 @Composable
 private fun HeatmapChart(slots: List<com.inktone.domain.usecase.HeatmapSlot>) {
-    val dayLabels = listOf("L", "M", "M", "J", "V", "S", "D")
-    val slotLabels = listOf("6h", "10h", "14h", "18h", "22h")
+    // 0=Dim, 1=Lun, 2=Mar, 3=Mer, 4=Jeu, 5=Ven, 6=Sam (strftime %w)
+    // Affichage : L Ma Me J V | S D
+    val dayLabels = listOf("L", "Ma", "Me", "J", "V", "S", "D")
+    // Shift : Sunday (0) → index 6, Monday (1) → index 0
+    fun displayIndex(sqlDay: Int) = if (sqlDay == 0) 6 else sqlDay - 1
 
     ElevatedCard(shape = RoundedCornerShape(16.dp), modifier = Modifier.fillMaxWidth()) {
         Column(modifier = Modifier.padding(InkToneSpacing.cardPadding)) {
@@ -250,8 +254,17 @@ private fun HeatmapChart(slots: List<com.inktone.domain.usecase.HeatmapSlot>) {
                 val cellW = size.width / cols
                 val cellH = size.height / rows
 
+                // Séparateur visuel week-end (entre V et S)
+                val sepX = 5 * cellW
+                drawLine(
+                    color = accent.copy(alpha = 0.15f),
+                    start = Offset(sepX, 0f),
+                    end = Offset(sepX, size.height),
+                    strokeWidth = 2.dp.toPx(),
+                )
+
                 for (slot in slots) {
-                    val x = slot.dayOfWeek * cellW
+                    val x = displayIndex(slot.dayOfWeek) * cellW
                     val y = slot.slotIndex * cellH
                     drawRoundRect(
                         color = accent.copy(alpha = slot.intensity.coerceIn(0f, 1f)),
@@ -262,14 +275,12 @@ private fun HeatmapChart(slots: List<com.inktone.domain.usecase.HeatmapSlot>) {
                 }
             }
 
-            // Légende jours
             Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceEvenly) {
                 dayLabels.forEach { day ->
                     Text(day, style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.onSurfaceVariant, textAlign = TextAlign.Center, modifier = Modifier.weight(1f))
                 }
             }
             Spacer(Modifier.height(4.dp))
-            // Légende créneaux
             Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
                 Text("Matin", style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
                 Text("Soir", style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
@@ -284,28 +295,10 @@ private fun HeatmapChart(slots: List<com.inktone.domain.usecase.HeatmapSlot>) {
 private fun HistogramChart(dailyStats: List<DailyReadingStats>) {
     val visualColor = MaterialTheme.colorScheme.primary
     val ttsColor = MaterialTheme.colorScheme.tertiary
+    val todayIndex = dailyStats.size - 1 // dernière barre = aujourd'hui
 
     ElevatedCard(shape = RoundedCornerShape(16.dp), modifier = Modifier.fillMaxWidth()) {
         Column(modifier = Modifier.padding(InkToneSpacing.cardPadding)) {
-            // Légende
-            Row(horizontalArrangement = Arrangement.spacedBy(16.dp)) {
-                Row(verticalAlignment = Alignment.CenterVertically) {
-                    Canvas(Modifier.size(10.dp)) {
-                        drawRect(visualColor)
-                    }
-                    Spacer(Modifier.width(4.dp))
-                    Text("Visuel", style = MaterialTheme.typography.labelSmall)
-                }
-                Row(verticalAlignment = Alignment.CenterVertically) {
-                    Canvas(Modifier.size(10.dp)) {
-                        drawRect(ttsColor)
-                    }
-                    Spacer(Modifier.width(4.dp))
-                    Text("TTS", style = MaterialTheme.typography.labelSmall)
-                }
-            }
-            Spacer(Modifier.height(8.dp))
-
             val maxMs = dailyStats.maxOfOrNull { it.visualMs + it.ttsMs }?.coerceAtLeast(1L) ?: 1L
             val barCount = dailyStats.size.coerceAtMost(30)
 
@@ -314,19 +307,49 @@ private fun HistogramChart(dailyStats: List<DailyReadingStats>) {
                 val barW = (size.width / barCount) * 0.7f
                 val gap = (size.width / barCount) * 0.3f
 
+                // Ligne de repère pointillée à 50%
+                val midY = size.height * 0.5f
+                var dashX = 0f
+                while (dashX < size.width) {
+                    drawLine(visualColor.copy(alpha = 0.2f), Offset(dashX, midY), Offset((dashX + 8.dp.toPx()).coerceAtMost(size.width), midY), strokeWidth = 1.dp.toPx())
+                    dashX += 16.dp.toPx()
+                }
+
                 dailyStats.takeLast(barCount).forEachIndexed { i, day ->
                     val x = i * (barW + gap) + gap / 2
                     val visualH = (day.visualMs.toFloat() / maxMs * size.height)
                     val ttsH = (day.ttsMs.toFloat() / maxMs * size.height)
 
-                    // Barre TTS (derrière)
+                    // Marqueur jour courant : bordure plus épaisse
+                    if (i == barCount - 1 && barCount > 0) {
+                        drawRect(
+                            visualColor.copy(alpha = 0.3f),
+                            Offset(x - 2.dp.toPx(), 0f),
+                            Size(barW + 4.dp.toPx(), size.height),
+                        )
+                    }
+
                     if (ttsH > 1f) {
                         drawRect(ttsColor, Offset(x, size.height - ttsH), Size(barW, ttsH))
                     }
-                    // Barre visuelle (devant, empilée)
                     if (visualH > 1f) {
                         drawRect(visualColor, Offset(x, size.height - visualH - ttsH), Size(barW, visualH))
                     }
+                }
+            }
+
+            Spacer(Modifier.height(8.dp))
+            // Légende en pied
+            Row(horizontalArrangement = Arrangement.spacedBy(16.dp)) {
+                Row(verticalAlignment = Alignment.CenterVertically) {
+                    Canvas(Modifier.size(10.dp)) { drawRect(visualColor) }
+                    Spacer(Modifier.width(4.dp))
+                    Text("Visuel", style = MaterialTheme.typography.labelSmall)
+                }
+                Row(verticalAlignment = Alignment.CenterVertically) {
+                    Canvas(Modifier.size(10.dp)) { drawRect(ttsColor) }
+                    Spacer(Modifier.width(4.dp))
+                    Text("TTS", style = MaterialTheme.typography.labelSmall)
                 }
             }
         }
