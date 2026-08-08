@@ -20,4 +20,7 @@ interface PublicationRepository {
     suspend fun delete(id: String)
     suspend fun setFavorite(id: String, isFavorite: Boolean)
     suspend fun setPinned(id: String, isPinned: Boolean)
+
+    // ───── Audit fix : COUNT pour le dashboard (pas .first().size) ─────
+    suspend fun countFiltered(mode: FilterMode): Int
 }

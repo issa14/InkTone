@@ -71,4 +71,14 @@ class FakeReadingSessionRepository : ReadingSessionRepository {
 
     override suspend fun getByPublicationId(bookId: String): List<ReadingSession> =
         getAll().filter { it.publicationId == bookId }
+
+    // ───── Audit fix : requêtes ciblées ─────
+    override suspend fun getRecentSessionsWithWords(limit: Int): List<ReadingSession> =
+        getAll()
+            .filter { it.wordsRead > 0 && it.durationMs > 0 }
+            .sortedByDescending { it.startedAt }
+            .take(limit)
+
+    override suspend fun getDistinctPublicationIds(): List<String> =
+        getAll().map { it.publicationId }.distinct()
 }

@@ -24,9 +24,16 @@ class ExportStatisticsUseCase @Inject constructor(
 
     private suspend fun export(format: ExportFormat): File = withContext(Dispatchers.IO) {
         val sessions = readingSessionDao.getAll()
-        val timestamp = System.currentTimeMillis()
         val dir = File(context.cacheDir, "exports")
         dir.mkdirs()
+
+        // Nettoie les fichiers d'export de plus de 24h (évite l'accumulation)
+        val cutoff = System.currentTimeMillis() - 86_400_000L
+        dir.listFiles()?.forEach { f ->
+            if (f.lastModified() < cutoff) f.delete()
+        }
+
+        val timestamp = System.currentTimeMillis()
         val file = File(dir, "inktone_statistics_$timestamp.${format.extension}")
 
         val content = when (format) {

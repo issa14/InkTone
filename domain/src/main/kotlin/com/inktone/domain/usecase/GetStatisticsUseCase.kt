@@ -4,7 +4,8 @@ import com.inktone.domain.model.FilterMode
 import com.inktone.domain.model.HeatmapPoint
 import com.inktone.domain.repository.PublicationRepository
 import com.inktone.domain.repository.ReadingSessionRepository
-import kotlinx.coroutines.flow.first
+import kotlinx.coroutines.async
+import kotlinx.coroutines.coroutineScope
 import java.text.SimpleDateFormat
 import java.util.Locale
 import java.util.concurrent.TimeUnit
@@ -38,54 +39,55 @@ data class HeatmapSlot(
 /**
  * Statistiques de lecture (Lot Statistiques Palier 1).
  *
- * Remplace le chargement mémoire (`getAll().sumOf {}`) par des
- * agrégations SQL natives. Seul le calcul WPM (30 dernières sessions
- * avec mots lus) utilise encore `getAll()` — les autres métriques
- * passent par les projections Room.
+ * Audit fix : plus aucun `getAll()` — toutes les métriques passent
+ * par des requêtes SQL ciblées (LIMIT 30 pour le WPM, SUM pour
+ * aujourd'hui, COUNT pour les livres finis). Les 5 appels DAO
+ * indépendants sont lancés en parallèle via `coroutineScope`.
  */
 class GetStatisticsUseCase(
     private val readingSessionRepository: ReadingSessionRepository,
     private val publicationRepository: PublicationRepository,
 ) {
-    suspend operator fun invoke(): StatisticsResult {
-        // ───── KPIs globaux (SQL) ─────
-        val totals = readingSessionRepository.getTotalStats()
-        val finishedCount = publicationRepository.observeFiltered(FilterMode.READ).first().size
+    suspend operator fun invoke(): StatisticsResult = coroutineScope {
+        val thirtyDaysAgo = System.currentTimeMillis() - TimeUnit.DAYS.toMillis(30)
 
-        // ───── Streaks (SQL : jours distincts) ─────
-        val distinctDays = readingSessionRepository.getDistinctReadingDays()
+        // ───── 5 requêtes indépendantes lancées en parallèle ─────
+        val totalsDeferred = async { readingSessionRepository.getTotalStats() }
+        val finishedDeferred = async { publicationRepository.countFiltered(FilterMode.READ) }
+        val distinctDaysDeferred = async { readingSessionRepository.getDistinctReadingDays() }
+        val dailyStatsDeferred = async { readingSessionRepository.getDailyStatsSince(thirtyDaysAgo) }
+        val heatmapDeferred = async { readingSessionRepository.getHeatmapStatsSince(thirtyDaysAgo) }
+
+        val totals = totalsDeferred.await()
+        val finishedCount = finishedDeferred.await()
+        val distinctDays = distinctDaysDeferred.await()
+        val dailyStats = dailyStatsDeferred.await()
+        val heatmapRaw = heatmapDeferred.await()
+
+        // ───── Streaks (Kotlin, pas de query supplémentaire) ─────
         val streakDays = distinctDays.mapNotNull { parseDateToEpochDay(it) }
         val streak = computeStreak(streakDays)
         val maxStreak = computeMaxStreak(streakDays)
 
-        // ───── WPM (30 dernières sessions avec mots, nécessite données individuelles) ─────
-        val sessions = readingSessionRepository.getAll()
-        val sessionsWithWords = sessions
-            .filter { it.wordsRead > 0 && it.durationMs > 0 }
-            .sortedByDescending { it.startedAt }
-            .take(30)
+        // ───── WPM : 30 dernières sessions avec mots (SQL LIMIT 30) ─────
+        val sessionsWithWords = readingSessionRepository.getRecentSessionsWithWords(30)
         val averageWpm = if (sessionsWithWords.isNotEmpty()) {
             val totalWords = sessionsWithWords.sumOf { it.wordsRead }
             val totalMinutes = sessionsWithWords.sumOf { it.durationMs } / 60_000.0
             if (totalMinutes > 0) (totalWords / totalMinutes).toInt() else 0
         } else 0
 
-        // ───── Lecture du jour ─────
-        val todayStart = TimeUnit.MILLISECONDS.toDays(System.currentTimeMillis())
-        val todaySessions = sessions.filter {
-            TimeUnit.MILLISECONDS.toDays(it.startedAt) == todayStart
-        }
-        val todayReadingMinutes = todaySessions.sumOf { it.durationMs } / 60_000L
+        // ───── Lecture du jour : déduit du dailyStats (déjà agrégé) ─────
+        val todayKey = SimpleDateFormat("yyyy-MM-dd", Locale.ROOT)
+            .format(System.currentTimeMillis())
+        val todayReadingMinutes = dailyStats
+            .firstOrNull { it.date == todayKey }
+            ?.let { (it.visualMs + it.ttsMs) / 60_000L } ?: 0L
 
-        // ───── Histogramme : 30 derniers jours (SQL) ─────
-        val thirtyDaysAgo = System.currentTimeMillis() - TimeUnit.DAYS.toMillis(30)
-        val dailyStats = readingSessionRepository.getDailyStatsSince(thirtyDaysAgo)
-
-        // ───── Heatmap : regroupement en 5 créneaux (SQL + Kotlin) ─────
-        val heatmapRaw = readingSessionRepository.getHeatmapStatsSince(thirtyDaysAgo)
+        // ───── Heatmap : regroupement en 5 créneaux ─────
         val heatmapSlots = computeHeatmapSlots(heatmapRaw)
 
-        return StatisticsResult(
+        StatisticsResult(
             totalVisualMs = totals.totalVisualMs,
             totalTtsMs = totals.totalTtsMs,
             booksFinished = finishedCount,

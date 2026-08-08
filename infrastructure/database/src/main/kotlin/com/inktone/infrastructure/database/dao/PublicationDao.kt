@@ -74,4 +74,20 @@ interface PublicationDao {
 
     @Query("UPDATE publications SET isPinned = :isPinned WHERE id = :id")
     suspend fun setPinned(id: String, isPinned: Boolean)
+
+    // ───── Audit fix : COUNT pour le dashboard (pas .first().size) ─────
+
+    @Query(
+        """
+        SELECT COUNT(*) FROM publications p
+        LEFT JOIN reading_states rs ON p.id = rs.publicationId
+        WHERE
+            (:mode != 'FAVORITES' OR p.isFavorite = 1)
+            AND (:mode != 'SERIES' OR p.seriesName = :value)
+            AND (:mode != 'UNREAD' OR rs.publicationId IS NULL)
+            AND (:mode != 'IN_PROGRESS' OR (rs.publicationId IS NOT NULL AND rs.chapterIndex < p.chapterCount - 1))
+            AND (:mode != 'READ' OR (rs.publicationId IS NOT NULL AND rs.chapterIndex >= p.chapterCount - 1))
+        """
+    )
+    suspend fun countFiltered(mode: String, value: String? = null): Int
 }

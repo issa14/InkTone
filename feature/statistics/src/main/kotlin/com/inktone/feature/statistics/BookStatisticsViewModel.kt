@@ -13,8 +13,10 @@ import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.flow
 import kotlinx.coroutines.flow.flowOn
 import kotlinx.coroutines.flow.stateIn
-import java.text.SimpleDateFormat
-import java.util.Date
+import java.time.Instant
+import java.time.ZoneId
+import java.time.format.DateTimeFormatter
+import java.time.Duration
 import java.util.Locale
 import java.util.concurrent.TimeUnit
 import javax.inject.Inject
@@ -89,10 +91,9 @@ class BookStatisticsViewModel @Inject constructor(
         val publication = publicationRepository.getById(bookId)
         val sessions = readingSessionRepository.getByPublicationId(bookId)
 
-        // Liste des ouvrages avec au moins une session (pour le sélecteur)
-        val allPublicationIds = readingSessionRepository.getAll()
-            .map { it.publicationId }.distinct()
-        val availableBooks = allPublicationIds.mapNotNull { id ->
+        // Sélecteur : DISTINCT publicationId (SQL, pas getAll)
+        val distinctIds = readingSessionRepository.getDistinctPublicationIds()
+        val availableBooks = distinctIds.mapNotNull { id ->
             publicationRepository.getById(id)?.let { BookSelectorItem(it.id, it.title) }
         }.sortedBy { it.title }
 
@@ -104,12 +105,13 @@ class BookStatisticsViewModel @Inject constructor(
             formatDuration(TimeUnit.MINUTES.toMillis(minutesRemaining))
         } else "—"
 
-        // Historique
-        val dateFmt = SimpleDateFormat("d MMMM yyyy", Locale.FRENCH)
-        val timeFmt = SimpleDateFormat("HH'h'mm", Locale.FRENCH)
+        // Historique — DateTimeFormatter (thread-safe, API 26+)
+        val dateFmt = DateTimeFormatter.ofPattern("d MMMM yyyy", Locale.FRENCH)
+        val timeFmt = DateTimeFormatter.ofPattern("HH'h'mm", Locale.FRENCH)
+        val zone = ZoneId.systemDefault()
         val history = sessions.sortedByDescending { it.startedAt }.map { session ->
-            val start = Date(session.startedAt)
-            val end = session.endedAt?.let { Date(it) }
+            val start = Instant.ofEpochMilli(session.startedAt).atZone(zone)
+            val end = session.endedAt?.let { Instant.ofEpochMilli(it).atZone(zone) }
             SessionHistoryItem(
                 dateFormatted = dateFmt.format(start),
                 timeRange = if (end != null) "${timeFmt.format(start)} - ${timeFmt.format(end)}"

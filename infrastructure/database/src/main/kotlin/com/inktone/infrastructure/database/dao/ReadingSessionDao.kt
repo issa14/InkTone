@@ -81,6 +81,21 @@ interface ReadingSessionDao {
     @Query("SELECT * FROM reading_sessions WHERE publicationId = :bookId ORDER BY startedAt DESC")
     suspend fun getByPublicationId(bookId: String): List<ReadingSessionEntity>
 
+    // ───── Audit fix : sessions récentes avec mots pour WPM (pas getAll) ─────
+
+    @Query("""
+        SELECT * FROM reading_sessions 
+        WHERE wordsRead > 0 AND durationMs > 0 
+        ORDER BY startedAt DESC 
+        LIMIT :limit
+    """)
+    suspend fun getRecentSessionsWithWords(limit: Int = 30): List<ReadingSessionEntity>
+
+    // ───── Audit fix : publicationIds distincts pour le sélecteur ─────
+
+    @Query("SELECT DISTINCT publicationId FROM reading_sessions")
+    suspend fun getDistinctPublicationIds(): List<String>
+
     // ───── Méthodes existantes conservées pour compatibilité ─────
 
     @Insert

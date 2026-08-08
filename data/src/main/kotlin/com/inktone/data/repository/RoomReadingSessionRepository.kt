@@ -39,4 +39,10 @@ class RoomReadingSessionRepository @Inject constructor(
     override suspend fun getLastReadPublicationId(): String? = dao.getLastReadPublicationId()
     override suspend fun getByPublicationId(bookId: String): List<ReadingSession> =
         dao.getByPublicationId(bookId).map { it.toDomain() }
+
+    // ───── Audit fix : requêtes ciblées ─────
+    override suspend fun getRecentSessionsWithWords(limit: Int): List<ReadingSession> =
+        dao.getRecentSessionsWithWords(limit).map { it.toDomain() }
+    override suspend fun getDistinctPublicationIds(): List<String> =
+        dao.getDistinctPublicationIds()
 }

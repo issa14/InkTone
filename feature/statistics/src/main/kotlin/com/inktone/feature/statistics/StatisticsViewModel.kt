@@ -117,7 +117,8 @@ class StatisticsViewModel @Inject constructor(
         val readingState = readingStateRepository.get(publicationId)
 
         val progressPercent = if (readingState != null && publication.chapterCount > 0) {
-            (readingState.locator.chapterIndex.toFloat() / publication.chapterCount).coerceIn(0f, 1f)
+            // chapterIndex 0-based → dernier chapitre = chapterCount-1 → +1 pour 100%
+            ((readingState.locator.chapterIndex.toFloat() + 1f) / publication.chapterCount).coerceIn(0f, 1f)
         } else 0f
 
         // Temps total passé sur ce livre pour l'estimation du temps restant

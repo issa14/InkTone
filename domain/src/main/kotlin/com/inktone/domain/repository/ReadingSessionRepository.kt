@@ -26,4 +26,8 @@ interface ReadingSessionRepository {
     suspend fun getDistinctReadingDays(): List<String>
     suspend fun getLastReadPublicationId(): String?
     suspend fun getByPublicationId(bookId: String): List<ReadingSession>
+
+    // ───── Audit fix : requêtes ciblées (pas getAll) ─────
+    suspend fun getRecentSessionsWithWords(limit: Int = 30): List<ReadingSession>
+    suspend fun getDistinctPublicationIds(): List<String>
 }
