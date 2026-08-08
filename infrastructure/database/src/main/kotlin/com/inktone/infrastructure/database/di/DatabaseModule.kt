@@ -19,6 +19,8 @@ import com.inktone.infrastructure.database.MIGRATION_12_13
 import com.inktone.infrastructure.database.MIGRATION_13_14
 import com.inktone.infrastructure.database.MIGRATION_14_15
 import com.inktone.infrastructure.database.MIGRATION_15_16
+import com.inktone.infrastructure.database.MIGRATION_16_17
+import com.inktone.infrastructure.database.MIGRATION_17_18
 import dagger.Module
 import dagger.Provides
 import dagger.hilt.InstallIn
@@ -37,7 +39,7 @@ object DatabaseModule {
             .setJournalMode(RoomDatabase.JournalMode.WRITE_AHEAD_LOGGING) // K1 — Blueprint §6.5, ADR-016
             // PAS de fallbackToDestructiveMigration ici (K4) : toute migration
             // manquante doit faire planter l'app, jamais effacer les données.
-            .addMigrations(MIGRATION_1_2, MIGRATION_2_3, MIGRATION_3_4, MIGRATION_4_5, MIGRATION_5_6, MIGRATION_6_7, MIGRATION_7_8, MIGRATION_8_9, MIGRATION_9_10, MIGRATION_10_11, MIGRATION_11_12, MIGRATION_12_13, MIGRATION_13_14, MIGRATION_14_15, MIGRATION_15_16)
+            .addMigrations(MIGRATION_1_2, MIGRATION_2_3, MIGRATION_3_4, MIGRATION_4_5, MIGRATION_5_6, MIGRATION_6_7, MIGRATION_7_8, MIGRATION_8_9, MIGRATION_9_10, MIGRATION_10_11, MIGRATION_11_12, MIGRATION_12_13, MIGRATION_13_14, MIGRATION_14_15, MIGRATION_15_16, MIGRATION_16_17, MIGRATION_17_18)
             .build()
 
     @Provides fun providePublicationDao(db: InkToneDatabase) = db.publicationDao()

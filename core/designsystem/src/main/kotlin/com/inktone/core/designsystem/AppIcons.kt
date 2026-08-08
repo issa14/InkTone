@@ -31,11 +31,13 @@ import androidx.compose.material.icons.outlined.EditNote
 import androidx.compose.material.icons.outlined.Error
 import androidx.compose.material.icons.outlined.FavoriteBorder
 import androidx.compose.material.icons.outlined.FilterList
+import androidx.compose.material.icons.outlined.Headphones
 import androidx.compose.material.icons.outlined.HourglassEmpty
 import androidx.compose.material.icons.outlined.ImportContacts
 import androidx.compose.material.icons.outlined.Info
 import androidx.compose.material.icons.outlined.KeyboardArrowDown
 import androidx.compose.material.icons.outlined.Lightbulb
+import androidx.compose.material.icons.outlined.LocalFireDepartment
 import androidx.compose.material.icons.outlined.Mic
 import androidx.compose.material.icons.outlined.Palette
 import androidx.compose.material.icons.outlined.PhotoLibrary
@@ -46,6 +48,7 @@ import androidx.compose.material.icons.outlined.Save
 import androidx.compose.material.icons.outlined.Search
 import androidx.compose.material.icons.outlined.Settings
 import androidx.compose.material.icons.outlined.Smartphone
+import androidx.compose.material.icons.outlined.Visibility
 import androidx.compose.material.icons.outlined.ViewDay
 import androidx.compose.material.icons.outlined.Warning
 import androidx.compose.material.icons.outlined.Widgets
@@ -93,6 +96,12 @@ object AppIcons {
     val Refresh = Icons.Outlined.Refresh
     val ChevronDown = Icons.Outlined.KeyboardArrowDown
     val Stats = Icons.Outlined.BarChart
+
+    // Tache 7.3/7.2 — statistiques : modes de session (historique par
+    // ouvrage) et carte objectif du jour (série avec flamme).
+    val VisualReading = Icons.Outlined.Visibility
+    val TtsListening = Icons.Outlined.Headphones
+    val Streak = Icons.Outlined.LocalFireDepartment
 
     val Search = Icons.Outlined.Search
     val Filter = Icons.Outlined.FilterList

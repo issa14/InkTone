@@ -211,7 +211,7 @@ class SettingsViewModelTest {
         dispatcher.scheduler.advanceUntilIdle()
 
         val prefs = preferencesRepository.get()
-        assertEquals(20, prefs.dailyGoalMinutes)
+        assertEquals(30, prefs.dailyGoalMinutes)
         assertEquals(AppTheme.SYSTEM, prefs.appTheme)
     }
 

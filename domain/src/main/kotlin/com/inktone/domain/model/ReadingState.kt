@@ -38,6 +38,11 @@ data class ReadingOverrides(
  * Enregistrement HISTORIQUE d'une période de lecture, à des fins
  * statistiques uniquement (Blueprint §3.3). Plusieurs instances par
  * publication.
+ *
+ * Lot Statistiques Palier 1 : [visualDurationMs] et [ttsDurationMs]
+ * séparent les deux modes de lecture pour les graphiques.
+ * [durationMs] reste disponible comme propriété calculée pour
+ * compatibilité ascendante (total = visuel + TTS).
  */
 data class ReadingSession(
     val id: String,
@@ -46,15 +51,23 @@ data class ReadingSession(
     val endedAt: Long?,
     val mode: ReadingMode,
     val sentencesRead: Int = 0,
-    val durationMs: Long = 0,
-    val wordsRead: Int = 0, // D.4 — nécessaire pour WPM
+    val wordsRead: Int = 0,
+    // Lot Statistiques Palier 1 — métriques séparées (avant durationMs,
+    // qui en est une propriété calculée et doit les voir déclarées).
+    val visualDurationMs: Long = 0,
+    val ttsDurationMs: Long = 0,
 ) {
+    /** Propriété calculée — total = visuel + TTS (compatibilité ascendante). */
+    val durationMs: Long get() = visualDurationMs + ttsDurationMs
+
     init {
         require(publicationId.isNotBlank()) { "publicationId ne peut pas être vide" }
         require(sentencesRead >= 0) { "sentencesRead doit être positif ou nul" }
         require(durationMs >= 0) { "durationMs doit être positif ou nul" }
-        endedAt?.let {
-            require(it >= startedAt) { "endedAt doit être postérieur ou égal à startedAt" }
+        require(visualDurationMs >= 0) { "visualDurationMs doit être positif ou nul" }
+        require(ttsDurationMs >= 0) { "ttsDurationMs doit être positif ou nul" }
+        endedAt?.let { end ->
+            require(end >= startedAt) { "endedAt doit être postérieur ou égal à startedAt" }
         }
     }
 }

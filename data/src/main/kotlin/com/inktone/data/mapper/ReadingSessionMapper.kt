@@ -7,9 +7,11 @@ import com.inktone.infrastructure.database.entity.ReadingSessionEntity
 fun ReadingSession.toEntity(): ReadingSessionEntity = ReadingSessionEntity(
     id = id, publicationId = publicationId, startedAt = startedAt, endedAt = endedAt,
     mode = mode.name, sentencesRead = sentencesRead, durationMs = durationMs, wordsRead = wordsRead,
+    visualDurationMs = visualDurationMs, ttsDurationMs = ttsDurationMs,
 )
 
 fun ReadingSessionEntity.toDomain(): ReadingSession = ReadingSession(
     id = id, publicationId = publicationId, startedAt = startedAt, endedAt = endedAt,
-    mode = ReadingMode.valueOf(mode), sentencesRead = sentencesRead, durationMs = durationMs, wordsRead = wordsRead,
+    mode = ReadingMode.valueOf(mode), sentencesRead = sentencesRead, wordsRead = wordsRead,
+    visualDurationMs = visualDurationMs, ttsDurationMs = ttsDurationMs,
 )
