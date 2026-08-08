@@ -336,11 +336,21 @@ private val SLOT_NAMES = listOf("6h", "10h", "14h", "18h", "22h")
 private val HEATMAP_GRID_HEIGHT = 150.dp
 private val HEATMAP_ROW_HEIGHT = HEATMAP_GRID_HEIGHT / SLOT_NAMES.size
 
+// Légende d'intensité à 5 paliers ; le premier (le plus faible) est aussi
+// la teinte par défaut des cases sans aucune activité — sans quoi une case
+// "inactif" et une case "pas de données" sont visuellement indissociables
+// (transparente = fond de la carte, dans les deux cas).
+private const val HEATMAP_LEGEND_STEPS = 5
+private const val HEATMAP_INACTIVE_ALPHA = 1f / HEATMAP_LEGEND_STEPS
+
 @Composable
 private fun HeatmapChart(slots: List<com.inktone.domain.usecase.HeatmapSlot>, peakSlotIndex: Int?) {
     fun displayIndex(sqlDay: Int) = if (sqlDay == 0) 6 else sqlDay - 1
 
     val peakLabel = peakSlotIndex?.let { "Pic : ${SLOT_NAMES[it]}" } ?: ""
+    // Intensité par case (dayOfWeek SQL, slotIndex) — absente si aucune
+    // activité, auquel cas la case est peinte avec HEATMAP_INACTIVE_ALPHA.
+    val intensityByCell = remember(slots) { slots.associate { (it.dayOfWeek to it.slotIndex) to it.intensity } }
 
     ElevatedCard(shape = RoundedCornerShape(16.dp), modifier = Modifier.fillMaxWidth()) {
         Column(modifier = Modifier.padding(InkToneSpacing.cardPadding)) {
@@ -375,15 +385,22 @@ private fun HeatmapChart(slots: List<com.inktone.domain.usecase.HeatmapSlot>, pe
                         val sepX = 5 * cellW
                         drawLine(accent.copy(alpha = 0.15f), Offset(sepX, 0f), Offset(sepX, size.height), strokeWidth = 2.dp.toPx())
 
-                        for (slot in slots) {
-                            val x = displayIndex(slot.dayOfWeek) * cellW
-                            val y = slot.slotIndex * cellH
-                            drawRoundRect(
-                                color = accent.copy(alpha = slot.intensity),
-                                topLeft = Offset(x + 2.dp.toPx(), y + 2.dp.toPx()),
-                                size = Size(cellW - 4.dp.toPx(), cellH - 4.dp.toPx()),
-                                cornerRadius = CornerRadius(4.dp.toPx()),
-                            )
+                        // Les 35 cases (7 jours × 5 créneaux) sont toujours
+                        // dessinées — jamais seulement celles avec activité,
+                        // sans quoi "inactif" et "sans données" sont
+                        // indiscernables (toutes deux transparentes).
+                        for (sqlDay in 0..6) {
+                            for (slotIndex in SLOT_NAMES.indices) {
+                                val intensity = intensityByCell[sqlDay to slotIndex] ?: HEATMAP_INACTIVE_ALPHA
+                                val x = displayIndex(sqlDay) * cellW
+                                val y = slotIndex * cellH
+                                drawRoundRect(
+                                    color = accent.copy(alpha = intensity),
+                                    topLeft = Offset(x + 2.dp.toPx(), y + 2.dp.toPx()),
+                                    size = Size(cellW - 4.dp.toPx(), cellH - 4.dp.toPx()),
+                                    cornerRadius = CornerRadius(4.dp.toPx()),
+                                )
+                            }
                         }
                     }
                     Spacer(Modifier.height(4.dp))
@@ -399,11 +416,11 @@ private fun HeatmapChart(slots: List<com.inktone.domain.usecase.HeatmapSlot>, pe
             Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.Center, verticalAlignment = Alignment.CenterVertically) {
                 Text("Inactif", style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
                 Spacer(Modifier.width(4.dp))
-                for (i in 0..4) {
+                for (i in 0 until HEATMAP_LEGEND_STEPS) {
                     Canvas(Modifier.size(10.dp)) {
-                        drawRoundRect(accent.copy(alpha = (i + 1) / 5f), cornerRadius = CornerRadius(2.dp.toPx()))
+                        drawRoundRect(accent.copy(alpha = (i + 1) * HEATMAP_INACTIVE_ALPHA), cornerRadius = CornerRadius(2.dp.toPx()))
                     }
-                    if (i < 4) Spacer(Modifier.width(2.dp))
+                    if (i < HEATMAP_LEGEND_STEPS - 1) Spacer(Modifier.width(2.dp))
                 }
                 Spacer(Modifier.width(4.dp))
                 Text("Très actif", style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
