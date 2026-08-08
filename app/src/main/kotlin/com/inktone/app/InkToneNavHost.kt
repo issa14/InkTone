@@ -43,6 +43,7 @@ import com.inktone.feature.reader.ReaderViewModel
 import com.inktone.feature.search.SearchScreen
 import com.inktone.feature.settings.PronunciationRulesScreen
 import com.inktone.feature.settings.SettingsScreen
+import com.inktone.feature.statistics.BookStatisticsScreen
 import com.inktone.feature.statistics.StatisticsScreen
 
 /**
@@ -165,8 +166,19 @@ fun InkToneNavHost(navController: NavHostController = rememberNavController()) {
         }
         composable<StatisticsRoute> {
             BackScaffold(title = "Statistiques", onBack = navController::popBackStack) {
-                StatisticsScreen()
+                StatisticsScreen(
+                    onNavigateToBookDetail = { bookId ->
+                        navController.navigate(BookStatisticsRoute(bookId))
+                    },
+                )
             }
+        }
+        composable<BookStatisticsRoute> { entry ->
+            val route = entry.toRoute<BookStatisticsRoute>()
+            BookStatisticsScreen(
+                onBack = navController::popBackStack,
+                onSelectBook = { bookId -> navController.navigate(BookStatisticsRoute(bookId)) },
+            )
         }
         composable<BookmarksRoute> {
             LibraryItemsScreen(

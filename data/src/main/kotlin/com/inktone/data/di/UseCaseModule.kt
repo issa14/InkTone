@@ -1,5 +1,7 @@
 package com.inktone.data.di
 
+import android.content.Context
+import com.inktone.data.export.ExportStatisticsUseCase
 import com.inktone.domain.repository.AnnotationRepository
 import com.inktone.domain.repository.BookmarkRepository
 import com.inktone.domain.repository.PreferencesRepository
@@ -11,6 +13,7 @@ import com.inktone.domain.service.FileStorageService
 import com.inktone.domain.service.ImportSessionStore
 import com.inktone.domain.service.PublicationParser
 import com.inktone.domain.service.SearchService
+import com.inktone.domain.service.StatisticsExportService
 import com.inktone.domain.usecase.AddAnnotationUseCase
 import com.inktone.domain.usecase.ApplyAccessibilityPresetUseCase
 import com.inktone.domain.usecase.CreateBookmarkUseCase
@@ -18,6 +21,7 @@ import com.inktone.domain.usecase.DeleteAnnotationUseCase
 import com.inktone.domain.usecase.DeleteBookmarkUseCase
 import com.inktone.domain.usecase.DeleteLibraryItemUseCase
 import com.inktone.domain.usecase.ExportLibraryUseCase
+import com.inktone.domain.usecase.GetCurrentBookUseCase
 import com.inktone.domain.usecase.GetReadingStateUseCase
 import com.inktone.domain.usecase.GetStatisticsUseCase
 import com.inktone.domain.usecase.GetVoiceProfilesUseCase
@@ -28,9 +32,11 @@ import com.inktone.domain.usecase.ToggleFavoriteUseCase
 import com.inktone.domain.usecase.ToggleLibraryItemPinUseCase
 import com.inktone.domain.usecase.TogglePinUseCase
 import com.inktone.domain.usecase.UpdateReadingStateUseCase
+import com.inktone.infrastructure.database.dao.ReadingSessionDao
 import dagger.Module
 import dagger.Provides
 import dagger.hilt.InstallIn
+import dagger.hilt.android.qualifiers.ApplicationContext
 import dagger.hilt.components.SingletonComponent
 import javax.inject.Singleton
 
@@ -147,4 +153,18 @@ object UseCaseModule {
         readingSessionRepository: ReadingSessionRepository,
         publicationRepository: PublicationRepository,
     ): GetStatisticsUseCase = GetStatisticsUseCase(readingSessionRepository, publicationRepository)
+
+    @Provides
+    fun provideGetCurrentBookUseCase(
+        readingSessionRepository: ReadingSessionRepository,
+        publicationRepository: PublicationRepository,
+        readingStateRepository: ReadingStateRepository,
+    ): GetCurrentBookUseCase = GetCurrentBookUseCase(readingSessionRepository, publicationRepository, readingStateRepository)
+
+    @Provides
+    @Singleton
+    fun provideStatisticsExportService(
+        readingSessionDao: ReadingSessionDao,
+        @ApplicationContext context: Context,
+    ): StatisticsExportService = ExportStatisticsUseCase(readingSessionDao, context)
 }

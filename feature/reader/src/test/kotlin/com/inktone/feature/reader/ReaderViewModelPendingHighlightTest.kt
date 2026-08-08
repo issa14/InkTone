@@ -5,6 +5,7 @@ import com.inktone.core.testing.fake.FakeBookmarkRepository
 import com.inktone.core.testing.fake.FakePreferencesRepository
 import com.inktone.core.testing.fake.FakePublicationParser
 import com.inktone.core.testing.fake.FakePublicationRepository
+import com.inktone.core.testing.fake.FakeReadingSessionRepository
 import com.inktone.core.testing.fake.FakeReadingStateRepository
 import com.inktone.core.testing.fake.FakeTtsEngine
 import com.inktone.core.testing.fake.FakeVoiceProfileRepository
@@ -104,6 +105,7 @@ class ReaderViewModelPendingHighlightTest {
             deleteBookmark = DeleteBookmarkUseCase(bookmarkRepository),
             voiceProfileRepository = FakeVoiceProfileRepository(),
             getVoiceProfiles = GetVoiceProfilesUseCase(FakeVoiceProfileRepository()),
+            readingSessionRepository = FakeReadingSessionRepository(),
         )
     }
 
@@ -135,6 +137,12 @@ class ReaderViewModelPendingHighlightTest {
         assertEquals(0, pending!!.chapterIndex)
         assertEquals(1, pending.sentenceIndex)
         assertNull("pas de flash tant que la mise en page n'est pas confirmée", viewModel.state.value.highlightedWordRange)
+
+        // Casse le timer de checkpoint de session (Lot Sessions), démarré
+        // inconditionnellement à l'ouverture, auto-récurrent — sinon le
+        // drain implicite de fin de runTest boucle indéfiniment.
+        viewModel.cancelCheckpointTimerForTest()
+        dispatcher.scheduler.runCurrent()
     }
 
     @Test
@@ -175,6 +183,9 @@ class ReaderViewModelPendingHighlightTest {
         dispatcher.scheduler.advanceTimeBy(10_000)
         dispatcher.scheduler.runCurrent()
         assertNull(viewModel.state.value.highlightedWordRange)
+
+        viewModel.cancelCheckpointTimerForTest()
+        dispatcher.scheduler.runCurrent()
     }
 
     @Test
@@ -206,5 +217,8 @@ class ReaderViewModelPendingHighlightTest {
 
         assertNull(viewModel.state.value.pendingHighlightTarget)
         assertNull(viewModel.state.value.highlightedWordRange)
+
+        viewModel.cancelCheckpointTimerForTest()
+        dispatcher.scheduler.runCurrent()
     }
 }

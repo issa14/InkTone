@@ -101,4 +101,8 @@ fun ReadingStateBackup.toDomain(): ReadingState = ReadingState(
 fun ReadingSession.toBackup(): ReadingSessionBackup =
     ReadingSessionBackup(id, publicationId, startedAt, endedAt, mode.name, sentencesRead, durationMs)
 fun ReadingSessionBackup.toDomain(): ReadingSession =
-    ReadingSession(id, publicationId, startedAt, endedAt, ReadingMode.valueOf(mode), sentencesRead, durationMs)
+    ReadingSession(
+        id = id, publicationId = publicationId, startedAt = startedAt, endedAt = endedAt,
+        mode = ReadingMode.valueOf(mode), sentencesRead = sentencesRead,
+        visualDurationMs = durationMs, ttsDurationMs = 0,
+    )

@@ -5,6 +5,7 @@ import com.inktone.core.testing.fake.FakeBookmarkRepository
 import com.inktone.core.testing.fake.FakePreferencesRepository
 import com.inktone.core.testing.fake.FakePublicationParser
 import com.inktone.core.testing.fake.FakePublicationRepository
+import com.inktone.core.testing.fake.FakeReadingSessionRepository
 import com.inktone.core.testing.fake.FakeReadingStateRepository
 import com.inktone.core.testing.fake.FakeTtsEngine
 import com.inktone.core.testing.fake.FakeVoiceProfileRepository
@@ -79,7 +80,11 @@ class ReaderViewModelScrollPositionTest {
         // laissé activé, dispatcher.scheduler.advanceUntilIdle() ci-dessous
         // ne terminerait jamais (la file de délais virtuels ne se vide
         // jamais). Ce test ne porte pas sur le repos oculaire, on le
-        // désactive pour ne pas coupler les deux.
+        // désactive pour ne pas coupler les deux. Même raison pour
+        // remplacer advanceUntilIdle() par runCurrent()/advanceTimeBy()
+        // borné ci-dessous : le timer de checkpoint de session (Lot
+        // Sessions, `startCheckpointTimer`) est lui aussi auto-récurrent
+        // et démarre inconditionnellement à l'ouverture d'une publication.
         val preferencesRepository = FakePreferencesRepository()
         preferencesRepository.update(UserPreferences(eyeRestReminderEnabled = false))
         val bookmarkRepository = FakeBookmarkRepository()
@@ -111,6 +116,7 @@ class ReaderViewModelScrollPositionTest {
             deleteBookmark = DeleteBookmarkUseCase(bookmarkRepository),
             voiceProfileRepository = FakeVoiceProfileRepository(),
             getVoiceProfiles = GetVoiceProfilesUseCase(FakeVoiceProfileRepository()),
+            readingSessionRepository = FakeReadingSessionRepository(),
         )
     }
 
@@ -127,7 +133,7 @@ class ReaderViewModelScrollPositionTest {
         )
         val viewModel = buildViewModel(readingStateRepository, publicationRepository)
         viewModel.onIntent(ReaderIntent.OpenPublication("pub-1"))
-        dispatcher.scheduler.advanceUntilIdle()
+        dispatcher.scheduler.runCurrent()
 
         assertEquals(0, viewModel.state.value.currentSentenceIndex)
         val progressionBefore = viewModel.state.value.bookProgression
@@ -139,6 +145,12 @@ class ReaderViewModelScrollPositionTest {
         // compteur de page, jamais un second calcul en retard).
         assertEquals(2, viewModel.state.value.currentSentenceIndex)
         assertEquals(true, viewModel.state.value.bookProgression > progressionBefore)
+
+        // Casse le timer de checkpoint (auto-récurrent) comme le ferait
+        // onCleared() sur un vrai ViewModel détruit — sinon le drain
+        // implicite de fin de runTest boucle indéfiniment.
+        viewModel.cancelCheckpointTimerForTest()
+        dispatcher.scheduler.runCurrent()
     }
 
     @Test
@@ -154,7 +166,7 @@ class ReaderViewModelScrollPositionTest {
         )
         val viewModel = buildViewModel(readingStateRepository, publicationRepository)
         viewModel.onIntent(ReaderIntent.OpenPublication("pub-1"))
-        dispatcher.scheduler.advanceUntilIdle()
+        dispatcher.scheduler.runCurrent()
 
         viewModel.onIntent(ReaderIntent.UpdateScrollPosition(2))
 
@@ -166,11 +178,18 @@ class ReaderViewModelScrollPositionTest {
 
         // Test 3 (persistance) — antipattern legacy corrige : un
         // defilement silencieux (sans TTS) est bien persiste une fois le
-        // debounce ecoule, pas seulement la derniere position TTS.
-        dispatcher.scheduler.advanceUntilIdle()
+        // debounce ecoule, pas seulement la derniere position TTS. Avance
+        // bornee (400ms de debounce + marge) plutot qu'advanceUntilIdle() :
+        // le timer de checkpoint de session, demarre par OpenPublication,
+        // est auto-recurrent et viderait sinon la file indefiniment.
+        dispatcher.scheduler.advanceTimeBy(500L)
+        dispatcher.scheduler.runCurrent()
         val restored = readingStateRepository.get("pub-1")
         assertEquals(0, restored?.locator?.chapterIndex)
         assertEquals(24, restored?.locator?.charOffset) // Sentence(2).startOffset
+
+        viewModel.cancelCheckpointTimerForTest()
+        dispatcher.scheduler.runCurrent()
     }
 
     // Le scenario K3 "defilement ignore pendant le TTS" n'est pas testable

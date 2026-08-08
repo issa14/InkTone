@@ -65,6 +65,7 @@ class ReaderViewModelReadingRulerTest {
             deleteBookmark = DeleteBookmarkUseCase(bookmarkRepository),
             voiceProfileRepository = com.inktone.core.testing.fake.FakeVoiceProfileRepository(),
             getVoiceProfiles = com.inktone.domain.usecase.GetVoiceProfilesUseCase(com.inktone.core.testing.fake.FakeVoiceProfileRepository()),
+            readingSessionRepository = com.inktone.core.testing.fake.FakeReadingSessionRepository(),
         )
         dispatcher.scheduler.advanceUntilIdle()
 

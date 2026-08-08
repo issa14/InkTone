@@ -66,4 +66,18 @@ class FakePublicationRepository : PublicationRepository {
     override suspend fun setPinned(id: String, isPinned: Boolean) {
         state.value = state.value.map { if (it.id == id) it.copy(isPinned = isPinned) else it }
     }
+
+    // ───── Audit fix : COUNT pour le dashboard ─────
+    override suspend fun countFiltered(mode: FilterMode): Int =
+        state.value.count { pub ->
+            val progress = readingProgress.value[pub.id]
+            when (mode) {
+                FilterMode.ALL -> true
+                FilterMode.FAVORITES -> pub.isFavorite
+                FilterMode.READ -> progress != null && progress >= pub.chapterCount - 1
+                FilterMode.UNREAD -> progress == null
+                FilterMode.IN_PROGRESS -> progress != null && progress < pub.chapterCount - 1
+                else -> true
+            }
+        }
 }
