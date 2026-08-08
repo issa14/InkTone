@@ -277,4 +277,35 @@ class StatisticsViewModelTest {
         // Le mois (20 jours d'activité) cumule strictement plus que la semaine (7 jours).
         assertNotEquals(monthState.activity.periodTotalFormatted, weekState.activity.periodTotalFormatted)
     }
+
+    // ───── Densification des jours manquants (carte Activité) ─────
+
+    @Test
+    fun activite_contient_toujours_exactement_7_jours_en_vue_semaine_meme_avec_des_trous() = runTest {
+        val readingSessionRepo = FakeReadingSessionRepository()
+        val now = System.currentTimeMillis()
+        val oneDayMs = TimeUnit.DAYS.toMillis(1)
+        // Deux sessions non consecutives : aujourd'hui et il y a 3 jours.
+        // Cote SQL, les jours sans session n'ont aucune ligne (GROUP BY date) :
+        // sans densification, la liste ne contiendrait que 2 entrees.
+        readingSessionRepo.insert(session("today", "pub-1", now, visualMs = 60_000L))
+        readingSessionRepo.insert(session("j-3", "pub-1", now - 3 * oneDayMs, visualMs = 30_000L))
+
+        val vm = StatisticsViewModel(
+            getStatistics = GetStatisticsUseCase(readingSessionRepo, FakePublicationRepository()),
+            getCurrentBook = GetCurrentBookUseCase(readingSessionRepo, FakePublicationRepository(), FakeReadingStateRepository()),
+            preferencesRepository = FakePreferencesRepository(),
+            exportService = FakeStatisticsExportService(),
+        )
+        vm.onPeriodSelected(StatsPeriod.WEEK)
+
+        val ready = vm.state.first { (it as? StatisticsUiState.Ready)?.activity?.period == StatsPeriod.WEEK } as StatisticsUiState.Ready
+
+        // 7 jours calendaires consecutifs, pas seulement les 2 jours actifs.
+        assertEquals(7, ready.activity.dailyStats.size)
+        // La derniere entree est bien aujourd'hui (avec la session inseree).
+        assertEquals(60_000L, ready.activity.dailyStats.last().visualMs)
+        // Un jour sans session est present, a zero — pas absent de la liste.
+        assertTrue(ready.activity.dailyStats.any { it.visualMs == 0L && it.ttsMs == 0L })
+    }
 }

@@ -75,6 +75,8 @@ import com.inktone.domain.usecase.StatsPeriod
 import androidx.compose.runtime.LaunchedEffect
 import kotlinx.coroutines.flow.collectLatest
 import java.io.File
+import java.time.DayOfWeek
+import java.time.LocalDate
 
 /**
  * Tableau de bord statistiques (Lot Statistiques Palier 3).
@@ -431,17 +433,35 @@ private fun HeatmapChart(slots: List<com.inktone.domain.usecase.HeatmapSlot>, pe
 
 // ───── Histogramme Canvas ─────
 
+private fun currentDayShortLabel(): String = when (LocalDate.now().dayOfWeek) {
+    DayOfWeek.MONDAY -> "L"
+    DayOfWeek.TUESDAY -> "Ma"
+    DayOfWeek.WEDNESDAY -> "Me"
+    DayOfWeek.THURSDAY -> "J"
+    DayOfWeek.FRIDAY -> "V"
+    DayOfWeek.SATURDAY -> "S"
+    DayOfWeek.SUNDAY -> "D"
+}
+
 @Composable
 private fun HistogramChart(dailyStats: List<DailyReadingStats>) {
-    val visualColor = MaterialTheme.colorScheme.primary
-    val ttsColor = MaterialTheme.colorScheme.tertiary
+    // Couleurs fixes, indépendantes de l'accent Material You : la cible UX
+    // distingue les deux modes par une couleur dédiée (vert lecture
+    // visuelle, violet écoute TTS), contrairement à la heatmap — un seul
+    // mode confondu, qui garde l'accent dynamique du thème.
+    val isDark = isSystemInDarkTheme()
+    val visualColor = if (isDark) Color(0xFF81C784) else Color(0xFF2E7D32)
+    val ttsColor = if (isDark) Color(0xFFCE93D8) else Color(0xFF8E24AA)
+    val markerColor = MaterialTheme.colorScheme.primary
 
     ElevatedCard(shape = RoundedCornerShape(16.dp), modifier = Modifier.fillMaxWidth()) {
         Column(modifier = Modifier.padding(InkToneSpacing.cardPadding)) {
             val maxMs = remember(dailyStats) {
                 dailyStats.maxOfOrNull { it.visualMs + it.ttsMs }?.coerceAtLeast(1L) ?: 1L
             }
-            val barCount = dailyStats.size.coerceAtMost(30)
+            // `dailyStats` est desormais dense (StatisticsViewModel.fillMissingDays) :
+            // exactement une entree par jour calendaire, alignee sur aujourd'hui.
+            val barCount = dailyStats.size
 
             Canvas(modifier = Modifier.fillMaxWidth().height(140.dp)) {
                 if (barCount == 0) return@Canvas
@@ -456,16 +476,17 @@ private fun HistogramChart(dailyStats: List<DailyReadingStats>) {
                     dashX += 16.dp.toPx()
                 }
 
-                dailyStats.takeLast(barCount).forEachIndexed { i, day ->
+                dailyStats.forEachIndexed { i, day ->
                     val x = i * (barW + gap) + gap / 2
                     val ttsH = (day.ttsMs.toFloat() / maxMs * size.height)
                     val visualH = (day.visualMs.toFloat() / maxMs * size.height)
                     val totalH = ttsH + visualH
 
-                    // Marqueur jour courant
-                    if (i == barCount - 1 && barCount > 0) {
+                    // Repère de fond du jour courant (toujours la dernière
+                    // barre, la série étant dense et se terminant aujourd'hui).
+                    if (i == barCount - 1) {
                         drawRect(
-                            visualColor.copy(alpha = 0.3f),
+                            markerColor.copy(alpha = 0.15f),
                             Offset(x - 2.dp.toPx(), 0f),
                             Size(barW + 4.dp.toPx(), size.height),
                         )
@@ -482,18 +503,39 @@ private fun HistogramChart(dailyStats: List<DailyReadingStats>) {
                 }
             }
 
+            // Marqueur "jour courant" : libellé + point, aligné sur la
+            // dernière colonne (même technique que l'axe de la heatmap —
+            // une case par jour, largeur égale via weight(1f)).
+            if (barCount > 0) {
+                Spacer(Modifier.height(2.dp))
+                Row(modifier = Modifier.fillMaxWidth()) {
+                    repeat(barCount) { i ->
+                        Box(modifier = Modifier.weight(1f), contentAlignment = Alignment.Center) {
+                            if (i == barCount - 1) {
+                                Text(
+                                    "${currentDayShortLabel()} •",
+                                    style = MaterialTheme.typography.labelSmall,
+                                    fontWeight = FontWeight.SemiBold,
+                                    color = markerColor,
+                                )
+                            }
+                        }
+                    }
+                }
+            }
+
             Spacer(Modifier.height(8.dp))
             // Légende en pied
             Row(horizontalArrangement = Arrangement.spacedBy(16.dp)) {
                 Row(verticalAlignment = Alignment.CenterVertically) {
                     Canvas(Modifier.size(10.dp)) { drawRect(visualColor) }
                     Spacer(Modifier.width(4.dp))
-                    Text("Visuel", style = MaterialTheme.typography.labelSmall)
+                    Text("Lecture visuelle", style = MaterialTheme.typography.labelSmall)
                 }
                 Row(verticalAlignment = Alignment.CenterVertically) {
                     Canvas(Modifier.size(10.dp)) { drawRect(ttsColor) }
                     Spacer(Modifier.width(4.dp))
-                    Text("TTS", style = MaterialTheme.typography.labelSmall)
+                    Text("Écoute TTS", style = MaterialTheme.typography.labelSmall)
                 }
             }
         }

@@ -26,6 +26,8 @@ import kotlinx.coroutines.flow.receiveAsFlow
 import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.launch
 import java.io.File
+import java.time.LocalDate
+import java.time.format.DateTimeFormatter
 import java.util.Locale
 import java.util.concurrent.TimeUnit
 import javax.inject.Inject
@@ -96,7 +98,14 @@ class StatisticsViewModel @Inject constructor(
 
     private fun StatisticsResult.toActivityState(period: StatsPeriod): ActivityChartState {
         val windowDays = if (period == StatsPeriod.WEEK) DAYS_IN_WEEK else DAYS_IN_MONTH
-        val windowedStats = dailyStats.takeLast(windowDays)
+        // `dailyStats` est creuse : `getDailyStatsSince` groupe uniquement les
+        // jours ayant une session (GROUP BY date), un jour sans activité n'a
+        // aucune ligne. Sans densification, les barres de l'histogramme
+        // s'enchaîneraient sans tenir compte des jours vides, désalignant
+        // visuellement l'axe des jours — et rendant le marqueur "jour
+        // courant" (dernière barre) faux dès que le jour courant n'a encore
+        // aucune session.
+        val windowedStats = fillMissingDays(dailyStats, windowDays)
         val periodTotalMs = windowedStats.sumOf { it.visualMs + it.ttsMs }
         return ActivityChartState(
             dailyStats = windowedStats,
@@ -106,6 +115,21 @@ class StatisticsViewModel @Inject constructor(
             period = period,
             periodTotalFormatted = formatDuration(periodTotalMs),
         )
+    }
+
+    /**
+     * Complète la série creuse par des jours à zéro pour obtenir exactement
+     * [windowDays] entrées consécutives se terminant aujourd'hui — la somme
+     * totale est inchangée (un jour manquant ne contribue de toute façon que
+     * pour 0), seul l'alignement visuel des barres en dépend.
+     */
+    private fun fillMissingDays(dailyStats: List<DailyReadingStats>, windowDays: Int): List<DailyReadingStats> {
+        val byDate = dailyStats.associateBy { it.date }
+        val today = LocalDate.now()
+        return (windowDays - 1 downTo 0).map { offset ->
+            val date = today.minusDays(offset.toLong()).format(DateTimeFormatter.ISO_LOCAL_DATE)
+            byDate[date] ?: DailyReadingStats(date = date, visualMs = 0L, ttsMs = 0L)
+        }
     }
 
     private fun formatDuration(ms: Long): String {
