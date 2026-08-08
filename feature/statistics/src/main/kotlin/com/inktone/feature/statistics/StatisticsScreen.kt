@@ -1,116 +1,425 @@
 package com.inktone.feature.statistics
 
+import androidx.compose.foundation.Canvas
+import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
+import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.layout.width
+import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.outlined.BarChart
 import androidx.compose.material.icons.outlined.CalendarMonth
 import androidx.compose.material.icons.outlined.CheckCircle
-import androidx.compose.material.icons.outlined.Schedule
+import androidx.compose.material.icons.outlined.ChevronRight
+import androidx.compose.material.icons.outlined.Download
+import androidx.compose.material.icons.outlined.Headphones
+import androidx.compose.material.icons.outlined.MenuBook
 import androidx.compose.material.icons.outlined.Speed
 import androidx.compose.material.icons.outlined.TrendingUp
-import androidx.compose.material3.Card
-import androidx.compose.material3.CardDefaults
+import androidx.compose.material.icons.outlined.Visibility
+import androidx.compose.material.icons.outlined.ImportContacts
+import androidx.compose.material3.Button
+import androidx.compose.material3.CircularProgressIndicator
+import androidx.compose.material3.ElevatedCard
+import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.Icon
-import androidx.compose.material3.LinearProgressIndicator
+import androidx.compose.material3.ListItem
 import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.ModalBottomSheet
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
-import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
+import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.graphics.vector.ImageVector
+import androidx.compose.ui.geometry.CornerRadius
+import androidx.compose.ui.geometry.Offset
+import androidx.compose.ui.geometry.Size
+import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.StrokeCap
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
-import androidx.hilt.navigation.compose.hiltViewModel
+import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.inktone.core.designsystem.InkToneSpacing
-import com.inktone.domain.usecase.StatisticsUiState
+import com.inktone.domain.model.DailyReadingStats
 
 /**
- * Tableau de bord statistiques (Lot Statistiques Palier 2).
+ * Tableau de bord statistiques (Lot Statistiques Palier 3).
  *
- * L'état est exposé par le ViewModel en sealed interface
- * ([StatisticsUiState.Loading] / [StatisticsUiState.Ready]).
- * Les durées arrivent déjà formatées du ViewModel (ex: "14h 32m").
+ * Trois sections rendues dans une [LazyColumn] avec
+ * [safeDrawingPadding] pour ne pas être mangé par la barre de navigation.
+ * L'état est consommé via [collectAsStateWithLifecycle].
  */
+@OptIn(ExperimentalMaterial3Api::class)
 @Composable
-fun StatisticsScreen(viewModel: StatisticsViewModel = hiltViewModel()) {
-    val state by viewModel.state.collectAsState()
+fun StatisticsScreen(viewModel: StatisticsViewModel = androidx.hilt.navigation.compose.hiltViewModel()) {
+    val state by viewModel.state.collectAsStateWithLifecycle()
 
     when (val s = state) {
-        is StatisticsUiState.Loading -> {
-            // Rien à afficher en chargement — le ViewModel résout en ~ms
+        is com.inktone.domain.usecase.StatisticsUiState.Loading -> LoadingContent()
+        is com.inktone.domain.usecase.StatisticsUiState.Ready -> DashboardContent(s)
+    }
+}
+
+// ───── Loading ─────
+
+@Composable
+private fun LoadingContent() {
+    Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
+        CircularProgressIndicator()
+    }
+}
+
+// ───── Dashboard ─────
+
+@Composable
+private fun DashboardContent(state: com.inktone.domain.usecase.StatisticsUiState.Ready) {
+    LazyColumn(
+        modifier = Modifier
+            .fillMaxSize()
+            .padding(horizontal = InkToneSpacing.screenHorizontal),
+        verticalArrangement = Arrangement.spacedBy(InkToneSpacing.md),
+        contentPadding = PaddingValues(bottom = 80.dp),
+    ) {
+        item { Section1Kpis(state.kpi) }
+        item { Section2Charts(state.activity) }
+        if (state.currentBook != null) {
+            item { Section3CurrentBook(state.currentBook!!) }
         }
-        is StatisticsUiState.Ready -> {
-            StatisticsContent(s.kpi, s.activity, s.currentBook)
+        item { ExportButton() }
+    }
+}
+
+// ═══════════════════════════════════════════════
+// Section 1 — KPIs & Objectifs
+// ═══════════════════════════════════════════════
+
+@Composable
+private fun Section1Kpis(kpi: com.inktone.domain.usecase.KpiState) {
+    Column(verticalArrangement = Arrangement.spacedBy(InkToneSpacing.md)) {
+        Text("Objectifs & KPIs", style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.SemiBold)
+
+        // Jauge circulaire + streak
+        DailyGoalGauge(kpi)
+
+        // Cartes de volumes : visuel, TTS, livres, streak max
+        Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(InkToneSpacing.md)) {
+            StatCard(
+                icon = Icons.Outlined.Visibility, label = "Visuel",
+                value = kpi.totalVisualTimeFormatted, modifier = Modifier.weight(1f),
+            )
+            StatCard(
+                icon = Icons.Outlined.Headphones, label = "TTS",
+                value = kpi.totalTtsTimeFormatted, modifier = Modifier.weight(1f),
+            )
+        }
+
+        Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(InkToneSpacing.md)) {
+            StatCard(
+                icon = Icons.Outlined.CheckCircle, label = "Livres finis",
+                value = kpi.booksFinished.toString(), modifier = Modifier.weight(1f),
+            )
+            StatCard(
+                icon = Icons.Outlined.Speed, label = "WPM",
+                value = kpi.averageWpm.toString(), modifier = Modifier.weight(1f),
+            )
+        }
+
+        Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(InkToneSpacing.md)) {
+            StatCard(
+                icon = Icons.Outlined.CalendarMonth, label = "Série",
+                value = "${kpi.currentStreakDays} j", modifier = Modifier.weight(1f),
+            )
+            StatCard(
+                icon = Icons.Outlined.TrendingUp, label = "Record",
+                value = "${kpi.maxStreakDays} j", modifier = Modifier.weight(1f),
+            )
         }
     }
 }
 
 @Composable
-private fun StatisticsContent(
-    kpi: com.inktone.domain.usecase.KpiState,
-    activity: com.inktone.domain.usecase.ActivityChartState,
-    currentBook: com.inktone.domain.usecase.CurrentBookState?,
-) {
-    Column(
-        modifier = Modifier.fillMaxWidth().padding(InkToneSpacing.screenHorizontal),
-        verticalArrangement = Arrangement.spacedBy(InkToneSpacing.md),
+private fun DailyGoalGauge(kpi: com.inktone.domain.usecase.KpiState) {
+    val progress = (kpi.todayReadingMinutes.toFloat() / kpi.dailyGoalMinutes).coerceIn(0f, 1f)
+    val progressColor = if (progress >= 1f) MaterialTheme.colorScheme.primary
+    else MaterialTheme.colorScheme.tertiary
+
+    ElevatedCard(
+        shape = RoundedCornerShape(16.dp),
+        modifier = Modifier.fillMaxWidth(),
     ) {
-        // Objectif du jour avec jauge
-        val goalProgress = (kpi.todayReadingMinutes.toFloat() / kpi.dailyGoalMinutes).coerceIn(0f, 1f)
-        Card(
-            colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceVariant),
+        Column(
+            modifier = Modifier.padding(InkToneSpacing.cardPadding).fillMaxWidth(),
+            horizontalAlignment = Alignment.CenterHorizontally,
+        ) {
+            Text("Objectif du jour", style = MaterialTheme.typography.labelLarge, color = MaterialTheme.colorScheme.onSurfaceVariant)
+            Spacer(Modifier.height(12.dp))
+            Box(contentAlignment = Alignment.Center, modifier = Modifier.size(120.dp)) {
+                CircularProgressIndicator(
+                    progress = { 1f },
+                    modifier = Modifier.fillMaxSize(),
+                    strokeCap = StrokeCap.Round,
+                    color = MaterialTheme.colorScheme.surfaceVariant,
+                    strokeWidth = 8.dp,
+                )
+                CircularProgressIndicator(
+                    progress = { progress },
+                    modifier = Modifier.fillMaxSize(),
+                    strokeCap = StrokeCap.Round,
+                    color = progressColor,
+                    strokeWidth = 8.dp,
+                )
+                Column(horizontalAlignment = Alignment.CenterHorizontally) {
+                    Text(
+                        kpi.todayReadingMinutesFormatted,
+                        style = MaterialTheme.typography.headlineSmall,
+                        fontWeight = FontWeight.Bold,
+                    )
+                    Text(
+                        "sur ${kpi.dailyGoalMinutes} min",
+                        style = MaterialTheme.typography.bodySmall,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    )
+                }
+            }
+        }
+    }
+}
+
+// ═══════════════════════════════════════════════
+// Section 2 — Graphiques d'Activité
+// ═══════════════════════════════════════════════
+
+@Composable
+private fun Section2Charts(activity: com.inktone.domain.usecase.ActivityChartState) {
+    Column(verticalArrangement = Arrangement.spacedBy(InkToneSpacing.md)) {
+        // En-tête avec variation
+        Row(
+            modifier = Modifier.fillMaxWidth(),
+            horizontalArrangement = Arrangement.SpaceBetween,
+            verticalAlignment = Alignment.CenterVertically,
+        ) {
+            Text("Activité", style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.SemiBold)
+            val isPositive = activity.variationPercent.startsWith("+")
+            val varColor = when {
+                activity.variationPercent == "—" -> MaterialTheme.colorScheme.onSurfaceVariant
+                isPositive -> Color(0xFF2E7D32)
+                else -> MaterialTheme.colorScheme.error
+            }
+            Text(activity.variationPercent, style = MaterialTheme.typography.labelLarge, color = varColor)
+        }
+
+        // Heatmap
+        HeatmapChart(activity.heatmapSlots)
+
+        // Histogramme
+        HistogramChart(activity.dailyStats)
+    }
+}
+
+// ───── Heatmap Canvas ─────
+
+@Composable
+private fun HeatmapChart(slots: List<com.inktone.domain.usecase.HeatmapSlot>) {
+    val dayLabels = listOf("L", "M", "M", "J", "V", "S", "D")
+    val slotLabels = listOf("6h", "10h", "14h", "18h", "22h")
+
+    ElevatedCard(shape = RoundedCornerShape(16.dp), modifier = Modifier.fillMaxWidth()) {
+        Column(modifier = Modifier.padding(InkToneSpacing.cardPadding)) {
+            Text("Habitudes de lecture", style = MaterialTheme.typography.labelLarge, color = MaterialTheme.colorScheme.onSurfaceVariant)
+            Spacer(Modifier.height(8.dp))
+
+            val accent = MaterialTheme.colorScheme.primary
+
+            Canvas(modifier = Modifier.fillMaxWidth().height(180.dp)) {
+                val cols = 7
+                val rows = 5
+                val cellW = size.width / cols
+                val cellH = size.height / rows
+
+                for (slot in slots) {
+                    val x = slot.dayOfWeek * cellW
+                    val y = slot.slotIndex * cellH
+                    drawRoundRect(
+                        color = accent.copy(alpha = slot.intensity.coerceIn(0f, 1f)),
+                        topLeft = Offset(x + 2.dp.toPx(), y + 2.dp.toPx()),
+                        size = Size(cellW - 4.dp.toPx(), cellH - 4.dp.toPx()),
+                        cornerRadius = CornerRadius(4.dp.toPx()),
+                    )
+                }
+            }
+
+            // Légende jours
+            Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceEvenly) {
+                dayLabels.forEach { day ->
+                    Text(day, style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.onSurfaceVariant, textAlign = TextAlign.Center, modifier = Modifier.weight(1f))
+                }
+            }
+            Spacer(Modifier.height(4.dp))
+            // Légende créneaux
+            Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
+                Text("Matin", style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                Text("Soir", style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+            }
+        }
+    }
+}
+
+// ───── Histogramme Canvas ─────
+
+@Composable
+private fun HistogramChart(dailyStats: List<DailyReadingStats>) {
+    val visualColor = MaterialTheme.colorScheme.primary
+    val ttsColor = MaterialTheme.colorScheme.tertiary
+
+    ElevatedCard(shape = RoundedCornerShape(16.dp), modifier = Modifier.fillMaxWidth()) {
+        Column(modifier = Modifier.padding(InkToneSpacing.cardPadding)) {
+            // Légende
+            Row(horizontalArrangement = Arrangement.spacedBy(16.dp)) {
+                Row(verticalAlignment = Alignment.CenterVertically) {
+                    Canvas(Modifier.size(10.dp)) {
+                        drawRect(visualColor)
+                    }
+                    Spacer(Modifier.width(4.dp))
+                    Text("Visuel", style = MaterialTheme.typography.labelSmall)
+                }
+                Row(verticalAlignment = Alignment.CenterVertically) {
+                    Canvas(Modifier.size(10.dp)) {
+                        drawRect(ttsColor)
+                    }
+                    Spacer(Modifier.width(4.dp))
+                    Text("TTS", style = MaterialTheme.typography.labelSmall)
+                }
+            }
+            Spacer(Modifier.height(8.dp))
+
+            val maxMs = dailyStats.maxOfOrNull { it.visualMs + it.ttsMs }?.coerceAtLeast(1L) ?: 1L
+            val barCount = dailyStats.size.coerceAtMost(30)
+
+            Canvas(modifier = Modifier.fillMaxWidth().height(140.dp)) {
+                if (barCount == 0) return@Canvas
+                val barW = (size.width / barCount) * 0.7f
+                val gap = (size.width / barCount) * 0.3f
+
+                dailyStats.takeLast(barCount).forEachIndexed { i, day ->
+                    val x = i * (barW + gap) + gap / 2
+                    val visualH = (day.visualMs.toFloat() / maxMs * size.height)
+                    val ttsH = (day.ttsMs.toFloat() / maxMs * size.height)
+
+                    // Barre TTS (derrière)
+                    if (ttsH > 1f) {
+                        drawRect(ttsColor, Offset(x, size.height - ttsH), Size(barW, ttsH))
+                    }
+                    // Barre visuelle (devant, empilée)
+                    if (visualH > 1f) {
+                        drawRect(visualColor, Offset(x, size.height - visualH - ttsH), Size(barW, visualH))
+                    }
+                }
+            }
+        }
+    }
+}
+
+// ═══════════════════════════════════════════════
+// Section 3 — Livre en cours & Export
+// ═══════════════════════════════════════════════
+
+@OptIn(ExperimentalMaterial3Api::class)
+@Composable
+private fun Section3CurrentBook(book: com.inktone.domain.usecase.CurrentBookState) {
+    Column(verticalArrangement = Arrangement.spacedBy(InkToneSpacing.md)) {
+        Text("Livre en cours", style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.SemiBold)
+
+        ElevatedCard(
+            onClick = { /* Navigation vers le Reader — TODO */ },
             shape = RoundedCornerShape(16.dp),
             modifier = Modifier.fillMaxWidth(),
         ) {
-            Column(modifier = Modifier.padding(InkToneSpacing.cardPadding)) {
-                Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
-                    Text("Objectif du jour", style = MaterialTheme.typography.bodyMedium, color = MaterialTheme.colorScheme.onSurfaceVariant)
-                    Text("${kpi.todayReadingMinutes} / ${kpi.dailyGoalMinutes} min", style = MaterialTheme.typography.bodyMedium, fontWeight = FontWeight.SemiBold)
+            Row(
+                modifier = Modifier.padding(InkToneSpacing.cardPadding).fillMaxWidth(),
+                verticalAlignment = Alignment.CenterVertically,
+            ) {
+                Icon(Icons.Outlined.MenuBook, contentDescription = null, tint = MaterialTheme.colorScheme.primary)
+                Spacer(Modifier.width(12.dp))
+                Column(Modifier.weight(1f)) {
+                    Text(book.title, style = MaterialTheme.typography.titleSmall, maxLines = 1)
+                    val progressPct = (book.progressPercent * 100).toInt()
+                    Text(
+                        "${progressPct}% · ${book.remainingTimeFormatted ?: "—"}",
+                        style = MaterialTheme.typography.bodySmall,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    )
                 }
-                Spacer(Modifier.height(8.dp))
-                LinearProgressIndicator(
-                    progress = { goalProgress },
-                    modifier = Modifier.fillMaxWidth().height(8.dp),
-                    trackColor = MaterialTheme.colorScheme.surfaceVariant,
-                )
+                Icon(Icons.Outlined.ChevronRight, contentDescription = null, tint = MaterialTheme.colorScheme.onSurfaceVariant)
             }
         }
-
-        // Série + record
-        Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(InkToneSpacing.md)) {
-            StatCard(icon = Icons.Outlined.CalendarMonth, label = "Série", value = "${kpi.currentStreakDays} j", modifier = Modifier.weight(1f))
-            StatCard(icon = Icons.Outlined.TrendingUp, label = "Record", value = "${kpi.maxStreakDays} j", modifier = Modifier.weight(1f))
-        }
-
-        StatCard(icon = Icons.Outlined.Speed, label = "Vitesse moyenne", value = "${kpi.averageWpm} WPM")
-        StatCard(icon = Icons.Outlined.Schedule, label = "Temps visuel", value = kpi.totalVisualTimeFormatted)
-        StatCard(icon = Icons.Outlined.Schedule, label = "Temps TTS", value = kpi.totalTtsTimeFormatted)
-        StatCard(icon = Icons.Outlined.CheckCircle, label = "Livres terminés", value = kpi.booksFinished.toString())
     }
 }
 
+@OptIn(ExperimentalMaterial3Api::class)
 @Composable
-private fun StatCard(icon: ImageVector, label: String, value: String, modifier: Modifier = Modifier) {
-    Card(
-        colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceVariant),
-        shape = RoundedCornerShape(16.dp),
-        modifier = modifier.fillMaxWidth(),
+private fun ExportButton() {
+    var showSheet by remember { mutableStateOf(false) }
+
+    Button(
+        onClick = { showSheet = true },
+        modifier = Modifier.fillMaxWidth(),
     ) {
-        Row(
-            modifier = Modifier.fillMaxWidth().padding(InkToneSpacing.cardPadding),
+        Icon(Icons.Outlined.Download, contentDescription = null, modifier = Modifier.size(18.dp))
+        Spacer(Modifier.width(8.dp))
+        Text("Exporter les statistiques")
+    }
+
+    if (showSheet) {
+        ModalBottomSheet(onDismissRequest = { showSheet = false }) {
+            Text(
+                "Format d'export",
+                style = MaterialTheme.typography.titleMedium,
+                modifier = Modifier.padding(horizontal = InkToneSpacing.screenHorizontal, vertical = 12.dp),
+            )
+            ListItem(
+                headlineContent = { Text("Format CSV") },
+                supportingContent = { Text("Récapitulatif des sessions") },
+                leadingContent = { Icon(Icons.Outlined.BarChart, contentDescription = null) },
+                modifier = Modifier.clickable { showSheet = false },
+            )
+            ListItem(
+                headlineContent = { Text("Format JSON") },
+                supportingContent = { Text("Données brutes d'événements") },
+                leadingContent = { Icon(Icons.Outlined.ImportContacts, contentDescription = null) },
+                modifier = Modifier.clickable { showSheet = false },
+            )
+            Spacer(Modifier.height(32.dp))
+        }
+    }
+}
+
+// ───── Carte statistique générique ─────
+
+@Composable
+private fun StatCard(icon: androidx.compose.ui.graphics.vector.ImageVector, label: String, value: String, modifier: Modifier = Modifier) {
+    ElevatedCard(shape = RoundedCornerShape(12.dp), modifier = modifier) {
+        Column(
+            modifier = Modifier.padding(12.dp),
+            horizontalAlignment = Alignment.CenterHorizontally,
         ) {
-            Icon(icon, contentDescription = null, tint = MaterialTheme.colorScheme.primary)
-            Column(Modifier.padding(start = InkToneSpacing.md)) {
-                Text(value, style = MaterialTheme.typography.headlineSmall, fontWeight = FontWeight.SemiBold)
-                Text(label, style = MaterialTheme.typography.bodyMedium, color = MaterialTheme.colorScheme.onSurfaceVariant)
-            }
+            Icon(icon, contentDescription = null, tint = MaterialTheme.colorScheme.primary, modifier = Modifier.size(20.dp))
+            Spacer(Modifier.height(4.dp))
+            Text(value, style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.SemiBold)
+            Text(label, style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
         }
     }
 }
