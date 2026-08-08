@@ -513,8 +513,8 @@ class DatabaseMigrationTest {
         val v14 = helper.createDatabase(TEST_DB_NAME, 14)
         v14.execSQL(
             """
-            INSERT INTO user_preferences (id, theme, fontSize, defaultTtsEngine, crashReportingEnabled, language, fontFamily, reduceMotion, dynamicColorEnabled, readingRulerEnabled, dailyGoalMinutes, activeVoiceProfileId, readingMode, audioGain, useSystemFontScale)
-            VALUES (0, 'SYSTEM', 18, 'SHERPA_ONNX', 0, 'fr', 'DEFAULT', 0, 1, 0, 20, NULL, 'SCROLL', 1.0, 0)
+            INSERT INTO user_preferences (id, theme, fontSize, defaultTtsEngine, crashReportingEnabled, language, fontFamily, reduceMotion, dynamicColorEnabled, readingRulerEnabled, dailyGoalMinutes, activeVoiceProfileId, readingMode, audioGain, useSystemFontScale, lineHeightMultiplier, readerBrightness, eyeRestReminderEnabled, eyeRestReminderIntervalMinutes)
+            VALUES (0, 'SYSTEM', 18, 'SHERPA_ONNX', 0, 'fr', 'DEFAULT', 0, 1, 0, 20, NULL, 'SCROLL', 1.0, 0, 1.4, NULL, 1, 60)
             """.trimIndent(),
         )
         v14.close()
@@ -543,8 +543,8 @@ class DatabaseMigrationTest {
         val v15 = helper.createDatabase(TEST_DB_NAME, 15)
         v15.execSQL(
             """
-            INSERT INTO user_preferences (id, theme, fontSize, defaultTtsEngine, crashReportingEnabled, language, fontFamily, reduceMotion, dynamicColorEnabled, readingRulerEnabled, dailyGoalMinutes, activeVoiceProfileId, readingMode, audioGain, useSystemFontScale, appTheme)
-            VALUES (0, 'SYSTEM', 18, 'SHERPA_ONNX', 0, 'fr', 'DEFAULT', 0, 1, 0, 20, NULL, 'SCROLL', 1.0, 0, 'SYSTEM')
+            INSERT INTO user_preferences (id, theme, fontSize, defaultTtsEngine, crashReportingEnabled, language, fontFamily, reduceMotion, dynamicColorEnabled, readingRulerEnabled, dailyGoalMinutes, activeVoiceProfileId, readingMode, audioGain, useSystemFontScale, appTheme, lineHeightMultiplier, readerBrightness, eyeRestReminderEnabled, eyeRestReminderIntervalMinutes)
+            VALUES (0, 'SYSTEM', 18, 'SHERPA_ONNX', 0, 'fr', 'DEFAULT', 0, 1, 0, 20, NULL, 'SCROLL', 1.0, 0, 'SYSTEM', 1.4, NULL, 1, 60)
             """.trimIndent(),
         )
         v15.close()
@@ -573,8 +573,8 @@ class DatabaseMigrationTest {
         val v16 = helper.createDatabase(TEST_DB_NAME, 16)
         v16.execSQL(
             """
-            INSERT INTO publications (id, title, authors, format, fileUri, fileHash, fileSize, chapterCount, subjects, isFavorite, isDrmProtected, importDate)
-            VALUES ('pub-stats', 'Stats Book', '', 'EPUB', '/stats.epub', 'hash-stats', 1024, 1, '', 0, 0, 0)
+            INSERT INTO publications (id, title, authors, format, fileUri, fileHash, fileSize, chapterCount, subjects, isFavorite, isPinned, isDrmProtected, importDate)
+            VALUES ('pub-stats', 'Stats Book', '', 'EPUB', '/stats.epub', 'hash-stats', 1024, 1, '', 0, 0, 0, 0)
             """.trimIndent(),
         )
         // Session sans mots lus (pre-D.4, durationMs seul)

@@ -128,6 +128,7 @@ class ReadingSessionDaoTest {
     @Test
     fun getByPublicationId_retourne_les_sessions_d_un_livre_triees_par_date() = runTest {
         insertPublication("pub-1")
+        insertPublication("pub-2")
         db.readingSessionDao().insert(
             ReadingSessionEntity("s1", "pub-1", 0L, 100L, "AUDIO", 0, 0),
         )
@@ -142,5 +143,52 @@ class ReadingSessionDaoTest {
         assertEquals(2, sessions.size)
         // Tri décroissant par startedAt
         assertEquals("s2", sessions.first().id)
+    }
+
+    @Test
+    fun getDailyStatsSince_agrege_par_jour() = runTest {
+        insertPublication("pub-1")
+        // Deux sessions sur le même jour UTC pour éviter la coupure
+        // localtime (le fuseau du device peut décaler la date).
+        val day = 1700000000000L
+
+        val s1 = ReadingSessionEntity("s1", "pub-1", day, day + 500, "VISUAL", 0, 0,
+            visualDurationMs = 100, ttsDurationMs = 0)
+        val s2 = ReadingSessionEntity("s2", "pub-1", day + 3_600_000, day + 4_000, "AUDIO", 0, 0,
+            visualDurationMs = 0, ttsDurationMs = 200)
+        db.readingSessionDao().insert(s1)
+        db.readingSessionDao().insert(s2)
+
+        // Vérifier que l'insertion a bien persisté les nouvelles colonnes
+        val all = db.readingSessionDao().getAll()
+        assertEquals(2, all.size)
+        assertEquals(100L, all.first { it.id == "s1" }.visualDurationMs)
+        assertEquals(200L, all.first { it.id == "s2" }.ttsDurationMs)
+
+        // Agrégation : somme des durées (visuel + TTS) sur toutes les
+        // lignes retournées, quel que soit le regroupement localtime.
+        val stats = db.readingSessionDao().getDailyStatsSince(day)
+        val totalVisual = stats.sumOf { it.visualMs }
+        val totalTts = stats.sumOf { it.ttsMs }
+        assertEquals(100L, totalVisual)
+        assertEquals(200L, totalTts)
+    }
+
+    @Test
+    fun getHeatmapStatsSince_groupe_par_jour_et_heure() = runTest {
+        insertPublication("pub-1")
+        val base = 1700000000000L
+
+        // Deux sessions à la même heure → comptées comme 2 interactions
+        db.readingSessionDao().insert(
+            ReadingSessionEntity("s1", "pub-1", base, base + 100, "VISUAL", 0, 0),
+        )
+        db.readingSessionDao().insert(
+            ReadingSessionEntity("s2", "pub-1", base + 60000, base + 70000, "AUDIO", 0, 0),
+        )
+
+        val points = db.readingSessionDao().getHeatmapStatsSince(base)
+        assertEquals(1, points.size)
+        assertEquals(2, points.first().interactionCount)
     }
 }

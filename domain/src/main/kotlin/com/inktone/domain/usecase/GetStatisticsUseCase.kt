@@ -138,20 +138,22 @@ class GetStatisticsUseCase(
      * Regroupe les points de heatmap bruts (0-23h) dans les 5 créneaux
      * de la cible d'écran (6h, 10h, 14h, 18h, 22h) et normalise
      * l'intensité par créneau sur 0.0–1.0.
+     *
+     * Les heures 0–3 sont rattachées au créneau 22h du jour précédent
+     * (la nuit de lundi 2h appartient conceptuellement à la soirée de
+     * dimanche) — sans cela, une session à 1h du matin tomberait dans
+     * le créneau « matin ».
      */
     internal fun computeHeatmapSlots(raw: List<HeatmapPoint>): List<HeatmapSlot> {
         if (raw.isEmpty()) return emptyList()
 
-        val slotCenters = listOf(6, 10, 14, 18, 22)
         data class SlotKey(val dayOfWeek: Int, val slotIndex: Int)
 
         // Regrouper les heures brutes dans les créneaux les plus proches
         val slotCounts = mutableMapOf<SlotKey, Int>()
         for (point in raw) {
-            val slotIndex = slotCenters.indices.minByOrNull {
-                kotlin.math.abs(point.hourOfDay - slotCenters[it])
-            } ?: 2 // fallback : milieu de journée
-            val key = SlotKey(point.dayOfWeek, slotIndex)
+            val (slotIndex, adjustedDay) = slotFor(point.hourOfDay, point.dayOfWeek)
+            val key = SlotKey(adjustedDay, slotIndex)
             slotCounts[key] = (slotCounts[key] ?: 0) + point.interactionCount
         }
 
@@ -172,6 +174,30 @@ class GetStatisticsUseCase(
     }
 
     // ───── Helpers ─────
+
+    /**
+     * Détermine le créneau horaire UX auquel appartient une heure brute.
+     *
+     * Heures 0–3  → créneau 22h du jour précédent (nuit).
+     * Heures 4–8  → créneau 6h  (matin).
+     * Heures 9–12 → créneau 10h (fin de matinée).
+     * Heures 13-16 → créneau 14h (après-midi).
+     * Heures 17-20 → créneau 18h (soirée).
+     * Heures 21-23 → créneau 22h (nuit).
+     *
+     * @return Pair(slotIndex, adjustedDayOfWeek). Le jour est décrémenté
+     *         d'une unité (avec wrap, 0→6) pour les heures 0–3.
+     */
+    private fun slotFor(hourOfDay: Int, dayOfWeek: Int): Pair<Int, Int> {
+        return when {
+            hourOfDay in 0..3   -> 4 to ((dayOfWeek + 6) % 7)  // nuit → 22h, jour précédent
+            hourOfDay in 4..8   -> 0 to dayOfWeek                // matin → 6h
+            hourOfDay in 9..12  -> 1 to dayOfWeek                // fin de matinée → 10h
+            hourOfDay in 13..16 -> 2 to dayOfWeek                // après-midi → 14h
+            hourOfDay in 17..20 -> 3 to dayOfWeek                // soirée → 18h
+            else                -> 4 to dayOfWeek                // 21-23h → 22h
+        }
+    }
 
     private val dateFormat = SimpleDateFormat("yyyy-MM-dd", Locale.ROOT)
 

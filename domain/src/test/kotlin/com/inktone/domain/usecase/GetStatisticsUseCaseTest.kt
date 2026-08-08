@@ -111,12 +111,12 @@ class GetStatisticsUseCaseTest {
 
         val useCase = GetStatisticsUseCase(readingSessionRepository, publicationRepository)
 
-        // 4 points : 5h→6h, 13h→14h, 21h→22h, 9h→10h
+        // 4 points sur des heures non ambiguës
         val raw = listOf(
-            HeatmapPoint(dayOfWeek = 1, hourOfDay = 5, interactionCount = 2),
-            HeatmapPoint(dayOfWeek = 1, hourOfDay = 13, interactionCount = 5),
-            HeatmapPoint(dayOfWeek = 1, hourOfDay = 21, interactionCount = 3),
-            HeatmapPoint(dayOfWeek = 1, hourOfDay = 9, interactionCount = 1),
+            HeatmapPoint(dayOfWeek = 1, hourOfDay = 7, interactionCount = 2),  // → 6h
+            HeatmapPoint(dayOfWeek = 1, hourOfDay = 13, interactionCount = 5), // → 14h
+            HeatmapPoint(dayOfWeek = 1, hourOfDay = 21, interactionCount = 3), // → 22h
+            HeatmapPoint(dayOfWeek = 1, hourOfDay = 9, interactionCount = 1),  // → 10h
         )
         val slots = useCase.computeHeatmapSlots(raw)
 
@@ -131,5 +131,19 @@ class GetStatisticsUseCaseTest {
         // 5h → slot 6h (slotIndex 0)
         val slot6h = slots.first { it.slotIndex == 0 }
         assertTrue(slot6h.intensity <= 1f)
+    }
+
+    @Test
+    fun heatmap_midnight_0_a_3_remonte_sur_22h_jour_precedent() = runTest {
+        val useCase = GetStatisticsUseCase(FakeReadingSessionRepository(), FakePublicationRepository())
+
+        // Mardi (dayOfWeek=2) à 2h du matin → lundi (1) soir, slot 22h
+        val raw = listOf(HeatmapPoint(dayOfWeek = 2, hourOfDay = 2, interactionCount = 1))
+        val slots = useCase.computeHeatmapSlots(raw)
+
+        assertEquals(1, slots.size)
+        assertEquals(4, slots.first().slotIndex) // 22h
+        assertEquals(1, slots.first().dayOfWeek) // lundi
+        assertEquals(1f, slots.first().intensity)
     }
 }
