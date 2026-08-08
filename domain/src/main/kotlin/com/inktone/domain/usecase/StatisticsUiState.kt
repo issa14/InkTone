@@ -59,6 +59,7 @@ data class ActivityChartState(
     val dailyStats: List<DailyReadingStats>,
     val variationPercent: String,
     val heatmapSlots: List<HeatmapSlot>,
+    val peakSlotIndex: Int?,
     val period: StatsPeriod,
     val periodTotalFormatted: String,
 )

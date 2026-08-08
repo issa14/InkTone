@@ -30,6 +30,7 @@ data class StatisticsResult(
     val totalWordsRead: Long,
     val dailyStats: List<com.inktone.domain.model.DailyReadingStats>,
     val heatmapSlots: List<HeatmapSlot>,
+    val peakSlotIndex: Int?,
 )
 
 /**
@@ -90,6 +91,7 @@ class GetStatisticsUseCase(
                 ?.let { (it.visualMs + it.ttsMs) / 60_000L } ?: 0L
 
             val heatmapSlots = computeHeatmapSlots(heatmapRaw)
+            val peakSlotIndex = computePeakSlotIndex(heatmapRaw)
 
             StatisticsResult(
                 totalVisualMs = totals.totalVisualMs,
@@ -102,6 +104,7 @@ class GetStatisticsUseCase(
                 totalWordsRead = totals.totalWordsRead,
                 dailyStats = dailyStats,
                 heatmapSlots = heatmapSlots,
+                peakSlotIndex = peakSlotIndex,
             )
         }
         emit(result)
@@ -176,6 +179,34 @@ class GetStatisticsUseCase(
         }
     }
 
+    /**
+     * Détermine le créneau le plus actif (label « Pic : XXh »), sur les
+     * comptes bruts agrégés sur tous les jours — jamais sur
+     * `HeatmapSlot.intensity`, qui est normalisée *par créneau*
+     * (`computeHeatmapSlots` ci-dessus : chaque créneau a son propre
+     * maximum ramené à 1.0, par choix assumé pour la couleur de la
+     * grille). Dès qu'il y a de l'activité dans plus d'un créneau
+     * horaire, plusieurs créneaux atteignent 1.0 chacun sur leur propre
+     * échelle : un `maxByOrNull` sur l'intensité départagerait alors une
+     * égalité arbitrairement, dans un ordre qui dépend en plus de
+     * l'ordre de retour de `GROUP BY` (non garanti par SQLite en
+     * l'absence d'`ORDER BY`). Ici, égalité départagée par le créneau le
+     * plus tôt dans la journée — déterministe, reproductible.
+     */
+    internal fun computePeakSlotIndex(raw: List<HeatmapPoint>): Int? {
+        if (raw.isEmpty()) return null
+
+        val totalsBySlot = IntArray(HEATMAP_SLOT_COUNT)
+        for (point in raw) {
+            val (slotIndex, _) = slotFor(point.hourOfDay, point.dayOfWeek)
+            totalsBySlot[slotIndex] += point.interactionCount
+        }
+
+        val maxTotal = totalsBySlot.max()
+        if (maxTotal == 0) return null
+        return totalsBySlot.indexOfFirst { it == maxTotal }
+    }
+
     // ───── Helpers ─────
 
     /**
@@ -210,5 +241,10 @@ class GetStatisticsUseCase(
         } catch (_: Exception) {
             null
         }
+    }
+
+    private companion object {
+        // 5 créneaux UX : 6h, 10h, 14h, 18h, 22h (voir slotFor).
+        const val HEATMAP_SLOT_COUNT = 5
     }
 }

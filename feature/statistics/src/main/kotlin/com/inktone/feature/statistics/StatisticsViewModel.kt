@@ -102,6 +102,7 @@ class StatisticsViewModel @Inject constructor(
             dailyStats = windowedStats,
             variationPercent = computeVariation(dailyStats, windowDays),
             heatmapSlots = heatmapSlots,
+            peakSlotIndex = peakSlotIndex,
             period = period,
             periodTotalFormatted = formatDuration(periodTotalMs),
         )

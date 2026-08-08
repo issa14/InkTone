@@ -298,7 +298,7 @@ private fun Section2Charts(activity: com.inktone.domain.usecase.ActivityChartSta
         }
 
         // Heatmap
-        HeatmapChart(activity.heatmapSlots)
+        HeatmapChart(activity.heatmapSlots, activity.peakSlotIndex)
 
         // Histogramme
         HistogramChart(activity.dailyStats)
@@ -331,12 +331,16 @@ private val SLOT_NAMES = listOf("6h", "10h", "14h", "18h", "22h")
 
 // ───── Heatmap Canvas ─────
 
+// Grille de la heatmap : hauteur totale et hauteur par ligne partagées entre
+// le Canvas et l'axe des créneaux horaires pour qu'ils restent alignés.
+private val HEATMAP_GRID_HEIGHT = 150.dp
+private val HEATMAP_ROW_HEIGHT = HEATMAP_GRID_HEIGHT / SLOT_NAMES.size
+
 @Composable
-private fun HeatmapChart(slots: List<com.inktone.domain.usecase.HeatmapSlot>) {
+private fun HeatmapChart(slots: List<com.inktone.domain.usecase.HeatmapSlot>, peakSlotIndex: Int?) {
     fun displayIndex(sqlDay: Int) = if (sqlDay == 0) 6 else sqlDay - 1
 
-    val peakSlot = remember(slots) { slots.maxByOrNull { it.intensity } }
-    val peakLabel = if (peakSlot != null) "Pic : ${SLOT_NAMES[peakSlot.slotIndex]}" else ""
+    val peakLabel = peakSlotIndex?.let { "Pic : ${SLOT_NAMES[it]}" } ?: ""
 
     ElevatedCard(shape = RoundedCornerShape(16.dp), modifier = Modifier.fillMaxWidth()) {
         Column(modifier = Modifier.padding(InkToneSpacing.cardPadding)) {
@@ -350,38 +354,47 @@ private fun HeatmapChart(slots: List<com.inktone.domain.usecase.HeatmapSlot>) {
 
             val accent = MaterialTheme.colorScheme.primary
 
-            Canvas(modifier = Modifier.fillMaxWidth().height(150.dp)) {
-                val cols = 7
-                val rows = 5
-                val cellW = size.width / cols
-                val cellH = size.height / rows
+            Row(modifier = Modifier.fillMaxWidth()) {
+                // Axe des créneaux horaires — une ligne de texte par ligne de
+                // grille, alignée via la même hauteur (HEATMAP_ROW_HEIGHT).
+                Column(modifier = Modifier.width(28.dp)) {
+                    SLOT_NAMES.forEach { name ->
+                        Box(modifier = Modifier.height(HEATMAP_ROW_HEIGHT).fillMaxWidth(), contentAlignment = Alignment.CenterStart) {
+                            Text(name, style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                        }
+                    }
+                }
+                Spacer(Modifier.width(4.dp))
+                Column(modifier = Modifier.weight(1f)) {
+                    Canvas(modifier = Modifier.fillMaxWidth().height(HEATMAP_GRID_HEIGHT)) {
+                        val cols = 7
+                        val rows = SLOT_NAMES.size
+                        val cellW = size.width / cols
+                        val cellH = size.height / rows
 
-                val sepX = 5 * cellW
-                drawLine(accent.copy(alpha = 0.15f), Offset(sepX, 0f), Offset(sepX, size.height), strokeWidth = 2.dp.toPx())
+                        val sepX = 5 * cellW
+                        drawLine(accent.copy(alpha = 0.15f), Offset(sepX, 0f), Offset(sepX, size.height), strokeWidth = 2.dp.toPx())
 
-                for (slot in slots) {
-                    val x = displayIndex(slot.dayOfWeek) * cellW
-                    val y = slot.slotIndex * cellH
-                    drawRoundRect(
-                        color = accent.copy(alpha = slot.intensity.coerceIn(0f, 1f)),
-                        topLeft = Offset(x + 2.dp.toPx(), y + 2.dp.toPx()),
-                        size = Size(cellW - 4.dp.toPx(), cellH - 4.dp.toPx()),
-                        cornerRadius = CornerRadius(4.dp.toPx()),
-                    )
+                        for (slot in slots) {
+                            val x = displayIndex(slot.dayOfWeek) * cellW
+                            val y = slot.slotIndex * cellH
+                            drawRoundRect(
+                                color = accent.copy(alpha = slot.intensity),
+                                topLeft = Offset(x + 2.dp.toPx(), y + 2.dp.toPx()),
+                                size = Size(cellW - 4.dp.toPx(), cellH - 4.dp.toPx()),
+                                cornerRadius = CornerRadius(4.dp.toPx()),
+                            )
+                        }
+                    }
+                    Spacer(Modifier.height(4.dp))
+                    Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceEvenly) {
+                        DAY_LABELS.forEach { day ->
+                            Text(day, style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.onSurfaceVariant, textAlign = TextAlign.Center, modifier = Modifier.weight(1f))
+                        }
+                    }
                 }
             }
-
-            Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceEvenly) {
-                DAY_LABELS.forEach { day ->
-                    Text(day, style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.onSurfaceVariant, textAlign = TextAlign.Center, modifier = Modifier.weight(1f))
-                }
-            }
-            Spacer(Modifier.height(4.dp))
-            Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
-                Text("Matin", style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
-                Text("Soir", style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
-            }
-            Spacer(Modifier.height(4.dp))
+            Spacer(Modifier.height(8.dp))
             // Légende d'intensité
             Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.Center, verticalAlignment = Alignment.CenterVertically) {
                 Text("Inactif", style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.onSurfaceVariant)

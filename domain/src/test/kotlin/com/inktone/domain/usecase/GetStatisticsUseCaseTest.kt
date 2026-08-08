@@ -147,4 +147,43 @@ class GetStatisticsUseCaseTest {
         assertEquals(1, slots.first().dayOfWeek) // lundi
         assertEquals(1f, slots.first().intensity)
     }
+
+    @Test
+    fun pic_ignore_l_intensite_normalisee_et_compare_les_comptes_bruts() = runTest {
+        val useCase = GetStatisticsUseCase(FakeReadingSessionRepository(), FakePublicationRepository())
+
+        // Meme jeu de donnees que heatmap_slot_regroupe_les_heures_brutes_en_5_creneaux :
+        // un seul jour de donnees par creneau, donc les 4 creneaux ont chacun une
+        // intensite normalisee de 1.0 (chacun est son propre max). Avant le fix,
+        // maxByOrNull sur l'intensite ne pouvait pas departager cette egalite de
+        // maniere fiable. Ici, 14h (5 interactions) doit gagner sur les comptes bruts.
+        val raw = listOf(
+            HeatmapPoint(dayOfWeek = 1, hourOfDay = 7, interactionCount = 2),  // → 6h
+            HeatmapPoint(dayOfWeek = 1, hourOfDay = 13, interactionCount = 5), // → 14h (le plus actif)
+            HeatmapPoint(dayOfWeek = 1, hourOfDay = 21, interactionCount = 3), // → 22h
+            HeatmapPoint(dayOfWeek = 1, hourOfDay = 9, interactionCount = 1),  // → 10h
+        )
+
+        assertEquals(2, useCase.computePeakSlotIndex(raw)) // slotIndex 2 = 14h
+    }
+
+    @Test
+    fun pic_departage_une_egalite_par_le_creneau_le_plus_tot() = runTest {
+        val useCase = GetStatisticsUseCase(FakeReadingSessionRepository(), FakePublicationRepository())
+
+        // 6h (slot 0) et 18h (slot 3) ont exactement le meme total agrege (3) :
+        // le departage doit etre deterministe, pas dependant d'un ordre SQL non garanti.
+        val raw = listOf(
+            HeatmapPoint(dayOfWeek = 1, hourOfDay = 6, interactionCount = 3),  // → 6h
+            HeatmapPoint(dayOfWeek = 2, hourOfDay = 18, interactionCount = 3), // → 18h
+        )
+
+        assertEquals(0, useCase.computePeakSlotIndex(raw)) // 6h retenu, le plus tot
+    }
+
+    @Test
+    fun pic_absent_sans_donnees() = runTest {
+        val useCase = GetStatisticsUseCase(FakeReadingSessionRepository(), FakePublicationRepository())
+        assertEquals(null, useCase.computePeakSlotIndex(emptyList()))
+    }
 }
