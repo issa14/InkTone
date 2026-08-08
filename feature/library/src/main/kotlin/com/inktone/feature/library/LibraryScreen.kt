@@ -100,6 +100,7 @@ fun LibraryScreen(
     viewModel: LibraryViewModel = hiltViewModel(),
     floatingActionButton: @Composable () -> Unit = {},
     floatingAudioButton: @Composable () -> Unit = {},
+    onOpenRecents: () -> Unit = {},
     onOpenBookmarks: () -> Unit = {},
     onOpenStats: () -> Unit = {},
     onImportClick: () -> Unit = {},
@@ -139,6 +140,10 @@ fun LibraryScreen(
             DismissibleDrawerSheet {
                 LibraryDrawerContent(
                     onSelectLibrary = { scope.launch { drawerState.close() } },
+                    onOpenRecents = {
+                        scope.launch { drawerState.close() }
+                        onOpenRecents()
+                    },
                     onOpenBookmarks = {
                         scope.launch { drawerState.close() }
                         onOpenBookmarks()
@@ -247,6 +252,7 @@ fun LibraryScreen(
 internal fun LibraryDrawerContent(
     onOpenBookmarks: () -> Unit,
     onOpenStats: () -> Unit,
+    onOpenRecents: () -> Unit = {},
     onSelectLibrary: () -> Unit = {},
     onOpenSettings: () -> Unit = {},
     onOpenAbout: () -> Unit = {},
@@ -276,6 +282,19 @@ internal fun LibraryDrawerContent(
             )
         }
         Column(Modifier.padding(16.dp)) {
+        // Récents — Lot 8, en première position des destinations (cible
+        // UX). Destination à part entière qui navigue vers un écran
+        // dédié : ne JAMAIS reproduire le défaut de l'item mort supprimé
+        // au lot 1, dont le onClick posait un filtre sur la Bibliothèque
+        // au lieu de naviguer. Icône `AppIcons.Recents` (horloge
+        // d'historique) — pas `AppIcons.Loading` (sablier), défaut de
+        // l'item historique corrigé par suppression au lot 1.
+        NavigationDrawerItem(
+            label = { Text("Récents") },
+            icon = { Icon(AppIcons.Recents, contentDescription = null) },
+            selected = false,
+            onClick = onOpenRecents,
+        )
         // Bibliotheque — destination a part entiere, toujours active par
         // defaut : LibraryDrawerContent n'est monte que depuis l'ecran
         // Bibliotheque lui-meme, il n'y a pas d'autre etat possible.

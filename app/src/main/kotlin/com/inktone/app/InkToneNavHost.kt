@@ -37,6 +37,7 @@ import com.inktone.feature.library.LibraryDetailCategory
 import com.inktone.feature.library.LibraryDetailScreen
 import com.inktone.feature.library.LibraryItemsScreen
 import com.inktone.feature.library.LibraryScreen
+import com.inktone.feature.library.RecentsScreen
 import com.inktone.feature.reader.ReaderIntent
 import com.inktone.feature.reader.ReaderScreen
 import com.inktone.feature.reader.ReaderViewModel
@@ -75,6 +76,7 @@ fun InkToneNavHost(navController: NavHostController = rememberNavController()) {
             }
             LibraryScreen(
                 onNavigateToReader = { publicationId -> navController.navigate(ReaderRoute(publicationId)) },
+                onOpenRecents = { navController.navigate(RecentsRoute) },
                 onOpenBookmarks = { navController.navigate(BookmarksRoute) },
                 onOpenStats = { navController.navigate(StatisticsRoute) },
                 onOpenSettings = { navController.navigate(SettingsRoute) },
@@ -89,6 +91,12 @@ fun InkToneNavHost(navController: NavHostController = rememberNavController()) {
                 floatingActionButton = { ImportPickerButton() },
             )
             } // CompositionLocalProvider
+        }
+        composable<RecentsRoute> {
+            RecentsScreen(
+                onNavigateToReader = { publicationId -> navController.navigate(ReaderRoute(publicationId)) },
+                onBack = navController::popBackStack,
+            )
         }
         composable<ReaderRoute> { entry ->
             CompositionLocalProvider(LocalAnimatedVisibilityScope provides this@composable) {
