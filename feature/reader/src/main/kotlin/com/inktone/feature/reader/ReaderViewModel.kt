@@ -9,7 +9,9 @@ import com.inktone.domain.model.Bookmark
 import com.inktone.domain.model.EffectiveReadingSettings
 import com.inktone.domain.model.Publication
 import com.inktone.domain.model.PublicationFormat
+import com.inktone.domain.model.ReadingMode as DomainReadingMode
 import com.inktone.domain.model.ReadingOverrides
+import com.inktone.domain.model.ReadingSession
 import com.inktone.domain.model.ReadingState
 import com.inktone.domain.model.SleepTimerState
 import com.inktone.domain.model.TtsEngineId
@@ -19,9 +21,11 @@ import com.inktone.domain.repository.AnnotationRepository
 import com.inktone.domain.repository.BookmarkRepository
 import com.inktone.domain.repository.PreferencesRepository
 import com.inktone.domain.repository.PublicationRepository
+import com.inktone.domain.repository.ReadingSessionRepository
 import com.inktone.domain.repository.VoiceProfileRepository
 import com.inktone.domain.service.ParseResult
 import com.inktone.domain.service.PublicationParser
+import com.inktone.domain.service.ReadingSessionTracker
 import com.inktone.domain.service.TtsEngine
 import com.inktone.domain.usecase.AddAnnotationUseCase
 import com.inktone.domain.usecase.CreateBookmarkUseCase
@@ -31,6 +35,7 @@ import com.inktone.domain.usecase.GetVoiceProfilesUseCase
 import com.inktone.domain.usecase.UpdateReadingStateUseCase
 import com.inktone.domain.valueobject.Locator
 import dagger.hilt.android.lifecycle.HiltViewModel
+import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.MutableStateFlow
@@ -63,6 +68,8 @@ class ReaderViewModel @Inject constructor(
     private val bookmarkRepository: BookmarkRepository,
     private val createBookmark: CreateBookmarkUseCase,
     private val deleteBookmark: DeleteBookmarkUseCase,
+    // ───── Lot Sessions ─────
+    private val readingSessionRepository: ReadingSessionRepository,
 ) : ViewModel() {
 
     private val _state = MutableStateFlow(ReaderUiState())
@@ -94,6 +101,12 @@ class ReaderViewModel @Inject constructor(
     private val sentenceAudioBuffer = SentenceAudioBuffer(viewModelScope, ttsEngine)
     private val annotationSelectionHandler = AnnotationSelectionHandler()
     private var sleepTimerJob: Job? = null
+
+    // ───── Lot Sessions ─────
+    private var sessionTracker: ReadingSessionTracker? = null
+    private var checkpointJob: Job? = null
+    private var lastFragmentSavedMs: Long = 0L
+    // ───── Fin Lot Sessions ─────
 
     // 3d.5 — rappel de repos oculaire : eyeRestReminderJob porte le délai
     // jusqu'à l'échéance (relancé à chaque reprise, jamais deux en
@@ -293,6 +306,15 @@ class ReaderViewModel @Inject constructor(
             when (val result = publicationParser.parse(publication.fileUri)) {
                 is ParseResult.Success -> {
                     currentPublicationId = publicationId
+
+                    // ───── Lot Sessions : démarre le tracking ─────
+                    val tracker = ReadingSessionTracker(publicationId)
+                    sessionTracker = tracker
+                    lastFragmentSavedMs = tracker.startTimestamp
+                    tracker.resume(DomainReadingMode.VISUAL)
+                    startCheckpointTimer()
+                    // ───── Fin Lot Sessions ─────
+
                     val restored = getReadingState(publicationId)
                     val effectiveSettings = EffectiveReadingSettings.resolve(
                         overrides = restored?.overrides,
@@ -603,6 +625,10 @@ class ReaderViewModel @Inject constructor(
             val index = _state.value.currentSentenceIndex
             val publicationId = currentPublicationId ?: return@launch
 
+            // ───── Lot Sessions : bascule en mode TTS ─────
+            sessionTracker?.switchMode(DomainReadingMode.AUDIO)
+            // ───── Fin Lot Sessions ─────
+
             if (index >= sentences.size) {
                 // Fin de chapitre → auto-avance chapitre suivant si possible.
                 // navigateToChapter() (appelée par NextChapter) relance elle-même
@@ -674,6 +700,10 @@ class ReaderViewModel @Inject constructor(
         playbackJob?.cancel()
         audioSegmentPlayer.stop()
         _state.value = _state.value.copy(isPlaying = false, isAudioActive = false, highlightedWordRange = null)
+
+        // ───── Lot Sessions : retour en mode visuel ─────
+        sessionTracker?.switchMode(DomainReadingMode.VISUAL)
+        // ───── Fin Lot Sessions ─────
     }
 
     /**
@@ -826,12 +856,83 @@ class ReaderViewModel @Inject constructor(
      * de jouer après la destruction de l'écran.
      */
     override fun onCleared() {
+        // ───── Lot Sessions : sauvegarde finale + arrêt timer ─────
+        saveCurrentFragment()
+        checkpointJob?.cancel()
+        // ───── Fin Lot Sessions ─────
+
         super.onCleared()
         audioSegmentPlayer.stop()
         sleepTimerJob?.cancel()
         scrollPersistJob?.cancel()
         eyeRestReminderJob?.cancel()
         eyeRestCountdownJob?.cancel()
+    }
+
+    // ═══════════════════════════════════════════════
+    // Lot Sessions — checkpointing et persistance
+    // ═══════════════════════════════════════════════
+
+    /**
+     * Appelé par [ReaderScreen] quand l'activité passe en arrière-plan
+     * (ON_STOP). Sauve un fragment sans pauser le tracker — les rotations
+     * d'écran n'interrompent pas le tracking continu.
+     */
+    fun onAppBackground() {
+        saveCurrentFragment()
+    }
+
+    /** Timer de checkpoint : sauve un fragment toutes les 5 minutes. */
+    private fun startCheckpointTimer() {
+        checkpointJob?.cancel()
+        checkpointJob = viewModelScope.launch {
+            while (true) {
+                delay(CHECKPOINT_INTERVAL_MS)
+                val t = sessionTracker ?: continue
+                if (t.isPaused) continue
+                val (v, tts) = t.snapshot()
+                if (v + tts < 5_000L) continue
+                persistFragment(v, tts)
+                t.reset()
+            }
+        }
+    }
+
+    /** Flush + save d'un fragment sans pauser le tracker. */
+    private fun saveCurrentFragment() {
+        val t = sessionTracker ?: return
+        val (v, tts) = t.snapshot()
+        if (v + tts < 5_000L) return
+        persistFragment(v, tts)
+        t.reset()
+    }
+
+    /**
+     * Insère un fragment de session en base (Dispatchers.IO).
+     * Chaque fragment est non-chevauchant : [lastFragmentSavedMs]
+     * avance à chaque sauvegarde.
+     */
+    private fun persistFragment(visualMs: Long, ttsMs: Long) {
+        val fragmentStart = lastFragmentSavedMs
+        lastFragmentSavedMs = System.currentTimeMillis()
+        viewModelScope.launch(Dispatchers.IO) {
+            readingSessionRepository.insert(
+                ReadingSession(
+                    id = java.util.UUID.randomUUID().toString(),
+                    publicationId = sessionTracker!!.publicationId,
+                    startedAt = fragmentStart,
+                    endedAt = lastFragmentSavedMs,
+                    mode = if (ttsMs >= visualMs) DomainReadingMode.AUDIO else DomainReadingMode.VISUAL,
+                    visualDurationMs = visualMs,
+                    ttsDurationMs = ttsMs,
+                )
+            )
+        }
+    }
+
+    companion object {
+        /** Intervalle de checkpoint : 5 minutes. */
+        private const val CHECKPOINT_INTERVAL_MS = 5 * 60 * 1000L
     }
 }
 

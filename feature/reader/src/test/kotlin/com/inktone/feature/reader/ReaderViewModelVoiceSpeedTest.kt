@@ -5,6 +5,7 @@ import com.inktone.core.testing.fake.FakeBookmarkRepository
 import com.inktone.core.testing.fake.FakePreferencesRepository
 import com.inktone.core.testing.fake.FakePublicationParser
 import com.inktone.core.testing.fake.FakePublicationRepository
+import com.inktone.core.testing.fake.FakeReadingSessionRepository
 import com.inktone.core.testing.fake.FakeReadingStateRepository
 import com.inktone.core.testing.fake.FakeTtsEngine
 import com.inktone.core.testing.fake.FakeVoiceProfileRepository
@@ -72,6 +73,7 @@ class ReaderViewModelVoiceSpeedTest {
             deleteBookmark = DeleteBookmarkUseCase(bookmarkRepository),
             voiceProfileRepository = voiceProfileRepository,
             getVoiceProfiles = GetVoiceProfilesUseCase(voiceProfileRepository),
+            readingSessionRepository = FakeReadingSessionRepository(),
         )
     }
 

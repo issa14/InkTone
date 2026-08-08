@@ -5,6 +5,7 @@ import com.inktone.core.testing.fake.FakeBookmarkRepository
 import com.inktone.core.testing.fake.FakePreferencesRepository
 import com.inktone.core.testing.fake.FakePublicationParser
 import com.inktone.core.testing.fake.FakePublicationRepository
+import com.inktone.core.testing.fake.FakeReadingSessionRepository
 import com.inktone.core.testing.fake.FakeReadingStateRepository
 import com.inktone.core.testing.fake.FakeTtsEngine
 import com.inktone.core.testing.fake.FakeVoiceProfileRepository
@@ -102,6 +103,7 @@ class ReaderViewModelBookmarkToggleTest {
             deleteBookmark = DeleteBookmarkUseCase(bookmarkRepository),
             voiceProfileRepository = FakeVoiceProfileRepository(),
             getVoiceProfiles = GetVoiceProfilesUseCase(FakeVoiceProfileRepository()),
+            readingSessionRepository = FakeReadingSessionRepository(),
         )
     }
 
@@ -249,6 +251,7 @@ class ReaderViewModelBookmarkToggleTest {
             deleteBookmark = DeleteBookmarkUseCase(bookmarkRepository),
             voiceProfileRepository = FakeVoiceProfileRepository(),
             getVoiceProfiles = GetVoiceProfilesUseCase(FakeVoiceProfileRepository()),
+            readingSessionRepository = FakeReadingSessionRepository(),
         )
         viewModel.onIntent(ReaderIntent.OpenPublication("pub-1"))
         dispatcher.scheduler.advanceUntilIdle()
