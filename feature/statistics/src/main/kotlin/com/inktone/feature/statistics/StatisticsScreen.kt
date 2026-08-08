@@ -326,7 +326,7 @@ private fun PeriodSelector(selected: StatsPeriod, onSelected: (StatsPeriod) -> U
 
 // ───── Constantes de heatmap (top-level, pas d'allocation par recomposition) ─────
 
-private val DAY_LABELS = listOf("L", "Ma", "Me", "J", "V", "S", "D")
+private val DAY_LABELS = listOf("Lun", "Mar", "Mer", "Jeu", "Ven", "Sam", "Dim")
 private val SLOT_NAMES = listOf("6h", "10h", "14h", "18h", "22h")
 
 // ───── Heatmap Canvas ─────
@@ -355,7 +355,7 @@ private fun HeatmapChart(slots: List<com.inktone.domain.usecase.HeatmapSlot>, pe
     ElevatedCard(shape = RoundedCornerShape(16.dp), modifier = Modifier.fillMaxWidth()) {
         Column(modifier = Modifier.padding(InkToneSpacing.cardPadding)) {
             Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
-                Text("Habitudes de lecture", style = MaterialTheme.typography.labelLarge, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                Text("Habitudes de lecture", style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.SemiBold)
                 if (peakLabel.isNotEmpty()) {
                     Text(peakLabel, style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.primary)
                 }
