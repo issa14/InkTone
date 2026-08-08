@@ -159,8 +159,6 @@ private fun DashboardContent(state: com.inktone.domain.usecase.StatisticsUiState
 @Composable
 private fun Section1Kpis(kpi: com.inktone.domain.usecase.KpiState) {
     Column(verticalArrangement = Arrangement.spacedBy(InkToneSpacing.md)) {
-        Text("Objectifs & KPIs", style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.SemiBold)
-
         // Bloc 1 — Objectif du jour : jauge circulaire, Série et Record en
         // regard, libellé de régularité (Tache 7.2).
         DailyGoalGauge(kpi)
@@ -212,7 +210,7 @@ private fun DailyGoalGauge(kpi: com.inktone.domain.usecase.KpiState) {
             modifier = Modifier.padding(InkToneSpacing.cardPadding).fillMaxWidth(),
             horizontalAlignment = Alignment.CenterHorizontally,
         ) {
-            Text("Objectif du jour", style = MaterialTheme.typography.labelLarge, color = MaterialTheme.colorScheme.onSurfaceVariant)
+            Text("Objectif du jour", style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.SemiBold)
             Spacer(Modifier.height(12.dp))
             Box(contentAlignment = Alignment.Center, modifier = Modifier.size(120.dp)) {
                 CircularProgressIndicator(
@@ -239,8 +237,8 @@ private fun DailyGoalGauge(kpi: com.inktone.domain.usecase.KpiState) {
             }
             Spacer(Modifier.height(16.dp))
             Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceEvenly) {
-                GoalStreakItem(icon = Icons.Outlined.TrendingUp, label = "Record", value = "${kpi.maxStreakDays} j")
                 GoalStreakItem(icon = AppIcons.Streak, label = "Série", value = "${kpi.currentStreakDays} j")
+                GoalStreakItem(icon = Icons.Outlined.TrendingUp, label = "Record", value = "${kpi.maxStreakDays} j")
             }
             Spacer(Modifier.height(8.dp))
             Text(
@@ -597,13 +595,13 @@ private fun ExportButton(viewModel: StatisticsViewModel) {
 private fun StatCard(icon: androidx.compose.ui.graphics.vector.ImageVector, label: String, value: String, modifier: Modifier = Modifier) {
     ElevatedCard(shape = RoundedCornerShape(12.dp), modifier = modifier) {
         Column(
-            modifier = Modifier.padding(12.dp),
+            modifier = Modifier.padding(12.dp).fillMaxWidth(),
             horizontalAlignment = Alignment.CenterHorizontally,
         ) {
             Icon(icon, contentDescription = null, tint = MaterialTheme.colorScheme.primary, modifier = Modifier.size(20.dp))
             Spacer(Modifier.height(4.dp))
-            Text(value, style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.SemiBold)
-            Text(label, style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+            Text(value, style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.SemiBold, textAlign = TextAlign.Center)
+            Text(label, style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.onSurfaceVariant, textAlign = TextAlign.Center)
         }
     }
 }
