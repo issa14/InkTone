@@ -242,7 +242,9 @@ Cinq actions, dans l'ordre :
 
 **Tous les items du drawer sont désormais conçus, à l'exception d'OPDS (différé volontairement à v1.x).**
 
-**État d'implémentation (lot 1) :** le drawer porte 3 destinations (Bibliothèque, Marque-pages et Notes, Statistiques de lecture) et 2 boutons de pied (Paramètres, À propos). Récents, Catalogues OPDS, Synchronisation et Thèmes sont **volontairement masqués** tant que leur écran n'existe pas — décision actée : aucune destination affichée sans écran derrière. Séries / Auteurs / Tags restent transitoirement dans le drawer jusqu'au lot 2, qui les déplace vers le flyout du titre.
+**État d'implémentation (lot 1) :** le drawer portait 3 destinations (Bibliothèque, Marque-pages et Notes, Statistiques de lecture) et 2 boutons de pied (Paramètres, À propos). Récents, Catalogues OPDS, Synchronisation et Thèmes étaient **volontairement masqués** tant que leur écran n'existait pas — décision actée : aucune destination affichée sans écran derrière. Séries / Auteurs / Tags restent transitoirement dans le drawer jusqu'au lot 2, qui les déplace vers le flyout du titre.
+
+**État d'implémentation (lot 8) :** Récents n'est plus masqué — item réactivé en première position (avant Bibliothèque), icône `AppIcons.Recents` (horloge d'historique, pas le sablier `AppIcons.Loading` de l'ancien item défectueux corrigé au lot 1). Écran dédié `RecentsScreen` (`feature/library`), topbar flèche de retour + titre seul, réutilise `PublicationListRow` en vue Liste forcée. Contenu : livres à progression ≥1%, triés par `lastOpened` décroissant, limités aux 30 plus récents. **Point tranché (Tâche 8.2) :** les livres terminés à 100% restent affichés — lecture « récemment consultés », pas « en cours de lecture » seul, pour ne pas faire disparaître un livre au moment précis où il vient d'être fini. Catalogues OPDS, Synchronisation et Thèmes restent masqués (hors périmètre de ce lot).
 
 ---
 
