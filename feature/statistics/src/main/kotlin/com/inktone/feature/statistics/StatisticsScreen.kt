@@ -58,7 +58,9 @@ import androidx.compose.ui.graphics.StrokeCap
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.text.drawText
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.rememberTextMeasurer
 import androidx.compose.ui.text.style.TextAlign
 import android.widget.Toast
 import androidx.compose.ui.unit.dp
@@ -303,7 +305,7 @@ private fun Section2Charts(activity: com.inktone.domain.usecase.ActivityChartSta
         HeatmapChart(activity.heatmapSlots, activity.peakSlotIndex)
 
         // Histogramme
-        HistogramChart(activity.dailyStats)
+        HistogramChart(activity.dailyStats, isMonthView = activity.period == StatsPeriod.MONTH)
     }
 }
 
@@ -433,7 +435,7 @@ private fun HeatmapChart(slots: List<com.inktone.domain.usecase.HeatmapSlot>, pe
 
 // ───── Histogramme Canvas ─────
 
-private fun currentDayShortLabel(): String = when (LocalDate.now().dayOfWeek) {
+private fun dayShortLabel(date: LocalDate): String = when (date.dayOfWeek) {
     DayOfWeek.MONDAY -> "L"
     DayOfWeek.TUESDAY -> "Ma"
     DayOfWeek.WEDNESDAY -> "Me"
@@ -443,9 +445,20 @@ private fun currentDayShortLabel(): String = when (LocalDate.now().dayOfWeek) {
     DayOfWeek.SUNDAY -> "D"
 }
 
+private data class HistogramAxisLabel(val index: Int, val text: String)
+
+// Zone des barres et zone réservée aux repères de l'axe X (dessinés dans le
+// même Canvas via TextMeasurer) — hauteurs disjointes pour ne jamais
+// tronquer ni les barres ni le texte.
+private val HISTOGRAM_BAR_AREA_HEIGHT = 140.dp
+private val HISTOGRAM_LABEL_AREA_HEIGHT = 18.dp
+private val HISTOGRAM_BASELINE_HEIGHT = 3.dp
+
 @Composable
-private fun HistogramChart(dailyStats: List<DailyReadingStats>) {
-    // Couleurs fixes, indépendantes de l'accent Material You : la cible UX
+private fun HistogramChart(dailyStats: List<DailyReadingStats>, isMonthView: Boolean) {
+    // Couleurs et style fixes, calculés une fois par (re)composition — jamais
+    // à l'intérieur du DrawScope du Canvas (pas d'allocation par frame).
+    // Couleurs indépendantes de l'accent Material You : la cible UX
     // distingue les deux modes par une couleur dédiée (vert lecture
     // visuelle, violet écoute TTS), contrairement à la heatmap — un seul
     // mode confondu, qui garde l'accent dynamique du thème.
@@ -453,74 +466,106 @@ private fun HistogramChart(dailyStats: List<DailyReadingStats>) {
     val visualColor = if (isDark) Color(0xFF81C784) else Color(0xFF2E7D32)
     val ttsColor = if (isDark) Color(0xFFCE93D8) else Color(0xFF8E24AA)
     val markerColor = MaterialTheme.colorScheme.primary
+    val baselineColor = Color(0xFF242320)
+    val dashColor = visualColor.copy(alpha = 0.2f)
+    val markerBgColor = markerColor.copy(alpha = 0.15f)
+    val axisTextStyle = MaterialTheme.typography.labelSmall.copy(color = markerColor, fontWeight = FontWeight.SemiBold)
 
     ElevatedCard(shape = RoundedCornerShape(16.dp), modifier = Modifier.fillMaxWidth()) {
         Column(modifier = Modifier.padding(InkToneSpacing.cardPadding)) {
             val maxMs = remember(dailyStats) {
                 dailyStats.maxOfOrNull { it.visualMs + it.ttsMs }?.coerceAtLeast(1L) ?: 1L
             }
-            // `dailyStats` est desormais dense (StatisticsViewModel.fillMissingDays) :
-            // exactement une entree par jour calendaire, alignee sur aujourd'hui.
+            // `dailyStats` est dense (StatisticsViewModel.fillMissingDays) :
+            // exactement une entrée par jour calendaire, alignée sur
+            // aujourd'hui — sa taille suit déjà isMonthView (7 ou 30).
             val barCount = dailyStats.size
 
-            Canvas(modifier = Modifier.fillMaxWidth().height(140.dp)) {
-                if (barCount == 0) return@Canvas
-                val barW = (size.width / barCount) * 0.7f
-                val gap = (size.width / barCount) * 0.3f
+            // Repères de l'axe X : le jour courant en vue Semaine, trois
+            // jalons (début, milieu, aujourd'hui) en vue Mois pour ne pas
+            // surcharger 30 colonnes étroites.
+            val axisLabels = remember(dailyStats, isMonthView) {
+                if (dailyStats.isEmpty()) {
+                    emptyList()
+                } else {
+                    val lastIndex = dailyStats.size - 1
+                    val todayLabel = dayShortLabel(LocalDate.parse(dailyStats[lastIndex].date)) + " •"
+                    if (isMonthView) {
+                        val midIndex = (lastIndex / 2).coerceIn(0, lastIndex)
+                        listOf(0, midIndex, lastIndex).distinct().map { i ->
+                            val text = if (i == lastIndex) todayLabel else dayShortLabel(LocalDate.parse(dailyStats[i].date))
+                            HistogramAxisLabel(i, text)
+                        }
+                    } else {
+                        listOf(HistogramAxisLabel(lastIndex, todayLabel))
+                    }
+                }
+            }
+            val textMeasurer = rememberTextMeasurer()
+            // Mesuré une fois hors DrawScope, réutilisé tel quel dans le Canvas.
+            val measuredLabels = remember(axisLabels, axisTextStyle) {
+                axisLabels.map { it to textMeasurer.measure(it.text, style = axisTextStyle) }
+            }
 
-                // Ligne de repère pointillée à 50%
-                val midY = size.height * 0.5f
+            Canvas(modifier = Modifier.fillMaxWidth().height(HISTOGRAM_BAR_AREA_HEIGHT + HISTOGRAM_LABEL_AREA_HEIGHT)) {
+                if (barCount == 0) return@Canvas
+                val barAreaHeight = HISTOGRAM_BAR_AREA_HEIGHT.toPx()
+                val baselineHeightPx = HISTOGRAM_BASELINE_HEIGHT.toPx()
+                val colWidth = size.width / barCount
+                val barW = colWidth * 0.7f
+                val gap = colWidth * 0.3f
+
+                // Ligne de repère pointillée à 50% de la zone des barres
+                val midY = barAreaHeight * 0.5f
                 var dashX = 0f
                 while (dashX < size.width) {
-                    drawLine(visualColor.copy(alpha = 0.2f), Offset(dashX, midY), Offset((dashX + 8.dp.toPx()).coerceAtMost(size.width), midY), strokeWidth = 1.dp.toPx())
+                    drawLine(dashColor, Offset(dashX, midY), Offset((dashX + 8.dp.toPx()).coerceAtMost(size.width), midY), strokeWidth = 1.dp.toPx())
                     dashX += 16.dp.toPx()
                 }
 
                 dailyStats.forEachIndexed { i, day ->
-                    val x = i * (barW + gap) + gap / 2
-                    val ttsH = (day.ttsMs.toFloat() / maxMs * size.height)
-                    val visualH = (day.visualMs.toFloat() / maxMs * size.height)
+                    val x = i * colWidth + gap / 2
+                    val ttsH = (day.ttsMs.toFloat() / maxMs * barAreaHeight)
+                    val visualH = (day.visualMs.toFloat() / maxMs * barAreaHeight)
                     val totalH = ttsH + visualH
 
                     // Repère de fond du jour courant (toujours la dernière
-                    // barre, la série étant dense et se terminant aujourd'hui).
+                    // colonne, la série étant dense et se terminant aujourd'hui).
                     if (i == barCount - 1) {
-                        drawRect(
-                            markerColor.copy(alpha = 0.15f),
-                            Offset(x - 2.dp.toPx(), 0f),
-                            Size(barW + 4.dp.toPx(), size.height),
-                        )
+                        drawRect(markerBgColor, Offset(x - 2.dp.toPx(), 0f), Size(barW + 4.dp.toPx(), barAreaHeight))
                     }
+
+                    // Socle systématique : matérialise CHAQUE colonne, même
+                    // sans activité. Sans lui, une journée à zéro ne
+                    // dessinait rien — la "colonne fantôme" qui donnait
+                    // l'impression d'un graphique cassé dès que peu de jours
+                    // étaient actifs. Dessiné avant les barres de données :
+                    // une vraie barre le recouvre entièrement.
+                    drawRoundRect(
+                        color = baselineColor,
+                        topLeft = Offset(x, barAreaHeight - baselineHeightPx),
+                        size = Size(barW, baselineHeightPx),
+                        cornerRadius = CornerRadius(1.dp.toPx()),
+                    )
 
                     // Empilement vertical : TTS en bas, visuel posé dessus.
                     // Le Y du visuel est dicté par la hauteur TTS en dessous.
                     if (ttsH > 1f) {
-                        drawRect(ttsColor, Offset(x, size.height - ttsH), Size(barW, ttsH))
+                        drawRect(ttsColor, Offset(x, barAreaHeight - ttsH), Size(barW, ttsH))
                     }
                     if (visualH > 1f) {
-                        drawRect(visualColor, Offset(x, size.height - totalH), Size(barW, visualH))
+                        drawRect(visualColor, Offset(x, barAreaHeight - totalH), Size(barW, visualH))
                     }
                 }
-            }
 
-            // Marqueur "jour courant" : libellé + point, aligné sur la
-            // dernière colonne (même technique que l'axe de la heatmap —
-            // une case par jour, largeur égale via weight(1f)).
-            if (barCount > 0) {
-                Spacer(Modifier.height(2.dp))
-                Row(modifier = Modifier.fillMaxWidth()) {
-                    repeat(barCount) { i ->
-                        Box(modifier = Modifier.weight(1f), contentAlignment = Alignment.Center) {
-                            if (i == barCount - 1) {
-                                Text(
-                                    "${currentDayShortLabel()} •",
-                                    style = MaterialTheme.typography.labelSmall,
-                                    fontWeight = FontWeight.SemiBold,
-                                    color = markerColor,
-                                )
-                            }
-                        }
-                    }
+                // Repères de l'axe X — centrés sur leur colonne, dessinés à
+                // partir des mesures pré-calculées (zéro measure() ici).
+                measuredLabels.forEach { (label, measured) ->
+                    val centerX = label.index * colWidth + colWidth / 2
+                    drawText(
+                        measured,
+                        topLeft = Offset(centerX - measured.size.width / 2f, barAreaHeight + 2.dp.toPx()),
+                    )
                 }
             }
 
