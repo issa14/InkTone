@@ -14,12 +14,14 @@ import org.junit.Rule
 import org.junit.Test
 
 /**
- * Lot 1/2a.5 — garde-fou du critère « zéro décoration » : un item du
+ * Lot 1/2a.5/8 — garde-fou du critère « zéro décoration » : un item du
  * drawer qui n'appelle rien fait échouer ce test. `LibraryDrawerContent`
  * est sans état (pattern `SettingsContent`, `SettingsAccessibilityTest`).
- * Depuis 2a.5, ne porte plus que 3 destinations + 2 boutons de pied —
- * les filtres/Séries/Auteurs/Tags transitoires du lot 1 sont retirés
- * (déplacés vers le flyout du titre, 2a.3).
+ * Depuis le lot 8, porte 4 destinations (Récents, Bibliothèque,
+ * Marque-pages et Notes, Statistiques de lecture) + 2 boutons de pied —
+ * les filtres/Séries/Auteurs/Tags transitoires du lot 1 restent retirés
+ * (déplacés vers le flyout du titre, 2a.3) ; Récents en revanche est une
+ * vraie destination réactivée, pas un filtre.
  */
 class LibraryDrawerContentTest {
 
@@ -40,6 +42,24 @@ class LibraryDrawerContentTest {
         }
 
         composeTestRule.onNodeWithText("Bibliothèque").performClick()
+
+        assertEquals(true, clicked)
+    }
+
+    @Test
+    fun recents_declenche_son_callback() {
+        var clicked = false
+        composeTestRule.setContent {
+            MaterialTheme {
+                LibraryDrawerContent(
+                    onOpenBookmarks = {},
+                    onOpenStats = {},
+                    onOpenRecents = { clicked = true },
+                )
+            }
+        }
+
+        composeTestRule.onNodeWithText("Récents").performClick()
 
         assertEquals(true, clicked)
     }
@@ -125,7 +145,9 @@ class LibraryDrawerContentTest {
             }
         }
 
-        composeTestRule.onAllNodesWithText("Récents").assertCountEquals(0)
+        // "Récents" retiré de cette liste au lot 8 : ce n'est plus un
+        // filtre transitoire absent, mais une destination à part entière
+        // (voir recents_declenche_son_callback ci-dessus).
         composeTestRule.onAllNodesWithText("Debug").assertCountEquals(0)
         composeTestRule.onAllNodesWithText("Thème").assertCountEquals(0)
         composeTestRule.onAllNodesWithText("Favoris").assertCountEquals(0)
@@ -145,6 +167,7 @@ class LibraryDrawerContentTest {
         }
 
         composeTestRule.onNodeWithText("Bibliothèque").assertIsSelected()
+        composeTestRule.onNodeWithText("Récents").assertIsNotSelected()
         composeTestRule.onNodeWithText("Marque-pages et Notes").assertIsNotSelected()
         composeTestRule.onNodeWithText("Statistiques de lecture").assertIsNotSelected()
     }
