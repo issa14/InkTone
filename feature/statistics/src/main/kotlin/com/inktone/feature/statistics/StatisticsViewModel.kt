@@ -4,12 +4,9 @@ import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.inktone.domain.service.ExportFormat
 import com.inktone.domain.service.StatisticsExportService
-import com.inktone.domain.model.Publication
-import com.inktone.domain.repository.PublicationRepository
-import com.inktone.domain.repository.ReadingSessionRepository
-import com.inktone.domain.repository.ReadingStateRepository
 import com.inktone.domain.usecase.ActivityChartState
 import com.inktone.domain.usecase.CurrentBookState
+import com.inktone.domain.usecase.GetCurrentBookUseCase
 import com.inktone.domain.usecase.GetStatisticsUseCase
 import com.inktone.domain.usecase.KpiState
 import com.inktone.domain.usecase.StatisticsResult
@@ -20,12 +17,10 @@ import kotlinx.coroutines.channels.Channel
 import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.combine
-import kotlinx.coroutines.flow.flow
 import kotlinx.coroutines.flow.flowOn
 import kotlinx.coroutines.flow.receiveAsFlow
 import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.launch
-import kotlinx.coroutines.withContext
 import java.io.File
 import java.util.concurrent.TimeUnit
 import javax.inject.Inject
@@ -44,10 +39,8 @@ import javax.inject.Inject
  */
 @HiltViewModel
 class StatisticsViewModel @Inject constructor(
-    private val getStatistics: GetStatisticsUseCase,
-    private val readingSessionRepository: ReadingSessionRepository,
-    private val publicationRepository: PublicationRepository,
-    private val readingStateRepository: ReadingStateRepository,
+    getStatistics: GetStatisticsUseCase,
+    getCurrentBook: GetCurrentBookUseCase,
     private val exportService: StatisticsExportService,
 ) : ViewModel() {
 
@@ -55,16 +48,14 @@ class StatisticsViewModel @Inject constructor(
     val effects = _effects.receiveAsFlow()
 
     val state: StateFlow<StatisticsUiState> = combine(
-        flow { emit(getStatistics()) },
-        flow { emit(currentBook()) },
+        getStatistics(),
+        getCurrentBook(),
     ) { rawStats, book ->
-        withContext(Dispatchers.Default) {
-            StatisticsUiState.Ready(
-                kpi = rawStats.toKpiState(),
-                activity = rawStats.toActivityState(),
-                currentBook = book?.withRemainingTime(rawStats.averageWpm),
-            )
-        }
+        StatisticsUiState.Ready(
+            kpi = rawStats.toKpiState(),
+            activity = rawStats.toActivityState(),
+            currentBook = book?.withRemainingTime(rawStats.averageWpm),
+        )
     }.flowOn(Dispatchers.Default)
         .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), StatisticsUiState.Loading)
 
@@ -109,31 +100,7 @@ class StatisticsViewModel @Inject constructor(
         return "${if (pct >= 0) "+" else ""}$pct%"
     }
 
-    // ───── Livre en cours ─────
-
-    private suspend fun currentBook(): CurrentBookState? {
-        val publicationId = readingSessionRepository.getLastReadPublicationId() ?: return null
-        val publication = publicationRepository.getById(publicationId) ?: return null
-        val readingState = readingStateRepository.get(publicationId)
-
-        val progressPercent = if (readingState != null && publication.chapterCount > 0) {
-            // chapterIndex 0-based → dernier chapitre = chapterCount-1 → +1 pour 100%
-            ((readingState.locator.chapterIndex.toFloat() + 1f) / publication.chapterCount).coerceIn(0f, 1f)
-        } else 0f
-
-        // Temps total passé sur ce livre pour l'estimation du temps restant
-        val sessions = readingSessionRepository.getByPublicationId(publicationId)
-        val totalBookTimeMs = sessions.sumOf { it.durationMs }
-
-        return CurrentBookState(
-            id = publication.id,
-            title = publication.title,
-            coverUri = publication.coverUri,
-            progressPercent = progressPercent,
-            totalBookTimeMs = totalBookTimeMs,
-            remainingTimeFormatted = null, // rempli par withRemainingTime
-        )
-    }
+    // ───── Livre en cours (formatage, pas de query) ─────
 
     /**
      * Estime le temps restant pour ce livre à partir du WPM moyen
@@ -152,15 +119,20 @@ class StatisticsViewModel @Inject constructor(
 
     fun export(format: ExportFormat) {
         viewModelScope.launch(Dispatchers.IO) {
-            val file = when (format) {
-                ExportFormat.CSV -> exportService.exportCsv()
-                ExportFormat.JSON -> exportService.exportJson()
+            try {
+                val file = when (format) {
+                    ExportFormat.CSV -> exportService.exportCsv()
+                    ExportFormat.JSON -> exportService.exportJson()
+                }
+                _effects.send(ExportEvent.Share(file, format))
+            } catch (e: Exception) {
+                _effects.send(ExportEvent.Error(e.localizedMessage ?: "Erreur d'exportation"))
             }
-            _effects.send(ExportEvent.Share(file, format))
         }
     }
 }
 
 sealed interface ExportEvent {
     data class Share(val file: File, val format: ExportFormat) : ExportEvent
+    data class Error(val message: String) : ExportEvent
 }

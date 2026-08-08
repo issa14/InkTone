@@ -4,8 +4,12 @@ import com.inktone.domain.model.FilterMode
 import com.inktone.domain.model.HeatmapPoint
 import com.inktone.domain.repository.PublicationRepository
 import com.inktone.domain.repository.ReadingSessionRepository
+import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.async
 import kotlinx.coroutines.coroutineScope
+import kotlinx.coroutines.flow.Flow
+import kotlinx.coroutines.flow.flow
+import kotlinx.coroutines.flow.flowOn
 import java.text.SimpleDateFormat
 import java.util.Locale
 import java.util.concurrent.TimeUnit
@@ -48,57 +52,55 @@ class GetStatisticsUseCase(
     private val readingSessionRepository: ReadingSessionRepository,
     private val publicationRepository: PublicationRepository,
 ) {
-    suspend operator fun invoke(): StatisticsResult = coroutineScope {
-        val thirtyDaysAgo = System.currentTimeMillis() - TimeUnit.DAYS.toMillis(30)
+    /** Retourne un Flow pour intégration directe dans `combine()` — pas de `flow { emit() }` wrapper dans le ViewModel. */
+    operator fun invoke(): Flow<StatisticsResult> = flow {
+        val result = coroutineScope {
+            val thirtyDaysAgo = System.currentTimeMillis() - TimeUnit.DAYS.toMillis(30)
+            val totalsDeferred = async { readingSessionRepository.getTotalStats() }
+            val finishedDeferred = async { publicationRepository.countFiltered(FilterMode.READ) }
+            val distinctDaysDeferred = async { readingSessionRepository.getDistinctReadingDays() }
+            val dailyStatsDeferred = async { readingSessionRepository.getDailyStatsSince(thirtyDaysAgo) }
+            val heatmapDeferred = async { readingSessionRepository.getHeatmapStatsSince(thirtyDaysAgo) }
 
-        // ───── 5 requêtes indépendantes lancées en parallèle ─────
-        val totalsDeferred = async { readingSessionRepository.getTotalStats() }
-        val finishedDeferred = async { publicationRepository.countFiltered(FilterMode.READ) }
-        val distinctDaysDeferred = async { readingSessionRepository.getDistinctReadingDays() }
-        val dailyStatsDeferred = async { readingSessionRepository.getDailyStatsSince(thirtyDaysAgo) }
-        val heatmapDeferred = async { readingSessionRepository.getHeatmapStatsSince(thirtyDaysAgo) }
+            val totals = totalsDeferred.await()
+            val finishedCount = finishedDeferred.await()
+            val distinctDays = distinctDaysDeferred.await()
+            val dailyStats = dailyStatsDeferred.await()
+            val heatmapRaw = heatmapDeferred.await()
 
-        val totals = totalsDeferred.await()
-        val finishedCount = finishedDeferred.await()
-        val distinctDays = distinctDaysDeferred.await()
-        val dailyStats = dailyStatsDeferred.await()
-        val heatmapRaw = heatmapDeferred.await()
+            val streakDays = distinctDays.mapNotNull { parseDateToEpochDay(it) }
+            val streak = computeStreak(streakDays)
+            val maxStreak = computeMaxStreak(streakDays)
 
-        // ───── Streaks (Kotlin, pas de query supplémentaire) ─────
-        val streakDays = distinctDays.mapNotNull { parseDateToEpochDay(it) }
-        val streak = computeStreak(streakDays)
-        val maxStreak = computeMaxStreak(streakDays)
+            val sessionsWithWords = readingSessionRepository.getRecentSessionsWithWords(30)
+            val averageWpm = if (sessionsWithWords.isNotEmpty()) {
+                val totalWords = sessionsWithWords.sumOf { it.wordsRead }
+                val totalMinutes = sessionsWithWords.sumOf { it.durationMs } / 60_000.0
+                if (totalMinutes > 0) (totalWords / totalMinutes).toInt() else 0
+            } else 0
 
-        // ───── WPM : 30 dernières sessions avec mots (SQL LIMIT 30) ─────
-        val sessionsWithWords = readingSessionRepository.getRecentSessionsWithWords(30)
-        val averageWpm = if (sessionsWithWords.isNotEmpty()) {
-            val totalWords = sessionsWithWords.sumOf { it.wordsRead }
-            val totalMinutes = sessionsWithWords.sumOf { it.durationMs } / 60_000.0
-            if (totalMinutes > 0) (totalWords / totalMinutes).toInt() else 0
-        } else 0
+            val todayKey = SimpleDateFormat("yyyy-MM-dd", Locale.ROOT)
+                .format(System.currentTimeMillis())
+            val todayReadingMinutes = dailyStats
+                .firstOrNull { it.date == todayKey }
+                ?.let { (it.visualMs + it.ttsMs) / 60_000L } ?: 0L
 
-        // ───── Lecture du jour : déduit du dailyStats (déjà agrégé) ─────
-        val todayKey = SimpleDateFormat("yyyy-MM-dd", Locale.ROOT)
-            .format(System.currentTimeMillis())
-        val todayReadingMinutes = dailyStats
-            .firstOrNull { it.date == todayKey }
-            ?.let { (it.visualMs + it.ttsMs) / 60_000L } ?: 0L
+            val heatmapSlots = computeHeatmapSlots(heatmapRaw)
 
-        // ───── Heatmap : regroupement en 5 créneaux ─────
-        val heatmapSlots = computeHeatmapSlots(heatmapRaw)
-
-        StatisticsResult(
-            totalVisualMs = totals.totalVisualMs,
-            totalTtsMs = totals.totalTtsMs,
-            booksFinished = finishedCount,
-            currentStreakDays = streak,
-            averageWpm = averageWpm,
-            maxStreakDays = maxStreak,
-            todayReadingMinutes = todayReadingMinutes,
-            dailyStats = dailyStats,
-            heatmapSlots = heatmapSlots,
-        )
-    }
+            StatisticsResult(
+                totalVisualMs = totals.totalVisualMs,
+                totalTtsMs = totals.totalTtsMs,
+                booksFinished = finishedCount,
+                currentStreakDays = streak,
+                averageWpm = averageWpm,
+                maxStreakDays = maxStreak,
+                todayReadingMinutes = todayReadingMinutes,
+                dailyStats = dailyStats,
+                heatmapSlots = heatmapSlots,
+            )
+        }
+        emit(result)
+    }.flowOn(Dispatchers.Default)
 
     // ───── Streak (sur des epochDays, pas des timestamps) ─────
 

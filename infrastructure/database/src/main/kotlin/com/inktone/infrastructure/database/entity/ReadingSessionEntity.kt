@@ -20,7 +20,7 @@ import androidx.room.PrimaryKey
         entity = PublicationEntity::class, parentColumns = ["id"],
         childColumns = ["publicationId"], onDelete = ForeignKey.CASCADE,
     )],
-    indices = [Index("publicationId")],
+    indices = [Index("publicationId"), Index("startedAt")],
 )
 data class ReadingSessionEntity(
     @PrimaryKey val id: String,

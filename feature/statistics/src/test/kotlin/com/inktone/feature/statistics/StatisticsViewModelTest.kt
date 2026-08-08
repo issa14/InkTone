@@ -8,6 +8,7 @@ import com.inktone.domain.model.Publication
 import com.inktone.domain.model.PublicationFormat
 import com.inktone.domain.model.ReadingMode
 import com.inktone.domain.model.ReadingSession
+import com.inktone.domain.usecase.GetCurrentBookUseCase
 import com.inktone.domain.usecase.GetStatisticsUseCase
 import com.inktone.domain.usecase.StatisticsUiState
 import kotlinx.coroutines.Dispatchers
@@ -45,9 +46,7 @@ class StatisticsViewModelTest {
     fun etat_initial_est_Loading() = runTest {
         val vm = StatisticsViewModel(
             getStatistics = GetStatisticsUseCase(FakeReadingSessionRepository(), FakePublicationRepository()),
-            readingSessionRepository = FakeReadingSessionRepository(),
-            publicationRepository = FakePublicationRepository(),
-            readingStateRepository = FakeReadingStateRepository(),
+            getCurrentBook = GetCurrentBookUseCase(FakeReadingSessionRepository(), FakePublicationRepository(), FakeReadingStateRepository()),
             exportService = FakeStatisticsExportService(),
         )
 
@@ -67,9 +66,7 @@ class StatisticsViewModelTest {
 
         val vm = StatisticsViewModel(
             getStatistics = GetStatisticsUseCase(readingSessionRepo, FakePublicationRepository()),
-            readingSessionRepository = readingSessionRepo,
-            publicationRepository = FakePublicationRepository(),
-            readingStateRepository = FakeReadingStateRepository(),
+            getCurrentBook = GetCurrentBookUseCase(readingSessionRepo, FakePublicationRepository(), FakeReadingStateRepository()),
             exportService = FakeStatisticsExportService(),
         )
 
@@ -87,9 +84,7 @@ class StatisticsViewModelTest {
     fun livre_en_cours_est_null_sans_session() = runTest {
         val vm = StatisticsViewModel(
             getStatistics = GetStatisticsUseCase(FakeReadingSessionRepository(), FakePublicationRepository()),
-            readingSessionRepository = FakeReadingSessionRepository(),
-            publicationRepository = FakePublicationRepository(),
-            readingStateRepository = FakeReadingStateRepository(),
+            getCurrentBook = GetCurrentBookUseCase(FakeReadingSessionRepository(), FakePublicationRepository(), FakeReadingStateRepository()),
             exportService = FakeStatisticsExportService(),
         )
 
@@ -112,9 +107,7 @@ class StatisticsViewModelTest {
 
         val vm = StatisticsViewModel(
             getStatistics = GetStatisticsUseCase(FakeReadingSessionRepository(), publicationRepo),
-            readingSessionRepository = readingSessionRepo,
-            publicationRepository = publicationRepo,
-            readingStateRepository = FakeReadingStateRepository(),
+            getCurrentBook = GetCurrentBookUseCase(readingSessionRepo, publicationRepo, FakeReadingStateRepository()),
             exportService = FakeStatisticsExportService(),
         )
 
@@ -137,9 +130,7 @@ class StatisticsViewModelTest {
 
         val vm = StatisticsViewModel(
             getStatistics = GetStatisticsUseCase(readingSessionRepo, FakePublicationRepository()),
-            readingSessionRepository = readingSessionRepo,
-            publicationRepository = FakePublicationRepository(),
-            readingStateRepository = FakeReadingStateRepository(),
+            getCurrentBook = GetCurrentBookUseCase(readingSessionRepo, FakePublicationRepository(), FakeReadingStateRepository()),
             exportService = FakeStatisticsExportService(),
         )
 

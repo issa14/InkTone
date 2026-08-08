@@ -40,7 +40,7 @@ class ExportStatisticsUseCase @Inject constructor(
             ExportFormat.CSV -> buildString {
                 appendLine("id,publicationId,startTimestamp,endTimestamp,visualDurationMs,ttsDurationMs")
                 sessions.forEach { s ->
-                    appendLine("${s.id},${s.publicationId},${s.startedAt},${s.endedAt ?: ""},${s.visualDurationMs},${s.ttsDurationMs}")
+                    appendLine("${s.id.escapeCsv()},${s.publicationId.escapeCsv()},${s.startedAt},${s.endedAt ?: ""},${s.visualDurationMs},${s.ttsDurationMs}")
                 }
             }
             ExportFormat.JSON -> {
@@ -61,4 +61,9 @@ class ExportStatisticsUseCase @Inject constructor(
         file.writeText(content)
         file
     }
+
+    /** Échappe une valeur CSV : guillemets si contient virgule, guillemet ou saut de ligne. */
+    private fun String.escapeCsv(): String =
+        if (any { it == ',' || it == '"' || it == '\n' || it == '\r' }) "\"${replace("\"", "\"\"")}\""
+        else this
 }

@@ -85,7 +85,7 @@ interface ReadingSessionDao {
 
     @Query("""
         SELECT * FROM reading_sessions 
-        WHERE wordsRead > 0 AND durationMs > 0 
+        WHERE wordsRead > 0 AND (visualDurationMs + ttsDurationMs) > 0 
         ORDER BY startedAt DESC 
         LIMIT :limit
     """)
@@ -107,6 +107,10 @@ interface ReadingSessionDao {
     @Query("SELECT * FROM reading_sessions")
     suspend fun getAll(): List<ReadingSessionEntity>
 
-    @Query("SELECT COALESCE(SUM(durationMs), 0) FROM reading_sessions WHERE date(startedAt / 1000, 'unixepoch') = :date")
+    @Query("""
+        SELECT COALESCE(SUM(visualDurationMs + ttsDurationMs), 0) 
+        FROM reading_sessions 
+        WHERE date(startedAt / 1000, 'unixepoch', 'localtime') = :date
+    """)
     suspend fun getTotalDurationForDate(date: String): Long
 }

@@ -222,6 +222,20 @@ val MIGRATION_16_17 = object : Migration(16, 17) {
         db.execSQL("ALTER TABLE reading_sessions ADD COLUMN ttsDurationMs INTEGER NOT NULL DEFAULT 0")
         // Peupler les nouvelles colonnes depuis l'ancien champ pour les
         // sessions préexistantes (valeur par défaut = mode visuel).
-        db.execSQL("UPDATE reading_sessions SET visualDurationMs = durationMs WHERE durationMs > 0")
+        db.execSQL("UPDATE reading_sessions SET visualDurationMs = durationMs WHERE mode != 'AUDIO' AND durationMs > 0")
+        db.execSQL("UPDATE reading_sessions SET ttsDurationMs = durationMs WHERE mode = 'AUDIO' AND durationMs > 0")
+    }
+}
+
+/**
+ * Audit Lot Statistiques : index sur `startedAt` pour les agrégations
+ * temporelles (daily stats, heatmap) + correction des sessions AUDIO
+ * qui avaient été migrées vers `visualDurationMs` par erreur (16→17
+ * ne tenait pas compte de la colonne `mode`).
+ */
+val MIGRATION_17_18 = object : Migration(17, 18) {
+    override fun migrate(db: SupportSQLiteDatabase) {
+        db.execSQL("CREATE INDEX IF NOT EXISTS index_reading_sessions_startedAt ON reading_sessions (startedAt)")
+        db.execSQL("UPDATE reading_sessions SET ttsDurationMs = visualDurationMs, visualDurationMs = 0 WHERE mode = 'AUDIO' AND visualDurationMs > 0 AND ttsDurationMs = 0")
     }
 }

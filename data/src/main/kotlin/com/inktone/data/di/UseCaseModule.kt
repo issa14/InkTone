@@ -21,6 +21,7 @@ import com.inktone.domain.usecase.DeleteAnnotationUseCase
 import com.inktone.domain.usecase.DeleteBookmarkUseCase
 import com.inktone.domain.usecase.DeleteLibraryItemUseCase
 import com.inktone.domain.usecase.ExportLibraryUseCase
+import com.inktone.domain.usecase.GetCurrentBookUseCase
 import com.inktone.domain.usecase.GetReadingStateUseCase
 import com.inktone.domain.usecase.GetStatisticsUseCase
 import com.inktone.domain.usecase.GetVoiceProfilesUseCase
@@ -152,6 +153,13 @@ object UseCaseModule {
         readingSessionRepository: ReadingSessionRepository,
         publicationRepository: PublicationRepository,
     ): GetStatisticsUseCase = GetStatisticsUseCase(readingSessionRepository, publicationRepository)
+
+    @Provides
+    fun provideGetCurrentBookUseCase(
+        readingSessionRepository: ReadingSessionRepository,
+        publicationRepository: PublicationRepository,
+        readingStateRepository: ReadingStateRepository,
+    ): GetCurrentBookUseCase = GetCurrentBookUseCase(readingSessionRepository, publicationRepository, readingStateRepository)
 
     @Provides
     @Singleton

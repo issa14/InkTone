@@ -57,6 +57,7 @@ import androidx.compose.ui.graphics.StrokeCap
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
+import android.widget.Toast
 import androidx.compose.ui.unit.dp
 import androidx.core.content.FileProvider
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
@@ -98,6 +99,9 @@ fun StatisticsScreen(
                         addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION)
                     }
                     context.startActivity(intent)
+                }
+                is ExportEvent.Error -> {
+                    Toast.makeText(context, event.message, Toast.LENGTH_LONG).show()
                 }
             }
         }
@@ -263,17 +267,19 @@ private fun Section2Charts(activity: com.inktone.domain.usecase.ActivityChartSta
     }
 }
 
+// ───── Constantes de heatmap (top-level, pas d'allocation par recomposition) ─────
+
+private val DAY_LABELS = listOf("L", "Ma", "Me", "J", "V", "S", "D")
+private val SLOT_NAMES = listOf("6h", "10h", "14h", "18h", "22h")
+
 // ───── Heatmap Canvas ─────
 
 @Composable
 private fun HeatmapChart(slots: List<com.inktone.domain.usecase.HeatmapSlot>) {
-    val dayLabels = listOf("L", "Ma", "Me", "J", "V", "S", "D")
     fun displayIndex(sqlDay: Int) = if (sqlDay == 0) 6 else sqlDay - 1
 
-    // Pic horaire : créneau le plus actif (caching via remember)
     val peakSlot = remember(slots) { slots.maxByOrNull { it.intensity } }
-    val slotNames = listOf("6h", "10h", "14h", "18h", "22h")
-    val peakLabel = if (peakSlot != null) "Pic : ${slotNames[peakSlot.slotIndex]}" else ""
+    val peakLabel = if (peakSlot != null) "Pic : ${SLOT_NAMES[peakSlot.slotIndex]}" else ""
 
     ElevatedCard(shape = RoundedCornerShape(16.dp), modifier = Modifier.fillMaxWidth()) {
         Column(modifier = Modifier.padding(InkToneSpacing.cardPadding)) {
@@ -309,7 +315,7 @@ private fun HeatmapChart(slots: List<com.inktone.domain.usecase.HeatmapSlot>) {
             }
 
             Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceEvenly) {
-                dayLabels.forEach { day ->
+                DAY_LABELS.forEach { day ->
                     Text(day, style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.onSurfaceVariant, textAlign = TextAlign.Center, modifier = Modifier.weight(1f))
                 }
             }
@@ -345,7 +351,9 @@ private fun HistogramChart(dailyStats: List<DailyReadingStats>) {
 
     ElevatedCard(shape = RoundedCornerShape(16.dp), modifier = Modifier.fillMaxWidth()) {
         Column(modifier = Modifier.padding(InkToneSpacing.cardPadding)) {
-            val maxMs = dailyStats.maxOfOrNull { it.visualMs + it.ttsMs }?.coerceAtLeast(1L) ?: 1L
+            val maxMs = remember(dailyStats) {
+                dailyStats.maxOfOrNull { it.visualMs + it.ttsMs }?.coerceAtLeast(1L) ?: 1L
+            }
             val barCount = dailyStats.size.coerceAtMost(30)
 
             Canvas(modifier = Modifier.fillMaxWidth().height(140.dp)) {
