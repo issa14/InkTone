@@ -822,7 +822,7 @@ Les 7 icônes (Sommaire, Marque-pages, Play, Thème, TT, Minuteur, Haut-parleur)
 
 **Toutes les questions en suspens ont été tranchées, y compris les deux derniers points ouverts identifiés lors de l'audit de fin de session :**
 - Icône hamburger comme déclencheur du drawer, et positionnement de b3 juste après Bibliothèque — **confirmés explicitement par Issa**.
-- Affichage d'une session mixte lecture/TTS dans l'historique par ouvrage (§ Statistiques, Section 4) — **laissé volontairement ouvert**, mécanisme exact à définir si le cas se présente en pratique, pas bloquant pour la suite.
+- Affichage d'une session mixte lecture/TTS dans l'historique par ouvrage (§ Statistiques, Section 4) — **tranché depuis (Lot 7, tâche 7.3)** : deux icônes de mode 24dp côte à côte sans mode dominant, ventilation par mode sous la durée totale, arrondi total-puis-répartition, annonce TalkBack unique. Voir § Statistiques, Section 4 pour le détail et `BookStatisticsScreen.kt`/`BookStatisticsViewModel.kt` pour l'implémentation vérifiée.
 
 ---
 
@@ -830,5 +830,4 @@ Les 7 icônes (Sommaire, Marque-pages, Play, Thème, TT, Minuteur, Haut-parleur)
 
 **Le flux général de niveau 1 est entièrement conçu.** Prochaines pistes possibles pour une future session, à définir avec Issa :
 - Niveau 2 : détail des interactions/comportements internes à chaque item du drawer (fonction précise de chaque destination, au-delà de l'apparence déjà posée).
-- Micro-point resté ouvert : affichage d'une session mixte lecture/TTS dans l'historique par ouvrage (§ Statistiques).
 - Toute reprise de contact avec le code existant (audit, phases d'exécution Claude Code) sort du périmètre de cette session de conception UX.
