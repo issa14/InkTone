@@ -35,6 +35,7 @@ import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.ElevatedCard
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.Icon
+import androidx.compose.material3.LinearProgressIndicator
 import androidx.compose.material3.ListItem
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.ModalBottomSheet
@@ -612,6 +613,12 @@ private fun Section3CurrentBook(book: com.inktone.domain.usecase.CurrentBookStat
                 Spacer(Modifier.width(12.dp))
                 Column(Modifier.weight(1f)) {
                     Text(book.title, style = MaterialTheme.typography.titleSmall, maxLines = 1)
+                    Spacer(Modifier.height(6.dp))
+                    LinearProgressIndicator(
+                        progress = { book.progressPercent },
+                        modifier = Modifier.fillMaxWidth().height(6.dp).clip(RoundedCornerShape(3.dp)),
+                    )
+                    Spacer(Modifier.height(6.dp))
                     val progressPct = (book.progressPercent * 100).toInt()
                     Text(
                         "${progressPct}% · ${book.remainingTimeFormatted ?: "—"}",
