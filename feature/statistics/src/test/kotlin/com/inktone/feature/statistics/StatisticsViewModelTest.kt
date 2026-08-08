@@ -3,6 +3,7 @@ package com.inktone.feature.statistics
 import com.inktone.core.testing.fake.FakePublicationRepository
 import com.inktone.core.testing.fake.FakeReadingSessionRepository
 import com.inktone.core.testing.fake.FakeReadingStateRepository
+import com.inktone.core.testing.fake.FakeStatisticsExportService
 import com.inktone.domain.model.Publication
 import com.inktone.domain.model.PublicationFormat
 import com.inktone.domain.model.ReadingMode
@@ -47,6 +48,7 @@ class StatisticsViewModelTest {
             readingSessionRepository = FakeReadingSessionRepository(),
             publicationRepository = FakePublicationRepository(),
             readingStateRepository = FakeReadingStateRepository(),
+            exportService = FakeStatisticsExportService(),
         )
 
         // Tant que le combine n'a pas émis, l'état initial (seed) de stateIn est Loading
@@ -68,6 +70,7 @@ class StatisticsViewModelTest {
             readingSessionRepository = readingSessionRepo,
             publicationRepository = FakePublicationRepository(),
             readingStateRepository = FakeReadingStateRepository(),
+            exportService = FakeStatisticsExportService(),
         )
 
         val state = vm.state.first { it is StatisticsUiState.Ready }
@@ -87,6 +90,7 @@ class StatisticsViewModelTest {
             readingSessionRepository = FakeReadingSessionRepository(),
             publicationRepository = FakePublicationRepository(),
             readingStateRepository = FakeReadingStateRepository(),
+            exportService = FakeStatisticsExportService(),
         )
 
         val state = vm.state.first { it is StatisticsUiState.Ready }
@@ -111,6 +115,7 @@ class StatisticsViewModelTest {
             readingSessionRepository = readingSessionRepo,
             publicationRepository = publicationRepo,
             readingStateRepository = FakeReadingStateRepository(),
+            exportService = FakeStatisticsExportService(),
         )
 
         val state = vm.state.first { it is StatisticsUiState.Ready }
@@ -135,6 +140,7 @@ class StatisticsViewModelTest {
             readingSessionRepository = readingSessionRepo,
             publicationRepository = FakePublicationRepository(),
             readingStateRepository = FakeReadingStateRepository(),
+            exportService = FakeStatisticsExportService(),
         )
 
         val state = vm.state.first { it is StatisticsUiState.Ready }

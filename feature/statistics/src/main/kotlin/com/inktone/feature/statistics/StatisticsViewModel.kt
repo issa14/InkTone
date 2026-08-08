@@ -2,6 +2,8 @@ package com.inktone.feature.statistics
 
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
+import com.inktone.domain.service.ExportFormat
+import com.inktone.domain.service.StatisticsExportService
 import com.inktone.domain.model.Publication
 import com.inktone.domain.repository.PublicationRepository
 import com.inktone.domain.repository.ReadingSessionRepository
@@ -9,19 +11,22 @@ import com.inktone.domain.repository.ReadingStateRepository
 import com.inktone.domain.usecase.ActivityChartState
 import com.inktone.domain.usecase.CurrentBookState
 import com.inktone.domain.usecase.GetStatisticsUseCase
-import com.inktone.domain.usecase.HeatmapSlot
 import com.inktone.domain.usecase.KpiState
 import com.inktone.domain.usecase.StatisticsResult
 import com.inktone.domain.usecase.StatisticsUiState
 import dagger.hilt.android.lifecycle.HiltViewModel
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.channels.Channel
 import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.combine
 import kotlinx.coroutines.flow.flow
 import kotlinx.coroutines.flow.flowOn
+import kotlinx.coroutines.flow.receiveAsFlow
 import kotlinx.coroutines.flow.stateIn
+import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
+import java.io.File
 import java.util.concurrent.TimeUnit
 import javax.inject.Inject
 
@@ -43,7 +48,11 @@ class StatisticsViewModel @Inject constructor(
     private val readingSessionRepository: ReadingSessionRepository,
     private val publicationRepository: PublicationRepository,
     private val readingStateRepository: ReadingStateRepository,
+    private val exportService: StatisticsExportService,
 ) : ViewModel() {
+
+    private val _effects = Channel<ExportEvent>(Channel.BUFFERED)
+    val effects = _effects.receiveAsFlow()
 
     val state: StateFlow<StatisticsUiState> = combine(
         flow { emit(getStatistics()) },
@@ -137,4 +146,20 @@ class StatisticsViewModel @Inject constructor(
         val remainingMs = estimatedTotalMs - totalBookTimeMs
         return copy(remainingTimeFormatted = if (remainingMs > 0) formatDuration(remainingMs) else null)
     }
+
+    // ───── Export ─────
+
+    fun export(format: ExportFormat) {
+        viewModelScope.launch(Dispatchers.IO) {
+            val file = when (format) {
+                ExportFormat.CSV -> exportService.exportCsv()
+                ExportFormat.JSON -> exportService.exportJson()
+            }
+            _effects.send(ExportEvent.Share(file, format))
+        }
+    }
+}
+
+sealed interface ExportEvent {
+    data class Share(val file: File, val format: ExportFormat) : ExportEvent
 }

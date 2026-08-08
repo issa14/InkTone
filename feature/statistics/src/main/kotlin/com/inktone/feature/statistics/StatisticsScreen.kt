@@ -1,5 +1,6 @@
 package com.inktone.feature.statistics
 
+import android.content.Intent
 import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.isSystemInDarkTheme
@@ -53,13 +54,18 @@ import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.geometry.Size
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.StrokeCap
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
+import androidx.core.content.FileProvider
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.hilt.navigation.compose.hiltViewModel
 import com.inktone.core.designsystem.InkToneSpacing
 import com.inktone.domain.model.DailyReadingStats
+import com.inktone.domain.service.ExportFormat
+import androidx.compose.runtime.LaunchedEffect
+import kotlinx.coroutines.flow.collectLatest
 
 /**
  * Tableau de bord statistiques (Lot Statistiques Palier 3).
@@ -75,10 +81,31 @@ fun StatisticsScreen(
     viewModel: StatisticsViewModel = hiltViewModel(),
 ) {
     val state by viewModel.state.collectAsStateWithLifecycle()
+    val context = LocalContext.current
+
+    LaunchedEffect(Unit) {
+        viewModel.effects.collectLatest { event ->
+            when (event) {
+                is ExportEvent.Share -> {
+                    val uri = FileProvider.getUriForFile(
+                        context,
+                        "${context.packageName}.fileprovider",
+                        event.file
+                    )
+                    val intent = Intent(Intent.ACTION_SEND).apply {
+                        type = event.format.mimeType
+                        putExtra(Intent.EXTRA_STREAM, uri)
+                        addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION)
+                    }
+                    context.startActivity(intent)
+                }
+            }
+        }
+    }
 
     when (val s = state) {
         is com.inktone.domain.usecase.StatisticsUiState.Loading -> LoadingContent()
-        is com.inktone.domain.usecase.StatisticsUiState.Ready -> DashboardContent(s, onNavigateToBookDetail)
+        is com.inktone.domain.usecase.StatisticsUiState.Ready -> DashboardContent(s, onNavigateToBookDetail, viewModel)
     }
 }
 
@@ -94,7 +121,7 @@ private fun LoadingContent() {
 // ───── Dashboard ─────
 
 @Composable
-private fun DashboardContent(state: com.inktone.domain.usecase.StatisticsUiState.Ready, onNavigateToBookDetail: (String) -> Unit) {
+private fun DashboardContent(state: com.inktone.domain.usecase.StatisticsUiState.Ready, onNavigateToBookDetail: (String) -> Unit, viewModel: StatisticsViewModel) {
     LazyColumn(
         modifier = Modifier
             .fillMaxSize()
@@ -109,7 +136,7 @@ private fun DashboardContent(state: com.inktone.domain.usecase.StatisticsUiState
         if (state.currentBook != null) {
             item { Section3CurrentBook(state.currentBook!!, onNavigateToBookDetail) }
         }
-        item { ExportButton() }
+        item { ExportButton(viewModel) }
     }
 }
 
@@ -416,7 +443,7 @@ private fun Section3CurrentBook(book: com.inktone.domain.usecase.CurrentBookStat
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
-private fun ExportButton() {
+private fun ExportButton(viewModel: StatisticsViewModel) {
     var showSheet by remember { mutableStateOf(false) }
 
     Button(
@@ -439,13 +466,19 @@ private fun ExportButton() {
                 headlineContent = { Text("Format CSV") },
                 supportingContent = { Text("Récapitulatif des sessions") },
                 leadingContent = { Icon(Icons.Outlined.BarChart, contentDescription = null) },
-                modifier = Modifier.clickable { showSheet = false },
+                modifier = Modifier.clickable {
+                    showSheet = false
+                    viewModel.export(ExportFormat.CSV)
+                },
             )
             ListItem(
                 headlineContent = { Text("Format JSON") },
                 supportingContent = { Text("Données brutes d'événements") },
                 leadingContent = { Icon(Icons.Outlined.ImportContacts, contentDescription = null) },
-                modifier = Modifier.clickable { showSheet = false },
+                modifier = Modifier.clickable {
+                    showSheet = false
+                    viewModel.export(ExportFormat.JSON)
+                },
             )
             Spacer(Modifier.height(32.dp))
         }
