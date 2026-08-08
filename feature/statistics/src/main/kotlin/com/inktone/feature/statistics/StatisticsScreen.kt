@@ -2,6 +2,7 @@ package com.inktone.feature.statistics
 
 import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.clickable
+import androidx.compose.foundation.isSystemInDarkTheme
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -215,9 +216,10 @@ private fun Section2Charts(activity: com.inktone.domain.usecase.ActivityChartSta
         ) {
             Text("Activité", style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.SemiBold)
             val isPositive = activity.variationPercent.startsWith("+")
+            val positiveGreen = if (isSystemInDarkTheme()) Color(0xFF81C784) else Color(0xFF2E7D32)
             val varColor = when {
                 activity.variationPercent == "—" -> MaterialTheme.colorScheme.onSurfaceVariant
-                isPositive -> Color(0xFF2E7D32)
+                isPositive -> positiveGreen
                 else -> MaterialTheme.colorScheme.error
             }
             Text(activity.variationPercent, style = MaterialTheme.typography.labelLarge, color = varColor)
@@ -238,8 +240,8 @@ private fun HeatmapChart(slots: List<com.inktone.domain.usecase.HeatmapSlot>) {
     val dayLabels = listOf("L", "Ma", "Me", "J", "V", "S", "D")
     fun displayIndex(sqlDay: Int) = if (sqlDay == 0) 6 else sqlDay - 1
 
-    // Pic horaire : créneau le plus actif
-    val peakSlot = slots.maxByOrNull { it.intensity }
+    // Pic horaire : créneau le plus actif (caching via remember)
+    val peakSlot = remember(slots) { slots.maxByOrNull { it.intensity } }
     val slotNames = listOf("6h", "10h", "14h", "18h", "22h")
     val peakLabel = if (peakSlot != null) "Pic : ${slotNames[peakSlot.slotIndex]}" else ""
 
@@ -331,10 +333,11 @@ private fun HistogramChart(dailyStats: List<DailyReadingStats>) {
 
                 dailyStats.takeLast(barCount).forEachIndexed { i, day ->
                     val x = i * (barW + gap) + gap / 2
-                    val visualH = (day.visualMs.toFloat() / maxMs * size.height)
                     val ttsH = (day.ttsMs.toFloat() / maxMs * size.height)
+                    val visualH = (day.visualMs.toFloat() / maxMs * size.height)
+                    val totalH = ttsH + visualH
 
-                    // Marqueur jour courant : bordure plus épaisse
+                    // Marqueur jour courant
                     if (i == barCount - 1 && barCount > 0) {
                         drawRect(
                             visualColor.copy(alpha = 0.3f),
@@ -343,11 +346,13 @@ private fun HistogramChart(dailyStats: List<DailyReadingStats>) {
                         )
                     }
 
+                    // Empilement vertical : TTS en bas, visuel posé dessus.
+                    // Le Y du visuel est dicté par la hauteur TTS en dessous.
                     if (ttsH > 1f) {
                         drawRect(ttsColor, Offset(x, size.height - ttsH), Size(barW, ttsH))
                     }
                     if (visualH > 1f) {
-                        drawRect(visualColor, Offset(x, size.height - visualH - ttsH), Size(barW, visualH))
+                        drawRect(visualColor, Offset(x, size.height - totalH), Size(barW, visualH))
                     }
                 }
             }
