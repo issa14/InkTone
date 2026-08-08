@@ -48,7 +48,7 @@ class GetStatisticsUseCaseTest {
         val result = useCase()
 
         assertEquals(1, result.booksFinished)
-        assertEquals(1000L, result.totalReadingTimeMs)
+        assertEquals(1000L, result.totalVisualMs)
     }
 
     @Test
@@ -101,7 +101,7 @@ class GetStatisticsUseCaseTest {
 
         assertEquals(500L, result.totalVisualMs)
         assertEquals(300L, result.totalTtsMs)
-        assertEquals(800L, result.totalReadingTimeMs) // calculé = totalVisualMs + totalTtsMs
+        assertEquals(800L, result.totalVisualMs + result.totalTtsMs)
     }
 
     @Test

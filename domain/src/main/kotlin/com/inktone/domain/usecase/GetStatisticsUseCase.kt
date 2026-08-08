@@ -1,7 +1,6 @@
 package com.inktone.domain.usecase
 
 import com.inktone.domain.model.FilterMode
-import com.inktone.domain.model.DailyReadingStats
 import com.inktone.domain.model.HeatmapPoint
 import com.inktone.domain.repository.PublicationRepository
 import com.inktone.domain.repository.ReadingSessionRepository
@@ -10,29 +9,25 @@ import java.text.SimpleDateFormat
 import java.util.Locale
 import java.util.concurrent.TimeUnit
 
-data class StatisticsUiState(
-    val totalReadingTimeMs: Long = 0,
-    val totalVisualMs: Long = 0,
-    val totalTtsMs: Long = 0,
-    val booksFinished: Int = 0,
-    val currentStreakDays: Int = 0,
-    val averageWpm: Int = 0,
-    val maxStreakDays: Int = 0,
-    val dailyGoalMinutes: Int = 20,
-    val todayReadingMinutes: Long = 0,
-    // Lot Statistiques Palier 1 — graphiques
-    val dailyStats: List<DailyReadingStats> = emptyList(),
-    val heatmapSlots: List<HeatmapSlot> = emptyList(),
+/**
+ * Résultat brut du UseCase statistiques (Palier 2) — toutes les valeurs
+ * sont au format brut (Long, Int, List). Le formatage en Strings
+ * ("14h 32m", "+12%") est fait par le ViewModel sur Dispatchers.Default.
+ */
+data class StatisticsResult(
+    val totalVisualMs: Long,
+    val totalTtsMs: Long,
+    val booksFinished: Int,
+    val currentStreakDays: Int,
+    val averageWpm: Int,
+    val maxStreakDays: Int,
+    val todayReadingMinutes: Long,
+    val dailyStats: List<com.inktone.domain.model.DailyReadingStats>,
+    val heatmapSlots: List<HeatmapSlot>,
 )
 
 /**
  * Créneau horaire normalisé pour la heatmap (Lot Statistiques Palier 1).
- * Les heures brutes 0-23 du DAO sont regroupées en 5 créneaux
- * conformément à la cible UX : 6h, 10h, 14h, 18h, 22h.
- *
- * [slotIndex] : 0=6h, 1=10h, 2=14h, 3=18h, 4=22h.
- * [dayOfWeek] : 0=Dimanche … 6=Samedi.
- * [intensity] : 0.0–1.0, normalisé sur le max du créneau.
  */
 data class HeatmapSlot(
     val slotIndex: Int,
@@ -52,7 +47,7 @@ class GetStatisticsUseCase(
     private val readingSessionRepository: ReadingSessionRepository,
     private val publicationRepository: PublicationRepository,
 ) {
-    suspend operator fun invoke(): StatisticsUiState {
+    suspend operator fun invoke(): StatisticsResult {
         // ───── KPIs globaux (SQL) ─────
         val totals = readingSessionRepository.getTotalStats()
         val finishedCount = publicationRepository.observeFiltered(FilterMode.READ).first().size
@@ -90,8 +85,7 @@ class GetStatisticsUseCase(
         val heatmapRaw = readingSessionRepository.getHeatmapStatsSince(thirtyDaysAgo)
         val heatmapSlots = computeHeatmapSlots(heatmapRaw)
 
-        return StatisticsUiState(
-            totalReadingTimeMs = totals.totalVisualMs + totals.totalTtsMs,
+        return StatisticsResult(
             totalVisualMs = totals.totalVisualMs,
             totalTtsMs = totals.totalTtsMs,
             booksFinished = finishedCount,

@@ -29,26 +29,41 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.hilt.navigation.compose.hiltViewModel
 import com.inktone.core.designsystem.InkToneSpacing
-import java.util.concurrent.TimeUnit
+import com.inktone.domain.usecase.StatisticsUiState
 
 /**
- * Tache 9bis.6 — porte la structure visuelle (cartes) plutot que le
- * texte brut de la Tache 8.6. Pas de graphique temporel (courbe/barres
- * par jour) : `StatisticsUiState` n'expose que 3 valeurs agregees,
- * aucune serie temporelle en base pour l'alimenter honnetement - ajouter
- * un graphique ici afficherait des donnees inventees, contraire au
- * principe du projet (Blueprint §17.2).
+ * Tableau de bord statistiques (Lot Statistiques Palier 2).
+ *
+ * L'état est exposé par le ViewModel en sealed interface
+ * ([StatisticsUiState.Loading] / [StatisticsUiState.Ready]).
+ * Les durées arrivent déjà formatées du ViewModel (ex: "14h 32m").
  */
 @Composable
 fun StatisticsScreen(viewModel: StatisticsViewModel = hiltViewModel()) {
     val state by viewModel.state.collectAsState()
 
+    when (val s = state) {
+        is StatisticsUiState.Loading -> {
+            // Rien à afficher en chargement — le ViewModel résout en ~ms
+        }
+        is StatisticsUiState.Ready -> {
+            StatisticsContent(s.kpi, s.activity, s.currentBook)
+        }
+    }
+}
+
+@Composable
+private fun StatisticsContent(
+    kpi: com.inktone.domain.usecase.KpiState,
+    activity: com.inktone.domain.usecase.ActivityChartState,
+    currentBook: com.inktone.domain.usecase.CurrentBookState?,
+) {
     Column(
         modifier = Modifier.fillMaxWidth().padding(InkToneSpacing.screenHorizontal),
         verticalArrangement = Arrangement.spacedBy(InkToneSpacing.md),
     ) {
-        // D.4 — Objectif du jour avec jauge
-        val goalProgress = (state.todayReadingMinutes.toFloat() / state.dailyGoalMinutes).coerceIn(0f, 1f)
+        // Objectif du jour avec jauge
+        val goalProgress = (kpi.todayReadingMinutes.toFloat() / kpi.dailyGoalMinutes).coerceIn(0f, 1f)
         Card(
             colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceVariant),
             shape = RoundedCornerShape(16.dp),
@@ -57,7 +72,7 @@ fun StatisticsScreen(viewModel: StatisticsViewModel = hiltViewModel()) {
             Column(modifier = Modifier.padding(InkToneSpacing.cardPadding)) {
                 Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
                     Text("Objectif du jour", style = MaterialTheme.typography.bodyMedium, color = MaterialTheme.colorScheme.onSurfaceVariant)
-                    Text("${state.todayReadingMinutes} / ${state.dailyGoalMinutes} min", style = MaterialTheme.typography.bodyMedium, fontWeight = FontWeight.SemiBold)
+                    Text("${kpi.todayReadingMinutes} / ${kpi.dailyGoalMinutes} min", style = MaterialTheme.typography.bodyMedium, fontWeight = FontWeight.SemiBold)
                 }
                 Spacer(Modifier.height(8.dp))
                 LinearProgressIndicator(
@@ -68,15 +83,16 @@ fun StatisticsScreen(viewModel: StatisticsViewModel = hiltViewModel()) {
             }
         }
 
-        // D.4 — Série + record
+        // Série + record
         Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(InkToneSpacing.md)) {
-            StatCard(icon = Icons.Outlined.CalendarMonth, label = "Série", value = "${state.currentStreakDays} j", modifier = Modifier.weight(1f))
-            StatCard(icon = Icons.Outlined.TrendingUp, label = "Record", value = "${state.maxStreakDays} j", modifier = Modifier.weight(1f))
+            StatCard(icon = Icons.Outlined.CalendarMonth, label = "Série", value = "${kpi.currentStreakDays} j", modifier = Modifier.weight(1f))
+            StatCard(icon = Icons.Outlined.TrendingUp, label = "Record", value = "${kpi.maxStreakDays} j", modifier = Modifier.weight(1f))
         }
 
-        StatCard(icon = Icons.Outlined.Speed, label = "Vitesse moyenne", value = "${state.averageWpm} WPM")
-        StatCard(icon = Icons.Outlined.Schedule, label = "Temps de lecture total", value = formatDuration(state.totalReadingTimeMs))
-        StatCard(icon = Icons.Outlined.CheckCircle, label = "Livres terminés", value = state.booksFinished.toString())
+        StatCard(icon = Icons.Outlined.Speed, label = "Vitesse moyenne", value = "${kpi.averageWpm} WPM")
+        StatCard(icon = Icons.Outlined.Schedule, label = "Temps visuel", value = kpi.totalVisualTimeFormatted)
+        StatCard(icon = Icons.Outlined.Schedule, label = "Temps TTS", value = kpi.totalTtsTimeFormatted)
+        StatCard(icon = Icons.Outlined.CheckCircle, label = "Livres terminés", value = kpi.booksFinished.toString())
     }
 }
 
@@ -97,10 +113,4 @@ private fun StatCard(icon: ImageVector, label: String, value: String, modifier: 
             }
         }
     }
-}
-
-private fun formatDuration(durationMs: Long): String {
-    val hours = TimeUnit.MILLISECONDS.toHours(durationMs)
-    val minutes = TimeUnit.MILLISECONDS.toMinutes(durationMs) % 60
-    return "${hours}h ${minutes}min"
 }
