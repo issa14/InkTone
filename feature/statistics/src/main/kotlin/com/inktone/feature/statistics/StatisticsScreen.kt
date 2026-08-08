@@ -620,8 +620,10 @@ private fun Section3CurrentBook(book: com.inktone.domain.usecase.CurrentBookStat
                     )
                     Spacer(Modifier.height(6.dp))
                     val progressPct = (book.progressPercent * 100).toInt()
+                    val remaining = book.remainingTimeFormatted
+                    val remainingLabel = if (remaining != null) "encore ≈ $remaining estimées" else "—"
                     Text(
-                        "${progressPct}% · ${book.remainingTimeFormatted ?: "—"}",
+                        "${progressPct}% · $remainingLabel",
                         style = MaterialTheme.typography.bodySmall,
                         color = MaterialTheme.colorScheme.onSurfaceVariant,
                     )
