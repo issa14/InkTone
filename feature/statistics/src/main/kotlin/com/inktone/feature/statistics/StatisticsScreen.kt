@@ -77,7 +77,6 @@ import com.inktone.domain.usecase.StatsPeriod
 import androidx.compose.runtime.LaunchedEffect
 import kotlinx.coroutines.flow.collectLatest
 import java.io.File
-import java.time.DayOfWeek
 import java.time.LocalDate
 
 /**
@@ -301,11 +300,13 @@ private fun Section2Charts(activity: com.inktone.domain.usecase.ActivityChartSta
             PeriodSelector(selected = activity.period, onSelected = onPeriodSelected)
         }
 
+        // Histogramme — juste sous l'en-tête, qu'il décrit (total, variation,
+        // sélecteur Semaine/Mois). La heatmap est indépendante de la période
+        // sélectionnée (toujours 30 jours), elle vient après.
+        HistogramChart(activity.dailyStats, isMonthView = activity.period == StatsPeriod.MONTH)
+
         // Heatmap
         HeatmapChart(activity.heatmapSlots, activity.peakSlotIndex)
-
-        // Histogramme
-        HistogramChart(activity.dailyStats, isMonthView = activity.period == StatsPeriod.MONTH)
     }
 }
 
@@ -435,15 +436,10 @@ private fun HeatmapChart(slots: List<com.inktone.domain.usecase.HeatmapSlot>, pe
 
 // ───── Histogramme Canvas ─────
 
-private fun dayShortLabel(date: LocalDate): String = when (date.dayOfWeek) {
-    DayOfWeek.MONDAY -> "L"
-    DayOfWeek.TUESDAY -> "Ma"
-    DayOfWeek.WEDNESDAY -> "Me"
-    DayOfWeek.THURSDAY -> "J"
-    DayOfWeek.FRIDAY -> "V"
-    DayOfWeek.SATURDAY -> "S"
-    DayOfWeek.SUNDAY -> "D"
-}
+// Réutilise DAY_LABELS (Lun/Mar/.../Dim) — même convention que l'axe des
+// jours de la heatmap, pour ne pas avoir deux formats d'abréviation de
+// jour différents dans le même écran.
+private fun dayShortLabel(date: LocalDate): String = DAY_LABELS[date.dayOfWeek.value - 1]
 
 private data class HistogramAxisLabel(val index: Int, val text: String)
 
@@ -497,7 +493,13 @@ private fun HistogramChart(dailyStats: List<DailyReadingStats>, isMonthView: Boo
                             HistogramAxisLabel(i, text)
                         }
                     } else {
-                        listOf(HistogramAxisLabel(lastIndex, todayLabel))
+                        // Vue Semaine : les 7 colonnes tiennent large, un
+                        // label par jour (même convention que la heatmap),
+                        // le jour courant se distinguant par le point.
+                        dailyStats.indices.map { i ->
+                            val text = if (i == lastIndex) todayLabel else dayShortLabel(LocalDate.parse(dailyStats[i].date))
+                            HistogramAxisLabel(i, text)
+                        }
                     }
                 }
             }
