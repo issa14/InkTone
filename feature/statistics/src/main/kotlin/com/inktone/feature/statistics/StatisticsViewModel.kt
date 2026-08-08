@@ -166,9 +166,9 @@ class StatisticsViewModel @Inject constructor(
      * de période de comparaison, ou "0%" si identique.
      */
     private fun computeVariation(dailyStats: List<DailyReadingStats>, windowDays: Int): String {
-        if (dailyStats.size < windowDays * 2) return "—"
-        val current = dailyStats.takeLast(windowDays).sumOf { it.visualMs + it.ttsMs }
-        val previous = dailyStats.dropLast(windowDays).takeLast(windowDays).sumOf { it.visualMs + it.ttsMs }
+        val dense = fillMissingDays(dailyStats, windowDays * 2)
+        val current = dense.takeLast(windowDays).sumOf { it.visualMs + it.ttsMs }
+        val previous = dense.dropLast(windowDays).takeLast(windowDays).sumOf { it.visualMs + it.ttsMs }
         if (previous == 0L) return "—"
         val pct = ((current - previous) * 100.0 / previous).toInt()
         return "${if (pct >= 0) "+" else ""}$pct%"

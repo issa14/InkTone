@@ -308,4 +308,67 @@ class StatisticsViewModelTest {
         // Un jour sans session est present, a zero — pas absent de la liste.
         assertTrue(ready.activity.dailyStats.any { it.visualMs == 0L && it.ttsMs == 0L })
     }
+
+    // ───── Correction du calcul de variation (fenetres calendaires, pas les N derniers jours actifs) ─────
+
+    @Test
+    fun variation_compare_les_bonnes_fenetres_calendaires_meme_avec_un_trou() = runTest {
+        val readingSessionRepo = FakeReadingSessionRepository()
+        val now = System.currentTimeMillis()
+        val oneDayMs = TimeUnit.DAYS.toMillis(1)
+
+        // Periode actuelle : J-0 a J-6, activite chaque jour.
+        for (i in 0..6) {
+            readingSessionRepo.insert(session("cur-$i", "pub-1", now - i * oneDayMs, visualMs = 60_000L))
+        }
+        // Trou calendaire de J-7 a J-20 : aucune session (la vraie semaine
+        // precedente, J-7..J-13, est donc entierement vide).
+        // Activite plus ancienne, J-21 a J-27 : avec l'ancien code (takeLast/
+        // dropLast sur la liste creuse), ces 7 entrees etaient prises a tort
+        // comme "periode precedente" puisque ce sont les 7 entrees actives
+        // juste avant les 7 dernieres, quel que soit leur veritable ecart
+        // calendaire.
+        for (i in 21..27) {
+            readingSessionRepo.insert(session("old-$i", "pub-1", now - i * oneDayMs, visualMs = 90_000L))
+        }
+
+        val vm = StatisticsViewModel(
+            getStatistics = GetStatisticsUseCase(readingSessionRepo, FakePublicationRepository()),
+            getCurrentBook = GetCurrentBookUseCase(readingSessionRepo, FakePublicationRepository(), FakeReadingStateRepository()),
+            preferencesRepository = FakePreferencesRepository(),
+            exportService = FakeStatisticsExportService(),
+        )
+        vm.onPeriodSelected(StatsPeriod.WEEK)
+
+        val ready = vm.state.first { (it as? StatisticsUiState.Ready)?.activity?.period == StatsPeriod.WEEK } as StatisticsUiState.Ready
+
+        // La vraie semaine precedente (J-7..J-13) est vide : pas de comparaison
+        // possible, et surtout pas un pourcentage calcule a partir de
+        // l'activite de J-21..J-27.
+        assertEquals("—", ready.activity.variationPercent)
+    }
+
+    @Test
+    fun variation_est_un_tiret_quand_la_periode_precedente_est_entierement_vide() = runTest {
+        val readingSessionRepo = FakeReadingSessionRepository()
+        val now = System.currentTimeMillis()
+        val oneDayMs = TimeUnit.DAYS.toMillis(1)
+
+        // Seule la semaine en cours a de l'activite, rien avant.
+        for (i in 0..6) {
+            readingSessionRepo.insert(session("cur-$i", "pub-1", now - i * oneDayMs, visualMs = 45_000L))
+        }
+
+        val vm = StatisticsViewModel(
+            getStatistics = GetStatisticsUseCase(readingSessionRepo, FakePublicationRepository()),
+            getCurrentBook = GetCurrentBookUseCase(readingSessionRepo, FakePublicationRepository(), FakeReadingStateRepository()),
+            preferencesRepository = FakePreferencesRepository(),
+            exportService = FakeStatisticsExportService(),
+        )
+        vm.onPeriodSelected(StatsPeriod.WEEK)
+
+        val ready = vm.state.first { (it as? StatisticsUiState.Ready)?.activity?.period == StatsPeriod.WEEK } as StatisticsUiState.Ready
+
+        assertEquals("—", ready.activity.variationPercent)
+    }
 }
