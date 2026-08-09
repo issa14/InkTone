@@ -44,6 +44,8 @@ import com.inktone.feature.reader.ReaderViewModel
 import com.inktone.feature.search.SearchScreen
 import com.inktone.feature.settings.PronunciationRulesScreen
 import com.inktone.feature.settings.SettingsScreen
+import com.inktone.feature.settings.ThemeGalleryScreen
+import com.inktone.feature.settings.ThemeStudioScreen
 import com.inktone.feature.statistics.BookStatisticsScreen
 import com.inktone.feature.statistics.StatisticsScreen
 
@@ -81,6 +83,7 @@ fun InkToneNavHost(navController: NavHostController = rememberNavController()) {
                 onOpenStats = { navController.navigate(StatisticsRoute) },
                 onOpenSettings = { navController.navigate(SettingsRoute) },
                 onOpenAbout = { navController.navigate(AboutRoute) },
+                onOpenThemes = { navController.navigate(ThemeGalleryRoute) },
                 onNavigateToSeriesDetail = { series -> navController.navigate(LibraryDetailRoute("series", series)) },
                 onNavigateToTagDetail = { tag -> navController.navigate(LibraryDetailRoute("tag", tag)) },
                 onImportClick = { importLauncher.launch(arrayOf("application/epub+zip", "text/plain")) },
@@ -209,6 +212,21 @@ fun InkToneNavHost(navController: NavHostController = rememberNavController()) {
             BackScaffold(title = "A propos", onBack = navController::popBackStack) {
                 AboutScreen(versionName = BuildConfig.VERSION_NAME)
             }
+        }
+        composable<ThemeGalleryRoute> {
+            ThemeGalleryScreen(
+                onBack = navController::popBackStack,
+                onOpenStudio = { themeId -> navController.navigate(ThemeStudioRoute(themeId)) },
+            )
+        }
+        composable<ThemeStudioRoute> { entry ->
+            val route = entry.toRoute<ThemeStudioRoute>()
+            ThemeStudioScreen(
+                themeId = route.themeId,
+                onSaved = navController::popBackStack,
+                onDeleted = navController::popBackStack,
+                onBack = navController::popBackStack,
+            )
         }
         composable<LibraryDetailRoute> { entry ->
             val route = entry.toRoute<LibraryDetailRoute>()
