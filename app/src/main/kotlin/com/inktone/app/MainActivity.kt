@@ -51,8 +51,14 @@ class MainActivity : ComponentActivity() {
                 val appThemeViewModel: AppThemeViewModel = hiltViewModel()
                 val useDynamicColor by appThemeViewModel.useDynamicColor.collectAsState()
                 val appTheme by appThemeViewModel.appTheme.collectAsState()
+                // Lot 10 — null tant que la préférence n'est pas encore
+                // chargée depuis Room : un seul frame de retard plutôt
+                // qu'un flash sur LibraryRoute avant redirection vers
+                // l'onboarding (piège explicite du plan, Tâche 10.4).
+                val hasSeenOnboarding by appThemeViewModel.hasSeenOnboarding.collectAsState()
                 InkToneTheme(useDynamicColor = useDynamicColor, appTheme = appTheme) {
                     Surface {
+                        if (hasSeenOnboarding == null) return@Surface
                         if (BuildConfig.DEBUG) {
                             val bootstrapViewModel: ReaderViewModel = hiltViewModel()
                             LaunchedEffect(Unit) {
@@ -72,7 +78,9 @@ class MainActivity : ComponentActivity() {
                             }
                         }
 
-                        InkToneNavHost()
+                        InkToneNavHost(
+                            startDestination = if (hasSeenOnboarding == true) LibraryRoute else OnboardingRoute,
+                        )
                     }
                 }
             }

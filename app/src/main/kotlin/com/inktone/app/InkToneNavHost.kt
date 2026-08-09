@@ -38,6 +38,7 @@ import com.inktone.feature.library.LibraryDetailScreen
 import com.inktone.feature.library.LibraryItemsScreen
 import com.inktone.feature.library.LibraryScreen
 import com.inktone.feature.library.RecentsScreen
+import com.inktone.feature.onboarding.OnboardingScreen
 import com.inktone.feature.reader.ReaderIntent
 import com.inktone.feature.reader.ReaderScreen
 import com.inktone.feature.reader.ReaderViewModel
@@ -51,7 +52,16 @@ import com.inktone.feature.statistics.StatisticsScreen
 
 /**
  * Tâche 9bis.2 — `NavHost` réel, remplace `AppScreen` (état à 3 cas,
- * Phase 7). `LibraryRoute` reste l'écran de démarrage (inchangé).
+ * Phase 7).
+ *
+ * Lot 10 — [startDestination] devient un paramètre (`OnboardingRoute` au
+ * premier lancement, `LibraryRoute` ensuite, arbitré par l'appelant sur
+ * `UserPreferences.hasSeenOnboarding` — voir `MainActivity`) plutôt qu'un
+ * `LibraryRoute` figé. Aucun `BackHandler` n'intercepte le retour système
+ * depuis la carte 1 de l'onboarding : avec un seul back stack entry, le
+ * retour système ferme l'app normalement plutôt que de laisser un écran
+ * vide — comportement par défaut de Navigation Compose, pas un cas
+ * particulier à coder.
  *
  * Retour prédictif Android : activé au niveau manifeste
  * (`android:enableOnBackInvokedCallback="true"`) — Navigation Compose
@@ -62,10 +72,22 @@ import com.inktone.feature.statistics.StatisticsScreen
  */
 @OptIn(ExperimentalSharedTransitionApi::class)
 @Composable
-fun InkToneNavHost(navController: NavHostController = rememberNavController()) {
+fun InkToneNavHost(navController: NavHostController = rememberNavController(), startDestination: Any = LibraryRoute) {
     SharedTransitionLayout {
         CompositionLocalProvider(LocalSharedTransitionScope provides this@SharedTransitionLayout) {
-        NavHost(navController = navController, startDestination = LibraryRoute) {
+        NavHost(navController = navController, startDestination = startDestination) {
+        composable<OnboardingRoute> {
+            OnboardingScreen(
+                onDone = {
+                    // Retire l'onboarding du back stack : un retour système
+                    // depuis la Bibliothèque ne doit jamais y ramener
+                    // (indicateur déjà posé, piège explicite du plan).
+                    navController.navigate(LibraryRoute) {
+                        popUpTo(OnboardingRoute) { inclusive = true }
+                    }
+                },
+            )
+        }
         composable<LibraryRoute> {
             CompositionLocalProvider(LocalAnimatedVisibilityScope provides this@composable) {
             val importViewModel: ImportViewModel = hiltViewModel()
