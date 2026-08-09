@@ -214,16 +214,17 @@ private fun FeaturesCard(accent: Color) {
     }
 }
 
+/** Pastille à 48dp et espacement à 12dp (retour Issa) : à 56dp/16dp, la colonne de texte était trop étroite et cassait les descriptions en lignes de deux mots. */
 @Composable
 private fun FeatureRow(accent: Color, icon: ImageVector, title: String, body: String) {
     Row(verticalAlignment = Alignment.Top) {
         Box(
-            Modifier.size(56.dp).clip(CircleShape).background(accent.copy(alpha = 0.1f)),
+            Modifier.size(48.dp).clip(CircleShape).background(accent.copy(alpha = 0.1f)),
             contentAlignment = Alignment.Center,
         ) {
-            Icon(icon, contentDescription = null, tint = accent, modifier = Modifier.size(28.dp))
+            Icon(icon, contentDescription = null, tint = accent, modifier = Modifier.size(24.dp))
         }
-        Spacer(Modifier.width(16.dp))
+        Spacer(Modifier.width(12.dp))
         Column(Modifier.weight(1f)) {
             Text(title, style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.Bold)
             Spacer(Modifier.height(4.dp))
