@@ -284,3 +284,39 @@ val MIGRATION_18_19 = object : Migration(18, 19) {
         db.execSQL("UPDATE reading_states SET overrideTheme = 'papier_clair' WHERE overrideTheme = 'SYSTEM'")
     }
 }
+
+/**
+ * Lot 10 : indicateur "onboarding vu", pilote le `startDestination`
+ * (Onboarding au premier lancement, Bibliothèque ensuite).
+ *
+ * `DEFAULT 1` ici est délibérément l'inverse du défaut Kotlin de
+ * `UserPreferencesEntity.hasSeenOnboarding` (`false`) : cette migration
+ * ne s'applique qu'à des lignes déjà existantes en base, c'est-à-dire des
+ * utilisateurs qui utilisaient déjà l'app avant ce lot — leur faire
+ * revoir l'onboarding après une simple mise à jour serait un défaut, pas
+ * une fonctionnalité. Une installation neuve n'a AUCUNE ligne
+ * `user_preferences` avant le premier `update()` (voir
+ * `RoomPreferencesRepository.get()`) : elle ne passe jamais par cette
+ * migration, et reçoit le défaut Kotlin `false` en mémoire tant qu'aucune
+ * ligne n'est écrite — c'est ce qui déclenche l'onboarding au tout
+ * premier lancement.
+ */
+val MIGRATION_19_20 = object : Migration(19, 20) {
+    override fun migrate(db: SupportSQLiteDatabase) {
+        db.execSQL("ALTER TABLE user_preferences ADD COLUMN hasSeenOnboarding INTEGER NOT NULL DEFAULT 1")
+    }
+}
+
+/**
+ * Lot 10 — retour Issa (vérification device) : proposition proactive de
+ * la voix neuronale au premier usage réel du TTS (`ReaderViewModel
+ * .playCurrentSentence`). `DEFAULT 0` ici (contrairement à
+ * `hasSeenOnboarding`) : contrairement à l'onboarding, il n'y a aucune
+ * raison de priver les utilisateurs déjà en base de cette proposition —
+ * elle ne leur a jamais été faite non plus.
+ */
+val MIGRATION_20_21 = object : Migration(20, 21) {
+    override fun migrate(db: SupportSQLiteDatabase) {
+        db.execSQL("ALTER TABLE user_preferences ADD COLUMN hasPromptedVoiceDownload INTEGER NOT NULL DEFAULT 0")
+    }
+}

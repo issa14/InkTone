@@ -49,6 +49,15 @@ data class UserPreferences(
     // que le préréglage d'accessibilité (Tâche 8.4) puisse la piloter. Stockée en String
     // (comme readingMode) : LibraryLayoutMode vit dans feature/library, hors de portée du domaine.
     val libraryLayoutMode: String = "GRID_COVERS",
+    // Lot 10 — indicateur "onboarding vu", pilote le startDestination
+    // (Onboarding au premier lancement, Bibliothèque ensuite).
+    val hasSeenOnboarding: Boolean = false,
+    // Lot 10 — retour Issa (vérification device) : le retrait de l'étape
+    // d'onboarding VoiceDownload avait laissé aucun point de proposition
+    // proactive au premier usage réel du TTS (la Réglages seule exige une
+    // découverte active). true dès la première proposition faite, jamais
+    // reproposé ensuite — ReaderViewModel.playCurrentSentence.
+    val hasPromptedVoiceDownload: Boolean = false,
 ) {
     init {
         require(fontSize > 0) { "fontSize doit être strictement positif" }

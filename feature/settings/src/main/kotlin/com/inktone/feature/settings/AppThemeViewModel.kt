@@ -44,4 +44,17 @@ class AppThemeViewModel @Inject constructor(
             }
         }
         .stateIn(viewModelScope, SharingStarted.Eagerly, AppThemeMode.SYSTEM)
+
+    /**
+     * Lot 10 — pilote le `startDestination` de `InkToneNavHost` depuis
+     * `MainActivity` (même contrainte Blueprint §12.4 qu'au-dessus :
+     * `app` ne voit jamais `PreferencesRepository`/`UserPreferences`
+     * directement). `null` = valeur pas encore chargée depuis Room —
+     * distinct de `false`, pour que `MainActivity` puisse retarder
+     * l'affichage d'un seul frame plutôt que de risquer un flash sur
+     * `LibraryRoute` avant de rediriger vers l'onboarding.
+     */
+    val hasSeenOnboarding: StateFlow<Boolean?> = preferencesRepository.observe()
+        .map { it.hasSeenOnboarding }
+        .stateIn(viewModelScope, SharingStarted.Eagerly, null)
 }

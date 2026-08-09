@@ -8,8 +8,6 @@ import com.inktone.domain.model.Annotation
 import com.inktone.domain.model.AnnotationColor
 import com.inktone.domain.model.Bookmark
 import com.inktone.domain.model.EffectiveReadingSettings
-import com.inktone.domain.model.Publication
-import com.inktone.domain.model.PublicationFormat
 import com.inktone.domain.model.ReadingMode as DomainReadingMode
 import com.inktone.domain.model.ReadingOverrides
 import com.inktone.domain.model.ReadingSession
@@ -153,11 +151,6 @@ class ReaderViewModel @Inject constructor(
                 }
                 openPublication(intent.publicationId, targetLocator, intent.flashOnArrival)
             }
-            is ReaderIntent.BootstrapAndOpenFixture -> {
-                if (BuildConfig.DEBUG) {
-                    bootstrapAndOpenFixture(intent.publicationId, intent.fileUri)
-                }
-            }
             is ReaderIntent.NextChapter -> navigateToChapter(_state.value.currentChapterIndex + 1)
             is ReaderIntent.PreviousChapter -> navigateToChapter(_state.value.currentChapterIndex - 1)
             is ReaderIntent.JumpToChapter -> navigateToChapter(intent.chapterIndex)
@@ -165,6 +158,7 @@ class ReaderViewModel @Inject constructor(
             is ReaderIntent.PlayCurrentSentence -> playCurrentSentence()
             is ReaderIntent.Pause -> pausePlayback()
             is ReaderIntent.DismissError -> _state.value = _state.value.copy(errorMessage = null)
+            is ReaderIntent.DismissVoiceDownloadPrompt -> _state.value = _state.value.copy(showVoiceDownloadPrompt = false)
             is ReaderIntent.ToggleReadingMode -> {
                 val newMode = if (_state.value.readingMode == ReadingMode.SCROLL) ReadingMode.PAGED else ReadingMode.SCROLL
                 _state.value = _state.value.copy(readingMode = newMode)
@@ -540,31 +534,6 @@ class ReaderViewModel @Inject constructor(
         }
     }
 
-    private fun bootstrapAndOpenFixture(publicationId: String, fileUri: String) {
-        viewModelScope.launch {
-            // Idempotent depuis que PublicationDao.insert() n'est plus
-            // OnConflictStrategy.REPLACE (Tache 7.1bis) : cette fixture a un
-            // id et un fileHash fixes, appelee a chaque lancement debug -
-            // sans cette verification, le deuxieme lancement sur un device
-            // deja utilise levait SQLiteConstraintException (crash reel
-            // observe en testant ce changement, pas suppose).
-            if (publicationRepository.getById(publicationId) == null) {
-                publicationRepository.insert(
-                    Publication(
-                        id = publicationId,
-                        title = "Fixture marche a blanc",
-                        format = PublicationFormat.EPUB,
-                        fileUri = fileUri,
-                        fileHash = "walking-skeleton-fixture-hash",
-                        fileSize = java.io.File(fileUri).length(),
-                        chapterCount = 1,
-                        importDate = System.currentTimeMillis(),
-                    ),
-                )
-            }
-        }
-    }
-
     private fun navigateToChapter(targetIndex: Int) {
         val chapters = _state.value.chapters
         if (targetIndex !in chapters.indices) return // pas de navigation hors bornes silencieuse
@@ -663,10 +632,24 @@ class ReaderViewModel @Inject constructor(
 
             val sentence = sentences[index]
             // A.5 — résout le profil vocal actif depuis les préférences utilisateur
-            val voiceProfile = resolveVoiceProfile(preferencesRepository.get())
+            val prefs = preferencesRepository.get()
+            val voiceProfile = resolveVoiceProfile(prefs)
             val segment = sentenceAudioBuffer.get(sentence, voiceProfile)
             audioSegmentPlayer.play(segment)
             _state.value = _state.value.copy(isAudioActive = true)
+
+            // Lot 10 — retour Issa (vérification device) : proposition
+            // proactive au premier usage réel du TTS, plutôt que de
+            // laisser le repli Android natif (ADR-021, FallbackTtsEngine)
+            // silencieux sans jamais suggérer la voix neuronale.
+            // ttsEngine.id reflète le moteur RÉELLEMENT actif après ce
+            // synthesize() (jamais figé, voir FallbackTtsEngine), donc
+            // couvre aussi bien "réglé sur Android natif" que "Sherpa-ONNX
+            // a échoué et le repli vient de se produire".
+            if (ttsEngine.id == TtsEngineId.ANDROID_NATIVE && !prefs.hasPromptedVoiceDownload) {
+                _state.value = _state.value.copy(showVoiceDownloadPrompt = true)
+                preferencesRepository.update(prefs.copy(hasPromptedVoiceDownload = true))
+            }
 
             // Précharge la phrase suivante pendant que celle-ci se joue
             sentences.getOrNull(index + 1)?.let {

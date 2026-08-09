@@ -111,6 +111,7 @@ fun ReaderScreen(
     onSearchClick: () -> Unit = {},
     onBack: () -> Unit = {},
     onOpenPronunciationRules: () -> Unit = {},
+    onOpenSettings: () -> Unit = {},
 ) {
     val state by viewModel.state.collectAsState()
 
@@ -854,6 +855,32 @@ fun ReaderScreen(
                     onClose = { viewModel.onIntent(ReaderIntent.ToggleBookmarkList) },
                 )
             }
+        }
+
+        // Lot 10 — retour Issa (vérification device) : proposition
+        // proactive de la voix neuronale au premier usage réel du TTS.
+        // "Télécharger" ouvre les Réglages (carte Lecture) où le
+        // téléchargement réel se confirme et se suit — pas de logique de
+        // téléchargement dupliquée ici.
+        if (state.showVoiceDownloadPrompt) {
+            androidx.compose.material3.AlertDialog(
+                onDismissRequest = { viewModel.onIntent(ReaderIntent.DismissVoiceDownloadPrompt) },
+                title = { Text("Voix neuronale disponible") },
+                text = {
+                    Text("Une voix plus naturelle peut être téléchargée (environ 126 Mo, une seule fois). La lecture visuelle et la voix actuelle restent disponibles sans cela.")
+                },
+                confirmButton = {
+                    androidx.compose.material3.TextButton(onClick = {
+                        viewModel.onIntent(ReaderIntent.DismissVoiceDownloadPrompt)
+                        onOpenSettings()
+                    }) { Text("Télécharger") }
+                },
+                dismissButton = {
+                    androidx.compose.material3.TextButton(onClick = { viewModel.onIntent(ReaderIntent.DismissVoiceDownloadPrompt) }) {
+                        Text("Plus tard")
+                    }
+                },
+            )
         }
     }
     }
