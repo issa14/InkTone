@@ -11,6 +11,7 @@ import com.inktone.domain.model.PronunciationRule
 import com.inktone.domain.model.ReadingTheme
 import com.inktone.domain.model.TtsEngineId
 import com.inktone.domain.model.VoiceProfile
+import com.inktone.domain.service.VoiceModelDownloadService
 import com.inktone.domain.usecase.ApplyAccessibilityPresetUseCase
 import com.inktone.domain.usecase.GetVoiceProfilesUseCase
 import kotlinx.coroutines.Dispatchers
@@ -57,7 +58,7 @@ class SettingsViewModelTest {
         preferencesRepository: FakePreferencesRepository = FakePreferencesRepository(),
         voiceProfileRepository: FakeVoiceProfileRepository = FakeVoiceProfileRepository(),
         pronunciationRuleRepository: FakePronunciationRuleRepository = FakePronunciationRuleRepository(),
-        voiceModelDownloadService: FakeVoiceModelDownloadService = FakeVoiceModelDownloadService(),
+        voiceModelDownloadService: VoiceModelDownloadService = FakeVoiceModelDownloadService(),
     ) = SettingsViewModel(
         preferencesRepository,
         ApplyAccessibilityPresetUseCase(preferencesRepository),
@@ -329,5 +330,34 @@ class SettingsViewModelTest {
         dispatcher.scheduler.advanceUntilIdle()
 
         assertEquals(com.inktone.domain.service.VoiceDownloadProgress.Complete, vm.state.value.voiceDownloadProgress)
+    }
+
+    @Test
+    fun `CancelVoiceDownload interrompt le telechargement en cours et efface la progression`() = runTest {
+        // Flow qui ne termine jamais seul (suspend indefiniment apres le
+        // premier evenement) : seule une annulation explicite peut
+        // l'arreter -- prouve que CancelVoiceDownload annule reellement
+        // la coroutine, pas seulement qu'elle ignore les evenements
+        // suivants d'un flow deja termine.
+        val neverEndingDownload = object : com.inktone.domain.service.VoiceModelDownloadService {
+            override fun downloadDefaultVoiceModel() = kotlinx.coroutines.flow.flow {
+                emit(com.inktone.domain.service.VoiceDownloadProgress.InProgress(50, 100))
+                kotlinx.coroutines.awaitCancellation()
+            }
+        }
+        val vm = viewModel(voiceModelDownloadService = neverEndingDownload)
+        dispatcher.scheduler.advanceUntilIdle()
+
+        vm.onIntent(SettingsIntent.StartVoiceDownload)
+        dispatcher.scheduler.advanceUntilIdle()
+        assertEquals(
+            com.inktone.domain.service.VoiceDownloadProgress.InProgress(50, 100),
+            vm.state.value.voiceDownloadProgress,
+        )
+
+        vm.onIntent(SettingsIntent.CancelVoiceDownload)
+        dispatcher.scheduler.advanceUntilIdle()
+
+        assertEquals(null, vm.state.value.voiceDownloadProgress)
     }
 }

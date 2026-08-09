@@ -88,6 +88,9 @@ sealed interface SettingsIntent {
     // Lot 10 — téléchargement de la voix neuronale par défaut, point de
     // besoin réel après le retrait de l'étape d'onboarding (Tâche 10.3).
     object StartVoiceDownload : SettingsIntent
+    // Retour Issa (vérification device) : le téléchargement doit pouvoir
+    // être annulé en cours de route, pas seulement lancé.
+    object CancelVoiceDownload : SettingsIntent
     // Conservé pour compatibilité — remplacé fonctionnellement par SetAccessibilityPreset
     object ApplyAccessibilityPreset : SettingsIntent
 

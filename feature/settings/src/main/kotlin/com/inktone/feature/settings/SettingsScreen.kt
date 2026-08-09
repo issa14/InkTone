@@ -241,6 +241,7 @@ internal fun SettingsContent(
             VoiceDownloadRow(
                 progress = voiceDownloadProgress,
                 onStart = { onIntent(SettingsIntent.StartVoiceDownload) },
+                onCancel = { onIntent(SettingsIntent.CancelVoiceDownload) },
             )
             // Lot 6 — vitesse : même cible VoiceProfile.speed que le panneau Voix du lecteur (Tâche 3d).
             SliderSetting(
@@ -760,14 +761,25 @@ private fun PresetRow(
  * Lot 10 — téléchargement de la voix neuronale par défaut (Tâche 10.3).
  * Jamais bloquant : le Palier 1 (moteur natif Android) reste utilisable
  * sans, texte assumé explicitement plutôt que sous-entendu.
+ *
+ * Retour Issa (vérification device) : confirmation avant de lancer (nom
+ * du moteur/voix + taille annoncés, pas de démarrage automatique au
+ * clic), annulation possible en cours de route, progression affichée en
+ * Mo plutôt qu'en octets bruts.
  */
 @Composable
-private fun VoiceDownloadRow(progress: com.inktone.domain.service.VoiceDownloadProgress?, onStart: () -> Unit) {
+private fun VoiceDownloadRow(
+    progress: com.inktone.domain.service.VoiceDownloadProgress?,
+    onStart: () -> Unit,
+    onCancel: () -> Unit,
+) {
+    var showConfirmDialog by remember { mutableStateOf(false) }
+
     Column(Modifier.fillMaxWidth().padding(horizontal = 20.dp, vertical = 8.dp)) {
         Text(
             when (progress) {
                 is com.inktone.domain.service.VoiceDownloadProgress.InProgress ->
-                    "Téléchargement : ${progress.bytesDownloaded} / ${progress.totalBytes} octets"
+                    "Téléchargement : ${formatMegabytes(progress.bytesDownloaded)} / ${formatMegabytes(progress.totalBytes)}"
                 is com.inktone.domain.service.VoiceDownloadProgress.Failed -> "Échec : ${progress.message}"
                 com.inktone.domain.service.VoiceDownloadProgress.Complete -> "Voix neuronale installée"
                 null -> "Améliore la qualité de la narration. La lecture visuelle reste disponible sans cela."
@@ -776,13 +788,38 @@ private fun VoiceDownloadRow(progress: com.inktone.domain.service.VoiceDownloadP
             color = MaterialTheme.colorScheme.onSurfaceVariant,
         )
         Spacer(Modifier.height(8.dp))
-        OutlinedButton(onClick = onStart, enabled = progress !is com.inktone.domain.service.VoiceDownloadProgress.InProgress) {
-            Icon(Icons.Default.Download, contentDescription = null)
-            Spacer(Modifier.width(8.dp))
-            Text("Télécharger une voix neuronale")
+        if (progress is com.inktone.domain.service.VoiceDownloadProgress.InProgress) {
+            OutlinedButton(onClick = onCancel) {
+                Text("Annuler le téléchargement")
+            }
+        } else {
+            OutlinedButton(onClick = { showConfirmDialog = true }) {
+                Icon(Icons.Default.Download, contentDescription = null)
+                Spacer(Modifier.width(8.dp))
+                Text("Télécharger une voix neuronale")
+            }
         }
     }
+
+    if (showConfirmDialog) {
+        AlertDialog(
+            onDismissRequest = { showConfirmDialog = false },
+            title = { Text("Télécharger la voix neuronale ?") },
+            text = {
+                Text("Moteur Sherpa-ONNX (voix Kokoro) · environ 126 Mo. Téléchargé une seule fois, réutilisable hors ligne ensuite.")
+            },
+            confirmButton = {
+                TextButton(onClick = { showConfirmDialog = false; onStart() }) { Text("Télécharger") }
+            },
+            dismissButton = {
+                TextButton(onClick = { showConfirmDialog = false }) { Text("Annuler") }
+            },
+        )
+    }
 }
+
+/** Retour Issa : Mo lisibles plutôt que des octets bruts ("345566/132111222"). */
+private fun formatMegabytes(bytes: Long): String = "%.1f Mo".format(bytes / 1_000_000.0)
 
 /**
  * Tâche 9.1.1 — Row entière rendue accessible via Modifier.toggleable

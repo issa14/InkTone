@@ -20,6 +20,7 @@ import com.inktone.feature.settings.di.IoDispatcher
 import dagger.hilt.android.lifecycle.HiltViewModel
 import dagger.hilt.android.qualifiers.ApplicationContext
 import kotlinx.coroutines.CoroutineDispatcher
+import kotlinx.coroutines.Job
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
@@ -59,6 +60,7 @@ class SettingsViewModel @Inject constructor(
 ) : ViewModel() {
 
     private val _state = MutableStateFlow(SettingsUiState())
+    private var voiceDownloadJob: Job? = null
     val state: StateFlow<SettingsUiState> = _state.asStateFlow()
 
     init {
@@ -135,6 +137,7 @@ class SettingsViewModel @Inject constructor(
                 // retiré de l'onboarding (Tâche 10.3). Même mécanisme que
                 // l'ancien OnboardingViewModel.startVoiceDownload.
                 is SettingsIntent.StartVoiceDownload -> startVoiceDownload()
+                is SettingsIntent.CancelVoiceDownload -> cancelVoiceDownload()
 
                 // Lot 6, Palier B — carte Données
                 is SettingsIntent.RefreshCacheSize -> refreshCacheSize()
@@ -150,10 +153,23 @@ class SettingsViewModel @Inject constructor(
         }
     }
 
-    private suspend fun startVoiceDownload() {
-        voiceModelDownloadService.downloadDefaultVoiceModel().collect { progress ->
-            _state.value = _state.value.copy(voiceDownloadProgress = progress)
+    // Job dédié plutôt que la coroutine de onIntent() : doit survivre au
+    //-delà de l'appel courant et être annulable individuellement (retour
+    // Issa, vérification device — un téléchargement doit pouvoir être
+    // interrompu, pas seulement lancé).
+    private fun startVoiceDownload() {
+        voiceDownloadJob?.cancel()
+        voiceDownloadJob = viewModelScope.launch {
+            voiceModelDownloadService.downloadDefaultVoiceModel().collect { progress ->
+                _state.value = _state.value.copy(voiceDownloadProgress = progress)
+            }
         }
+    }
+
+    private fun cancelVoiceDownload() {
+        voiceDownloadJob?.cancel()
+        voiceDownloadJob = null
+        _state.value = _state.value.copy(voiceDownloadProgress = null)
     }
 
     /** Lot 6, Palier B — taille réelle occupée par `Context.cacheDir`, pas une estimation. */
