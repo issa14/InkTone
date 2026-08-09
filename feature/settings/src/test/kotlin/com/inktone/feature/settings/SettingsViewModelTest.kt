@@ -3,6 +3,7 @@ package com.inktone.feature.settings
 import androidx.test.core.app.ApplicationProvider
 import com.inktone.core.testing.fake.FakePreferencesRepository
 import com.inktone.core.testing.fake.FakePronunciationRuleRepository
+import com.inktone.core.testing.fake.FakeVoiceModelDownloadService
 import com.inktone.core.testing.fake.FakeVoiceProfileRepository
 import com.inktone.domain.model.AppTheme
 import com.inktone.domain.model.FontFamily
@@ -56,12 +57,14 @@ class SettingsViewModelTest {
         preferencesRepository: FakePreferencesRepository = FakePreferencesRepository(),
         voiceProfileRepository: FakeVoiceProfileRepository = FakeVoiceProfileRepository(),
         pronunciationRuleRepository: FakePronunciationRuleRepository = FakePronunciationRuleRepository(),
+        voiceModelDownloadService: FakeVoiceModelDownloadService = FakeVoiceModelDownloadService(),
     ) = SettingsViewModel(
         preferencesRepository,
         ApplyAccessibilityPresetUseCase(preferencesRepository),
         GetVoiceProfilesUseCase(voiceProfileRepository),
         voiceProfileRepository,
         pronunciationRuleRepository,
+        voiceModelDownloadService,
         ApplicationProvider.getApplicationContext(),
         // Même dispatcher que Dispatchers.setMain(dispatcher) ci-dessus : sans
         // ça, withContext(Dispatchers.IO) saute sur un vrai pool de threads
@@ -306,5 +309,25 @@ class SettingsViewModelTest {
 
         assertEquals(0L, vm.state.value.cacheSizeBytes)
         assertEquals(false, tempFile.exists())
+    }
+
+    // ───── Lot 10, Tâche 10.3 — point de besoin réel du téléchargement de voix ─────
+
+    @Test
+    fun `StartVoiceDownload reflete la progression jusqu a la fin`() = runTest {
+        val downloadService = FakeVoiceModelDownloadService(
+            listOf(
+                com.inktone.domain.service.VoiceDownloadProgress.InProgress(50, 100),
+                com.inktone.domain.service.VoiceDownloadProgress.Complete,
+            ),
+        )
+        val vm = viewModel(voiceModelDownloadService = downloadService)
+        dispatcher.scheduler.advanceUntilIdle()
+        assertEquals(null, vm.state.value.voiceDownloadProgress)
+
+        vm.onIntent(SettingsIntent.StartVoiceDownload)
+        dispatcher.scheduler.advanceUntilIdle()
+
+        assertEquals(com.inktone.domain.service.VoiceDownloadProgress.Complete, vm.state.value.voiceDownloadProgress)
     }
 }
