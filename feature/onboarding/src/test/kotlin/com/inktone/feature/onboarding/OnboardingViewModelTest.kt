@@ -1,8 +1,6 @@
 package com.inktone.feature.onboarding
 
 import com.inktone.core.testing.fake.FakePreferencesRepository
-import com.inktone.core.testing.fake.FakeVoiceModelDownloadService
-import com.inktone.domain.service.VoiceDownloadProgress
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.test.StandardTestDispatcher
@@ -15,7 +13,14 @@ import org.junit.Assert.assertTrue
 import org.junit.Before
 import org.junit.Test
 
-/** Tache 8.8 — les trois chemins de l'onboarding. */
+/**
+ * Lot 10, Tâche 10.7 — l'onboarding est redevenu une pure présentation
+ * (Tâche 10.3) : `OnboardingIntent` ne porte plus que `Complete`, envoyé
+ * aussi bien par « Passer » (cartes 1/2) que par « Commencer » (carte 3)
+ * dans `OnboardingScreen`. `SetCrashReporting`/`StartVoiceDownload`
+ * n'existent plus — cette absence est déjà prouvée par la compilation de
+ * ce fichier, pas seulement par ces tests.
+ */
 @OptIn(ExperimentalCoroutinesApi::class)
 class OnboardingViewModelTest {
 
@@ -28,66 +33,35 @@ class OnboardingViewModelTest {
     fun tearDown() { Dispatchers.resetMain() }
 
     @Test
-    fun onboarding_accepte_le_crash_reporting() = runTest {
-        val preferencesRepository = FakePreferencesRepository()
-        val viewModel = OnboardingViewModel(preferencesRepository, FakeVoiceModelDownloadService())
-
-        viewModel.onIntent(OnboardingIntent.Next) // Welcome -> CrashConsent
-        viewModel.onIntent(OnboardingIntent.SetCrashReporting(true))
-        dispatcher.scheduler.advanceUntilIdle()
-
-        assertTrue(preferencesRepository.get().crashReportingEnabled)
-        assertEquals(OnboardingStep.VoiceDownload, viewModel.state.value.step)
+    fun l_etat_initial_n_est_pas_termine() = runTest {
+        val viewModel = OnboardingViewModel(FakePreferencesRepository())
+        assertEquals(false, viewModel.state.value.hasCompleted)
     }
 
     @Test
-    fun onboarding_refuse_le_crash_reporting() = runTest {
+    fun complete_pose_l_indicateur_persiste_et_marque_l_etat_termine() = runTest {
         val preferencesRepository = FakePreferencesRepository()
-        val viewModel = OnboardingViewModel(preferencesRepository, FakeVoiceModelDownloadService())
+        assertTrue(!preferencesRepository.get().hasSeenOnboarding)
+        val viewModel = OnboardingViewModel(preferencesRepository)
 
-        viewModel.onIntent(OnboardingIntent.Next) // Welcome -> CrashConsent
-        viewModel.onIntent(OnboardingIntent.SetCrashReporting(false))
+        viewModel.onIntent(OnboardingIntent.Complete)
         dispatcher.scheduler.advanceUntilIdle()
 
-        assertTrue(!preferencesRepository.get().crashReportingEnabled)
-        assertEquals(OnboardingStep.VoiceDownload, viewModel.state.value.step)
+        assertTrue(preferencesRepository.get().hasSeenOnboarding)
+        assertTrue(viewModel.state.value.hasCompleted)
     }
 
     @Test
-    fun onboarding_reporte_le_telechargement_de_voix_sans_bloquer() = runTest {
+    fun complete_ne_touche_a_aucune_autre_preference() = runTest {
         val preferencesRepository = FakePreferencesRepository()
-        val viewModel = OnboardingViewModel(preferencesRepository, FakeVoiceModelDownloadService())
+        val before = preferencesRepository.get()
+        val viewModel = OnboardingViewModel(preferencesRepository)
 
-        viewModel.onIntent(OnboardingIntent.Next) // Welcome -> CrashConsent
-        viewModel.onIntent(OnboardingIntent.SetCrashReporting(false))
-        dispatcher.scheduler.advanceUntilIdle()
-        assertEquals(OnboardingStep.VoiceDownload, viewModel.state.value.step)
-
-        // Le Palier 1 (Android natif) doit rester utilisable sans
-        // telecharger la voix (ADR-018) - "Passer" avance sans bloquer.
-        viewModel.onIntent(OnboardingIntent.Next)
+        viewModel.onIntent(OnboardingIntent.Complete)
         dispatcher.scheduler.advanceUntilIdle()
 
-        assertEquals(OnboardingStep.Done, viewModel.state.value.step)
-    }
-
-    @Test
-    fun onboarding_telecharge_la_voix_et_avance_une_fois_terminee() = runTest {
-        val preferencesRepository = FakePreferencesRepository()
-        val viewModel = OnboardingViewModel(
-            preferencesRepository,
-            FakeVoiceModelDownloadService(
-                listOf(VoiceDownloadProgress.InProgress(50, 100), VoiceDownloadProgress.Complete),
-            ),
-        )
-
-        viewModel.onIntent(OnboardingIntent.Next)
-        viewModel.onIntent(OnboardingIntent.SetCrashReporting(false))
-        dispatcher.scheduler.advanceUntilIdle()
-
-        viewModel.onIntent(OnboardingIntent.StartVoiceDownload)
-        dispatcher.scheduler.advanceUntilIdle()
-
-        assertEquals(OnboardingStep.Done, viewModel.state.value.step)
+        val after = preferencesRepository.get()
+        assertEquals(before.crashReportingEnabled, after.crashReportingEnabled)
+        assertEquals(before.theme, after.theme)
     }
 }

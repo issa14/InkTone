@@ -6,6 +6,7 @@ import com.inktone.domain.model.PronunciationRule
 import com.inktone.domain.model.TtsEngineId
 import com.inktone.domain.model.UserPreferences
 import com.inktone.domain.model.VoiceProfile
+import com.inktone.domain.service.VoiceDownloadProgress
 
 data class SettingsUiState(
     val preferences: UserPreferences = UserPreferences(),
@@ -19,6 +20,10 @@ data class SettingsUiState(
     // aucun module externe requis.
     val cacheSizeBytes: Long = 0L,
     val isClearingCache: Boolean = false,
+    // Lot 10 — point de besoin réel du téléchargement de voix neuronale
+    // (Tâche 10.3), retiré de l'onboarding : accessible ici, dans la
+    // carte Lecture, à côté du sélecteur de voix.
+    val voiceDownloadProgress: VoiceDownloadProgress? = null,
 )
 
 /**
@@ -80,6 +85,12 @@ sealed interface SettingsIntent {
     data class SetAccessibilityPreset(val enabled: Boolean) : SettingsIntent
     // Lot 6 — écouter un extrait
     object PlayPreview : SettingsIntent
+    // Lot 10 — téléchargement de la voix neuronale par défaut, point de
+    // besoin réel après le retrait de l'étape d'onboarding (Tâche 10.3).
+    object StartVoiceDownload : SettingsIntent
+    // Retour Issa (vérification device) : le téléchargement doit pouvoir
+    // être annulé en cours de route, pas seulement lancé.
+    object CancelVoiceDownload : SettingsIntent
     // Conservé pour compatibilité — remplacé fonctionnellement par SetAccessibilityPreset
     object ApplyAccessibilityPreset : SettingsIntent
 
