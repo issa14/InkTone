@@ -322,6 +322,17 @@ internal fun LibraryDrawerContent(
             selected = false,
             onClick = onOpenBookmarks,
         )
+        // Lot 11, tâche 11.6 — "Synchronisation" réactivée en b5
+        // (UX_FLOW_DESIGN.md §Drawer), entre Marque-pages (b3) et
+        // Statistiques (b6) — b4 (Catalogues OPDS) reste masqué, différé
+        // à v1.x. Retour Issa (vérification) : ce n'est PAS un item de
+        // pied de drawer, une première version l'y avait placé à tort.
+        NavigationDrawerItem(
+            label = { Text("Synchronisation") },
+            icon = { Icon(AppIcons.Sync, contentDescription = null) },
+            selected = false,
+            onClick = onOpenSync,
+        )
         NavigationDrawerItem(
             label = { Text("Statistiques de lecture") },
             icon = { Icon(AppIcons.Stats, contentDescription = null) },
@@ -341,10 +352,6 @@ internal fun LibraryDrawerContent(
             // lot 1 (aucune destination affichée sans écran derrière).
             DrawerFooterItem("Thèmes", AppIcons.Appearance) { onOpenThemes() }
             DrawerFooterItem("À propos", AppIcons.Info) { onOpenAbout() }
-            // Lot 11, tâche 11.6 — "Synchronisation", dernière des 4
-            // destinations masquées au lot 1 (plus aucune destination
-            // affichée sans écran derrière, UX_FLOW_DESIGN.md à jour).
-            DrawerFooterItem("Synchronisation", AppIcons.Sync) { onOpenSync() }
         }
         } // Column content
     } // Column root
