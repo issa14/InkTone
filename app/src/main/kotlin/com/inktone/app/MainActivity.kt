@@ -7,17 +7,13 @@ import androidx.compose.material3.Surface
 import androidx.compose.material3.windowsizeclass.ExperimentalMaterial3WindowSizeClassApi
 import androidx.compose.material3.windowsizeclass.calculateWindowSizeClass
 import androidx.compose.runtime.CompositionLocalProvider
-import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.hilt.navigation.compose.hiltViewModel
 import com.inktone.core.designsystem.InkToneTheme
 import com.inktone.core.designsystem.LocalWindowSizeClass
-import com.inktone.feature.reader.ReaderIntent
-import com.inktone.feature.reader.ReaderViewModel
 import com.inktone.feature.settings.AppThemeViewModel
 import dagger.hilt.android.AndroidEntryPoint
-import java.io.File
 
 /**
  * Point d'entrée de l'app (Tâche 9bis.2, révision) — héberge maintenant
@@ -28,12 +24,13 @@ import java.io.File
  * `SearchRoute` (`Routes.kt`), le back stack manuel (`BackHandler`
  * répété par écran) est remplacé par le back stack réel de `NavHost`.
  *
- * `BootstrapAndOpenFixture` (debug uniquement, `BuildConfig.DEBUG`) :
- * insère la publication fixture dans la bibliothèque via une instance de
- * `ReaderViewModel` dédiée à ce seul effet, distincte de celle que
- * `ReaderRoute` créera plus tard (scoped à son `NavBackStackEntry`) —
- * l'insertion passe par Room (Tâche 6.1), donc visible de l'une comme de
- * l'autre, aucun état partagé requis entre les deux instances.
+ * Lot 10 — le scaffolding de marche à blanc (`BootstrapAndOpenFixture`,
+ * insertion automatique d'une publication fixture à chaque lancement
+ * debug, Phase 3) est retiré : hérité d'avant que l'import réel
+ * (`feature/import`) n'existe, il polluait silencieusement la
+ * bibliothèque de tout build debug et rendait l'état vide impossible à
+ * vérifier sur appareil (retour Issa). `ReaderIntent
+ * .BootstrapAndOpenFixture`/`fixture-marche-a-blanc.epub` retirés avec.
  */
 @AndroidEntryPoint
 class MainActivity : ComponentActivity() {
@@ -59,24 +56,6 @@ class MainActivity : ComponentActivity() {
                 InkToneTheme(useDynamicColor = useDynamicColor, appTheme = appTheme) {
                     Surface {
                         if (hasSeenOnboarding == null) return@Surface
-                        if (BuildConfig.DEBUG) {
-                            val bootstrapViewModel: ReaderViewModel = hiltViewModel()
-                            LaunchedEffect(Unit) {
-                                val fixtureFile = File(cacheDir, "fixture-marche-a-blanc.epub").apply {
-                                    if (!exists()) {
-                                        assets.open("fixture-marche-a-blanc.epub").use { input ->
-                                            outputStream().use { output -> input.copyTo(output) }
-                                        }
-                                    }
-                                }
-                                bootstrapViewModel.onIntent(
-                                    ReaderIntent.BootstrapAndOpenFixture(
-                                        publicationId = WALKING_SKELETON_FIXTURE_PUBLICATION_ID,
-                                        fileUri = fixtureFile.absolutePath,
-                                    ),
-                                )
-                            }
-                        }
 
                         InkToneNavHost(
                             startDestination = if (hasSeenOnboarding == true) LibraryRoute else OnboardingRoute,
@@ -85,9 +64,5 @@ class MainActivity : ComponentActivity() {
                 }
             }
         }
-    }
-
-    private companion object {
-        const val WALKING_SKELETON_FIXTURE_PUBLICATION_ID = "walking-skeleton-fixture"
     }
 }

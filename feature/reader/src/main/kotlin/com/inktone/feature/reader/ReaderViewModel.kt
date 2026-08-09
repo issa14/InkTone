@@ -8,8 +8,6 @@ import com.inktone.domain.model.Annotation
 import com.inktone.domain.model.AnnotationColor
 import com.inktone.domain.model.Bookmark
 import com.inktone.domain.model.EffectiveReadingSettings
-import com.inktone.domain.model.Publication
-import com.inktone.domain.model.PublicationFormat
 import com.inktone.domain.model.ReadingMode as DomainReadingMode
 import com.inktone.domain.model.ReadingOverrides
 import com.inktone.domain.model.ReadingSession
@@ -152,11 +150,6 @@ class ReaderViewModel @Inject constructor(
                     null
                 }
                 openPublication(intent.publicationId, targetLocator, intent.flashOnArrival)
-            }
-            is ReaderIntent.BootstrapAndOpenFixture -> {
-                if (BuildConfig.DEBUG) {
-                    bootstrapAndOpenFixture(intent.publicationId, intent.fileUri)
-                }
             }
             is ReaderIntent.NextChapter -> navigateToChapter(_state.value.currentChapterIndex + 1)
             is ReaderIntent.PreviousChapter -> navigateToChapter(_state.value.currentChapterIndex - 1)
@@ -537,31 +530,6 @@ class ReaderViewModel @Inject constructor(
             delay(FLASH_HIGHLIGHT_DURATION_MS)
             if (_state.value.currentSentenceIndex == target.sentenceIndex && !_state.value.isPlaying) {
                 _state.value = _state.value.copy(highlightedWordRange = null)
-            }
-        }
-    }
-
-    private fun bootstrapAndOpenFixture(publicationId: String, fileUri: String) {
-        viewModelScope.launch {
-            // Idempotent depuis que PublicationDao.insert() n'est plus
-            // OnConflictStrategy.REPLACE (Tache 7.1bis) : cette fixture a un
-            // id et un fileHash fixes, appelee a chaque lancement debug -
-            // sans cette verification, le deuxieme lancement sur un device
-            // deja utilise levait SQLiteConstraintException (crash reel
-            // observe en testant ce changement, pas suppose).
-            if (publicationRepository.getById(publicationId) == null) {
-                publicationRepository.insert(
-                    Publication(
-                        id = publicationId,
-                        title = "Fixture marche a blanc",
-                        format = PublicationFormat.EPUB,
-                        fileUri = fileUri,
-                        fileHash = "walking-skeleton-fixture-hash",
-                        fileSize = java.io.File(fileUri).length(),
-                        chapterCount = 1,
-                        importDate = System.currentTimeMillis(),
-                    ),
-                )
             }
         }
     }
