@@ -107,6 +107,7 @@ fun LibraryScreen(
     onOpenSettings: () -> Unit = {},
     onOpenAbout: () -> Unit = {},
     onOpenThemes: () -> Unit = {},
+    onOpenSync: () -> Unit = {},
     onNavigateToSeriesDetail: (String) -> Unit = {},
     onNavigateToTagDetail: (String) -> Unit = {},
 ) {
@@ -164,6 +165,10 @@ fun LibraryScreen(
                     onOpenThemes = {
                         scope.launch { drawerState.close() }
                         onOpenThemes()
+                    },
+                    onOpenSync = {
+                        scope.launch { drawerState.close() }
+                        onOpenSync()
                     },
                 )
             }
@@ -262,6 +267,7 @@ internal fun LibraryDrawerContent(
     onOpenSettings: () -> Unit = {},
     onOpenAbout: () -> Unit = {},
     onOpenThemes: () -> Unit = {},
+    onOpenSync: () -> Unit = {},
 ) {
     Column {
         // C.1 — Header avec dégradé brand (legacy §1.2)
@@ -335,6 +341,10 @@ internal fun LibraryDrawerContent(
             // lot 1 (aucune destination affichée sans écran derrière).
             DrawerFooterItem("Thèmes", AppIcons.Appearance) { onOpenThemes() }
             DrawerFooterItem("À propos", AppIcons.Info) { onOpenAbout() }
+            // Lot 11, tâche 11.6 — "Synchronisation", dernière des 4
+            // destinations masquées au lot 1 (plus aucune destination
+            // affichée sans écran derrière, UX_FLOW_DESIGN.md à jour).
+            DrawerFooterItem("Synchronisation", AppIcons.Sync) { onOpenSync() }
         }
         } // Column content
     } // Column root

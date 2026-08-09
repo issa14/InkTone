@@ -42,6 +42,10 @@ object SearchRoute
 @Serializable
 object SettingsRoute
 
+/** Lot 11, tâche 11.6 — dernière des 4 destinations masquées au lot 1 (drawer). */
+@Serializable
+object SyncRoute
+
 @Serializable
 object PronunciationRulesRoute
 

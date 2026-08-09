@@ -2,7 +2,12 @@ package com.inktone.app
 
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.outlined.Visibility
+import androidx.compose.material.icons.outlined.VisibilityOff
 import androidx.compose.material3.AlertDialog
+import androidx.compose.material3.Icon
+import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Text
@@ -14,14 +19,14 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.text.input.PasswordVisualTransformation
+import androidx.compose.ui.text.input.VisualTransformation
 
 /**
- * Invite de mot de passe minimale pour l'export/import chiffré du
- * fichier local (Lot 11, tâche 11.1). Provisoire : la tâche 11.6
- * (Palier B) remplace ce dialogue par la carte « Fichier local » dédiée
- * de l'écran Configuration de synchronisation (bascule afficher/masquer
- * incluse) — ne pas dupliquer ce travail ici, seulement rester
- * fonctionnel et honnête sur l'irréversibilité en attendant.
+ * Invite de mot de passe pour l'export/import chiffré du fichier local
+ * (Lot 11, tâche 11.1). Décision actée à la tâche 11.6 : reste ici
+ * plutôt que déplacée vers une carte dédiée de l'écran Configuration de
+ * synchronisation — la carte « Fichier local » de cet écran pointe vers
+ * Réglages au lieu de dupliquer ce dialogue une seconde fois.
  */
 @Composable
 fun BackupPasswordDialog(
@@ -32,6 +37,7 @@ fun BackupPasswordDialog(
     onDismiss: () -> Unit,
 ) {
     var password by remember { mutableStateOf("") }
+    var isPasswordVisible by remember { mutableStateOf(false) }
 
     AlertDialog(
         onDismissRequest = onDismiss,
@@ -43,7 +49,15 @@ fun BackupPasswordDialog(
                     onValueChange = { password = it },
                     label = { Text("Mot de passe") },
                     singleLine = true,
-                    visualTransformation = PasswordVisualTransformation(),
+                    visualTransformation = if (isPasswordVisible) VisualTransformation.None else PasswordVisualTransformation(),
+                    trailingIcon = {
+                        IconButton(onClick = { isPasswordVisible = !isPasswordVisible }) {
+                            Icon(
+                                if (isPasswordVisible) Icons.Outlined.VisibilityOff else Icons.Outlined.Visibility,
+                                contentDescription = if (isPasswordVisible) "Masquer le mot de passe" else "Afficher le mot de passe",
+                            )
+                        }
+                    },
                     modifier = Modifier.fillMaxWidth(),
                 )
                 if (showLossWarning) {
