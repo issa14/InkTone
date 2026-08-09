@@ -106,6 +106,7 @@ fun LibraryScreen(
     onImportClick: () -> Unit = {},
     onOpenSettings: () -> Unit = {},
     onOpenAbout: () -> Unit = {},
+    onOpenThemes: () -> Unit = {},
     onNavigateToSeriesDetail: (String) -> Unit = {},
     onNavigateToTagDetail: (String) -> Unit = {},
 ) {
@@ -159,6 +160,10 @@ fun LibraryScreen(
                     onOpenAbout = {
                         scope.launch { drawerState.close() }
                         onOpenAbout()
+                    },
+                    onOpenThemes = {
+                        scope.launch { drawerState.close() }
+                        onOpenThemes()
                     },
                 )
             }
@@ -256,6 +261,7 @@ internal fun LibraryDrawerContent(
     onSelectLibrary: () -> Unit = {},
     onOpenSettings: () -> Unit = {},
     onOpenAbout: () -> Unit = {},
+    onOpenThemes: () -> Unit = {},
 ) {
     Column {
         // C.1 — Header avec dégradé brand (legacy §1.2)
@@ -325,6 +331,9 @@ internal fun LibraryDrawerContent(
             horizontalArrangement = Arrangement.SpaceEvenly,
         ) {
             DrawerFooterItem("Paramètres", AppIcons.Settings) { onOpenSettings() }
+            // Lot 9 — "Thèmes" réactivé, 3e des 4 destinations masquées au
+            // lot 1 (aucune destination affichée sans écran derrière).
+            DrawerFooterItem("Thèmes", AppIcons.Appearance) { onOpenThemes() }
             DrawerFooterItem("À propos", AppIcons.Info) { onOpenAbout() }
         }
         } // Column content

@@ -53,6 +53,14 @@ object BookmarksRoute
 @Serializable
 object AboutRoute
 
+/** Lot 9 — pied de drawer, "Thèmes" réactivé. */
+@Serializable
+object ThemeGalleryRoute
+
+/** Lot 9 — themeId null = création (carte pointillée), non-null = édition (icône crayon). */
+@Serializable
+data class ThemeStudioRoute(val themeId: String? = null)
+
 /**
  * Lot 2a.4 — écran de détail Séries/Tags, un seul écran réutilisable
  * pour les deux cas. `category` reste une chaîne brute ("series"/"tag")
