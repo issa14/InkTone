@@ -26,7 +26,9 @@ import androidx.compose.material.icons.outlined.BrightnessMedium
 import androidx.compose.material.icons.outlined.CheckCircle
 import androidx.compose.material.icons.outlined.ContentCopy
 import androidx.compose.material.icons.outlined.Contrast
+import androidx.compose.material.icons.outlined.AddCircle
 import androidx.compose.material.icons.outlined.Delete
+import androidx.compose.material.icons.outlined.Edit
 import androidx.compose.material.icons.outlined.EditNote
 import androidx.compose.material.icons.outlined.Error
 import androidx.compose.material.icons.outlined.FavoriteBorder
@@ -100,6 +102,10 @@ object AppIcons {
     // Lot 8 — item de drawer Récents. Distinct de `Loading` (sablier,
     // défaut historique corrigé au lot 1, ne pas réintroduire).
     val Recents = Icons.Outlined.History
+
+    // Lot 9 — Galerie de thèmes / Studio.
+    val Edit = Icons.Outlined.Edit
+    val AddCircle = Icons.Outlined.AddCircle
 
     // Tache 7.3/7.2 — statistiques : modes de session (historique par
     // ouvrage) et carte objectif du jour (série avec flamme).
