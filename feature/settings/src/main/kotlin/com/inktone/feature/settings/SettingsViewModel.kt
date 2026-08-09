@@ -13,6 +13,7 @@ import com.inktone.domain.model.VoiceProfile
 import com.inktone.domain.repository.PreferencesRepository
 import com.inktone.domain.repository.PronunciationRuleRepository
 import com.inktone.domain.repository.VoiceProfileRepository
+import com.inktone.domain.service.VoiceModelDownloadService
 import com.inktone.domain.usecase.ApplyAccessibilityPresetUseCase
 import com.inktone.domain.usecase.GetVoiceProfilesUseCase
 import com.inktone.feature.settings.di.IoDispatcher
@@ -52,6 +53,7 @@ class SettingsViewModel @Inject constructor(
     private val getVoiceProfiles: GetVoiceProfilesUseCase,
     private val voiceProfileRepository: VoiceProfileRepository,
     private val pronunciationRuleRepository: PronunciationRuleRepository,
+    private val voiceModelDownloadService: VoiceModelDownloadService,
     @ApplicationContext private val appContext: Context,
     @IoDispatcher private val ioDispatcher: CoroutineDispatcher,
 ) : ViewModel() {
@@ -129,6 +131,10 @@ class SettingsViewModel @Inject constructor(
                 // Lot 6 — écouter un extrait : signalé non branché (voir commentaire)
                 // PlayPreview nécessite une UseCase dédiée hors scope SettingsViewModel.
                 is SettingsIntent.PlayPreview -> { /* Signalé : non branché au TTS — UseCase dédiée à créer */ }
+                // Lot 10 — point de besoin réel du téléchargement de voix,
+                // retiré de l'onboarding (Tâche 10.3). Même mécanisme que
+                // l'ancien OnboardingViewModel.startVoiceDownload.
+                is SettingsIntent.StartVoiceDownload -> startVoiceDownload()
 
                 // Lot 6, Palier B — carte Données
                 is SettingsIntent.RefreshCacheSize -> refreshCacheSize()
@@ -141,6 +147,12 @@ class SettingsViewModel @Inject constructor(
                     pronunciationRuleRepository.save(intent.rule.copy(isEnabled = !intent.rule.isEnabled))
                 is SettingsIntent.DeletePronunciationRule -> pronunciationRuleRepository.delete(intent.id)
             }
+        }
+    }
+
+    private suspend fun startVoiceDownload() {
+        voiceModelDownloadService.downloadDefaultVoiceModel().collect { progress ->
+            _state.value = _state.value.copy(voiceDownloadProgress = progress)
         }
     }
 

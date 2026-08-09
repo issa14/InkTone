@@ -145,6 +145,7 @@ fun SettingsScreen(
                 voiceProfiles = state.voiceProfiles,
                 pronunciationRules = state.pronunciationRules,
                 cacheSizeBytes = state.cacheSizeBytes,
+                voiceDownloadProgress = state.voiceDownloadProgress,
                 onIntent = viewModel::onIntent,
                 onOpenAbout = onOpenAbout,
                 modelsFolderInfo = modelsFolderInfo,
@@ -168,6 +169,7 @@ internal fun SettingsContent(
     voiceProfiles: List<VoiceProfile> = emptyList(),
     pronunciationRules: List<PronunciationRule> = emptyList(),
     cacheSizeBytes: Long = 0L,
+    voiceDownloadProgress: com.inktone.domain.service.VoiceDownloadProgress? = null,
     onIntent: (SettingsIntent) -> Unit,
     onOpenAbout: () -> Unit = {},
     modelsFolderInfo: ModelsFolderInfo = ModelsFolderInfo(path = "Emplacement inconnu"),
@@ -231,6 +233,14 @@ internal fun SettingsContent(
                 label = "Voix active",
                 value = activeVoiceName,
                 onClick = { showVoicePicker = true },
+            )
+            // Lot 10 — point de besoin réel du téléchargement de voix
+            // neuronale (Tâche 10.3), retiré de l'onboarding : le Palier 1
+            // (moteur natif Android) reste utilisable sans, ce bouton
+            // n'est donc jamais bloquant.
+            VoiceDownloadRow(
+                progress = voiceDownloadProgress,
+                onStart = { onIntent(SettingsIntent.StartVoiceDownload) },
             )
             // Lot 6 — vitesse : même cible VoiceProfile.speed que le panneau Voix du lecteur (Tâche 3d).
             SliderSetting(
@@ -329,8 +339,15 @@ internal fun SettingsContent(
                     onIntent(SettingsIntent.SetLanguage(if (preferences.language == "fr") "en" else "fr"))
                 },
             )
+            // Lot 10, Tâche 10.5 — formulation honnête exigée par ADR-014
+            // (« avec une explication honnête de son contenu »). Seul
+            // point de consentement restant depuis le retrait de l'étape
+            // d'onboarding CrashConsent (Tâche 10.3) : cette description
+            // doit porter l'explication à elle seule.
             ToggleSetting(
                 label = "Rapports de crash",
+                description = "Envoie uniquement la trace d'erreur, la version de l'app et le modèle d'appareil. " +
+                    "Jamais le contenu de vos livres ni vos annotations.",
                 checked = preferences.crashReportingEnabled,
                 onCheckedChange = { onIntent(SettingsIntent.SetCrashReportingEnabled(it)) },
             )
@@ -740,12 +757,40 @@ private fun PresetRow(
 }
 
 /**
+ * Lot 10 — téléchargement de la voix neuronale par défaut (Tâche 10.3).
+ * Jamais bloquant : le Palier 1 (moteur natif Android) reste utilisable
+ * sans, texte assumé explicitement plutôt que sous-entendu.
+ */
+@Composable
+private fun VoiceDownloadRow(progress: com.inktone.domain.service.VoiceDownloadProgress?, onStart: () -> Unit) {
+    Column(Modifier.fillMaxWidth().padding(horizontal = 20.dp, vertical = 8.dp)) {
+        Text(
+            when (progress) {
+                is com.inktone.domain.service.VoiceDownloadProgress.InProgress ->
+                    "Téléchargement : ${progress.bytesDownloaded} / ${progress.totalBytes} octets"
+                is com.inktone.domain.service.VoiceDownloadProgress.Failed -> "Échec : ${progress.message}"
+                com.inktone.domain.service.VoiceDownloadProgress.Complete -> "Voix neuronale installée"
+                null -> "Améliore la qualité de la narration. La lecture visuelle reste disponible sans cela."
+            },
+            style = MaterialTheme.typography.bodySmall,
+            color = MaterialTheme.colorScheme.onSurfaceVariant,
+        )
+        Spacer(Modifier.height(8.dp))
+        OutlinedButton(onClick = onStart, enabled = progress !is com.inktone.domain.service.VoiceDownloadProgress.InProgress) {
+            Icon(Icons.Default.Download, contentDescription = null)
+            Spacer(Modifier.width(8.dp))
+            Text("Télécharger une voix neuronale")
+        }
+    }
+}
+
+/**
  * Tâche 9.1.1 — Row entière rendue accessible via Modifier.toggleable
  * (role Switch, label fusionné) plutôt que le seul Switch isolé :
  * TalkBack annonce "Rapports de crash, interrupteur, désactivé".
  */
 @Composable
-private fun ToggleSetting(label: String, checked: Boolean, onCheckedChange: (Boolean) -> Unit) {
+private fun ToggleSetting(label: String, checked: Boolean, onCheckedChange: (Boolean) -> Unit, description: String? = null) {
     Row(
         modifier = Modifier
             .fillMaxWidth()
@@ -755,7 +800,12 @@ private fun ToggleSetting(label: String, checked: Boolean, onCheckedChange: (Boo
         horizontalArrangement = Arrangement.SpaceBetween,
         verticalAlignment = Alignment.CenterVertically,
     ) {
-        Text(label, modifier = Modifier.weight(1f))
+        Column(Modifier.weight(1f)) {
+            Text(label)
+            description?.let {
+                Text(it, style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+            }
+        }
         Switch(checked = checked, onCheckedChange = null)
     }
 }
