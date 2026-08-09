@@ -634,6 +634,115 @@ class DatabaseMigrationTest {
         v17.close()
     }
 
+    /**
+     * Lot 9 — le point le plus a risque de la migration : une base reelle
+     * peut porter n'importe laquelle des quatre valeurs historiques de
+     * l'ancien enum (LIGHT/DARK/SEPIA/SYSTEM) sur `user_preferences.theme`
+     * ET sur `reading_states.overrideTheme` (qui peut aussi etre NULL, cas
+     * "pas de surcharge" a preserver tel quel). Sans cette migration,
+     * UserPreferencesMapper/ReadingStateMapper planteraient au premier
+     * lancement post-mise a jour (K4) : ce test le prouve pour les quatre
+     * valeurs, pas seulement une.
+     */
+    @Test
+    fun migration_18_vers_19_reecrit_les_valeurs_heritees_de_theme_et_cree_custom_themes() {
+        val v18 = helper.createDatabase(TEST_DB_NAME, 18)
+        v18.execSQL(
+            """
+            INSERT INTO user_preferences (id, theme, fontSize, defaultTtsEngine, crashReportingEnabled, language, fontFamily, reduceMotion, dynamicColorEnabled, readingRulerEnabled, dailyGoalMinutes, activeVoiceProfileId, readingMode, audioGain, useSystemFontScale, appTheme, libraryLayoutMode, lineHeightMultiplier, readerBrightness, eyeRestReminderEnabled, eyeRestReminderIntervalMinutes)
+            VALUES (0, 'DARK', 18, 'SHERPA_ONNX', 0, 'fr', 'DEFAULT', 0, 1, 0, 20, NULL, 'SCROLL', 1.0, 0, 'SYSTEM', 'GRID_COVERS', 1.4, NULL, 1, 60)
+            """.trimIndent(),
+        )
+        v18.execSQL(
+            """
+            INSERT INTO publications (id, title, authors, format, fileUri, fileHash, fileSize, chapterCount, subjects, isFavorite, isPinned, isDrmProtected, importDate)
+            VALUES ('pub-1', 'Livre 1', '', 'EPUB', '/1.epub', 'hash-1', 1024, 1, '', 0, 0, 0, 0)
+            """.trimIndent(),
+        )
+        v18.execSQL(
+            """
+            INSERT INTO publications (id, title, authors, format, fileUri, fileHash, fileSize, chapterCount, subjects, isFavorite, isPinned, isDrmProtected, importDate)
+            VALUES ('pub-2', 'Livre 2', '', 'EPUB', '/2.epub', 'hash-2', 1024, 1, '', 0, 0, 0, 0)
+            """.trimIndent(),
+        )
+        // Les quatre valeurs historiques possibles + le cas NULL (aucune surcharge, doit le rester).
+        v18.execSQL(
+            "INSERT INTO reading_states (publicationId, resourceHref, chapterIndex, paragraphIndex, charOffset, lastReadAt, voiceProfileId, overrideTheme, overrideFontSize) " +
+                "VALUES ('pub-1', 'ch1.xhtml', 0, NULL, 0, 0, NULL, 'SEPIA', NULL)",
+        )
+        v18.execSQL(
+            "INSERT INTO reading_states (publicationId, resourceHref, chapterIndex, paragraphIndex, charOffset, lastReadAt, voiceProfileId, overrideTheme, overrideFontSize) " +
+                "VALUES ('pub-2', 'ch1.xhtml', 0, NULL, 0, 0, NULL, NULL, 20)",
+        )
+        v18.close()
+
+        val v19 = helper.runMigrationsAndValidate(
+            TEST_DB_NAME, 19, true,
+            MIGRATION_1_2, MIGRATION_2_3, MIGRATION_3_4, MIGRATION_4_5, MIGRATION_5_6, MIGRATION_6_7,
+            MIGRATION_7_8, MIGRATION_8_9, MIGRATION_9_10, MIGRATION_10_11, MIGRATION_11_12, MIGRATION_12_13,
+            MIGRATION_13_14, MIGRATION_14_15, MIGRATION_15_16, MIGRATION_16_17, MIGRATION_17_18, MIGRATION_18_19,
+        )
+
+        // DARK -> obsidienne, sans perte du reste de la ligne.
+        v19.query("SELECT theme, fontSize FROM user_preferences WHERE id = 0").use { cursor ->
+            assertEquals(true, cursor.moveToFirst())
+            assertEquals("obsidienne", cursor.getString(0))
+            assertEquals(18, cursor.getInt(1))
+        }
+
+        // SEPIA -> sepia_vintage sur la surcharge par publication.
+        v19.query("SELECT overrideTheme FROM reading_states WHERE publicationId = 'pub-1'").use { cursor ->
+            assertEquals(true, cursor.moveToFirst())
+            assertEquals("sepia_vintage", cursor.getString(0))
+        }
+
+        // NULL reste NULL : "pas de surcharge" n'est jamais transformé en une valeur réelle.
+        v19.query("SELECT overrideTheme, overrideFontSize FROM reading_states WHERE publicationId = 'pub-2'").use { cursor ->
+            assertEquals(true, cursor.moveToFirst())
+            assertEquals(null, cursor.getString(0))
+            assertEquals(20, cursor.getInt(1))
+        }
+
+        // La table custom_themes existe et est utilisable.
+        v19.execSQL(
+            "INSERT INTO custom_themes (id, displayName, backgroundColorHex, textColorHex, accentColorHex, highlightColorHex, fontFamily) " +
+                "VALUES ('mon-theme', 'Mon thème', '#112233', '#FFFFFF', '#AABBCC', '#DDEEFF', 'DEFAULT')",
+        )
+        v19.query("SELECT displayName FROM custom_themes WHERE id = 'mon-theme'").use { cursor ->
+            assertEquals(true, cursor.moveToFirst())
+            assertEquals("Mon thème", cursor.getString(0))
+        }
+        v19.close()
+    }
+
+    @Test
+    fun migration_18_vers_19_reecrit_LIGHT_et_SYSTEM_vers_papier_clair() {
+        val v18 = helper.createDatabase(TEST_DB_NAME, 18)
+        v18.execSQL(
+            """
+            INSERT INTO user_preferences (id, theme, fontSize, defaultTtsEngine, crashReportingEnabled, language, fontFamily, reduceMotion, dynamicColorEnabled, readingRulerEnabled, dailyGoalMinutes, activeVoiceProfileId, readingMode, audioGain, useSystemFontScale, appTheme, libraryLayoutMode, lineHeightMultiplier, readerBrightness, eyeRestReminderEnabled, eyeRestReminderIntervalMinutes)
+            VALUES (0, 'SYSTEM', 18, 'SHERPA_ONNX', 0, 'fr', 'DEFAULT', 0, 1, 0, 20, NULL, 'SCROLL', 1.0, 0, 'SYSTEM', 'GRID_COVERS', 1.4, NULL, 1, 60)
+            """.trimIndent(),
+        )
+        v18.close()
+
+        val v19 = helper.runMigrationsAndValidate(
+            TEST_DB_NAME, 19, true,
+            MIGRATION_1_2, MIGRATION_2_3, MIGRATION_3_4, MIGRATION_4_5, MIGRATION_5_6, MIGRATION_6_7,
+            MIGRATION_7_8, MIGRATION_8_9, MIGRATION_9_10, MIGRATION_10_11, MIGRATION_11_12, MIGRATION_12_13,
+            MIGRATION_13_14, MIGRATION_14_15, MIGRATION_15_16, MIGRATION_16_17, MIGRATION_17_18, MIGRATION_18_19,
+        )
+
+        // SYSTEM n'a jamais ete un vrai choix de theme de lecture (AppTheme
+        // le porte separement depuis le lot 6) : replie sur Papier Clair,
+        // comme LIGHT.
+        v19.query("SELECT theme FROM user_preferences WHERE id = 0").use { cursor ->
+            assertEquals(true, cursor.moveToFirst())
+            assertEquals("papier_clair", cursor.getString(0))
+        }
+        v19.close()
+    }
+
     companion object {
         private const val TEST_DB_NAME = "migration-test"
     }

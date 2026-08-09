@@ -6,6 +6,7 @@ import androidx.room.TypeConverters
 import com.inktone.infrastructure.database.converter.StringListConverter
 import com.inktone.infrastructure.database.dao.AnnotationDao
 import com.inktone.infrastructure.database.dao.BookmarkDao
+import com.inktone.infrastructure.database.dao.CustomThemeDao
 import com.inktone.infrastructure.database.dao.ImportResultDao
 import com.inktone.infrastructure.database.dao.LibraryItemDao
 import com.inktone.infrastructure.database.dao.PronunciationRuleDao
@@ -17,6 +18,7 @@ import com.inktone.infrastructure.database.dao.UserPreferencesDao
 import com.inktone.infrastructure.database.dao.VoiceProfileDao
 import com.inktone.infrastructure.database.entity.AnnotationEntity
 import com.inktone.infrastructure.database.entity.BookmarkEntity
+import com.inktone.infrastructure.database.entity.CustomThemeEntity
 import com.inktone.infrastructure.database.entity.ImportResultEntity
 import com.inktone.infrastructure.database.entity.LibraryItemView
 import com.inktone.infrastructure.database.entity.PronunciationRuleEntity
@@ -32,10 +34,10 @@ import com.inktone.infrastructure.database.entity.VoiceProfileEntity
         PublicationEntity::class, ReadingStateEntity::class, ReadingSessionEntity::class,
         BookmarkEntity::class, AnnotationEntity::class, VoiceProfileEntity::class,
         UserPreferencesEntity::class, SentenceFtsEntity::class, PronunciationRuleEntity::class,
-        ImportResultEntity::class,
+        ImportResultEntity::class, CustomThemeEntity::class,
     ],
     views = [LibraryItemView::class],
-    version = 18, // Audit Lot Statistiques : index startedAt + correction mode AUDIO (MIGRATION_17_18)
+    version = 19, // Lot 9 : table custom_themes + migration des valeurs héritées de ReadingTheme (MIGRATION_18_19)
     exportSchema = true, // condition du harnais de migration — Tâche 2.4
 )
 @TypeConverters(StringListConverter::class)
@@ -51,4 +53,5 @@ abstract class InkToneDatabase : RoomDatabase() {
     abstract fun pronunciationRuleDao(): PronunciationRuleDao
     abstract fun libraryItemDao(): LibraryItemDao
     abstract fun importResultDao(): ImportResultDao
+    abstract fun customThemeDao(): CustomThemeDao
 }

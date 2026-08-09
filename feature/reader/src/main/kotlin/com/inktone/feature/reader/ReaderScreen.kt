@@ -257,7 +257,7 @@ fun ReaderScreen(
         modifier = Modifier
             .fillMaxSize()
             .then(sharedElementMod)
-            .background(ThemeColors.background(state.effectiveSettings.theme))
+            .background(ThemeColors.background(state.resolvedTheme))
             .clickable(
                 interactionSource = remember { MutableInteractionSource() },
                 indication = null,
@@ -408,6 +408,12 @@ fun ReaderScreen(
         // calcul, consommé à la fois par la mesure de pagination et par le
         // rendu en mode SCROLL (SentenceText) ci-dessous.
         val lineHeightSp = (state.effectiveSettings.fontSize * state.lineHeightMultiplier).roundToInt()
+        // Lot 9 — police effective (préférence explicite si définie, sinon
+        // celle du thème actif) : entre dans la clé d'invalidation de la
+        // pagination via `baseTextStyle`, jamais les couleurs.
+        val effectiveFontFamily = remember(state.effectiveSettings.fontFamily, state.resolvedTheme.fontFamily) {
+            ThemeColors.toComposeFontFamily(ThemeColors.effectiveFontFamily(state.effectiveSettings, state.resolvedTheme))
+        }
         val pagination = rememberChapterPaginationState(
             chapter = state.currentChapter,
             nextChapter = state.chapters.getOrNull(state.currentChapterIndex + 1),
@@ -417,6 +423,7 @@ fun ReaderScreen(
             viewportWidthPx = readingAreaSize.width,
             viewportHeightPx = readingAreaSize.height,
             paddingPx = paginationPaddingPx,
+            fontFamily = effectiveFontFamily,
         )
 
         // Lot 4, tâche 4.7 — signale la fin de mise en page du chapitre
@@ -472,7 +479,8 @@ fun ReaderScreen(
                                     existingAnnotationColor = annotationColorFor(state.currentChapterIndex, sentence, state.annotations),
                                     fontSizeSp = state.effectiveSettings.fontSize,
                                     lineHeightSp = lineHeightSp,
-                                    textColor = ThemeColors.text(state.effectiveSettings.theme).copy(alpha = trailAlpha),
+                                    textColor = ThemeColors.text(state.resolvedTheme).copy(alpha = trailAlpha),
+                                    fontFamily = effectiveFontFamily,
                                     onLongClick = { viewModel.onIntent(ReaderIntent.BeginSentenceSelection(index)) },
                                     onClick = {
                                         if (selectedRange != null) {
@@ -529,7 +537,7 @@ fun ReaderScreen(
                         selectedRange = selectedRange,
                         annotations = state.annotations,
                         currentChapterIndex = state.currentChapterIndex,
-                        textColor = ThemeColors.text(state.effectiveSettings.theme),
+                        textColor = ThemeColors.text(state.resolvedTheme),
                         isReadingRulerEnabled = state.isReadingRulerEnabled,
                         onSentenceLongClick = { index -> viewModel.onIntent(ReaderIntent.BeginSentenceSelection(index)) },
                         onSentenceClick = { index ->
@@ -741,8 +749,8 @@ fun ReaderScreen(
                 currentFontSize = state.effectiveSettings.fontSize,
                 currentLineHeightMultiplier = state.lineHeightMultiplier,
                 previewText = previewText,
-                previewTextColor = ThemeColors.text(state.effectiveSettings.theme),
-                previewBackgroundColor = ThemeColors.background(state.effectiveSettings.theme),
+                previewTextColor = ThemeColors.text(state.resolvedTheme),
+                previewBackgroundColor = ThemeColors.background(state.resolvedTheme),
                 onFontSizeChange = { size ->
                     val overrides = (state.currentOverrides ?: ReadingOverrides()).copy(fontSize = size)
                     viewModel.onIntent(ReaderIntent.SetOverrides(overrides))
@@ -852,16 +860,23 @@ fun ReaderScreen(
 }
 
 /**
- * Tâche 3b.6 — bascule cyclique du thème (icône Thème du panneau) : Clair
- * → Sombre → Sépia → Clair, sans ouvrir de panneau, sans retour visuel
- * autre que le changement lui-même. SYSTEM (jamais réglé par ce cycle,
- * seulement possible comme état initial hérité des préférences globales)
- * repart sur Clair plutôt que de rester coincé hors cycle.
+ * Tâche 3b.6/9.2 — bascule cyclique du thème (icône Thème du panneau) :
+ * Papier Clair → Obsidienne → Sépia Vintage → Papier Clair, sans ouvrir
+ * de panneau, sans retour visuel autre que le changement lui-même.
+ *
+ * Lot 9 — tranché : cycle borné sur `ReadingTheme.CYCLE` (3 ambiances de
+ * référence), pas sur l'ensemble ouvert des thèmes personnalisés — un
+ * cycle sur un catalogue de taille arbitraire serait impraticable au
+ * geste rapide (l'utilisateur passerait N fois pour revenir). Reprend
+ * exactement le mapping de l'ancien enum LIGHT→DARK→SEPIA→LIGHT, aucune
+ * surprise. Un id hors cycle (thème personnalisé actif, ou ancien
+ * `SYSTEM` jamais réglé par ce cycle) repart sur la première ambiance du
+ * cycle plutôt que de rester coincé hors cycle.
  */
-private fun nextReadingTheme(current: ReadingTheme): ReadingTheme = when (current) {
-    ReadingTheme.LIGHT -> ReadingTheme.DARK
-    ReadingTheme.DARK -> ReadingTheme.SEPIA
-    ReadingTheme.SEPIA, ReadingTheme.SYSTEM -> ReadingTheme.LIGHT
+internal fun nextReadingTheme(currentId: String): String {
+    val cycle = ReadingTheme.CYCLE.map { it.id }
+    val index = cycle.indexOf(currentId)
+    return if (index == -1 || index == cycle.lastIndex) cycle.first() else cycle[index + 1]
 }
 
 @OptIn(ExperimentalFoundationApi::class)
@@ -876,6 +891,7 @@ internal fun SentenceText(
     fontSizeSp: Int,
     lineHeightSp: Int = fontSizeSp,
     textColor: Color,
+    fontFamily: androidx.compose.ui.text.font.FontFamily? = null,
     onLongClick: () -> Unit,
     onClick: () -> Unit,
     modifier: Modifier = Modifier,
@@ -928,6 +944,7 @@ internal fun SentenceText(
         fontSize = fontSizeSp.sp,
         lineHeight = lineHeightSp.sp,
         color = textColor,
+        fontFamily = fontFamily,
     )
 }
 

@@ -1,6 +1,7 @@
 package com.inktone.data.backup
 
 import com.inktone.domain.model.Bookmark
+import com.inktone.domain.model.FontFamily
 import com.inktone.domain.model.PronunciationRule
 import com.inktone.domain.model.ReadingMode
 import com.inktone.domain.model.ReadingOverrides
@@ -24,6 +25,10 @@ data class BackupPayload(
     val pronunciationRules: List<PronunciationRuleBackup>,
     val readingStates: List<ReadingStateBackup>,
     val readingSessions: List<ReadingSessionBackup>,
+    // Lot 9 — thèmes personnalisés, absents des exports antérieurs
+    // (défaut vide : un import d'une sauvegarde pré-lot 9 ne perd rien
+    // qu'elle ne contenait déjà pas).
+    val customThemes: List<CustomThemeBackup> = emptyList(),
 )
 
 @Serializable
@@ -64,6 +69,17 @@ data class ReadingStateBackup(
 )
 
 @Serializable
+data class CustomThemeBackup(
+    val id: String,
+    val displayName: String,
+    val backgroundColorHex: String,
+    val textColorHex: String,
+    val accentColorHex: String,
+    val highlightColorHex: String,
+    val fontFamily: String,
+)
+
+@Serializable
 data class ReadingSessionBackup(
     val id: String,
     val publicationId: String,
@@ -87,15 +103,26 @@ fun PronunciationRuleBackup.toDomain(): PronunciationRule =
 
 fun ReadingState.toBackup(): ReadingStateBackup = ReadingStateBackup(
     publicationId, locator.toBackup(), lastReadAt, voiceProfileId,
-    overrides?.theme?.name, overrides?.fontSize,
+    // Lot 9 — id de thème (String), plus un enum.
+    overrides?.theme, overrides?.fontSize,
 )
 fun ReadingStateBackup.toDomain(): ReadingState = ReadingState(
     publicationId, locator.toDomain(), lastReadAt, voiceProfileId,
     if (overrideTheme != null || overrideFontSize != null) {
-        ReadingOverrides(overrideTheme?.let { ReadingTheme.valueOf(it) }, overrideFontSize)
+        ReadingOverrides(overrideTheme, overrideFontSize)
     } else {
         null
     },
+)
+
+fun ReadingTheme.toBackup(): CustomThemeBackup = CustomThemeBackup(
+    id, displayName, backgroundColorHex, textColorHex, accentColorHex, highlightColorHex, fontFamily.name,
+)
+fun CustomThemeBackup.toDomain(): ReadingTheme = ReadingTheme(
+    id = id, displayName = displayName, isBuiltIn = false,
+    backgroundColorHex = backgroundColorHex, textColorHex = textColorHex,
+    accentColorHex = accentColorHex, highlightColorHex = highlightColorHex,
+    fontFamily = FontFamily.valueOf(fontFamily),
 )
 
 fun ReadingSession.toBackup(): ReadingSessionBackup =

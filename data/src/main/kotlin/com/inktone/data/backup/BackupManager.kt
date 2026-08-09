@@ -5,6 +5,7 @@ import com.inktone.domain.repository.PronunciationRuleRepository
 import com.inktone.domain.repository.PublicationRepository
 import com.inktone.domain.repository.ReadingSessionRepository
 import com.inktone.domain.repository.ReadingStateRepository
+import com.inktone.domain.repository.ThemeRepository
 import com.inktone.domain.service.FileStorageService
 import kotlinx.coroutines.flow.first
 import kotlinx.serialization.encodeToString
@@ -32,6 +33,7 @@ class BackupManager @Inject constructor(
     private val readingStateRepository: ReadingStateRepository,
     private val readingSessionRepository: ReadingSessionRepository,
     private val publicationRepository: PublicationRepository,
+    private val themeRepository: ThemeRepository,
 ) {
     /** @return `true` si l'écriture a réussi — le résultat doit remonter à l'appelant, pas être avalé. */
     suspend fun exportTo(destinationUri: String, appVersion: String): Boolean {
@@ -42,6 +44,7 @@ class BackupManager @Inject constructor(
             pronunciationRules = pronunciationRuleRepository.observeAll().first().map { it.toBackup() },
             readingStates = readingStateRepository.getAll().map { it.toBackup() },
             readingSessions = readingSessionRepository.getAll().map { it.toBackup() },
+            customThemes = themeRepository.observeAll().first().filterNot { it.isBuiltIn }.map { it.toBackup() },
         )
         val json = Json.encodeToString(payload)
         val tempFile = File.createTempFile("inktone-backup", ".json")
@@ -78,6 +81,10 @@ class BackupManager @Inject constructor(
         }
         payload.pronunciationRules.forEach { backup ->
             pronunciationRuleRepository.save(backup.toDomain())
+            restored++
+        }
+        payload.customThemes.forEach { backup ->
+            themeRepository.saveCustom(backup.toDomain())
             restored++
         }
         payload.readingStates.forEach { backup ->
