@@ -860,6 +860,33 @@ class DatabaseMigrationTest {
         v23.close()
     }
 
+    @Test
+    fun migration_23_vers_24_cree_la_table_pending_conflicts_utilisable() {
+        helper.createDatabase(TEST_DB_NAME, 23).close()
+
+        val v24 = helper.runMigrationsAndValidate(
+            TEST_DB_NAME, 24, true,
+            MIGRATION_1_2, MIGRATION_2_3, MIGRATION_3_4, MIGRATION_4_5, MIGRATION_5_6, MIGRATION_6_7,
+            MIGRATION_7_8, MIGRATION_8_9, MIGRATION_9_10, MIGRATION_10_11, MIGRATION_11_12, MIGRATION_12_13,
+            MIGRATION_13_14, MIGRATION_14_15, MIGRATION_15_16, MIGRATION_16_17, MIGRATION_17_18, MIGRATION_18_19,
+            MIGRATION_19_20, MIGRATION_20_21, MIGRATION_21_22, MIGRATION_22_23, MIGRATION_23_24,
+        )
+
+        v24.execSQL(
+            """
+            INSERT INTO pending_conflicts (publicationId, bookTitle, localResourceHref, localChapterIndex, localParagraphIndex, localCharOffset, localDeviceLabel, localAt, localChapterCount, remoteResourceHref, remoteChapterIndex, remoteParagraphIndex, remoteCharOffset, remoteDeviceLabel, remoteAt, remoteChapterCount)
+            VALUES ('pub-1', 'Le Grand Livre', 'ch1.xhtml', 1, NULL, 0, 'Cet appareil', 50, 20, 'ch8.xhtml', 8, NULL, 0, 'Tablette B', 200, 20)
+            """.trimIndent(),
+        )
+        v24.query("SELECT bookTitle, localChapterIndex, remoteChapterIndex FROM pending_conflicts WHERE publicationId = 'pub-1'").use { cursor ->
+            assertEquals(true, cursor.moveToFirst())
+            assertEquals("Le Grand Livre", cursor.getString(0))
+            assertEquals(1, cursor.getInt(1))
+            assertEquals(8, cursor.getInt(2))
+        }
+        v24.close()
+    }
+
     companion object {
         private const val TEST_DB_NAME = "migration-test"
     }
