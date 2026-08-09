@@ -1,5 +1,7 @@
 package com.inktone.data.di
 
+import com.inktone.data.repository.DeviceIdentityRepositoryImpl
+import com.inktone.data.repository.InMemorySyncOperationTracker
 import com.inktone.data.repository.RoomAnnotationRepository
 import com.inktone.data.repository.RoomBookmarkRepository
 import com.inktone.data.repository.RoomLibraryItemRepository
@@ -8,18 +10,22 @@ import com.inktone.data.repository.RoomPronunciationRuleRepository
 import com.inktone.data.repository.RoomPublicationRepository
 import com.inktone.data.repository.RoomReadingSessionRepository
 import com.inktone.data.repository.RoomReadingStateRepository
+import com.inktone.data.repository.RoomSyncAccountRepository
 import com.inktone.data.repository.RoomThemeRepository
 import com.inktone.data.repository.RoomVoiceProfileRepository
 import com.inktone.domain.repository.AnnotationRepository
 import com.inktone.domain.repository.BookmarkRepository
+import com.inktone.domain.repository.DeviceIdentityRepository
 import com.inktone.domain.repository.LibraryItemRepository
 import com.inktone.domain.repository.PreferencesRepository
 import com.inktone.domain.repository.PronunciationRuleRepository
 import com.inktone.domain.repository.PublicationRepository
 import com.inktone.domain.repository.ReadingSessionRepository
 import com.inktone.domain.repository.ReadingStateRepository
+import com.inktone.domain.repository.SyncAccountRepository
 import com.inktone.domain.repository.ThemeRepository
 import com.inktone.domain.repository.VoiceProfileRepository
+import com.inktone.domain.service.SyncOperationTracker
 import dagger.Binds
 import dagger.Module
 import dagger.hilt.InstallIn
@@ -39,4 +45,7 @@ abstract class RepositoryModule {
     @Binds @Singleton abstract fun bindPronunciationRuleRepository(impl: RoomPronunciationRuleRepository): PronunciationRuleRepository
     @Binds @Singleton abstract fun bindLibraryItemRepository(impl: RoomLibraryItemRepository): LibraryItemRepository
     @Binds @Singleton abstract fun bindThemeRepository(impl: RoomThemeRepository): ThemeRepository
+    @Binds @Singleton abstract fun bindSyncAccountRepository(impl: RoomSyncAccountRepository): SyncAccountRepository
+    @Binds @Singleton abstract fun bindDeviceIdentityRepository(impl: DeviceIdentityRepositoryImpl): DeviceIdentityRepository
+    @Binds @Singleton abstract fun bindSyncOperationTracker(impl: InMemorySyncOperationTracker): SyncOperationTracker
 }

@@ -320,3 +320,23 @@ val MIGRATION_20_21 = object : Migration(20, 21) {
         db.execSQL("ALTER TABLE user_preferences ADD COLUMN hasPromptedVoiceDownload INTEGER NOT NULL DEFAULT 0")
     }
 }
+
+/**
+ * Lot 11, tâche 11.2 — identité d'appareil (utilisée par la flotte,
+ * palier C, et la détection de conflits, palier D) et état du compte de
+ * synchronisation unique (exclusivité mutuelle Drive/WebDAV). Toutes les
+ * colonnes sont nullables ou à défaut neutre : une ligne existante se
+ * retrouve simplement non configurée (`syncProvider IS NULL`), jamais en
+ * échec.
+ */
+val MIGRATION_21_22 = object : Migration(21, 22) {
+    override fun migrate(db: SupportSQLiteDatabase) {
+        db.execSQL("ALTER TABLE user_preferences ADD COLUMN deviceId TEXT DEFAULT NULL")
+        db.execSQL("ALTER TABLE user_preferences ADD COLUMN deviceDisplayName TEXT DEFAULT NULL")
+        db.execSQL("ALTER TABLE user_preferences ADD COLUMN syncProvider TEXT DEFAULT NULL")
+        db.execSQL("ALTER TABLE user_preferences ADD COLUMN syncAccountLabel TEXT DEFAULT NULL")
+        db.execSQL("ALTER TABLE user_preferences ADD COLUMN syncLinkedAt INTEGER DEFAULT NULL")
+        db.execSQL("ALTER TABLE user_preferences ADD COLUMN syncLastSyncAt INTEGER DEFAULT NULL")
+        db.execSQL("ALTER TABLE user_preferences ADD COLUMN syncLastAutoSyncFailed INTEGER NOT NULL DEFAULT 0")
+    }
+}
