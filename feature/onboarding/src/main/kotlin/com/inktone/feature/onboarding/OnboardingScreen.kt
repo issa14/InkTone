@@ -247,9 +247,16 @@ private fun ReadyCard(accent: Color, onStart: () -> Unit) {
         // Carte 3 volontairement différenciée de la carte 1 (retour Issa) :
         // icône livre AU CENTRE EXACT de cercles concentriques, pas la
         // même composition que l'accueil.
+        // Alpha des bordures dépendant du thème (retour Issa, V2206) : à
+        // alpha fixe, les cercles s'effacent sur le fond quasi noir du
+        // thème sombre — un alpha fixe appliqué à une couleur déjà proche
+        // du fond passe sous le seuil de perception.
+        val isDark = isSystemInDarkTheme()
+        val outerAlpha = if (isDark) 0.35f else 0.15f
+        val innerAlpha = if (isDark) 0.55f else 0.3f
         Box(contentAlignment = Alignment.Center) {
-            Box(Modifier.size(140.dp).clip(CircleShape).border(1.dp, accent.copy(alpha = 0.15f), CircleShape))
-            Box(Modifier.size(112.dp).clip(CircleShape).border(1.dp, accent.copy(alpha = 0.3f), CircleShape))
+            Box(Modifier.size(140.dp).clip(CircleShape).border(1.dp, accent.copy(alpha = outerAlpha), CircleShape))
+            Box(Modifier.size(112.dp).clip(CircleShape).border(1.dp, accent.copy(alpha = innerAlpha), CircleShape))
             BrandIcon(icon = Icons.AutoMirrored.Outlined.MenuBook, size = 88.dp, tint = accent)
         }
         Spacer(Modifier.height(32.dp))
