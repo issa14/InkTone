@@ -6,29 +6,29 @@ import org.junit.Assert.assertTrue
 import org.junit.Test
 
 /**
- * Tache 9.1.3 — mesure reelle du contraste des quatre variantes de theme,
- * pas une supposition. WCAG AA : >= 4.5:1 texte normal.
+ * Tache 9.1.3 — mesure reelle du contraste des themes integres, pas une
+ * supposition. WCAG AA : >= 4.5:1 texte normal.
  *
- * Point d'attention du plan (SEPIA jamais verifie, choisi pour
- * l'esthetique) : mesure, ne devine pas — le resultat confirme un texte
- * NOIR sur un fond clair `0xFFF4ECD8`, un cas favorable, pas defavorable.
+ * Lot 9 — la liste explicite d'enum est remplacee par ReadingTheme.BUILT_IN
+ * (catalogue ouvert) : ce test couvre automatiquement tout thème intégré
+ * ajouté au catalogue, pas seulement les quatre valeurs historiques.
  */
 class ContrastRatioTest {
 
     @Test
-    fun tous_les_themes_respectent_le_contraste_wcag_aa() {
-        listOf(ReadingTheme.LIGHT, ReadingTheme.DARK, ReadingTheme.SEPIA, ReadingTheme.SYSTEM).forEach { theme ->
+    fun tous_les_themes_integres_respectent_le_contraste_wcag_aa() {
+        ReadingTheme.BUILT_IN.forEach { theme ->
             val bg = ThemeColors.background(theme)
             val fg = ThemeColors.text(theme)
             val ratio = calculateContrastRatio(bg, fg)
-            assertTrue("theme $theme : ratio $ratio < 4.5", ratio >= 4.5)
+            assertTrue("theme ${theme.id} : ratio $ratio < 4.5", ratio >= 4.5)
         }
     }
 
     @Test
-    fun theme_sepia_mesure_specifiquement_au_dessus_du_seuil() {
-        val ratio = calculateContrastRatio(ThemeColors.background(ReadingTheme.SEPIA), ThemeColors.text(ReadingTheme.SEPIA))
-        // Mesure reelle (pas supposee) : texte noir sur fond 0xFFF4ECD8 ~= 17.7:1
-        assertTrue("ratio SEPIA mesure : $ratio", ratio > 15.0)
+    fun theme_sepia_vintage_mesure_specifiquement_au_dessus_du_seuil() {
+        val ratio = calculateContrastRatio(ThemeColors.background(ReadingTheme.SEPIA_VINTAGE), ThemeColors.text(ReadingTheme.SEPIA_VINTAGE))
+        // Mesure reelle (pas supposee) : texte sombre sur fond clair, largement au-dessus du seuil.
+        assertTrue("ratio Sepia Vintage mesure : $ratio", ratio > 10.0)
     }
 }

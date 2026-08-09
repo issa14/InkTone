@@ -108,6 +108,7 @@ class ReaderViewModelBookmarkToggleTest {
             voiceProfileRepository = FakeVoiceProfileRepository(),
             getVoiceProfiles = GetVoiceProfilesUseCase(FakeVoiceProfileRepository()),
             readingSessionRepository = FakeReadingSessionRepository(),
+            themeRepository = com.inktone.core.testing.fake.FakeThemeRepository(),
         )
     }
 
@@ -268,6 +269,7 @@ class ReaderViewModelBookmarkToggleTest {
             voiceProfileRepository = FakeVoiceProfileRepository(),
             getVoiceProfiles = GetVoiceProfilesUseCase(FakeVoiceProfileRepository()),
             readingSessionRepository = FakeReadingSessionRepository(),
+            themeRepository = com.inktone.core.testing.fake.FakeThemeRepository(),
         )
         viewModel.onIntent(ReaderIntent.OpenPublication("pub-1"))
         dispatcher.scheduler.runCurrent()
