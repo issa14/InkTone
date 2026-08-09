@@ -2,7 +2,6 @@ package com.inktone.data.mapper
 
 import com.inktone.domain.model.ReadingOverrides
 import com.inktone.domain.model.ReadingState
-import com.inktone.domain.model.ReadingTheme
 import com.inktone.infrastructure.database.entity.ReadingStateEntity
 
 fun ReadingState.toEntity(): ReadingStateEntity {
@@ -12,7 +11,8 @@ fun ReadingState.toEntity(): ReadingStateEntity {
         resourceHref = cols.resourceHref, chapterIndex = cols.chapterIndex,
         paragraphIndex = cols.paragraphIndex, charOffset = cols.charOffset,
         lastReadAt = lastReadAt, voiceProfileId = voiceProfileId,
-        overrideTheme = overrides?.theme?.name, overrideFontSize = overrides?.fontSize,
+        // Lot 9 — id de thème (String), plus un enum.
+        overrideTheme = overrides?.theme, overrideFontSize = overrides?.fontSize,
     )
 }
 
@@ -22,7 +22,7 @@ fun ReadingStateEntity.toDomain(): ReadingState = ReadingState(
     lastReadAt = lastReadAt, voiceProfileId = voiceProfileId,
     overrides = if (overrideTheme != null || overrideFontSize != null) {
         ReadingOverrides(
-            theme = overrideTheme?.let { ReadingTheme.valueOf(it) },
+            theme = overrideTheme,
             fontSize = overrideFontSize,
         )
     } else null,
