@@ -49,30 +49,35 @@ Premier lancement → Onboarding → Bibliothèque (centre de navigation)
 
 - **Illustration :** un livre ouvert stylisé (deux pages en éventail avec lignes de texte suggérées) d'où partent deux arcs représentant des ondes sonores — symbolise « lecture + audio » en une seule image plutôt que deux symboles séparés.
 - **Titre :** « Bienvenue sur InkTone »
-- **Corps de texte (inventé par Claude, à valider ou remplacer) :** « Une nouvelle façon de lire et d'écouter vos livres, pensée pour vous accompagner à chaque page. »
-- **Bouton :** « Suivant »
+- **Corps de texte (validé, lot 10) :** « Lisez avec les yeux, continuez avec les oreilles. Une expérience de lecture unifiée qui s'adapte à votre rythme. »
+- **Bouton :** « Passer » (coin supérieur droit)
 
-### Carte 2 — Ce que InkTone offre
+### Carte 2 — Conçu pour votre confort
 
-- **Titre :** « Ce que InkTone vous offre »
+- **Titre (validé, lot 10) :** « Conçu pour votre confort »
 - **Disposition :** deux blocs côte à côte (pas une illustration unique comme la carte 1 — jugé plus lisible pour deux capacités distinctes) :
-  - Bloc gauche — icône livre simple : **« Lecture immersive »** / « Thèmes et typographie entièrement personnalisables »
-  - Bloc droit — icône égaliseur audio simple : **« Voix neuronale »** / « Narration naturelle, vitesse et voix réglables »
-- **Personnalisation poussée :** intégrée dans le texte de chaque bloc (« personnalisables », « réglables ») plutôt qu'en ligne séparée — à revoir si Issa préfère une phrase commune dédiée à la personnalisation.
-- **Bouton :** « Suivant »
+  - Bloc gauche — icône livre simple : **« Lecture sur mesure »** / « Thèmes, typographie et mise en page entièrement personnalisables pour un confort visuel absolu. »
+  - Bloc droit — icône égaliseur audio simple : **« Narration naturelle »** / « Des voix ultra-réalistes et fluides. Ajustez la vitesse et laissez-vous porter par l'histoire. »
+- **Bouton :** « Passer » (coin supérieur droit)
 
 ### Carte 3 — Clôture
 
-- **Illustration :** variante de celle de la carte 1 — le livre centré, avec les ondes sonores rayonnant complètement autour (pas juste d'un côté), pour symboliser une expérience unifiée plutôt que deux capacités séparées (rappel visuel délibéré de la carte 1, callback narratif).
-- **Titre (scindé en deux, décision de mise en forme) :** titre principal « Profitez d'une expérience de lecture et d'écoute unique », sous-texte plus discret « avec InkTone. » — plutôt qu'un seul bloc de texte, jugé plus léger visuellement sur une carte de clôture.
+- **Illustration :** variante différenciée de celle de la carte 1 (lot 10, tâche 10.1, point 5) — le livre est retiré, seules les ondes sonores concentriques convergent vers un point d'accent central, pour éviter que les cartes 1 et 3 se ressemblent trop dans un pager de trois cartes.
+- **Titre (validé, lot 10) :** « Votre prochaine histoire vous attend »
+- **Sous-texte (validé, lot 10) :** « Importez vos livres et commencez l'expérience InkTone. »
 - **Bouton :** « Commencer » (mène à la Bibliothèque)
 
-### Points ouverts, explicitement non résolus
+### Points ouverts — résolus au lot 10
 
-- Le texte exact de chaque carte est en grande partie inventé par Claude pendant la conception — à remplacer par le texte réel voulu par Issa avant toute implémentation.
-- **Source des illustrations finales : génération IA** (tranché — les mockups actuels en SVG plats restent des esquisses de composition, à remplacer par des illustrations générées).
-- **Retrait du bouton « Passer » sur la carte 3 : confirmé explicitement.**
-- Palette de couleur utilisée dans les mockups = palette générique de l'outil de maquettage, **pas** la palette bordeaux `#7A1F3D` déjà actée pour InkTone (portée du legacy en Phase 9bis) — à appliquer à la version finale.
+- **Textes validés** (repris à la lettre, `LOT_10_ONBOARDING.md`) — le titre carte 3 diffère du brouillon initial de conception (« Profitez d'une expérience... ») : le texte validé prime.
+- **Source des illustrations : vectoriel composé (Compose Canvas), pas génération IA** — décision inversée par rapport au brouillon de conception. Six corrections avant intégration (couleurs paramétrées depuis `MaterialTheme`, tout en `dp.toPx()`, `quadraticTo`, taille laissée à l'appelant, cartes 1/3 différenciées, `clearAndSetSemantics` pour l'accessibilité) — voir `OnboardingIllustrations.kt`.
+- **Bouton « Suivant » retiré** : le plan d'exécution (`LOT_10_ONBOARDING.md`, tâche 10.2) simplifie à balayage horizontal + « Passer » (cartes 1/2) + « Commencer » (carte 3), sans bouton « Suivant » séparé — écart assumé par rapport à la décision de fond initiale (accessibilité, ne pas dépendre uniquement du geste) : le balayage reste secondé par un bouton explicite sur chaque carte (Passer ou Commencer), donc jamais uniquement gestuel.
+- **Retrait du bouton « Passer » sur la carte 3 : confirmé, implémenté.**
+- Palette bordeaux `#7A1F3D` : consommée via `MaterialTheme.colorScheme.primary` (paramètre par défaut), pas un littéral dans les illustrations.
+
+### État d'implémentation (lot 10)
+
+Onboarding câblé au premier lancement (`OnboardingRoute`, `startDestination` de `InkToneNavHost` arbitré sur `UserPreferences.hasSeenOnboarding`, migration 19→20). `CrashConsent`/`VoiceDownload` retirés (pure présentation) : le consentement crash vit dans la carte Confidentialité des Réglages (formulation honnête ajoutée ce lot, gap trouvé à l'audit — voir `LOT_ONBOARDING_PERIMETRE.md`), le téléchargement de voix dans la carte Lecture des Réglages (`SettingsIntent.StartVoiceDownload`, nouveau point de besoin réel, aucun autre point d'accès n'existait avant ce lot).
 
 ---
 
@@ -88,7 +93,7 @@ Premier lancement → Onboarding → Bibliothèque (centre de navigation)
 5. Icône menu 3-points — ouvre un bottom sheet (contenu détaillé et **maquetté** plus loin, § Bottom sheet du menu 3-points).
 
 **Corps, état vide :**
-- Illustration : étagère avec emplacements de livres en pointillés (suggère l'absence de contenu plutôt qu'un vide complet). **Non produite au lot 2a** — asset vectoriel à créer, `AppIcons.Reading` (icône générique) reste en repli en attendant, signalé explicitement plutôt que présenté comme conforme.
+- Illustration : étagère avec emplacements de livres en pointillés (suggère l'absence de contenu plutôt qu'un vide complet). **Produite au lot 10** (`EmptyLibraryShelfIllustration`, vectoriel Compose Canvas, même procédé que l'onboarding — couleur paramétrée, proportionnelle à la taille reçue) — ferme la dette signalée au lot 2a.6, `AppIcons.Reading` n'est plus un repli.
 - Titre : « Votre bibliothèque est vide » — **textes validés** (lot 2a).
 - Corps : « Importez votre premier livre pour commencer à lire et écouter avec InkTone. » — **texte validé** (lot 2a).
 - Bouton central, icône + libellé : « Importer votre premier livre ».
