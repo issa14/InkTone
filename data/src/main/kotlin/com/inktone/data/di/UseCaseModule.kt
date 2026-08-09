@@ -8,6 +8,7 @@ import com.inktone.domain.repository.PreferencesRepository
 import com.inktone.domain.repository.PublicationRepository
 import com.inktone.domain.repository.ReadingSessionRepository
 import com.inktone.domain.repository.ReadingStateRepository
+import com.inktone.domain.repository.ConflictQueueRepository
 import com.inktone.domain.repository.SyncAccountRepository
 import com.inktone.domain.service.SyncNowService
 import com.inktone.domain.repository.ThemeRepository
@@ -32,6 +33,7 @@ import com.inktone.domain.usecase.GetStatisticsUseCase
 import com.inktone.domain.usecase.GetVoiceProfilesUseCase
 import com.inktone.domain.usecase.ImportPublicationUseCase
 import com.inktone.domain.usecase.ObserveSyncUiStateUseCase
+import com.inktone.domain.usecase.ResolvePositionConflictUseCase
 import com.inktone.domain.usecase.SynchronizeNowUseCase
 import com.inktone.domain.usecase.SearchPublicationUseCase
 import com.inktone.domain.usecase.DeletePublicationUseCase
@@ -93,6 +95,12 @@ object UseCaseModule {
     fun provideSynchronizeNowUseCase(
         syncNowService: SyncNowService,
     ): SynchronizeNowUseCase = SynchronizeNowUseCase(syncNowService)
+
+    @Provides
+    fun provideResolvePositionConflictUseCase(
+        readingStateRepository: ReadingStateRepository,
+        conflictQueueRepository: ConflictQueueRepository,
+    ): ResolvePositionConflictUseCase = ResolvePositionConflictUseCase(readingStateRepository, conflictQueueRepository)
 
     @Provides
     fun provideImportPublicationUseCase(

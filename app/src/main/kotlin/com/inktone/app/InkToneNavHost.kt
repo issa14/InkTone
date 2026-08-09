@@ -54,6 +54,7 @@ import com.inktone.feature.settings.ThemeStudioScreen
 import com.inktone.feature.statistics.BookStatisticsScreen
 import com.inktone.feature.statistics.StatisticsScreen
 import com.inktone.feature.sync.SyncConfigurationScreen
+import com.inktone.feature.sync.SyncConflictBottomSheet
 
 /**
  * Tâche 9bis.2 — `NavHost` réel, remplace `AppScreen` (état à 3 cas,
@@ -121,6 +122,11 @@ fun InkToneNavHost(navController: NavHostController = rememberNavController(), s
                 // drawer plutot que des icones eparpillees.
                 floatingActionButton = { ImportPickerButton() },
             )
+            // Lot 11, tâche 11.10 — présenté à la prochaine ouverture de
+            // l'app (Bibliothèque = première destination réelle après
+            // l'onboarding) : un conflit détecté en arrière-plan ne se
+            // résout jamais tout seul.
+            SyncConflictBottomSheet()
             } // CompositionLocalProvider
         }
         composable<RecentsRoute> {

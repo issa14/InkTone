@@ -348,3 +348,32 @@ val MIGRATION_22_23 = object : Migration(22, 23) {
         db.execSQL("ALTER TABLE user_preferences ADD COLUMN syncWifiOnly INTEGER NOT NULL DEFAULT 0")
     }
 }
+
+/** Lot 11, tâche 11.10 — file des conflits de position en attente d'arbitrage, au plus un par publication. */
+val MIGRATION_23_24 = object : Migration(23, 24) {
+    override fun migrate(db: SupportSQLiteDatabase) {
+        db.execSQL(
+            """
+            CREATE TABLE IF NOT EXISTS `pending_conflicts` (
+                `publicationId` TEXT NOT NULL,
+                `bookTitle` TEXT NOT NULL,
+                `localResourceHref` TEXT NOT NULL,
+                `localChapterIndex` INTEGER NOT NULL,
+                `localParagraphIndex` INTEGER,
+                `localCharOffset` INTEGER NOT NULL,
+                `localDeviceLabel` TEXT NOT NULL,
+                `localAt` INTEGER NOT NULL,
+                `localChapterCount` INTEGER NOT NULL,
+                `remoteResourceHref` TEXT NOT NULL,
+                `remoteChapterIndex` INTEGER NOT NULL,
+                `remoteParagraphIndex` INTEGER,
+                `remoteCharOffset` INTEGER NOT NULL,
+                `remoteDeviceLabel` TEXT NOT NULL,
+                `remoteAt` INTEGER NOT NULL,
+                `remoteChapterCount` INTEGER NOT NULL,
+                PRIMARY KEY(`publicationId`)
+            )
+            """.trimIndent(),
+        )
+    }
+}

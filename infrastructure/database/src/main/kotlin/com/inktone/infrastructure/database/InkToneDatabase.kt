@@ -9,6 +9,7 @@ import com.inktone.infrastructure.database.dao.BookmarkDao
 import com.inktone.infrastructure.database.dao.CustomThemeDao
 import com.inktone.infrastructure.database.dao.ImportResultDao
 import com.inktone.infrastructure.database.dao.LibraryItemDao
+import com.inktone.infrastructure.database.dao.PendingConflictDao
 import com.inktone.infrastructure.database.dao.PronunciationRuleDao
 import com.inktone.infrastructure.database.dao.PublicationDao
 import com.inktone.infrastructure.database.dao.ReadingSessionDao
@@ -21,6 +22,7 @@ import com.inktone.infrastructure.database.entity.BookmarkEntity
 import com.inktone.infrastructure.database.entity.CustomThemeEntity
 import com.inktone.infrastructure.database.entity.ImportResultEntity
 import com.inktone.infrastructure.database.entity.LibraryItemView
+import com.inktone.infrastructure.database.entity.PendingConflictEntity
 import com.inktone.infrastructure.database.entity.PronunciationRuleEntity
 import com.inktone.infrastructure.database.entity.PublicationEntity
 import com.inktone.infrastructure.database.entity.ReadingSessionEntity
@@ -34,10 +36,10 @@ import com.inktone.infrastructure.database.entity.VoiceProfileEntity
         PublicationEntity::class, ReadingStateEntity::class, ReadingSessionEntity::class,
         BookmarkEntity::class, AnnotationEntity::class, VoiceProfileEntity::class,
         UserPreferencesEntity::class, SentenceFtsEntity::class, PronunciationRuleEntity::class,
-        ImportResultEntity::class, CustomThemeEntity::class,
+        ImportResultEntity::class, CustomThemeEntity::class, PendingConflictEntity::class,
     ],
     views = [LibraryItemView::class],
-    version = 23, // Lot 11, tâche 11.8 : synchro automatique + Wi-Fi uniquement (MIGRATION_22_23)
+    version = 24, // Lot 11, tâche 11.10 : file de conflits de position (MIGRATION_23_24)
     exportSchema = true, // condition du harnais de migration — Tâche 2.4
 )
 @TypeConverters(StringListConverter::class)
@@ -54,4 +56,5 @@ abstract class InkToneDatabase : RoomDatabase() {
     abstract fun libraryItemDao(): LibraryItemDao
     abstract fun importResultDao(): ImportResultDao
     abstract fun customThemeDao(): CustomThemeDao
+    abstract fun pendingConflictDao(): PendingConflictDao
 }
