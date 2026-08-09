@@ -9,6 +9,7 @@ import com.inktone.domain.repository.PublicationRepository
 import com.inktone.domain.repository.ReadingSessionRepository
 import com.inktone.domain.repository.ReadingStateRepository
 import com.inktone.domain.repository.SyncAccountRepository
+import com.inktone.domain.service.SyncNowService
 import com.inktone.domain.repository.ThemeRepository
 import com.inktone.domain.repository.VoiceProfileRepository
 import com.inktone.domain.service.FileStorageService
@@ -31,6 +32,7 @@ import com.inktone.domain.usecase.GetStatisticsUseCase
 import com.inktone.domain.usecase.GetVoiceProfilesUseCase
 import com.inktone.domain.usecase.ImportPublicationUseCase
 import com.inktone.domain.usecase.ObserveSyncUiStateUseCase
+import com.inktone.domain.usecase.SynchronizeNowUseCase
 import com.inktone.domain.usecase.SearchPublicationUseCase
 import com.inktone.domain.usecase.DeletePublicationUseCase
 import com.inktone.domain.usecase.ToggleFavoriteUseCase
@@ -86,6 +88,11 @@ object UseCaseModule {
         syncAccountRepository: SyncAccountRepository,
         syncOperationTracker: SyncOperationTracker,
     ): ObserveSyncUiStateUseCase = ObserveSyncUiStateUseCase(syncAccountRepository, syncOperationTracker)
+
+    @Provides
+    fun provideSynchronizeNowUseCase(
+        syncNowService: SyncNowService,
+    ): SynchronizeNowUseCase = SynchronizeNowUseCase(syncNowService)
 
     @Provides
     fun provideImportPublicationUseCase(

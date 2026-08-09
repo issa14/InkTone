@@ -4,6 +4,7 @@ import android.app.Application
 import androidx.hilt.work.HiltWorkerFactory
 import androidx.work.Configuration
 import com.inktone.infrastructure.crashreporting.CrashReportingConsentObserver
+import com.inktone.infrastructure.worker.SyncScheduleObserver
 import dagger.hilt.android.HiltAndroidApp
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
@@ -31,6 +32,11 @@ class InkToneApplication : Application(), Configuration.Provider {
     // (CrashReportingConsentObserver), `app` ne fait que déclencher [start].
     @Inject lateinit var crashReportingConsentObserver: CrashReportingConsentObserver
 
+    // Lot 11, tâche 11.8 — même raison que crashReportingConsentObserver :
+    // reflète UserPreferences.syncAutoEnabled/syncWifiOnly sur
+    // SyncScheduler (WorkManager) en continu.
+    @Inject lateinit var syncScheduleObserver: SyncScheduleObserver
+
     override val workManagerConfiguration: Configuration
         get() = Configuration.Builder().setWorkerFactory(workerFactory).build()
 
@@ -46,5 +52,6 @@ class InkToneApplication : Application(), Configuration.Provider {
         // désactivée par défaut avec NoOpCrashReporter (le cas sans
         // google-services.json) et n'a alors aucun effet réel.
         crashReportingConsentObserver.start(CoroutineScope(SupervisorJob() + Dispatchers.Default))
+        syncScheduleObserver.start(CoroutineScope(SupervisorJob() + Dispatchers.Default))
     }
 }

@@ -19,7 +19,8 @@ sealed interface ImportBackupResult {
     data class Failed(val message: String) : ImportBackupResult
 }
 
-private val backupJson = Json { ignoreUnknownKeys = true }
+/** `internal` (tâche 11.8) : réutilisée par `com.inktone.data.sync.SyncNowManager` pour sérialiser le même [BackupPayload] vers l'instantané distant — une seule définition de charge utile. */
+internal val backupJson = Json { ignoreUnknownKeys = true }
 
 /**
  * Export/import des metadonnees utilisateur (Tache 8.5, recupere
@@ -67,6 +68,18 @@ class BackupManager @Inject constructor(
             tempFile.delete()
         }
     }
+
+    /**
+     * Lot 11, tâche 11.8 — même charge utile que l'export local
+     * ([exportTo]), réutilisée telle quelle pour l'instantané de
+     * synchronisation distante ([com.inktone.data.sync.SyncNowManager]) :
+     * « une seule définition de charge utile, pas deux qui divergeront »
+     * (tâche 11.2). `appVersion` fixé à `"sync"` plutôt que
+     * `BuildConfig.VERSION_NAME` — cet appelant peut être un `Worker` en
+     * arrière-plan sans accès à la version de build, et ce champ ne sert
+     * qu'à l'audit, jamais à une décision de compatibilité.
+     */
+    internal suspend fun buildPayloadForSync(): BackupPayload = buildPayload(appVersion = "sync")
 
     private suspend fun buildPayload(appVersion: String) = BackupPayload(
         appVersion = appVersion,

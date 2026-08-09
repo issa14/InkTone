@@ -27,6 +27,8 @@ fun UserPreferences.toEntity(): UserPreferencesEntity = UserPreferencesEntity(
     syncLinkedAt = syncLinkedAt,
     syncLastSyncAt = syncLastSyncAt,
     syncLastAutoSyncFailed = syncLastAutoSyncFailed,
+    syncAutoEnabled = syncAutoEnabled,
+    syncWifiOnly = syncWifiOnly,
 )
 
 fun UserPreferencesEntity.toDomain(): UserPreferences = UserPreferences(
@@ -54,4 +56,6 @@ fun UserPreferencesEntity.toDomain(): UserPreferences = UserPreferences(
     syncLinkedAt = syncLinkedAt,
     syncLastSyncAt = syncLastSyncAt,
     syncLastAutoSyncFailed = syncLastAutoSyncFailed,
+    syncAutoEnabled = syncAutoEnabled,
+    syncWifiOnly = syncWifiOnly,
 )

@@ -340,3 +340,11 @@ val MIGRATION_21_22 = object : Migration(21, 22) {
         db.execSQL("ALTER TABLE user_preferences ADD COLUMN syncLastAutoSyncFailed INTEGER NOT NULL DEFAULT 0")
     }
 }
+
+/** Lot 11, tâche 11.8 — synchro automatique en arrière-plan et sa contrainte Wi-Fi uniquement, toutes deux désactivées par défaut. */
+val MIGRATION_22_23 = object : Migration(22, 23) {
+    override fun migrate(db: SupportSQLiteDatabase) {
+        db.execSQL("ALTER TABLE user_preferences ADD COLUMN syncAutoEnabled INTEGER NOT NULL DEFAULT 0")
+        db.execSQL("ALTER TABLE user_preferences ADD COLUMN syncWifiOnly INTEGER NOT NULL DEFAULT 0")
+    }
+}

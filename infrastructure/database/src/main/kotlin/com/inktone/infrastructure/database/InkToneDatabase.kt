@@ -37,7 +37,7 @@ import com.inktone.infrastructure.database.entity.VoiceProfileEntity
         ImportResultEntity::class, CustomThemeEntity::class,
     ],
     views = [LibraryItemView::class],
-    version = 22, // Lot 11 : identité d'appareil + état du compte de synchronisation (MIGRATION_21_22)
+    version = 23, // Lot 11, tâche 11.8 : synchro automatique + Wi-Fi uniquement (MIGRATION_22_23)
     exportSchema = true, // condition du harnais de migration — Tâche 2.4
 )
 @TypeConverters(StringListConverter::class)

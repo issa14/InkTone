@@ -72,6 +72,13 @@ data class UserPreferences(
     val syncLinkedAt: Long? = null,
     val syncLastSyncAt: Long? = null,
     val syncLastAutoSyncFailed: Boolean = false,
+    // Lot 11, tâche 11.8 — synchro automatique en arrière-plan (WorkManager)
+    // et sa contrainte réseau. `syncWifiOnly` n'a d'effet que si
+    // `syncAutoEnabled` est vrai (même patron que
+    // eyeRestReminderEnabled/eyeRestReminderIntervalMinutes) : grisé côté
+    // UI, et sans effet côté planification si l'auto-sync est éteinte.
+    val syncAutoEnabled: Boolean = false,
+    val syncWifiOnly: Boolean = false,
 ) {
     init {
         require(fontSize > 0) { "fontSize doit être strictement positif" }

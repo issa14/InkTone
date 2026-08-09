@@ -37,4 +37,6 @@ data class UserPreferencesEntity(
     val syncLinkedAt: Long? = null, // Lot 11
     val syncLastSyncAt: Long? = null, // Lot 11
     val syncLastAutoSyncFailed: Boolean = false, // Lot 11 — pilote la bannière persistante du Dashboard
+    val syncAutoEnabled: Boolean = false, // Lot 11, tâche 11.8
+    val syncWifiOnly: Boolean = false, // Lot 11, tâche 11.8
 )
