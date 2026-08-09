@@ -89,7 +89,7 @@ class SettingsViewModel @Inject constructor(
             // jusqu'a _state.value (Tache 6.6, regression trouvee par test).
             val current = preferencesRepository.get()
             when (intent) {
-                is SettingsIntent.SetTheme -> preferencesRepository.update(current.copy(theme = intent.theme))
+                is SettingsIntent.SetTheme -> preferencesRepository.update(current.copy(theme = intent.themeId))
                 is SettingsIntent.SetFontSize -> preferencesRepository.update(current.copy(fontSize = intent.fontSize))
                 is SettingsIntent.SetFontFamily -> preferencesRepository.update(current.copy(fontFamily = intent.fontFamily))
                 is SettingsIntent.SetDefaultTtsEngine ->
@@ -209,15 +209,16 @@ class SettingsViewModel @Inject constructor(
     }
 
     /**
-     * Lot 6 — Préset Mode sombre.
-     * ON : ReadingTheme.DARK + AppTheme.DARK.
+     * Lot 6/9 — Préset Mode sombre.
+     * ON : ReadingTheme.OBSIDIENNE (Lot 9 — id du thème intégré remplaçant
+     * l'ancien `ReadingTheme.DARK`) + AppTheme.DARK.
      * OFF : retour aux valeurs par défaut (approche simple et prévisible plutôt
      * que mémoriser l'état antérieur, qui surprend si l'utilisateur a modifié
      * des réglages entre-temps).
      */
     private suspend fun applyDarkModePreset(enabled: Boolean, current: UserPreferences) {
         if (enabled) {
-            preferencesRepository.update(current.copy(theme = ReadingTheme.DARK, appTheme = AppTheme.DARK))
+            preferencesRepository.update(current.copy(theme = ReadingTheme.OBSIDIENNE.id, appTheme = AppTheme.DARK))
         } else {
             val defaults = UserPreferences()
             preferencesRepository.update(current.copy(theme = defaults.theme, appTheme = AppTheme.SYSTEM))
@@ -225,11 +226,13 @@ class SettingsViewModel @Inject constructor(
     }
 
     /**
-     * Lot 6 — Préset Accessibilité (toggle réversible).
-     * ON : OpenDyslexic + 24sp + ReadingTheme.LIGHT + reduceMotion + readingRuler
-     * + bascule de la bibliothèque en mode Liste (décision actée au lot 2b —
-     * cohérent avec l'esprit du préréglage : reconnaissance d'un livre par le
-     * texte plutôt que par la seule couverture).
+     * Lot 6/9 — Préset Accessibilité (toggle réversible).
+     * ON : OpenDyslexic + 24sp + ReadingTheme.PAPIER_CLAIR (Lot 9 — id du
+     * thème intégré remplaçant l'ancien `ReadingTheme.LIGHT`) + reduceMotion
+     * + readingRuler + bascule de la bibliothèque en mode Liste (décision
+     * actée au lot 2b — cohérent avec l'esprit du préréglage :
+     * reconnaissance d'un livre par le texte plutôt que par la seule
+     * couverture).
      * OFF : retour aux valeurs par défaut — plus simple et prévisible.
      */
     private suspend fun applyAccessibilityPresetToggle(enabled: Boolean, current: UserPreferences) {
@@ -237,7 +240,7 @@ class SettingsViewModel @Inject constructor(
             preferencesRepository.update(
                 current.copy(
                     fontSize = 24,
-                    theme = ReadingTheme.LIGHT,
+                    theme = ReadingTheme.PAPIER_CLAIR.id,
                     fontFamily = FontFamily.OPEN_DYSLEXIC,
                     reduceMotion = true,
                     readingRulerEnabled = true,

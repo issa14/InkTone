@@ -19,7 +19,7 @@ class ApplyAccessibilityPresetUseCaseTest {
 
         val result = repository.get()
         assertEquals(24, result.fontSize)
-        assertEquals(ReadingTheme.LIGHT, result.theme)
+        assertEquals(ReadingTheme.PAPIER_CLAIR.id, result.theme)
         assertEquals(FontFamily.OPEN_DYSLEXIC, result.fontFamily)
         assertTrue(result.reduceMotion)
         // Tache 9bis.3.6 - extension notee dans le plan Phase 9bis.

@@ -6,6 +6,7 @@ import com.inktone.core.testing.fake.FakePreferencesRepository
 import com.inktone.core.testing.fake.FakePublicationParser
 import com.inktone.core.testing.fake.FakePublicationRepository
 import com.inktone.core.testing.fake.FakeReadingStateRepository
+import com.inktone.core.testing.fake.FakeThemeRepository
 import com.inktone.core.testing.fake.FakeTtsEngine
 import com.inktone.domain.model.Publication
 import com.inktone.domain.model.PublicationFormat
@@ -82,6 +83,7 @@ class ReaderViewModelOverrideTest {
             voiceProfileRepository = com.inktone.core.testing.fake.FakeVoiceProfileRepository(),
             getVoiceProfiles = com.inktone.domain.usecase.GetVoiceProfilesUseCase(com.inktone.core.testing.fake.FakeVoiceProfileRepository()),
             readingSessionRepository = com.inktone.core.testing.fake.FakeReadingSessionRepository(),
+            themeRepository = FakeThemeRepository(),
         )
 
         // 3d.5 — le rappel de repos oculaire (activé par défaut, recurrent)
@@ -90,25 +92,27 @@ class ReaderViewModelOverrideTest {
         // Même raison pour utiliser runCurrent() plutôt qu'advanceUntilIdle()
         // ci-dessous : le timer de checkpoint de session démarre lui aussi
         // inconditionnellement à l'ouverture d'une publication.
-        preferencesRepository.update(UserPreferences(theme = ReadingTheme.LIGHT, eyeRestReminderEnabled = false))
+        preferencesRepository.update(UserPreferences(theme = ReadingTheme.PAPIER_CLAIR.id, eyeRestReminderEnabled = false))
         viewModel.onIntent(ReaderIntent.OpenPublication(publicationId))
         dispatcher.scheduler.runCurrent()
 
-        // Sans surcharge : le theme global (LIGHT) s'applique.
-        assertEquals(ReadingTheme.LIGHT, viewModel.state.value.effectiveSettings.theme)
+        // Sans surcharge : le theme global (Papier Clair) s'applique.
+        assertEquals(ReadingTheme.PAPIER_CLAIR.id, viewModel.state.value.effectiveSettings.theme)
+        assertEquals(ReadingTheme.PAPIER_CLAIR, viewModel.state.value.resolvedTheme)
 
-        viewModel.onIntent(ReaderIntent.SetOverrides(ReadingOverrides(theme = ReadingTheme.DARK)))
+        viewModel.onIntent(ReaderIntent.SetOverrides(ReadingOverrides(theme = ReadingTheme.OBSIDIENNE.id)))
         dispatcher.scheduler.runCurrent()
 
         // La surcharge gagne, pas le reglage global.
-        assertEquals(ReadingTheme.DARK, viewModel.state.value.effectiveSettings.theme)
-        assertEquals(ReadingTheme.DARK, readingStateRepository.get(publicationId)?.overrides?.theme)
+        assertEquals(ReadingTheme.OBSIDIENNE.id, viewModel.state.value.effectiveSettings.theme)
+        assertEquals(ReadingTheme.OBSIDIENNE, viewModel.state.value.resolvedTheme)
+        assertEquals(ReadingTheme.OBSIDIENNE.id, readingStateRepository.get(publicationId)?.overrides?.theme)
 
         viewModel.onIntent(ReaderIntent.SetOverrides(null))
         dispatcher.scheduler.runCurrent()
 
         // La surcharge effacee : le reglage global reprend la main.
-        assertEquals(ReadingTheme.LIGHT, viewModel.state.value.effectiveSettings.theme)
+        assertEquals(ReadingTheme.PAPIER_CLAIR.id, viewModel.state.value.effectiveSettings.theme)
 
         // Casse le timer de checkpoint (auto-récurrent) comme le ferait
         // onCleared() sur un vrai ViewModel détruit — sinon le drain

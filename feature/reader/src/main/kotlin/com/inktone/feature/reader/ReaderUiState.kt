@@ -40,7 +40,12 @@ data class ReaderUiState(
     // moment de l'ouverture (Tache 4.7) - ReaderScreen ne connait jamais
     // ReadingOverrides ni UserPreferences separement, seulement ce
     // resultat final.
-    val effectiveSettings: EffectiveReadingSettings = EffectiveReadingSettings(ReadingTheme.SYSTEM, 18),
+    val effectiveSettings: EffectiveReadingSettings = EffectiveReadingSettings(ReadingTheme.DEFAULT.id, 18),
+    // Lot 9 — ReadingTheme complet (couleurs + police) résolu depuis
+    // `effectiveSettings.theme` (un id) via ThemeRepository. Source
+    // unique de rendu couleur/police du lecteur — ThemeColors.kt en
+    // dérive, jamais un `when` sur un enum fermé.
+    val resolvedTheme: ReadingTheme = ReadingTheme.DEFAULT,
     // Selection personnalisee par phrase (Tache 7.0) - remplace la
     // selection Compose native, Selection/SelectionContainer controle
     // etant internal a androidx.compose.foundation:foundation:1.7.2

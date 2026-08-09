@@ -3,7 +3,6 @@ package com.inktone.feature.settings
 import com.inktone.domain.model.AppTheme
 import com.inktone.domain.model.FontFamily
 import com.inktone.domain.model.PronunciationRule
-import com.inktone.domain.model.ReadingTheme
 import com.inktone.domain.model.TtsEngineId
 import com.inktone.domain.model.UserPreferences
 import com.inktone.domain.model.VoiceProfile
@@ -48,7 +47,8 @@ sealed interface DataOperationResult {
 }
 
 sealed interface SettingsIntent {
-    data class SetTheme(val theme: ReadingTheme) : SettingsIntent
+    // Lot 9 — id d'un ReadingTheme (intégré ou personnalisé), plus un enum fermé.
+    data class SetTheme(val themeId: String) : SettingsIntent
     data class SetFontSize(val fontSize: Int) : SettingsIntent
     data class SetFontFamily(val fontFamily: FontFamily) : SettingsIntent
     data class SetDefaultTtsEngine(val engine: TtsEngineId) : SettingsIntent

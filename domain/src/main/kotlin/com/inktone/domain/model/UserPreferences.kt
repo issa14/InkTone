@@ -6,7 +6,9 @@ package com.inktone.domain.model
  * valeurs (Blueprint §3.3).
  */
 data class UserPreferences(
-    val theme: ReadingTheme = ReadingTheme.SYSTEM,
+    // Lot 9 — id d'un ReadingTheme (intégré ou personnalisé), plus un enum
+    // fermé. Défaut : Papier Clair (voir ReadingTheme.DEFAULT).
+    val theme: String = ReadingTheme.DEFAULT.id,
     val fontSize: Int = 18,
     val defaultTtsEngine: TtsEngineId = TtsEngineId.SHERPA_ONNX,
     val crashReportingEnabled: Boolean = false,

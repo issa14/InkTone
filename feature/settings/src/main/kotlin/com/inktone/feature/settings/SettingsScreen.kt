@@ -186,10 +186,10 @@ internal fun SettingsContent(
         // Le toggle reflète l'état réel : si un réglage du préset est modifié
         // manuellement, le toggle se désactive automatiquement.
         val isDarkPresetActive = preferences.appTheme == AppTheme.DARK &&
-            preferences.theme == ReadingTheme.DARK
+            preferences.theme == ReadingTheme.OBSIDIENNE.id
         val isAccessibilityPresetActive = preferences.fontFamily == FontFamily.OPEN_DYSLEXIC &&
             preferences.fontSize == 24 &&
-            preferences.theme == ReadingTheme.LIGHT &&
+            preferences.theme == ReadingTheme.PAPIER_CLAIR.id &&
             preferences.reduceMotion &&
             preferences.libraryLayoutMode == "LIST"
 

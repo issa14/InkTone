@@ -8,6 +8,7 @@ import com.inktone.domain.repository.PreferencesRepository
 import com.inktone.domain.repository.PublicationRepository
 import com.inktone.domain.repository.ReadingSessionRepository
 import com.inktone.domain.repository.ReadingStateRepository
+import com.inktone.domain.repository.ThemeRepository
 import com.inktone.domain.repository.VoiceProfileRepository
 import com.inktone.domain.service.FileStorageService
 import com.inktone.domain.service.ImportSessionStore
@@ -19,6 +20,7 @@ import com.inktone.domain.usecase.ApplyAccessibilityPresetUseCase
 import com.inktone.domain.usecase.CreateBookmarkUseCase
 import com.inktone.domain.usecase.DeleteAnnotationUseCase
 import com.inktone.domain.usecase.DeleteBookmarkUseCase
+import com.inktone.domain.usecase.DeleteCustomThemeUseCase
 import com.inktone.domain.usecase.DeleteLibraryItemUseCase
 import com.inktone.domain.usecase.ExportLibraryUseCase
 import com.inktone.domain.usecase.GetCurrentBookUseCase
@@ -160,6 +162,13 @@ object UseCaseModule {
         publicationRepository: PublicationRepository,
         readingStateRepository: ReadingStateRepository,
     ): GetCurrentBookUseCase = GetCurrentBookUseCase(readingSessionRepository, publicationRepository, readingStateRepository)
+
+    @Provides
+    fun provideDeleteCustomThemeUseCase(
+        themeRepository: ThemeRepository,
+        preferencesRepository: PreferencesRepository,
+        readingStateRepository: ReadingStateRepository,
+    ): DeleteCustomThemeUseCase = DeleteCustomThemeUseCase(themeRepository, preferencesRepository, readingStateRepository)
 
     @Provides
     @Singleton
