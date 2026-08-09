@@ -2,10 +2,10 @@ package com.inktone.feature.onboarding
 
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
+import androidx.compose.foundation.isSystemInDarkTheme
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
-import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
@@ -13,6 +13,7 @@ import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.pager.HorizontalPager
 import androidx.compose.foundation.pager.rememberPagerState
 import androidx.compose.foundation.shape.CircleShape
@@ -20,14 +21,12 @@ import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.outlined.MenuBook
 import androidx.compose.material.icons.automirrored.outlined.VolumeUp
-import androidx.compose.material.icons.outlined.Palette
 import androidx.compose.material3.Button
 import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
-import androidx.compose.material3.OutlinedCard
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
@@ -42,24 +41,45 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
+import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.hilt.navigation.compose.hiltViewModel
 
-/** Couleur signature InkTone — utilisée volontairement en littéral sur cet écran de marque (retour Issa, vérification device) : la couleur dynamique (Material You, activée par défaut) ne garantit pas le bordeaux à cet endroit précis, alors que l'onboarding est le premier contact avec l'identité visuelle. */
+/**
+ * Couleur signature InkTone — utilisée volontairement en littéral sur cet
+ * écran de marque (retour Issa, vérification device) : la couleur
+ * dynamique (Material You, activée par défaut) ne garantit pas le
+ * bordeaux à cet endroit précis, alors que l'onboarding est le premier
+ * contact avec l'identité visuelle.
+ *
+ * [InkToneBordeauxLight] — retour Issa (test appareil réel, mode sombre) :
+ * le bordeaux standard manque de contraste sur fond sombre. [accentColor]
+ * choisit la bonne variante selon [isSystemInDarkTheme] pour les accents
+ * (icônes, indicateurs, texte secondaire) ; le bouton « Commencer » reste
+ * volontairement sur le bordeaux standard avec un texte blanc forcé, pas
+ * la variante claire (voir [ReadyCard]) — un bouton plein doit rester
+ * lisible par son propre contraste fond/texte, indépendamment du thème.
+ */
 val InkToneBordeaux = Color(0xFF7A1F3D)
+val InkToneBordeauxLight = Color(0xFFD67393)
+
+@Composable
+private fun accentColor(): Color = if (isSystemInDarkTheme()) InkToneBordeauxLight else InkToneBordeaux
 
 /**
  * Lot 10, Tâche 10.2 — `HorizontalPager` à trois cartes. Retour Issa
  * (vérification device) : chaque page est encapsulée dans une `Card`
  * centrale (pas des éléments flottant en plein écran), la couleur
  * signature InkTone remplace les teintes par défaut du Material Theme
- * sur les éléments d'accentuation.
+ * sur les éléments d'accentuation, avec une variante claire en mode
+ * sombre pour rester lisible.
  */
 @Composable
 fun OnboardingScreen(viewModel: OnboardingViewModel = hiltViewModel(), onDone: () -> Unit = {}) {
     val state by viewModel.state.collectAsState()
     val pagerState = rememberPagerState(pageCount = { 3 })
+    val accent = accentColor()
 
     LaunchedEffect(state.hasCompleted) {
         if (state.hasCompleted) onDone()
@@ -76,9 +96,9 @@ fun OnboardingScreen(viewModel: OnboardingViewModel = hiltViewModel(), onDone: (
                         elevation = CardDefaults.cardElevation(defaultElevation = 2.dp),
                     ) {
                         when (page) {
-                            0 -> WelcomeCard()
-                            1 -> FeaturesCard()
-                            else -> ReadyCard(onStart = { viewModel.onIntent(OnboardingIntent.Complete) })
+                            0 -> WelcomeCard(accent)
+                            1 -> FeaturesCard(accent)
+                            else -> ReadyCard(accent, onStart = { viewModel.onIntent(OnboardingIntent.Complete) })
                         }
                     }
                 }
@@ -89,13 +109,14 @@ fun OnboardingScreen(viewModel: OnboardingViewModel = hiltViewModel(), onDone: (
                     onClick = { viewModel.onIntent(OnboardingIntent.Complete) },
                     modifier = Modifier.align(Alignment.TopEnd).padding(24.dp),
                 ) {
-                    Text("Passer", color = InkToneBordeaux)
+                    Text("Passer", color = accent)
                 }
             }
 
             PageIndicators(
                 pageCount = 3,
                 currentPage = pagerState.currentPage,
+                accent = accent,
                 modifier = Modifier.align(Alignment.BottomCenter).padding(bottom = 32.dp),
             )
         }
@@ -103,13 +124,13 @@ fun OnboardingScreen(viewModel: OnboardingViewModel = hiltViewModel(), onDone: (
 }
 
 @Composable
-private fun WelcomeCard() {
+private fun WelcomeCard(accent: Color) {
     Column(
         modifier = Modifier.fillMaxSize().padding(horizontal = 24.dp),
         horizontalAlignment = Alignment.CenterHorizontally,
         verticalArrangement = Arrangement.Center,
     ) {
-        BrandIcon(icon = Icons.AutoMirrored.Outlined.MenuBook, size = 96.dp)
+        BrandIcon(icon = Icons.AutoMirrored.Outlined.MenuBook, size = 96.dp, tint = accent)
         Spacer(Modifier.height(32.dp))
         Text("Bienvenue sur InkTone", style = MaterialTheme.typography.headlineMedium, fontWeight = FontWeight.Bold, textAlign = TextAlign.Center)
         Spacer(Modifier.height(16.dp))
@@ -118,11 +139,16 @@ private fun WelcomeCard() {
     }
 }
 
+/**
+ * Carte 2 — retour Issa (test appareil réel) : les deux sous-cartes
+ * côte à côte compressaient le texte en un mur illisible. Remplacées par
+ * une liste verticale aérée (icône ronde à gauche, titre + description à
+ * droite), plus lisible qu'une contrainte de largeur à 50/50.
+ */
 @Composable
-private fun FeaturesCard() {
+private fun FeaturesCard(accent: Color) {
     Column(
-        modifier = Modifier.fillMaxSize().padding(vertical = 24.dp),
-        horizontalAlignment = Alignment.CenterHorizontally,
+        modifier = Modifier.fillMaxSize().padding(horizontal = 32.dp),
         verticalArrangement = Arrangement.Center,
     ) {
         Text(
@@ -130,55 +156,42 @@ private fun FeaturesCard() {
             style = MaterialTheme.typography.headlineMedium,
             fontWeight = FontWeight.Bold,
             textAlign = TextAlign.Center,
-            modifier = Modifier.padding(horizontal = 32.dp),
+            modifier = Modifier.fillMaxWidth(),
         )
-        Spacer(Modifier.height(32.dp))
-        Row(
-            modifier = Modifier.fillMaxWidth().padding(horizontal = 16.dp),
-            horizontalArrangement = Arrangement.spacedBy(12.dp),
-        ) {
-            FeatureBlock(
-                modifier = Modifier.weight(1f),
+        Spacer(Modifier.height(40.dp))
+        Column(verticalArrangement = Arrangement.spacedBy(24.dp)) {
+            FeatureRow(
+                accent = accent,
                 icon = Icons.AutoMirrored.Outlined.MenuBook,
                 title = "Lecture sur mesure",
                 body = "Thèmes, typographie et mise en page entièrement personnalisables pour un confort visuel absolu.",
             )
-            FeatureBlock(
-                modifier = Modifier.weight(1f),
+            FeatureRow(
+                accent = accent,
                 icon = Icons.AutoMirrored.Outlined.VolumeUp,
                 title = "Narration naturelle",
                 body = "Des voix ultra-réalistes et fluides. Ajustez la vitesse et laissez-vous porter par l'histoire.",
             )
         }
-        Spacer(Modifier.height(48.dp))
     }
 }
 
 @Composable
-private fun FeatureBlock(modifier: Modifier = Modifier, icon: ImageVector, title: String, body: String) {
-    OutlinedCard(
-        modifier = modifier,
-        shape = RoundedCornerShape(16.dp),
-        colors = CardDefaults.outlinedCardColors(containerColor = InkToneBordeaux.copy(alpha = 0.04f)),
-        border = androidx.compose.foundation.BorderStroke(1.dp, InkToneBordeaux.copy(alpha = 0.15f)),
-    ) {
-        Column(
-            Modifier.padding(16.dp),
-            horizontalAlignment = Alignment.CenterHorizontally,
+private fun FeatureRow(accent: Color, icon: ImageVector, title: String, body: String) {
+    Row(verticalAlignment = Alignment.Top) {
+        Box(
+            Modifier.size(56.dp).clip(CircleShape).background(accent.copy(alpha = 0.1f)),
+            contentAlignment = Alignment.Center,
         ) {
-            Box(
-                Modifier.size(48.dp).clip(CircleShape).background(InkToneBordeaux.copy(alpha = 0.08f)),
-                contentAlignment = Alignment.Center,
-            ) {
-                Icon(icon, contentDescription = null, tint = InkToneBordeaux, modifier = Modifier.size(32.dp))
-            }
-            Spacer(Modifier.height(12.dp))
-            Text(title, style = MaterialTheme.typography.titleSmall, fontWeight = FontWeight.Bold, textAlign = TextAlign.Center)
-            Spacer(Modifier.height(6.dp))
+            Icon(icon, contentDescription = null, tint = accent, modifier = Modifier.size(28.dp))
+        }
+        Spacer(Modifier.width(16.dp))
+        Column(Modifier.weight(1f)) {
+            Text(title, style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.Bold)
+            Spacer(Modifier.height(4.dp))
             Text(
                 body,
-                style = MaterialTheme.typography.bodySmall.copy(fontSize = 13.sp, lineHeight = 18.sp),
-                textAlign = TextAlign.Center,
+                style = MaterialTheme.typography.bodyMedium.copy(lineHeight = 20.sp),
                 color = MaterialTheme.colorScheme.onSurfaceVariant,
             )
         }
@@ -186,19 +199,19 @@ private fun FeatureBlock(modifier: Modifier = Modifier, icon: ImageVector, title
 }
 
 @Composable
-private fun ReadyCard(onStart: () -> Unit) {
+private fun ReadyCard(accent: Color, onStart: () -> Unit) {
     Column(
         modifier = Modifier.fillMaxSize().padding(horizontal = 24.dp),
         horizontalAlignment = Alignment.CenterHorizontally,
         verticalArrangement = Arrangement.Center,
     ) {
-        // Carte 3 volontairement différenciée de la carte 1 (retour Issa,
-        // point 5 du plan) : icône livre entourée de cercles concentriques,
-        // pas la même composition que l'accueil.
+        // Carte 3 volontairement différenciée de la carte 1 (retour Issa) :
+        // icône livre AU CENTRE EXACT de cercles concentriques, pas la
+        // même composition que l'accueil.
         Box(contentAlignment = Alignment.Center) {
-            Box(Modifier.size(140.dp).clip(CircleShape).border(1.dp, InkToneBordeaux.copy(alpha = 0.15f), CircleShape))
-            Box(Modifier.size(112.dp).clip(CircleShape).border(1.dp, InkToneBordeaux.copy(alpha = 0.3f), CircleShape))
-            BrandIcon(icon = Icons.AutoMirrored.Outlined.MenuBook, size = 88.dp)
+            Box(Modifier.size(140.dp).clip(CircleShape).border(1.dp, accent.copy(alpha = 0.15f), CircleShape))
+            Box(Modifier.size(112.dp).clip(CircleShape).border(1.dp, accent.copy(alpha = 0.3f), CircleShape))
+            BrandIcon(icon = Icons.AutoMirrored.Outlined.MenuBook, size = 88.dp, tint = accent)
         }
         Spacer(Modifier.height(32.dp))
         Text(
@@ -210,10 +223,14 @@ private fun ReadyCard(onStart: () -> Unit) {
         Spacer(Modifier.height(12.dp))
         BodyText("Importez vos livres et commencez l'expérience InkTone.")
         Spacer(Modifier.height(32.dp))
+        // Contraste force explicitement (retour Issa) : le bouton plein
+        // reste sur le bordeaux standard (pas la variante claire) avec un
+        // texte blanc force, lisible en clair comme en sombre par son
+        // propre contraste, independamment de accentColor().
         Button(
             onClick = onStart,
             modifier = Modifier.fillMaxWidth(0.7f),
-            colors = ButtonDefaults.buttonColors(containerColor = InkToneBordeaux),
+            colors = ButtonDefaults.buttonColors(containerColor = InkToneBordeaux, contentColor = Color.White),
         ) {
             Text("Commencer")
         }
@@ -223,8 +240,8 @@ private fun ReadyCard(onStart: () -> Unit) {
 
 /** Icône de marque — remplace les `Canvas` dessinés à la main (retour Issa) : prêt à accueillir un futur `VectorDrawable`/SVG sans changer l'appelant. */
 @Composable
-private fun BrandIcon(icon: ImageVector, size: androidx.compose.ui.unit.Dp) {
-    Icon(icon, contentDescription = null, tint = InkToneBordeaux, modifier = Modifier.size(size))
+private fun BrandIcon(icon: ImageVector, size: Dp, tint: Color) {
+    Icon(icon, contentDescription = null, tint = tint, modifier = Modifier.size(size))
 }
 
 @Composable
@@ -239,7 +256,7 @@ private fun BodyText(text: String) {
 }
 
 @Composable
-private fun PageIndicators(pageCount: Int, currentPage: Int, modifier: Modifier = Modifier) {
+private fun PageIndicators(pageCount: Int, currentPage: Int, accent: Color, modifier: Modifier = Modifier) {
     Row(modifier, horizontalArrangement = Arrangement.spacedBy(8.dp)) {
         repeat(pageCount) { index ->
             val isActive = index == currentPage
@@ -247,7 +264,7 @@ private fun PageIndicators(pageCount: Int, currentPage: Int, modifier: Modifier 
                 Modifier
                     .size(if (isActive) 10.dp else 8.dp)
                     .clip(CircleShape)
-                    .background(if (isActive) InkToneBordeaux else InkToneBordeaux.copy(alpha = 0.25f)),
+                    .background(if (isActive) accent else accent.copy(alpha = 0.25f)),
             )
         }
     }
