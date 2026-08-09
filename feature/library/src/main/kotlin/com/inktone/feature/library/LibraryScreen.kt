@@ -771,24 +771,16 @@ private fun ImportProgressBanner(progress: ImportProgress) {
  * redemander) — cas absent de la cible, conservé et consigné dans
  * UX_FLOW_DESIGN.md comme ajout plutôt que laissé en zone grise.
  *
- * Illustration cible : étagère avec emplacements de livres en
- * pointillés (asset vectoriel dédié). **Non produite ce lot** — je n'ai
- * pas d'outil de génération d'image fiable ici, et un `VectorDrawable`
- * bricolé à la main aurait été de qualité douteuse sans validation
- * visuelle possible (pas d'émulateur/device pour ce point précis).
- * `AppIcons.Reading` reste un repli générique, pas présenté comme
- * conforme — signalé au rapport de livraison.
+ * Illustration : étagère avec emplacements de livres en pointillés,
+ * produite au lot 10 (`EmptyLibraryShelfIllustration`) — ferme la dette
+ * du lot 2a.6, `AppIcons.Reading` n'est plus un repli.
  */
 @Composable
 private fun EmptyState(hasActiveImport: Boolean, onImportClick: () -> Unit) {
     Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
         Column(horizontalAlignment = Alignment.CenterHorizontally) {
-            Icon(
-                AppIcons.Reading,
-                contentDescription = null,
-                modifier = Modifier.size(64.dp),
-                tint = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.4f),
-            )
+            EmptyLibraryShelfIllustration(modifier = Modifier.size(width = 160.dp, height = 100.dp))
+            Spacer(Modifier.height(8.dp))
             Text(
                 if (hasActiveImport) "Import en cours…" else "Votre bibliothèque est vide",
                 style = MaterialTheme.typography.titleMedium,

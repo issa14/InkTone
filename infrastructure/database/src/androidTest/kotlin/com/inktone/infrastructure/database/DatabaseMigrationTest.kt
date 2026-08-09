@@ -743,6 +743,38 @@ class DatabaseMigrationTest {
         v19.close()
     }
 
+    /**
+     * Lot 10 — les utilisateurs déjà en base avant ce lot ne doivent
+     * jamais revoir l'onboarding après une simple mise à jour
+     * (`DEFAULT 1` côté SQL, inverse du défaut Kotlin `false`).
+     */
+    @Test
+    fun migration_19_vers_20_replie_les_lignes_existantes_sur_onboarding_deja_vu() {
+        val v19 = helper.createDatabase(TEST_DB_NAME, 19)
+        v19.execSQL(
+            """
+            INSERT INTO user_preferences (id, theme, fontSize, defaultTtsEngine, crashReportingEnabled, language, fontFamily, reduceMotion, dynamicColorEnabled, readingRulerEnabled, dailyGoalMinutes, activeVoiceProfileId, readingMode, audioGain, useSystemFontScale, appTheme, libraryLayoutMode, lineHeightMultiplier, readerBrightness, eyeRestReminderEnabled, eyeRestReminderIntervalMinutes)
+            VALUES (0, 'papier_clair', 18, 'SHERPA_ONNX', 0, 'fr', 'DEFAULT', 0, 1, 0, 20, NULL, 'SCROLL', 1.0, 0, 'SYSTEM', 'GRID_COVERS', 1.4, NULL, 1, 60)
+            """.trimIndent(),
+        )
+        v19.close()
+
+        val v20 = helper.runMigrationsAndValidate(
+            TEST_DB_NAME, 20, true,
+            MIGRATION_1_2, MIGRATION_2_3, MIGRATION_3_4, MIGRATION_4_5, MIGRATION_5_6, MIGRATION_6_7,
+            MIGRATION_7_8, MIGRATION_8_9, MIGRATION_9_10, MIGRATION_10_11, MIGRATION_11_12, MIGRATION_12_13,
+            MIGRATION_13_14, MIGRATION_14_15, MIGRATION_15_16, MIGRATION_16_17, MIGRATION_17_18, MIGRATION_18_19,
+            MIGRATION_19_20,
+        )
+
+        v20.query("SELECT hasSeenOnboarding, theme FROM user_preferences WHERE id = 0").use { cursor ->
+            assertEquals(true, cursor.moveToFirst())
+            assertEquals(1, cursor.getInt(0)) // deja vu, pas un nouvel utilisateur
+            assertEquals("papier_clair", cursor.getString(1)) // aucune perte de donnees
+        }
+        v20.close()
+    }
+
     companion object {
         private const val TEST_DB_NAME = "migration-test"
     }

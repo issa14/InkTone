@@ -18,6 +18,8 @@ fun UserPreferences.toEntity(): UserPreferencesEntity = UserPreferencesEntity(
     eyeRestReminderIntervalMinutes = eyeRestReminderIntervalMinutes,
     appTheme = appTheme.name,
     libraryLayoutMode = libraryLayoutMode,
+    hasSeenOnboarding = hasSeenOnboarding,
+    hasPromptedVoiceDownload = hasPromptedVoiceDownload,
 )
 
 fun UserPreferencesEntity.toDomain(): UserPreferences = UserPreferences(
@@ -36,4 +38,6 @@ fun UserPreferencesEntity.toDomain(): UserPreferences = UserPreferences(
     eyeRestReminderIntervalMinutes = eyeRestReminderIntervalMinutes,
     appTheme = AppTheme.valueOf(appTheme),
     libraryLayoutMode = libraryLayoutMode,
+    hasSeenOnboarding = hasSeenOnboarding,
+    hasPromptedVoiceDownload = hasPromptedVoiceDownload,
 )

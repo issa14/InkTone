@@ -28,6 +28,10 @@ data class ReaderRoute(
 @Serializable
 object LibraryRoute
 
+/** Lot 10 — premier lancement uniquement (UserPreferences.hasSeenOnboarding). */
+@Serializable
+object OnboardingRoute
+
 /** Lot 8 — item de drawer Récents, en première position des destinations. */
 @Serializable
 object RecentsRoute

@@ -13,12 +13,14 @@ import com.inktone.domain.model.VoiceProfile
 import com.inktone.domain.repository.PreferencesRepository
 import com.inktone.domain.repository.PronunciationRuleRepository
 import com.inktone.domain.repository.VoiceProfileRepository
+import com.inktone.domain.service.VoiceModelDownloadService
 import com.inktone.domain.usecase.ApplyAccessibilityPresetUseCase
 import com.inktone.domain.usecase.GetVoiceProfilesUseCase
 import com.inktone.feature.settings.di.IoDispatcher
 import dagger.hilt.android.lifecycle.HiltViewModel
 import dagger.hilt.android.qualifiers.ApplicationContext
 import kotlinx.coroutines.CoroutineDispatcher
+import kotlinx.coroutines.Job
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
@@ -52,11 +54,13 @@ class SettingsViewModel @Inject constructor(
     private val getVoiceProfiles: GetVoiceProfilesUseCase,
     private val voiceProfileRepository: VoiceProfileRepository,
     private val pronunciationRuleRepository: PronunciationRuleRepository,
+    private val voiceModelDownloadService: VoiceModelDownloadService,
     @ApplicationContext private val appContext: Context,
     @IoDispatcher private val ioDispatcher: CoroutineDispatcher,
 ) : ViewModel() {
 
     private val _state = MutableStateFlow(SettingsUiState())
+    private var voiceDownloadJob: Job? = null
     val state: StateFlow<SettingsUiState> = _state.asStateFlow()
 
     init {
@@ -129,6 +133,11 @@ class SettingsViewModel @Inject constructor(
                 // Lot 6 — écouter un extrait : signalé non branché (voir commentaire)
                 // PlayPreview nécessite une UseCase dédiée hors scope SettingsViewModel.
                 is SettingsIntent.PlayPreview -> { /* Signalé : non branché au TTS — UseCase dédiée à créer */ }
+                // Lot 10 — point de besoin réel du téléchargement de voix,
+                // retiré de l'onboarding (Tâche 10.3). Même mécanisme que
+                // l'ancien OnboardingViewModel.startVoiceDownload.
+                is SettingsIntent.StartVoiceDownload -> startVoiceDownload()
+                is SettingsIntent.CancelVoiceDownload -> cancelVoiceDownload()
 
                 // Lot 6, Palier B — carte Données
                 is SettingsIntent.RefreshCacheSize -> refreshCacheSize()
@@ -142,6 +151,25 @@ class SettingsViewModel @Inject constructor(
                 is SettingsIntent.DeletePronunciationRule -> pronunciationRuleRepository.delete(intent.id)
             }
         }
+    }
+
+    // Job dédié plutôt que la coroutine de onIntent() : doit survivre au
+    //-delà de l'appel courant et être annulable individuellement (retour
+    // Issa, vérification device — un téléchargement doit pouvoir être
+    // interrompu, pas seulement lancé).
+    private fun startVoiceDownload() {
+        voiceDownloadJob?.cancel()
+        voiceDownloadJob = viewModelScope.launch {
+            voiceModelDownloadService.downloadDefaultVoiceModel().collect { progress ->
+                _state.value = _state.value.copy(voiceDownloadProgress = progress)
+            }
+        }
+    }
+
+    private fun cancelVoiceDownload() {
+        voiceDownloadJob?.cancel()
+        voiceDownloadJob = null
+        _state.value = _state.value.copy(voiceDownloadProgress = null)
     }
 
     /** Lot 6, Palier B — taille réelle occupée par `Context.cacheDir`, pas une estimation. */
