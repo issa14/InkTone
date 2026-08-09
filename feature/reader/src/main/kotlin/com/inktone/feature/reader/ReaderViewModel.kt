@@ -165,6 +165,7 @@ class ReaderViewModel @Inject constructor(
             is ReaderIntent.PlayCurrentSentence -> playCurrentSentence()
             is ReaderIntent.Pause -> pausePlayback()
             is ReaderIntent.DismissError -> _state.value = _state.value.copy(errorMessage = null)
+            is ReaderIntent.DismissVoiceDownloadPrompt -> _state.value = _state.value.copy(showVoiceDownloadPrompt = false)
             is ReaderIntent.ToggleReadingMode -> {
                 val newMode = if (_state.value.readingMode == ReadingMode.SCROLL) ReadingMode.PAGED else ReadingMode.SCROLL
                 _state.value = _state.value.copy(readingMode = newMode)
@@ -663,10 +664,24 @@ class ReaderViewModel @Inject constructor(
 
             val sentence = sentences[index]
             // A.5 — résout le profil vocal actif depuis les préférences utilisateur
-            val voiceProfile = resolveVoiceProfile(preferencesRepository.get())
+            val prefs = preferencesRepository.get()
+            val voiceProfile = resolveVoiceProfile(prefs)
             val segment = sentenceAudioBuffer.get(sentence, voiceProfile)
             audioSegmentPlayer.play(segment)
             _state.value = _state.value.copy(isAudioActive = true)
+
+            // Lot 10 — retour Issa (vérification device) : proposition
+            // proactive au premier usage réel du TTS, plutôt que de
+            // laisser le repli Android natif (ADR-021, FallbackTtsEngine)
+            // silencieux sans jamais suggérer la voix neuronale.
+            // ttsEngine.id reflète le moteur RÉELLEMENT actif après ce
+            // synthesize() (jamais figé, voir FallbackTtsEngine), donc
+            // couvre aussi bien "réglé sur Android natif" que "Sherpa-ONNX
+            // a échoué et le repli vient de se produire".
+            if (ttsEngine.id == TtsEngineId.ANDROID_NATIVE && !prefs.hasPromptedVoiceDownload) {
+                _state.value = _state.value.copy(showVoiceDownloadPrompt = true)
+                preferencesRepository.update(prefs.copy(hasPromptedVoiceDownload = true))
+            }
 
             // Précharge la phrase suivante pendant que celle-ci se joue
             sentences.getOrNull(index + 1)?.let {

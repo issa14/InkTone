@@ -52,6 +52,12 @@ data class UserPreferences(
     // Lot 10 — indicateur "onboarding vu", pilote le startDestination
     // (Onboarding au premier lancement, Bibliothèque ensuite).
     val hasSeenOnboarding: Boolean = false,
+    // Lot 10 — retour Issa (vérification device) : le retrait de l'étape
+    // d'onboarding VoiceDownload avait laissé aucun point de proposition
+    // proactive au premier usage réel du TTS (la Réglages seule exige une
+    // découverte active). true dès la première proposition faite, jamais
+    // reproposé ensuite — ReaderViewModel.playCurrentSentence.
+    val hasPromptedVoiceDownload: Boolean = false,
 ) {
     init {
         require(fontSize > 0) { "fontSize doit être strictement positif" }

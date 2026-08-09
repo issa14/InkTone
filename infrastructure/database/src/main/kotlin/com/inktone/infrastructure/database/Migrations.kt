@@ -306,3 +306,17 @@ val MIGRATION_19_20 = object : Migration(19, 20) {
         db.execSQL("ALTER TABLE user_preferences ADD COLUMN hasSeenOnboarding INTEGER NOT NULL DEFAULT 1")
     }
 }
+
+/**
+ * Lot 10 — retour Issa (vérification device) : proposition proactive de
+ * la voix neuronale au premier usage réel du TTS (`ReaderViewModel
+ * .playCurrentSentence`). `DEFAULT 0` ici (contrairement à
+ * `hasSeenOnboarding`) : contrairement à l'onboarding, il n'y a aucune
+ * raison de priver les utilisateurs déjà en base de cette proposition —
+ * elle ne leur a jamais été faite non plus.
+ */
+val MIGRATION_20_21 = object : Migration(20, 21) {
+    override fun migrate(db: SupportSQLiteDatabase) {
+        db.execSQL("ALTER TABLE user_preferences ADD COLUMN hasPromptedVoiceDownload INTEGER NOT NULL DEFAULT 0")
+    }
+}

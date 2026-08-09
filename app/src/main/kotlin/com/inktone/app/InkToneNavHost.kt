@@ -143,6 +143,7 @@ fun InkToneNavHost(navController: NavHostController = rememberNavController(), s
                 onSearchClick = { navController.navigate(SearchRoute) },
                 onBack = { navController.popBackStack() },
                 onOpenPronunciationRules = { navController.navigate(PronunciationRulesRoute) },
+                onOpenSettings = { navController.navigate(SettingsRoute) },
             )
             } // CompositionLocalProvider
         }

@@ -29,4 +29,5 @@ data class UserPreferencesEntity(
     val appTheme: String = "SYSTEM", // Lot 6 — thème système de l'app
     val libraryLayoutMode: String = "GRID_COVERS", // Lot 6 — disposition biblio, pilotée par le préréglage d'accessibilité
     val hasSeenOnboarding: Boolean = false, // Lot 10 — pilote le startDestination
+    val hasPromptedVoiceDownload: Boolean = false, // Lot 10 — proposition proactive au premier usage TTS
 )
