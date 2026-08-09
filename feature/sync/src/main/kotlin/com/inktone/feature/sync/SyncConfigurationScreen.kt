@@ -15,6 +15,7 @@ import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.outlined.ArrowBack
+import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Button
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
@@ -31,6 +32,9 @@ import androidx.compose.material3.TopAppBar
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
@@ -115,6 +119,7 @@ private fun GoogleDriveCard(
         else -> null
     }
     val isActive = account != null
+    var showDisconnectConfirm by remember { mutableStateOf(false) }
 
     Card(
         colors = if (isActive) {
@@ -162,7 +167,9 @@ private fun GoogleDriveCard(
                     }
                 }
                 Spacer(Modifier.height(12.dp))
-                OutlinedButton(onClick = onDisconnect, modifier = Modifier.fillMaxWidth()) { Text("Déconnecter") }
+                OutlinedButton(onClick = { showDisconnectConfirm = true }, modifier = Modifier.fillMaxWidth()) {
+                    Text("Déconnecter")
+                }
             } else {
                 Spacer(Modifier.height(12.dp))
                 if (!isConfigured) {
@@ -186,6 +193,26 @@ private fun GoogleDriveCard(
                 }
             }
         }
+    }
+
+    if (showDisconnectConfirm) {
+        // Retour Issa (vérification device) : la déconnexion agissait
+        // sans confirmation, un seul appui malheureux suffisait à
+        // rompre le lien. Même patron que ConfirmDialog (feature/settings).
+        AlertDialog(
+            onDismissRequest = { showDisconnectConfirm = false },
+            title = { Text("Déconnecter Google Drive ?") },
+            text = { Text("La synchronisation s'arrêtera. Vous pourrez vous reconnecter à tout moment.") },
+            confirmButton = {
+                TextButton(
+                    onClick = {
+                        showDisconnectConfirm = false
+                        onDisconnect()
+                    },
+                ) { Text("Déconnecter", color = MaterialTheme.colorScheme.error) }
+            },
+            dismissButton = { TextButton(onClick = { showDisconnectConfirm = false }) { Text("Annuler") } },
+        )
     }
 }
 
