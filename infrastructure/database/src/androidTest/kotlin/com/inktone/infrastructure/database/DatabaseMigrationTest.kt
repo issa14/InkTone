@@ -832,6 +832,34 @@ class DatabaseMigrationTest {
         v22.close()
     }
 
+    @Test
+    fun migration_22_vers_23_conserve_les_donnees_et_ajoute_syncAutoEnabled_syncWifiOnly() {
+        val v22 = helper.createDatabase(TEST_DB_NAME, 22)
+        v22.execSQL(
+            """
+            INSERT INTO user_preferences (id, theme, fontSize, defaultTtsEngine, crashReportingEnabled, language, fontFamily, reduceMotion, dynamicColorEnabled, readingRulerEnabled, dailyGoalMinutes, activeVoiceProfileId, readingMode, audioGain, useSystemFontScale, appTheme, libraryLayoutMode, lineHeightMultiplier, readerBrightness, eyeRestReminderEnabled, eyeRestReminderIntervalMinutes, hasSeenOnboarding, hasPromptedVoiceDownload, syncLastAutoSyncFailed)
+            VALUES (0, 'papier_clair', 18, 'SHERPA_ONNX', 0, 'fr', 'DEFAULT', 0, 1, 0, 20, NULL, 'SCROLL', 1.0, 0, 'SYSTEM', 'GRID_COVERS', 1.4, NULL, 1, 60, 1, 1, 0)
+            """.trimIndent(),
+        )
+        v22.close()
+
+        val v23 = helper.runMigrationsAndValidate(
+            TEST_DB_NAME, 23, true,
+            MIGRATION_1_2, MIGRATION_2_3, MIGRATION_3_4, MIGRATION_4_5, MIGRATION_5_6, MIGRATION_6_7,
+            MIGRATION_7_8, MIGRATION_8_9, MIGRATION_9_10, MIGRATION_10_11, MIGRATION_11_12, MIGRATION_12_13,
+            MIGRATION_13_14, MIGRATION_14_15, MIGRATION_15_16, MIGRATION_16_17, MIGRATION_17_18, MIGRATION_18_19,
+            MIGRATION_19_20, MIGRATION_20_21, MIGRATION_21_22, MIGRATION_22_23,
+        )
+
+        v23.query("SELECT theme, syncAutoEnabled, syncWifiOnly FROM user_preferences WHERE id = 0").use { cursor ->
+            assertEquals(true, cursor.moveToFirst())
+            assertEquals("papier_clair", cursor.getString(0)) // aucune perte de donnees
+            assertEquals(0, cursor.getInt(1)) // desactive par defaut
+            assertEquals(0, cursor.getInt(2)) // desactive par defaut
+        }
+        v23.close()
+    }
+
     companion object {
         private const val TEST_DB_NAME = "migration-test"
     }
