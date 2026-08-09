@@ -1,5 +1,6 @@
 package com.inktone.feature.onboarding
 
+import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.isSystemInDarkTheme
@@ -37,7 +38,11 @@ import androidx.compose.runtime.getValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.geometry.Offset
+import androidx.compose.ui.geometry.Size
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.StrokeCap
+import androidx.compose.ui.graphics.drawscope.Stroke
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
@@ -123,6 +128,15 @@ fun OnboardingScreen(viewModel: OnboardingViewModel = hiltViewModel(), onDone: (
     }
 }
 
+/**
+ * Retour Issa (vérification device, V2206) : la métaphore sonore du texte
+ * (« continuez avec les oreilles ») avait disparu de cette carte — le
+ * livre y était seul, identique en composition à la carte 3. [SoundWaves]
+ * réintroduit l'évocation audio à côté du livre, sans revenir à un
+ * `Canvas` pour le livre lui-même (toujours un [BrandIcon]).
+ * Le `Spacer` final de 64dp qui poussait le bloc vers le haut est retiré :
+ * `Arrangement.Center` seul recentre correctement la composition.
+ */
 @Composable
 private fun WelcomeCard(accent: Color) {
     Column(
@@ -130,12 +144,36 @@ private fun WelcomeCard(accent: Color) {
         horizontalAlignment = Alignment.CenterHorizontally,
         verticalArrangement = Arrangement.Center,
     ) {
-        BrandIcon(icon = Icons.AutoMirrored.Outlined.MenuBook, size = 96.dp, tint = accent)
+        Row(verticalAlignment = Alignment.CenterVertically) {
+            BrandIcon(icon = Icons.AutoMirrored.Outlined.MenuBook, size = 96.dp, tint = accent)
+            SoundWaves(accent = accent, modifier = Modifier.width(48.dp).height(96.dp))
+        }
         Spacer(Modifier.height(32.dp))
         Text("Bienvenue sur InkTone", style = MaterialTheme.typography.headlineMedium, fontWeight = FontWeight.Bold, textAlign = TextAlign.Center)
         Spacer(Modifier.height(16.dp))
         BodyText("Lisez avec les yeux, continuez avec les oreilles. Une expérience de lecture unifiée qui s'adapte à votre rythme.")
-        Spacer(Modifier.height(64.dp))
+    }
+}
+
+/** Arcs concentrés évoquant une onde sonore, opacité décroissante vers l'extérieur — pas un dessin du livre, une couche graphique légère à côté de [BrandIcon]. */
+@Composable
+private fun SoundWaves(accent: Color, modifier: Modifier = Modifier) {
+    Canvas(modifier) {
+        val strokeWidth = 3.dp.toPx()
+        val baseRadius = size.height * 0.4f
+        repeat(3) { index ->
+            val radius = baseRadius + index * (size.height * 0.22f)
+            val alpha = 0.5f - index * 0.15f
+            drawArc(
+                color = accent.copy(alpha = alpha),
+                startAngle = -55f,
+                sweepAngle = 110f,
+                useCenter = false,
+                topLeft = Offset(-radius, size.height / 2f - radius),
+                size = Size(radius * 2, radius * 2),
+                style = Stroke(width = strokeWidth, cap = StrokeCap.Round),
+            )
+        }
     }
 }
 
