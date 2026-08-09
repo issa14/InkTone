@@ -17,7 +17,9 @@ import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
@@ -174,12 +176,19 @@ fun InkToneNavHost(navController: NavHostController = rememberNavController(), s
             // meme pattern que ImportPickerButton) restent donc ici, dans app.
             val backupViewModel: BackupViewModel = hiltViewModel()
             val dataOperationResult by backupViewModel.lastResult.collectAsState()
+            // Lot 11, tâche 11.1 — le fichier est désormais chiffré E2EE ;
+            // un mot de passe est demandé après le choix de
+            // l'emplacement/du fichier. Invite provisoire
+            // (BackupPasswordDialog), remplacée par la carte « Fichier
+            // local » dédiée à la tâche 11.6.
+            var pendingExportUri by remember { mutableStateOf<android.net.Uri?>(null) }
+            var pendingImportUri by remember { mutableStateOf<android.net.Uri?>(null) }
             val exportLauncher = rememberLauncherForActivityResult(
-                ActivityResultContracts.CreateDocument("application/json"),
-            ) { uri -> uri?.let { backupViewModel.exportTo(it.toString()) } }
+                ActivityResultContracts.CreateDocument("application/octet-stream"),
+            ) { uri -> pendingExportUri = uri }
             val importBackupLauncher = rememberLauncherForActivityResult(
                 ActivityResultContracts.OpenDocument(),
-            ) { uri -> uri?.let { backupViewModel.importFrom(it.toString()) } }
+            ) { uri -> pendingImportUri = uri }
 
             SettingsScreen(
                 onOpenAbout = { navController.navigate(AboutRoute) },
@@ -188,10 +197,37 @@ fun InkToneNavHost(navController: NavHostController = rememberNavController(), s
                 dataOperationResult = dataOperationResult,
                 onDismissDataOperationResult = backupViewModel::dismissResult,
                 onExportData = {
-                    exportLauncher.launch("inktone-backup-${java.time.LocalDate.now()}.json")
+                    exportLauncher.launch("inktone-backup-${java.time.LocalDate.now()}.rfbackup")
                 },
-                onImportData = { importBackupLauncher.launch(arrayOf("application/json")) },
+                onImportData = {
+                    importBackupLauncher.launch(arrayOf("application/octet-stream", "application/json", "*/*"))
+                },
             )
+
+            pendingExportUri?.let { uri ->
+                BackupPasswordDialog(
+                    title = "Mot de passe de la sauvegarde",
+                    confirmLabel = "Exporter",
+                    showLossWarning = true,
+                    onConfirm = { password ->
+                        backupViewModel.exportTo(uri.toString(), password)
+                        pendingExportUri = null
+                    },
+                    onDismiss = { pendingExportUri = null },
+                )
+            }
+            pendingImportUri?.let { uri ->
+                BackupPasswordDialog(
+                    title = "Mot de passe (si la sauvegarde est chiffrée)",
+                    confirmLabel = "Importer",
+                    showLossWarning = false,
+                    onConfirm = { password ->
+                        backupViewModel.importFrom(uri.toString(), password.ifBlank { null })
+                        pendingImportUri = null
+                    },
+                    onDismiss = { pendingImportUri = null },
+                )
+            }
         }
         composable<PronunciationRulesRoute> {
             BackScaffold(title = "Regles de prononciation", onBack = navController::popBackStack) {
