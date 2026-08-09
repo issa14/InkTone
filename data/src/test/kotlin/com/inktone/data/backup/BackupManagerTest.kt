@@ -5,6 +5,7 @@ import com.inktone.core.testing.fake.FakePronunciationRuleRepository
 import com.inktone.core.testing.fake.FakePublicationRepository
 import com.inktone.core.testing.fake.FakeReadingSessionRepository
 import com.inktone.core.testing.fake.FakeReadingStateRepository
+import com.inktone.core.testing.fake.FakeThemeRepository
 import com.inktone.domain.model.Publication
 import com.inktone.domain.model.PublicationFormat
 import com.inktone.domain.service.FileStorageService
@@ -55,6 +56,7 @@ class BackupManagerTest {
         val backupManager = BackupManager(
             fileStorageService, bookmarkRepository, pronunciationRuleRepository,
             readingStateRepository, readingSessionRepository, publicationRepository,
+            FakeThemeRepository(),
         )
 
         // Sauvegarde manuelle contenant un signet valide et un signet
@@ -117,6 +119,7 @@ class BackupManagerTest {
         val exportManager = BackupManager(
             fileStorageService, bookmarkRepository, pronunciationRuleRepository,
             readingStateRepository, readingSessionRepository, publicationRepository,
+            FakeThemeRepository(),
         )
 
         val exported = exportManager.exportTo("backup://roundtrip", appVersion = "1.2.3")
@@ -127,6 +130,7 @@ class BackupManagerTest {
         val importManager = BackupManager(
             fileStorageService, FakeBookmarkRepository(), FakePronunciationRuleRepository(),
             FakeReadingStateRepository(), FakeReadingSessionRepository(), publicationRepository,
+            FakeThemeRepository(),
         )
         val result = importManager.importFrom("backup://roundtrip")
 
@@ -147,6 +151,7 @@ class BackupManagerTest {
         val backupManager = BackupManager(
             fileStorageService, FakeBookmarkRepository(), FakePronunciationRuleRepository(),
             FakeReadingStateRepository(), FakeReadingSessionRepository(), FakePublicationRepository(),
+            FakeThemeRepository(),
         )
 
         val result = backupManager.importFrom("backup://corrupted")
