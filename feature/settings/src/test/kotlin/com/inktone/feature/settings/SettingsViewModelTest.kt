@@ -82,7 +82,7 @@ class SettingsViewModelTest {
 
         val prefs = preferencesRepository.get()
         assertEquals(AppTheme.DARK, prefs.appTheme)
-        assertEquals(ReadingTheme.DARK, prefs.theme)
+        assertEquals(ReadingTheme.OBSIDIENNE.id, prefs.theme)
     }
 
     @Test
@@ -98,7 +98,7 @@ class SettingsViewModelTest {
 
         val prefs = preferencesRepository.get()
         assertEquals(AppTheme.SYSTEM, prefs.appTheme)
-        assertEquals(ReadingTheme.SYSTEM, prefs.theme)
+        assertEquals(ReadingTheme.DEFAULT.id, prefs.theme)
     }
 
     @Test
@@ -113,7 +113,7 @@ class SettingsViewModelTest {
         val prefs = preferencesRepository.get()
         assertEquals(FontFamily.OPEN_DYSLEXIC, prefs.fontFamily)
         assertEquals(24, prefs.fontSize)
-        assertEquals(ReadingTheme.LIGHT, prefs.theme)
+        assertEquals(ReadingTheme.PAPIER_CLAIR.id, prefs.theme)
         assertEquals(true, prefs.reduceMotion)
         assertEquals("LIST", prefs.libraryLayoutMode)
     }
@@ -132,7 +132,7 @@ class SettingsViewModelTest {
         val prefs = preferencesRepository.get()
         assertEquals(FontFamily.DEFAULT, prefs.fontFamily)
         assertEquals(18, prefs.fontSize)
-        assertEquals(ReadingTheme.SYSTEM, prefs.theme)
+        assertEquals(ReadingTheme.DEFAULT.id, prefs.theme)
         assertEquals(false, prefs.reduceMotion)
         assertEquals("GRID_COVERS", prefs.libraryLayoutMode)
     }
@@ -148,7 +148,7 @@ class SettingsViewModelTest {
 
         val prefs = preferencesRepository.get()
         assertEquals(AppTheme.DARK, prefs.appTheme)
-        assertEquals(ReadingTheme.SYSTEM, prefs.theme) // inchangé
+        assertEquals(ReadingTheme.DEFAULT.id, prefs.theme) // inchangé
     }
 
     @Test

@@ -10,6 +10,7 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberUpdatedState
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.text.TextStyle
+import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.text.rememberTextMeasurer
 import androidx.compose.ui.unit.sp
 import com.inktone.domain.model.Chapter
@@ -131,6 +132,12 @@ fun rememberChapterPaginationState(
     viewportWidthPx: Int,
     viewportHeightPx: Int,
     paddingPx: Int,
+    // Lot 9 — police effective (thème actif ou préférence explicite, voir
+    // ThemeColors.effectiveFontFamily côté ReaderScreen). Fait
+    // délibérément partie du style de MESURE : contrairement à la couleur
+    // (3a.1, jamais ici), une police change la largeur du texte et donc
+    // la pagination. `null` = police système par défaut.
+    fontFamily: FontFamily? = null,
 ): ChapterPaginationState {
     val textMeasurer = rememberTextMeasurer()
     val chapterTextMeasurer = remember(textMeasurer) { ChapterTextMeasurer(textMeasurer) }
@@ -141,9 +148,11 @@ fun rememberChapterPaginationState(
     // 3d.2 — lineHeight fait maintenant partie du style de MESURE réel
     // (au lieu d'être absent) : paginationStyleKeyFrom le lit directement
     // sur ce TextStyle, garde-fou posé en 3b.2 pour que changer
-    // l'interligne redéclenche automatiquement la pagination.
-    val baseTextStyle = remember(fontSizeSp, lineHeightSp) {
-        TextStyle(fontSize = fontSizeSp.sp, lineHeight = lineHeightSp.sp)
+    // l'interligne redéclenche automatiquement la pagination. Lot 9 :
+    // fontFamily rejoint ce même style pour la même raison — changer
+    // d'ambiance dont la police diffère doit recalculer la pagination.
+    val baseTextStyle = remember(fontSizeSp, lineHeightSp, fontFamily) {
+        TextStyle(fontSize = fontSizeSp.sp, lineHeight = lineHeightSp.sp, fontFamily = fontFamily)
     }
     val state = remember(engine, baseTextStyle) { ChapterPaginationState(engine, baseTextStyle) }
 

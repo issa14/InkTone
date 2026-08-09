@@ -74,6 +74,7 @@ class ReaderViewModelVoiceSpeedTest {
             voiceProfileRepository = voiceProfileRepository,
             getVoiceProfiles = GetVoiceProfilesUseCase(voiceProfileRepository),
             readingSessionRepository = FakeReadingSessionRepository(),
+            themeRepository = com.inktone.core.testing.fake.FakeThemeRepository(),
         )
     }
 

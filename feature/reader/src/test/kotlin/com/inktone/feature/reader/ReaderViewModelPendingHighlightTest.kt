@@ -106,6 +106,7 @@ class ReaderViewModelPendingHighlightTest {
             voiceProfileRepository = FakeVoiceProfileRepository(),
             getVoiceProfiles = GetVoiceProfilesUseCase(FakeVoiceProfileRepository()),
             readingSessionRepository = FakeReadingSessionRepository(),
+            themeRepository = com.inktone.core.testing.fake.FakeThemeRepository(),
         )
     }
 

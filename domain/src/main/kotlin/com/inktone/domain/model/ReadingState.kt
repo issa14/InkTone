@@ -4,8 +4,6 @@ import com.inktone.domain.valueobject.Locator
 
 enum class ReadingMode { VISUAL, AUDIO }
 
-enum class ReadingTheme { LIGHT, DARK, SEPIA, SYSTEM }
-
 /**
  * État de reprise d'une publication — SOURCE DE VÉRITÉ UNIQUE de la
  * position de lecture, quel que soit le mode (Blueprint §3.3, §7.7,
@@ -28,9 +26,15 @@ data class ReadingState(
  * Surcharges de réglages propres à une publication. Priment toujours sur
  * [UserPreferences] — voir la règle de précédence du Blueprint §3.3 et
  * [EffectiveReadingSettings.resolve].
+ *
+ * [theme] est l'id d'un [ReadingTheme] (Lot 9 — modèle ouvert, thèmes
+ * personnalisés compris) plutôt que la valeur elle-même : cette classe
+ * reste une donnée légère persistée telle quelle (`reading_states`),
+ * jamais un lookup. La résolution id → [ReadingTheme] complet vit dans
+ * la couche qui a accès au catalogue (`ThemeRepository`), jamais ici.
  */
 data class ReadingOverrides(
-    val theme: ReadingTheme? = null,
+    val theme: String? = null,
     val fontSize: Int? = null,
 )
 
@@ -76,16 +80,26 @@ data class ReadingSession(
  * Réglages effectifs après application de la règle de précédence
  * (Blueprint §3.3) : surcharge de publication > préférences globales.
  * Résultat calculé, jamais persisté tel quel.
+ *
+ * [theme] reste un id (Lot 9), pas encore résolu — voir [ReadingOverrides.theme].
+ * [fontFamily] n'a pas de surcharge par publication (aucun champ
+ * correspondant dans [ReadingOverrides]) : toujours la préférence
+ * globale. `FontFamily.DEFAULT` signifie « pas de choix explicite » —
+ * c'est alors la police du thème résolu qui s'applique (voir
+ * `ThemeColors.effectiveFontFamily` côté `feature/reader`), pas cette
+ * classe qui n'a pas accès au catalogue de thèmes.
  */
 data class EffectiveReadingSettings(
-    val theme: ReadingTheme,
+    val theme: String,
     val fontSize: Int,
+    val fontFamily: FontFamily = FontFamily.DEFAULT,
 ) {
     companion object {
         fun resolve(overrides: ReadingOverrides?, global: UserPreferences): EffectiveReadingSettings =
             EffectiveReadingSettings(
                 theme = overrides?.theme ?: global.theme,
                 fontSize = overrides?.fontSize ?: global.fontSize,
+                fontFamily = global.fontFamily,
             )
     }
 }

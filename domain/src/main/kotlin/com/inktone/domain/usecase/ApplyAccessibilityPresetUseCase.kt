@@ -17,7 +17,7 @@ class ApplyAccessibilityPresetUseCase(
         preferencesRepository.update(
             current.copy(
                 fontSize = 24,
-                theme = ReadingTheme.LIGHT,
+                theme = ReadingTheme.PAPIER_CLAIR.id,
                 fontFamily = FontFamily.OPEN_DYSLEXIC,
                 reduceMotion = true,
                 // Tache 9bis.3.6 - extension notee dans le plan Phase 9bis :

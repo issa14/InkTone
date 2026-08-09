@@ -14,6 +14,7 @@ import com.inktone.domain.model.ReadingMode as DomainReadingMode
 import com.inktone.domain.model.ReadingOverrides
 import com.inktone.domain.model.ReadingSession
 import com.inktone.domain.model.ReadingState
+import com.inktone.domain.model.ReadingTheme
 import com.inktone.domain.model.SleepTimerState
 import com.inktone.domain.model.TtsEngineId
 import com.inktone.domain.model.UserPreferences
@@ -23,6 +24,7 @@ import com.inktone.domain.repository.BookmarkRepository
 import com.inktone.domain.repository.PreferencesRepository
 import com.inktone.domain.repository.PublicationRepository
 import com.inktone.domain.repository.ReadingSessionRepository
+import com.inktone.domain.repository.ThemeRepository
 import com.inktone.domain.repository.VoiceProfileRepository
 import com.inktone.domain.service.ParseResult
 import com.inktone.domain.service.PublicationParser
@@ -71,6 +73,8 @@ class ReaderViewModel @Inject constructor(
     private val deleteBookmark: DeleteBookmarkUseCase,
     // ───── Lot Sessions ─────
     private val readingSessionRepository: ReadingSessionRepository,
+    // Lot 9 — résolution id → ReadingTheme complet (couleurs + police).
+    private val themeRepository: ThemeRepository,
 ) : ViewModel() {
 
     private val _state = MutableStateFlow(ReaderUiState())
@@ -270,9 +274,11 @@ class ReaderViewModel @Inject constructor(
                 lastReadAt = System.currentTimeMillis(),
             )
             updateReadingState(baseState.copy(overrides = overrides, lastReadAt = System.currentTimeMillis()))
+            val effectiveSettings = EffectiveReadingSettings.resolve(overrides, preferencesRepository.get())
             _state.value = _state.value.copy(
                 currentOverrides = overrides,
-                effectiveSettings = EffectiveReadingSettings.resolve(overrides, preferencesRepository.get()),
+                effectiveSettings = effectiveSettings,
+                resolvedTheme = themeRepository.getById(effectiveSettings.theme) ?: ReadingTheme.DEFAULT,
             )
         }
     }
@@ -322,6 +328,7 @@ class ReaderViewModel @Inject constructor(
                         global = preferencesRepository.get(),
                     )
                     val prefs = preferencesRepository.get()
+                    val resolvedTheme = themeRepository.getById(effectiveSettings.theme) ?: ReadingTheme.DEFAULT
                     val activeVoiceProfile = resolveVoiceProfile(prefs)
                     val availableVoiceProfiles = getVoiceProfiles()
                     _state.value = ReaderUiState(
@@ -334,6 +341,7 @@ class ReaderViewModel @Inject constructor(
                         tableOfContents = result.documentModel.tableOfContents,
                         currentChapterIndex = restored?.locator?.chapterIndex ?: 0,
                         effectiveSettings = effectiveSettings,
+                        resolvedTheme = resolvedTheme,
                         // B.1 — restaure le mode de lecture persisté
                         readingMode = if (prefs.readingMode == "PAGED") ReadingMode.PAGED else ReadingMode.SCROLL,
                         currentOverrides = restored?.overrides,

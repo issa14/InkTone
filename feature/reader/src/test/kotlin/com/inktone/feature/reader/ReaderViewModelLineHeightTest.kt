@@ -7,6 +7,7 @@ import com.inktone.core.testing.fake.FakePublicationParser
 import com.inktone.core.testing.fake.FakePublicationRepository
 import com.inktone.core.testing.fake.FakeReadingSessionRepository
 import com.inktone.core.testing.fake.FakeReadingStateRepository
+import com.inktone.core.testing.fake.FakeThemeRepository
 import com.inktone.core.testing.fake.FakeTtsEngine
 import com.inktone.core.testing.fake.FakeVoiceProfileRepository
 import com.inktone.domain.model.ReadingOverrides
@@ -75,6 +76,7 @@ class ReaderViewModelLineHeightTest {
             voiceProfileRepository = voiceProfileRepository,
             getVoiceProfiles = GetVoiceProfilesUseCase(voiceProfileRepository),
             readingSessionRepository = FakeReadingSessionRepository(),
+            themeRepository = FakeThemeRepository(),
         )
         dispatcher.scheduler.advanceUntilIdle()
 
@@ -88,7 +90,7 @@ class ReaderViewModelLineHeightTest {
 
         // Changer le thème (surcharge par publication) ne doit JAMAIS
         // faire varier l'interligne — pas de couplage accidentel.
-        viewModel.onIntent(ReaderIntent.SetOverrides(ReadingOverrides(theme = ReadingTheme.DARK)))
+        viewModel.onIntent(ReaderIntent.SetOverrides(ReadingOverrides(theme = ReadingTheme.OBSIDIENNE.id)))
         dispatcher.scheduler.advanceUntilIdle()
 
         assertEquals(1.8f, viewModel.state.value.lineHeightMultiplier)

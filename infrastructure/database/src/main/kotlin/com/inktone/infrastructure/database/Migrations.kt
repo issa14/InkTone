@@ -239,3 +239,48 @@ val MIGRATION_17_18 = object : Migration(17, 18) {
         db.execSQL("UPDATE reading_sessions SET ttsDurationMs = visualDurationMs, visualDurationMs = 0 WHERE mode = 'AUDIO' AND visualDurationMs > 0 AND ttsDurationMs = 0")
     }
 }
+
+/**
+ * Lot 9 : ouvre `ReadingTheme` (enum fermé LIGHT/DARK/SEPIA/SYSTEM → modèle
+ * à thèmes personnalisés). Deux responsabilités dans la même migration,
+ * jamais séparées :
+ *
+ * 1. Table `custom_themes` — les thèmes créés depuis le Studio.
+ * 2. Réécriture des valeurs héritées de `user_preferences.theme` et
+ *    `reading_states.overrideTheme` : les anciens noms d'enum
+ *    (`LIGHT`/`DARK`/`SEPIA`/`SYSTEM`) ne correspondent plus à aucun id
+ *    du nouveau catalogue. Sans cette réécriture, `UserPreferencesMapper`
+ *    planterait au premier lancement post-mise à jour (K4 — aucune
+ *    migration manquante silencieuse). `SYSTEM` n'a jamais été un choix
+ *    réel de thème de lecture (AppTheme le porte séparément depuis le lot
+ *    6) : replié sur Papier Clair comme les autres valeurs orphelines,
+ *    par défensive plutôt que par correspondance sémantique.
+ *    `overrideTheme` reste NULL quand il l'était déjà (aucune surcharge).
+ */
+val MIGRATION_18_19 = object : Migration(18, 19) {
+    override fun migrate(db: SupportSQLiteDatabase) {
+        db.execSQL(
+            """
+            CREATE TABLE IF NOT EXISTS custom_themes (
+                id TEXT NOT NULL PRIMARY KEY,
+                displayName TEXT NOT NULL,
+                backgroundColorHex TEXT NOT NULL,
+                textColorHex TEXT NOT NULL,
+                accentColorHex TEXT NOT NULL,
+                highlightColorHex TEXT NOT NULL,
+                fontFamily TEXT NOT NULL
+            )
+            """.trimIndent(),
+        )
+
+        db.execSQL("UPDATE user_preferences SET theme = 'papier_clair' WHERE theme = 'LIGHT'")
+        db.execSQL("UPDATE user_preferences SET theme = 'obsidienne' WHERE theme = 'DARK'")
+        db.execSQL("UPDATE user_preferences SET theme = 'sepia_vintage' WHERE theme = 'SEPIA'")
+        db.execSQL("UPDATE user_preferences SET theme = 'papier_clair' WHERE theme = 'SYSTEM'")
+
+        db.execSQL("UPDATE reading_states SET overrideTheme = 'papier_clair' WHERE overrideTheme = 'LIGHT'")
+        db.execSQL("UPDATE reading_states SET overrideTheme = 'obsidienne' WHERE overrideTheme = 'DARK'")
+        db.execSQL("UPDATE reading_states SET overrideTheme = 'sepia_vintage' WHERE overrideTheme = 'SEPIA'")
+        db.execSQL("UPDATE reading_states SET overrideTheme = 'papier_clair' WHERE overrideTheme = 'SYSTEM'")
+    }
+}

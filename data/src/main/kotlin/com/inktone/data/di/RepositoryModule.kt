@@ -8,6 +8,7 @@ import com.inktone.data.repository.RoomPronunciationRuleRepository
 import com.inktone.data.repository.RoomPublicationRepository
 import com.inktone.data.repository.RoomReadingSessionRepository
 import com.inktone.data.repository.RoomReadingStateRepository
+import com.inktone.data.repository.RoomThemeRepository
 import com.inktone.data.repository.RoomVoiceProfileRepository
 import com.inktone.domain.repository.AnnotationRepository
 import com.inktone.domain.repository.BookmarkRepository
@@ -17,6 +18,7 @@ import com.inktone.domain.repository.PronunciationRuleRepository
 import com.inktone.domain.repository.PublicationRepository
 import com.inktone.domain.repository.ReadingSessionRepository
 import com.inktone.domain.repository.ReadingStateRepository
+import com.inktone.domain.repository.ThemeRepository
 import com.inktone.domain.repository.VoiceProfileRepository
 import dagger.Binds
 import dagger.Module
@@ -36,4 +38,5 @@ abstract class RepositoryModule {
     @Binds @Singleton abstract fun bindPreferencesRepository(impl: RoomPreferencesRepository): PreferencesRepository
     @Binds @Singleton abstract fun bindPronunciationRuleRepository(impl: RoomPronunciationRuleRepository): PronunciationRuleRepository
     @Binds @Singleton abstract fun bindLibraryItemRepository(impl: RoomLibraryItemRepository): LibraryItemRepository
+    @Binds @Singleton abstract fun bindThemeRepository(impl: RoomThemeRepository): ThemeRepository
 }
