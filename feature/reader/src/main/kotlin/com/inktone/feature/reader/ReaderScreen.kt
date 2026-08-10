@@ -496,7 +496,7 @@ fun ReaderScreen(
                                     isCurrentlyPlaying = isCurrentlyPlaying,
                                     highlightedWordRange = state.highlightedWordRange,
                                     isSelected = isSentenceSelected,
-                                    existingAnnotationColor = annotationColorFor(state.currentChapterIndex, sentence, state.annotations),
+                                    existingAnnotationHighlight = annotationHighlightFor(state.currentChapterIndex, sentence, state.annotations),
                                     fontSizeSp = state.effectiveSettings.fontSize,
                                     lineHeightSp = lineHeightSp,
                                     textColor = ThemeColors.text(state.resolvedTheme).copy(alpha = trailAlpha),
@@ -577,6 +577,7 @@ fun ReaderScreen(
                         onFreeSelectionChanged = { anchor, focus ->
                             viewModel.onIntent(ReaderIntent.SetFreeSelection(anchor, focus))
                         },
+                        onFreeSelectionCleared = { viewModel.onIntent(ReaderIntent.ClearFreeSelection) },
                         onFreeSelectionBoundsInWindow = { bounds -> pagedFreeSelectionBounds = bounds },
                     )
                 }
@@ -940,7 +941,7 @@ internal fun SentenceText(
     isCurrentlyPlaying: Boolean,
     highlightedWordRange: IntRange?,
     isSelected: Boolean,
-    existingAnnotationColor: AnnotationColor?,
+    existingAnnotationHighlight: Pair<AnnotationColor, IntRange>?,
     fontSizeSp: Int,
     lineHeightSp: Int = fontSizeSp,
     textColor: Color,
@@ -949,11 +950,16 @@ internal fun SentenceText(
     onClick: () -> Unit,
     modifier: Modifier = Modifier,
 ) {
-    val background = when {
-        isSelected -> SelectionHighlightColor
-        existingAnnotationColor != null -> existingAnnotationColor.toComposeColor()
-        else -> Color.Transparent
-    }
+    // Correctif diagnostic 3f.2 — `existingAnnotationHighlight` porte
+    // désormais la plage LOCALE exacte de l'annotation (offsets de
+    // caractère, pas la phrase entière), peinte en `SpanStyle` dans le
+    // texte lui-même (voir plus bas) et non plus en fond de tout le
+    // noeud — sinon une annotation au mot redevenait indiscernable d'une
+    // annotation de phrase entière. `isSelected`, lui, reste un fond de
+    // noeud complet : c'est le modèle de sélection PAR PHRASE (mode
+    // SCROLL, coexistant temporairement avec la sélection libre au mot),
+    // véritablement sentence-large par construction.
+    val background = if (isSelected) SelectionHighlightColor else Color.Transparent
 
     // B.4 — Style enrichi selon le type de paragraphe
     val styleModifier = when (paragraphStyle) {
@@ -983,13 +989,17 @@ internal fun SentenceText(
     )
 
     Text(
-        text = if (isCurrentlyPlaying && highlightedWordRange != null && sentence.text.isNotEmpty()) {
-            val start = animatedStart.coerceIn(0, sentence.text.length - 1)
-            val end = animatedEnd.coerceIn(start, sentence.text.length - 1)
-            buildHighlightedSentence(sentence.text, start..end)
-        } else {
-            AnnotatedString(sentence.text)
-        },
+        text = buildSentenceDisplayText(
+            text = sentence.text,
+            annotationHighlight = existingAnnotationHighlight,
+            currentWordRange = if (isCurrentlyPlaying && highlightedWordRange != null && sentence.text.isNotEmpty()) {
+                val start = animatedStart.coerceIn(0, sentence.text.length - 1)
+                val end = animatedEnd.coerceIn(start, sentence.text.length - 1)
+                start..end
+            } else {
+                null
+            },
+        ),
         modifier = modifier
             .then(styleModifier)
             .background(background)
@@ -1003,29 +1013,66 @@ internal fun SentenceText(
 
 private val SelectionHighlightColor = Color(0x664FC3F7)
 
-private fun buildHighlightedSentence(text: String, range: IntRange): AnnotatedString = buildAnnotatedString {
-    append(text.substring(0, range.first))
-    withStyle(SpanStyle(background = Color.Yellow)) {
-        append(text.substring(range.first, range.last + 1))
+/**
+ * Combine, dans un seul `AnnotatedString`, le fond de l'annotation
+ * existante (offsets locaux exacts, correctif diagnostic 3f.2) et le
+ * mot actuellement prononcé par le TTS (`currentWordRange`, animé) —
+ * l'annotation est posée en premier, le mot TTS par-dessus, même ordre
+ * qu'en mode PAGED (`PageBlock.drawWithContent`) pour un rendu cohérent
+ * entre les deux modes de lecture.
+ */
+private fun buildSentenceDisplayText(
+    text: String,
+    annotationHighlight: Pair<AnnotationColor, IntRange>?,
+    currentWordRange: IntRange?,
+): AnnotatedString = buildAnnotatedString {
+    append(text)
+    annotationHighlight?.let { (color, range) ->
+        val start = range.first.coerceIn(0, text.length)
+        val endExclusive = (range.last + 1).coerceIn(start, text.length)
+        if (start < endExclusive) {
+            addStyle(SpanStyle(background = color.toComposeColor()), start, endExclusive)
+        }
     }
-    append(text.substring(range.last + 1))
+    currentWordRange?.let { range ->
+        addStyle(SpanStyle(background = Color.Yellow), range.first, range.last + 1)
+    }
 }
 
 /**
- * Couleur de la première annotation existante couvrant [sentence]
- * (Tâche 7.1, critère de validation : le surlignage doit réapparaître à
- * la réouverture). Les annotations créées par cette UI ne portent
- * aujourd'hui que sur un seul chapitre (sélection par phrase à
- * l'intérieur du chapitre affiché) — comparer `chapterIndex` suffit, pas
- * besoin de gérer une plage à cheval sur plusieurs chapitres pour
- * l'instant.
+ * Couleur ET plage LOCALE exacte (offsets de caractère dans [sentence],
+ * pas la phrase entière) de la première annotation existante chevauchant
+ * [sentence] (Tâche 7.1, critère de validation : le surlignage doit
+ * réapparaître à la réouverture). Les annotations créées par cette UI ne
+ * portent aujourd'hui que sur un seul chapitre (sélection par phrase ou
+ * au mot à l'intérieur du chapitre affiché) — comparer `chapterIndex`
+ * suffit, pas besoin de gérer une plage à cheval sur plusieurs chapitres
+ * pour l'instant.
+ *
+ * Correctif diagnostic 3f.2 — l'ancienne version (`annotationColorFor`)
+ * ne renvoyait qu'une couleur dès qu'une annotation touchait [sentence]
+ * n'importe où (simple test de chevauchement), peinte ensuite en fond de
+ * TOUTE la phrase par l'appelant : une annotation au mot (sélection
+ * libre 3f.1) redevenait donc indiscernable d'un surlignage de phrase
+ * entière. Intersection réelle ici, bornée à [sentence].
  */
-private fun annotationColorFor(chapterIndex: Int, sentence: Sentence, annotations: List<Annotation>): AnnotationColor? =
-    annotations.firstOrNull { annotation ->
+private fun annotationHighlightFor(
+    chapterIndex: Int,
+    sentence: Sentence,
+    annotations: List<Annotation>,
+): Pair<AnnotationColor, IntRange>? {
+    val annotation = annotations.firstOrNull { annotation ->
         annotation.startLocator.chapterIndex == chapterIndex &&
             sentence.startOffset < annotation.endLocator.charOffset &&
             sentence.endOffset > annotation.startLocator.charOffset
-    }?.color
+    } ?: return null
+    val localStart = (maxOf(annotation.startLocator.charOffset, sentence.startOffset) - sentence.startOffset)
+        .coerceIn(0, sentence.text.length)
+    val localEndExclusive = (minOf(annotation.endLocator.charOffset, sentence.endOffset) - sentence.startOffset)
+        .coerceIn(localStart, sentence.text.length)
+    if (localStart >= localEndExclusive) return null
+    return annotation.color to (localStart until localEndExclusive)
+}
 
 /**
  * B.4 — Placeholder pour une image EPUB. En attendant l'intégration de
