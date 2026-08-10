@@ -47,6 +47,7 @@ import dagger.Provides
 import dagger.hilt.InstallIn
 import dagger.hilt.android.qualifiers.ApplicationContext
 import dagger.hilt.components.SingletonComponent
+import java.time.Clock
 import javax.inject.Singleton
 
 /**
@@ -69,6 +70,10 @@ object UseCaseModule {
     @Provides
     @Singleton
     fun provideImportSessionStore(): ImportSessionStore = ImportSessionStore()
+
+    @Provides
+    @Singleton
+    fun provideClock(): Clock = Clock.systemDefaultZone()
 
     @Provides
     fun provideUpdateReadingStateUseCase(
@@ -178,7 +183,8 @@ object UseCaseModule {
     fun provideGetStatisticsUseCase(
         readingSessionRepository: ReadingSessionRepository,
         publicationRepository: PublicationRepository,
-    ): GetStatisticsUseCase = GetStatisticsUseCase(readingSessionRepository, publicationRepository)
+        clock: Clock,
+    ): GetStatisticsUseCase = GetStatisticsUseCase(readingSessionRepository, publicationRepository, clock)
 
     @Provides
     fun provideGetCurrentBookUseCase(

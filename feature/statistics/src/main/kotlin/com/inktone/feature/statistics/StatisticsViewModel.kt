@@ -26,6 +26,7 @@ import kotlinx.coroutines.flow.receiveAsFlow
 import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.launch
 import java.io.File
+import java.time.Clock
 import java.time.LocalDate
 import java.time.format.DateTimeFormatter
 import java.util.Locale
@@ -50,6 +51,7 @@ class StatisticsViewModel @Inject constructor(
     getCurrentBook: GetCurrentBookUseCase,
     private val preferencesRepository: PreferencesRepository,
     private val exportService: StatisticsExportService,
+    private val clock: Clock = Clock.systemDefaultZone(),
 ) : ViewModel() {
 
     private val _effects = Channel<ExportEvent>(Channel.BUFFERED)
@@ -125,7 +127,7 @@ class StatisticsViewModel @Inject constructor(
      */
     private fun fillMissingDays(dailyStats: List<DailyReadingStats>, windowDays: Int): List<DailyReadingStats> {
         val byDate = dailyStats.associateBy { it.date }
-        val today = LocalDate.now()
+        val today = LocalDate.now(clock)
         return (windowDays - 1 downTo 0).map { offset ->
             val date = today.minusDays(offset.toLong()).format(DateTimeFormatter.ISO_LOCAL_DATE)
             byDate[date] ?: DailyReadingStats(date = date, visualMs = 0L, ttsMs = 0L)

@@ -27,6 +27,10 @@ import org.junit.Assert.assertNotNull
 import org.junit.Assert.assertTrue
 import org.junit.Before
 import org.junit.Test
+import java.time.Clock
+import java.time.LocalDate
+import java.time.ZoneId
+import java.util.TimeZone
 import java.util.concurrent.TimeUnit
 
 @OptIn(ExperimentalCoroutinesApi::class)
@@ -34,11 +38,32 @@ class StatisticsViewModelTest {
 
     private val dispatcher = StandardTestDispatcher()
 
+    // Dette streak/jour calendaire : fillMissingDays/computeVariation utilisent
+    // LocalDate.now(clock) — fixer l'horloge sur un fuseau a decalage positif
+    // (aucun des tests originaux ne le faisait) elimine la course a la
+    // frontiere de minuit et la dependance au fuseau de la machine hote.
+    private val zone = ZoneId.of("Africa/Porto-Novo") // UTC+1, sans DST
+    private val today = LocalDate.of(2026, 8, 10)
+    private val clock = Clock.fixed(today.atTime(9, 0).atZone(zone).toInstant(), zone)
+    private val fixedNow = clock.millis()
+    private lateinit var defaultTimeZone: TimeZone
+
     @Before
-    fun setUp() { Dispatchers.setMain(dispatcher) }
+    fun setUp() {
+        Dispatchers.setMain(dispatcher)
+        // FakeReadingSessionRepository derive ses dates du fuseau par defaut
+        // de la JVM (comme le fait la vraie requete SQL 'localtime') : il
+        // doit correspondre au fuseau du Clock fixe ci-dessus pour que les
+        // deux calculs de "jour calendaire" restent coherents entre eux.
+        defaultTimeZone = TimeZone.getDefault()
+        TimeZone.setDefault(TimeZone.getTimeZone(zone))
+    }
 
     @After
-    fun tearDown() { Dispatchers.resetMain() }
+    fun tearDown() {
+        Dispatchers.resetMain()
+        TimeZone.setDefault(defaultTimeZone)
+    }
 
     private fun publication(id: String, chapterCount: Int = 10) = Publication(
         id = id, title = "Titre $id", format = PublicationFormat.EPUB,
@@ -232,16 +257,17 @@ class StatisticsViewModelTest {
         val readyNoStreak = vmNoStreak.state.first { it is StatisticsUiState.Ready } as StatisticsUiState.Ready
 
         val longStreak = FakeReadingSessionRepository()
-        val now = System.currentTimeMillis()
+        val now = fixedNow
         val oneDayMs = TimeUnit.DAYS.toMillis(1)
         for (i in 0 until 8) {
             longStreak.insert(session("streak-$i", "pub-1", now - i * oneDayMs, visualMs = 1_000L))
         }
         val vmLongStreak = StatisticsViewModel(
-            getStatistics = GetStatisticsUseCase(longStreak, FakePublicationRepository()),
+            getStatistics = GetStatisticsUseCase(longStreak, FakePublicationRepository(), clock),
             getCurrentBook = GetCurrentBookUseCase(longStreak, FakePublicationRepository(), FakeReadingStateRepository()),
             preferencesRepository = FakePreferencesRepository(),
             exportService = FakeStatisticsExportService(),
+            clock = clock,
         )
         val readyLongStreak = vmLongStreak.state.first { it is StatisticsUiState.Ready } as StatisticsUiState.Ready
 
@@ -254,7 +280,7 @@ class StatisticsViewModelTest {
     @Test
     fun changer_de_periode_change_le_total_et_potentiellement_la_variation() = runTest {
         val readingSessionRepo = FakeReadingSessionRepository()
-        val now = System.currentTimeMillis()
+        val now = fixedNow
         val oneDayMs = TimeUnit.DAYS.toMillis(1)
         // 20 jours d'activité récente, au-delà de la semaine mais dans le mois.
         for (i in 0 until 20) {
@@ -262,10 +288,11 @@ class StatisticsViewModelTest {
         }
 
         val vm = StatisticsViewModel(
-            getStatistics = GetStatisticsUseCase(readingSessionRepo, FakePublicationRepository()),
+            getStatistics = GetStatisticsUseCase(readingSessionRepo, FakePublicationRepository(), clock),
             getCurrentBook = GetCurrentBookUseCase(readingSessionRepo, FakePublicationRepository(), FakeReadingStateRepository()),
             preferencesRepository = FakePreferencesRepository(),
             exportService = FakeStatisticsExportService(),
+            clock = clock,
         )
 
         val monthState = vm.state.first { it is StatisticsUiState.Ready } as StatisticsUiState.Ready
@@ -283,7 +310,7 @@ class StatisticsViewModelTest {
     @Test
     fun activite_contient_toujours_exactement_7_jours_en_vue_semaine_meme_avec_des_trous() = runTest {
         val readingSessionRepo = FakeReadingSessionRepository()
-        val now = System.currentTimeMillis()
+        val now = fixedNow
         val oneDayMs = TimeUnit.DAYS.toMillis(1)
         // Deux sessions non consecutives : aujourd'hui et il y a 3 jours.
         // Cote SQL, les jours sans session n'ont aucune ligne (GROUP BY date) :
@@ -292,10 +319,11 @@ class StatisticsViewModelTest {
         readingSessionRepo.insert(session("j-3", "pub-1", now - 3 * oneDayMs, visualMs = 30_000L))
 
         val vm = StatisticsViewModel(
-            getStatistics = GetStatisticsUseCase(readingSessionRepo, FakePublicationRepository()),
+            getStatistics = GetStatisticsUseCase(readingSessionRepo, FakePublicationRepository(), clock),
             getCurrentBook = GetCurrentBookUseCase(readingSessionRepo, FakePublicationRepository(), FakeReadingStateRepository()),
             preferencesRepository = FakePreferencesRepository(),
             exportService = FakeStatisticsExportService(),
+            clock = clock,
         )
         vm.onPeriodSelected(StatsPeriod.WEEK)
 
@@ -314,7 +342,7 @@ class StatisticsViewModelTest {
     @Test
     fun variation_compare_les_bonnes_fenetres_calendaires_meme_avec_un_trou() = runTest {
         val readingSessionRepo = FakeReadingSessionRepository()
-        val now = System.currentTimeMillis()
+        val now = fixedNow
         val oneDayMs = TimeUnit.DAYS.toMillis(1)
 
         // Periode actuelle : J-0 a J-6, activite chaque jour.
@@ -333,10 +361,11 @@ class StatisticsViewModelTest {
         }
 
         val vm = StatisticsViewModel(
-            getStatistics = GetStatisticsUseCase(readingSessionRepo, FakePublicationRepository()),
+            getStatistics = GetStatisticsUseCase(readingSessionRepo, FakePublicationRepository(), clock),
             getCurrentBook = GetCurrentBookUseCase(readingSessionRepo, FakePublicationRepository(), FakeReadingStateRepository()),
             preferencesRepository = FakePreferencesRepository(),
             exportService = FakeStatisticsExportService(),
+            clock = clock,
         )
         vm.onPeriodSelected(StatsPeriod.WEEK)
 
@@ -351,7 +380,7 @@ class StatisticsViewModelTest {
     @Test
     fun variation_est_un_tiret_quand_la_periode_precedente_est_entierement_vide() = runTest {
         val readingSessionRepo = FakeReadingSessionRepository()
-        val now = System.currentTimeMillis()
+        val now = fixedNow
         val oneDayMs = TimeUnit.DAYS.toMillis(1)
 
         // Seule la semaine en cours a de l'activite, rien avant.
@@ -360,10 +389,11 @@ class StatisticsViewModelTest {
         }
 
         val vm = StatisticsViewModel(
-            getStatistics = GetStatisticsUseCase(readingSessionRepo, FakePublicationRepository()),
+            getStatistics = GetStatisticsUseCase(readingSessionRepo, FakePublicationRepository(), clock),
             getCurrentBook = GetCurrentBookUseCase(readingSessionRepo, FakePublicationRepository(), FakeReadingStateRepository()),
             preferencesRepository = FakePreferencesRepository(),
             exportService = FakeStatisticsExportService(),
+            clock = clock,
         )
         vm.onPeriodSelected(StatsPeriod.WEEK)
 
