@@ -46,14 +46,15 @@ data class ReaderUiState(
     // unique de rendu couleur/police du lecteur — ThemeColors.kt en
     // dérive, jamais un `when` sur un enum fermé.
     val resolvedTheme: ReadingTheme = ReadingTheme.DEFAULT,
-    // Selection personnalisee par phrase (Tache 7.0) - remplace la
-    // selection Compose native, Selection/SelectionContainer controle
-    // etant internal a androidx.compose.foundation:foundation:1.7.2
-    // (verifie par le compilateur, pas suppose). anchorIndex = phrase du
-    // premier appui long ; focusIndex = derniere phrase touchee par une
-    // extension (peut etre avant ou apres l'ancre).
-    val selectionAnchorIndex: Int? = null,
-    val selectionFocusIndex: Int? = null,
+    // Palier 3f.1/3f.3 — sélection libre au mot (appui long + glissement,
+    // PAGED et SCROLL), seul modèle de sélection de texte du lecteur
+    // depuis le retrait de l'ancien modèle par phrase (palier 3f.5 —
+    // Selection/SelectionContainer contrôlé de Compose étant internal,
+    // voir git blame pour l'historique). Offsets de caractère ABSOLUS
+    // dans le chapitre, calés sur les bornes de mot
+    // (TextLayoutResult.getWordBoundary par l'appelant).
+    val freeSelectionAnchorOffset: Int? = null,
+    val freeSelectionFocusOffset: Int? = null,
     val annotations: List<Annotation> = emptyList(),
     val bookmarks: List<Bookmark> = emptyList(),
     val isBookmarkListVisible: Boolean = false,
@@ -139,10 +140,11 @@ data class ReaderUiState(
             return Locator.computeProgression(locator, totalCharsBeforeChapter, totalCharsInPublication)
         }
 
-    val selectedSentenceRange: IntRange?
+    /** Plage de caractères (bornes inclusives, offsets absolus au chapitre) de la sélection libre en cours, ou `null`. */
+    val freeSelectionRange: IntRange?
         get() {
-            val anchor = selectionAnchorIndex ?: return null
-            val focus = selectionFocusIndex ?: anchor
+            val anchor = freeSelectionAnchorOffset ?: return null
+            val focus = freeSelectionFocusOffset ?: anchor
             return minOf(anchor, focus)..maxOf(anchor, focus)
         }
 
@@ -212,12 +214,16 @@ sealed interface ReaderIntent {
     data object PlayCurrentSentence : ReaderIntent
     data object Pause : ReaderIntent
 
-    /** Appui long sur une phrase (Tâche 7.0/7.1) : démarre une sélection. */
-    data class BeginSentenceSelection(val sentenceIndex: Int) : ReaderIntent
-
-    /** Appui simple sur une autre phrase pendant qu'une sélection est active : l'étend. */
-    data class ExtendSentenceSelection(val sentenceIndex: Int) : ReaderIntent
-    data object ClearSentenceSelection : ReaderIntent
+    /**
+     * Sélection libre au mot (appui long + glissement, PAGED et SCROLL).
+     * `anchorOffset`/`focusOffset` : offsets de caractère absolus dans le
+     * chapitre, déjà calés sur des bornes de mot par l'appelant
+     * (`PagedChapterContent.PageBlock`/`ReaderScreen.ParagraphText`, via
+     * la sélection native de `BasicTextField`) — ce ViewModel ne fait que
+     * les stocker.
+     */
+    data class SetFreeSelection(val anchorOffset: Int, val focusOffset: Int) : ReaderIntent
+    data object ClearFreeSelection : ReaderIntent
 
     /**
      * Tâche 3c.4 — `content` : texte de la note associée (popup de
