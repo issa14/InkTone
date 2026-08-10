@@ -53,6 +53,9 @@ import androidx.compose.ui.platform.LocalLifecycleOwner
 import androidx.compose.ui.platform.LocalTextToolbar
 import androidx.compose.ui.platform.TextToolbar
 import androidx.compose.ui.platform.TextToolbarStatus
+import androidx.compose.ui.semantics.onClick
+import androidx.compose.ui.semantics.semantics
+import androidx.compose.ui.semantics.stateDescription
 import androidx.compose.ui.text.AnnotatedString
 import androidx.compose.ui.text.SpanStyle
 import androidx.compose.ui.text.TextLayoutResult
@@ -1161,6 +1164,28 @@ internal fun ParagraphText(
                             onClick()
                         },
                     )
+                }
+                // Palier 3f.4 (première passe, pas de spike TalkBack dédié
+                // — voir CHIFFRAGE_LOT_3F_SELECTION_MOT.md) : même raison
+                // qu'en PAGED (`PageBlock`) — un `pointerInput` brut est
+                // invisible à l'action « activer » que TalkBack synthétise
+                // (double-tap après exploration), seulement à un tap
+                // tactile réel. `stateDescription` : signale la position de
+                // lecture TTS à l'exploration, sans l'interrompre — a
+                // contrario du `liveRegion` déjà essayé et retiré (lot 1,
+                // conflit avec la voix TTS active, voir plus bas dans
+                // `ReaderScreen`) : `stateDescription` n'est lu que quand
+                // l'utilisateur navigue explicitement sur ce noeud, jamais
+                // annoncé de force pendant la lecture.
+                .semantics {
+                    if (isCurrentSentenceInParagraph) {
+                        stateDescription = "Lecture en cours"
+                    }
+                    onClick(label = "Afficher ou masquer les commandes") {
+                        if (!selection.collapsed) return@onClick false
+                        onClick()
+                        true
+                    }
                 },
         )
     }

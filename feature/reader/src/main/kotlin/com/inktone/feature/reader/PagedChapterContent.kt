@@ -33,6 +33,8 @@ import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.platform.LocalTextToolbar
 import androidx.compose.ui.platform.TextToolbar
 import androidx.compose.ui.platform.TextToolbarStatus
+import androidx.compose.ui.semantics.onClick
+import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.AnnotatedString
 import androidx.compose.ui.text.SpanStyle
 import androidx.compose.ui.text.TextLayoutResult
@@ -493,6 +495,23 @@ private fun PageBlock(
                             onClick()
                         },
                     )
+                }
+                // Palier 3f.4 (première passe, pas de spike TalkBack
+                // dédié — voir CHIFFRAGE_LOT_3F_SELECTION_MOT.md) : un
+                // `pointerInput` brut est invisible à l'accessibilité —
+                // `detectTapGestures` ci-dessus ne réagit qu'à un tap
+                // tactile réel, jamais à l'action « activer » que
+                // TalkBack synthétise (double-tap après exploration).
+                // Sans cette action sémantique dédiée, un utilisateur
+                // TalkBack ne pouvait pas du tout rappeler le HUD depuis
+                // la zone de lecture. Même garde que le geste tactile
+                // (`selection.collapsed`), pour la même raison.
+                .semantics {
+                    onClick(label = "Afficher ou masquer les commandes") {
+                        if (!selection.collapsed) return@onClick false
+                        onClick()
+                        true
+                    }
                 }
                 .drawWithContent {
                     textLayoutResult?.let { layout ->
