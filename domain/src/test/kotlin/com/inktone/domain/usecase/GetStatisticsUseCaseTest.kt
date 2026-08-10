@@ -9,12 +9,36 @@ import com.inktone.domain.model.ReadingMode
 import com.inktone.domain.model.ReadingSession
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.test.runTest
+import org.junit.After
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertTrue
+import org.junit.Before
 import org.junit.Test
+import java.time.Clock
+import java.time.LocalDate
+import java.time.ZoneId
+import java.util.TimeZone
 import java.util.concurrent.TimeUnit
 
 class GetStatisticsUseCaseTest {
+
+    // Bug historique (dette streak/jour calendaire) : le calcul du streak
+    // decalait le jour calendaire d'un jour sur tout fuseau UTC positif.
+    // Fixer un fuseau positif ici est la condition qui declenche le bug —
+    // aucun des tests originaux ne le faisait.
+    private val zone = ZoneId.of("Africa/Porto-Novo") // UTC+1, sans DST
+    private lateinit var defaultTimeZone: TimeZone
+
+    @Before
+    fun fixerLeFuseauParDefaut() {
+        defaultTimeZone = TimeZone.getDefault()
+        TimeZone.setDefault(TimeZone.getTimeZone(zone))
+    }
+
+    @After
+    fun restaurerLeFuseauParDefaut() {
+        TimeZone.setDefault(defaultTimeZone)
+    }
 
     @Test
     fun livre_termine_reutilise_exactement_la_definition_de_FilterMode_READ() = runTest {
@@ -57,7 +81,9 @@ class GetStatisticsUseCaseTest {
         val publicationRepository = FakePublicationRepository()
         val readingSessionRepository = FakeReadingSessionRepository()
 
-        val now = System.currentTimeMillis()
+        val today = LocalDate.of(2026, 8, 10)
+        val clock = Clock.fixed(today.atTime(9, 0).atZone(zone).toInstant(), zone)
+        val now = clock.millis()
         val oneDayMs = TimeUnit.DAYS.toMillis(1)
 
         readingSessionRepository.insert(
@@ -73,11 +99,43 @@ class GetStatisticsUseCaseTest {
             ),
         )
 
-        val useCase = GetStatisticsUseCase(readingSessionRepository, publicationRepository)
+        val useCase = GetStatisticsUseCase(readingSessionRepository, publicationRepository, clock)
         val result = useCase().first()
 
         assertEquals(2, result.currentStreakDays)
         assertEquals(2, result.maxStreakDays) // pas plus de 2 jours dans le fake
+    }
+
+    @Test
+    fun serie_de_jours_consecutifs_se_terminant_hier_rien_lu_aujourd_hui() = runTest {
+        // Non-regression du bug de production (dette streak/jour calendaire) :
+        // aucun des tests precedents ne couvrait "rien lu aujourd'hui" — c'est
+        // exactement le cas ou l'ancien calcul (SimpleDateFormat + division en
+        // jours UTC) retombait a 0 sur tout fuseau a decalage positif.
+        val publicationRepository = FakePublicationRepository()
+        val readingSessionRepository = FakeReadingSessionRepository()
+
+        val today = LocalDate.of(2026, 8, 10)
+        // "Maintenant" = ce matin, avant toute lecture du jour.
+        val clock = Clock.fixed(today.atTime(7, 30).atZone(zone).toInstant(), zone)
+
+        // Serie de 3 jours consecutifs se terminant hier (08-09, 08-08, 08-07).
+        listOf(1L, 2L, 3L).forEachIndexed { index, daysAgo ->
+            val instant = today.minusDays(daysAgo).atTime(20, 0).atZone(zone).toInstant()
+            readingSessionRepository.insert(
+                ReadingSession(
+                    id = "s$index", publicationId = "p",
+                    startedAt = instant.toEpochMilli(), endedAt = instant.toEpochMilli(),
+                    mode = ReadingMode.AUDIO, ttsDurationMs = 0L,
+                ),
+            )
+        }
+
+        val useCase = GetStatisticsUseCase(readingSessionRepository, publicationRepository, clock)
+        val result = useCase().first()
+
+        assertEquals(3, result.currentStreakDays)
+        assertEquals(3, result.maxStreakDays)
     }
 
     @Test

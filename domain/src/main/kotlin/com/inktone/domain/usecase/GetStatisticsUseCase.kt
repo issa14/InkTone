@@ -10,8 +10,8 @@ import kotlinx.coroutines.coroutineScope
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.flow
 import kotlinx.coroutines.flow.flowOn
-import java.text.SimpleDateFormat
-import java.util.Locale
+import java.time.Clock
+import java.time.LocalDate
 import java.util.concurrent.TimeUnit
 
 /**
@@ -53,14 +53,15 @@ data class HeatmapSlot(
 class GetStatisticsUseCase(
     private val readingSessionRepository: ReadingSessionRepository,
     private val publicationRepository: PublicationRepository,
+    private val clock: Clock = Clock.systemDefaultZone(),
 ) {
     /** Retourne un Flow pour intégration directe dans `combine()` — pas de `flow { emit() }` wrapper dans le ViewModel. */
     operator fun invoke(): Flow<StatisticsResult> = flow {
         val result = coroutineScope {
-            val thirtyDaysAgo = System.currentTimeMillis() - TimeUnit.DAYS.toMillis(30)
+            val thirtyDaysAgo = clock.millis() - TimeUnit.DAYS.toMillis(30)
             // Tache 7.4 — 60 jours pour permettre la comparaison mois courant / mois
             // precedent (30 vs 30) en plus de la comparaison semaine (7 vs 7).
-            val sixtyDaysAgo = System.currentTimeMillis() - TimeUnit.DAYS.toMillis(60)
+            val sixtyDaysAgo = clock.millis() - TimeUnit.DAYS.toMillis(60)
             val totalsDeferred = async { readingSessionRepository.getTotalStats() }
             val finishedDeferred = async { publicationRepository.countFiltered(FilterMode.READ) }
             val distinctDaysDeferred = async { readingSessionRepository.getDistinctReadingDays() }
@@ -74,7 +75,8 @@ class GetStatisticsUseCase(
             val heatmapRaw = heatmapDeferred.await()
 
             val streakDays = distinctDays.mapNotNull { parseDateToEpochDay(it) }
-            val streak = computeStreak(streakDays)
+            val today = LocalDate.now(clock).toEpochDay()
+            val streak = computeStreak(streakDays, today)
             val maxStreak = computeMaxStreak(streakDays)
 
             val sessionsWithWords = readingSessionRepository.getRecentSessionsWithWords(30)
@@ -84,8 +86,7 @@ class GetStatisticsUseCase(
                 if (totalMinutes > 0) (totalWords / totalMinutes).toInt() else 0
             } else 0
 
-            val todayKey = SimpleDateFormat("yyyy-MM-dd", Locale.ROOT)
-                .format(System.currentTimeMillis())
+            val todayKey = LocalDate.now(clock).toString()
             val todayReadingMinutes = dailyStats
                 .firstOrNull { it.date == todayKey }
                 ?.let { (it.visualMs + it.ttsMs) / 60_000L } ?: 0L
@@ -112,10 +113,9 @@ class GetStatisticsUseCase(
 
     // ───── Streak (sur des epochDays, pas des timestamps) ─────
 
-    private fun computeStreak(epochDays: List<Long>): Int {
+    private fun computeStreak(epochDays: List<Long>, today: Long): Int {
         if (epochDays.isEmpty()) return 0
         val days = epochDays.sortedDescending()
-        val today = TimeUnit.MILLISECONDS.toDays(System.currentTimeMillis())
         if (days.first() != today && days.first() != today - 1) return 0
         var streak = 1
         var expected = days.first() - 1
@@ -233,15 +233,8 @@ class GetStatisticsUseCase(
         }
     }
 
-    private val dateFormat = SimpleDateFormat("yyyy-MM-dd", Locale.ROOT)
-
-    private fun parseDateToEpochDay(date: String): Long? {
-        return try {
-            TimeUnit.MILLISECONDS.toDays(dateFormat.parse(date)!!.time)
-        } catch (_: Exception) {
-            null
-        }
-    }
+    private fun parseDateToEpochDay(date: String): Long? =
+        runCatching { LocalDate.parse(date).toEpochDay() }.getOrNull()
 
     private companion object {
         // 5 créneaux UX : 6h, 10h, 14h, 18h, 22h (voir slotFor).
