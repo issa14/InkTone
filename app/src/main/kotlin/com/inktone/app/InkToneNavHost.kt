@@ -6,18 +6,22 @@ import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.padding
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
+import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Text
+import androidx.compose.material3.TextButton
 import androidx.compose.material3.TopAppBar
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
@@ -49,6 +53,8 @@ import com.inktone.feature.settings.ThemeGalleryScreen
 import com.inktone.feature.settings.ThemeStudioScreen
 import com.inktone.feature.statistics.BookStatisticsScreen
 import com.inktone.feature.statistics.StatisticsScreen
+import com.inktone.feature.sync.SyncConfigurationScreen
+import com.inktone.feature.sync.SyncConflictBottomSheet
 
 /**
  * Tâche 9bis.2 — `NavHost` réel, remplace `AppScreen` (état à 3 cas,
@@ -106,6 +112,7 @@ fun InkToneNavHost(navController: NavHostController = rememberNavController(), s
                 onOpenSettings = { navController.navigate(SettingsRoute) },
                 onOpenAbout = { navController.navigate(AboutRoute) },
                 onOpenThemes = { navController.navigate(ThemeGalleryRoute) },
+                onOpenSync = { navController.navigate(SyncRoute) },
                 onNavigateToSeriesDetail = { series -> navController.navigate(LibraryDetailRoute("series", series)) },
                 onNavigateToTagDetail = { tag -> navController.navigate(LibraryDetailRoute("tag", tag)) },
                 onImportClick = { importLauncher.launch(arrayOf("application/epub+zip", "text/plain")) },
@@ -115,6 +122,11 @@ fun InkToneNavHost(navController: NavHostController = rememberNavController(), s
                 // drawer plutot que des icones eparpillees.
                 floatingActionButton = { ImportPickerButton() },
             )
+            // Lot 11, tâche 11.10 — présenté à la prochaine ouverture de
+            // l'app (Bibliothèque = première destination réelle après
+            // l'onboarding) : un conflit détecté en arrière-plan ne se
+            // résout jamais tout seul.
+            SyncConflictBottomSheet()
             } // CompositionLocalProvider
         }
         composable<RecentsRoute> {
@@ -174,12 +186,21 @@ fun InkToneNavHost(navController: NavHostController = rememberNavController(), s
             // meme pattern que ImportPickerButton) restent donc ici, dans app.
             val backupViewModel: BackupViewModel = hiltViewModel()
             val dataOperationResult by backupViewModel.lastResult.collectAsState()
+            // Lot 11, tâche 11.1 — le fichier est désormais chiffré E2EE ;
+            // un mot de passe est demandé après le choix de
+            // l'emplacement/du fichier. Reste ici (tâche 11.6) : la carte
+            // « Fichier local » de l'écran Configuration Sync pointe vers
+            // cet écran plutôt que de dupliquer le mot de passe/l'export
+            // /import une seconde fois — un seul chemin, pas deux qui
+            // divergeraient.
+            var pendingExportUri by remember { mutableStateOf<android.net.Uri?>(null) }
+            var pendingImportUri by remember { mutableStateOf<android.net.Uri?>(null) }
             val exportLauncher = rememberLauncherForActivityResult(
-                ActivityResultContracts.CreateDocument("application/json"),
-            ) { uri -> uri?.let { backupViewModel.exportTo(it.toString()) } }
+                ActivityResultContracts.CreateDocument("application/octet-stream"),
+            ) { uri -> pendingExportUri = uri }
             val importBackupLauncher = rememberLauncherForActivityResult(
                 ActivityResultContracts.OpenDocument(),
-            ) { uri -> uri?.let { backupViewModel.importFrom(it.toString()) } }
+            ) { uri -> pendingImportUri = uri }
 
             SettingsScreen(
                 onOpenAbout = { navController.navigate(AboutRoute) },
@@ -188,10 +209,68 @@ fun InkToneNavHost(navController: NavHostController = rememberNavController(), s
                 dataOperationResult = dataOperationResult,
                 onDismissDataOperationResult = backupViewModel::dismissResult,
                 onExportData = {
-                    exportLauncher.launch("inktone-backup-${java.time.LocalDate.now()}.json")
+                    exportLauncher.launch("inktone-backup-${java.time.LocalDate.now()}.rfbackup")
                 },
-                onImportData = { importBackupLauncher.launch(arrayOf("application/json")) },
+                onImportData = {
+                    importBackupLauncher.launch(arrayOf("application/octet-stream", "application/json", "*/*"))
+                },
             )
+
+            pendingExportUri?.let { uri ->
+                BackupPasswordDialog(
+                    title = "Mot de passe de la sauvegarde",
+                    confirmLabel = "Exporter",
+                    showLossWarning = true,
+                    onConfirm = { password ->
+                        backupViewModel.exportTo(uri.toString(), password)
+                        pendingExportUri = null
+                    },
+                    onDismiss = { pendingExportUri = null },
+                )
+            }
+            pendingImportUri?.let { uri ->
+                BackupPasswordDialog(
+                    title = "Mot de passe (si la sauvegarde est chiffrée)",
+                    confirmLabel = "Importer",
+                    showLossWarning = false,
+                    onConfirm = { password ->
+                        backupViewModel.importFrom(uri.toString(), password.ifBlank { null })
+                        pendingImportUri = null
+                    },
+                    onDismiss = { pendingImportUri = null },
+                )
+            }
+        }
+        composable<SyncRoute> {
+            // Lot 11, tâche 11.6 — même pont que BackupViewModel : le
+            // flux OAuth (Intent/ActivityResult) et l'écriture du compte
+            // persisté sont hors de portée de feature/sync (jamais de
+            // réseau/identifiants dans un module feature), donc pilotés
+            // ici via SyncAuthViewModel (app -> infrastructure/sync + data).
+            val syncAuthViewModel: SyncAuthViewModel = hiltViewModel()
+            val isAuthenticating by syncAuthViewModel.isAuthenticating.collectAsState()
+            val authError by syncAuthViewModel.authError.collectAsState()
+            val authLauncher = rememberLauncherForActivityResult(
+                ActivityResultContracts.StartActivityForResult(),
+            ) { result -> syncAuthViewModel.onAuthorizationResult(result.data) }
+
+            SyncConfigurationScreen(
+                onBack = navController::popBackStack,
+                onOpenLocalBackup = { navController.navigate(SettingsRoute) },
+                isGoogleAuthenticating = isAuthenticating,
+                isGoogleConfigured = syncAuthViewModel.isGoogleConfigured,
+                onConnectGoogle = { authLauncher.launch(syncAuthViewModel.buildAuthorizationIntent()) },
+                onDisconnectGoogle = syncAuthViewModel::disconnect,
+            )
+
+            authError?.let { message ->
+                AlertDialog(
+                    onDismissRequest = syncAuthViewModel::dismissError,
+                    title = { Text("Échec de la connexion") },
+                    text = { Text(message) },
+                    confirmButton = { TextButton(onClick = syncAuthViewModel::dismissError) { Text("OK") } },
+                )
+            }
         }
         composable<PronunciationRulesRoute> {
             BackScaffold(title = "Regles de prononciation", onBack = navController::popBackStack) {

@@ -24,6 +24,9 @@ import androidx.compose.material.icons.outlined.Bolt
 import androidx.compose.material.icons.outlined.BookmarkAdd
 import androidx.compose.material.icons.outlined.BrightnessMedium
 import androidx.compose.material.icons.outlined.CheckCircle
+import androidx.compose.material.icons.outlined.CloudDone
+import androidx.compose.material.icons.outlined.CloudOff
+import androidx.compose.material.icons.outlined.CloudSync
 import androidx.compose.material.icons.outlined.ContentCopy
 import androidx.compose.material.icons.outlined.Contrast
 import androidx.compose.material.icons.outlined.AddCircle
@@ -99,6 +102,9 @@ object AppIcons {
     val Refresh = Icons.Outlined.Refresh
     val ChevronDown = Icons.Outlined.KeyboardArrowDown
     val Stats = Icons.Outlined.BarChart
+    val Sync = Icons.Outlined.CloudSync
+    val CloudConnected = Icons.Outlined.CloudDone
+    val CloudDisconnected = Icons.Outlined.CloudOff
     // Lot 8 — item de drawer Récents. Distinct de `Loading` (sablier,
     // défaut historique corrigé au lot 1, ne pas réintroduire).
     val Recents = Icons.Outlined.History

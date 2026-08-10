@@ -253,6 +253,23 @@ Cinq actions, dans l'ordre :
 
 **État d'implémentation (lot 9) :** Thèmes n'est plus masqué — pied de drawer passé à 3 boutons (Paramètres / Thèmes / À propos, icône `AppIcons.Appearance`). `ReadingTheme` ouvert d'un enum fermé (LIGHT/DARK/SEPIA/SYSTEM) vers un modèle à thèmes personnalisés (6 thèmes intégrés + thèmes créés en base, migration Room 18→19). Galerie (`ThemeGalleryScreen`, `feature/settings`) et Studio (`ThemeStudioScreen`) entièrement fonctionnels — cartes-aperçu vivant, badge ACTIF, appui long, 4 sélecteurs de couleur, badge WCAG, suppression sécurisée. **Point tranché (Tâche 9.2) :** la bascule cyclique du lecteur (icône Thème du panneau, lot 3b) reste bornée à 3 ambiances de référence (Papier Clair → Obsidienne → Sépia Vintage → Papier Clair) plutôt que de cycler sur l'ensemble ouvert des thèmes personnalisés — un cycle sur un catalogue de taille arbitraire serait impraticable au geste rapide ; la Galerie reste le chemin complet pour choisir un thème personnalisé. **Écart déclaré (Tâche 9.4) :** l'appui long prévisualise via un recouvrement plein écran DANS la Galerie (mockup agrandi), pas une poussée en direct dans un Reader déjà ouvert ailleurs — `ReaderViewModel` ne réobserve pas en continu `UserPreferences.theme` (seulement à l'ouverture/`SetOverrides`), et ajouter cette réobservation aurait débordé le périmètre de ce lot pour un gain marginal. Catalogues OPDS et Synchronisation restent masqués (hors périmètre).
 
+**État d'implémentation (lot 11) :** Synchronisation n'est plus masquée — réactivée en **b5** de la liste principale du drawer (entre Marque-pages et Statistiques), pas au pied de drawer comme une première implémentation l'avait placée à tort (retour Issa, vérification device, corrigé le jour même). **Toutes les destinations conçues sont désormais affichées** — seule Catalogues OPDS (b4) reste masquée, différée volontairement à v1.x (elle n'a jamais été conçue dans cette session, ce n'est pas un oubli).
+
+**Google Drive en V1, WebDAV différé (décision actée, tâche 11.2)** : `drive.appdata` est une portée sensible mais non restreinte — 100 comptes de test disponibles sans attente en mode Test, aucun audit de sécurité tiers requis pour démarrer. L'exclusivité mutuelle actée dans la cible (un seul fournisseur cloud actif) impose de toute façon une frontière propre entre fournisseurs ; WebDAV sera une seconde implémentation derrière la même interface `SyncProvider`, hors périmètre du lot 11. La carte WebDAV de l'écran Configuration reste grisée en permanence (pas seulement quand Drive est actif, contrairement à la cible) tant qu'aucune implémentation n'existe.
+
+**Écran de conflit — absent de la conception initiale (tâche 11.10)** : `UX_FLOW_DESIGN.md` ne décrivait aucun écran de conflit avant ce lot ; c'est un manque de conception identifié à l'implémentation, pas un oubli d'exécution. `SyncConflictBottomSheet` a été conçu directement en code, sans maquette préalable — exception assumée à la méthode habituelle de ce document. Il n'arbitre **que** la position de lecture, jamais les annotations ni les marque-pages.
+
+**Matrice de résolution des conflits (tâche 11.10)** :
+
+| Donnée | Résolution |
+|---|---|
+| Position de lecture | Arbitrage utilisateur (`SyncConflictBottomSheet`) — valeur unique par livre |
+| Marque-pages, annotations | Fusion silencieuse (union par identifiant), jamais de question posée |
+| Réglages, thèmes personnalisés | Dernier écrit gagne |
+| Suppressions | **Écart déclaré** — aucun marqueur de suppression horodaté n'existe encore : un élément supprimé localement peut réapparaître si un autre appareil le televerse encore. Retrofitter les chemins de suppression existants pour écrire une tombe plutôt qu'un DELETE dur est un chantier à part, volontairement hors de ce lot plutôt que fait en hâte. |
+
+La synchro en arrière-plan ne tranche jamais un conflit de position elle-même : elle le détecte et le met en file (persistée, Room), présentée à la prochaine ouverture de l'app (écran Bibliothèque).
+
 ---
 
 ## Bibliothèque : écran complet

@@ -320,3 +320,60 @@ val MIGRATION_20_21 = object : Migration(20, 21) {
         db.execSQL("ALTER TABLE user_preferences ADD COLUMN hasPromptedVoiceDownload INTEGER NOT NULL DEFAULT 0")
     }
 }
+
+/**
+ * Lot 11, tâche 11.2 — identité d'appareil (utilisée par la flotte,
+ * palier C, et la détection de conflits, palier D) et état du compte de
+ * synchronisation unique (exclusivité mutuelle Drive/WebDAV). Toutes les
+ * colonnes sont nullables ou à défaut neutre : une ligne existante se
+ * retrouve simplement non configurée (`syncProvider IS NULL`), jamais en
+ * échec.
+ */
+val MIGRATION_21_22 = object : Migration(21, 22) {
+    override fun migrate(db: SupportSQLiteDatabase) {
+        db.execSQL("ALTER TABLE user_preferences ADD COLUMN deviceId TEXT DEFAULT NULL")
+        db.execSQL("ALTER TABLE user_preferences ADD COLUMN deviceDisplayName TEXT DEFAULT NULL")
+        db.execSQL("ALTER TABLE user_preferences ADD COLUMN syncProvider TEXT DEFAULT NULL")
+        db.execSQL("ALTER TABLE user_preferences ADD COLUMN syncAccountLabel TEXT DEFAULT NULL")
+        db.execSQL("ALTER TABLE user_preferences ADD COLUMN syncLinkedAt INTEGER DEFAULT NULL")
+        db.execSQL("ALTER TABLE user_preferences ADD COLUMN syncLastSyncAt INTEGER DEFAULT NULL")
+        db.execSQL("ALTER TABLE user_preferences ADD COLUMN syncLastAutoSyncFailed INTEGER NOT NULL DEFAULT 0")
+    }
+}
+
+/** Lot 11, tâche 11.8 — synchro automatique en arrière-plan et sa contrainte Wi-Fi uniquement, toutes deux désactivées par défaut. */
+val MIGRATION_22_23 = object : Migration(22, 23) {
+    override fun migrate(db: SupportSQLiteDatabase) {
+        db.execSQL("ALTER TABLE user_preferences ADD COLUMN syncAutoEnabled INTEGER NOT NULL DEFAULT 0")
+        db.execSQL("ALTER TABLE user_preferences ADD COLUMN syncWifiOnly INTEGER NOT NULL DEFAULT 0")
+    }
+}
+
+/** Lot 11, tâche 11.10 — file des conflits de position en attente d'arbitrage, au plus un par publication. */
+val MIGRATION_23_24 = object : Migration(23, 24) {
+    override fun migrate(db: SupportSQLiteDatabase) {
+        db.execSQL(
+            """
+            CREATE TABLE IF NOT EXISTS `pending_conflicts` (
+                `publicationId` TEXT NOT NULL,
+                `bookTitle` TEXT NOT NULL,
+                `localResourceHref` TEXT NOT NULL,
+                `localChapterIndex` INTEGER NOT NULL,
+                `localParagraphIndex` INTEGER,
+                `localCharOffset` INTEGER NOT NULL,
+                `localDeviceLabel` TEXT NOT NULL,
+                `localAt` INTEGER NOT NULL,
+                `localChapterCount` INTEGER NOT NULL,
+                `remoteResourceHref` TEXT NOT NULL,
+                `remoteChapterIndex` INTEGER NOT NULL,
+                `remoteParagraphIndex` INTEGER,
+                `remoteCharOffset` INTEGER NOT NULL,
+                `remoteDeviceLabel` TEXT NOT NULL,
+                `remoteAt` INTEGER NOT NULL,
+                `remoteChapterCount` INTEGER NOT NULL,
+                PRIMARY KEY(`publicationId`)
+            )
+            """.trimIndent(),
+        )
+    }
+}
