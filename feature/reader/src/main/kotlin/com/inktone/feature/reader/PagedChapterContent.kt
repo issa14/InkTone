@@ -1,6 +1,7 @@
 package com.inktone.feature.reader
 
 import androidx.compose.foundation.ExperimentalFoundationApi
+import androidx.compose.foundation.gestures.detectDragGesturesAfterLongPress
 import androidx.compose.foundation.gestures.detectTapGestures
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.fillMaxSize
@@ -90,6 +91,11 @@ fun PagedChapterContent(
     onPageChanged: (Int) -> Unit = {},
     onManualPageChange: (sentenceIndex: Int) -> Unit = {},
     onSelectionBoundsInWindow: (Rect?) -> Unit = {},
+    // Palier 3f.1 — sélection libre au mot, offsets de caractère absolus
+    // dans le chapitre (pas des index de Sentence, voir ReaderUiState).
+    freeSelectedRange: IntRange? = null,
+    onFreeSelectionChanged: (anchorOffset: Int, focusOffset: Int) -> Unit = { _, _ -> },
+    onFreeSelectionBoundsInWindow: (Rect?) -> Unit = {},
     modifier: Modifier = Modifier,
 ) {
     val renderTextStyle = remember(pagination.baseTextStyle, textColor) {
@@ -245,6 +251,11 @@ fun PagedChapterContent(
     }
     val selectedRangeState = rememberUpdatedState(absoluteSelectedRange)
 
+    // Palier 3f.1 — déjà en offsets de caractère absolus (calés sur des
+    // bornes de mot par PageBlock), aucune conversion index-de-phrase à
+    // faire ici contrairement à absoluteSelectedRange ci-dessus.
+    val freeSelectedRangeState = rememberUpdatedState(freeSelectedRange)
+
     HorizontalPager(
         state = pagerState,
         modifier = modifier.fillMaxSize(),
@@ -276,6 +287,9 @@ fun PagedChapterContent(
                         isReadingRulerEnabled = isReadingRulerEnabled,
                         onCurrentLineY = onCurrentLineY,
                         onSelectionBoundsInWindow = onSelectionBoundsInWindow,
+                        freeSelectedRange = freeSelectedRangeState,
+                        onFreeSelectionChanged = onFreeSelectionChanged,
+                        onFreeSelectionBoundsInWindow = onFreeSelectionBoundsInWindow,
                         onOffsetLongPress = { absoluteOffset ->
                             onSentenceLongClick(sentenceIndexForOffset(currentMeasurement.sentenceStartOffsets, absoluteOffset))
                         },
@@ -296,6 +310,7 @@ fun PagedChapterContent(
  * mot-à-mot et la sélection en cours, eux, sont lus en phase de dessin
  * (`drawWithContent`) pour ne jamais invalider mesure ni placement.
  */
+@OptIn(ExperimentalFoundationApi::class)
 @Composable
 private fun PageBlock(
     pageText: AnnotatedString,
@@ -307,12 +322,23 @@ private fun PageBlock(
     isReadingRulerEnabled: Boolean,
     onCurrentLineY: (Dp) -> Unit,
     onSelectionBoundsInWindow: (Rect?) -> Unit,
+    freeSelectedRange: State<IntRange?>,
+    onFreeSelectionChanged: (anchorOffset: Int, focusOffset: Int) -> Unit,
+    onFreeSelectionBoundsInWindow: (Rect?) -> Unit,
     onOffsetLongPress: (Int) -> Unit,
     onOffsetTap: (Int) -> Unit,
 ) {
     var textLayoutResult by remember { mutableStateOf<TextLayoutResult?>(null) }
     var textCoordinates by remember { mutableStateOf<LayoutCoordinates?>(null) }
     val density = LocalDensity.current
+
+    // Palier 3f.1 — plage (inclusive, absolue) du mot sous le doigt au
+    // début du glissement, fixe pour tout le geste. À chaque étape du
+    // glissement, la sélection émise est l'union de cette plage ancre et
+    // de la plage du mot actuellement sous le doigt : correct pour un
+    // glissement dans les deux sens sans avoir à suivre sa direction
+    // explicitement (voir onDrag ci-dessous).
+    var anchorWordRange by remember { mutableStateOf<IntRange?>(null) }
 
     // 3c.4 — position du popup de sélection alimentée par les
     // LayoutCoordinates réelles de la zone sélectionnée (contrainte
@@ -339,23 +365,24 @@ private fun PageBlock(
             return@LaunchedEffect
         }
         snapshotFlow { selectedRange.value }.collect { absolute ->
-            val layout = textLayoutResult
-            val coords = textCoordinates
-            if (layout == null || coords == null || absolute == null) {
-                onSelectionBoundsInWindow(null)
-                return@collect
-            }
-            val textLength = layout.layoutInput.text.length
-            val localStart = (absolute.first - pageOffsetRange.first).coerceIn(0, textLength)
-            val localEndExclusive = (absolute.last + 1 - pageOffsetRange.first).coerceIn(localStart, textLength)
-            if (localStart >= localEndExclusive) {
-                onSelectionBoundsInWindow(null)
-            } else {
-                val localBounds = layout.getPathForRange(localStart, localEndExclusive).getBounds()
-                val topLeft = coords.localToWindow(localBounds.topLeft)
-                val bottomRight = coords.localToWindow(localBounds.bottomRight)
-                onSelectionBoundsInWindow(Rect(topLeft, bottomRight))
-            }
+            onSelectionBoundsInWindow(
+                rangeBoundsInWindow(textLayoutResult, textCoordinates, pageOffsetRange, absolute),
+            )
+        }
+    }
+
+    // Palier 3f.1 — même mécanisme que ci-dessus, pour la sélection libre
+    // au mot, source de bornes distincte pour le même popup (voir
+    // SelectionActionPopup.kt).
+    LaunchedEffect(isDisplayedPage, pageOffsetRange) {
+        if (!isDisplayedPage) {
+            onFreeSelectionBoundsInWindow(null)
+            return@LaunchedEffect
+        }
+        snapshotFlow { freeSelectedRange.value }.collect { absolute ->
+            onFreeSelectionBoundsInWindow(
+                rangeBoundsInWindow(textLayoutResult, textCoordinates, pageOffsetRange, absolute),
+            )
         }
     }
 
@@ -392,9 +419,44 @@ private fun PageBlock(
                     },
                 )
             }
+            // Palier 3f.1 — mécanisme validé par le prototype 3c.5 (30/30
+            // sur mesure robuste, voir NOTE_3C5_PROTOTYPE_SELECTION_MOT.md) :
+            // `pointerInput` SIBLING de celui du tap ci-dessus, avec
+            // `detectDragGesturesAfterLongPress` + `change.consume()`, sans
+            // mécanisme supplémentaire (ni `userScrollEnabled`, ni
+            // participation à `NestedScrollConnection`) — suffisant pour
+            // empêcher le `HorizontalPager` de tourner la page pendant le
+            // glissement.
+            .pointerInput(pageOffsetRange) {
+                detectDragGesturesAfterLongPress(
+                    onDragStart = { position ->
+                        val layout = textLayoutResult ?: return@detectDragGesturesAfterLongPress
+                        val local = layout.getOffsetForPosition(position).coerceIn(0, layout.layoutInput.text.length)
+                        val word = layout.getWordBoundary(local)
+                        val range = (pageOffsetRange.first + word.start)..(pageOffsetRange.first + word.end - 1)
+                        anchorWordRange = range
+                        onFreeSelectionChanged(range.first, range.last)
+                    },
+                    onDrag = { change, _ ->
+                        change.consume()
+                        val anchor = anchorWordRange ?: return@detectDragGesturesAfterLongPress
+                        val layout = textLayoutResult ?: return@detectDragGesturesAfterLongPress
+                        val local = layout.getOffsetForPosition(change.position).coerceIn(0, layout.layoutInput.text.length)
+                        val word = layout.getWordBoundary(local)
+                        val currentStart = pageOffsetRange.first + word.start
+                        val currentEnd = pageOffsetRange.first + word.end - 1
+                        onFreeSelectionChanged(minOf(anchor.first, currentStart), maxOf(anchor.last, currentEnd))
+                    },
+                    onDragEnd = { anchorWordRange = null },
+                    onDragCancel = { anchorWordRange = null },
+                )
+            }
             .drawWithContent {
                 textLayoutResult?.let { layout ->
                     selectedRange.value?.let { absolute ->
+                        drawAbsoluteRangeHighlight(layout, pageOffsetRange, absolute, SelectionHighlightColor)
+                    }
+                    freeSelectedRange.value?.let { absolute ->
                         drawAbsoluteRangeHighlight(layout, pageOffsetRange, absolute, SelectionHighlightColor)
                     }
                     highlightedRange.value?.let { absolute ->
@@ -404,6 +466,23 @@ private fun PageBlock(
                 drawContent()
             },
     )
+}
+
+private fun rangeBoundsInWindow(
+    layout: TextLayoutResult?,
+    coords: LayoutCoordinates?,
+    pageOffsetRange: IntRange,
+    absolute: IntRange?,
+): Rect? {
+    if (layout == null || coords == null || absolute == null) return null
+    val textLength = layout.layoutInput.text.length
+    val localStart = (absolute.first - pageOffsetRange.first).coerceIn(0, textLength)
+    val localEndExclusive = (absolute.last + 1 - pageOffsetRange.first).coerceIn(localStart, textLength)
+    if (localStart >= localEndExclusive) return null
+    val localBounds = layout.getPathForRange(localStart, localEndExclusive).getBounds()
+    val topLeft = coords.localToWindow(localBounds.topLeft)
+    val bottomRight = coords.localToWindow(localBounds.bottomRight)
+    return Rect(topLeft, bottomRight)
 }
 
 private fun DrawScope.drawAbsoluteRangeHighlight(

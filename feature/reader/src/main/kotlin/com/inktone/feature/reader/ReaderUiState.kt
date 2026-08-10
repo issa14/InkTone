@@ -54,6 +54,15 @@ data class ReaderUiState(
     // extension (peut etre avant ou apres l'ancre).
     val selectionAnchorIndex: Int? = null,
     val selectionFocusIndex: Int? = null,
+    // Palier 3f.1 — sélection libre au mot (appui long + glissement),
+    // mode PAGED uniquement. Offsets de caractère ABSOLUS dans le
+    // chapitre, calés sur les bornes de mot (TextLayoutResult.getWordBoundary),
+    // pas des index de Sentence — modèle distinct de
+    // selectionAnchorIndex/selectionFocusIndex ci-dessus, avec lequel il
+    // coexiste temporairement. Ne pas laisser cette coexistence dépasser
+    // le lot 3f (retrait de l'ancien modèle prévu en 3f.5).
+    val freeSelectionAnchorOffset: Int? = null,
+    val freeSelectionFocusOffset: Int? = null,
     val annotations: List<Annotation> = emptyList(),
     val bookmarks: List<Bookmark> = emptyList(),
     val isBookmarkListVisible: Boolean = false,
@@ -146,6 +155,14 @@ data class ReaderUiState(
             return minOf(anchor, focus)..maxOf(anchor, focus)
         }
 
+    /** Palier 3f.1 — plage de caractères (bornes inclusives) de la sélection libre en cours, ou `null`. */
+    val freeSelectionRange: IntRange?
+        get() {
+            val anchor = freeSelectionAnchorOffset ?: return null
+            val focus = freeSelectionFocusOffset ?: anchor
+            return minOf(anchor, focus)..maxOf(anchor, focus)
+        }
+
     /**
      * Tâche 3c.3 — état du toggle « Marquer cette page » du panneau
      * Marque-pages. Adressage par `Locator`/`Sentence` (Blueprint K3 :
@@ -218,6 +235,16 @@ sealed interface ReaderIntent {
     /** Appui simple sur une autre phrase pendant qu'une sélection est active : l'étend. */
     data class ExtendSentenceSelection(val sentenceIndex: Int) : ReaderIntent
     data object ClearSentenceSelection : ReaderIntent
+
+    /**
+     * Palier 3f.1 — sélection libre au mot (appui long + glissement, mode
+     * PAGED). `anchorOffset`/`focusOffset` : offsets de caractère absolus
+     * dans le chapitre, déjà calés sur des bornes de mot par l'appelant
+     * (`PagedChapterContent`, via `getWordBoundary`) — ce ViewModel ne
+     * fait que les stocker, comme pour la sélection par phrase.
+     */
+    data class SetFreeSelection(val anchorOffset: Int, val focusOffset: Int) : ReaderIntent
+    data object ClearFreeSelection : ReaderIntent
 
     /**
      * Tâche 3c.4 — `content` : texte de la note associée (popup de

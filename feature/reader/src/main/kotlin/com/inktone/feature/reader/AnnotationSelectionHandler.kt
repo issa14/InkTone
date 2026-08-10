@@ -36,4 +36,42 @@ class AnnotationSelectionHandler {
 
         return if (endLocator >= startLocator) startLocator to endLocator else null
     }
+
+    /**
+     * Palier 3f.1 — même résolution que [resolveSelection], mais pour une
+     * sélection libre au mot : les bornes sont déjà des offsets de
+     * caractère absolus (calés sur des bornes de mot par l'appelant), pas
+     * des index de [Sentence] entière.
+     */
+    fun resolveCharRange(
+        startOffset: Int,
+        endOffsetExclusive: Int,
+        chapterIndex: Int,
+        resourceHref: String,
+    ): Pair<Locator, Locator>? {
+        if (endOffsetExclusive <= startOffset) return null
+        val startLocator = Locator(resourceHref = resourceHref, chapterIndex = chapterIndex, charOffset = startOffset)
+        val endLocator = Locator(resourceHref = resourceHref, chapterIndex = chapterIndex, charOffset = endOffsetExclusive)
+        return startLocator to endLocator
+    }
+}
+
+/**
+ * Palier 3f.1 — substring exacte `[startOffset, endOffsetExclusive)` d'un
+ * chapitre reconstruite à partir des offsets de ses [Sentence], pour
+ * l'excerpt/le texte copié d'une sélection libre qui travaille en offsets
+ * de caractère plutôt qu'en index de phrase entière. Les espaces entre
+ * phrases (hors texte de chaque `Sentence`) ne sont pas restitués — sans
+ * incidence, ceci ne sert qu'à un aperçu tronqué, jamais à une réécriture.
+ */
+internal fun sliceChapterText(sentences: List<Sentence>, startOffset: Int, endOffsetExclusive: Int): String {
+    val builder = StringBuilder()
+    for (sentence in sentences) {
+        if (sentence.endOffset <= startOffset) continue
+        if (sentence.startOffset >= endOffsetExclusive) break
+        val localStart = (startOffset - sentence.startOffset).coerceAtLeast(0)
+        val localEnd = (endOffsetExclusive - sentence.startOffset).coerceAtMost(sentence.text.length)
+        if (localStart < localEnd) builder.append(sentence.text, localStart, localEnd)
+    }
+    return builder.toString()
 }

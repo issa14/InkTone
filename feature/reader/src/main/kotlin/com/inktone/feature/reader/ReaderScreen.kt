@@ -99,6 +99,14 @@ import kotlin.math.roundToInt
  * construction, aucune conversion pixel → offset nécessaire (voir
  * [AnnotationSelectionHandler]).
  *
+ * **Palier 3f.1 — sélection libre au mot, mode PAGED uniquement.**
+ * Coexiste temporairement avec le modèle par phrase ci-dessus (voir
+ * `ReaderUiState.freeSelectionRange`) : `pointerInput` sibling avec
+ * `detectDragGesturesAfterLongPress`, bornes calées au mot via
+ * `TextLayoutResult.getWordBoundary` (voir `PagedChapterContent.PageBlock`).
+ * Ne pas laisser cette coexistence dépasser le lot 3f (retrait prévu en
+ * 3f.5, voir `docs/execution/CHIFFRAGE_LOT_3F_SELECTION_MOT.md`).
+ *
  * **Limite connue, non résolue ici** : aucun défilement automatique vers
  * la phrase en cours de lecture TTS — la vue défile uniquement sur
  * changement de chapitre. Un chapitre long avec lecture TTS active peut
@@ -280,6 +288,9 @@ fun ReaderScreen(
         LaunchedEffect(state.currentChapterIndex) { scrollState.scrollTo(0) }
 
         val selectedRange = state.selectedSentenceRange
+        // Palier 3f.1 — sélection libre au mot, mode PAGED uniquement,
+        // coexiste temporairement avec selectedRange ci-dessus.
+        val freeSelectedRange = state.freeSelectionRange
 
         // A.1 / Tache 9bis.3.6 - position Y de la phrase active
         var currentLineYDp by remember { mutableStateOf(0.dp) }
@@ -364,6 +375,9 @@ fun ReaderScreen(
             mutableStateMapOf<Int, Rect>()
         }
         var pagedSelectionBounds by remember { mutableStateOf<Rect?>(null) }
+        // Palier 3f.1 — bornes de la sélection libre, source distincte de
+        // pagedSelectionBounds (voir PagedChapterContent.onFreeSelectionBoundsInWindow).
+        var pagedFreeSelectionBounds by remember { mutableStateOf<Rect?>(null) }
         val selectionBoundsInWindow = when (state.readingMode) {
             ReadingMode.SCROLL -> selectedRange
                 ?.mapNotNull { scrollSelectionBoundsPx[it] }
@@ -375,12 +389,17 @@ fun ReaderScreen(
                         bottom = maxOf(a.bottom, b.bottom),
                     )
                 }
-            ReadingMode.PAGED -> pagedSelectionBounds
+            ReadingMode.PAGED -> pagedFreeSelectionBounds ?: pagedSelectionBounds
         }
-        val selectedText = remember(selectedRange, state.currentChapter) {
-            val range = selectedRange ?: return@remember ""
-            val sentences = state.currentChapter?.paragraphs?.flatMap { it.sentences } ?: emptyList()
-            range.mapNotNull { sentences.getOrNull(it)?.text }.joinToString(" ")
+        val selectedText = remember(selectedRange, freeSelectedRange, state.currentChapter) {
+            val chapterSentences = state.currentChapter?.paragraphs?.flatMap { it.sentences } ?: emptyList()
+            val freeRange = freeSelectedRange
+            if (freeRange != null) {
+                sliceChapterText(chapterSentences, freeRange.first, freeRange.last + 1)
+            } else {
+                val range = selectedRange ?: return@remember ""
+                range.mapNotNull { chapterSentences.getOrNull(it)?.text }.joinToString(" ")
+            }
         }
 
         // 3b.5 — barre du haut : appartient au HUD, apparaît/disparaît
@@ -555,6 +574,11 @@ fun ReaderScreen(
                             viewModel.onIntent(ReaderIntent.UpdateScrollPosition(sentenceIndex))
                         },
                         onSelectionBoundsInWindow = { bounds -> pagedSelectionBounds = bounds },
+                        freeSelectedRange = freeSelectedRange,
+                        onFreeSelectionChanged = { anchor, focus ->
+                            viewModel.onIntent(ReaderIntent.SetFreeSelection(anchor, focus))
+                        },
+                        onFreeSelectionBoundsInWindow = { bounds -> pagedFreeSelectionBounds = bounds },
                     )
                 }
             }
@@ -570,7 +594,7 @@ fun ReaderScreen(
         // 3c.4 — remplace AnnotationColorPicker (position fixe basse
         // d'écran, Confirmer/Annuler) par le popup Copier/Surligner/Note
         // positionné près de la sélection réelle.
-        if (selectedRange != null) {
+        if (selectedRange != null || freeSelectedRange != null) {
             SelectionActionPopup(
                 selectedText = selectedText,
                 selectionBoundsInWindow = selectionBoundsInWindow,
@@ -580,7 +604,10 @@ fun ReaderScreen(
                 onSaveNote = { content, color ->
                     viewModel.onIntent(ReaderIntent.ConfirmAnnotation(color, content))
                 },
-                onDismiss = { viewModel.onIntent(ReaderIntent.ClearSentenceSelection) },
+                onDismiss = {
+                    viewModel.onIntent(ReaderIntent.ClearSentenceSelection)
+                    viewModel.onIntent(ReaderIntent.ClearFreeSelection)
+                },
             )
         }
 
