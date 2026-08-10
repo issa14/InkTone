@@ -49,13 +49,9 @@ import com.inktone.domain.model.AnnotationColor
  * (`UX_FLOW_DESIGN.md` § popup de sélection de texte, Signet
  * volontairement absent : un signet marque une position, pas une plage).
  *
- * **Écart connu, reconduit** (Tâche 7.0/7.1, `ReaderScreen` § doc de
- * tête) : la sélection reste par phrase (appui long puis extension), pas
- * libre au caractère — `Selection`/`SelectionContainer` contrôlé restent
- * `internal` dans `androidx.compose.foundation` (BOM 2024.09.02, vérifié
- * par le compilateur, pas supposé). Ce popup s'applique à cette sélection
- * par phrase ; la sélection libre au mot est un lot séparé et conditionnel
- * (3f, voir Tâche 3c.5).
+ * S'applique à la sélection libre au mot (voir `ReaderUiState.freeSelectionRange`,
+ * `PagedChapterContent.PageBlock`/`ReaderScreen.ParagraphText`) — seul
+ * modèle de sélection de texte du lecteur.
  */
 private enum class SelectionPopupMode { ACTIONS, COLOR_PICKER, NOTE_INPUT }
 
@@ -84,9 +80,19 @@ fun SelectionActionPopup(
     // false), pensé pour les tooltips/menus qui ne doivent pas voler le
     // focus) — un OutlinedTextField à l'intérieur ne peut alors jamais
     // recevoir le focus, donc jamais déclencher l'IME. `focusable = true`
-    // ci-dessous, plus une demande de focus explicite au passage en mode
-    // NOTE_INPUT (un TextField ne se focus jamais tout seul à sa
-    // composition).
+    // uniquement en mode NOTE_INPUT (voir plus bas), plus une demande de
+    // focus explicite au passage dans ce mode (un TextField ne se focus
+    // jamais tout seul à sa composition).
+    //
+    // Bug réel trouvé sur appareil (palier 3f.2, diagnostic dédié) :
+    // `focusable = true` posé sans condition sur TOUT le Popup (donc dès
+    // le mode ACTIONS, avant même que l'utilisateur touche « Note »)
+    // volait le focus de FENÊTRE Android à la zone de lecture dès qu'une
+    // sélection existait — `BasicTextField` masque alors ses poignées et
+    // sa loupe natives dès que sa fenêtre hôte n'est plus focus (même
+    // logique que le natif `EditText` : ce n'est pas un bug de Compose,
+    // c'est notre propre popup qui volait le focus trop tôt). Restreint
+    // désormais au SEUL mode qui a réellement besoin du clavier.
     LaunchedEffect(mode) {
         if (mode == SelectionPopupMode.NOTE_INPUT) {
             noteFocusRequester.requestFocus()
@@ -101,7 +107,7 @@ fun SelectionActionPopup(
     Popup(
         popupPositionProvider = positionProvider,
         onDismissRequest = onDismiss,
-        properties = PopupProperties(focusable = true),
+        properties = PopupProperties(focusable = mode == SelectionPopupMode.NOTE_INPUT),
     ) {
         Surface(
             shape = RoundedCornerShape(12.dp),

@@ -168,8 +168,9 @@ class ReaderViewModelBookmarkToggleTest {
         viewModel.onIntent(ReaderIntent.OpenPublication("pub-1"))
         dispatcher.scheduler.runCurrent()
 
-        // Surlignage sans note (action « Surligner » du popup 3c.4).
-        viewModel.onIntent(ReaderIntent.BeginSentenceSelection(0))
+        // Surlignage sans note (action « Surligner » du popup 3c.4) —
+        // "Phrase unique." fait 14 caracteres, offsets 0..13.
+        viewModel.onIntent(ReaderIntent.SetFreeSelection(0, 13))
         viewModel.onIntent(ReaderIntent.ConfirmAnnotation(AnnotationColor.YELLOW))
         dispatcher.scheduler.runCurrent()
 
@@ -178,7 +179,7 @@ class ReaderViewModelBookmarkToggleTest {
 
         // Note (action « Note » du popup 3c.4) : contenu reellement rempli
         // et relu depuis l'etat observe.
-        viewModel.onIntent(ReaderIntent.BeginSentenceSelection(0))
+        viewModel.onIntent(ReaderIntent.SetFreeSelection(0, 13))
         viewModel.onIntent(ReaderIntent.ConfirmAnnotation(AnnotationColor.GREEN, "Ma note de lecture"))
         dispatcher.scheduler.runCurrent()
 
@@ -274,7 +275,7 @@ class ReaderViewModelBookmarkToggleTest {
         viewModel.onIntent(ReaderIntent.OpenPublication("pub-1"))
         dispatcher.scheduler.runCurrent()
 
-        viewModel.onIntent(ReaderIntent.BeginSentenceSelection(0))
+        viewModel.onIntent(ReaderIntent.SetFreeSelection(0, longText.length - 1))
         viewModel.onIntent(ReaderIntent.ConfirmAnnotation(AnnotationColor.YELLOW))
         dispatcher.scheduler.runCurrent()
 

@@ -1,7 +1,9 @@
 package com.inktone.feature.reader
 
 import androidx.compose.ui.text.AnnotatedString
-import com.inktone.domain.model.Sentence
+import com.inktone.domain.model.Annotation
+import com.inktone.domain.model.AnnotationColor
+import com.inktone.domain.valueobject.Locator
 import org.junit.Assert.assertEquals
 import org.junit.Test
 
@@ -30,9 +32,6 @@ class PagedChapterContentBuildPageAnnotatedStringTest {
         val result = buildPageAnnotatedString(
             full = full,
             pageOffsetRange = staleRange,
-            sentences = emptyList(),
-            sentenceStartOffsets = emptyList(),
-            pageSentenceRange = IntRange.EMPTY,
             chapterIndex = 0,
             annotations = emptyList(),
         )
@@ -51,9 +50,6 @@ class PagedChapterContentBuildPageAnnotatedStringTest {
         val result = buildPageAnnotatedString(
             full = full,
             pageOffsetRange = partiallyStaleRange,
-            sentences = emptyList(),
-            sentenceStartOffsets = emptyList(),
-            pageSentenceRange = IntRange.EMPTY,
             chapterIndex = 0,
             annotations = emptyList(),
         )
@@ -64,18 +60,52 @@ class PagedChapterContentBuildPageAnnotatedStringTest {
     @Test
     fun pageOffsetRange_coherent_avec_full_reste_inchange() {
         val full = AnnotatedString("Phrase un. Phrase deux.")
-        val sentence = Sentence(index = 0, text = "Phrase un.", startOffset = 0, endOffset = 10)
 
         val result = buildPageAnnotatedString(
             full = full,
             pageOffsetRange = 0..22,
-            sentences = listOf(sentence),
-            sentenceStartOffsets = listOf(0),
-            pageSentenceRange = 0..0,
             chapterIndex = 0,
             annotations = emptyList(),
         )
 
         assertEquals(full.text, result.text)
+    }
+
+    /**
+     * Régression — diagnostic palier 3f.2 : une annotation au MOT (offsets
+     * de caractère exacts, sélection libre 3f.1) se retrouvait peinte sur
+     * la PHRASE entière qui la contient, l'ancienne version bouclant sur
+     * les phrases de la page et appliquant le `SpanStyle` sur leurs bornes
+     * complètes dès qu'une annotation les touchait (simple test de
+     * chevauchement, pas d'intersection réelle). Ici, l'annotation ne
+     * couvre que le mot « deux » (offsets 18..21 dans « Phrase un. Phrase
+     * deux. ») — le `SpanStyle` posé doit s'arrêter exactement là, pas
+     * couvrir toute la deuxième phrase (offsets 11..22).
+     */
+    @Test
+    fun annotation_au_mot_ne_peint_que_ses_propres_offsets_pas_toute_la_phrase() {
+        val full = AnnotatedString("Phrase un. Phrase deux.")
+        val annotation = Annotation(
+            id = "a1",
+            publicationId = "pub",
+            startLocator = Locator(resourceHref = "c.xhtml", chapterIndex = 0, charOffset = 18),
+            endLocator = Locator(resourceHref = "c.xhtml", chapterIndex = 0, charOffset = 22),
+            color = AnnotationColor.YELLOW,
+            createdAt = 0,
+            updatedAt = 0,
+        )
+
+        val result = buildPageAnnotatedString(
+            full = full,
+            pageOffsetRange = 0..22,
+            chapterIndex = 0,
+            annotations = listOf(annotation),
+        )
+
+        assertEquals(1, result.spanStyles.size)
+        val span = result.spanStyles.first()
+        assertEquals(18, span.start)
+        assertEquals(22, span.end)
+        assertEquals(AnnotationColor.YELLOW.toComposeColor(), span.item.background)
     }
 }
