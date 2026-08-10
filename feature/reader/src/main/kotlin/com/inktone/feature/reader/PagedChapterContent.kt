@@ -7,13 +7,17 @@ import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.pager.HorizontalPager
 import androidx.compose.foundation.pager.rememberPagerState
-import androidx.compose.material3.Text
+import androidx.compose.foundation.text.BasicTextField
+import androidx.compose.foundation.text.selection.LocalTextSelectionColors
+import androidx.compose.foundation.text.selection.TextSelectionColors
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.State
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.rememberUpdatedState
 import androidx.compose.runtime.setValue
 import androidx.compose.runtime.snapshotFlow
@@ -26,19 +30,28 @@ import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.layout.LayoutCoordinates
 import androidx.compose.ui.layout.onGloballyPositioned
 import androidx.compose.ui.platform.LocalDensity
+import androidx.compose.ui.platform.LocalTextToolbar
+import androidx.compose.ui.platform.TextToolbar
+import androidx.compose.ui.platform.TextToolbarStatus
+import androidx.compose.ui.semantics.onClick
+import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.AnnotatedString
 import androidx.compose.ui.text.SpanStyle
 import androidx.compose.ui.text.TextLayoutResult
+import androidx.compose.ui.text.TextRange
 import androidx.compose.ui.text.TextStyle
 import androidx.compose.ui.text.buildAnnotatedString
+import androidx.compose.ui.text.input.TextFieldValue
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 
 import com.inktone.domain.model.Annotation
 import com.inktone.domain.model.AnnotationColor
 import com.inktone.domain.model.Chapter
-import com.inktone.domain.model.Sentence
 import com.inktone.feature.reader.pagination.ChapterPaginationState
+import kotlinx.coroutines.Job
+import kotlinx.coroutines.delay
+import kotlinx.coroutines.launch
 
 /**
  * 3a.2/3b.1 — Contenu paginé par swipe horizontal, rendu depuis le
@@ -78,25 +91,26 @@ fun PagedChapterContent(
     pagination: ChapterPaginationState,
     currentSentenceIndex: Int,
     highlightedWordRange: IntRange?,
-    selectedRange: IntRange?,
     annotations: List<Annotation>,
     currentChapterIndex: Int,
     textColor: Color,
     isReadingRulerEnabled: Boolean,
-    onSentenceLongClick: (Int) -> Unit,
-    onSentenceClick: (Int) -> Unit,
+    onClick: () -> Unit,
     onNextChapter: () -> Unit,
     onCurrentLineY: (Dp) -> Unit,
     onPageChanged: (Int) -> Unit = {},
     onManualPageChange: (sentenceIndex: Int) -> Unit = {},
-    onSelectionBoundsInWindow: (Rect?) -> Unit = {},
+    // Sélection libre au mot, offsets de caractère absolus dans le
+    // chapitre.
+    freeSelectedRange: IntRange? = null,
+    onFreeSelectionChanged: (anchorOffset: Int, focusOffset: Int) -> Unit = { _, _ -> },
+    onFreeSelectionCleared: () -> Unit = {},
+    onFreeSelectionBoundsInWindow: (Rect?) -> Unit = {},
     modifier: Modifier = Modifier,
 ) {
     val renderTextStyle = remember(pagination.baseTextStyle, textColor) {
         pagination.baseTextStyle.copy(color = textColor)
     }
-
-    val sentences = chapter?.paragraphs?.flatMap { it.sentences } ?: emptyList()
 
     val pageCount = if (chapter != null) pagination.pageCount(chapter.index) else 1
 
@@ -228,22 +242,9 @@ fun PagedChapterContent(
     // composable : un mot prononcé ne doit invalider que le dessin.
     val highlightedRangeState = rememberUpdatedState(absoluteHighlightedRange)
 
-    // measurement.sentenceStartOffsets peut être plus court que sentences
-    // pendant la mesure en deux temps (3a.3, préfixe pas encore élargi) -
-    // borner sur ses propres indices, jamais sur ceux de sentences.
-    val absoluteSelectedRange = if (
-        chapter != null && currentMeasurement != null && selectedRange != null &&
-        currentMeasurement.sentenceStartOffsets.isNotEmpty()
-    ) {
-        val startSentence = selectedRange.first.coerceIn(currentMeasurement.sentenceStartOffsets.indices)
-        val endSentence = selectedRange.last.coerceIn(currentMeasurement.sentenceStartOffsets.indices)
-        val start = currentMeasurement.sentenceStartOffsets[startSentence]
-        val end = currentMeasurement.sentenceStartOffsets[endSentence] + sentences[endSentence].text.length - 1
-        start..end
-    } else {
-        null
-    }
-    val selectedRangeState = rememberUpdatedState(absoluteSelectedRange)
+    // Déjà en offsets de caractère absolus (calés sur des bornes de mot
+    // par PageBlock), aucune conversion à faire ici.
+    val freeSelectedRangeState = rememberUpdatedState(freeSelectedRange)
 
     HorizontalPager(
         state = pagerState,
@@ -253,15 +254,11 @@ fun PagedChapterContent(
         Box(modifier = Modifier.fillMaxSize().padding(16.dp)) {
             if (chapter != null && currentMeasurement != null && pageIndex < pageCount) {
                 val pageOffsetRange = pagination.pageOffsetRange(chapter.index, pageIndex)
-                val pageSentenceRange = pagination.sentenceRangeOf(chapter.index, pageIndex)
                 if (!pageOffsetRange.isEmpty()) {
-                    val pageText = remember(currentMeasurement, pageOffsetRange, pageSentenceRange, annotations) {
+                    val pageText = remember(currentMeasurement, pageOffsetRange, annotations) {
                         buildPageAnnotatedString(
                             full = currentMeasurement.annotatedString,
                             pageOffsetRange = pageOffsetRange,
-                            sentences = sentences,
-                            sentenceStartOffsets = currentMeasurement.sentenceStartOffsets,
-                            pageSentenceRange = pageSentenceRange,
                             chapterIndex = currentChapterIndex,
                             annotations = annotations,
                         )
@@ -271,17 +268,14 @@ fun PagedChapterContent(
                         pageOffsetRange = pageOffsetRange,
                         textStyle = renderTextStyle,
                         highlightedRange = highlightedRangeState,
-                        selectedRange = selectedRangeState,
                         isDisplayedPage = pageIndex == pagerState.currentPage,
                         isReadingRulerEnabled = isReadingRulerEnabled,
                         onCurrentLineY = onCurrentLineY,
-                        onSelectionBoundsInWindow = onSelectionBoundsInWindow,
-                        onOffsetLongPress = { absoluteOffset ->
-                            onSentenceLongClick(sentenceIndexForOffset(currentMeasurement.sentenceStartOffsets, absoluteOffset))
-                        },
-                        onOffsetTap = { absoluteOffset ->
-                            onSentenceClick(sentenceIndexForOffset(currentMeasurement.sentenceStartOffsets, absoluteOffset))
-                        },
+                        freeSelectedRange = freeSelectedRangeState,
+                        onFreeSelectionChanged = onFreeSelectionChanged,
+                        onFreeSelectionCleared = onFreeSelectionCleared,
+                        onFreeSelectionBoundsInWindow = onFreeSelectionBoundsInWindow,
+                        onClick = onClick,
                     )
                 }
             }
@@ -296,114 +290,259 @@ fun PagedChapterContent(
  * mot-à-mot et la sélection en cours, eux, sont lus en phase de dessin
  * (`drawWithContent`) pour ne jamais invalider mesure ni placement.
  */
+@OptIn(ExperimentalFoundationApi::class)
 @Composable
 private fun PageBlock(
     pageText: AnnotatedString,
     pageOffsetRange: IntRange,
     textStyle: TextStyle,
     highlightedRange: State<IntRange?>,
-    selectedRange: State<IntRange?>,
     isDisplayedPage: Boolean,
     isReadingRulerEnabled: Boolean,
     onCurrentLineY: (Dp) -> Unit,
-    onSelectionBoundsInWindow: (Rect?) -> Unit,
-    onOffsetLongPress: (Int) -> Unit,
-    onOffsetTap: (Int) -> Unit,
+    freeSelectedRange: State<IntRange?>,
+    onFreeSelectionChanged: (anchorOffset: Int, focusOffset: Int) -> Unit,
+    onFreeSelectionCleared: () -> Unit,
+    onFreeSelectionBoundsInWindow: (Rect?) -> Unit,
+    onClick: () -> Unit,
 ) {
     var textLayoutResult by remember { mutableStateOf<TextLayoutResult?>(null) }
     var textCoordinates by remember { mutableStateOf<LayoutCoordinates?>(null) }
     val density = LocalDensity.current
 
-    // 3c.4 — position du popup de sélection alimentée par les
-    // LayoutCoordinates réelles de la zone sélectionnée (contrainte
-    // d'implémentation retenue, pas des coordonnées calculées à la main) :
-    // convertit le rectangle LOCAL de la sélection (getPathForRange, même
-    // mécanisme que le dessin du surlignage ci-dessous) en coordonnées
-    // fenêtre via les coordonnées réelles du Text.
-    //
-    // Bug réel trouvé sur appareil (popup de sélection jamais affiché en
-    // mode PAGED) : un `SideEffect` ne se ré-exécute QUE quand ce
-    // composable (`PageBlock`) se recompose pour une AUTRE raison — lire
-    // `selectedRange.value` à l'intérieur ne l'abonne à rien (c'est
-    // volontaire pour `highlightedRange`, lu de la même façon en dessin
-    // via `drawWithContent`, qui a sa propre observation réactive du
-    // State — voir le commentaire de tête sur l'isolation du
-    // surlignage : « ne déclenche donc qu'un redessin, jamais... un
-    // replacement de la page »). Une sélection ne fait donc JAMAIS
-    // recomposer `PageBlock`, le `SideEffect` ne se relançait donc
-    // jamais après la sélection initiale. `snapshotFlow` observe l'État
-    // directement, indépendamment de toute recomposition.
+    // Un `BasicTextField` en lecture seule délègue directement à la
+    // sélection NATIVE de Compose (appui long calé sur le mot via
+    // `getWordBoundary`, poignées de glissement caractère par caractère,
+    // aucune réimplémentation gestuelle) — la seule source qui produit
+    // un `TextRange` réellement exact.
+    // Offsets LOCAUX à la page ; réinitialisée à chaque page (la
+    // sélection ne survit pas un changement de page — bornée à la page,
+    // jamais à cheval sur deux, limite structurelle du découpage).
+    var selection by remember(pageOffsetRange) { mutableStateOf(TextRange.Zero) }
+    val fieldValue = remember(pageText, selection) { TextFieldValue(pageText, selection) }
+
+    // Anti-rebond de `showMenu` (voir le `TextToolbar` plus bas) — déclaré
+    // ici pour pouvoir aussi être annulé par l'effet de nettoyage
+    // `isDisplayedPage` ci-dessous, sinon un affichage différé pourrait
+    // encore se déclencher après que la page a quitté l'écran.
+    val coroutineScope = rememberCoroutineScope()
+    var pendingShowJob by remember(pageOffsetRange) { mutableStateOf<Job?>(null) }
+
+    // Resynchronisation dans l'autre sens : si `freeSelectedRange` (état
+    // remonté par le ViewModel) redevient `null` ailleurs (bouton Annuler
+    // du popup, `ClearFreeSelection`), la sélection LOCALE du champ doit
+    // être effacée aussi, sinon les poignées natives resteraient
+    // affichées sur une sélection que le reste de l'écran a déjà
+    // oubliée. Les BORNES du popup, elles, viennent désormais de
+    // `showMenu` ci-dessous (rect natif), pas d'un recalcul ici.
     LaunchedEffect(isDisplayedPage, pageOffsetRange) {
         if (!isDisplayedPage) {
-            onSelectionBoundsInWindow(null)
+            pendingShowJob?.cancel()
+            pendingShowJob = null
+            onFreeSelectionBoundsInWindow(null)
             return@LaunchedEffect
         }
-        snapshotFlow { selectedRange.value }.collect { absolute ->
-            val layout = textLayoutResult
-            val coords = textCoordinates
-            if (layout == null || coords == null || absolute == null) {
-                onSelectionBoundsInWindow(null)
-                return@collect
-            }
-            val textLength = layout.layoutInput.text.length
-            val localStart = (absolute.first - pageOffsetRange.first).coerceIn(0, textLength)
-            val localEndExclusive = (absolute.last + 1 - pageOffsetRange.first).coerceIn(localStart, textLength)
-            if (localStart >= localEndExclusive) {
-                onSelectionBoundsInWindow(null)
-            } else {
-                val localBounds = layout.getPathForRange(localStart, localEndExclusive).getBounds()
-                val topLeft = coords.localToWindow(localBounds.topLeft)
-                val bottomRight = coords.localToWindow(localBounds.bottomRight)
-                onSelectionBoundsInWindow(Rect(topLeft, bottomRight))
+        snapshotFlow { freeSelectedRange.value }.collect { absolute ->
+            if (absolute == null && selection != TextRange.Zero) {
+                selection = TextRange.Zero
             }
         }
     }
 
-    Text(
-        text = pageText,
-        style = textStyle,
-        onTextLayout = { layout ->
-            textLayoutResult = layout
-            if (isDisplayedPage && isReadingRulerEnabled) {
-                val absRange = highlightedRange.value
-                if (absRange != null) {
-                    val local = absRange.first - pageOffsetRange.first
-                    if (local in 0 until layout.layoutInput.text.length) {
-                        val line = layout.getLineForOffset(local)
-                        onCurrentLineY(with(density) { layout.getLineTop(line).toDp() })
-                    }
+    // Le champ dessine lui-même un fond de sélection natif sur
+    // `fieldValue.selection`, qui doublerait le surlignage posé par
+    // `drawAbsoluteRangeHighlight` ci-dessous (seule source qui reste
+    // correcte une fois le champ défocalisé, ex. popup de sélection
+    // ouvert). Fond neutralisé, poignées de glissement inchangées (leur
+    // couleur ne dépend pas de `backgroundColor`).
+    val selectionColors = LocalTextSelectionColors.current
+    val handlesOnlySelectionColors = remember(selectionColors) {
+        TextSelectionColors(handleColor = selectionColors.handleColor, backgroundColor = Color.Transparent)
+    }
+
+    // Palier 3f.2 (correctif du menu système en double) — `BasicTextField`
+    // appelle `LocalTextToolbar.current.showMenu(rect, ...)` pour afficher
+    // SON menu Copier/Coller. Sans interception, c'est le vrai
+    // `TextToolbar` de la plateforme (barre système blanche, `ActionMode`)
+    // qui s'affiche, EN PLUS du popup sombre de l'app (`SelectionActionPopup`,
+    // toujours monté dès que `freeSelectedRange != null`, indépendamment de
+    // ce toolbar) — d'où le doublon constaté sur appareil. On ne délègue
+    // donc JAMAIS à `defaultToolbar` — le menu système ne doit plus jamais
+    // apparaître. `status` fixé à `Hidden` en conséquence : de son propre
+    // point de vue, ce `TextToolbar` ne montre jamais rien.
+    //
+    // Bug réel trouvé sur appareil (popup sombre à une position aléatoire
+    // à l'écran) : le `rect` fourni en paramètre de `showMenu` n'est PAS
+    // fiable comme bornes de la sélection réelle — c'est l'ancre du menu
+    // système que `BasicTextField` aurait affiché, pas garanti d'être les
+    // bornes pixel-exactes de la sélection rendue. Recalculé ici via le
+    // même mécanisme que `rangeBoundsInWindow` (`getPathForRange` +
+    // `localToWindow`), à partir de la sélection LOCALE réellement
+    // affichée (`selection`, pas le `rect` reçu) — jamais le paramètre
+    // `rect` lui-même.
+    //
+    // Bug réel trouvé sur appareil (popup sombre visible PENDANT le
+    // glissement d'une poignée, recouvrant la loupe native) : `showMenu`
+    // se déclenche à CHAQUE étape du glissement (repositionnement continu,
+    // pas seulement au relâchement) quand l'appui long et le glissement
+    // d'extension se font en un seul geste continu (sans lever le doigt
+    // entre les deux) — `hide()` n'a alors aucune fenêtre "glissement en
+    // cours" à signaler puisqu'il n'y a pas d'évènement de relâchement
+    // intermédiaire. Non observable en lisant le code seul (dépend de la
+    // cadence réelle des appels internes de `BasicTextField`, vérifiée sur
+    // appareil, pas supposée) : anti-rebond côté appelant plutôt qu'une
+    // dépendance à un relâchement qui peut ne jamais survenir en milieu de
+    // geste. `hide()` reste instantané (glissement démarré ou sélection
+    // effacée : aucune raison d'attendre) ; `showMenu` calcule les bornes
+    // immédiatement (état de sélection à cet instant précis) mais ne les
+    // transmet qu'une fois les appels retombés silencieux pendant
+    // `SelectionPopupSettleDelayMs` — un nouvel appel (donc glissement
+    // toujours actif) annule et relance le délai avec de nouvelles bornes.
+    val toolbar = remember(pageOffsetRange) {
+        object : TextToolbar {
+            override val status: TextToolbarStatus = TextToolbarStatus.Hidden
+
+            override fun showMenu(
+                rect: Rect,
+                onCopyRequested: (() -> Unit)?,
+                onPasteRequested: (() -> Unit)?,
+                onCutRequested: (() -> Unit)?,
+                onSelectAllRequested: (() -> Unit)?,
+            ) {
+                val currentSelection = selection
+                val absolute = if (currentSelection.collapsed) {
+                    null
+                } else {
+                    (pageOffsetRange.first + currentSelection.min)..(pageOffsetRange.first + currentSelection.max - 1)
+                }
+                val windowRect = rangeBoundsInWindow(textLayoutResult, textCoordinates, pageOffsetRange, absolute)
+                pendingShowJob?.cancel()
+                pendingShowJob = coroutineScope.launch {
+                    delay(SelectionPopupSettleDelayMs)
+                    onFreeSelectionBoundsInWindow(windowRect)
                 }
             }
-        },
-        modifier = Modifier
-            .fillMaxSize()
-            .onGloballyPositioned { textCoordinates = it }
-            .pointerInput(pageOffsetRange) {
-                detectTapGestures(
-                    onLongPress = { position ->
-                        textLayoutResult?.let { layout ->
-                            onOffsetLongPress(pageOffsetRange.first + layout.getOffsetForPosition(position))
-                        }
-                    },
-                    onTap = { position ->
-                        textLayoutResult?.let { layout ->
-                            onOffsetTap(pageOffsetRange.first + layout.getOffsetForPosition(position))
-                        }
-                    },
-                )
+
+            override fun hide() {
+                pendingShowJob?.cancel()
+                pendingShowJob = null
+                onFreeSelectionBoundsInWindow(null)
             }
-            .drawWithContent {
-                textLayoutResult?.let { layout ->
-                    selectedRange.value?.let { absolute ->
-                        drawAbsoluteRangeHighlight(layout, pageOffsetRange, absolute, SelectionHighlightColor)
+        }
+    }
+
+    CompositionLocalProvider(
+        LocalTextSelectionColors provides handlesOnlySelectionColors,
+        LocalTextToolbar provides toolbar,
+    ) {
+        BasicTextField(
+            value = fieldValue,
+            onValueChange = { newValue ->
+                // Bug réel trouvé sur appareil : un tap sur la sélection
+                // pour l'annuler est traité EN INTERNE par BasicTextField
+                // (collapse de la sélection) — notre pointerInput sibling
+                // ci-dessous ne voit jamais cet évènement précis (avalé
+                // avant lui), donc `onClick` n'était jamais appelé et le
+                // HUD ne revenait pas après une annulation par tap.
+                // Détecté ici via la transition non-collapsed → collapsed
+                // (seule source fiable de ce signal), pas via le geste.
+                val wasCollapsed = selection.collapsed
+                selection = newValue.selection
+                if (newValue.selection.collapsed) {
+                    onFreeSelectionCleared()
+                    if (!wasCollapsed) {
+                        onClick()
                     }
-                    highlightedRange.value?.let { absolute ->
-                        drawAbsoluteRangeHighlight(layout, pageOffsetRange, absolute, WordHighlightColor)
-                    }
+                } else {
+                    val min = newValue.selection.min
+                    val max = newValue.selection.max
+                    onFreeSelectionChanged(pageOffsetRange.first + min, pageOffsetRange.first + max - 1)
                 }
-                drawContent()
             },
-    )
+            readOnly = true,
+            textStyle = textStyle,
+            onTextLayout = { layout ->
+                textLayoutResult = layout
+                if (isDisplayedPage && isReadingRulerEnabled) {
+                    val absRange = highlightedRange.value
+                    if (absRange != null) {
+                        val local = absRange.first - pageOffsetRange.first
+                        if (local in 0 until layout.layoutInput.text.length) {
+                            val line = layout.getLineForOffset(local)
+                            onCurrentLineY(with(density) { layout.getLineTop(line).toDp() })
+                        }
+                    }
+                }
+            },
+            modifier = Modifier
+                .fillMaxSize()
+                .onGloballyPositioned { textCoordinates = it }
+                .pointerInput(pageOffsetRange) {
+                    detectTapGestures(
+                        onTap = {
+                            // Ne rien faire tant qu'une sélection libre est
+                            // active (poignées visibles) : appeler `onClick`
+                            // déclencherait potentiellement
+                            // `handleReadingAreaTap` (bascule du HUD, donc
+                            // une remesure de pagination qui recrée ce
+                            // champ) EN PLEIN geste de sélection — c'est ce
+                            // qui faisait disparaître les poignées natives
+                            // trouvé sur appareil, pas la reconnaissance du
+                            // geste d'appui long elle-même (délégué en
+                            // interne par `BasicTextField`, jamais
+                            // intercepté ici).
+                            if (!selection.collapsed) return@detectTapGestures
+                            onClick()
+                        },
+                    )
+                }
+                // Palier 3f.4 (première passe, pas de spike TalkBack
+                // dédié — voir CHIFFRAGE_LOT_3F_SELECTION_MOT.md) : un
+                // `pointerInput` brut est invisible à l'accessibilité —
+                // `detectTapGestures` ci-dessus ne réagit qu'à un tap
+                // tactile réel, jamais à l'action « activer » que
+                // TalkBack synthétise (double-tap après exploration).
+                // Sans cette action sémantique dédiée, un utilisateur
+                // TalkBack ne pouvait pas du tout rappeler le HUD depuis
+                // la zone de lecture. Même garde que le geste tactile
+                // (`selection.collapsed`), pour la même raison.
+                .semantics {
+                    onClick(label = "Afficher ou masquer les commandes") {
+                        if (!selection.collapsed) return@onClick false
+                        onClick()
+                        true
+                    }
+                }
+                .drawWithContent {
+                    textLayoutResult?.let { layout ->
+                        freeSelectedRange.value?.let { absolute ->
+                            drawAbsoluteRangeHighlight(layout, pageOffsetRange, absolute, SelectionHighlightColor)
+                        }
+                        highlightedRange.value?.let { absolute ->
+                            drawAbsoluteRangeHighlight(layout, pageOffsetRange, absolute, WordHighlightColor)
+                        }
+                    }
+                    drawContent()
+                },
+        )
+    }
+}
+
+private fun rangeBoundsInWindow(
+    layout: TextLayoutResult?,
+    coords: LayoutCoordinates?,
+    pageOffsetRange: IntRange,
+    absolute: IntRange?,
+): Rect? {
+    if (layout == null || coords == null || absolute == null) return null
+    val textLength = layout.layoutInput.text.length
+    val localStart = (absolute.first - pageOffsetRange.first).coerceIn(0, textLength)
+    val localEndExclusive = (absolute.last + 1 - pageOffsetRange.first).coerceIn(localStart, textLength)
+    if (localStart >= localEndExclusive) return null
+    val localBounds = layout.getPathForRange(localStart, localEndExclusive).getBounds()
+    val topLeft = coords.localToWindow(localBounds.topLeft)
+    val bottomRight = coords.localToWindow(localBounds.bottomRight)
+    return Rect(topLeft, bottomRight)
 }
 
 private fun DrawScope.drawAbsoluteRangeHighlight(
@@ -422,21 +561,12 @@ private fun DrawScope.drawAbsoluteRangeHighlight(
 private val WordHighlightColor = Color(0xFFFFEB3B)
 private val SelectionHighlightColor = Color(0x664FC3F7)
 
-/** Recherche linéaire volontaire : appelée uniquement sur tap/appui long, jamais par recomposition ni par mot prononcé — pas le O(n²) par page que corrige 3a.2. */
-private fun sentenceIndexForOffset(sentenceStartOffsets: List<Int>, absoluteOffset: Int): Int {
-    var result = 0
-    for (i in sentenceStartOffsets.indices) {
-        if (sentenceStartOffsets[i] <= absoluteOffset) result = i else break
-    }
-    return result
-}
+/** Anti-rebond de `showMenu` (voir `PageBlock`) — assez court pour rester imperceptible après un relâchement réel, assez long pour couvrir l'intervalle entre deux étapes d'un glissement actif. */
+private const val SelectionPopupSettleDelayMs = 200L
 
 internal fun buildPageAnnotatedString(
     full: AnnotatedString,
     pageOffsetRange: IntRange,
-    sentences: List<Sentence>,
-    sentenceStartOffsets: List<Int>,
-    pageSentenceRange: IntRange,
     chapterIndex: Int,
     annotations: List<Annotation>,
 ): AnnotatedString {
@@ -460,27 +590,31 @@ internal fun buildPageAnnotatedString(
     val endExclusive = (pageOffsetRange.last + 1).coerceIn(startInclusive, full.length)
     if (startInclusive >= endExclusive) return AnnotatedString("")
     val base = full.subSequence(startInclusive, endExclusive)
-    if (pageSentenceRange.isEmpty()) return base
+
+    // Correctif diagnostic 3f.2 — l'ancienne version parcourait les
+    // PHRASES de la page et peignait le fond sur la phrase ENTIÈRE dès
+    // qu'une annotation la touchait (test de simple chevauchement), sans
+    // rapport avec les offsets réels de l'annotation. Une annotation au
+    // mot (sélection libre 3f.1) se retrouvait donc affichée comme si
+    // toute la phrase avait été surlignée. Ici, chaque annotation est
+    // intersectée directement avec la page — aucune notion de phrase.
+    val overlapping = annotations.filter { annotation ->
+        annotation.startLocator.chapterIndex == chapterIndex &&
+            annotation.startLocator.charOffset < endExclusive &&
+            annotation.endLocator.charOffset > startInclusive
+    }
+    if (overlapping.isEmpty()) return base
 
     return buildAnnotatedString {
         append(base)
-        for (sentenceIndex in pageSentenceRange) {
-            if (sentenceIndex !in sentences.indices) continue
-            val color = annotationColorFor(chapterIndex, sentences[sentenceIndex], annotations) ?: continue
-            val localStart = (sentenceStartOffsets[sentenceIndex] - startInclusive).coerceAtLeast(0)
-            val localEndExclusive =
-                (sentenceStartOffsets[sentenceIndex] + sentences[sentenceIndex].text.length - startInclusive)
-                    .coerceAtMost(base.length)
+        for (annotation in overlapping) {
+            val localStart = (maxOf(annotation.startLocator.charOffset, startInclusive) - startInclusive)
+                .coerceIn(0, base.length)
+            val localEndExclusive = (minOf(annotation.endLocator.charOffset, endExclusive) - startInclusive)
+                .coerceIn(localStart, base.length)
             if (localStart < localEndExclusive) {
-                addStyle(SpanStyle(background = color.toComposeColor()), localStart, localEndExclusive)
+                addStyle(SpanStyle(background = annotation.color.toComposeColor()), localStart, localEndExclusive)
             }
         }
     }
 }
-
-private fun annotationColorFor(chapterIndex: Int, sentence: Sentence, annotations: List<Annotation>): AnnotationColor? =
-    annotations.firstOrNull { annotation ->
-        annotation.startLocator.chapterIndex == chapterIndex &&
-            sentence.startOffset < annotation.endLocator.charOffset &&
-            sentence.endOffset > annotation.startLocator.charOffset
-    }?.color

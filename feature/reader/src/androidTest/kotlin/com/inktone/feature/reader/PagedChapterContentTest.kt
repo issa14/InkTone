@@ -83,8 +83,8 @@ class PagedChapterContentTest {
         fontSizeSp: Int,
         currentSentenceIndex: Int,
         highlightedWordRange: IntRange?,
-        onSentenceLongClick: (Int) -> Unit,
-        onSentenceClick: (Int) -> Unit,
+        onClick: () -> Unit,
+        onFreeSelectionChanged: (anchorOffset: Int, focusOffset: Int) -> Unit = { _, _ -> },
     ) {
         var areaSize by remember { mutableStateOf(IntSize.Zero) }
         Box(
@@ -105,15 +105,14 @@ class PagedChapterContentTest {
                 pagination = pagination,
                 currentSentenceIndex = currentSentenceIndex,
                 highlightedWordRange = highlightedWordRange,
-                selectedRange = null,
                 annotations = emptyList<Annotation>(),
                 currentChapterIndex = 0,
                 textColor = Color.Black,
                 isReadingRulerEnabled = false,
-                onSentenceLongClick = onSentenceLongClick,
-                onSentenceClick = onSentenceClick,
+                onClick = onClick,
                 onNextChapter = {},
                 onCurrentLineY = {},
+                onFreeSelectionChanged = onFreeSelectionChanged,
             )
         }
     }
@@ -151,8 +150,7 @@ class PagedChapterContentTest {
                 fontSizeSp = 18,
                 currentSentenceIndex = 0,
                 highlightedWordRange = null,
-                onSentenceLongClick = {},
-                onSentenceClick = {},
+                onClick = {},
             )
         }
 
@@ -174,10 +172,19 @@ class PagedChapterContentTest {
         )
     }
 
+    /**
+     * Palier 3f.1 — l'appui long sélectionne désormais le mot (offset de
+     * caractère absolu), plus la phrase entière (index) : ce test
+     * remplace `appui_long_sur_une_phrase_de_la_deuxieme_page_donne_le_bon_index_global`,
+     * dont le mécanisme (`onSentenceLongClick`) a été retiré en mode PAGED
+     * (conflit avec `detectDragGesturesAfterLongPress`, trouvé sur
+     * appareil). Même régression visée : un offset LOCAL à la page 2
+     * (pas absolu au chapitre) reproduirait le bug O(n²) corrigé en 3a.2.
+     */
     @Test
-    fun appui_long_sur_une_phrase_de_la_deuxieme_page_donne_le_bon_index_global() {
+    fun appui_long_sur_un_mot_de_la_deuxieme_page_donne_un_offset_absolu_correct() {
         val (chapter, sentenceTexts) = manyShortSentencesChapter()
-        var clickedIndex: Int? = null
+        var freeSelection by mutableStateOf<IntRange?>(null)
 
         composeTestRule.setContent {
             PagedChapterContentHarness(
@@ -185,8 +192,8 @@ class PagedChapterContentTest {
                 fontSizeSp = 32,
                 currentSentenceIndex = 0,
                 highlightedWordRange = null,
-                onSentenceLongClick = { index -> clickedIndex = index },
-                onSentenceClick = {},
+                onClick = {},
+                onFreeSelectionChanged = { anchor, focus -> freeSelection = minOf(anchor, focus)..maxOf(anchor, focus) },
             )
         }
 
@@ -209,15 +216,24 @@ class PagedChapterContentTest {
         )
         assertNotEquals("la page 2 ne devrait pas commencer par la phrase 0", 0, firstSentenceIndexOnPage2)
 
+        // Borne minimale robuste : le chapitre commence à l'offset 0, donc
+        // la page 2 reprend forcément au moins là où la page 1 s'arrête —
+        // qu'une phrase déborde visuellement d'une page à l'autre ou non
+        // (voir doc de tête de PagedChapterContent). Ne PAS utiliser le
+        // startOffset de la première phrase pleinement contenue sur la
+        // page 2 comme borne : si elle déborde depuis la page 1, le texte
+        // RÉEL de la page 2 commence avant ce startOffset, pas après.
+        val minimumAbsoluteOffset = page1Text.length
+
         composeTestRule.onNode(SemanticsMatcher("page2") { it.id == page2Node.id })
             .performTouchInput { longClick(topLeft + Offset(4f, 4f)) }
 
-        composeTestRule.waitUntil(timeoutMillis = 3_000) { clickedIndex != null }
-        assertNotEquals(
-            "l'appui long en haut de la page 2 doit rapporter l'index GLOBAL de la phrase, pas 0 " +
-                "(position locale dans une liste propre à la page) — c'est le bug indexOf O(n²) corrigé en 3a.2",
-            0,
-            clickedIndex,
+        composeTestRule.waitUntil(timeoutMillis = 3_000) { freeSelection != null }
+        assertTrue(
+            "l'appui long en haut de la page 2 doit rapporter un offset ABSOLU au chapitre " +
+                "(>= $minimumAbsoluteOffset, la fin de la page 1), pas un offset local à la page 2 " +
+                "recommençant près de 0 — c'est le bug O(n²) corrigé en 3a.2",
+            freeSelection!!.first >= minimumAbsoluteOffset,
         )
     }
 
@@ -233,8 +249,7 @@ class PagedChapterContentTest {
                 fontSizeSp = 32,
                 currentSentenceIndex = currentSentenceIndex,
                 highlightedWordRange = highlightedWordRange,
-                onSentenceLongClick = {},
-                onSentenceClick = {},
+                onClick = {},
             )
         }
 

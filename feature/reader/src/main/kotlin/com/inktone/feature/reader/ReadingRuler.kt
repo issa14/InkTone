@@ -19,9 +19,10 @@ import androidx.compose.ui.unit.dp
  * Branchee depuis `ReaderScreen` : `enabled` reflete
  * `UserPreferences.readingRulerEnabled` (observe en continu par
  * `ReaderViewModel`, reglable depuis `SettingsScreen`) ; `currentLineY`
- * vient du `Modifier.onGloballyPositioned` de la seule `SentenceText`
- * dont `isCurrentlyPlaying` est vrai, position relative au `Box` qui
- * superpose cette reglette et le texte du chapitre.
+ * vient de `ParagraphText.onCurrentLineY` (palier 3f.3bis — un seul
+ * `TextLayoutResult` par paragraphe, pas un `onGloballyPositioned` par
+ * phrase), position relative au `Box` qui superpose cette reglette et le
+ * texte du chapitre.
  */
 @Composable
 fun ReadingRuler(currentLineY: Dp, enabled: Boolean) {
