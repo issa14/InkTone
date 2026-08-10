@@ -35,7 +35,6 @@ import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.derivedStateOf
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableIntStateOf
-import androidx.compose.runtime.mutableStateMapOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
@@ -47,7 +46,6 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.layout.LayoutCoordinates
-import androidx.compose.ui.layout.boundsInWindow
 import androidx.compose.ui.layout.onGloballyPositioned
 import androidx.compose.ui.layout.positionInParent
 import androidx.compose.ui.platform.LocalDensity
@@ -101,23 +99,6 @@ import kotlin.math.roundToInt
  * `FlowRow` défilable (`verticalScroll`, jamais `LazyColumn` : la mise en
  * page en flux imite le texte continu tout en gardant chaque phrase comme
  * composable adressable individuellement).
- *
- * **Ancien modèle de sélection : par phrase, pas par caractère (Tâche
- * 7.0/7.1, retiré de l'UI, coexiste encore en état — voir palier 3f.5)** —
- * `Selection` et le `SelectionContainer(selection, onSelectionChange,
- * content)` contrôlé sont `internal` dans
- * `androidx.compose.foundation:foundation:1.7.2` (BOM 2024.09.02, vérifié
- * par le compilateur Kotlin en écrivant cette tâche : `Cannot access
- * 'data class Selection : Any': it is internal in file` — pas une
- * supposition d'après une doc générique, qui avait justement mal anticipé
- * cette API). Appui long sur une phrase pour démarrer une sélection, appui
- * simple sur une autre phrase pour l'étendre — l'index de `Sentence`
- * touché est connu par construction, aucune conversion pixel → offset
- * nécessaire (voir [AnnotationSelectionHandler]). Plus aucun point d'entrée
- * ne déclenche plus ce modèle (retiré des deux modes, PAGED en 3f.1, SCROLL
- * en 3f.3 — conflit avec l'appui long natif de `BasicTextField`, voir
- * ci-dessous) ; `selectionAnchorIndex`/`selectionFocusIndex` et les intents
- * associés restent en état jusqu'au retrait complet (3f.5).
  *
  * **Palier 3f.1-3f.3 — sélection libre au mot, PAGED et SCROLL.** Un
  * `BasicTextField` en lecture seule par unité adressable (une page en
@@ -322,9 +303,6 @@ fun ReaderScreen(
         val scrollState = rememberScrollState()
         LaunchedEffect(state.currentChapterIndex) { scrollState.scrollTo(0) }
 
-        val selectedRange = state.selectedSentenceRange
-        // Palier 3f.1 — sélection libre au mot, mode PAGED uniquement,
-        // coexiste temporairement avec selectedRange ci-dessus.
         val freeSelectedRange = state.freeSelectionRange
 
         // A.1 / Tache 9bis.3.6 - position Y de la phrase active
@@ -408,47 +386,22 @@ fun ReaderScreen(
         // PAGED : remonté par PagedChapterContent (conversion locale →
         // fenêtre via TextLayoutResult, seul capable de la produire).
         //
-        // Palier 3f.3 — plus jamais peuplée depuis `ParagraphText`
-        // (l'ancien modèle par phrase qu'elle sert n'a plus aucun point
-        // d'entrée UI, voir doc de tête du fichier) : reste déclarée pour
-        // ne pas toucher le fallback de `selectionBoundsInWindow`
-        // ci-dessous avant le retrait complet de l'ancien modèle (3f.5),
-        // mais s'évalue désormais toujours vide.
-        val scrollSelectionBoundsPx = remember(state.currentChapterIndex) {
-            mutableStateMapOf<Int, Rect>()
-        }
-        var pagedSelectionBounds by remember { mutableStateOf<Rect?>(null) }
-        // Palier 3f.1 — bornes de la sélection libre, source distincte de
-        // pagedSelectionBounds (voir PagedChapterContent.onFreeSelectionBoundsInWindow).
+        // Bornes fenêtre de la sélection libre active, par mode — un seul
+        // Rect (pas une map à unioner) puisque la sélection libre au mot
+        // est bornée à une seule unité adressable (une page en PAGED, un
+        // paragraphe en SCROLL — voir PagedChapterContent.PageBlock /
+        // ReaderScreen.ParagraphText, doc de tête), jamais à cheval sur
+        // plusieurs à unir.
         var pagedFreeSelectionBounds by remember { mutableStateOf<Rect?>(null) }
-        // Palier 3f.3 — même rôle que pagedFreeSelectionBounds, pour le
-        // mode SCROLL : un seul Rect (pas une map à unioner comme
-        // scrollSelectionBoundsPx) puisque la sélection libre au mot y est
-        // bornée à UN SEUL ParagraphText (voir ParagraphText, doc de
-        // tête) — jamais à cheval sur plusieurs paragraphes à unir.
         var scrollFreeSelectionBounds by remember(state.currentChapterIndex) { mutableStateOf<Rect?>(null) }
         val selectionBoundsInWindow = when (state.readingMode) {
-            ReadingMode.SCROLL -> scrollFreeSelectionBounds ?: selectedRange
-                ?.mapNotNull { scrollSelectionBoundsPx[it] }
-                ?.reduceOrNull { a, b ->
-                    Rect(
-                        left = minOf(a.left, b.left),
-                        top = minOf(a.top, b.top),
-                        right = maxOf(a.right, b.right),
-                        bottom = maxOf(a.bottom, b.bottom),
-                    )
-                }
-            ReadingMode.PAGED -> pagedFreeSelectionBounds ?: pagedSelectionBounds
+            ReadingMode.SCROLL -> scrollFreeSelectionBounds
+            ReadingMode.PAGED -> pagedFreeSelectionBounds
         }
-        val selectedText = remember(selectedRange, freeSelectedRange, state.currentChapter) {
+        val selectedText = remember(freeSelectedRange, state.currentChapter) {
+            val freeRange = freeSelectedRange ?: return@remember ""
             val chapterSentences = state.currentChapter?.paragraphs?.flatMap { it.sentences } ?: emptyList()
-            val freeRange = freeSelectedRange
-            if (freeRange != null) {
-                sliceChapterText(chapterSentences, freeRange.first, freeRange.last + 1)
-            } else {
-                val range = selectedRange ?: return@remember ""
-                range.mapNotNull { chapterSentences.getOrNull(it)?.text }.joinToString(" ")
-            }
+            sliceChapterText(chapterSentences, freeRange.first, freeRange.last + 1)
         }
 
         // 3b.5 — barre du haut : appartient au HUD, apparaît/disparaît
@@ -537,7 +490,6 @@ fun ReaderScreen(
                                     globalStartIndex = paragraphStartIndex,
                                     currentSentenceIndex = state.currentSentenceIndex,
                                     highlightedWordRange = state.highlightedWordRange,
-                                    selectedRange = selectedRange,
                                     annotations = state.annotations,
                                     chapterIndex = state.currentChapterIndex,
                                     freeSelectionRange = freeSelectedRange,
@@ -549,11 +501,7 @@ fun ReaderScreen(
                                     // lecture : sans ce relais, le tap est consommé par
                                     // ParagraphText et ne remonte jamais au Column parent,
                                     // rendant le HUD quasiment impossible à rappeler une
-                                    // fois masqué (bug réel trouvé à l'audit, 3f.1). Plus
-                                    // de branche ExtendSentenceSelection ici (ancien modèle,
-                                    // voir doc de tête du fichier) : sans point d'entrée
-                                    // (BeginSentenceSelection retiré des deux modes),
-                                    // `selectedRange` ne peut plus jamais être non-null.
+                                    // fois masqué (bug réel trouvé à l'audit).
                                     onClick = { handleReadingAreaTap() },
                                     onFreeSelectionChanged = { anchor, focus ->
                                         viewModel.onIntent(ReaderIntent.SetFreeSelection(anchor, focus))
@@ -580,25 +528,17 @@ fun ReaderScreen(
                         pagination = pagination,
                         currentSentenceIndex = state.currentSentenceIndex,
                         highlightedWordRange = state.highlightedWordRange,
-                        selectedRange = selectedRange,
                         annotations = state.annotations,
                         currentChapterIndex = state.currentChapterIndex,
                         textColor = ThemeColors.text(state.resolvedTheme),
                         isReadingRulerEnabled = state.isReadingRulerEnabled,
-                        onSentenceClick = { index ->
-                            if (selectedRange != null) {
-                                viewModel.onIntent(ReaderIntent.ExtendSentenceSelection(index))
-                            } else {
-                                handleReadingAreaTap()
-                            }
-                        },
+                        onClick = { handleReadingAreaTap() },
                         onNextChapter = { viewModel.onIntent(ReaderIntent.NextChapter) },
                         onCurrentLineY = { y -> currentLineYDp = y },
                         onPageChanged = { pageIndex -> pagedLivePageIndex = pageIndex },
                         onManualPageChange = { sentenceIndex ->
                             viewModel.onIntent(ReaderIntent.UpdateScrollPosition(sentenceIndex))
                         },
-                        onSelectionBoundsInWindow = { bounds -> pagedSelectionBounds = bounds },
                         freeSelectedRange = freeSelectedRange,
                         onFreeSelectionChanged = { anchor, focus ->
                             viewModel.onIntent(ReaderIntent.SetFreeSelection(anchor, focus))
@@ -620,7 +560,7 @@ fun ReaderScreen(
         // 3c.4 — remplace AnnotationColorPicker (position fixe basse
         // d'écran, Confirmer/Annuler) par le popup Copier/Surligner/Note
         // positionné près de la sélection réelle.
-        if (selectedRange != null || freeSelectedRange != null) {
+        if (freeSelectedRange != null) {
             SelectionActionPopup(
                 selectedText = selectedText,
                 selectionBoundsInWindow = selectionBoundsInWindow,
@@ -630,10 +570,7 @@ fun ReaderScreen(
                 onSaveNote = { content, color ->
                     viewModel.onIntent(ReaderIntent.ConfirmAnnotation(color, content))
                 },
-                onDismiss = {
-                    viewModel.onIntent(ReaderIntent.ClearSentenceSelection)
-                    viewModel.onIntent(ReaderIntent.ClearFreeSelection)
-                },
+                onDismiss = { viewModel.onIntent(ReaderIntent.ClearFreeSelection) },
             )
         }
 
@@ -991,7 +928,6 @@ internal fun ParagraphText(
     globalStartIndex: Int,
     currentSentenceIndex: Int,
     highlightedWordRange: IntRange?,
-    selectedRange: IntRange?,
     annotations: List<Annotation>,
     chapterIndex: Int,
     // Palier 3f.3bis — offsets de caractère ABSOLUS au chapitre (comme
@@ -1176,7 +1112,6 @@ internal fun ParagraphText(
         currentSentenceIndex = currentSentenceIndex,
         chapterIndex = chapterIndex,
         annotations = annotations,
-        selectedRange = selectedRange,
         textColor = textColor,
         freeSelectionHighlightRange = if (selection.collapsed) null else selection.min until selection.max,
         currentWordRange = currentWordLocalRange,
@@ -1311,16 +1246,13 @@ private fun buildParagraphTextMapping(paragraph: Paragraph): ParagraphTextMappin
 /**
  * Combine, dans un seul `AnnotatedString`, l'alpha différentiel par
  * phrase (B.5, piste de lecture — plus par `Modifier.background`/couleur
- * de noeud entier comme avant ce palier), le fond de l'ANCIEN modèle de
- * sélection par phrase (voir doc de tête du fichier — plus aucun point
- * d'entrée UI ne le déclenche depuis ce palier, laissé fonctionnel en
- * attendant le retrait complet 3f.5), le fond des annotations existantes
- * (offsets exacts, correctif diagnostic 3f.2 — une annotation peut
+ * de noeud entier comme avant le regroupement par paragraphe), le fond
+ * des annotations existantes (offsets exacts — une annotation peut
  * chevaucher plusieurs phrases du paragraphe, d'où potentiellement
- * plusieurs sous-plages), la sélection libre au mot en cours (palier
- * 3f.3) et le mot actuellement prononcé par le TTS (`currentWordRange`,
- * animé) — posés dans cet ordre, le mot TTS toujours au-dessus, même
- * ordre qu'en mode PAGED (`PageBlock.drawWithContent`).
+ * plusieurs sous-plages), la sélection libre au mot en cours et le mot
+ * actuellement prononcé par le TTS (`currentWordRange`, animé) — posés
+ * dans cet ordre, le mot TTS toujours au-dessus, même ordre qu'en mode
+ * PAGED (`PageBlock.drawWithContent`).
  */
 private fun buildParagraphDisplayText(
     mapping: ParagraphTextMapping,
@@ -1328,7 +1260,6 @@ private fun buildParagraphDisplayText(
     currentSentenceIndex: Int,
     chapterIndex: Int,
     annotations: List<Annotation>,
-    selectedRange: IntRange?,
     textColor: Color,
     freeSelectionHighlightRange: IntRange?,
     currentWordRange: IntRange?,
@@ -1344,14 +1275,6 @@ private fun buildParagraphDisplayText(
             else -> 0.88f
         }
         addStyle(SpanStyle(color = textColor.copy(alpha = alpha)), span.localStart, span.localEndExclusive)
-    }
-
-    if (selectedRange != null) {
-        mapping.spans.forEachIndexed { i, span ->
-            if (globalStartIndex + i in selectedRange) {
-                addStyle(SpanStyle(background = SelectionHighlightColor), span.localStart, span.localEndExclusive)
-            }
-        }
     }
 
     for (annotation in annotations) {

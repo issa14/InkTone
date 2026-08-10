@@ -39,9 +39,8 @@ import org.junit.Before
 import org.junit.Test
 
 /**
- * Palier 3f.1 — sélection libre au mot : `SetFreeSelection`/`ClearFreeSelection`
- * et branchement de `ConfirmAnnotation` sur les offsets de caractère plutôt
- * que sur `selectedSentenceRange` quand une sélection libre est active.
+ * Sélection libre au mot : `SetFreeSelection`/`ClearFreeSelection` et
+ * branchement de `ConfirmAnnotation` sur les offsets de caractère exacts.
  */
 @OptIn(ExperimentalCoroutinesApi::class)
 class ReaderViewModelFreeSelectionTest {
@@ -180,7 +179,7 @@ class ReaderViewModelFreeSelectionTest {
     }
 
     @Test
-    fun confirmAnnotation_reinitialise_les_deux_modeles_de_selection() = runTest {
+    fun confirmAnnotation_reinitialise_la_selection_libre() = runTest {
         val readingStateRepository = FakeReadingStateRepository()
         val publicationRepository = FakePublicationRepository()
         val annotationRepository = FakeAnnotationRepository()
@@ -192,7 +191,6 @@ class ReaderViewModelFreeSelectionTest {
         dispatcher.scheduler.runCurrent()
 
         assertNull(viewModel.state.value.freeSelectionRange)
-        assertNull(viewModel.state.value.selectedSentenceRange)
 
         viewModel.cancelCheckpointTimerForTest()
         dispatcher.scheduler.runCurrent()

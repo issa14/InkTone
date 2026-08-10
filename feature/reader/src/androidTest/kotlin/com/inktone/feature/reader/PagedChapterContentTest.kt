@@ -83,7 +83,7 @@ class PagedChapterContentTest {
         fontSizeSp: Int,
         currentSentenceIndex: Int,
         highlightedWordRange: IntRange?,
-        onSentenceClick: (Int) -> Unit,
+        onClick: () -> Unit,
         onFreeSelectionChanged: (anchorOffset: Int, focusOffset: Int) -> Unit = { _, _ -> },
     ) {
         var areaSize by remember { mutableStateOf(IntSize.Zero) }
@@ -105,12 +105,11 @@ class PagedChapterContentTest {
                 pagination = pagination,
                 currentSentenceIndex = currentSentenceIndex,
                 highlightedWordRange = highlightedWordRange,
-                selectedRange = null,
                 annotations = emptyList<Annotation>(),
                 currentChapterIndex = 0,
                 textColor = Color.Black,
                 isReadingRulerEnabled = false,
-                onSentenceClick = onSentenceClick,
+                onClick = onClick,
                 onNextChapter = {},
                 onCurrentLineY = {},
                 onFreeSelectionChanged = onFreeSelectionChanged,
@@ -151,7 +150,7 @@ class PagedChapterContentTest {
                 fontSizeSp = 18,
                 currentSentenceIndex = 0,
                 highlightedWordRange = null,
-                onSentenceClick = {},
+                onClick = {},
             )
         }
 
@@ -193,7 +192,7 @@ class PagedChapterContentTest {
                 fontSizeSp = 32,
                 currentSentenceIndex = 0,
                 highlightedWordRange = null,
-                onSentenceClick = {},
+                onClick = {},
                 onFreeSelectionChanged = { anchor, focus -> freeSelection = minOf(anchor, focus)..maxOf(anchor, focus) },
             )
         }
@@ -250,7 +249,7 @@ class PagedChapterContentTest {
                 fontSizeSp = 32,
                 currentSentenceIndex = currentSentenceIndex,
                 highlightedWordRange = highlightedWordRange,
-                onSentenceClick = {},
+                onClick = {},
             )
         }
 

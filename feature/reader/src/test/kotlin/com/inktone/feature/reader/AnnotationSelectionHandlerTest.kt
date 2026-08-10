@@ -16,41 +16,6 @@ class AnnotationSelectionHandlerTest {
     )
 
     @Test
-    fun `selection d'une seule phrase produit un locator sur ses bornes exactes`() {
-        val result = AnnotationSelectionHandler().resolveSelection(
-            sentences, startIndex = 0, endIndex = 0, chapterIndex = 0, resourceHref = "ch1.xhtml",
-        )
-        assertNotNull(result)
-        assertEquals(0, result!!.first.charOffset)
-        assertEquals(18, result.second.charOffset)
-    }
-
-    @Test
-    fun `selection traversant plusieurs phrases est geree, pas rejetee silencieusement`() {
-        val result = AnnotationSelectionHandler().resolveSelection(
-            sentences, startIndex = 0, endIndex = 2, chapterIndex = 0, resourceHref = "ch1.xhtml",
-        )
-        assertNotNull("une selection multi-phrases doit produire une annotation, pas null", result)
-        assertEquals(0, result!!.first.charOffset)
-        assertEquals(55, result.second.charOffset)
-    }
-
-    @Test
-    fun `ordre inverse (focus avant l'ancre) produit le meme resultat`() {
-        val forward = AnnotationSelectionHandler().resolveSelection(sentences, 0, 2, 0, "ch1.xhtml")
-        val backward = AnnotationSelectionHandler().resolveSelection(sentences, 2, 0, 0, "ch1.xhtml")
-        assertEquals(forward, backward)
-    }
-
-    @Test
-    fun `index hors bornes retourne null, pas une exception`() {
-        val result = AnnotationSelectionHandler().resolveSelection(sentences, 0, 99, 0, "ch1.xhtml")
-        assertNull(result)
-    }
-
-    // ───── Palier 3f.1 — sélection libre au mot (offsets de caractère) ─────
-
-    @Test
     fun `resolveCharRange produit un locator sur les offsets exacts, pas ceux de la phrase entiere`() {
         val sentence = sentences[0]
         val start = sentence.startOffset + sentence.text.indexOf("le")

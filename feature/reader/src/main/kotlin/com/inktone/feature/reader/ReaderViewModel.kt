@@ -168,13 +168,6 @@ class ReaderViewModel @Inject constructor(
                     preferencesRepository.update(current.copy(readingMode = newMode.name))
                 }
             }
-            is ReaderIntent.BeginSentenceSelection -> _state.value = _state.value.copy(
-                selectionAnchorIndex = intent.sentenceIndex, selectionFocusIndex = intent.sentenceIndex,
-            )
-            is ReaderIntent.ExtendSentenceSelection -> _state.value = _state.value.copy(selectionFocusIndex = intent.sentenceIndex)
-            is ReaderIntent.ClearSentenceSelection -> _state.value = _state.value.copy(
-                selectionAnchorIndex = null, selectionFocusIndex = null,
-            )
             is ReaderIntent.SetFreeSelection -> _state.value = _state.value.copy(
                 freeSelectionAnchorOffset = intent.anchorOffset, freeSelectionFocusOffset = intent.focusOffset,
             )
@@ -384,36 +377,22 @@ class ReaderViewModel @Inject constructor(
     }
 
     /**
-     * Construit l'`Annotation` à partir de la sélection active — soit la
-     * sélection libre au mot (palier 3f.1, offsets de caractère), soit,
-     * à défaut, la plage de phrases sélectionnée (Tâche 7.1, index de
-     * `Sentence`). Les deux modèles coexistent temporairement (voir
-     * `ReaderUiState`) ; jamais d'offset arbitraire dans les deux cas.
+     * Construit l'`Annotation` à partir de la sélection libre au mot
+     * active (offsets de caractère absolus au chapitre) — jamais d'offset
+     * arbitraire, jamais la phrase entière.
      */
     private fun confirmAnnotation(color: AnnotationColor, content: String? = null) {
         val chapter = _state.value.currentChapter ?: return
         val publicationId = currentPublicationId ?: return
         val sentences = chapter.paragraphs.flatMap { it.sentences }
 
-        val freeRange = _state.value.freeSelectionRange
-        val (startLocator, endLocator, excerpt) = if (freeRange != null) {
-            val endOffsetExclusive = freeRange.last + 1
-            val locators = annotationSelectionHandler.resolveCharRange(
-                freeRange.first, endOffsetExclusive, chapter.index, chapter.href,
-            ) ?: return
-            val excerpt = sliceChapterText(sentences, freeRange.first, endOffsetExclusive)
-                .take(Annotation.MAX_EXCERPT_LENGTH)
-            Triple(locators.first, locators.second, excerpt)
-        } else {
-            val range = _state.value.selectedSentenceRange ?: return
-            val locators = annotationSelectionHandler.resolveSelection(
-                sentences, range.first, range.last, chapter.index, chapter.href,
-            ) ?: return
-            val excerpt = sentences.subList(range.first, range.last + 1)
-                .joinToString(separator = " ") { it.text }
-                .take(Annotation.MAX_EXCERPT_LENGTH)
-            Triple(locators.first, locators.second, excerpt)
-        }
+        val freeRange = _state.value.freeSelectionRange ?: return
+        val endOffsetExclusive = freeRange.last + 1
+        val (startLocator, endLocator) = annotationSelectionHandler.resolveCharRange(
+            freeRange.first, endOffsetExclusive, chapter.index, chapter.href,
+        ) ?: return
+        val excerpt = sliceChapterText(sentences, freeRange.first, endOffsetExclusive)
+            .take(Annotation.MAX_EXCERPT_LENGTH)
 
         viewModelScope.launch {
             val now = System.currentTimeMillis()
@@ -431,7 +410,6 @@ class ReaderViewModel @Inject constructor(
                 ),
             )
             _state.value = _state.value.copy(
-                selectionAnchorIndex = null, selectionFocusIndex = null,
                 freeSelectionAnchorOffset = null, freeSelectionFocusOffset = null,
             )
         }

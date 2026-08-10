@@ -49,13 +49,9 @@ import com.inktone.domain.model.AnnotationColor
  * (`UX_FLOW_DESIGN.md` § popup de sélection de texte, Signet
  * volontairement absent : un signet marque une position, pas une plage).
  *
- * **Écart connu, reconduit** (Tâche 7.0/7.1, `ReaderScreen` § doc de
- * tête) : la sélection reste par phrase (appui long puis extension), pas
- * libre au caractère — `Selection`/`SelectionContainer` contrôlé restent
- * `internal` dans `androidx.compose.foundation` (BOM 2024.09.02, vérifié
- * par le compilateur, pas supposé). Ce popup s'applique à cette sélection
- * par phrase ; la sélection libre au mot est un lot séparé et conditionnel
- * (3f, voir Tâche 3c.5).
+ * S'applique à la sélection libre au mot (voir `ReaderUiState.freeSelectionRange`,
+ * `PagedChapterContent.PageBlock`/`ReaderScreen.ParagraphText`) — seul
+ * modèle de sélection de texte du lecteur.
  */
 private enum class SelectionPopupMode { ACTIONS, COLOR_PICKER, NOTE_INPUT }
 
