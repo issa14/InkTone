@@ -1,3 +1,5 @@
+import java.util.Properties
+
 plugins {
     id("inktone.application")
     alias(libs.plugins.kotlin.serialization)
@@ -15,12 +17,34 @@ if (firebaseConfigured) {
     pluginManager.apply(libs.plugins.firebase.crashlytics.get().pluginId)
 }
 
+// Lot 11, tâche 11.4 — même lecture que infrastructure/sync/build.gradle
+// .kts (local.properties, gitignoré, absent par défaut pour quiconque
+// clone le dépôt). AppAuth a besoin du schéma de redirection comme
+// manifestPlaceholder pour que son RedirectUriReceiverActivity (fusionné
+// depuis son propre manifeste) intercepte le retour du navigateur — ce
+// placeholder ne peut être posé qu'au niveau du module `app`, seul point
+// où le manifeste final est assemblé.
+val syncLocalProperties = Properties().apply {
+    val file = rootProject.file("local.properties")
+    if (file.exists()) file.inputStream().use { load(it) }
+}
+// AppAuth déclare `${appAuthRedirectScheme}` dans son propre manifeste
+// (RedirectUriReceiverActivity) : un placeholder non défini fait
+// échouer la fusion de manifeste pour QUICONQUE clone le dépôt, même
+// sans jamais toucher à la synchronisation. Toujours défini, avec un
+// schéma factice tant que local.properties n'en fournit pas un réel —
+// GoogleAuthConfig.isConfigured (clientId vide) empêche de toute façon
+// tout flux d'authentification de démarrer dans ce cas.
+val googleOAuthRedirectScheme = syncLocalProperties.getProperty("GOOGLE_OAUTH_REDIRECT_SCHEME", "")
+    .ifBlank { "inktone.oauth.unconfigured" }
+
 android {
     compileOptions {
         isCoreLibraryDesugaringEnabled = true
     }
 
     defaultConfig {
+        manifestPlaceholders["appAuthRedirectScheme"] = googleOAuthRedirectScheme
         // `app` n'a pas le droit de dépendre de `domain` (Blueprint
         // §12.4) : ce booléen traverse la frontière de module vers
         // `CrashReporterModule` (infrastructure/crashreporting, qui PEUT

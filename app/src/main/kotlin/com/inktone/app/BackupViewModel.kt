@@ -48,9 +48,9 @@ class BackupViewModel @Inject constructor(
             isEditable = false,
         )
 
-    fun exportTo(destinationUri: String) {
+    fun exportTo(destinationUri: String, password: String) {
         viewModelScope.launch {
-            val success = backupManager.exportTo(destinationUri, BuildConfig.VERSION_NAME)
+            val success = backupManager.exportTo(destinationUri, BuildConfig.VERSION_NAME, password)
             _lastResult.value = if (success) {
                 DataOperationResult.ExportSuccess
             } else {
@@ -59,9 +59,10 @@ class BackupViewModel @Inject constructor(
         }
     }
 
-    fun importFrom(sourceUri: String) {
+    /** @param password ignoré si le fichier importé est un export antérieur en clair (compatibilité ascendante). */
+    fun importFrom(sourceUri: String, password: String?) {
         viewModelScope.launch {
-            _lastResult.value = when (val result = backupManager.importFrom(sourceUri)) {
+            _lastResult.value = when (val result = backupManager.importFrom(sourceUri, password)) {
                 is ImportBackupResult.Success ->
                     DataOperationResult.ImportSuccess(result.restored, result.skippedOrphans)
                 is ImportBackupResult.Failed -> DataOperationResult.ImportFailed(result.message)

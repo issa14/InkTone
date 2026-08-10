@@ -1,5 +1,7 @@
 package com.inktone.data.backup
 
+import com.inktone.domain.model.Annotation
+import com.inktone.domain.model.AnnotationColor
 import com.inktone.domain.model.Bookmark
 import com.inktone.domain.model.FontFamily
 import com.inktone.domain.model.PronunciationRule
@@ -29,6 +31,11 @@ data class BackupPayload(
     // (défaut vide : un import d'une sauvegarde pré-lot 9 ne perd rien
     // qu'elle ne contenait déjà pas).
     val customThemes: List<CustomThemeBackup> = emptyList(),
+    // Lot 11, tâche 11.1 — absentes des exports antérieurs à ce lot
+    // (BackupManager n'appelait pas AnnotationRepository, défaut hérité
+    // du lot 6). Défaut vide : un import d'une sauvegarde pré-lot 11 ne
+    // perd rien qu'elle ne contenait déjà pas.
+    val annotations: List<AnnotationBackup> = emptyList(),
 )
 
 @Serializable
@@ -80,6 +87,20 @@ data class CustomThemeBackup(
 )
 
 @Serializable
+data class AnnotationBackup(
+    val id: String,
+    val publicationId: String,
+    val startLocator: LocatorBackup,
+    val endLocator: LocatorBackup,
+    val color: String,
+    val content: String? = null,
+    val excerpt: String? = null,
+    val isPinned: Boolean = false,
+    val createdAt: Long,
+    val updatedAt: Long,
+)
+
+@Serializable
 data class ReadingSessionBackup(
     val id: String,
     val publicationId: String,
@@ -123,6 +144,17 @@ fun CustomThemeBackup.toDomain(): ReadingTheme = ReadingTheme(
     backgroundColorHex = backgroundColorHex, textColorHex = textColorHex,
     accentColorHex = accentColorHex, highlightColorHex = highlightColorHex,
     fontFamily = FontFamily.valueOf(fontFamily),
+)
+
+fun Annotation.toBackup(): AnnotationBackup = AnnotationBackup(
+    id, publicationId, startLocator.toBackup(), endLocator.toBackup(),
+    color.name, content, excerpt, isPinned, createdAt, updatedAt,
+)
+fun AnnotationBackup.toDomain(): Annotation = Annotation(
+    id = id, publicationId = publicationId,
+    startLocator = startLocator.toDomain(), endLocator = endLocator.toDomain(),
+    color = AnnotationColor.valueOf(color), content = content, excerpt = excerpt,
+    isPinned = isPinned, createdAt = createdAt, updatedAt = updatedAt,
 )
 
 fun ReadingSession.toBackup(): ReadingSessionBackup =

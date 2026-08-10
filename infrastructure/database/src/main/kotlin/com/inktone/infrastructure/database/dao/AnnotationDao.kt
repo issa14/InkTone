@@ -26,4 +26,7 @@ interface AnnotationDao {
 
     @Query("UPDATE annotations SET isPinned = :isPinned WHERE id = :id")
     suspend fun setPinned(id: String, isPinned: Boolean)
+
+    @Query("SELECT * FROM annotations")
+    suspend fun getAll(): List<AnnotationEntity>
 }

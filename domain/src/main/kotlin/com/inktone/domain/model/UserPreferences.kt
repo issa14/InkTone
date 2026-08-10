@@ -58,6 +58,27 @@ data class UserPreferences(
     // découverte active). true dès la première proposition faite, jamais
     // reproposé ensuite — ReaderViewModel.playCurrentSentence.
     val hasPromptedVoiceDownload: Boolean = false,
+    // Lot 11, tâche 11.2 — identité d'appareil stable, générée au premier
+    // accès (voir DeviceIdentityRepository) : sert à la fois à la flotte
+    // d'appareils (palier C) et à la détection de conflits (palier D).
+    val deviceId: String? = null,
+    val deviceDisplayName: String? = null,
+    // Lot 11, tâche 11.2 — compte de synchronisation unique (exclusivité
+    // mutuelle Drive/WebDAV) : `syncProvider == null` matérialise l'état
+    // Unconfigured. `syncLastAutoSyncFailed` pilote la bannière persistante
+    // du Dashboard (une synchro automatique en échec, palier C).
+    val syncProvider: String? = null,
+    val syncAccountLabel: String? = null,
+    val syncLinkedAt: Long? = null,
+    val syncLastSyncAt: Long? = null,
+    val syncLastAutoSyncFailed: Boolean = false,
+    // Lot 11, tâche 11.8 — synchro automatique en arrière-plan (WorkManager)
+    // et sa contrainte réseau. `syncWifiOnly` n'a d'effet que si
+    // `syncAutoEnabled` est vrai (même patron que
+    // eyeRestReminderEnabled/eyeRestReminderIntervalMinutes) : grisé côté
+    // UI, et sans effet côté planification si l'auto-sync est éteinte.
+    val syncAutoEnabled: Boolean = false,
+    val syncWifiOnly: Boolean = false,
 ) {
     init {
         require(fontSize > 0) { "fontSize doit être strictement positif" }
@@ -66,6 +87,9 @@ data class UserPreferences(
             "readerBrightness doit être compris entre 0.01 et 1.0, ou null"
         }
         require(eyeRestReminderIntervalMinutes > 0) { "eyeRestReminderIntervalMinutes doit être strictement positif" }
+        require((syncProvider == null) == (syncAccountLabel == null && syncLinkedAt == null)) {
+            "syncProvider, syncAccountLabel et syncLinkedAt doivent être renseignés ensemble ou tous absents"
+        }
     }
 }
 
