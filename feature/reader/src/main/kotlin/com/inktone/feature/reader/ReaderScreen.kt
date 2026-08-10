@@ -559,7 +559,6 @@ fun ReaderScreen(
                         currentChapterIndex = state.currentChapterIndex,
                         textColor = ThemeColors.text(state.resolvedTheme),
                         isReadingRulerEnabled = state.isReadingRulerEnabled,
-                        onSentenceLongClick = { index -> viewModel.onIntent(ReaderIntent.BeginSentenceSelection(index)) },
                         onSentenceClick = { index ->
                             if (selectedRange != null) {
                                 viewModel.onIntent(ReaderIntent.ExtendSentenceSelection(index))

@@ -84,7 +84,6 @@ fun PagedChapterContent(
     currentChapterIndex: Int,
     textColor: Color,
     isReadingRulerEnabled: Boolean,
-    onSentenceLongClick: (Int) -> Unit,
     onSentenceClick: (Int) -> Unit,
     onNextChapter: () -> Unit,
     onCurrentLineY: (Dp) -> Unit,
@@ -290,9 +289,6 @@ fun PagedChapterContent(
                         freeSelectedRange = freeSelectedRangeState,
                         onFreeSelectionChanged = onFreeSelectionChanged,
                         onFreeSelectionBoundsInWindow = onFreeSelectionBoundsInWindow,
-                        onOffsetLongPress = { absoluteOffset ->
-                            onSentenceLongClick(sentenceIndexForOffset(currentMeasurement.sentenceStartOffsets, absoluteOffset))
-                        },
                         onOffsetTap = { absoluteOffset ->
                             onSentenceClick(sentenceIndexForOffset(currentMeasurement.sentenceStartOffsets, absoluteOffset))
                         },
@@ -325,7 +321,6 @@ private fun PageBlock(
     freeSelectedRange: State<IntRange?>,
     onFreeSelectionChanged: (anchorOffset: Int, focusOffset: Int) -> Unit,
     onFreeSelectionBoundsInWindow: (Rect?) -> Unit,
-    onOffsetLongPress: (Int) -> Unit,
     onOffsetTap: (Int) -> Unit,
 ) {
     var textLayoutResult by remember { mutableStateOf<TextLayoutResult?>(null) }
@@ -407,11 +402,6 @@ private fun PageBlock(
             .onGloballyPositioned { textCoordinates = it }
             .pointerInput(pageOffsetRange) {
                 detectTapGestures(
-                    onLongPress = { position ->
-                        textLayoutResult?.let { layout ->
-                            onOffsetLongPress(pageOffsetRange.first + layout.getOffsetForPosition(position))
-                        }
-                    },
                     onTap = { position ->
                         textLayoutResult?.let { layout ->
                             onOffsetTap(pageOffsetRange.first + layout.getOffsetForPosition(position))
@@ -427,6 +417,20 @@ private fun PageBlock(
             // participation à `NestedScrollConnection`) — suffisant pour
             // empêcher le `HorizontalPager` de tourner la page pendant le
             // glissement.
+            //
+            // Écart trouvé sur appareil (vérification palier 3f.1, pas
+            // anticipé par le chiffrage) : `detectTapGestures.onLongPress`
+            // ci-dessus se déclenche au même instant que
+            // `detectDragGesturesAfterLongPress.onDragStart` — deux
+            // `pointerInput` siblings reçoivent tous deux le même
+            // appui long. Avant retrait de `onLongPress`, l'ancien modèle
+            // par phrase (toute la phrase surlignée) s'imposait
+            // visuellement sur le nouveau, l'appui long au mot restant
+            // invisible tant qu'aucun glissement n'avait eu lieu. En mode
+            // PAGED, l'appui long sélectionne donc désormais exclusivement
+            // le mot — le modèle par phrase (`onLongPress` retiré
+            // ci-dessus) reste inchangé en mode SCROLL, non affecté par ce
+            // composable.
             .pointerInput(pageOffsetRange) {
                 detectDragGesturesAfterLongPress(
                     onDragStart = { position ->
