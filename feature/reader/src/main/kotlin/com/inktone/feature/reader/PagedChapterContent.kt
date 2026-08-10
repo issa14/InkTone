@@ -503,9 +503,21 @@ private fun PageBlock(
         BasicTextField(
             value = fieldValue,
             onValueChange = { newValue ->
+                // Bug réel trouvé sur appareil : un tap sur la sélection
+                // pour l'annuler est traité EN INTERNE par BasicTextField
+                // (collapse de la sélection) — notre pointerInput sibling
+                // ci-dessous ne voit jamais cet évènement précis (avalé
+                // avant lui), donc `onOffsetTap` n'était jamais appelé et
+                // le HUD ne revenait pas après une annulation par tap.
+                // Détecté ici via la transition non-collapsed → collapsed
+                // (seule source fiable de ce signal), pas via le geste.
+                val wasCollapsed = selection.collapsed
                 selection = newValue.selection
                 if (newValue.selection.collapsed) {
                     onFreeSelectionCleared()
+                    if (!wasCollapsed) {
+                        onOffsetTap(pageOffsetRange.first + newValue.selection.start)
+                    }
                 } else {
                     val min = newValue.selection.min
                     val max = newValue.selection.max
