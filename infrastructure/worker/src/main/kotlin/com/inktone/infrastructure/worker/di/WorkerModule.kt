@@ -4,8 +4,10 @@ import android.content.Context
 import androidx.work.WorkManager
 import com.inktone.domain.service.ImportProgressObserver
 import com.inktone.domain.service.ImportScheduler
+import com.inktone.domain.service.SyncScheduler
 import com.inktone.infrastructure.worker.WorkManagerImportProgressObserver
 import com.inktone.infrastructure.worker.WorkManagerImportScheduler
+import com.inktone.infrastructure.worker.WorkManagerSyncScheduler
 import dagger.Binds
 import dagger.Module
 import dagger.Provides
@@ -32,4 +34,8 @@ abstract class ImportSchedulerModule {
     @Binds
     @Singleton
     abstract fun bindImportProgressObserver(impl: WorkManagerImportProgressObserver): ImportProgressObserver
+
+    @Binds
+    @Singleton
+    abstract fun bindSyncScheduler(impl: WorkManagerSyncScheduler): SyncScheduler
 }

@@ -20,6 +20,15 @@ fun UserPreferences.toEntity(): UserPreferencesEntity = UserPreferencesEntity(
     libraryLayoutMode = libraryLayoutMode,
     hasSeenOnboarding = hasSeenOnboarding,
     hasPromptedVoiceDownload = hasPromptedVoiceDownload,
+    deviceId = deviceId,
+    deviceDisplayName = deviceDisplayName,
+    syncProvider = syncProvider,
+    syncAccountLabel = syncAccountLabel,
+    syncLinkedAt = syncLinkedAt,
+    syncLastSyncAt = syncLastSyncAt,
+    syncLastAutoSyncFailed = syncLastAutoSyncFailed,
+    syncAutoEnabled = syncAutoEnabled,
+    syncWifiOnly = syncWifiOnly,
 )
 
 fun UserPreferencesEntity.toDomain(): UserPreferences = UserPreferences(
@@ -40,4 +49,13 @@ fun UserPreferencesEntity.toDomain(): UserPreferences = UserPreferences(
     libraryLayoutMode = libraryLayoutMode,
     hasSeenOnboarding = hasSeenOnboarding,
     hasPromptedVoiceDownload = hasPromptedVoiceDownload,
+    deviceId = deviceId,
+    deviceDisplayName = deviceDisplayName,
+    syncProvider = syncProvider,
+    syncAccountLabel = syncAccountLabel,
+    syncLinkedAt = syncLinkedAt,
+    syncLastSyncAt = syncLastSyncAt,
+    syncLastAutoSyncFailed = syncLastAutoSyncFailed,
+    syncAutoEnabled = syncAutoEnabled,
+    syncWifiOnly = syncWifiOnly,
 )

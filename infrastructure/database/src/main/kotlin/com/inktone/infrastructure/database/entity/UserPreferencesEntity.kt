@@ -30,4 +30,13 @@ data class UserPreferencesEntity(
     val libraryLayoutMode: String = "GRID_COVERS", // Lot 6 — disposition biblio, pilotée par le préréglage d'accessibilité
     val hasSeenOnboarding: Boolean = false, // Lot 10 — pilote le startDestination
     val hasPromptedVoiceDownload: Boolean = false, // Lot 10 — proposition proactive au premier usage TTS
+    val deviceId: String? = null, // Lot 11 — identité d'appareil stable
+    val deviceDisplayName: String? = null, // Lot 11
+    val syncProvider: String? = null, // Lot 11 — null = aucun compte lié (Unconfigured)
+    val syncAccountLabel: String? = null, // Lot 11
+    val syncLinkedAt: Long? = null, // Lot 11
+    val syncLastSyncAt: Long? = null, // Lot 11
+    val syncLastAutoSyncFailed: Boolean = false, // Lot 11 — pilote la bannière persistante du Dashboard
+    val syncAutoEnabled: Boolean = false, // Lot 11, tâche 11.8
+    val syncWifiOnly: Boolean = false, // Lot 11, tâche 11.8
 )

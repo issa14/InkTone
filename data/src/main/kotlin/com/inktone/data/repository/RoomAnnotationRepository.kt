@@ -18,4 +18,5 @@ class RoomAnnotationRepository @Inject constructor(
     override suspend fun update(annotation: Annotation) = dao.update(annotation.toEntity())
     override suspend fun delete(id: String) = dao.delete(id)
     override suspend fun setPinned(id: String, isPinned: Boolean) = dao.setPinned(id, isPinned)
+    override suspend fun getAll(): List<Annotation> = dao.getAll().map { it.toDomain() }
 }

@@ -775,6 +775,118 @@ class DatabaseMigrationTest {
         v20.close()
     }
 
+    @Test
+    fun migration_20_vers_21_ajoute_hasPromptedVoiceDownload() {
+        val v20 = helper.createDatabase(TEST_DB_NAME, 20)
+        v20.execSQL(
+            """
+            INSERT INTO user_preferences (id, theme, fontSize, defaultTtsEngine, crashReportingEnabled, language, fontFamily, reduceMotion, dynamicColorEnabled, readingRulerEnabled, dailyGoalMinutes, activeVoiceProfileId, readingMode, audioGain, useSystemFontScale, appTheme, libraryLayoutMode, lineHeightMultiplier, readerBrightness, eyeRestReminderEnabled, eyeRestReminderIntervalMinutes, hasSeenOnboarding)
+            VALUES (0, 'papier_clair', 18, 'SHERPA_ONNX', 0, 'fr', 'DEFAULT', 0, 1, 0, 20, NULL, 'SCROLL', 1.0, 0, 'SYSTEM', 'GRID_COVERS', 1.4, NULL, 1, 60, 1)
+            """.trimIndent(),
+        )
+        v20.close()
+
+        val v21 = helper.runMigrationsAndValidate(
+            TEST_DB_NAME, 21, true,
+            MIGRATION_1_2, MIGRATION_2_3, MIGRATION_3_4, MIGRATION_4_5, MIGRATION_5_6, MIGRATION_6_7,
+            MIGRATION_7_8, MIGRATION_8_9, MIGRATION_9_10, MIGRATION_10_11, MIGRATION_11_12, MIGRATION_12_13,
+            MIGRATION_13_14, MIGRATION_14_15, MIGRATION_15_16, MIGRATION_16_17, MIGRATION_17_18, MIGRATION_18_19,
+            MIGRATION_19_20, MIGRATION_20_21,
+        )
+
+        v21.query("SELECT hasPromptedVoiceDownload FROM user_preferences WHERE id = 0").use { cursor ->
+            assertEquals(true, cursor.moveToFirst())
+            assertEquals(0, cursor.getInt(0))
+        }
+        v21.close()
+    }
+
+    @Test
+    fun migration_21_vers_22_conserve_les_donnees_et_ajoute_l_identite_d_appareil_et_l_etat_de_synchronisation() {
+        val v21 = helper.createDatabase(TEST_DB_NAME, 21)
+        v21.execSQL(
+            """
+            INSERT INTO user_preferences (id, theme, fontSize, defaultTtsEngine, crashReportingEnabled, language, fontFamily, reduceMotion, dynamicColorEnabled, readingRulerEnabled, dailyGoalMinutes, activeVoiceProfileId, readingMode, audioGain, useSystemFontScale, appTheme, libraryLayoutMode, lineHeightMultiplier, readerBrightness, eyeRestReminderEnabled, eyeRestReminderIntervalMinutes, hasSeenOnboarding, hasPromptedVoiceDownload)
+            VALUES (0, 'papier_clair', 18, 'SHERPA_ONNX', 0, 'fr', 'DEFAULT', 0, 1, 0, 20, NULL, 'SCROLL', 1.0, 0, 'SYSTEM', 'GRID_COVERS', 1.4, NULL, 1, 60, 1, 1)
+            """.trimIndent(),
+        )
+        v21.close()
+
+        val v22 = helper.runMigrationsAndValidate(
+            TEST_DB_NAME, 22, true,
+            MIGRATION_1_2, MIGRATION_2_3, MIGRATION_3_4, MIGRATION_4_5, MIGRATION_5_6, MIGRATION_6_7,
+            MIGRATION_7_8, MIGRATION_8_9, MIGRATION_9_10, MIGRATION_10_11, MIGRATION_11_12, MIGRATION_12_13,
+            MIGRATION_13_14, MIGRATION_14_15, MIGRATION_15_16, MIGRATION_16_17, MIGRATION_17_18, MIGRATION_18_19,
+            MIGRATION_19_20, MIGRATION_20_21, MIGRATION_21_22,
+        )
+
+        v22.query(
+            "SELECT theme, deviceId, syncProvider, syncLastAutoSyncFailed FROM user_preferences WHERE id = 0",
+        ).use { cursor ->
+            assertEquals(true, cursor.moveToFirst())
+            assertEquals("papier_clair", cursor.getString(0)) // aucune perte de donnees
+            assertEquals(true, cursor.isNull(1)) // deviceId : pas encore genere
+            assertEquals(true, cursor.isNull(2)) // syncProvider NULL == Unconfigured
+            assertEquals(0, cursor.getInt(3)) // pas d echec par defaut
+        }
+        v22.close()
+    }
+
+    @Test
+    fun migration_22_vers_23_conserve_les_donnees_et_ajoute_syncAutoEnabled_syncWifiOnly() {
+        val v22 = helper.createDatabase(TEST_DB_NAME, 22)
+        v22.execSQL(
+            """
+            INSERT INTO user_preferences (id, theme, fontSize, defaultTtsEngine, crashReportingEnabled, language, fontFamily, reduceMotion, dynamicColorEnabled, readingRulerEnabled, dailyGoalMinutes, activeVoiceProfileId, readingMode, audioGain, useSystemFontScale, appTheme, libraryLayoutMode, lineHeightMultiplier, readerBrightness, eyeRestReminderEnabled, eyeRestReminderIntervalMinutes, hasSeenOnboarding, hasPromptedVoiceDownload, syncLastAutoSyncFailed)
+            VALUES (0, 'papier_clair', 18, 'SHERPA_ONNX', 0, 'fr', 'DEFAULT', 0, 1, 0, 20, NULL, 'SCROLL', 1.0, 0, 'SYSTEM', 'GRID_COVERS', 1.4, NULL, 1, 60, 1, 1, 0)
+            """.trimIndent(),
+        )
+        v22.close()
+
+        val v23 = helper.runMigrationsAndValidate(
+            TEST_DB_NAME, 23, true,
+            MIGRATION_1_2, MIGRATION_2_3, MIGRATION_3_4, MIGRATION_4_5, MIGRATION_5_6, MIGRATION_6_7,
+            MIGRATION_7_8, MIGRATION_8_9, MIGRATION_9_10, MIGRATION_10_11, MIGRATION_11_12, MIGRATION_12_13,
+            MIGRATION_13_14, MIGRATION_14_15, MIGRATION_15_16, MIGRATION_16_17, MIGRATION_17_18, MIGRATION_18_19,
+            MIGRATION_19_20, MIGRATION_20_21, MIGRATION_21_22, MIGRATION_22_23,
+        )
+
+        v23.query("SELECT theme, syncAutoEnabled, syncWifiOnly FROM user_preferences WHERE id = 0").use { cursor ->
+            assertEquals(true, cursor.moveToFirst())
+            assertEquals("papier_clair", cursor.getString(0)) // aucune perte de donnees
+            assertEquals(0, cursor.getInt(1)) // desactive par defaut
+            assertEquals(0, cursor.getInt(2)) // desactive par defaut
+        }
+        v23.close()
+    }
+
+    @Test
+    fun migration_23_vers_24_cree_la_table_pending_conflicts_utilisable() {
+        helper.createDatabase(TEST_DB_NAME, 23).close()
+
+        val v24 = helper.runMigrationsAndValidate(
+            TEST_DB_NAME, 24, true,
+            MIGRATION_1_2, MIGRATION_2_3, MIGRATION_3_4, MIGRATION_4_5, MIGRATION_5_6, MIGRATION_6_7,
+            MIGRATION_7_8, MIGRATION_8_9, MIGRATION_9_10, MIGRATION_10_11, MIGRATION_11_12, MIGRATION_12_13,
+            MIGRATION_13_14, MIGRATION_14_15, MIGRATION_15_16, MIGRATION_16_17, MIGRATION_17_18, MIGRATION_18_19,
+            MIGRATION_19_20, MIGRATION_20_21, MIGRATION_21_22, MIGRATION_22_23, MIGRATION_23_24,
+        )
+
+        v24.execSQL(
+            """
+            INSERT INTO pending_conflicts (publicationId, bookTitle, localResourceHref, localChapterIndex, localParagraphIndex, localCharOffset, localDeviceLabel, localAt, localChapterCount, remoteResourceHref, remoteChapterIndex, remoteParagraphIndex, remoteCharOffset, remoteDeviceLabel, remoteAt, remoteChapterCount)
+            VALUES ('pub-1', 'Le Grand Livre', 'ch1.xhtml', 1, NULL, 0, 'Cet appareil', 50, 20, 'ch8.xhtml', 8, NULL, 0, 'Tablette B', 200, 20)
+            """.trimIndent(),
+        )
+        v24.query("SELECT bookTitle, localChapterIndex, remoteChapterIndex FROM pending_conflicts WHERE publicationId = 'pub-1'").use { cursor ->
+            assertEquals(true, cursor.moveToFirst())
+            assertEquals("Le Grand Livre", cursor.getString(0))
+            assertEquals(1, cursor.getInt(1))
+            assertEquals(8, cursor.getInt(2))
+        }
+        v24.close()
+    }
+
     companion object {
         private const val TEST_DB_NAME = "migration-test"
     }
