@@ -380,6 +380,17 @@ class ReaderViewModel @Inject constructor(
      * Construit l'`Annotation` à partir de la sélection libre au mot
      * active (offsets de caractère absolus au chapitre) — jamais d'offset
      * arbitraire, jamais la phrase entière.
+     *
+     * **Contrat de synchronicité (Phase 4 de la refonte du cycle de vie de
+     * la sélection)** : la lecture de `freeSelectionRange` et la résolution
+     * des locators sont volontairement faites AVANT tout `launch`. L'UI
+     * purge son état de sélection immédiatement après avoir dispatché cet
+     * intent (`ReaderScreen.clearSelectionAndPopup`, pour que le lecteur
+     * redevienne propre sans attendre l'écriture en base) : si la
+     * résolution passait dans la coroutine, ce `ClearFreeSelection`
+     * arriverait le premier et l'annotation serait silencieusement perdue.
+     * Ne jamais déplacer ces lignes dans le `viewModelScope.launch`
+     * ci-dessous (garde-fou : `ReaderViewModelFreeSelectionTest`).
      */
     private fun confirmAnnotation(color: AnnotationColor, content: String? = null) {
         val chapter = _state.value.currentChapter ?: return
