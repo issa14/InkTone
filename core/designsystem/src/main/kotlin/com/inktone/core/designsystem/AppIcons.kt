@@ -82,8 +82,12 @@ import androidx.compose.material.icons.outlined.Save
 import androidx.compose.material.icons.outlined.Search
 import androidx.compose.material.icons.outlined.Settings
 import androidx.compose.material.icons.outlined.Smartphone
-import androidx.compose.material.icons.outlined.Visibility
+import androidx.compose.material.icons.outlined.Speed
+import androidx.compose.material.icons.outlined.Timer
+import androidx.compose.material.icons.outlined.TrendingUp
 import androidx.compose.material.icons.outlined.ViewDay
+import androidx.compose.material.icons.outlined.Visibility
+import androidx.compose.material.icons.outlined.VisibilityOff
 import androidx.compose.material.icons.outlined.Warning
 import androidx.compose.material.icons.outlined.Widgets
 import androidx.compose.material3.Icon
@@ -200,6 +204,8 @@ enum class AppSymbol(
     SearchOff(R.drawable.ic_symbol_search_off),
     Timer(R.drawable.ic_symbol_timer),
     TrendingUp(R.drawable.ic_symbol_trending_up),
+    Visibility(R.drawable.ic_symbol_visibility),
+    VisibilityOff(R.drawable.ic_symbol_visibility_off),
 }
 
 /**
@@ -333,4 +339,6 @@ object AppIcons {
     val SearchOff = Icons.Outlined.SearchOff
     val Timer = Icons.Outlined.Timer
     val TrendingUp = Icons.Outlined.TrendingUp
+    val Visibility = Icons.Outlined.Visibility
+    val VisibilityOff = Icons.Outlined.VisibilityOff
 }
