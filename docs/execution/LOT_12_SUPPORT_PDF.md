@@ -386,11 +386,12 @@ une fois l'écran de lecture branché.
 
 ## Tâche 12.7 — Contrat domaine de rendu et implémentation PDFium
 
-- Mesurer, sur le binding retenu (`io.legere:pdfiumandroid`), le temps de rendu par page et
-  l'empreinte mémoire d'un bitmap plein écran non zoomé, sur `fixture-large.pdf` et
-  `fixture-scanned.pdf` (fixtures du Palier 1) — remplace les chiffres MuPDF de la
-  recherche initiale (décision actée 19), sert de base aux seuils du test de
-  performance (tâche 12.13).
+- **Mesuré** (`PdfPageRendererImplTest.mesure_le_rendu_de_pages_sur_un_pdf_volumineux`, appareil
+  réel V2206) : rendu à 1080px de largeur sur 5 pages échantillonnées de `fixture-large.pdf`
+  (220 pages) — 24 à 34 ms par page. Remplace les chiffres MuPDF de la recherche initiale
+  (décision actée 19) ; sert de base aux seuils du test de performance (tâche 12.13). Largement
+  sous le budget d'un tourne-page perçu comme instantané (rendu déclenché à l'avance pour la
+  page N+1, pas dans le chemin critique d'une frame à 60 FPS).
 - `domain/service/FixedPageRenderer` + `domain/model/RenderedPage` (décision actée 12).
 - `infrastructure/parser` : `PdfPageRendererImpl : FixedPageRenderer`, réutilise la
   discipline JNI posée en tâche 12.2 (dispatcher/mutex dédié, `safeNativeCall`). Handle

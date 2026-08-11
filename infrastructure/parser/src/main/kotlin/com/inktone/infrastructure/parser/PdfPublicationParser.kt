@@ -145,7 +145,9 @@ class PdfPublicationParser @Inject constructor(
     }
 
     /**
-     * Rendu de la page 0 en bitmap basse resolution, sauvegarde au meme
+     * Rendu de la page 0 via la primitive partagee [renderToBitmap]
+     * (tache 12.7 - reutilisee par `PdfPageRendererImpl` au Palier 2, un
+     * seul point d'appel a l'API bitmap PDFium). Sauvegarde au meme
      * format et au meme emplacement que la couverture EPUB
      * ([ReadiumPublicationParser.extractAndSaveCover]) - JPEG qualite 85
      * dans `context.cacheDir/covers/`, pas WEBP comme envisage initialement
@@ -155,29 +157,24 @@ class PdfPublicationParser @Inject constructor(
     private fun extractAndSaveCover(document: io.legere.pdfiumandroid.PdfDocument, fileUri: String): String? =
         try {
             document.openPage(0).use { page ->
-                val widthPt = page.getPageWidthPoint()
-                val heightPt = page.getPageHeightPoint()
-                if (widthPt <= 0 || heightPt <= 0) {
-                    null
-                } else {
-                    val targetWidth = 300
-                    val targetHeight = (targetWidth.toFloat() * heightPt / widthPt).toInt().coerceAtLeast(1)
-                    val bitmap = Bitmap.createBitmap(targetWidth, targetHeight, Bitmap.Config.ARGB_8888)
-                    page.renderPageBitmap(bitmap, 0, 0, targetWidth, targetHeight, false, false)
+                val bitmap = page.renderToBitmap(COVER_TARGET_WIDTH_PX) ?: return@use null
 
-                    val coverDir = File(context.cacheDir, "covers")
-                    coverDir.mkdirs()
-                    val coverFile = File(coverDir, "${fileUri.hashCode().toUInt()}.jpg")
-                    try {
-                        FileOutputStream(coverFile).use { out -> bitmap.compress(Bitmap.CompressFormat.JPEG, 85, out) }
-                        coverFile.absolutePath
-                    } finally {
-                        bitmap.recycle()
-                    }
+                val coverDir = File(context.cacheDir, "covers")
+                coverDir.mkdirs()
+                val coverFile = File(coverDir, "${fileUri.hashCode().toUInt()}.jpg")
+                try {
+                    FileOutputStream(coverFile).use { out -> bitmap.compress(Bitmap.CompressFormat.JPEG, 85, out) }
+                    coverFile.absolutePath
+                } finally {
+                    bitmap.recycle()
                 }
             }
         } catch (e: Exception) {
             android.util.Log.w("PdfPublicationParser", "Echec sauvegarde couverture pour $fileUri", e)
             null
         }
+
+    private companion object {
+        const val COVER_TARGET_WIDTH_PX = 300
+    }
 }
