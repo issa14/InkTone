@@ -1,5 +1,6 @@
 package com.inktone.feature.reader
 
+import com.inktone.core.designsystem.AppIcons
 import androidx.compose.foundation.ExperimentalFoundationApi
 import androidx.compose.foundation.gestures.snapping.rememberSnapFlingBehavior
 import androidx.compose.foundation.layout.Arrangement
@@ -25,9 +26,6 @@ import androidx.compose.material3.Switch
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.material3.rememberModalBottomSheetState
-import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.filled.Add
-import androidx.compose.material.icons.filled.Remove
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
@@ -124,11 +122,11 @@ fun SleepTimerPanel(
                 Row(verticalAlignment = Alignment.CenterVertically) {
                     IconButton(
                         onClick = { onSetEyeRestReminderInterval((eyeRestReminderIntervalMinutes - 15).coerceAtLeast(15)) },
-                    ) { Icon(Icons.Filled.Remove, contentDescription = "Diminuer l'intervalle") }
+                    ) { Icon(AppIcons.Remove, contentDescription = "Diminuer l'intervalle") }
                     Text(formatEyeRestInterval(eyeRestReminderIntervalMinutes), style = MaterialTheme.typography.bodyLarge)
                     IconButton(
                         onClick = { onSetEyeRestReminderInterval(eyeRestReminderIntervalMinutes + 15) },
-                    ) { Icon(Icons.Filled.Add, contentDescription = "Augmenter l'intervalle") }
+                    ) { Icon(AppIcons.Add, contentDescription = "Augmenter l'intervalle") }
                 }
             }
 

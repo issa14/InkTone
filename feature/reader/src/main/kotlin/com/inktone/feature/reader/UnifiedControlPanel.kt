@@ -10,10 +10,6 @@ import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.shape.RoundedCornerShape
-import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.filled.Pause
-import androidx.compose.material.icons.filled.PlayArrow
-import androidx.compose.material.icons.filled.Timer
 import androidx.compose.material3.FilledIconButton
 import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.Icon
@@ -32,6 +28,7 @@ import androidx.compose.ui.platform.LocalHapticFeedback
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.inktone.core.designsystem.AppIcons
+import com.inktone.core.designsystem.AppSymbol
 import com.inktone.core.designsystem.InkToneShapes
 
 /**
@@ -113,7 +110,7 @@ fun UnifiedControlPanel(
                         shape = InkToneShapes.large,
                     ) {
                         Icon(
-                            if (isPlaying) Icons.Filled.Pause else Icons.Filled.PlayArrow,
+                            if (isPlaying) AppIcons.Pause else AppIcons.Play,
                             contentDescription = if (isPlaying) "Pause" else "Lire",
                             tint = MaterialTheme.colorScheme.surface,
                         )
@@ -137,7 +134,7 @@ fun UnifiedControlPanel(
             ) {
                 Box(Modifier.weight(1f), contentAlignment = Alignment.Center) {
                     SecondaryAction(
-                        icon = Icons.Filled.Timer,
+                        icon = AppIcons.SleepTimer,
                         label = "Minuteur",
                         tint = if (sleepTimerActive) accentColor else iconTint,
                         onClick = onSleepTimerClick,
