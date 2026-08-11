@@ -14,9 +14,6 @@ import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.shape.RoundedCornerShape
-import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.automirrored.filled.ArrowBack
-import androidx.compose.material.icons.automirrored.filled.Sort
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.Card
@@ -52,7 +49,9 @@ import androidx.compose.ui.text.font.FontStyle
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.hilt.navigation.compose.hiltViewModel
+import com.inktone.core.designsystem.AppIcon
 import com.inktone.core.designsystem.AppIcons
+import com.inktone.core.designsystem.AppSymbol
 import com.inktone.domain.model.AnnotationColor
 import com.inktone.domain.model.LibraryItem
 import com.inktone.domain.model.LibraryItemFilter
@@ -104,12 +103,12 @@ fun LibraryItemsScreen(
                 },
                 navigationIcon = {
                     IconButton(onClick = onBack) {
-                        Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = "Retour")
+                        AppIcon(AppSymbol.Back, contentDescription = "Retour")
                     }
                 },
                 actions = {
                     IconButton(onClick = { viewModel.onIntent(LibraryItemsIntent.ToggleSearchExpanded) }) {
-                        Icon(AppIcons.Search, contentDescription = if (state.isSearchExpanded) "Fermer la recherche" else "Rechercher")
+                        AppIcon(AppSymbol.Search,  contentDescription = if (state.isSearchExpanded) "Fermer la recherche" else "Rechercher")
                     }
                     SortMenuButton(
                         sortOrder = state.sortOrder,
@@ -215,18 +214,18 @@ private fun SortMenuButton(sortOrder: LibraryItemSortOrder, onSortOrderSelected:
     var isMenuExpanded by remember { mutableStateOf(false) }
     Box {
         IconButton(onClick = { isMenuExpanded = true }) {
-            Icon(Icons.AutoMirrored.Filled.Sort, contentDescription = "Trier")
+            AppIcon(AppSymbol.Sort, contentDescription = "Trier")
         }
         DropdownMenu(expanded = isMenuExpanded, onDismissRequest = { isMenuExpanded = false }) {
             DropdownMenuItem(
                 text = { Text("Chronologique") },
                 onClick = { onSortOrderSelected(LibraryItemSortOrder.CHRONOLOGICAL); isMenuExpanded = false },
-                trailingIcon = { if (sortOrder == LibraryItemSortOrder.CHRONOLOGICAL) Icon(AppIcons.Success, contentDescription = null) },
+                trailingIcon = { if (sortOrder == LibraryItemSortOrder.CHRONOLOGICAL) AppIcon(AppSymbol.Success,  contentDescription = null) },
             )
             DropdownMenuItem(
                 text = { Text("Alphabétique") },
                 onClick = { onSortOrderSelected(LibraryItemSortOrder.ALPHABETICAL); isMenuExpanded = false },
-                trailingIcon = { if (sortOrder == LibraryItemSortOrder.ALPHABETICAL) Icon(AppIcons.Success, contentDescription = null) },
+                trailingIcon = { if (sortOrder == LibraryItemSortOrder.ALPHABETICAL) AppIcon(AppSymbol.Success,  contentDescription = null) },
             )
         }
     }
@@ -276,7 +275,7 @@ private fun LibraryItemRow(
                     .padding(horizontal = 20.dp),
                 contentAlignment = Alignment.CenterEnd,
             ) {
-                Icon(AppIcons.Delete, contentDescription = null, tint = MaterialTheme.colorScheme.onErrorContainer)
+                AppIcon(AppSymbol.Delete,  contentDescription = null, tint = MaterialTheme.colorScheme.onErrorContainer)
             }
         },
     ) {
@@ -325,8 +324,7 @@ private fun LibraryItemRow(
                     )
                 }
                 IconButton(onClick = onTogglePin) {
-                    Icon(
-                        if (item.isPinned) AppIcons.Pin else AppIcons.PinOutlined,
+                    AppIcon(AppSymbol.Pin, selected = item.isPinned,
                         contentDescription = if (item.isPinned) "Désépingler" else "Épingler",
                         tint = if (item.isPinned) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurfaceVariant,
                     )

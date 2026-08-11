@@ -35,7 +35,9 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import coil.compose.SubcomposeAsyncImage
 import coil.request.ImageRequest
+import com.inktone.core.designsystem.AppIcon
 import com.inktone.core.designsystem.AppIcons
+import com.inktone.core.designsystem.AppSymbol
 import com.inktone.domain.model.Publication
 import java.io.File
 
@@ -136,8 +138,7 @@ fun BookCover(
                 onClick = onToggleFavorite,
                 modifier = Modifier.align(Alignment.TopEnd),
             ) {
-                Icon(
-                    if (publication.isFavorite) AppIcons.Favorite else AppIcons.FavoriteBorder,
+                AppIcon(AppSymbol.Favorite, selected = publication.isFavorite,
                     contentDescription = if (publication.isFavorite)
                         "Retirer des favoris"
                     else
@@ -184,7 +185,7 @@ fun BookCover(
                     .clip(CircleShape)
                     .background(Color.Black.copy(alpha = 0.55f)),
             ) {
-                Icon(AppIcons.MoreActions, contentDescription = "Actions sur « ${publication.title} »", tint = Color.White)
+                AppIcon(AppSymbol.MoreActions,  contentDescription = "Actions sur « ${publication.title} »", tint = Color.White)
             }
         }
 
