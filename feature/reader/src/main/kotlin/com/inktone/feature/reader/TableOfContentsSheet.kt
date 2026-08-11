@@ -22,7 +22,9 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
+import com.inktone.core.designsystem.AppIcon
 import com.inktone.core.designsystem.AppIcons
+import com.inktone.core.designsystem.AppSymbol
 import com.inktone.domain.model.TableOfContentsEntry
 
 /**
@@ -89,7 +91,7 @@ private fun TableOfContentsSheetContent(
         verticalAlignment = Alignment.CenterVertically,
     ) {
         IconButton(onClick = onClose) {
-            Icon(AppIcons.Back, contentDescription = "Fermer le sommaire")
+            AppIcon(AppSymbol.Back,  contentDescription = "Fermer le sommaire")
         }
         Text("Table des matières", style = MaterialTheme.typography.titleMedium)
     }
