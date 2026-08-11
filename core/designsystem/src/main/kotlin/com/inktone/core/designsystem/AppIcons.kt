@@ -11,6 +11,7 @@ import androidx.compose.material.icons.outlined.Article
 import androidx.compose.material.icons.outlined.ChevronRight
 import androidx.compose.material.icons.outlined.Close
 import androidx.compose.material.icons.outlined.Download
+import androidx.compose.material.icons.outlined.SearchOff
 import androidx.compose.material.icons.outlined.Speed
 import androidx.compose.material.icons.filled.DarkMode
 import androidx.compose.material.icons.filled.DeleteSweep
@@ -194,6 +195,7 @@ enum class AppSymbol(
     Lock(R.drawable.ic_symbol_lock),
     Upload(R.drawable.ic_symbol_upload),
     WarningAmber(R.drawable.ic_symbol_warning_amber),
+    SearchOff(R.drawable.ic_symbol_search_off),
 }
 
 /**
@@ -324,4 +326,5 @@ object AppIcons {
     val Lock = Icons.Filled.Lock
     val Upload = Icons.Filled.Upload
     val WarningAmber = Icons.Filled.WarningAmber
+    val SearchOff = Icons.Outlined.SearchOff
 }

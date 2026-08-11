@@ -9,15 +9,13 @@ import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
-import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.outlined.Close
-import androidx.compose.material.icons.outlined.SearchOff
 import androidx.compose.material3.CircularProgressIndicator
-import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextField
+import com.inktone.core.designsystem.AppIcon
+import com.inktone.core.designsystem.AppSymbol
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
@@ -66,7 +64,7 @@ fun SearchScreen(
             trailingIcon = {
                 if (state.query.isNotEmpty()) {
                     IconButton(onClick = { viewModel.onIntent(SearchIntent.QueryChanged("")) }) {
-                        Icon(Icons.Outlined.Close, contentDescription = "Effacer")
+                        AppIcon(AppSymbol.Close, contentDescription = "Effacer")
                     }
                 }
             },
@@ -84,11 +82,7 @@ fun SearchScreen(
                 modifier = Modifier.fillMaxWidth().padding(top = 48.dp),
                 horizontalAlignment = Alignment.CenterHorizontally,
             ) {
-                Icon(
-                    Icons.Outlined.SearchOff,
-                    contentDescription = null,
-                    tint = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.4f),
-                )
+                AppIcon(AppSymbol.SearchOff, contentDescription = null, tint = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.4f))
                 Spacer(Modifier.height(12.dp))
                 Text(
                     "Aucun résultat pour « ${state.query} »",
