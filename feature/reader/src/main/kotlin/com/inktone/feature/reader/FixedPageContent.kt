@@ -1,0 +1,226 @@
+package com.inktone.feature.reader
+
+import android.graphics.Bitmap
+import androidx.compose.foundation.background
+import androidx.compose.foundation.gestures.detectTransformGestures
+import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.fillMaxSize
+import androidx.compose.foundation.pager.HorizontalPager
+import androidx.compose.foundation.pager.rememberPagerState
+import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableFloatStateOf
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
+import androidx.compose.ui.Alignment
+import androidx.compose.ui.Modifier
+import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.ColorFilter
+import androidx.compose.ui.graphics.ColorMatrix
+import androidx.compose.ui.graphics.ImageBitmap
+import androidx.compose.ui.graphics.asImageBitmap
+import androidx.compose.ui.graphics.graphicsLayer
+import androidx.compose.ui.input.pointer.pointerInput
+import androidx.compose.foundation.Image
+import androidx.compose.ui.layout.ContentScale
+import androidx.compose.ui.layout.onSizeChanged
+import androidx.compose.ui.unit.IntSize
+import com.inktone.domain.model.RenderedPage
+import kotlinx.coroutines.delay
+import kotlinx.coroutines.isActive
+import kotlin.math.roundToInt
+
+/**
+ * Rendu d'un PDF page par page (Lot 12, Palier 2, tâche 12.8) — bitmap
+ * PDFium affiché tel quel, jamais de reflow du texte sous-jacent
+ * (ADR-017). [renderPage] est fourni par l'appelant (le ViewModel
+ * enveloppe [com.inktone.domain.service.FixedPageDocument]) : ce
+ * composant ne connaît jamais PDFium ni `infrastructure/parser`
+ * directement (règle de dépendance, Blueprint §4.7).
+ *
+ * **Rendu en tuiles simplifié (écart déclaré vs la recherche initiale).**
+ * La recherche envisageait un découpage en grille de tuiles indépendantes
+ * pour la zone zoomée. Ce palier retient une version plus simple mais
+ * réelle : au repos, la page est rendue à la largeur du viewport ; au-delà
+ * d'un zoom soutenu (après un temps mort du geste), une seule
+ * re-rasterisation à une résolution plus élevée remplace le bitmap —
+ * bornée à [MAX_RENDER_SCALE] fois la largeur du viewport, jamais un
+ * bitmap non borné qui risquerait un `OutOfMemoryError`. Un vrai
+ * découpage en tuiles (rendu du seul rectangle visible à la demande)
+ * reste une amélioration future si la netteté à très fort zoom s'avère
+ * insuffisante en usage réel.
+ */
+@Composable
+fun FixedPageContent(
+    pageCount: Int,
+    currentPageIndex: Int,
+    onPageIndexChanged: (Int) -> Unit,
+    onPageOffsetChanged: (Float) -> Unit,
+    renderPage: suspend (pageIndex: Int, targetWidthPx: Int) -> RenderedPage?,
+    invertColors: (pageIndex: Int) -> Boolean,
+    reduceMotion: Boolean,
+    modifier: Modifier = Modifier,
+) {
+    if (pageCount <= 0) return
+
+    val pagerState = rememberPagerState(initialPage = currentPageIndex.coerceIn(0, pageCount - 1)) { pageCount }
+
+    // Meme garde que le mode SCROLL/PAGED existant (isProgrammaticScroll,
+    // voir ReaderScreen) : une navigation programmatique (table des
+    // matieres, reprise de lecture, recherche) ne doit pas etre reprise
+    // comme un geste utilisateur par l'effet symetrique ci-dessous.
+    var isProgrammaticPageChange by remember { mutableStateOf(false) }
+
+    LaunchedEffect(currentPageIndex) {
+        if (pagerState.currentPage != currentPageIndex && currentPageIndex in 0 until pageCount) {
+            isProgrammaticPageChange = true
+            try {
+                if (reduceMotion) {
+                    pagerState.scrollToPage(currentPageIndex)
+                } else {
+                    pagerState.animateScrollToPage(currentPageIndex)
+                }
+            } finally {
+                isProgrammaticPageChange = false
+            }
+        }
+    }
+
+    LaunchedEffect(pagerState.currentPage) {
+        if (!isProgrammaticPageChange && pagerState.currentPage != currentPageIndex) {
+            onPageIndexChanged(pagerState.currentPage)
+        }
+    }
+
+    HorizontalPager(state = pagerState, modifier = modifier.fillMaxSize()) { pageIndex ->
+        FixedPage(
+            pageIndex = pageIndex,
+            isActivePage = pageIndex == pagerState.currentPage,
+            renderPage = renderPage,
+            invertColors = invertColors(pageIndex),
+            onPageOffsetChanged = onPageOffsetChanged,
+        )
+    }
+}
+
+@Composable
+private fun FixedPage(
+    pageIndex: Int,
+    isActivePage: Boolean,
+    renderPage: suspend (pageIndex: Int, targetWidthPx: Int) -> RenderedPage?,
+    invertColors: Boolean,
+    onPageOffsetChanged: (Float) -> Unit,
+) {
+    var viewportSizePx by remember { mutableStateOf(IntSize.Zero) }
+
+    var scale by remember { mutableFloatStateOf(1f) }
+    var offsetX by remember { mutableFloatStateOf(0f) }
+    var offsetY by remember { mutableFloatStateOf(0f) }
+
+    // Une page qui redevient inactive (swipe vers une autre) perd son
+    // zoom - sinon y revenir la retrouve figee au dernier facteur, un
+    // etat surprenant pour l'utilisateur.
+    LaunchedEffect(isActivePage) {
+        if (!isActivePage) {
+            scale = 1f
+            offsetX = 0f
+            offsetY = 0f
+        }
+    }
+    // Multiplicateur de resolution deja "cuit" dans le bitmap charge -
+    // distinct de `scale` (transformation GPU live du geste). Tant que
+    // les deux ne coincident pas, le bitmap est affiche a `scale /
+    // renderedScale` : net une fois la rasterisation haute definition
+    // arrivee, deja reactif pendant le geste via graphicsLayer seul.
+    var renderedScale by remember(pageIndex) { mutableFloatStateOf(1f) }
+    var bitmap by remember(pageIndex) { mutableStateOf<ImageBitmap?>(null) }
+
+    LaunchedEffect(pageIndex, viewportSizePx) {
+        if (viewportSizePx.width <= 0) return@LaunchedEffect
+        val rendered = renderPage(pageIndex, viewportSizePx.width)
+        if (rendered != null) {
+            bitmap = rendered.toImageBitmap()
+            renderedScale = 1f
+        }
+    }
+
+    // Rasterisation haute definition au relachement du geste (debounce) -
+    // jamais a chaque frame du pincement, qui saturerait le dispatcher
+    // JNI a un seul thread (decision actee, tache 12.2/12.7).
+    LaunchedEffect(pageIndex, scale) {
+        if (scale <= 1.01f || viewportSizePx.width <= 0) return@LaunchedEffect
+        delay(250)
+        if (!isActive) return@LaunchedEffect
+        val targetScale = scale.coerceAtMost(MAX_RENDER_SCALE)
+        val targetWidthPx = (viewportSizePx.width * targetScale).roundToInt()
+        val rendered = renderPage(pageIndex, targetWidthPx) ?: return@LaunchedEffect
+        bitmap = rendered.toImageBitmap()
+        renderedScale = targetScale
+    }
+
+    Box(
+        modifier = Modifier
+            .fillMaxSize()
+            .background(Color.Black)
+            .onSizeChanged { viewportSizePx = it }
+            .pointerInput(pageIndex) {
+                detectTransformGestures { _, pan, zoom, _ ->
+                    val newScale = (scale * zoom).coerceIn(1f, MAX_GESTURE_SCALE)
+                    scale = newScale
+                    offsetX += pan.x
+                    offsetY += pan.y
+                    if (newScale > 1f && viewportSizePx.height > 0) {
+                        val maxOffsetY = viewportSizePx.height * (newScale - 1f) / 2f
+                        offsetY = offsetY.coerceIn(-maxOffsetY, maxOffsetY)
+                        onPageOffsetChanged(((offsetY + maxOffsetY) / (maxOffsetY * 2f)).coerceIn(0f, 1f))
+                    } else {
+                        offsetX = 0f
+                        offsetY = 0f
+                        onPageOffsetChanged(0f)
+                    }
+                }
+            },
+        contentAlignment = Alignment.Center,
+    ) {
+        val currentBitmap = bitmap
+        if (currentBitmap != null) {
+            val displayScale = if (renderedScale > 0f) scale / renderedScale else scale
+            Image(
+                bitmap = currentBitmap,
+                contentDescription = null,
+                contentScale = ContentScale.Fit,
+                colorFilter = if (invertColors) invertedColorFilter else null,
+                modifier = Modifier
+                    .fillMaxSize()
+                    .graphicsLayer {
+                        scaleX = displayScale
+                        scaleY = displayScale
+                        translationX = offsetX
+                        translationY = offsetY
+                    },
+            )
+        }
+    }
+}
+
+private fun RenderedPage.toImageBitmap(): ImageBitmap =
+    Bitmap.createBitmap(pixelsArgb, widthPx, heightPx, Bitmap.Config.ARGB_8888).asImageBitmap()
+
+// ColorMatrix d'inversion de luminance (theme sombre/sepia sur page
+// vectorielle, tache 12.11) - fond noir, texte clair, sans toucher la
+// teinte (canal alpha inchange).
+private val invertedColorFilter = ColorFilter.colorMatrix(
+    ColorMatrix(
+        floatArrayOf(
+            -1f, 0f, 0f, 0f, 255f,
+            0f, -1f, 0f, 0f, 255f,
+            0f, 0f, -1f, 0f, 255f,
+            0f, 0f, 0f, 1f, 0f,
+        ),
+    ),
+)
+
+private const val MAX_RENDER_SCALE = 3f
+private const val MAX_GESTURE_SCALE = 5f
