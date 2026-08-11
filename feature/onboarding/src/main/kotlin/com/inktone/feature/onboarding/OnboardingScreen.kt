@@ -146,7 +146,7 @@ private fun WelcomeCard(accent: Color) {
         Image(
             painter = painterResource(com.inktone.core.designsystem.R.drawable.app_icon_monochrome),
             contentDescription = "Icône InkTone",
-            modifier = Modifier.size(140.dp),
+            modifier = Modifier.size(180.dp),
             contentScale = ContentScale.Fit,
             colorFilter = ColorFilter.tint(accent),
         )
