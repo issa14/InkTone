@@ -2,9 +2,18 @@ package com.inktone.core.designsystem
 
 import androidx.annotation.DrawableRes
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.automirrored.filled.ArrowForward
 import androidx.compose.material.icons.automirrored.filled.NavigateBefore
 import androidx.compose.material.icons.automirrored.filled.NavigateNext
 import androidx.compose.material.icons.automirrored.filled.Sort
+import androidx.compose.material.icons.automirrored.filled.VolumeDown
+import androidx.compose.material.icons.outlined.Article
+import androidx.compose.material.icons.outlined.ChevronRight
+import androidx.compose.material.icons.outlined.Close
+import androidx.compose.material.icons.outlined.Download
+import androidx.compose.material.icons.outlined.Speed
+import androidx.compose.material.icons.filled.DarkMode
+import androidx.compose.material.icons.filled.DeleteSweep
 import androidx.compose.material.icons.automirrored.outlined.ArrowBack
 import androidx.compose.material.icons.automirrored.outlined.List
 import androidx.compose.material.icons.automirrored.outlined.MenuBook
@@ -158,6 +167,17 @@ enum class AppSymbol(
     Accessibility(R.drawable.ic_symbol_accessibility),
     Pronunciation(R.drawable.ic_symbol_pronunciation),
     AddCircle(R.drawable.ic_symbol_add_circle),
+
+    // --- Lot 2c.2 — icônes ajoutées pour le rollout modules ---
+    DarkMode(R.drawable.ic_symbol_dark_mode),
+    Close(R.drawable.ic_symbol_close),
+    Download(R.drawable.ic_symbol_download),
+    ChevronRight(R.drawable.ic_symbol_chevron_right),
+    Article(R.drawable.ic_symbol_article),
+    Speed(R.drawable.ic_symbol_speed),
+    ArrowForward(R.drawable.ic_symbol_arrow_forward),
+    VolumeDown(R.drawable.ic_symbol_volume_down),
+    DeleteSweep(R.drawable.ic_symbol_delete_sweep),
 }
 
 /**
@@ -268,4 +288,15 @@ object AppIcons {
     val Add = Icons.Outlined.Add
     val Remove = Icons.Outlined.Remove
     val SleepTimer = Icons.Outlined.Bedtime
+
+    // Icônes ajoutées pour le rollout 2c.2 modules
+    val DarkMode = Icons.Filled.DarkMode
+    val Close = Icons.Outlined.Close
+    val Download = Icons.Outlined.Download
+    val ChevronRight = Icons.Outlined.ChevronRight
+    val Article = Icons.Outlined.Article
+    val Speed = Icons.Outlined.Speed
+    val ArrowForward = Icons.AutoMirrored.Filled.ArrowForward
+    val VolumeDown = Icons.AutoMirrored.Filled.VolumeDown
+    val DeleteSweep = Icons.Filled.DeleteSweep
 }
