@@ -54,6 +54,7 @@ import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.hilt.navigation.compose.hiltViewModel
+import com.inktone.core.designsystem.NarrativeAccentFamily
 
 /**
  * Couleur signature InkTone — utilisée volontairement en littéral sur cet
@@ -151,7 +152,7 @@ private fun WelcomeCard(accent: Color) {
             colorFilter = ColorFilter.tint(accent),
         )
         Spacer(Modifier.height(32.dp))
-        Text("Bienvenue sur InkTone", style = MaterialTheme.typography.headlineMedium, fontWeight = FontWeight.Bold, textAlign = TextAlign.Center)
+        Text("Bienvenue sur InkTone", style = MaterialTheme.typography.headlineMedium, fontFamily = NarrativeAccentFamily, fontWeight = FontWeight.Bold, textAlign = TextAlign.Center)
         Spacer(Modifier.height(16.dp))
         BodyText("Lisez avec les yeux, continuez avec les oreilles. Une expérience de lecture unifiée qui s'adapte à votre rythme.")
     }
@@ -172,6 +173,7 @@ private fun FeaturesCard(accent: Color) {
         Text(
             "Conçu pour votre confort",
             style = MaterialTheme.typography.headlineMedium,
+            fontFamily = NarrativeAccentFamily,
             fontWeight = FontWeight.Bold,
             textAlign = TextAlign.Center,
             modifier = Modifier.fillMaxWidth(),
@@ -243,6 +245,7 @@ private fun ReadyCard(accent: Color, onStart: () -> Unit) {
         Text(
             "Votre prochaine histoire vous attend",
             style = MaterialTheme.typography.headlineMedium,
+            fontFamily = NarrativeAccentFamily,
             fontWeight = FontWeight.Bold,
             textAlign = TextAlign.Center,
         )
