@@ -1,5 +1,7 @@
 package com.inktone.core.ui
 
+import com.inktone.core.designsystem.AppIcon
+import com.inktone.core.designsystem.AppSymbol
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
@@ -12,8 +14,6 @@ import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
-import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.automirrored.outlined.MenuBook
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.Icon
@@ -45,7 +45,7 @@ fun AboutScreen(versionName: String = "0.1.0") {
         horizontalAlignment = Alignment.CenterHorizontally,
     ) {
         Spacer(Modifier.height(20.dp))
-        Icon(Icons.AutoMirrored.Outlined.MenuBook, null, tint = MaterialTheme.colorScheme.primary, modifier = Modifier.height(64.dp).width(64.dp))
+        AppIcon(AppSymbol.Reading, null, tint = MaterialTheme.colorScheme.primary, modifier = Modifier.height(64.dp).width(64.dp))
         Spacer(Modifier.height(12.dp))
         Text("InkTone", color = MaterialTheme.colorScheme.onSurface, fontWeight = FontWeight.Bold, fontSize = 26.sp)
         Text("Version $versionName", color = MaterialTheme.colorScheme.onSurfaceVariant, fontSize = 13.sp)
