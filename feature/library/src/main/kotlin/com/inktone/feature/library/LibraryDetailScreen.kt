@@ -8,9 +8,6 @@ import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
-import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.automirrored.filled.ArrowBack
-import androidx.compose.material.icons.outlined.Search
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
@@ -33,7 +30,9 @@ import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.hilt.navigation.compose.hiltViewModel
+import com.inktone.core.designsystem.AppIcon
 import com.inktone.core.designsystem.AppIcons
+import com.inktone.core.designsystem.AppSymbol
 
 /**
  * Écran de détail Séries/Tags (UX §Menu déroulant du titre, écran de
@@ -85,7 +84,7 @@ fun LibraryDetailScreen(
                             isSearchActive = false
                             viewModel.onIntent(LibraryDetailIntent.SetSearchQuery(""))
                         }) {
-                            Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = "Fermer")
+                            AppIcon(AppSymbol.Back, contentDescription = "Fermer")
                         }
                     },
                     colors = TopAppBarDefaults.topAppBarColors(
@@ -116,15 +115,15 @@ fun LibraryDetailScreen(
                     },
                     navigationIcon = {
                         IconButton(onClick = onBack) {
-                            Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = "Retour")
+                            AppIcon(AppSymbol.Back, contentDescription = "Retour")
                         }
                     },
                     actions = {
                         IconButton(onClick = { isSearchActive = true }) {
-                            Icon(Icons.Outlined.Search, contentDescription = "Rechercher")
+                            AppIcon(AppSymbol.Search, contentDescription = "Rechercher")
                         }
                         IconButton(onClick = { showFilterDialog = true }) {
-                            Icon(AppIcons.Filter, contentDescription = "Filtrer")
+                            AppIcon(AppSymbol.Filter,  contentDescription = "Filtrer")
                         }
                     },
                     colors = TopAppBarDefaults.topAppBarColors(
