@@ -1,5 +1,7 @@
 package com.inktone.feature.statistics
 
+import com.inktone.core.designsystem.AppIcon
+import com.inktone.core.designsystem.AppSymbol
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -18,10 +20,6 @@ import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.shape.RoundedCornerShape
-import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.automirrored.filled.ArrowBack
-import androidx.compose.material.icons.outlined.Speed
-import androidx.compose.material.icons.outlined.Timer
 import androidx.compose.material3.CenterAlignedTopAppBar
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.DropdownMenuItem
@@ -83,7 +81,7 @@ fun BookStatisticsScreen(
                 },
                 navigationIcon = {
                     IconButton(onClick = onBack) {
-                        Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = "Retour")
+                        Icon(AppIcons.Back, contentDescription = "Retour")
                     }
                 },
                 colors = TopAppBarDefaults.centerAlignedTopAppBarColors(),
@@ -115,11 +113,11 @@ fun BookStatisticsScreen(
                             horizontalArrangement = Arrangement.spacedBy(InkToneSpacing.md),
                         ) {
                             KpiCard(
-                                icon = Icons.Outlined.Speed, label = "Vitesse",
+                                icon = AppIcons.Speed, label = "Vitesse",
                                 value = s.wpmFormatted, modifier = Modifier.weight(1f),
                             )
                             KpiCard(
-                                icon = Icons.Outlined.Timer, label = "Temps restant",
+                                icon = AppIcons.Timer, label = "Temps restant",
                                 value = s.remainingTimeFormatted, modifier = Modifier.weight(1f),
                             )
                         }
@@ -219,14 +217,14 @@ private fun SessionHistoryRow(item: SessionHistoryItem) {
             // sans réduction — pas de notion de "mode dominant".
             if (item.isMixed) {
                 Row {
-                    Icon(AppIcons.VisualReading, contentDescription = null, tint = MaterialTheme.colorScheme.primary)
+                    AppIcon(AppSymbol.VisualReading,  contentDescription = null, tint = MaterialTheme.colorScheme.primary)
                     Spacer(Modifier.width(4.dp))
-                    Icon(AppIcons.TtsListening, contentDescription = null, tint = MaterialTheme.colorScheme.tertiary)
+                    AppIcon(AppSymbol.TtsListening,  contentDescription = null, tint = MaterialTheme.colorScheme.tertiary)
                 }
             } else if (item.isVisual) {
-                Icon(AppIcons.VisualReading, contentDescription = null, tint = MaterialTheme.colorScheme.primary)
+                AppIcon(AppSymbol.VisualReading,  contentDescription = null, tint = MaterialTheme.colorScheme.primary)
             } else {
-                Icon(AppIcons.TtsListening, contentDescription = null, tint = MaterialTheme.colorScheme.tertiary)
+                AppIcon(AppSymbol.TtsListening,  contentDescription = null, tint = MaterialTheme.colorScheme.tertiary)
             }
         },
         trailingContent = {
@@ -244,11 +242,11 @@ private fun SessionHistoryRow(item: SessionHistoryItem) {
                     Row(verticalAlignment = Alignment.CenterVertically) {
                         Text("${item.visualMinutes} min", style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
                         Spacer(Modifier.width(2.dp))
-                        Icon(AppIcons.VisualReading, contentDescription = null, modifier = Modifier.size(14.dp), tint = MaterialTheme.colorScheme.primary)
+                        AppIcon(AppSymbol.VisualReading,  contentDescription = null, modifier = Modifier.size(14.dp), tint = MaterialTheme.colorScheme.primary)
                         Spacer(Modifier.width(6.dp))
                         Text("${item.ttsMinutes} min", style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
                         Spacer(Modifier.width(2.dp))
-                        Icon(AppIcons.TtsListening, contentDescription = null, modifier = Modifier.size(14.dp), tint = MaterialTheme.colorScheme.tertiary)
+                        AppIcon(AppSymbol.TtsListening,  contentDescription = null, modifier = Modifier.size(14.dp), tint = MaterialTheme.colorScheme.tertiary)
                     }
                 }
             }
