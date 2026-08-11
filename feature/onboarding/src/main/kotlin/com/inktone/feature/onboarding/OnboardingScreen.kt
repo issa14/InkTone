@@ -1,5 +1,6 @@
 package com.inktone.feature.onboarding
 
+import androidx.compose.foundation.Image
 import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
@@ -41,9 +42,12 @@ import androidx.compose.ui.draw.clip
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.geometry.Size
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.ColorFilter
 import androidx.compose.ui.graphics.StrokeCap
 import androidx.compose.ui.graphics.drawscope.Stroke
 import androidx.compose.ui.graphics.vector.ImageVector
+import androidx.compose.ui.layout.ContentScale
+import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.Dp
@@ -54,23 +58,21 @@ import androidx.hilt.navigation.compose.hiltViewModel
 /**
  * Couleur signature InkTone — utilisée volontairement en littéral sur cet
  * écran de marque (retour Issa, vérification device) : la couleur
- * dynamique (Material You, activée par défaut) ne garantit pas le
- * bordeaux à cet endroit précis, alors que l'onboarding est le premier
- * contact avec l'identité visuelle.
+ * dynamique (Material You) ne garantit pas le violet de marque à cet
+ * endroit précis, alors que l'onboarding est le premier contact avec
+ * l'identité visuelle. Sous-lot 2a — remplace le bordeaux legacy
+ * (#7A1F3D) par le violet Deadly Depths.
  *
- * [InkToneBordeauxLight] — retour Issa (test appareil réel, mode sombre) :
- * le bordeaux standard manque de contraste sur fond sombre. [accentColor]
- * choisit la bonne variante selon [isSystemInDarkTheme] pour les accents
- * (icônes, indicateurs, texte secondaire) ; le bouton « Commencer » reste
- * volontairement sur le bordeaux standard avec un texte blanc forcé, pas
- * la variante claire (voir [ReadyCard]) — un bouton plein doit rester
- * lisible par son propre contraste fond/texte, indépendamment du thème.
+ * [InkToneVioletLight] — variante claire pour le mode sombre :
+ * `AccentContainer300 #A698E1` (7.23:1 sur fond sombre), lisible en
+ * icône et en dessin vectoriel, contrairement à `primary` sombre
+ * (#7661D1) qui est sous le seuil WCAG AA texte.
  */
-val InkToneBordeaux = Color(0xFF7A1F3D)
-val InkToneBordeauxLight = Color(0xFFD67393)
+val InkToneViolet = Color(0xFF2C1E67)
+val InkToneVioletLight = Color(0xFFA698E1)
 
 @Composable
-private fun accentColor(): Color = if (isSystemInDarkTheme()) InkToneBordeauxLight else InkToneBordeaux
+private fun accentColor(): Color = if (isSystemInDarkTheme()) InkToneVioletLight else InkToneViolet
 
 /**
  * Lot 10, Tâche 10.2 — `HorizontalPager` à trois cartes. Retour Issa
@@ -129,13 +131,10 @@ fun OnboardingScreen(viewModel: OnboardingViewModel = hiltViewModel(), onDone: (
 }
 
 /**
- * Retour Issa (vérification device, V2206) : la métaphore sonore du texte
- * (« continuez avec les oreilles ») avait disparu de cette carte — le
- * livre y était seul, identique en composition à la carte 3. [SoundWaves]
- * réintroduit l'évocation audio à côté du livre, sans revenir à un
- * `Canvas` pour le livre lui-même (toujours un [BrandIcon]).
- * Le `Spacer` final de 64dp qui poussait le bloc vers le haut est retiré :
- * `Arrangement.Center` seul recentre correctement la composition.
+ * Sous-lot 2a — l'icône de l'application (cacatoès + livre) remplace
+ * l'ancienne illustration livre générique + ondes sonores. La version
+ * monochrome (drawable-nodpi) est tintée avec la couleur d'accent,
+ * qui s'adapte automatiquement au thème clair/sombre via [accentColor].
  */
 @Composable
 private fun WelcomeCard(accent: Color) {
@@ -144,36 +143,17 @@ private fun WelcomeCard(accent: Color) {
         horizontalAlignment = Alignment.CenterHorizontally,
         verticalArrangement = Arrangement.Center,
     ) {
-        Row(verticalAlignment = Alignment.CenterVertically) {
-            BrandIcon(icon = Icons.AutoMirrored.Outlined.MenuBook, size = 96.dp, tint = accent)
-            SoundWaves(accent = accent, modifier = Modifier.width(48.dp).height(96.dp))
-        }
+        Image(
+            painter = painterResource(com.inktone.core.designsystem.R.drawable.app_icon_monochrome),
+            contentDescription = "Icône InkTone",
+            modifier = Modifier.size(140.dp),
+            contentScale = ContentScale.Fit,
+            colorFilter = ColorFilter.tint(accent),
+        )
         Spacer(Modifier.height(32.dp))
         Text("Bienvenue sur InkTone", style = MaterialTheme.typography.headlineMedium, fontWeight = FontWeight.Bold, textAlign = TextAlign.Center)
         Spacer(Modifier.height(16.dp))
         BodyText("Lisez avec les yeux, continuez avec les oreilles. Une expérience de lecture unifiée qui s'adapte à votre rythme.")
-    }
-}
-
-/** Arcs concentrés évoquant une onde sonore, opacité décroissante vers l'extérieur — pas un dessin du livre, une couche graphique légère à côté de [BrandIcon]. */
-@Composable
-private fun SoundWaves(accent: Color, modifier: Modifier = Modifier) {
-    Canvas(modifier) {
-        val strokeWidth = 3.dp.toPx()
-        val baseRadius = size.height * 0.4f
-        repeat(3) { index ->
-            val radius = baseRadius + index * (size.height * 0.22f)
-            val alpha = 0.5f - index * 0.15f
-            drawArc(
-                color = accent.copy(alpha = alpha),
-                startAngle = -55f,
-                sweepAngle = 110f,
-                useCenter = false,
-                topLeft = Offset(-radius, size.height / 2f - radius),
-                size = Size(radius * 2, radius * 2),
-                style = Stroke(width = strokeWidth, cap = StrokeCap.Round),
-            )
-        }
     }
 }
 
@@ -276,7 +256,7 @@ private fun ReadyCard(accent: Color, onStart: () -> Unit) {
         Button(
             onClick = onStart,
             modifier = Modifier.fillMaxWidth(0.7f),
-            colors = ButtonDefaults.buttonColors(containerColor = InkToneBordeaux, contentColor = Color.White),
+            colors = ButtonDefaults.buttonColors(containerColor = InkToneViolet, contentColor = Color.White),
         ) {
             Text("Commencer")
         }
