@@ -17,7 +17,7 @@ data class UserPreferences(
     val reduceMotion: Boolean = false,
     // Tache 9bis.1.2 — s'applique uniquement au chrome de l'app
     // (InkToneTheme), jamais aux ReadingTheme de lecture.
-    val dynamicColorEnabled: Boolean = true,
+    val dynamicColorEnabled: Boolean = false,
     // Lot 6 — thème système de l'app (Système/Clair/Sombre), distinct du thème de lecture.
     val appTheme: AppTheme = AppTheme.SYSTEM,
     // Tache 9bis.3.6 — reglage seul pour l'instant, ReaderScreen ne
