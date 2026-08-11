@@ -95,15 +95,15 @@ Le bordeaux (`#7A1F3D`, ancienne teinte ReadFlow) a été écarté pour l'usage 
 
 Rampe tonale proposée à partir de Deadly Depths (`#19113B`, teinte 251°/55%/15% en HSL), avec un palier dédié au mode sombre pour rester lisible (contrastes vérifiés WCAG) :
 
-| Token | Hex | Usage | Contraste / fond crème `#FBFAF6` | Contraste / fond sombre `#121212` |
+| Token | Hex | Usage | Contraste / fond crème `#FFFBF5` | Contraste / fond sombre `#0F1419` |
 |---|---|---|---|---|
 | `Accent900` | `#19113B` | Emphase forte, usage ponctuel (mode clair uniquement) | 16.97:1 | — |
-| `Accent700` | `#2C1E67` | Accent principal — mode clair (icônes actives, boutons, liens, TTS) | 13.56:1 | — |
-| `Accent500` | `#7661D1` | Accent principal — mode sombre (même rôle que 700, adapté à la luminosité) | 4.58:1 | 3.92:1 |
-| `AccentContainer300` | `#A698E1` | Fond teinté clair (badges, container) | — | 7.32:1 |
+| `Accent700` | `#2C1E67` | Accent principal — mode clair (icônes actives, boutons, liens, TTS) | 13.68:1 | — |
+| `Accent500` | `#7661D1` | Accent principal — mode sombre (même rôle que 700, adapté à la luminosité) | 4.58:1 | 3.88:1 |
+| `AccentContainer300` | `#A698E1` | Fond teinté clair (badges, container) + **accent-texte sombre** (seul palier qui passe WCAG AA texte) | — | 7.23:1 |
 | `AccentContainer100` | `#E4DFF6` | Fond très légèrement teinté (sélection, highlight discret) | — | 14.46:1 |
 
-`Accent700` et `Accent500` dépassent le seuil WCAG non-text (3:1) et s'approchent ou dépassent le seuil texte (4.5:1) sur leurs fonds respectifs — utilisables aussi bien pour des icônes que pour du texte de lien.
+`Accent700` passe le seuil WCAG AA texte (≥ 4.5:1) sur fond clair — utilisable en icône, bouton et lien. **En mode sombre, `Accent500` est strictement non-texte** (3.88:1 sur le fond réel `#0F1419`) : tout texte ou lien accentué en sombre doit employer `AccentContainer300` (`#A698E1`, 7.23:1).
 
 **Couleurs sémantiques (erreur, succès, avertissement)** — *à définir*, mais doivent explicitement **ne pas** chevaucher la famille rouge/bordeaux ni la famille violette de l'accent, pour rester distinguables des couleurs de marque.
 
@@ -169,8 +169,7 @@ Consolidation des principes établis au fil du projet :
 | Traduction en microcopy (§2) | Validé | 10/08/2026 | Vouvoiement non rigide, voix impersonnelle sauf exception amorces TTS ("je") |
 | Typographie chrome + accent narratif (§3.3) | Validé | 10/08/2026 | Work Sans (chrome), Literata (accent narratif ponctuel) — licences OFL 1.1 vérifiées à la source |
 | Iconographie chrome (§3.4) | Validé | 10/08/2026 | Material Symbols Rounded, contour/plein pour l'état inactif/actif |
-| Typographie (§3.3) | À définir | — | — |
-| Iconographie chrome (§3.4) | À définir | — | — |
+| D0 = C — violet par défaut, Material You en option | Validé | 11/08/2026 | Défaut `dynamicColorEnabled` inversé à false ; installs neuves démarrent en violet de marque, Material You disponible en opt-in dans les réglages |
 
 ---
 
@@ -189,8 +188,11 @@ val Accent500 = Color(0xFF7661D1)  // accent principal, mode sombre
 val AccentContainer300 = Color(0xFFA698E1)
 val AccentContainer100 = Color(0xFFE4DFF6)
 
-// Référence — couleur de fond du logo (non utilisée en UI, pour cohérence visuelle uniquement)
-val LogoBackgroundReference = Color(0xFFFBFAF6)
+// Référence — fonds réels du thème (Color.kt), à utiliser comme base
+// de calcul pour tout nouveau contraste (ne pas employer #FBFAF6 ni #121212,
+// qui sont des approximations non représentatives du rendu device).
+val LightBackground = Color(0xFFFFFBF5)
+val DarkBackground = Color(0xFF0F1419)
 
 // Typographie — chrome fonctionnel vs accent narratif ponctuel (§3.3)
 // Work Sans et Literata : SIL OFL 1.1, à intégrer en variable font (poids 400/500 suffisent pour le chrome)

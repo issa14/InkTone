@@ -6,19 +6,17 @@ import androidx.compose.material3.lightColorScheme
 import androidx.compose.ui.graphics.Color
 
 /**
- * Palette "Signature" portée du legacy (Tâche 9bis.1.1) — bleu lecture +
- * orange TTS, seule des 4 palettes legacy retenue ici : les 3 autres
- * (Papier d'Art, Obsidian, Brouillard Nordique) n'étaient jamais
- * sélectionnables depuis les réglages (aucun `AppTheme` dans le domaine
- * actuel), portées mais jamais branchées côté UI. Ne pas réintroduire un
- * sélecteur de thème de chrome sans qu'une tâche l'exige explicitement —
- * la couleur dynamique (9bis.1.2) couvre déjà la personnalisation.
+ * Palette de marque "Deadly Depths" (Sous-lot 2a) — violet signature
+ * InkTone, remplace le bleu legacy. Contraste vérifié WCAG 2.x sur les
+ * fonds réels (#FFFBF5 / #0F1419). L'accent-texte sombre est déporté sur
+ * onPrimaryContainer (Cont.300) car primary sombre (#7661D1) est en
+ * dessous du seuil WCAG AA texte (3.88:1).
  */
 val InkToneLightColorScheme = lightColorScheme(
-    primary = Color(0xFF0066FF),
+    primary = Color(0xFF2C1E67),
     onPrimary = Color.White,
-    primaryContainer = Color(0xFFD6E3FF),
-    onPrimaryContainer = Color(0xFF001B3E),
+    primaryContainer = Color(0xFFE4DFF6),
+    onPrimaryContainer = Color(0xFF19113B),
     secondary = Color(0xFFC04000),
     onSecondary = Color.White,
     secondaryContainer = Color(0xFFFFDBD1),
@@ -41,16 +39,16 @@ val InkToneLightColorScheme = lightColorScheme(
     outlineVariant = Color(0xFFC4C6D0),
     inverseSurface = Color(0xFF303033),
     inverseOnSurface = Color(0xFFF2F0F4),
-    inversePrimary = Color(0xFFAAC7FF),
+    inversePrimary = Color(0xFF7661D1),
     scrim = Color.Black,
 )
 
 /** Variante sombre optimisée OLED (fond quasi noir). */
 val InkToneDarkColorScheme = darkColorScheme(
-    primary = Color(0xFF3399FF),
-    onPrimary = Color(0xFF001D3A),
-    primaryContainer = Color(0xFF004A9C),
-    onPrimaryContainer = Color(0xFFD6E3FF),
+    primary = Color(0xFF7661D1),
+    onPrimary = Color.White,
+    primaryContainer = Color(0xFF2C1E67),
+    onPrimaryContainer = Color(0xFFA698E1),
     secondary = Color(0xFFFF8C5A),
     onSecondary = Color(0xFF3D0D00),
     secondaryContainer = Color(0xFF5C1A00),
@@ -73,7 +71,7 @@ val InkToneDarkColorScheme = darkColorScheme(
     outlineVariant = Color(0xFF44464F),
     inverseSurface = Color(0xFFE2E2E6),
     inverseOnSurface = Color(0xFF1B1B1F),
-    inversePrimary = Color(0xFF0066FF),
+    inversePrimary = Color(0xFF7661D1),
     scrim = Color.Black,
 )
 
