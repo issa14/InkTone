@@ -8,12 +8,22 @@ package com.inktone.domain.valueobject
  * value object. Jamais de numéro de page (revue B5) : [progression] issue
  * de [computeProgression] est une valeur dérivée pour l'affichage,
  * jamais la source de vérité de la reprise de lecture.
+ *
+ * PDF (Lot 12) se fond dans ce Locator existant plutôt que d'en créer un
+ * second (règle non négociable) : `chapterIndex` vaut l'index de page
+ * (un `Chapter` par page, `PdfPublicationParser`), `resourceHref` le href
+ * réel de cette page (`"page-{index}"`), `charOffset` un décalage dans le
+ * texte extrait de la page (`0` par convention pour une page image sans
+ * texte). [pageOffsetY] est le seul ajout réel : un ratio de défilement
+ * vertical au sein de la page, sans équivalent en EPUB reflowable où la
+ * position se déduit entièrement de `charOffset`.
  */
 data class Locator(
     val resourceHref: String,
     val chapterIndex: Int,
     val paragraphIndex: Int? = null,
     val charOffset: Int,
+    val pageOffsetY: Float? = null,
 ) : Comparable<Locator> {
 
     init {
@@ -22,6 +32,9 @@ data class Locator(
         require(charOffset >= 0) { "charOffset doit être positif ou nul" }
         paragraphIndex?.let {
             require(it >= 0) { "paragraphIndex doit être positif ou nul" }
+        }
+        pageOffsetY?.let {
+            require(it in 0f..1f) { "pageOffsetY doit être compris entre 0 et 1" }
         }
     }
 

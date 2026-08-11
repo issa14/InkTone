@@ -115,6 +115,11 @@ class ImportPublicationUseCase(
             fileHash = hash,
             fileSize = size,
             chapterCount = result.documentModel.chapters.size,
+            // Lot 12, tache 12.4 : jamais depuis PublicationMetadata (pas
+            // ce champ) - derive du DocumentModel deja construit, qui
+            // coincide par construction avec chapterCount pour un PDF
+            // (page = chapitre, PdfPublicationParser).
+            pageCount = result.documentModel.chapters.size.takeIf { format == PublicationFormat.PDF },
             seriesName = metadata.seriesName,
             seriesIndex = metadata.seriesIndex,
             subjects = metadata.subjects,
@@ -126,12 +131,17 @@ class ImportPublicationUseCase(
 
     // Meme heuristique par extension que CompositePublicationParser
     // (infrastructure/parser) — coherence du choix de format entre
-    // "quel parser appeler" et "quel PublicationFormat stocker" (PDF hors
-    // perimetre v1, ADR-017 : ni l'un ni l'autre ne le distingue encore).
+    // "quel parser appeler" et "quel PublicationFormat stocker". PDF
+    // ajoute au Lot 12 (tache 12.4) - duplication de l'heuristique deja
+    // presente avant ce lot entre les deux fichiers, etendue ici plutot
+    // que corrigee (ecart declare, decision actee 11 du plan).
     // Prend le nom de fichier resolu (fileStorageService.getFileName),
     // jamais l'URI SAF brute qui ne le contient pas (bug corrige lot 2a).
-    private fun formatOf(fileName: String): PublicationFormat =
-        if (fileName.endsWith(".txt", ignoreCase = true)) PublicationFormat.TXT else PublicationFormat.EPUB
+    private fun formatOf(fileName: String): PublicationFormat = when {
+        fileName.endsWith(".txt", ignoreCase = true) -> PublicationFormat.TXT
+        fileName.endsWith(".pdf", ignoreCase = true) -> PublicationFormat.PDF
+        else -> PublicationFormat.EPUB
+    }
 }
 
 sealed interface ImportResult {
