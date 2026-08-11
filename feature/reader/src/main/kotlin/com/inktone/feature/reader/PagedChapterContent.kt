@@ -1,7 +1,6 @@
 package com.inktone.feature.reader
 
 import androidx.compose.foundation.ExperimentalFoundationApi
-import androidx.compose.foundation.gestures.detectTapGestures
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.padding
@@ -26,7 +25,6 @@ import androidx.compose.ui.draw.drawWithContent
 import androidx.compose.ui.geometry.Rect
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.drawscope.DrawScope
-import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.layout.LayoutCoordinates
 import androidx.compose.ui.layout.onGloballyPositioned
 import androidx.compose.ui.platform.LocalDensity
@@ -306,8 +304,12 @@ private fun PageBlock(
     onFreeSelectionBoundsInWindow: (Rect?) -> Unit,
     onClick: () -> Unit,
 ) {
-    var textLayoutResult by remember { mutableStateOf<TextLayoutResult?>(null) }
-    var textCoordinates by remember { mutableStateOf<LayoutCoordinates?>(null) }
+    // Keyé sur `pageOffsetRange`, comme `selection`/`pendingShowJob`
+    // ci-dessous : évite un `TextLayoutResult`/des coordonnées d'une
+    // AUTRE page qui persisteraient transitoirement si Compose réutilise
+    // cette instance de composable pour un `pageOffsetRange` différent.
+    var textLayoutResult by remember(pageOffsetRange) { mutableStateOf<TextLayoutResult?>(null) }
+    var textCoordinates by remember(pageOffsetRange) { mutableStateOf<LayoutCoordinates?>(null) }
     val density = LocalDensity.current
 
     // Un `BasicTextField` en lecture seule délègue directement à la
@@ -328,23 +330,46 @@ private fun PageBlock(
     val coroutineScope = rememberCoroutineScope()
     var pendingShowJob by remember(pageOffsetRange) { mutableStateOf<Job?>(null) }
 
-    // Resynchronisation dans l'autre sens : si `freeSelectedRange` (état
-    // remonté par le ViewModel) redevient `null` ailleurs (bouton Annuler
-    // du popup, `ClearFreeSelection`), la sélection LOCALE du champ doit
-    // être effacée aussi, sinon les poignées natives resteraient
-    // affichées sur une sélection que le reste de l'écran a déjà
-    // oubliée. Les BORNES du popup, elles, viennent désormais de
-    // `showMenu` ci-dessous (rect natif), pas d'un recalcul ici.
-    LaunchedEffect(isDisplayedPage, pageOffsetRange) {
+    // Resynchronisation stricte état local (`selection`) ↔ état global
+    // (`freeSelectedRange`, remonté par le ViewModel) : réévaluée à
+    // CHAQUE changement de `freeSelectedRange`, indépendamment de
+    // `isDisplayedPage` — même robustesse que `ParagraphText` (mode
+    // SCROLL, `stillOwnsSelection`). Avant ce correctif, seule la
+    // nullité globale était couverte (voir aussi le nettoyage au départ
+    // d'écran ci-dessous) ; vérifier l'APPARTENANCE complète (pas
+    // seulement la nullité) couvre aussi le cas où l'état global pointe
+    // désormais vers une AUTRE page.
+    LaunchedEffect(pageOffsetRange) {
+        snapshotFlow { freeSelectedRange.value }.collect { absolute ->
+            val stillOwnsSelection = absolute != null &&
+                absolute.first >= pageOffsetRange.first &&
+                absolute.last <= pageOffsetRange.last
+            if (!stillOwnsSelection && !selection.collapsed) {
+                selection = TextRange.Zero
+            }
+        }
+    }
+
+    // Départ d'écran (page adjacente gardée montée par
+    // `beyondViewportPageCount = 1`, jamais détruite par un simple
+    // swipe) : au-delà de masquer le popup (bornes à `null`, déjà en
+    // place), nettoie AUSSI immédiatement la sélection — locale ET
+    // globale — si cette page en portait une active. Corrige la
+    // « sélection fantôme » du diagnostic : sans ceci, `selection`
+    // restait non-collapsed indéfiniment sur cette instance conservée
+    // montée hors écran, ce qui bloquait tout tap ultérieur sur cette
+    // page (garde `!selection.collapsed`, `semantics` ci-dessous)
+    // jusqu'à un clear incident déclenché ailleurs, et pouvait faire
+    // réapparaître l'ancien surlignage SANS popup en reswipant vers
+    // cette page.
+    LaunchedEffect(isDisplayedPage) {
         if (!isDisplayedPage) {
             pendingShowJob?.cancel()
             pendingShowJob = null
             onFreeSelectionBoundsInWindow(null)
-            return@LaunchedEffect
-        }
-        snapshotFlow { freeSelectedRange.value }.collect { absolute ->
-            if (absolute == null && selection != TextRange.Zero) {
+            if (!selection.collapsed) {
                 selection = TextRange.Zero
+                onFreeSelectionCleared()
             }
         }
     }
@@ -438,21 +463,26 @@ private fun PageBlock(
         BasicTextField(
             value = fieldValue,
             onValueChange = { newValue ->
-                // Bug réel trouvé sur appareil : un tap sur la sélection
-                // pour l'annuler est traité EN INTERNE par BasicTextField
-                // (collapse de la sélection) — notre pointerInput sibling
-                // ci-dessous ne voit jamais cet évènement précis (avalé
-                // avant lui), donc `onClick` n'était jamais appelé et le
-                // HUD ne revenait pas après une annulation par tap.
-                // Détecté ici via la transition non-collapsed → collapsed
-                // (seule source fiable de ce signal), pas via le geste.
-                val wasCollapsed = selection.collapsed
+                // Bug 1 du diagnostic HUD : `BasicTextField` consomme en
+                // interne les taps pour positionner son curseur (même en
+                // lecture seule) — un `pointerInput` sibling voisin ne
+                // les voit alors jamais (avalés avant lui dans l'arène de
+                // gestes Compose), qu'il y ait une sélection à annuler ou
+                // non. Plutôt que de lutter contre cette priorité,
+                // `onValueChange` EST désormais la seule source de vérité
+                // du tap : toute transition qui aboutit à `collapsed` est
+                // nécessairement soit un tap simple (curseur juste
+                // déplacé), soit l'annulation d'une sélection active
+                // (tap sur la sélection, ou poignée ramenée jusqu'à la
+                // refermer) — dans les deux cas, nettoyer l'état global
+                // (no-op si déjà vide) et rappeler `onClick` (bascule le
+                // HUD) est le comportement voulu. Plus besoin de
+                // distinguer les deux cas (`wasCollapsed`) : les deux
+                // veulent la même action.
                 selection = newValue.selection
                 if (newValue.selection.collapsed) {
                     onFreeSelectionCleared()
-                    if (!wasCollapsed) {
-                        onClick()
-                    }
+                    onClick()
                 } else {
                     val min = newValue.selection.min
                     val max = newValue.selection.max
@@ -477,34 +507,19 @@ private fun PageBlock(
             modifier = Modifier
                 .fillMaxSize()
                 .onGloballyPositioned { textCoordinates = it }
-                .pointerInput(pageOffsetRange) {
-                    detectTapGestures(
-                        onTap = {
-                            // Ne rien faire tant qu'une sélection libre est
-                            // active (poignées visibles) : appeler `onClick`
-                            // déclencherait potentiellement
-                            // `handleReadingAreaTap` (bascule du HUD, donc
-                            // une remesure de pagination qui recrée ce
-                            // champ) EN PLEIN geste de sélection — c'est ce
-                            // qui faisait disparaître les poignées natives
-                            // trouvé sur appareil, pas la reconnaissance du
-                            // geste d'appui long elle-même (délégué en
-                            // interne par `BasicTextField`, jamais
-                            // intercepté ici).
-                            if (!selection.collapsed) return@detectTapGestures
-                            onClick()
-                        },
-                    )
-                }
                 // Palier 3f.4 (première passe, pas de spike TalkBack
-                // dédié — voir CHIFFRAGE_LOT_3F_SELECTION_MOT.md) : un
-                // `pointerInput` brut est invisible à l'accessibilité —
-                // `detectTapGestures` ci-dessus ne réagit qu'à un tap
-                // tactile réel, jamais à l'action « activer » que
-                // TalkBack synthétise (double-tap après exploration).
-                // Sans cette action sémantique dédiée, un utilisateur
-                // TalkBack ne pouvait pas du tout rappeler le HUD depuis
-                // la zone de lecture. Même garde que le geste tactile
+                // dédié — voir CHIFFRAGE_LOT_3F_SELECTION_MOT.md) : le tap
+                // tactile réel passe désormais uniquement par
+                // `onValueChange` ci-dessus (voir Bug 1 du diagnostic
+                // HUD — plus de `pointerInput`/`detectTapGestures`
+                // sibling ici, il perdait systématiquement l'arène de
+                // gestes face au tap interne de `BasicTextField`).
+                // L'action « activer » que TalkBack synthétise
+                // (double-tap après exploration) ne déclenche en revanche
+                // AUCUN évènement tactile ni `onValueChange` — sans cette
+                // action sémantique dédiée, un utilisateur TalkBack ne
+                // pouvait pas du tout rappeler le HUD depuis la zone de
+                // lecture. Même garde que la sélection en cours
                 // (`selection.collapsed`), pour la même raison.
                 .semantics {
                     onClick(label = "Afficher ou masquer les commandes") {
