@@ -1,6 +1,70 @@
 package com.inktone.core.designsystem
 
 import androidx.annotation.DrawableRes
+import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.automirrored.filled.NavigateBefore
+import androidx.compose.material.icons.automirrored.filled.NavigateNext
+import androidx.compose.material.icons.automirrored.outlined.ArrowBack
+import androidx.compose.material.icons.automirrored.outlined.List
+import androidx.compose.material.icons.automirrored.outlined.MenuBook
+import androidx.compose.material.icons.automirrored.outlined.ViewList
+import androidx.compose.material.icons.automirrored.outlined.VolumeUp
+import androidx.compose.material.icons.filled.Bookmark
+import androidx.compose.material.icons.filled.CheckCircle
+import androidx.compose.material.icons.filled.Error
+import androidx.compose.material.icons.filled.Favorite
+import androidx.compose.material.icons.filled.Highlight
+import androidx.compose.material.icons.filled.MoreVert
+import androidx.compose.material.icons.filled.Pause
+import androidx.compose.material.icons.filled.PlayArrow
+import androidx.compose.material.icons.outlined.Add
+import androidx.compose.material.icons.filled.PushPin
+import androidx.compose.material.icons.filled.SkipNext
+import androidx.compose.material.icons.filled.SkipPrevious
+import androidx.compose.material.icons.filled.Warning
+import androidx.compose.material.icons.outlined.Accessibility
+import androidx.compose.material.icons.outlined.AddCircle
+import androidx.compose.material.icons.outlined.BarChart
+import androidx.compose.material.icons.outlined.Bedtime
+import androidx.compose.material.icons.outlined.Bolt
+import androidx.compose.material.icons.outlined.BookmarkAdd
+import androidx.compose.material.icons.outlined.BrightnessMedium
+import androidx.compose.material.icons.outlined.CheckCircle
+import androidx.compose.material.icons.outlined.CloudDone
+import androidx.compose.material.icons.outlined.CloudOff
+import androidx.compose.material.icons.outlined.CloudSync
+import androidx.compose.material.icons.outlined.ContentCopy
+import androidx.compose.material.icons.outlined.Contrast
+import androidx.compose.material.icons.outlined.Delete
+import androidx.compose.material.icons.outlined.Edit
+import androidx.compose.material.icons.outlined.EditNote
+import androidx.compose.material.icons.outlined.Error
+import androidx.compose.material.icons.outlined.FavoriteBorder
+import androidx.compose.material.icons.outlined.FilterList
+import androidx.compose.material.icons.outlined.Headphones
+import androidx.compose.material.icons.outlined.History
+import androidx.compose.material.icons.outlined.HourglassEmpty
+import androidx.compose.material.icons.outlined.ImportContacts
+import androidx.compose.material.icons.outlined.Info
+import androidx.compose.material.icons.outlined.KeyboardArrowDown
+import androidx.compose.material.icons.outlined.Lightbulb
+import androidx.compose.material.icons.outlined.LocalFireDepartment
+import androidx.compose.material.icons.outlined.Mic
+import androidx.compose.material.icons.outlined.Palette
+import androidx.compose.material.icons.outlined.Pause
+import androidx.compose.material.icons.outlined.PhotoLibrary
+import androidx.compose.material.icons.outlined.PushPin
+import androidx.compose.material.icons.outlined.RecordVoiceOver
+import androidx.compose.material.icons.outlined.Refresh
+import androidx.compose.material.icons.outlined.Remove
+import androidx.compose.material.icons.outlined.Save
+import androidx.compose.material.icons.outlined.Search
+import androidx.compose.material.icons.outlined.Settings
+import androidx.compose.material.icons.outlined.Smartphone
+import androidx.compose.material.icons.outlined.Visibility
+import androidx.compose.material.icons.outlined.ViewDay
+import androidx.compose.material.icons.outlined.Warning
+import androidx.compose.material.icons.outlined.Widgets
 import androidx.compose.material3.Icon
 import androidx.compose.material3.LocalContentColor
 import androidx.compose.runtime.Composable
@@ -120,64 +184,82 @@ fun AppIcon(
     )
 }
 
-// --- Compatibilité transitoire (supprimé en 2c.3) ---
-// Ces alias permettent aux modules non encore migrés de référencer les
-// anciens noms via AppIcons.*. Ils seront retirés quand tous les modules
-// seront passés à AppSymbol + AppIcon.
+// --- Compatibilité ImageVector (legacy, supprimé en 2c.3) ---
+// Ces alias exposent les anciennes valeurs ImageVector pour que le code
+// existant continue de compiler pendant le rollout progressif 2c.2.
+// Ils seront supprimés une fois tous les modules migrés vers AppIcon.
 
+@Suppress("DEPRECATION")
 object AppIcons {
-    val Bookmark = AppSymbol.Bookmark
-    val Favorite = AppSymbol.Favorite
-    val Pin = AppSymbol.Pin
-    val Error = AppSymbol.Error
-    val Warning = AppSymbol.Warning
-    val Success = AppSymbol.Success
-    val Info = AppSymbol.Info
-    val Search = AppSymbol.Search
-    val Delete = AppSymbol.Delete
-    val Edit = AppSymbol.Edit
-    val Add = AppSymbol.Add
-    val Remove = AppSymbol.Remove
-    val Play = AppSymbol.Play
-    val Pause = AppSymbol.Pause
-    val Back = AppSymbol.Back
-    val Toc = AppSymbol.Toc
-    val Refresh = AppSymbol.Refresh
-    val Filter = AppSymbol.Filter
-    val ChevronDown = AppSymbol.ChevronDown
-    val MoreActions = AppSymbol.MoreActions
-    val Copy = AppSymbol.Copy
-    val Highlight = AppSymbol.Highlight
-    val Brightness = AppSymbol.Brightness
-    val SleepTimer = AppSymbol.SleepTimer
-    val Reading = AppSymbol.Reading
-    val Recents = AppSymbol.Recents
-    val Stats = AppSymbol.Stats
-    val Sync = AppSymbol.Sync
-    val Theme = AppSymbol.Theme
-    val Settings = AppSymbol.Settings
-    val Speaking = AppSymbol.Speaking
-    val ReadingModePaged = AppSymbol.ReadingModePaged
-    val ReadingModeScroll = AppSymbol.ReadingModeScroll
-    val ViewGrid = AppSymbol.ViewGrid
-    val ViewList = AppSymbol.ViewList
-    val CoverOnly = AppSymbol.CoverOnly
-    val Device = AppSymbol.Device
-    val CloudConnected = AppSymbol.CloudConnected
-    val CloudDisconnected = AppSymbol.CloudDisconnected
-    val VisualReading = AppSymbol.VisualReading
-    val TtsListening = AppSymbol.TtsListening
-    val Streak = AppSymbol.Streak
-    val Mic = AppSymbol.Mic
-    val Data = AppSymbol.Data
-    val Presets = AppSymbol.Presets
-    val Note = AppSymbol.Note
-    val Accessibility = AppSymbol.Accessibility
-    val Pronunciation = AppSymbol.Pronunciation
-    val AddCircle = AppSymbol.AddCircle
-    val ChapterPrevious = AppSymbol.ChapterPrevious
-    val ChapterNext = AppSymbol.ChapterNext
-    val SentencePrevious = AppSymbol.SentencePrevious
-    val SentenceNext = AppSymbol.SentenceNext
-    val Appearance = AppSymbol.Theme
+    val Bookmark = Icons.Filled.Bookmark
+    val BookmarkAdd = Icons.Outlined.BookmarkAdd
+    val Note = Icons.Outlined.EditNote
+    val Copy = Icons.Outlined.ContentCopy
+    val Highlight = Icons.Filled.Highlight
+    val Hint = Icons.Outlined.Lightbulb
+    val Favorite = Icons.Filled.Favorite
+    val FavoriteBorder = Icons.Outlined.FavoriteBorder
+    val Pin = Icons.Filled.PushPin
+    val PinOutlined = Icons.Outlined.PushPin
+    val MoreActions = Icons.Filled.MoreVert
+    val Delete = Icons.Outlined.Delete
+
+    val Success = Icons.Filled.CheckCircle
+    val SuccessOutlined = Icons.Outlined.CheckCircle
+    val Error = Icons.Filled.Error
+    val ErrorOutlined = Icons.Outlined.Error
+    val Warning = Icons.Filled.Warning
+    val WarningOutlined = Icons.Outlined.Warning
+    val Info = Icons.Outlined.Info
+
+    val Presets = Icons.Outlined.Bolt
+    val Reading = Icons.AutoMirrored.Outlined.MenuBook
+    val Device = Icons.Outlined.Smartphone
+    val Appearance = Icons.Outlined.Palette
+    val Accessibility = Icons.Outlined.Accessibility
+    val Data = Icons.Outlined.Save
+    val Pronunciation = Icons.Outlined.RecordVoiceOver
+    val Settings = Icons.Outlined.Settings
+
+    val Mic = Icons.Outlined.Mic
+    val Speaking = Icons.AutoMirrored.Outlined.VolumeUp
+    val Loading = Icons.Outlined.HourglassEmpty
+    val Refresh = Icons.Outlined.Refresh
+    val ChevronDown = Icons.Outlined.KeyboardArrowDown
+    val Stats = Icons.Outlined.BarChart
+    val Sync = Icons.Outlined.CloudSync
+    val CloudConnected = Icons.Outlined.CloudDone
+    val CloudDisconnected = Icons.Outlined.CloudOff
+    val Recents = Icons.Outlined.History
+
+    val Edit = Icons.Outlined.Edit
+    val AddCircle = Icons.Outlined.AddCircle
+    val VisualReading = Icons.Outlined.Visibility
+    val TtsListening = Icons.Outlined.Headphones
+    val Streak = Icons.Outlined.LocalFireDepartment
+
+    val Search = Icons.Outlined.Search
+    val Filter = Icons.Outlined.FilterList
+    val Toc = Icons.AutoMirrored.Outlined.List
+    val Back = Icons.AutoMirrored.Outlined.ArrowBack
+    val ReadingModePaged = Icons.Outlined.ViewDay
+    val ReadingModeScroll = Icons.Outlined.ImportContacts
+    val Theme = Icons.Outlined.Contrast
+    val Brightness = Icons.Outlined.BrightnessMedium
+
+    val ViewGrid = Icons.Outlined.Widgets
+    val ViewList = Icons.AutoMirrored.Outlined.ViewList
+    val CoverOnly = Icons.Outlined.PhotoLibrary
+
+    val ChapterPrevious = Icons.AutoMirrored.Filled.NavigateBefore
+    val ChapterNext = Icons.AutoMirrored.Filled.NavigateNext
+    val SentencePrevious = Icons.Filled.SkipPrevious
+    val SentenceNext = Icons.Filled.SkipNext
+
+    // Icônes inline centralisées (2c.1)
+    val Play = Icons.Filled.PlayArrow
+    val Pause = Icons.Filled.Pause
+    val Add = Icons.Outlined.Add
+    val Remove = Icons.Outlined.Remove
+    val SleepTimer = Icons.Outlined.Bedtime
 }
