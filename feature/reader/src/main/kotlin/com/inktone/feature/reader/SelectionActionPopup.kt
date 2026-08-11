@@ -39,6 +39,7 @@ import androidx.compose.ui.window.Popup
 import androidx.compose.ui.window.PopupPositionProvider
 import androidx.compose.ui.window.PopupProperties
 import com.inktone.core.designsystem.AppIcons
+import com.inktone.core.designsystem.AppSymbol
 import com.inktone.domain.model.AnnotationColor
 
 /**

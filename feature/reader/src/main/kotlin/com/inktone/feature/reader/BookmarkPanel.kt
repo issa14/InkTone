@@ -41,7 +41,9 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
+import com.inktone.core.designsystem.AppIcon
 import com.inktone.core.designsystem.AppIcons
+import com.inktone.core.designsystem.AppSymbol
 import com.inktone.domain.model.Annotation
 import com.inktone.domain.model.AnnotationColor
 import com.inktone.domain.model.Bookmark
@@ -114,7 +116,7 @@ fun BookmarkPanel(
                         verticalAlignment = Alignment.CenterVertically,
                     ) {
                         IconButton(onClick = onClose) {
-                            Icon(AppIcons.Back, contentDescription = "Fermer les marque-pages")
+                            AppIcon(AppSymbol.Back,  contentDescription = "Fermer les marque-pages")
                         }
                         Text("Marque-pages et notes", style = MaterialTheme.typography.titleMedium)
                     }
@@ -128,12 +130,12 @@ fun BookmarkPanel(
                                 modifier = Modifier.fillMaxWidth(),
                                 colors = ButtonDefaults.buttonColors(containerColor = MaterialTheme.colorScheme.primary),
                             ) {
-                                Icon(AppIcons.Pin, contentDescription = null, modifier = Modifier.padding(end = 8.dp))
+                                AppIcon(AppSymbol.Pin,  contentDescription = null, modifier = Modifier.padding(end = 8.dp))
                                 Text("Page marquée — retirer")
                             }
                         } else {
                             OutlinedButton(onClick = onToggleBookmark, modifier = Modifier.fillMaxWidth()) {
-                                Icon(AppIcons.PinOutlined, contentDescription = null, modifier = Modifier.padding(end = 8.dp))
+                                AppIcon(AppSymbol.Pin,  contentDescription = null, modifier = Modifier.padding(end = 8.dp))
                                 Text("Marquer cette page")
                             }
                         }
@@ -249,7 +251,7 @@ private fun BookmarksTab(bookmarks: List<Bookmark>, onClick: (Bookmark) -> Unit)
                     .padding(horizontal = 16.dp, vertical = 12.dp),
                 verticalAlignment = Alignment.CenterVertically,
             ) {
-                Icon(AppIcons.Bookmark, contentDescription = null, tint = MaterialTheme.colorScheme.primary)
+                AppIcon(AppSymbol.Bookmark,  contentDescription = null, tint = MaterialTheme.colorScheme.primary)
                 Spacer(Modifier.width(12.dp))
                 Column(modifier = Modifier.weight(1f)) {
                     Text(

@@ -17,7 +17,9 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
+import com.inktone.core.designsystem.AppIcon
 import com.inktone.core.designsystem.AppIcons
+import com.inktone.core.designsystem.AppSymbol
 
 /**
  * Barre du haut du lecteur (Tâche 3b.5) — appartient au **HUD** : soumise
@@ -43,7 +45,7 @@ fun ReaderTopBar(
             verticalAlignment = Alignment.CenterVertically,
         ) {
             IconButton(onClick = onBack) {
-                Icon(AppIcons.Back, contentDescription = "Retour")
+                AppIcon(AppSymbol.Back,  contentDescription = "Retour")
             }
             Spacer(Modifier.width(4.dp))
             Column(modifier = Modifier.padding(end = 16.dp)) {
