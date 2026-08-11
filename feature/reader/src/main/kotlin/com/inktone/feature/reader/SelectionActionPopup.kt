@@ -52,6 +52,15 @@ import com.inktone.domain.model.AnnotationColor
  * S'applique à la sélection libre au mot (voir `ReaderUiState.freeSelectionRange`,
  * `PagedChapterContent.PageBlock`/`ReaderScreen.ParagraphText`) — seul
  * modèle de sélection de texte du lecteur.
+ *
+ * **Cycle de vie (Phase 2 de la refonte de la sélection)** : ce popup
+ * n'est monté que lorsque l'unité adressable a remonté des bornes fenêtre
+ * depuis `TextToolbar.showMenu()`, c'est-à-dire quand le geste de
+ * sélection est TERMINÉ (doigt levé). `selectionBoundsInWindow == null`
+ * signifie « glissement de poignée en cours » : rien ne doit s'afficher,
+ * la loupe native doit rester dégagée — d'où le retour anticipé
+ * ci-dessous, qui rend aussi le popup apatride entre deux gestes (mode
+ * ACTIONS, texte de note vide à chaque réapparition).
  */
 private enum class SelectionPopupMode { ACTIONS, COLOR_PICKER, NOTE_INPUT }
 
@@ -107,7 +116,21 @@ fun SelectionActionPopup(
     Popup(
         popupPositionProvider = positionProvider,
         onDismissRequest = onDismiss,
-        properties = PopupProperties(focusable = mode == SelectionPopupMode.NOTE_INPUT),
+        // Bug réel trouvé sur appareil, pile d'appels à l'appui
+        // (`PopupLayout.onTouchEvent` → `onDismissRequest` →
+        // `clearSelectionAndPopup`) : tout toucher HORS de la surface du
+        // popup déclenchait `onDismissRequest`, donc la purge complète de la
+        // sélection. Or les poignées de sélection natives sont, par
+        // construction, hors de cette surface — saisir une poignée pour
+        // ajuster la sélection la détruisait avant même le moindre
+        // mouvement. Ce popup ne doit PAS se fermer sur un toucher
+        // extérieur : l'annulation passe par le tap sur le texte
+        // (`onValueChange`, seule source de vérité du tap) ou par une action
+        // du popup lui-même.
+        properties = PopupProperties(
+            focusable = mode == SelectionPopupMode.NOTE_INPUT,
+            dismissOnClickOutside = false,
+        ),
     ) {
         Surface(
             shape = RoundedCornerShape(12.dp),

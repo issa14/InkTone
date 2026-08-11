@@ -16,10 +16,8 @@ import androidx.compose.runtime.State
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
-import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.rememberUpdatedState
 import androidx.compose.runtime.setValue
-import androidx.compose.runtime.snapshotFlow
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.drawWithContent
 import androidx.compose.ui.geometry.Rect
@@ -47,9 +45,6 @@ import com.inktone.domain.model.Annotation
 import com.inktone.domain.model.AnnotationColor
 import com.inktone.domain.model.Chapter
 import com.inktone.feature.reader.pagination.ChapterPaginationState
-import kotlinx.coroutines.Job
-import kotlinx.coroutines.delay
-import kotlinx.coroutines.launch
 
 /**
  * 3a.2/3b.1 — Contenu paginé par swipe horizontal, rendu depuis le
@@ -103,7 +98,13 @@ fun PagedChapterContent(
     freeSelectedRange: IntRange? = null,
     onFreeSelectionChanged: (anchorOffset: Int, focusOffset: Int) -> Unit = { _, _ -> },
     onFreeSelectionCleared: () -> Unit = {},
-    onFreeSelectionBoundsInWindow: (Rect?) -> Unit = {},
+    // `ownerKey` — offset absolu de début de la PAGE émettrice. Plusieurs
+    // pages sont montées simultanément (`beyondViewportPageCount = 1`) et
+    // écrivent donc dans le même emplacement de bornes chez le parent :
+    // sans cette identité, le `hide()` tardif d'une page pourrait effacer
+    // le popup qu'une AUTRE page vient d'ouvrir. Arbitrage :
+    // `resolveSelectionPopupBounds` (ReaderScreen).
+    onFreeSelectionBoundsInWindow: (ownerKey: Int, bounds: Rect?) -> Unit = { _, _ -> },
     modifier: Modifier = Modifier,
 ) {
     val renderTextStyle = remember(pagination.baseTextStyle, textColor) {
@@ -272,7 +273,12 @@ fun PagedChapterContent(
                         freeSelectedRange = freeSelectedRangeState,
                         onFreeSelectionChanged = onFreeSelectionChanged,
                         onFreeSelectionCleared = onFreeSelectionCleared,
-                        onFreeSelectionBoundsInWindow = onFreeSelectionBoundsInWindow,
+                        // Identité de la page émettrice injectée ici : c'est
+                        // le seul endroit qui connaît à la fois le
+                        // `pageOffsetRange` et le callback du parent.
+                        onFreeSelectionBoundsInWindow = { bounds ->
+                            onFreeSelectionBoundsInWindow(pageOffsetRange.first, bounds)
+                        },
                         onClick = onClick,
                     )
                 }
@@ -320,57 +326,70 @@ private fun PageBlock(
     // Offsets LOCAUX à la page ; réinitialisée à chaque page (la
     // sélection ne survit pas un changement de page — bornée à la page,
     // jamais à cheval sur deux, limite structurelle du découpage).
-    var selection by remember(pageOffsetRange) { mutableStateOf(TextRange.Zero) }
+    var localSelection by remember(pageOffsetRange) { mutableStateOf(TextRange.Zero) }
+
+    // Phase 1 — état local strictement SUBORDONNÉ à l'appartenance
+    // globale. `localSelection` n'est qu'un état visuel transitoire ; la
+    // source de vérité de « qui possède la sélection » reste
+    // `freeSelectedRange` (remonté par le ViewModel). Dès que l'état
+    // global ne pointe plus dans cette page — devenu `null`, ou pointant
+    // désormais vers une AUTRE page — la sélection rendue est
+    // immédiatement `collapsed`, DANS LA MÊME recomposition. Dérivation
+    // pure plutôt qu'un `snapshotFlow`/`LaunchedEffect` de
+    // resynchronisation comme avant : un effet ne s'exécute qu'après la
+    // composition, laissant une frame où les poignées natives restaient
+    // affichées sur une sélection que le reste de l'écran avait déjà
+    // oubliée — et le popup pouvait se rouvrir dans cet intervalle.
+    val globalSelection = freeSelectedRange.value
+    val ownsGlobalSelection = globalSelection != null &&
+        globalSelection.first >= pageOffsetRange.first &&
+        globalSelection.last <= pageOffsetRange.last
+    val selection = if (ownsGlobalSelection) localSelection else TextRange.Zero
+    // `toolbar` ci-dessous est `remember`é : il ne peut pas capturer
+    // `selection` directement (val recalculé à chaque composition — il en
+    // figerait à jamais la toute première valeur, `TextRange.Zero`), d'où
+    // cet État relu à chaque appel.
+    val selectionState = rememberUpdatedState(selection)
+
     val fieldValue = remember(pageText, selection) { TextFieldValue(pageText, selection) }
 
-    // Anti-rebond de `showMenu` (voir le `TextToolbar` plus bas) — déclaré
-    // ici pour pouvoir aussi être annulé par l'effet de nettoyage
-    // `isDisplayedPage` ci-dessous, sinon un affichage différé pourrait
-    // encore se déclencher après que la page a quitté l'écran.
-    val coroutineScope = rememberCoroutineScope()
-    var pendingShowJob by remember(pageOffsetRange) { mutableStateOf<Job?>(null) }
+    // Phase 2 — visibilité du popup d'actions. Apparition pilotée par
+    // `TextToolbar.showMenu()` (doigt levé), disparition par le
+    // mouvement de la sélection (`onValueChange`, voir la justification
+    // mesurée là-bas) — jamais par une réaction à `freeSelectedRange`.
+    // Non-null ≡ popup visible : ces bornes fenêtre sont l'unique signal
+    // transmis au parent (`onFreeSelectionBoundsInWindow`), qui monte le
+    // popup si et seulement s'il les reçoit.
+    var popupBoundsInWindow by remember(pageOffsetRange) { mutableStateOf<Rect?>(null) }
+    val currentOnBoundsInWindow by rememberUpdatedState(onFreeSelectionBoundsInWindow)
+    val ownsGlobalSelectionState = rememberUpdatedState(ownsGlobalSelection)
 
-    // Resynchronisation stricte état local (`selection`) ↔ état global
-    // (`freeSelectedRange`, remonté par le ViewModel) : réévaluée à
-    // CHAQUE changement de `freeSelectedRange`, indépendamment de
-    // `isDisplayedPage` — même robustesse que `ParagraphText` (mode
-    // SCROLL, `stillOwnsSelection`). Avant ce correctif, seule la
-    // nullité globale était couverte (voir aussi le nettoyage au départ
-    // d'écran ci-dessous) ; vérifier l'APPARTENANCE complète (pas
-    // seulement la nullité) couvre aussi le cas où l'état global pointe
-    // désormais vers une AUTRE page.
-    LaunchedEffect(pageOffsetRange) {
-        snapshotFlow { freeSelectedRange.value }.collect { absolute ->
-            val stillOwnsSelection = absolute != null &&
-                absolute.first >= pageOffsetRange.first &&
-                absolute.last <= pageOffsetRange.last
-            if (!stillOwnsSelection && !selection.collapsed) {
-                selection = TextRange.Zero
-            }
-        }
+    /** Détruit le popup s'il est affiché, sans jamais réémettre inutilement vers le parent. */
+    fun hidePopup() {
+        if (popupBoundsInWindow == null) return
+        popupBoundsInWindow = null
+        currentOnBoundsInWindow(null)
     }
 
-    // Départ d'écran (page adjacente gardée montée par
+    // Phase 3 — départ d'écran (page adjacente gardée montée par
     // `beyondViewportPageCount = 1`, jamais détruite par un simple
-    // swipe) : au-delà de masquer le popup (bornes à `null`, déjà en
-    // place), nettoie AUSSI immédiatement la sélection — locale ET
-    // globale — si cette page en portait une active. Corrige la
-    // « sélection fantôme » du diagnostic : sans ceci, `selection`
-    // restait non-collapsed indéfiniment sur cette instance conservée
-    // montée hors écran, ce qui bloquait tout tap ultérieur sur cette
-    // page (garde `!selection.collapsed`, `semantics` ci-dessous)
-    // jusqu'à un clear incident déclenché ailleurs, et pouvait faire
-    // réapparaître l'ancien surlignage SANS popup en reswipant vers
-    // cette page.
+    // swipe) : nettoyage SILENCIEUX complet — popup détruit, sélection
+    // locale rétractée, état global purgé si cette page en était
+    // propriétaire. Corrige la « sélection fantôme » : sans ceci,
+    // `localSelection` restait non-collapsed indéfiniment sur cette
+    // instance conservée montée hors écran, ce qui bloquait tout tap
+    // ultérieur sur cette page et pouvait faire réapparaître l'ancien
+    // surlignage SANS popup en reswipant vers elle.
     LaunchedEffect(isDisplayedPage) {
         if (!isDisplayedPage) {
-            pendingShowJob?.cancel()
-            pendingShowJob = null
-            onFreeSelectionBoundsInWindow(null)
-            if (!selection.collapsed) {
-                selection = TextRange.Zero
-                onFreeSelectionCleared()
-            }
+            hidePopup()
+            localSelection = TextRange.Zero
+            // Purge de l'état GLOBAL uniquement si cette page en était
+            // encore propriétaire : après une action du popup (Phase 4),
+            // `localSelection` peut rester non-collapsed alors que la
+            // sélection globale appartient déjà à une autre unité — s'y
+            // fier ici effacerait la sélection de quelqu'un d'autre.
+            if (ownsGlobalSelectionState.value) onFreeSelectionCleared()
         }
     }
 
@@ -389,9 +408,11 @@ private fun PageBlock(
     // appelle `LocalTextToolbar.current.showMenu(rect, ...)` pour afficher
     // SON menu Copier/Coller. Sans interception, c'est le vrai
     // `TextToolbar` de la plateforme (barre système blanche, `ActionMode`)
-    // qui s'affiche, EN PLUS du popup sombre de l'app (`SelectionActionPopup`,
-    // toujours monté dès que `freeSelectedRange != null`, indépendamment de
-    // ce toolbar) — d'où le doublon constaté sur appareil. On ne délègue
+    // qui s'affiche, EN PLUS du popup sombre de l'app
+    // (`SelectionActionPopup`) — d'où le doublon constaté sur appareil.
+    // Depuis la Phase 2, ce popup n'est plus monté indépendamment de ce
+    // toolbar : c'est CE toolbar qui pilote seul son cycle de vie
+    // (`showMenu`/`hide` ci-dessous). On ne délègue
     // donc JAMAIS à `defaultToolbar` — le menu système ne doit plus jamais
     // apparaître. `status` fixé à `Hidden` en conséquence : de son propre
     // point de vue, ce `TextToolbar` ne montre jamais rien.
@@ -406,23 +427,15 @@ private fun PageBlock(
     // affichée (`selection`, pas le `rect` reçu) — jamais le paramètre
     // `rect` lui-même.
     //
-    // Bug réel trouvé sur appareil (popup sombre visible PENDANT le
-    // glissement d'une poignée, recouvrant la loupe native) : `showMenu`
-    // se déclenche à CHAQUE étape du glissement (repositionnement continu,
-    // pas seulement au relâchement) quand l'appui long et le glissement
-    // d'extension se font en un seul geste continu (sans lever le doigt
-    // entre les deux) — `hide()` n'a alors aucune fenêtre "glissement en
-    // cours" à signaler puisqu'il n'y a pas d'évènement de relâchement
-    // intermédiaire. Non observable en lisant le code seul (dépend de la
-    // cadence réelle des appels internes de `BasicTextField`, vérifiée sur
-    // appareil, pas supposée) : anti-rebond côté appelant plutôt qu'une
-    // dépendance à un relâchement qui peut ne jamais survenir en milieu de
-    // geste. `hide()` reste instantané (glissement démarré ou sélection
-    // effacée : aucune raison d'attendre) ; `showMenu` calcule les bornes
-    // immédiatement (état de sélection à cet instant précis) mais ne les
-    // transmet qu'une fois les appels retombés silencieux pendant
-    // `SelectionPopupSettleDelayMs` — un nouvel appel (donc glissement
-    // toujours actif) annule et relance le délai avec de nouvelles bornes.
+    // Phase 2 — cycle de vie du popup, calqué à l'identique sur celui du
+    // toolbar natif : `hide()` = « le doigt est posé / la sélection
+    // bouge » (glissement de poignée en cours : l'écran doit rester
+    // dégagé pour la loupe native), `showMenu()` = « le doigt est levé,
+    // la sélection est arrêtée ». Aucun anti-rebond côté appelant :
+    // `BasicTextField` appelle déjà `hide()` au début d'un glissement et
+    // `showMenu()` à sa fin, c'est LUI qui porte la notion de geste
+    // terminé — la dupliquer par un délai ne faisait que retarder
+    // l'apparition du popup après un relâchement réel.
     val toolbar = remember(pageOffsetRange) {
         object : TextToolbar {
             override val status: TextToolbarStatus = TextToolbarStatus.Hidden
@@ -434,24 +447,21 @@ private fun PageBlock(
                 onCutRequested: (() -> Unit)?,
                 onSelectAllRequested: (() -> Unit)?,
             ) {
-                val currentSelection = selection
+                val currentSelection = selectionState.value
                 val absolute = if (currentSelection.collapsed) {
                     null
                 } else {
                     (pageOffsetRange.first + currentSelection.min)..(pageOffsetRange.first + currentSelection.max - 1)
                 }
                 val windowRect = rangeBoundsInWindow(textLayoutResult, textCoordinates, pageOffsetRange, absolute)
-                pendingShowJob?.cancel()
-                pendingShowJob = coroutineScope.launch {
-                    delay(SelectionPopupSettleDelayMs)
-                    onFreeSelectionBoundsInWindow(windowRect)
-                }
+                popupBoundsInWindow = windowRect
+                currentOnBoundsInWindow(windowRect)
             }
 
             override fun hide() {
-                pendingShowJob?.cancel()
-                pendingShowJob = null
-                onFreeSelectionBoundsInWindow(null)
+                if (popupBoundsInWindow == null) return
+                popupBoundsInWindow = null
+                currentOnBoundsInWindow(null)
             }
         }
     }
@@ -463,27 +473,48 @@ private fun PageBlock(
         BasicTextField(
             value = fieldValue,
             onValueChange = { newValue ->
-                // Bug 1 du diagnostic HUD : `BasicTextField` consomme en
-                // interne les taps pour positionner son curseur (même en
-                // lecture seule) — un `pointerInput` sibling voisin ne
-                // les voit alors jamais (avalés avant lui dans l'arène de
-                // gestes Compose), qu'il y ait une sélection à annuler ou
-                // non. Plutôt que de lutter contre cette priorité,
-                // `onValueChange` EST désormais la seule source de vérité
-                // du tap : toute transition qui aboutit à `collapsed` est
-                // nécessairement soit un tap simple (curseur juste
-                // déplacé), soit l'annulation d'une sélection active
-                // (tap sur la sélection, ou poignée ramenée jusqu'à la
-                // refermer) — dans les deux cas, nettoyer l'état global
-                // (no-op si déjà vide) et rappeler `onClick` (bascule le
-                // HUD) est le comportement voulu. Plus besoin de
-                // distinguer les deux cas (`wasCollapsed`) : les deux
-                // veulent la même action.
-                selection = newValue.selection
+                // Phase 3 — `BasicTextField` consomme en interne les taps
+                // pour positionner son curseur (même en lecture seule) :
+                // un `pointerInput` sibling ne les voit jamais (avalés
+                // avant lui dans l'arène de gestes Compose). Plutôt que de
+                // lutter contre cette priorité, `onValueChange` EST la
+                // seule source de vérité du tap — aucun
+                // `detectTapGestures` concurrent nulle part sur ce champ.
+                //
+                // Passer de non-collapsed à collapsed = annulation
+                // EXPLICITE par l'utilisateur (tap hors de la sélection,
+                // tap dessus, ou poignée ramenée jusqu'à la refermer) :
+                // purge globale + destruction du popup, immédiatement.
+                // Un tap alors qu'il n'y avait rien de sélectionné ne
+                // fait que basculer le HUD.
+                val wasSelecting = !selection.collapsed
+                val selectionChanged = newValue.selection != selection
+                localSelection = newValue.selection
                 if (newValue.selection.collapsed) {
-                    onFreeSelectionCleared()
+                    if (wasSelecting) {
+                        onFreeSelectionCleared()
+                        hidePopup()
+                    }
                     onClick()
                 } else {
+                    // Phase 2, phase « glissement » — mesuré sur appareil
+                    // (V2206, Android 14) : `TextToolbar.hide()` n'est
+                    // JAMAIS appelé pendant le glissement d'une poignée, et
+                    // `showMenu()` ne l'est qu'au relâchement du doigt. Le
+                    // toolbar ne fournit donc à lui seul aucun signal de
+                    // « geste en cours » — s'y fier laissait le popup
+                    // affiché par-dessus la loupe native pendant tout le
+                    // glissement.
+                    //
+                    // Le seul signal fiable de ce geste est ICI : une
+                    // sélection qui CHANGE alors qu'elle reste non vide,
+                    // c'est l'utilisateur en train de l'ajuster. Le popup
+                    // se masque donc à chaque mouvement, et seul
+                    // `showMenu()` (doigt levé) le fait réapparaître —
+                    // exactement le découpage voulu, branché sur les
+                    // évènements qui existent réellement plutôt que sur
+                    // ceux que l'API laisse supposer.
+                    if (selectionChanged) hidePopup()
                     val min = newValue.selection.min
                     val max = newValue.selection.max
                     onFreeSelectionChanged(pageOffsetRange.first + min, pageOffsetRange.first + max - 1)
@@ -509,11 +540,11 @@ private fun PageBlock(
                 .onGloballyPositioned { textCoordinates = it }
                 // Palier 3f.4 (première passe, pas de spike TalkBack
                 // dédié — voir CHIFFRAGE_LOT_3F_SELECTION_MOT.md) : le tap
-                // tactile réel passe désormais uniquement par
-                // `onValueChange` ci-dessus (voir Bug 1 du diagnostic
-                // HUD — plus de `pointerInput`/`detectTapGestures`
-                // sibling ici, il perdait systématiquement l'arène de
-                // gestes face au tap interne de `BasicTextField`).
+                // tactile réel passe uniquement par `onValueChange`
+                // ci-dessus (Phase 3 — aucun
+                // `pointerInput`/`detectTapGestures` sibling ici, il
+                // perdait systématiquement l'arène de gestes face au tap
+                // interne de `BasicTextField`).
                 // L'action « activer » que TalkBack synthétise
                 // (double-tap après exploration) ne déclenche en revanche
                 // AUCUN évènement tactile ni `onValueChange` — sans cette
@@ -575,9 +606,6 @@ private fun DrawScope.drawAbsoluteRangeHighlight(
 
 private val WordHighlightColor = Color(0xFFFFEB3B)
 private val SelectionHighlightColor = Color(0x664FC3F7)
-
-/** Anti-rebond de `showMenu` (voir `PageBlock`) — assez court pour rester imperceptible après un relâchement réel, assez long pour couvrir l'intervalle entre deux étapes d'un glissement actif. */
-private const val SelectionPopupSettleDelayMs = 200L
 
 internal fun buildPageAnnotatedString(
     full: AnnotatedString,
