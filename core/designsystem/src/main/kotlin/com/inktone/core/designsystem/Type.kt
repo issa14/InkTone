@@ -1,9 +1,11 @@
 package com.inktone.core.designsystem
 
 import androidx.compose.material3.Typography
+import androidx.compose.ui.text.ExperimentalTextApi
 import androidx.compose.ui.text.TextStyle
 import androidx.compose.ui.text.font.Font
 import androidx.compose.ui.text.font.FontFamily
+import androidx.compose.ui.text.font.FontVariation
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.em
 import androidx.compose.ui.unit.sp
@@ -14,23 +16,49 @@ import androidx.compose.ui.unit.sp
  */
 val OpenDyslexicFamily: FontFamily = FontFamily(Font(R.font.opendyslexic_regular))
 
-/** Typographie du chrome de l'app (Tâche 9bis.1.1, porté du legacy tel quel). */
+// --- Sous-lot 2b — typographie de marque ---
+
+/** Work Sans variable (OFL 1.1, github.com/weiweihuanghuang/Work-Sans).
+ *  Axe `wght` 100–900, 4 poids fonctionnels : 400/500/600/700. */
+@OptIn(ExperimentalTextApi::class)
+private fun workSans(w: Int) = Font(
+    R.font.work_sans_variable,
+    weight = FontWeight(w),
+    variationSettings = FontVariation.Settings(FontVariation.weight(w)),
+)
+
+/** Chrome fonctionnel intégral — Work Sans (D-typo-3, Sous-lot 2b). */
+val WorkSansFamily = FontFamily(workSans(400), workSans(500), workSans(600), workSans(700))
+
+/** Literata variable (OFL 1.1, github.com/googlefonts/literata).
+ *  Axes `wght` + `opsz`, usage narratif ponctuel — jamais dans la scale. */
+@OptIn(ExperimentalTextApi::class)
+val NarrativeAccentFamily = FontFamily(
+    Font(R.font.literata_variable, FontWeight.Normal,
+         variationSettings = FontVariation.Settings(FontVariation.weight(400))),
+    Font(R.font.literata_variable, FontWeight.SemiBold,
+         variationSettings = FontVariation.Settings(FontVariation.weight(600))),
+)
+
+// --- Typographie chrome ---
+
+/** Typographie du chrome de l'app (Sous-lot 2b — Work Sans intégral). */
 val InkToneTypography = Typography(
-    displayLarge = TextStyle(fontFamily = FontFamily.SansSerif, fontWeight = FontWeight.Bold, fontSize = 32.sp, lineHeight = 40.sp),
-    displayMedium = TextStyle(fontFamily = FontFamily.SansSerif, fontWeight = FontWeight.Bold, fontSize = 28.sp, lineHeight = 36.sp),
-    displaySmall = TextStyle(fontFamily = FontFamily.SansSerif, fontWeight = FontWeight.Bold, fontSize = 24.sp, lineHeight = 32.sp),
-    headlineLarge = TextStyle(fontFamily = FontFamily.SansSerif, fontWeight = FontWeight.SemiBold, fontSize = 28.sp, lineHeight = 36.sp),
-    headlineMedium = TextStyle(fontFamily = FontFamily.SansSerif, fontWeight = FontWeight.SemiBold, fontSize = 24.sp, lineHeight = 32.sp),
-    headlineSmall = TextStyle(fontFamily = FontFamily.SansSerif, fontWeight = FontWeight.SemiBold, fontSize = 20.sp, lineHeight = 28.sp),
-    titleLarge = TextStyle(fontFamily = FontFamily.SansSerif, fontWeight = FontWeight.Medium, fontSize = 20.sp, lineHeight = 28.sp),
-    titleMedium = TextStyle(fontFamily = FontFamily.SansSerif, fontWeight = FontWeight.Medium, fontSize = 16.sp, lineHeight = 24.sp),
-    titleSmall = TextStyle(fontFamily = FontFamily.SansSerif, fontWeight = FontWeight.Medium, fontSize = 14.sp, lineHeight = 20.sp),
-    bodyLarge = TextStyle(fontFamily = FontFamily.Serif, fontWeight = FontWeight.Normal, fontSize = 18.sp, lineHeight = 28.sp, letterSpacing = 0.15.sp),
-    bodyMedium = TextStyle(fontFamily = FontFamily.Serif, fontWeight = FontWeight.Normal, fontSize = 16.sp, lineHeight = 24.sp, letterSpacing = 0.25.sp),
-    bodySmall = TextStyle(fontFamily = FontFamily.Serif, fontWeight = FontWeight.Normal, fontSize = 14.sp, lineHeight = 20.sp, letterSpacing = 0.4.sp),
-    labelLarge = TextStyle(fontFamily = FontFamily.SansSerif, fontWeight = FontWeight.Medium, fontSize = 14.sp, lineHeight = 20.sp),
-    labelMedium = TextStyle(fontFamily = FontFamily.SansSerif, fontWeight = FontWeight.Medium, fontSize = 12.sp, lineHeight = 16.sp),
-    labelSmall = TextStyle(fontFamily = FontFamily.SansSerif, fontWeight = FontWeight.Medium, fontSize = 10.sp, lineHeight = 14.sp),
+    displayLarge = TextStyle(fontFamily = WorkSansFamily, fontWeight = FontWeight.Bold, fontSize = 32.sp, lineHeight = 40.sp),
+    displayMedium = TextStyle(fontFamily = WorkSansFamily, fontWeight = FontWeight.Bold, fontSize = 28.sp, lineHeight = 36.sp),
+    displaySmall = TextStyle(fontFamily = WorkSansFamily, fontWeight = FontWeight.Bold, fontSize = 24.sp, lineHeight = 32.sp),
+    headlineLarge = TextStyle(fontFamily = WorkSansFamily, fontWeight = FontWeight.SemiBold, fontSize = 28.sp, lineHeight = 36.sp),
+    headlineMedium = TextStyle(fontFamily = WorkSansFamily, fontWeight = FontWeight.SemiBold, fontSize = 24.sp, lineHeight = 32.sp),
+    headlineSmall = TextStyle(fontFamily = WorkSansFamily, fontWeight = FontWeight.SemiBold, fontSize = 20.sp, lineHeight = 28.sp),
+    titleLarge = TextStyle(fontFamily = WorkSansFamily, fontWeight = FontWeight.Medium, fontSize = 20.sp, lineHeight = 28.sp),
+    titleMedium = TextStyle(fontFamily = WorkSansFamily, fontWeight = FontWeight.Medium, fontSize = 16.sp, lineHeight = 24.sp),
+    titleSmall = TextStyle(fontFamily = WorkSansFamily, fontWeight = FontWeight.Medium, fontSize = 14.sp, lineHeight = 20.sp),
+    bodyLarge = TextStyle(fontFamily = WorkSansFamily, fontWeight = FontWeight.Normal, fontSize = 18.sp, lineHeight = 28.sp, letterSpacing = 0.15.sp),
+    bodyMedium = TextStyle(fontFamily = WorkSansFamily, fontWeight = FontWeight.Normal, fontSize = 16.sp, lineHeight = 24.sp, letterSpacing = 0.25.sp),
+    bodySmall = TextStyle(fontFamily = WorkSansFamily, fontWeight = FontWeight.Normal, fontSize = 14.sp, lineHeight = 20.sp, letterSpacing = 0.4.sp),
+    labelLarge = TextStyle(fontFamily = WorkSansFamily, fontWeight = FontWeight.Medium, fontSize = 14.sp, lineHeight = 20.sp),
+    labelMedium = TextStyle(fontFamily = WorkSansFamily, fontWeight = FontWeight.Medium, fontSize = 12.sp, lineHeight = 16.sp),
+    labelSmall = TextStyle(fontFamily = WorkSansFamily, fontWeight = FontWeight.Medium, fontSize = 10.sp, lineHeight = 14.sp),
 )
 
 /**
