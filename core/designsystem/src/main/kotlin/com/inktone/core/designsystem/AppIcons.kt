@@ -14,6 +14,13 @@ import androidx.compose.material.icons.outlined.Download
 import androidx.compose.material.icons.outlined.Speed
 import androidx.compose.material.icons.filled.DarkMode
 import androidx.compose.material.icons.filled.DeleteSweep
+import androidx.compose.material.icons.filled.FastForward
+import androidx.compose.material.icons.filled.KeyboardArrowDown
+import androidx.compose.material.icons.filled.KeyboardArrowUp
+import androidx.compose.material.icons.filled.Lock
+import androidx.compose.material.icons.filled.SlowMotionVideo
+import androidx.compose.material.icons.filled.Upload
+import androidx.compose.material.icons.filled.WarningAmber
 import androidx.compose.material.icons.automirrored.outlined.ArrowBack
 import androidx.compose.material.icons.automirrored.outlined.List
 import androidx.compose.material.icons.automirrored.outlined.MenuBook
@@ -178,6 +185,15 @@ enum class AppSymbol(
     ArrowForward(R.drawable.ic_symbol_arrow_forward),
     VolumeDown(R.drawable.ic_symbol_volume_down),
     DeleteSweep(R.drawable.ic_symbol_delete_sweep),
+
+    // --- Lot 2c.2 settings — icônes ajoutées pour le rollout ---
+    SlowMotionVideo(R.drawable.ic_symbol_slow_motion_video),
+    FastForward(R.drawable.ic_symbol_fast_forward),
+    KeyboardArrowDown(R.drawable.ic_symbol_keyboard_arrow_down),
+    KeyboardArrowUp(R.drawable.ic_symbol_keyboard_arrow_up),
+    Lock(R.drawable.ic_symbol_lock),
+    Upload(R.drawable.ic_symbol_upload),
+    WarningAmber(R.drawable.ic_symbol_warning_amber),
 }
 
 /**
@@ -299,4 +315,13 @@ object AppIcons {
     val ArrowForward = Icons.AutoMirrored.Filled.ArrowForward
     val VolumeDown = Icons.AutoMirrored.Filled.VolumeDown
     val DeleteSweep = Icons.Filled.DeleteSweep
+
+    // Icônes ajoutées pour le rollout settings 2c.2
+    val SlowMotionVideo = Icons.Filled.SlowMotionVideo
+    val FastForward = Icons.Filled.FastForward
+    val KeyboardArrowDown = Icons.Filled.KeyboardArrowDown
+    val KeyboardArrowUp = Icons.Filled.KeyboardArrowUp
+    val Lock = Icons.Filled.Lock
+    val Upload = Icons.Filled.Upload
+    val WarningAmber = Icons.Filled.WarningAmber
 }
