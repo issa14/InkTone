@@ -1,5 +1,6 @@
 package com.inktone.feature.reader
 
+import com.inktone.core.designsystem.AppIcons
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.ExperimentalLayoutApi
@@ -10,11 +11,6 @@ import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
-import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.filled.Pause
-import androidx.compose.material.icons.filled.PlayArrow
-import androidx.compose.material.icons.filled.SkipNext
-import androidx.compose.material.icons.filled.SkipPrevious
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.FilledIconButton
@@ -101,14 +97,14 @@ fun ReaderTtsPanel(
                 verticalAlignment = Alignment.CenterVertically,
             ) {
                 IconButton(onClick = onPreviousSentence) {
-                    Icon(Icons.Filled.SkipPrevious, contentDescription = "Phrase précédente")
+                    Icon(AppIcons.SentencePrevious, contentDescription = "Phrase précédente")
                 }
                 Text(
                     "Phrase ${currentSentenceIndex + 1} / $totalSentences",
                     style = MaterialTheme.typography.bodyMedium,
                 )
                 IconButton(onClick = onNextSentence) {
-                    Icon(Icons.Filled.SkipNext, contentDescription = "Phrase suivante")
+                    Icon(AppIcons.SentenceNext, contentDescription = "Phrase suivante")
                 }
             }
 
@@ -127,7 +123,7 @@ fun ReaderTtsPanel(
                     shape = InkToneShapes.large,
                 ) {
                     Icon(
-                        if (isPlaying) Icons.Filled.Pause else Icons.Filled.PlayArrow,
+                        if (isPlaying) AppIcons.Pause else AppIcons.Play,
                         contentDescription = if (isPlaying) "Pause" else "Lire",
                         tint = MaterialTheme.colorScheme.surface,
                     )
