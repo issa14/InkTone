@@ -20,9 +20,6 @@ import androidx.compose.foundation.pager.HorizontalPager
 import androidx.compose.foundation.pager.rememberPagerState
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
-import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.automirrored.outlined.MenuBook
-import androidx.compose.material.icons.automirrored.outlined.VolumeUp
 import androidx.compose.material3.Button
 import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.Card
@@ -54,6 +51,7 @@ import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.hilt.navigation.compose.hiltViewModel
+import com.inktone.core.designsystem.AppIcons
 import com.inktone.core.designsystem.NarrativeAccentFamily
 
 /**
@@ -182,13 +180,13 @@ private fun FeaturesCard(accent: Color) {
         Column(verticalArrangement = Arrangement.spacedBy(24.dp)) {
             FeatureRow(
                 accent = accent,
-                icon = Icons.AutoMirrored.Outlined.MenuBook,
+                icon = AppIcons.Reading,
                 title = "Lecture sur mesure",
                 body = "Thèmes, typographie et mise en page entièrement personnalisables pour un confort visuel absolu.",
             )
             FeatureRow(
                 accent = accent,
-                icon = Icons.AutoMirrored.Outlined.VolumeUp,
+                icon = AppIcons.Speaking,
                 title = "Narration naturelle",
                 body = "Des voix ultra-réalistes et fluides. Ajustez la vitesse et laissez-vous porter par l'histoire.",
             )
@@ -239,7 +237,7 @@ private fun ReadyCard(accent: Color, onStart: () -> Unit) {
         Box(contentAlignment = Alignment.Center) {
             Box(Modifier.size(140.dp).clip(CircleShape).border(1.dp, accent.copy(alpha = outerAlpha), CircleShape))
             Box(Modifier.size(112.dp).clip(CircleShape).border(1.dp, accent.copy(alpha = innerAlpha), CircleShape))
-            BrandIcon(icon = Icons.AutoMirrored.Outlined.MenuBook, size = 88.dp, tint = accent)
+            BrandIcon(icon = AppIcons.Reading, size = 88.dp, tint = accent)
         }
         Spacer(Modifier.height(32.dp))
         Text(
