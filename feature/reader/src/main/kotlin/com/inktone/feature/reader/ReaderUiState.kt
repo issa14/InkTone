@@ -5,6 +5,7 @@ import com.inktone.domain.model.AnnotationColor
 import com.inktone.domain.model.Bookmark
 import com.inktone.domain.model.Chapter
 import com.inktone.domain.model.EffectiveReadingSettings
+import com.inktone.domain.model.PublicationFormat
 import com.inktone.domain.model.ReadingOverrides
 import com.inktone.domain.model.ReadingTheme
 import com.inktone.domain.model.SleepTimerState
@@ -112,6 +113,15 @@ data class ReaderUiState(
     // ReaderViewModel.playCurrentSentence) — posée une seule fois,
     // jamais reproposée (UserPreferences.hasPromptedVoiceDownload).
     val showVoiceDownloadPrompt: Boolean = false,
+    // Lot 12, Palier 2 (tache 12.9) — format de la publication ouverte,
+    // jamais reporte dans l'etat avant ce lot. EPUB par defaut : c'est le
+    // seul format ouvert avant que ce champ n'existe, aucune valeur
+    // initiale ambigue introduite pour l'existant.
+    val publicationFormat: PublicationFormat = PublicationFormat.EPUB,
+    // Ratio de defilement vertical [0f..1f] au sein de la page PDF
+    // courante (decision actee 7 du plan, Palier 1) - seul equivalent de
+    // `currentSentenceIndex` pour un format sans notion de phrase.
+    val pageOffsetY: Float = 0f,
 ) {
     val currentChapter: Chapter? get() = chapters.getOrNull(currentChapterIndex)
     val hasNextChapter: Boolean get() = currentChapterIndex < chapters.lastIndex
@@ -128,6 +138,15 @@ data class ReaderUiState(
      */
     val bookProgression: Float
         get() {
+            // Lot 12, tache 12.9 — branche dediee au format PDF : page =
+            // chapitre (Palier 1), pageOffsetY remplace le role de
+            // currentSentenceIndex. N'affecte pas Locator.computeProgression,
+            // qui reste le chemin EPUB/TXT inchange ci-dessous (decision
+            // actee du plan).
+            if (publicationFormat == PublicationFormat.PDF) {
+                if (chapters.isEmpty()) return 0f
+                return ((currentChapterIndex + pageOffsetY) / chapters.size).coerceIn(0f, 1f)
+            }
             val chapter = currentChapter ?: return 0f
             val sentence = chapter.paragraphs.flatMap { it.sentences }.getOrNull(currentSentenceIndex)
             val locator = Locator(
@@ -159,6 +178,12 @@ data class ReaderUiState(
      */
     val isCurrentPageBookmarked: Boolean
         get() {
+            // Lot 12, tache 12.9, decision actee 21 — granularite page,
+            // pas phrase : un PDF n'a pas de « phrase courante » suivie en
+            // navigation manuelle.
+            if (publicationFormat == PublicationFormat.PDF) {
+                return bookmarks.any { it.locator.chapterIndex == currentChapterIndex }
+            }
             val chapter = currentChapter ?: return false
             val sentence = chapter.paragraphs.flatMap { it.sentences }.getOrNull(currentSentenceIndex) ?: return false
             return bookmarks.any { bookmark ->
@@ -299,6 +324,14 @@ sealed interface ReaderIntent {
      * TTS, voir gardes `isProgrammaticScroll`/`isProgrammaticPageChange`).
      */
     data class UpdateScrollPosition(val sentenceIndex: Int) : ReaderIntent
+
+    /**
+     * Lot 12, tache 12.9 — miroir de [UpdateScrollPosition] pour le
+     * format PDF : remonte le ratio de defilement vertical au sein de la
+     * page courante (geste de panoramique, `FixedPageContent`), jamais
+     * emis par les autres formats.
+     */
+    data class UpdatePageOffset(val offsetY: Float) : ReaderIntent
 
     /**
      * 3d.1 — écrit la vitesse sur le profil vocal actif (jamais sur

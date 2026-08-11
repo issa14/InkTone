@@ -8,11 +8,13 @@ import com.inktone.domain.model.Annotation
 import com.inktone.domain.model.AnnotationColor
 import com.inktone.domain.model.Bookmark
 import com.inktone.domain.model.EffectiveReadingSettings
+import com.inktone.domain.model.PublicationFormat
 import com.inktone.domain.model.ReadingMode as DomainReadingMode
 import com.inktone.domain.model.ReadingOverrides
 import com.inktone.domain.model.ReadingSession
 import com.inktone.domain.model.ReadingState
 import com.inktone.domain.model.ReadingTheme
+import com.inktone.domain.model.RenderedPage
 import com.inktone.domain.model.SleepTimerState
 import com.inktone.domain.model.TtsEngineId
 import com.inktone.domain.model.UserPreferences
@@ -24,6 +26,9 @@ import com.inktone.domain.repository.PublicationRepository
 import com.inktone.domain.repository.ReadingSessionRepository
 import com.inktone.domain.repository.ThemeRepository
 import com.inktone.domain.repository.VoiceProfileRepository
+import com.inktone.domain.service.FixedPageDocument
+import com.inktone.domain.service.FixedPageOpenResult
+import com.inktone.domain.service.FixedPageRenderer
 import com.inktone.domain.service.ParseResult
 import com.inktone.domain.service.PublicationParser
 import com.inktone.domain.service.ReadingSessionTracker
@@ -73,6 +78,10 @@ class ReaderViewModel @Inject constructor(
     private val readingSessionRepository: ReadingSessionRepository,
     // Lot 9 — résolution id → ReadingTheme complet (couleurs + police).
     private val themeRepository: ThemeRepository,
+    // Lot 12, Palier 2 — rendu bitmap PDF (PdfPageRendererImpl via Hilt,
+    // infrastructure/parser/di/ParserModule). Jamais le binding PDFium
+    // directement (règle de dépendance, Blueprint §4.7).
+    private val fixedPageRenderer: FixedPageRenderer,
 ) : ViewModel() {
 
     private val _state = MutableStateFlow(ReaderUiState())
@@ -195,10 +204,18 @@ class ReaderViewModel @Inject constructor(
             is ReaderIntent.SetEyeRestReminderInterval -> setEyeRestReminderInterval(intent.minutes)
             is ReaderIntent.ResumeFromEyeRestReminder -> resumeFromEyeRestReminder()
             is ReaderIntent.SnoozeEyeRestReminder -> snoozeEyeRestReminder()
+            is ReaderIntent.UpdatePageOffset -> updatePageOffset(intent.offsetY)
         }
     }
 
     private var scrollPersistJob: Job? = null
+
+    // Lot 12, Palier 2 (tache 12.9) — cycle de vie distinct du parsing
+    // (decision actee 14 du plan) : ouvert une fois a l'ouverture d'une
+    // publication PDF, ferme explicitement a la fermeture de celle-ci ou
+    // du ViewModel (onCleared), jamais rouvert par page.
+    private var fixedPageDocument: FixedPageDocument? = null
+    private var pageOffsetPersistJob: Job? = null
 
     /**
      * Tâche 3c.1 — antipattern legacy corrigé : la position de lecture en
@@ -227,6 +244,33 @@ class ReaderViewModel @Inject constructor(
             persistPosition(chapterIndex = chapterIndex, sentenceIndex = sentenceIndex)
         }
     }
+
+    /**
+     * Lot 12, tache 12.9 — miroir de [updateScrollPosition] pour le
+     * format PDF, meme debounce (persister a chaque frame d'un geste de
+     * panoramique saturerait Room pour une position qui n'interesse
+     * qu'une fois le geste stabilise).
+     */
+    private fun updatePageOffset(offsetY: Float) {
+        if (offsetY == _state.value.pageOffsetY) return
+        val chapterIndex = _state.value.currentChapterIndex
+        _state.value = _state.value.copy(pageOffsetY = offsetY)
+        pageOffsetPersistJob?.cancel()
+        pageOffsetPersistJob = viewModelScope.launch {
+            delay(SCROLL_PERSIST_DEBOUNCE_MS)
+            persistPosition(chapterIndex = chapterIndex, sentenceIndex = 0)
+        }
+    }
+
+    /**
+     * Lot 12, tache 12.9 — enveloppe [FixedPageDocument.renderPage] pour
+     * `FixedPageContent` (feature/reader), qui ne connaît jamais
+     * `FixedPageRenderer`/PDFium directement. `null` si aucun document
+     * PDF n'est ouvert (format non PDF, ou échec d'ouverture déjà reflété
+     * dans `errorMessage`).
+     */
+    suspend fun renderPdfPage(pageIndex: Int, targetWidthPx: Int): RenderedPage? =
+        fixedPageDocument?.renderPage(pageIndex, targetWidthPx)
 
     /**
      * Tache 9bis.3.3 — minuteur de sommeil. Un seul job actif a la fois :
@@ -297,6 +341,12 @@ class ReaderViewModel @Inject constructor(
      * ne sont pas encore reflétés dans `ReaderUiState` — Tâche 4.8.
      */
     private fun openPublication(publicationId: String, targetLocator: Locator? = null, flashOnArrival: Boolean = false) {
+        // Lot 12, tache 12.9 — une publication PDF ouverte precedemment
+        // garde son FixedPageDocument vivant jusqu'ici (decision actee 14
+        // du plan) ; en ouvrir une nouvelle doit d'abord fermer l'ancien,
+        // jamais accumuler des handles natifs non fermes.
+        fixedPageDocument?.close()
+        fixedPageDocument = null
         viewModelScope.launch {
             val publication = publicationRepository.getById(publicationId) ?: run {
                 Log.w("ReaderViewModel", "openPublication: publication introuvable ($publicationId)")
@@ -341,12 +391,29 @@ class ReaderViewModel @Inject constructor(
                         activeVoiceProfile = activeVoiceProfile,
                         availableVoiceProfiles = availableVoiceProfiles,
                         lineHeightMultiplier = prefs.lineHeightMultiplier,
+                        // Lot 12, tache 12.9 — jamais reporte avant ce lot.
+                        publicationFormat = publication.format,
+                        pageOffsetY = restored?.locator?.pageOffsetY ?: 0f,
                     )
                     triggerPreload(_state.value.currentChapterIndex)
                     observeAnnotations(publicationId)
                     observeBookmarks(publicationId)
                     if (prefs.eyeRestReminderEnabled) scheduleEyeRestReminder(prefs.eyeRestReminderIntervalMinutes)
                     if (targetLocator != null) navigateToLocator(targetLocator, flashOnArrival)
+
+                    // Lot 12, tache 12.9 — ouvre le document de rendu fixe
+                    // pour toute la session de lecture (decision actee 14),
+                    // apres avoir peuple l'etat pour que errorMessage
+                    // s'affiche sur le meme ecran en cas d'echec.
+                    if (publication.format == PublicationFormat.PDF) {
+                        when (val openResult = fixedPageRenderer.open(publication.fileUri)) {
+                            is FixedPageOpenResult.Success -> fixedPageDocument = openResult.document
+                            is FixedPageOpenResult.Failed -> {
+                                Log.w("ReaderViewModel", "openPublication: echec ouverture rendu PDF (${openResult.reason})")
+                                _state.value = _state.value.copy(errorMessage = openResult.reason)
+                            }
+                        }
+                    }
                 }
                 else -> {
                     val message = when (result) {
@@ -444,9 +511,38 @@ class ReaderViewModel @Inject constructor(
      * courante », jamais un second calcul.
      */
     private fun toggleBookmarkAtCurrentPosition() {
+        val publicationId = currentPublicationId ?: return
+
+        // Lot 12, tache 12.9, decision actee 17 — meme Locator, memes Use
+        // Cases, granularite page (pas de Sentence a chercher).
+        if (_state.value.publicationFormat == PublicationFormat.PDF) {
+            val chapterIndex = _state.value.currentChapterIndex
+            val existing = _state.value.bookmarks.firstOrNull { it.locator.chapterIndex == chapterIndex }
+            viewModelScope.launch {
+                if (existing != null) {
+                    deleteBookmark(existing.id)
+                } else {
+                    createBookmark(
+                        Bookmark(
+                            id = UUID.randomUUID().toString(),
+                            publicationId = publicationId,
+                            locator = Locator(
+                                resourceHref = "page-$chapterIndex",
+                                chapterIndex = chapterIndex,
+                                charOffset = 0,
+                                pageOffsetY = _state.value.pageOffsetY,
+                            ),
+                            excerpt = "Page ${chapterIndex + 1}",
+                            createdAt = System.currentTimeMillis(),
+                        ),
+                    )
+                }
+            }
+            return
+        }
+
         val chapter = _state.value.currentChapter ?: return
         val sentence = chapter.paragraphs.flatMap { it.sentences }.getOrNull(_state.value.currentSentenceIndex) ?: return
-        val publicationId = currentPublicationId ?: return
         val existing = _state.value.bookmarks.firstOrNull { bookmark ->
             bookmark.locator.chapterIndex == chapter.index &&
                 bookmark.locator.charOffset in sentence.startOffset until sentence.endOffset
@@ -583,12 +679,28 @@ class ReaderViewModel @Inject constructor(
      */
     private fun persistPosition(chapterIndex: Int, sentenceIndex: Int) {
         viewModelScope.launch {
-            val chapter = _state.value.chapters.getOrNull(chapterIndex) ?: return@launch
-            val sentence = chapter.paragraphs.flatMap { it.sentences }.getOrNull(sentenceIndex) ?: return@launch
+            val publicationId = currentPublicationId ?: return@launch
+            // Lot 12, tache 12.9 — branche PDF : page = chapitre, jamais
+            // de Sentence a chercher (une page scannee n'en a aucune, ce
+            // qui faisait echouer silencieusement ce chemin avant cette
+            // branche — bug trouve en cablant cette tache). `sentenceIndex`
+            // est ignore pour ce format, `pageOffsetY` deja dans l'etat.
+            val locator = if (_state.value.publicationFormat == PublicationFormat.PDF) {
+                Locator(
+                    resourceHref = "page-$chapterIndex",
+                    chapterIndex = chapterIndex,
+                    charOffset = 0,
+                    pageOffsetY = _state.value.pageOffsetY,
+                )
+            } else {
+                val chapter = _state.value.chapters.getOrNull(chapterIndex) ?: return@launch
+                val sentence = chapter.paragraphs.flatMap { it.sentences }.getOrNull(sentenceIndex) ?: return@launch
+                sentence.startLocator(chapterIndex = chapterIndex, resourceHref = chapter.href)
+            }
             updateReadingState(
                 ReadingState(
-                    publicationId = currentPublicationId ?: return@launch,
-                    locator = sentence.startLocator(chapterIndex = chapterIndex, resourceHref = chapter.href),
+                    publicationId = publicationId,
+                    locator = locator,
                     lastReadAt = System.currentTimeMillis(),
                 ),
             )
@@ -870,6 +982,11 @@ class ReaderViewModel @Inject constructor(
         scrollPersistJob?.cancel()
         eyeRestReminderJob?.cancel()
         eyeRestCountdownJob?.cancel()
+        // Lot 12, tache 12.9 — libere les ressources natives PDFium du
+        // renderer, jamais laisse au ramasse-miettes (decision actee 14).
+        pageOffsetPersistJob?.cancel()
+        fixedPageDocument?.close()
+        fixedPageDocument = null
     }
 
     // ═══════════════════════════════════════════════
