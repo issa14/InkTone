@@ -21,8 +21,16 @@ la clôture se fait sur appareil.
    thèmes, ouverture du sélecteur SAF. Le TTS sur PDF (second volet d'ADR-017, extraction
    d'ordre de lecture, surlignage synchronisé) est un **lot distinct et ultérieur**, non
    planifié ici.
-2. **Moteur retenu : PDFium**, via le binding Kotlin `io.legere:pdfiumandroid:2.0.3`
+2. **Moteur retenu : PDFium**, via le binding Kotlin `io.legere:pdfiumandroid`
    (Maven Central, Apache-2.0 ; PDFium lui-même est BSD-3-Clause, projet Google/Chromium).
+   **Version épinglée : `1.0.20`, pas `2.0.3`** — corrigé par la tâche 12.1 (build réel,
+   pas supposition) : `2.0.3`, `2.0.2` et `1.0.35` sont tous compilés avec une métadonnée
+   Kotlin (2.4.0, 2.4.0, 2.2.0 respectivement) incompatible avec le plugin Kotlin du projet
+   (2.0.20, `kspDebugKotlin` échoue). `1.0.20` (dernière version dont la métadonnée reste
+   lisible par ce compilateur) expose la même API — `PdfTextPage`/`PdfTextPageKt`
+   (extraction de texte complète), `PdfPasswordException`, `PdfPage.renderPage`,
+   `PdfDocument.getTableOfContents` — vérifiée par inspection du jar (`javap`), pas
+   supposée équivalente aux versions plus récentes.
    Décision révisée en cours de recherche : MuPDF (proposition initiale) est AGPL, et
    Artifex précise explicitement que l'usage AGPL gratuit exige que **tout le code source
    de l'app** soit publié sous licence compatible et **exclut nommément Crashlytics** —
@@ -33,12 +41,15 @@ la clôture se fait sur appareil.
    [ArtifexSoftware/mupdf-android-fitz](https://github.com/ArtifexSoftware/mupdf-android-fitz),
    [io.legere/pdfiumandroid — Maven Central](https://central.sonatype.com/artifact/io.legere/pdfiumandroid),
    [johngray1965/PdfiumAndroidKt](https://github.com/johngray1965/PdfiumAndroidKt).
-3. **Deux points non vérifiables depuis la documentation publique** — traités par la
-   tâche 12.1 (spike dédiée), pas supposés acquis : (a) les ABI réellement embarquées dans
-   l'AAR `pdfiumandroid` (à inspecter directement, alignement `arm64-v8a` obligatoire, voir
-   décision 8) ; (b) le comportement exact de la lib face à un PDF protégé par mot de passe
-   (code d'erreur exposé côté Kotlin ou exception à intercepter — à établir par un test
-   direct avant d'écrire `PdfPublicationParser`, pas par supposition).
+3. **Deux points non vérifiables depuis la documentation publique — résolus par la tâche
+   12.1** (spike réelle, appareil physique V2206/Android 14, pas simulée) :
+   (a) l'AAR `pdfiumandroid:1.0.20` embarque `x86_64`, `x86`, `armeabi-v7a`, `arm64-v8a` —
+   restreint à `arm64-v8a` par `ndk.abiFilters` (décision 8), confirmé dans l'APK de test
+   final (`lib/arm64-v8a/libpdfium.so` + `libpdfiumandroid.so`, ~5,1 Mo, aucune autre ABI
+   packagée) ; (b) `PdfiumCore.newDocument(bytes)` lève `PdfPasswordException`
+   (`extends IOException`) si le PDF est protégé et qu'aucun mot de passe correct n'est
+   fourni ; `newDocument(bytes, password)` réussit avec le bon mot de passe. Les deux
+   confirmés par `PdfiumSpikeTest` (3 tests, tous verts sur appareil réel).
 4. **`DocumentModel` construit honnêtement, jamais un objet vide de façade.**
    `PdfPublicationParser` produit un `Chapter` par page (`index = pageIndex`), dont les
    `paragraphs` viennent du texte extrait via `PdfTextPage`/`FPDFText_*` — liste vide si la
