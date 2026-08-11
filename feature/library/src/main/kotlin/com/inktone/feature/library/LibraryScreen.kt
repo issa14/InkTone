@@ -21,10 +21,6 @@ import androidx.compose.foundation.lazy.grid.GridItemSpan
 import androidx.compose.foundation.lazy.grid.LazyVerticalGrid
 import androidx.compose.foundation.lazy.grid.items as gridItems
 import androidx.compose.foundation.lazy.items as listItems
-import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.outlined.MoreVert
-import androidx.compose.material.icons.outlined.Menu
-import androidx.compose.material.icons.outlined.Search
 import androidx.compose.material3.DismissibleDrawerSheet
 import androidx.compose.material3.DismissibleNavigationDrawer
 import androidx.compose.material3.ElevatedCard
@@ -45,7 +41,6 @@ import androidx.compose.material3.TopAppBarDefaults
 import androidx.compose.material3.Button
 import androidx.compose.material3.rememberDrawerState
 import androidx.compose.material3.rememberModalBottomSheetState
-import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material3.DrawerValue
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.DisposableEffect
@@ -68,7 +63,9 @@ import androidx.compose.ui.unit.dp
 import androidx.lifecycle.Lifecycle
 import androidx.lifecycle.LifecycleEventObserver
 import androidx.hilt.navigation.compose.hiltViewModel
+import com.inktone.core.designsystem.AppIcon
 import com.inktone.core.designsystem.AppIcons
+import com.inktone.core.designsystem.AppSymbol
 import com.inktone.domain.model.FilterMode
 import com.inktone.domain.model.Publication
 import com.inktone.domain.service.ImportProgress
@@ -303,7 +300,7 @@ internal fun LibraryDrawerContent(
         // l'item historique corrigé par suppression au lot 1.
         NavigationDrawerItem(
             label = { Text("Récents") },
-            icon = { Icon(AppIcons.Recents, contentDescription = null) },
+            icon = { AppIcon(AppSymbol.Recents,  contentDescription = null) },
             selected = false,
             onClick = onOpenRecents,
         )
@@ -312,13 +309,13 @@ internal fun LibraryDrawerContent(
         // Bibliotheque lui-meme, il n'y a pas d'autre etat possible.
         NavigationDrawerItem(
             label = { Text("Bibliothèque") },
-            icon = { Icon(AppIcons.Reading, contentDescription = null) },
+            icon = { AppIcon(AppSymbol.Reading,  contentDescription = null) },
             selected = true,
             onClick = onSelectLibrary,
         )
         NavigationDrawerItem(
             label = { Text("Marque-pages et Notes") },
-            icon = { Icon(AppIcons.Bookmark, contentDescription = null) },
+            icon = { AppIcon(AppSymbol.Bookmark,  contentDescription = null) },
             selected = false,
             onClick = onOpenBookmarks,
         )
@@ -329,13 +326,13 @@ internal fun LibraryDrawerContent(
         // pied de drawer, une première version l'y avait placé à tort.
         NavigationDrawerItem(
             label = { Text("Synchronisation") },
-            icon = { Icon(AppIcons.Sync, contentDescription = null) },
+            icon = { AppIcon(AppSymbol.Sync,  contentDescription = null) },
             selected = false,
             onClick = onOpenSync,
         )
         NavigationDrawerItem(
             label = { Text("Statistiques de lecture") },
-            icon = { Icon(AppIcons.Stats, contentDescription = null) },
+            icon = { AppIcon(AppSymbol.Stats,  contentDescription = null) },
             selected = false,
             onClick = onOpenStats,
         )
@@ -419,7 +416,7 @@ internal fun LibraryTopBar(
                     isSearchActive = false
                     onSearchQueryChange("")
                 }) {
-                    Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = "Fermer")
+                    AppIcon(AppSymbol.Back, contentDescription = "Fermer")
                 }
             },
             colors = TopAppBarDefaults.topAppBarColors(
@@ -469,18 +466,18 @@ internal fun LibraryTopBar(
             },
             navigationIcon = {
                 IconButton(onClick = onMenuClick) {
-                    Icon(Icons.Outlined.Menu, contentDescription = "Menu")
+                    AppIcon(AppSymbol.Menu, contentDescription = "Menu")
                 }
             },
             actions = {
                 IconButton(onClick = { isSearchActive = true }) {
-                    Icon(Icons.Outlined.Search, contentDescription = "Rechercher")
+                    AppIcon(AppSymbol.Search, contentDescription = "Rechercher")
                 }
                 IconButton(onClick = { showFilterDialog = true }) {
-                    Icon(AppIcons.Filter, contentDescription = "Filtrer")
+                    AppIcon(AppSymbol.Filter,  contentDescription = "Filtrer")
                 }
                 IconButton(onClick = { showActionsSheet = true }) {
-                    Icon(Icons.Outlined.MoreVert, contentDescription = "Actions")
+                    AppIcon(AppSymbol.MoreActions, contentDescription = "Actions")
                 }
             },
             colors = TopAppBarDefaults.topAppBarColors(
@@ -676,14 +673,13 @@ internal fun PublicationListRow(
                 }
             }
             IconButton(onClick = onToggleFavorite) {
-                Icon(
-                    if (publication.isFavorite) AppIcons.Favorite else AppIcons.FavoriteBorder,
+                AppIcon(AppSymbol.Favorite, selected = publication.isFavorite,
                     contentDescription = if (publication.isFavorite) "Retirer des favoris" else "Ajouter aux favoris",
                     tint = if (publication.isFavorite) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurfaceVariant,
                 )
             }
             IconButton(onClick = { showActionsSheet = true }) {
-                Icon(AppIcons.MoreActions, contentDescription = "Actions sur « ${publication.title} »", tint = MaterialTheme.colorScheme.onSurfaceVariant)
+                AppIcon(AppSymbol.MoreActions,  contentDescription = "Actions sur « ${publication.title} »", tint = MaterialTheme.colorScheme.onSurfaceVariant)
             }
         }
         if (progressPercent > 0) {

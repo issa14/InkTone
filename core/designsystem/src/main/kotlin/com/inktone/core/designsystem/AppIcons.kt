@@ -4,6 +4,7 @@ import androidx.annotation.DrawableRes
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.NavigateBefore
 import androidx.compose.material.icons.automirrored.filled.NavigateNext
+import androidx.compose.material.icons.automirrored.filled.Sort
 import androidx.compose.material.icons.automirrored.outlined.ArrowBack
 import androidx.compose.material.icons.automirrored.outlined.List
 import androidx.compose.material.icons.automirrored.outlined.MenuBook
@@ -49,6 +50,7 @@ import androidx.compose.material.icons.outlined.Info
 import androidx.compose.material.icons.outlined.KeyboardArrowDown
 import androidx.compose.material.icons.outlined.Lightbulb
 import androidx.compose.material.icons.outlined.LocalFireDepartment
+import androidx.compose.material.icons.outlined.Menu
 import androidx.compose.material.icons.outlined.Mic
 import androidx.compose.material.icons.outlined.Palette
 import androidx.compose.material.icons.outlined.Pause
@@ -137,6 +139,8 @@ enum class AppSymbol(
     Filter(R.drawable.ic_symbol_filter),
     ChevronDown(R.drawable.ic_symbol_chevron_down),
     MoreActions(R.drawable.ic_symbol_more_actions),
+    Menu(R.drawable.ic_symbol_menu),
+    Sort(R.drawable.ic_symbol_sort),
     Copy(R.drawable.ic_symbol_copy),
     Highlight(R.drawable.ic_symbol_highlight),
     Brightness(R.drawable.ic_symbol_brightness),
@@ -202,6 +206,8 @@ object AppIcons {
     val Pin = Icons.Filled.PushPin
     val PinOutlined = Icons.Outlined.PushPin
     val MoreActions = Icons.Filled.MoreVert
+    val Menu = Icons.Outlined.Menu
+    val Sort = Icons.AutoMirrored.Filled.Sort
     val Delete = Icons.Outlined.Delete
 
     val Success = Icons.Filled.CheckCircle
