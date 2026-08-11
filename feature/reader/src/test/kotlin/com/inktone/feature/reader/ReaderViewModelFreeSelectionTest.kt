@@ -196,6 +196,42 @@ class ReaderViewModelFreeSelectionTest {
         dispatcher.scheduler.runCurrent()
     }
 
+    /**
+     * Garde-fou du contrat de synchronicité de
+     * [ReaderViewModel.confirmAnnotation] (Phase 4 de la refonte du cycle
+     * de vie de la sélection) : l'UI purge son état de sélection —
+     * `ClearFreeSelection` — dans le MÊME callback que l'action du popup,
+     * juste après avoir dispatché `ConfirmAnnotation`, sans attendre
+     * l'écriture en base. L'annotation doit quand même être créée avec les
+     * offsets exacts. Ce test échoue si la lecture de `freeSelectionRange`
+     * ou la résolution des locators repasse un jour dans le
+     * `viewModelScope.launch`.
+     */
+    @Test
+    fun confirmAnnotation_puis_clearFreeSelection_immediat_cree_quand_meme_l_annotation() = runTest {
+        val readingStateRepository = FakeReadingStateRepository()
+        val publicationRepository = FakePublicationRepository()
+        val annotationRepository = FakeAnnotationRepository()
+        val viewModel = buildViewModel(readingStateRepository, publicationRepository, FakeBookmarkRepository(), annotationRepository)
+        openTestPublication(viewModel, publicationRepository)
+
+        // "monde" : offsets locaux 11-15 inclus (endOffsetExclusive 16).
+        viewModel.onIntent(ReaderIntent.SetFreeSelection(anchorOffset = 11, focusOffset = 15))
+        viewModel.onIntent(ReaderIntent.ConfirmAnnotation(AnnotationColor.YELLOW))
+        // Purge synchrone par l'UI, avant que la coroutine d'écriture ne tourne.
+        viewModel.onIntent(ReaderIntent.ClearFreeSelection)
+        dispatcher.scheduler.runCurrent()
+
+        val annotation = viewModel.state.value.annotations.single()
+        assertEquals(11, annotation.startLocator.charOffset)
+        assertEquals(16, annotation.endLocator.charOffset)
+        assertEquals("monde", annotation.excerpt)
+        assertNull(viewModel.state.value.freeSelectionRange)
+
+        viewModel.cancelCheckpointTimerForTest()
+        dispatcher.scheduler.runCurrent()
+    }
+
     @Test
     fun confirmAnnotation_sans_aucune_selection_active_ne_fait_rien() = runTest {
         val readingStateRepository = FakeReadingStateRepository()

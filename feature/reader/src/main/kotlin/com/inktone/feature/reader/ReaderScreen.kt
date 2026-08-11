@@ -7,22 +7,21 @@ import androidx.compose.animation.ExperimentalSharedTransitionApi
 import androidx.compose.foundation.ExperimentalFoundationApi
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
-import androidx.compose.foundation.gestures.detectTapGestures
 import androidx.compose.foundation.interaction.MutableInteractionSource
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.ExperimentalLayoutApi
-import androidx.compose.foundation.layout.FlowRow
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.lazy.LazyColumn
+import androidx.compose.foundation.lazy.itemsIndexed
+import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.foundation.layout.padding
-import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.text.BasicTextField
 import androidx.compose.foundation.text.selection.LocalTextSelectionColors
 import androidx.compose.foundation.text.selection.TextSelectionColors
-import androidx.compose.foundation.verticalScroll
 import androidx.compose.material3.Button
 import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
@@ -37,7 +36,7 @@ import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
-import androidx.compose.runtime.rememberCoroutineScope
+import androidx.compose.runtime.rememberUpdatedState
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -45,10 +44,8 @@ import androidx.compose.ui.geometry.Rect
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.graphicsLayer
-import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.layout.LayoutCoordinates
 import androidx.compose.ui.layout.onGloballyPositioned
-import androidx.compose.ui.layout.positionInParent
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.platform.LocalLifecycleOwner
 import androidx.compose.ui.platform.LocalTextToolbar
@@ -82,9 +79,7 @@ import com.inktone.domain.model.ReadingOverrides
 import com.inktone.domain.model.ReadingTheme
 import com.inktone.domain.model.Sentence
 import com.inktone.feature.reader.pagination.rememberChapterPaginationState
-import kotlinx.coroutines.Job
 import kotlinx.coroutines.delay
-import kotlinx.coroutines.launch
 import kotlin.math.roundToInt
 
 /**
@@ -99,10 +94,27 @@ import kotlin.math.roundToInt
  * 3/4), cet écran n'affichait qu'une seule `Sentence` à la fois (squelette
  * de marche à blanc pour le pipeline TTS), pas la « lecture visuelle »
  * que le Blueprint exige en complément du mode audio. Le chapitre entier
- * est maintenant rendu — toutes les `Sentence` du chapitre, dans un
- * `FlowRow` défilable (`verticalScroll`, jamais `LazyColumn` : la mise en
- * page en flux imite le texte continu tout en gardant chaque phrase comme
- * composable adressable individuellement).
+ * est maintenant rendu — toutes les `Sentence` du chapitre, un
+ * `Paragraph` par item de `LazyColumn`.
+ *
+ * **Migration `verticalScroll` → `LazyColumn` (virtualisation).** Le rendu
+ * SCROLL a longtemps été un `FlowRow` dans un `Modifier.verticalScroll`,
+ * choix assumé à l'époque pour imiter le texte continu. Conséquence
+ * mesurée sur appareil (V2206, Android 14) avant migration : composition
+ * EAGER du chapitre entier, donc des centaines de `BasicTextField`
+ * simultanés — **100 % de frames en gigue, médiane à 150 ms, 99e centile à
+ * 600 ms**, pour seulement 3-7 ms de GPU (tout le coût en
+ * composition/layout CPU). Le palier 3f.3bis (grain phrase → paragraphe)
+ * avait réduit le facteur sans traiter la cause : le nombre d'instances
+ * restait proportionnel à la LONGUEUR DU CHAPITRE, pas à ce qui est
+ * visible. `LazyColumn` le rend proportionnel à l'écran.
+ *
+ * Deux conséquences structurelles de la virtualisation, traitées ici :
+ * un item est DÉTRUIT hors écran (l'état de sélection est donc hissé au
+ * ViewModel et relu à la recomposition, voir `restoredSelection` dans
+ * `ParagraphText` — la sortie de composition n'efface plus rien), et un
+ * lazy layout n'expose aucun offset absolu de contenu (l'auto-scroll TTS
+ * et la détection de position visent donc l'ITEM, plus un pixel).
  *
  * **Palier 3f.1-3f.3 — sélection libre au mot, PAGED et SCROLL.** Un
  * `BasicTextField` en lecture seule par unité adressable (une page en
@@ -119,13 +131,11 @@ import kotlin.math.roundToInt
  *
  * **Palier 3f.3bis — grain SCROLL, phrase → paragraphe.** Un
  * `BasicTextField` par `Sentence` (grain initial de 3f.3) composait des
- * centaines d'instances simultanées sur un chapitre typique — `FlowRow`
- * et `verticalScroll` composent tout le chapitre d'un coup (pas de
- * `LazyColumn`, voir ci-dessus), et `BasicTextField` est nettement plus
- * lourd qu'un `Text`. Bug réel trouvé sur appareil : glissement de
- * sélection ET défilement simple saccadés. Regroupé par `Paragraph` —
- * facteur 3-8x moins d'instances pour un chapitre typique, aligné avec la
- * frontière déjà utilisée pour les images EPUB intercalées.
+ * centaines d'instances simultanées sur un chapitre typique, et
+ * `BasicTextField` est nettement plus lourd qu'un `Text`. Bug réel trouvé
+ * sur appareil : glissement de sélection ET défilement simple saccadés.
+ * Regroupé par `Paragraph` — frontière déjà utilisée pour les images EPUB
+ * intercalées, et devenue depuis l'unité d'item du `LazyColumn`.
  *
  * **Limite connue, non résolue ici** : aucun défilement automatique vers
  * la phrase en cours de lecture TTS — la vue défile uniquement sur
@@ -316,60 +326,77 @@ fun ReaderScreen(
             return@Box
         }
 
-        val scrollState = rememberScrollState()
-        LaunchedEffect(state.currentChapterIndex) { scrollState.scrollTo(0) }
+        // Migration LazyColumn (voir doc de tête) : l'état de défilement du
+        // mode SCROLL est désormais un `LazyListState` — un paragraphe = un
+        // item, jamais plus tout le chapitre composé d'un coup.
+        val scrollState = rememberLazyListState()
+        LaunchedEffect(state.currentChapterIndex) { scrollState.scrollToItem(0) }
 
         val freeSelectedRange = state.freeSelectionRange
 
-        // A.1 / Tache 9bis.3.6 - position Y de la phrase active
+        // A.1 / Tache 9bis.3.6 - position Y de la phrase active, LOCALE au
+        // paragraphe qui la contient (voir ParagraphText.onCurrentLineY) —
+        // sert la réglette de lecture. N'est plus une cible de défilement :
+        // un `LazyColumn` n'a pas d'offset absolu de contenu, l'auto-scroll
+        // TTS vise désormais l'ITEM (voir ci-dessous).
         var currentLineYDp by remember { mutableStateOf(0.dp) }
         val density = LocalDensity.current
 
-        // 3c.1 — drapeau posé explicitement autour du seul appel
-        // programmatique à scrollState (auto-scroll TTS), levé à sa fin.
-        // Discrimine l'origine réelle du défilement pour la détection de
-        // position ci-dessous : `ScrollableState.isScrollInProgress` vaut
-        // `true` pour CE défilement programmatique aussi bien que pour un
-        // drag utilisateur — il ne permet donc pas de distinguer les deux,
-        // contrairement à ce drapeau.
-        var isProgrammaticScroll by remember { mutableStateOf(false) }
-
-        // A.1 — Auto-scroll vers la phrase active pendant la lecture TTS
-        LaunchedEffect(state.currentSentenceIndex) {
-            if (state.isPlaying && currentLineYDp > 0.dp) {
-                isProgrammaticScroll = true
-                try {
-                    scrollState.animateScrollTo(with(density) { currentLineYDp.roundToPx() })
-                } finally {
-                    isProgrammaticScroll = false
-                }
+        // Index de paragraphe (= index d'item du LazyColumn) contenant une
+        // phrase donnée, et première phrase de chaque paragraphe : les deux
+        // conversions dont la virtualisation a besoin, calculées une fois
+        // par chapitre plutôt qu'à chaque frame.
+        val paragraphs = state.currentChapter?.paragraphs.orEmpty()
+        val firstSentenceIndexPerParagraph = remember(state.currentChapter) {
+            var running = 0
+            paragraphs.map { paragraph ->
+                val start = running
+                running += paragraph.sentences.size
+                start
             }
         }
 
-        // 3c.1 — position en contenu (indépendante du défilement, voir
-        // currentLineYDp ci-dessus qui utilise déjà cette même valeur comme
-        // cible ABSOLUE de scrollTo) de chaque phrase rendue en mode
-        // SCROLL. Map ordinaire, pas un State Compose : ses écritures
-        // (depuis `ParagraphText.onSentenceTopOffsets`, une seule fois par
-        // paragraphe au layout — pas par phrase depuis le palier 3f.3bis,
-        // ni à chaque frame de défilement) n'ont pas besoin de déclencher
-        // de recomposition, seule la lecture dans le derivedStateOf
-        // ci-dessous compte, déjà réactive via scrollState.value.
-        val sentenceTopOffsetsPx = remember(state.currentChapterIndex) { mutableMapOf<Int, Int>() }
+        // 3c.1 — drapeau posé explicitement autour du seul appel
+        // programmatique au défilement (auto-scroll TTS), levé à sa fin.
+        // Discrimine l'origine réelle du défilement pour la détection de
+        // position ci-dessous : `isScrollInProgress` vaut `true` pour CE
+        // défilement programmatique aussi bien que pour un drag
+        // utilisateur — il ne permet donc pas de distinguer les deux.
+        var isProgrammaticScroll by remember { mutableStateOf(false) }
 
-        // 3c.1 — dérive la phrase la plus haute visible, mais ne propage
-        // qu'un changement de PHRASE, jamais de position brute : sans ce
-        // derivedStateOf, la lecture de scrollState.value à chaque pixel
-        // défilé recalculerait (et recomposerait) au même rythme.
-        val topmostVisibleSentenceIndex by remember(state.currentChapterIndex) {
+        // A.1 — Auto-scroll vers la phrase active pendant la lecture TTS.
+        // `animateScrollToItem` remplace `animateScrollTo(offsetAbsolu)` :
+        // un lazy layout ne connaît pas la hauteur de ce qu'il n'a pas
+        // composé, il ne peut donc pas viser un pixel absolu. Vise le
+        // paragraphe porteur de la phrase — grain suffisant, et au passage
+        // plus correct que l'ancien calcul qui passait un Y LOCAL au
+        // paragraphe comme s'il était absolu au chapitre.
+        LaunchedEffect(state.currentSentenceIndex) {
+            if (!state.isPlaying) return@LaunchedEffect
+            val targetItem = firstSentenceIndexPerParagraph
+                .indexOfLast { it <= state.currentSentenceIndex }
+                .takeIf { it >= 0 } ?: return@LaunchedEffect
+            isProgrammaticScroll = true
+            try {
+                scrollState.animateScrollToItem(targetItem)
+            } finally {
+                isProgrammaticScroll = false
+            }
+        }
+
+        // 3c.1 — dérive la phrase la plus haute visible. La virtualisation
+        // rend ceci nettement plus direct qu'avant : le `LazyListState`
+        // publie lui-même les items visibles, plus besoin de collecter les
+        // offsets absolus de chaque phrase (`sentenceTopOffsetsPx`, retiré
+        // avec le `verticalScroll`) ni de les comparer à la position de
+        // défilement. `derivedStateOf` conserve la même garantie : seul un
+        // changement de PHRASE se propage, jamais la position brute.
+        val topmostVisibleSentenceIndex by remember(state.currentChapter) {
             derivedStateOf {
                 if (isProgrammaticScroll) return@derivedStateOf null
-                val scrollValue = scrollState.value
-                var result: Int? = null
-                for ((index, top) in sentenceTopOffsetsPx) {
-                    if (top <= scrollValue && (result == null || index > result!!)) result = index
-                }
-                result
+                val firstVisibleParagraph = scrollState.layoutInfo.visibleItemsInfo
+                    .firstOrNull()?.index ?: return@derivedStateOf null
+                firstSentenceIndexPerParagraph.getOrNull(firstVisibleParagraph)
             }
         }
 
@@ -408,11 +435,25 @@ fun ReaderScreen(
         // paragraphe en SCROLL — voir PagedChapterContent.PageBlock /
         // ReaderScreen.ParagraphText, doc de tête), jamais à cheval sur
         // plusieurs à unir.
-        var pagedFreeSelectionBounds by remember { mutableStateOf<Rect?>(null) }
-        var scrollFreeSelectionBounds by remember(state.currentChapterIndex) { mutableStateOf<Rect?>(null) }
+        var pagedFreeSelectionBounds by remember { mutableStateOf<SelectionPopupBounds?>(null) }
+        var scrollFreeSelectionBounds by remember(state.currentChapterIndex) { mutableStateOf<SelectionPopupBounds?>(null) }
         val selectionBoundsInWindow = when (state.readingMode) {
-            ReadingMode.SCROLL -> scrollFreeSelectionBounds
-            ReadingMode.PAGED -> pagedFreeSelectionBounds
+            ReadingMode.SCROLL -> scrollFreeSelectionBounds?.boundsInWindow
+            ReadingMode.PAGED -> pagedFreeSelectionBounds?.boundsInWindow
+        }
+
+        // Phase 4 — purge complète de l'état transitoire de sélection,
+        // synchrone : état global effacé ET popup détruit dans le même
+        // callback. C'est la disparition de ces bornes (jamais une
+        // réaction différée à `freeSelectionRange`) qui démonte le popup,
+        // exactement comme un `hide()` du toolbar natif ; l'unité
+        // adressable, elle, rétracte sa sélection locale à la même
+        // recomposition puisqu'elle ne possède plus l'état global (Phase 1,
+        // `PageBlock`/`ParagraphText`).
+        fun clearSelectionAndPopup() {
+            viewModel.onIntent(ReaderIntent.ClearFreeSelection)
+            pagedFreeSelectionBounds = null
+            scrollFreeSelectionBounds = null
         }
         val selectedText = remember(freeSelectedRange, state.currentChapter) {
             val freeRange = freeSelectedRange ?: return@remember ""
@@ -501,18 +542,47 @@ fun ReaderScreen(
 
             when (state.readingMode) {
                 ReadingMode.SCROLL -> {
-                    FlowRow(
-                        modifier = Modifier.verticalScroll(scrollState),
-                        horizontalArrangement = Arrangement.spacedBy(4.dp),
+                    // Images EPUB indexées une fois par chapitre : la
+                    // recherche par paragraphe se faisait auparavant dans la
+                    // boucle de composition (filterIsInstance + filter sur
+                    // TOUS les blocs structurels, pour CHAQUE paragraphe,
+                    // O(paragraphes × blocs)). Sous `LazyColumn` ce travail
+                    // retomberait dans le chemin de défilement, à chaque
+                    // item recyclé — exactement là où il ne faut pas.
+                    val imagesByParagraph = remember(state.currentChapter) {
+                        state.currentChapter?.structuralBlocks
+                            ?.filterIsInstance<com.inktone.domain.model.StructuralBlock.EpubImage>()
+                            ?.groupBy { it.anchorAfterParagraphIndex }
+                            .orEmpty()
+                    }
+
+                    LazyColumn(
+                        state = scrollState,
+                        modifier = Modifier.fillMaxSize(),
+                        // Priorité du geste de sélection sur le défilement :
+                        // une poignée se saisit par un appui suivi d'un
+                        // glissement, geste que le conteneur défilant
+                        // réclame aussi. Tant qu'une sélection est active,
+                        // le défilement utilisateur est neutralisé — le
+                        // glissement appartient sans ambiguïté aux
+                        // poignées. Un tap sur le texte reste possible (ce
+                        // n'est pas un défilement) et annule la sélection,
+                        // ce qui rend immédiatement le défilement.
+                        userScrollEnabled = freeSelectedRange == null,
                     ) {
-                        var globalIndex = 0
-                        state.currentChapter?.paragraphs?.forEach { paragraph ->
-                            val paragraphStartIndex = globalIndex
-                            globalIndex += paragraph.sentences.size
+                        itemsIndexed(
+                            items = paragraphs,
+                            // Clé stable : un paragraphe conserve son état
+                            // (et sa sélection locale) à travers le
+                            // recyclage, et le changement de chapitre ne
+                            // réutilise pas l'état d'un item d'un autre
+                            // chapitre.
+                            key = { _, paragraph -> "${state.currentChapterIndex}-${paragraph.index}" },
+                        ) { paragraphIndex, paragraph ->
                             if (paragraph.sentences.isNotEmpty()) {
                                 ParagraphText(
                                     paragraph = paragraph,
-                                    globalStartIndex = paragraphStartIndex,
+                                    globalStartIndex = firstSentenceIndexPerParagraph[paragraphIndex],
                                     currentSentenceIndex = state.currentSentenceIndex,
                                     highlightedWordRange = state.highlightedWordRange,
                                     annotations = state.annotations,
@@ -522,9 +592,9 @@ fun ReaderScreen(
                                     lineHeightSp = lineHeightSp,
                                     textColor = ThemeColors.text(state.resolvedTheme),
                                     fontFamily = effectiveFontFamily,
-                                    // Le FlowRow couvre la quasi-totalité de la zone de
+                                    // Le texte couvre la quasi-totalité de la zone de
                                     // lecture : sans ce relais, le tap est consommé par
-                                    // ParagraphText et ne remonte jamais au Column parent,
+                                    // ParagraphText et ne remonte jamais au Box parent,
                                     // rendant le HUD quasiment impossible à rappeler une
                                     // fois masqué (bug réel trouvé à l'audit).
                                     onClick = { handleReadingAreaTap() },
@@ -532,16 +602,24 @@ fun ReaderScreen(
                                         viewModel.onIntent(ReaderIntent.SetFreeSelection(anchor, focus))
                                     },
                                     onFreeSelectionCleared = { viewModel.onIntent(ReaderIntent.ClearFreeSelection) },
-                                    onFreeSelectionBoundsInWindow = { bounds -> scrollFreeSelectionBounds = bounds },
-                                    onSentenceTopOffsets = { offsets -> sentenceTopOffsetsPx.putAll(offsets) },
+                                    // Identité du paragraphe émetteur (son
+                                    // offset absolu de début) : plusieurs
+                                    // paragraphes restent montés en même
+                                    // temps (ceux visibles) et écrivent dans
+                                    // le même emplacement de bornes — voir
+                                    // resolveSelectionPopupBounds.
+                                    onFreeSelectionBoundsInWindow = { bounds ->
+                                        scrollFreeSelectionBounds = resolveSelectionPopupBounds(
+                                            current = scrollFreeSelectionBounds,
+                                            ownerKey = paragraph.sentences.first().startOffset,
+                                            bounds = bounds,
+                                        )
+                                    },
                                     onCurrentLineY = { y -> currentLineYDp = y },
                                 )
                             }
                             // B.4 — Images EPUB après le paragraphe
-                            val imagesAfterParagraph = state.currentChapter?.structuralBlocks
-                                ?.filterIsInstance<com.inktone.domain.model.StructuralBlock.EpubImage>()
-                                ?.filter { it.anchorAfterParagraphIndex == paragraph.index }
-                            imagesAfterParagraph?.forEach { image ->
+                            imagesByParagraph[paragraph.index]?.forEach { image ->
                                 EpubImagePlaceholder(href = image.href, altText = image.altText)
                             }
                         }
@@ -569,7 +647,13 @@ fun ReaderScreen(
                             viewModel.onIntent(ReaderIntent.SetFreeSelection(anchor, focus))
                         },
                         onFreeSelectionCleared = { viewModel.onIntent(ReaderIntent.ClearFreeSelection) },
-                        onFreeSelectionBoundsInWindow = { bounds -> pagedFreeSelectionBounds = bounds },
+                        onFreeSelectionBoundsInWindow = { ownerKey, bounds ->
+                            pagedFreeSelectionBounds = resolveSelectionPopupBounds(
+                                current = pagedFreeSelectionBounds,
+                                ownerKey = ownerKey,
+                                bounds = bounds,
+                            )
+                        },
                     )
                 }
             }
@@ -585,17 +669,31 @@ fun ReaderScreen(
         // 3c.4 — remplace AnnotationColorPicker (position fixe basse
         // d'écran, Confirmer/Annuler) par le popup Copier/Surligner/Note
         // positionné près de la sélection réelle.
-        if (freeSelectedRange != null) {
+        //
+        // Phase 2 — le popup n'est monté QUE si l'unité adressable a
+        // remonté des bornes fenêtre depuis `TextToolbar.showMenu()`
+        // (geste de sélection terminé, doigt levé). Une sélection active
+        // sans bornes = glissement de poignée en cours : rien à l'écran,
+        // la loupe native reste dégagée.
+        if (freeSelectedRange != null && selectionBoundsInWindow != null) {
             SelectionActionPopup(
                 selectedText = selectedText,
                 selectionBoundsInWindow = selectionBoundsInWindow,
+                // Phase 4 — l'intent est dispatché AVANT la purge :
+                // `ReaderViewModel.confirmAnnotation` lit
+                // `freeSelectionRange` et résout ses locators de façon
+                // SYNCHRONE (voir sa KDoc), le `ClearFreeSelection` qui
+                // suit ne peut donc pas lui retirer les offsets sous les
+                // pieds. L'ordre inverse perdrait l'annotation.
                 onHighlight = { color ->
                     viewModel.onIntent(ReaderIntent.ConfirmAnnotation(color))
+                    clearSelectionAndPopup()
                 },
                 onSaveNote = { content, color ->
                     viewModel.onIntent(ReaderIntent.ConfirmAnnotation(color, content))
+                    clearSelectionAndPopup()
                 },
-                onDismiss = { viewModel.onIntent(ReaderIntent.ClearFreeSelection) },
+                onDismiss = { clearSelectionAndPopup() },
             )
         }
 
@@ -1001,11 +1099,6 @@ internal fun ParagraphText(
     onFreeSelectionChanged: (anchorOffset: Int, focusOffset: Int) -> Unit = { _, _ -> },
     onFreeSelectionCleared: () -> Unit = {},
     onFreeSelectionBoundsInWindow: (Rect?) -> Unit = {},
-    // 3c.1 — remplace l'ancien `onGloballyPositioned` par phrase : un seul
-    // calcul par paragraphe (voir plus bas), qui redonne la position de
-    // CHAQUE phrase via `TextLayoutResult.getLineForOffset`, pas un
-    // `onGloballyPositioned` par composable.
-    onSentenceTopOffsets: (Map<Int, Int>) -> Unit = {},
     onCurrentLineY: (Dp) -> Unit = {},
     modifier: Modifier = Modifier,
 ) {
@@ -1047,44 +1140,91 @@ internal fun ParagraphText(
         label = "highlightEnd",
     )
 
-    var selection by remember(paragraphStartOffset) { mutableStateOf(TextRange.Zero) }
+    var localSelection by remember(paragraphStartOffset) { mutableStateOf(TextRange.Zero) }
     var textLayoutResult by remember { mutableStateOf<TextLayoutResult?>(null) }
     var textCoordinates by remember { mutableStateOf<LayoutCoordinates?>(null) }
-    val coroutineScope = rememberCoroutineScope()
-    var pendingShowJob by remember(paragraphStartOffset) { mutableStateOf<Job?>(null) }
 
-    // Resynchronisation externe → locale (même raison qu'en PAGED, voir
-    // `PageBlock`) : si `freeSelectionRange` (état remonté par le
-    // ViewModel) ne pointe plus vers CE paragraphe — devenu `null` (bouton
-    // Annuler du popup, `ClearFreeSelection`) OU pointant désormais vers
-    // un AUTRE paragraphe (l'utilisateur a sélectionné un mot ailleurs) —
-    // la sélection LOCALE de ce champ doit être effacée, sinon ses
-    // poignées natives resteraient affichées sur une sélection que le
-    // reste de l'écran a déjà oubliée ou transférée ailleurs.
-    LaunchedEffect(freeSelectionRange, paragraphStartOffset, paragraphEndOffset) {
-        val stillOwnsSelection = freeSelectionRange != null &&
-            freeSelectionRange.first >= paragraphStartOffset &&
-            freeSelectionRange.last < paragraphEndOffset
-        if (!stillOwnsSelection && !selection.collapsed) {
-            selection = TextRange.Zero
-        }
+    // Phase 1 — état local strictement SUBORDONNÉ à l'appartenance
+    // globale, mécanisme identique à celui de `PageBlock` (mode PAGED) :
+    // si `freeSelectionRange` (état remonté par le ViewModel) ne pointe
+    // plus vers CE paragraphe — devenu `null` (annulation, action du
+    // popup résolue) OU pointant désormais vers un AUTRE paragraphe —
+    // la sélection rendue par ce champ est immédiatement `collapsed`,
+    // DANS LA MÊME recomposition. Dérivation pure plutôt qu'un
+    // `LaunchedEffect` de resynchronisation comme avant : un effet ne
+    // s'exécute qu'après la composition, laissant une frame où les
+    // poignées natives restaient affichées sur une sélection que le
+    // reste de l'écran avait déjà oubliée ou transférée ailleurs.
+    val ownsGlobalSelection = freeSelectionRange != null &&
+        freeSelectionRange.first >= paragraphStartOffset &&
+        freeSelectionRange.last < paragraphEndOffset
+
+    // Virtualisation (migration LazyColumn) — un paragraphe est DÉTRUIT dès
+    // qu'il sort de l'écran et recomposé à neuf au retour, avec un
+    // `localSelection` vierge. L'état global étant hissé au ViewModel
+    // (seule source de vérité), l'item le RELIT pour se réafficher
+    // correctement : sans ceci, revenir sur le paragraphe sélectionné
+    // n'affichait plus ni surlignage ni poignées, alors que le reste de
+    // l'écran considérait toujours la sélection active.
+    //
+    // `hasLocalInput` distingue « jamais touché depuis (re)composition » de
+    // « l'utilisateur vient d'agir » : sans lui, le tap d'annulation
+    // (`localSelection` remis à zéro AVANT que l'état global n'ait fait
+    // l'aller-retour par le ViewModel) serait aussitôt annulé par cette
+    // restauration, et la sélection réapparaîtrait.
+    var hasLocalInput by remember(paragraphStartOffset) { mutableStateOf(false) }
+    val restoredSelection = if (ownsGlobalSelection && !hasLocalInput) {
+        // `ownsGlobalSelection` implique déjà `freeSelectionRange != null`.
+        val subRanges = mapping.localSubRangesFor(freeSelectionRange!!.first, freeSelectionRange.last + 1)
+        if (subRanges.isEmpty()) null else TextRange(subRanges.first().first, subRanges.last().last + 1)
+    } else {
+        null
+    }
+    val selection = when {
+        !ownsGlobalSelection -> TextRange.Zero
+        hasLocalInput -> localSelection
+        else -> restoredSelection ?: TextRange.Zero
+    }
+    // Même raison qu'en PAGED (`PageBlock`) : `toolbar` est `remember`é et
+    // ne peut pas capturer `selection` (val recalculé à chaque
+    // composition), il lit cet État.
+    val selectionState = rememberUpdatedState(selection)
+
+    // Phase 2 — visibilité du popup d'actions : apparition par
+    // `TextToolbar.showMenu()` (doigt levé), disparition par le mouvement
+    // de la sélection, jamais par une réaction à `freeSelectionRange`.
+    // Non-null ≡ popup visible (voir `PageBlock`, même contrat).
+    var popupBoundsInWindow by remember(paragraphStartOffset) { mutableStateOf<Rect?>(null) }
+    val currentOnBoundsInWindow by rememberUpdatedState(onFreeSelectionBoundsInWindow)
+    val currentOnFreeSelectionCleared by rememberUpdatedState(onFreeSelectionCleared)
+    val ownsGlobalSelectionState = rememberUpdatedState(ownsGlobalSelection)
+
+    /** Détruit le popup s'il est affiché, sans jamais réémettre inutilement vers le parent. */
+    fun hidePopup() {
+        if (popupBoundsInWindow == null) return
+        popupBoundsInWindow = null
+        currentOnBoundsInWindow(null)
     }
 
-    // 3c.1 — position de CHAQUE phrase du paragraphe (indépendante du
-    // défilement, comme avant ce palier) dérivée du layout du paragraphe
-    // (une seule mesure) plutôt que d'un `onGloballyPositioned` par
-    // phrase — ne se redéclenche QUE quand le layout ou la position du
-    // paragraphe change réellement, jamais à chaque tick TTS.
-    LaunchedEffect(textLayoutResult, textCoordinates) {
-        val layout = textLayoutResult ?: return@LaunchedEffect
-        val coords = textCoordinates ?: return@LaunchedEffect
-        val paragraphTopPx = coords.positionInParent().y
-        val textLength = layout.layoutInput.text.length
-        val offsets = mapping.spans.mapIndexed { i, span ->
-            val line = layout.getLineForOffset(span.localStart.coerceIn(0, textLength))
-            (globalStartIndex + i) to (paragraphTopPx + layout.getLineTop(line)).roundToInt()
-        }.toMap()
-        onSentenceTopOffsets(offsets)
+    // Phase 3, révisé par la virtualisation — sortie de composition. Sous
+    // `LazyColumn`, un paragraphe est détruit dès qu'il sort de l'écran :
+    // la disposition est devenue un évènement de DÉFILEMENT ORDINAIRE, plus
+    // le signal « ce contenu a disparu pour de bon » qu'elle était sous
+    // `verticalScroll` (où tout le chapitre restait composé). L'ancienne
+    // purge de l'état global ici effacerait donc la sélection au premier
+    // défilement qui éloigne le paragraphe — exactement le contraire de la
+    // conservation d'état voulue.
+    //
+    // Seul le popup est détruit (ses bornes fenêtre n'ont plus de sens hors
+    // écran) ; l'état global, hissé au ViewModel, survit et sera relu au
+    // retour du paragraphe (voir `restoredSelection` ci-dessus). La
+    // protection anti-fantôme repose désormais entièrement sur la
+    // subordination à l'appartenance globale (Phase 1), qui ne dépend
+    // d'aucun cycle de vie.
+    DisposableEffect(paragraphStartOffset) {
+        onDispose {
+            if (popupBoundsInWindow != null) currentOnBoundsInWindow(null)
+        }
     }
 
     // A.1/9bis.3.6 — position Y de la phrase en cours de lecture, pour
@@ -1110,14 +1250,14 @@ internal fun ParagraphText(
         TextSelectionColors(handleColor = selectionColors.handleColor, backgroundColor = Color.Transparent)
     }
 
-    // Même correctif qu'en PAGED (`PageBlock`) : n'affiche JAMAIS le vrai
-    // menu système (barre blanche `ActionMode`, doublon du popup sombre de
-    // l'app) ; recalcule les bornes fenêtre via `getPathForRange` +
-    // `localToWindow` (le `rect` fourni par `showMenu` n'est pas fiable
-    // comme bornes de sélection réelle) ; anti-rebond de
-    // `SelectionPopupSettleDelayMs` avant transmission (le popup sombre ne
-    // doit apparaître qu'une fois le geste stabilisé, pas pendant un
-    // glissement de poignée — `hide()` reste instantané).
+    // Phase 2 — strictement le même toolbar qu'en PAGED (`PageBlock`, doc
+    // détaillée là-bas) : n'affiche JAMAIS le vrai menu système (barre
+    // blanche `ActionMode`, doublon du popup sombre de l'app) ; recalcule
+    // les bornes fenêtre via `getPathForRange` + `localToWindow` (le
+    // `rect` fourni par `showMenu` n'est pas fiable comme bornes de
+    // sélection réelle) ; `hide()` détruit le popup instantanément
+    // (glissement de poignée en cours : l'écran doit rester dégagé pour la
+    // loupe native), `showMenu()` le rouvre au relâchement.
     val toolbar = remember(paragraphStartOffset) {
         object : TextToolbar {
             override val status: TextToolbarStatus = TextToolbarStatus.Hidden
@@ -1129,23 +1269,20 @@ internal fun ParagraphText(
                 onCutRequested: (() -> Unit)?,
                 onSelectAllRequested: (() -> Unit)?,
             ) {
-                val currentSelection = selection
+                val currentSelection = selectionState.value
                 val windowRect = if (currentSelection.collapsed) {
                     null
                 } else {
                     localSelectionBoundsInWindow(textLayoutResult, textCoordinates, currentSelection)
                 }
-                pendingShowJob?.cancel()
-                pendingShowJob = coroutineScope.launch {
-                    delay(SelectionPopupSettleDelayMs)
-                    onFreeSelectionBoundsInWindow(windowRect)
-                }
+                popupBoundsInWindow = windowRect
+                currentOnBoundsInWindow(windowRect)
             }
 
             override fun hide() {
-                pendingShowJob?.cancel()
-                pendingShowJob = null
-                onFreeSelectionBoundsInWindow(null)
+                if (popupBoundsInWindow == null) return
+                popupBoundsInWindow = null
+                currentOnBoundsInWindow(null)
             }
         }
     }
@@ -1164,17 +1301,29 @@ internal fun ParagraphText(
         null
     }
 
-    val displayText = buildParagraphDisplayText(
-        mapping = mapping,
-        globalStartIndex = globalStartIndex,
-        currentSentenceIndex = currentSentenceIndex,
-        chapterIndex = chapterIndex,
-        annotations = annotations,
-        textColor = textColor,
-        freeSelectionHighlightRange = if (selection.collapsed) null else selection.min until selection.max,
-        currentWordRange = currentWordLocalRange,
-    )
-    val fieldValue = TextFieldValue(displayText, selection)
+    // Mémoïsé : reconstruire l'`AnnotatedString` (texte + spans d'alpha par
+    // phrase, d'annotations, de sélection, de mot TTS) à chaque
+    // recomposition retombait directement dans le chemin de défilement.
+    // Chaque franchissement de paragraphe pousse `UpdateScrollPosition`,
+    // donc un nouveau `currentSentenceIndex`, donc une recomposition de
+    // TOUS les paragraphes visibles — sans ce `remember`, autant de
+    // reconstructions complètes par franchissement.
+    val displayText = remember(
+        mapping, globalStartIndex, currentSentenceIndex, chapterIndex,
+        annotations, textColor, selection, currentWordLocalRange,
+    ) {
+        buildParagraphDisplayText(
+            mapping = mapping,
+            globalStartIndex = globalStartIndex,
+            currentSentenceIndex = currentSentenceIndex,
+            chapterIndex = chapterIndex,
+            annotations = annotations,
+            textColor = textColor,
+            freeSelectionHighlightRange = if (selection.collapsed) null else selection.min until selection.max,
+            currentWordRange = currentWordLocalRange,
+        )
+    }
+    val fieldValue = remember(displayText, selection) { TextFieldValue(displayText, selection) }
 
     CompositionLocalProvider(
         LocalTextSelectionColors provides handlesOnlySelectionColors,
@@ -1183,19 +1332,32 @@ internal fun ParagraphText(
         BasicTextField(
             value = fieldValue,
             onValueChange = { newValue ->
-                // Bug réel trouvé sur appareil (voir PAGED, `PageBlock`,
-                // même correctif) : un tap sur la sélection pour l'annuler
-                // est traité EN INTERNE par BasicTextField, jamais vu par
-                // le pointerInput sibling ci-dessous — sans ceci, le HUD
-                // ne revenait pas après une annulation par tap.
-                val wasCollapsed = selection.collapsed
-                selection = newValue.selection
+                // Phase 3 — même contrat qu'en PAGED (`PageBlock`, doc
+                // détaillée là-bas) : `BasicTextField` traite les taps EN
+                // INTERNE (même en lecture seule), un `detectTapGestures`
+                // sibling ne les voit jamais — `onValueChange` est donc la
+                // seule source de vérité du tap, et il n'y a plus AUCUN
+                // `pointerInput` concurrent sur ce champ. Passer de
+                // non-collapsed à collapsed = annulation explicite par
+                // l'utilisateur : purge globale + destruction du popup.
+                val wasSelecting = !selection.collapsed
+                val selectionChanged = newValue.selection != selection
+                hasLocalInput = true
+                localSelection = newValue.selection
                 if (newValue.selection.collapsed) {
-                    onFreeSelectionCleared()
-                    if (!wasCollapsed) {
-                        onClick()
+                    if (wasSelecting) {
+                        onFreeSelectionCleared()
+                        hidePopup()
                     }
+                    onClick()
                 } else {
+                    // Phase 2, phase « glissement » — identique à PAGED
+                    // (`PageBlock`, justification mesurée sur appareil
+                    // détaillée là-bas) : `TextToolbar.hide()` n'est jamais
+                    // appelé pendant un glissement de poignée, une
+                    // sélection qui CHANGE est donc le seul signal fiable
+                    // de geste en cours.
+                    if (selectionChanged) hidePopup()
                     val min = newValue.selection.min
                     val max = newValue.selection.max
                     onFreeSelectionChanged(mapping.absoluteOffsetForLocal(min), mapping.absoluteOffsetForLocal(max) - 1)
@@ -1207,25 +1369,14 @@ internal fun ParagraphText(
             modifier = modifier
                 .then(styleModifier)
                 .onGloballyPositioned { textCoordinates = it }
-                .pointerInput(paragraphStartOffset) {
-                    detectTapGestures(
-                        onTap = {
-                            // Même garde qu'en PAGED (`PageBlock`) : ne rien
-                            // faire tant qu'une sélection libre est active
-                            // sur CE paragraphe, sinon `onClick` (bascule du
-                            // HUD) perturberait le geste de sélection natif
-                            // en cours.
-                            if (!selection.collapsed) return@detectTapGestures
-                            onClick()
-                        },
-                    )
-                }
                 // Palier 3f.4 (première passe, pas de spike TalkBack dédié
                 // — voir CHIFFRAGE_LOT_3F_SELECTION_MOT.md) : même raison
-                // qu'en PAGED (`PageBlock`) — un `pointerInput` brut est
-                // invisible à l'action « activer » que TalkBack synthétise
-                // (double-tap après exploration), seulement à un tap
-                // tactile réel. `stateDescription` : signale la position de
+                // qu'en PAGED (`PageBlock`) — l'action « activer » que
+                // TalkBack synthétise (double-tap après exploration) ne
+                // déclenche aucun évènement tactile ni `onValueChange`,
+                // d'où cette action sémantique dédiée, seule voie d'accès
+                // au HUD pour un utilisateur TalkBack.
+                // `stateDescription` : signale la position de
                 // lecture TTS à l'exploration, sans l'interrompre — a
                 // contrario du `liveRegion` déjà essayé et retiré (lot 1,
                 // conflit avec la voix TTS active, voir plus bas dans
@@ -1248,8 +1399,43 @@ internal fun ParagraphText(
 
 private val SelectionHighlightColor = Color(0x664FC3F7)
 
-/** Anti-rebond de `showMenu` (voir `ParagraphText`) — même valeur qu'en PAGED (`PagedChapterContent.SelectionPopupSettleDelayMs`) pour un délai perçu identique entre les deux modes. */
-private const val SelectionPopupSettleDelayMs = 200L
+/**
+ * Bornes fenêtre du popup de sélection, **accompagnées de l'identité de
+ * l'unité adressable qui les a émises** (`ownerKey` — offset absolu de
+ * début de la page en PAGED, du paragraphe en SCROLL).
+ *
+ * Plusieurs unités sont montées en même temps dans les deux modes (pages
+ * voisines préchargées par `beyondViewportPageCount = 1` ; tout le
+ * chapitre composé d'un coup par `FlowRow`/`verticalScroll`) et écrivent
+ * toutes dans le MÊME emplacement de bornes chez `ReaderScreen` — un seul
+ * `Rect` suffit puisque la sélection libre est bornée à une unique unité,
+ * mais rien n'identifiait jusqu'ici qui l'avait écrit.
+ */
+internal data class SelectionPopupBounds(val ownerKey: Int, val boundsInWindow: Rect)
+
+/**
+ * Arbitre une écriture de bornes venant de l'unité [ownerKey].
+ *
+ * - Bornes non nulles (`TextToolbar.showMenu`) : le dernier geste terminé
+ *   gagne toujours, quel que soit le propriétaire précédent.
+ * - Bornes nulles (`TextToolbar.hide`, nettoyage de sortie d'écran) :
+ *   n'efface QUE si l'unité émettrice est encore propriétaire. Sans cette
+ *   garde, sélectionner un mot dans le paragraphe B pendant que A est
+ *   sélectionné pouvait faire disparaître le popup de B — le `hide()` de
+ *   A, déclenché par la perte de focus, arrivant après le `showMenu()` de
+ *   B. L'ordre exact de ces deux appels internes à `BasicTextField` n'est
+ *   pas un contrat : cette fonction rend le résultat indépendant de
+ *   l'ordre plutôt que de parier dessus.
+ */
+internal fun resolveSelectionPopupBounds(
+    current: SelectionPopupBounds?,
+    ownerKey: Int,
+    bounds: Rect?,
+): SelectionPopupBounds? = when {
+    bounds != null -> SelectionPopupBounds(ownerKey, bounds)
+    current == null || current.ownerKey == ownerKey -> null
+    else -> current
+}
 
 /** Même mécanisme que `PagedChapterContent.rangeBoundsInWindow`, mais sur une sélection déjà LOCALE (offsets dans le texte de CE paragraphe, pas de conversion supplémentaire à faire ici). */
 private fun localSelectionBoundsInWindow(
