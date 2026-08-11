@@ -1,4 +1,6 @@
 package com.inktone.feature.settings
+import com.inktone.core.designsystem.AppIcon
+import com.inktone.core.designsystem.AppSymbol
 
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
@@ -20,10 +22,6 @@ import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
-import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.automirrored.filled.ArrowBack
-import androidx.compose.material.icons.outlined.CheckCircle
-import androidx.compose.material.icons.outlined.Warning
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Button
 import androidx.compose.material3.ExperimentalMaterial3Api
@@ -89,7 +87,7 @@ fun ThemeStudioScreen(
                 title = { Text("Studio de Thème") },
                 navigationIcon = {
                     IconButton(onClick = onBack) {
-                        Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = "Retour")
+                        Icon(AppIcons.Back, contentDescription = "Retour")
                     }
                 },
                 actions = {
@@ -149,7 +147,7 @@ fun ThemeStudioScreen(
                         Column {
                             HorizontalDivider(Modifier.padding(vertical = 8.dp))
                             TextButton(onClick = { showDeleteConfirm = true }) {
-                                Icon(AppIcons.Delete, contentDescription = null, tint = MaterialTheme.colorScheme.error)
+                                AppIcon(AppSymbol.Delete,  contentDescription = null, tint = MaterialTheme.colorScheme.error)
                                 Spacer(Modifier.width(8.dp))
                                 Text("Supprimer ce thème", color = MaterialTheme.colorScheme.error)
                             }
@@ -274,9 +272,9 @@ private fun StudioLivePreview(state: ThemeStudioUiState) {
 @Composable
 private fun WcagBadge(state: ThemeStudioUiState) {
     val (label, color, icon) = when (state.wcagLevel) {
-        WcagLevel.AAA -> Triple("WCAG AAA (%.1f:1)".format(state.contrastRatio), Color4Ok, Icons.Outlined.CheckCircle)
-        WcagLevel.AA -> Triple("WCAG AA (%.1f:1)".format(state.contrastRatio), Color4Ok, Icons.Outlined.CheckCircle)
-        WcagLevel.BELOW_THRESHOLD -> Triple("Contraste faible (%.1f:1)".format(state.contrastRatio), MaterialTheme.colorScheme.error, Icons.Outlined.Warning)
+        WcagLevel.AAA -> Triple("WCAG AAA (%.1f:1)".format(state.contrastRatio), Color4Ok, AppIcons.Success)
+        WcagLevel.AA -> Triple("WCAG AA (%.1f:1)".format(state.contrastRatio), Color4Ok, AppIcons.Success)
+        WcagLevel.BELOW_THRESHOLD -> Triple("Contraste faible (%.1f:1)".format(state.contrastRatio), MaterialTheme.colorScheme.error, AppIcons.Warning)
     }
     Surface(color = color.copy(alpha = 0.15f), shape = RoundedCornerShape(8.dp)) {
         Row(Modifier.padding(horizontal = 10.dp, vertical = 6.dp), verticalAlignment = Alignment.CenterVertically) {
@@ -315,7 +313,7 @@ private fun ColorSelectorRow(label: String, hex: String, onClick: () -> Unit) {
         )
         Spacer(Modifier.width(4.dp))
         IconButton(onClick = onClick) {
-            Icon(AppIcons.Edit, contentDescription = "Modifier $label")
+            AppIcon(AppSymbol.Edit,  contentDescription = "Modifier $label")
         }
     }
 }

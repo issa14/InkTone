@@ -1,4 +1,5 @@
 package com.inktone.feature.settings
+import com.inktone.core.designsystem.AppIcons
 
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
@@ -20,27 +21,6 @@ import androidx.compose.foundation.selection.toggleable
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
-import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.automirrored.filled.ArrowBack
-import androidx.compose.material.icons.automirrored.filled.ArrowForward
-import androidx.compose.material.icons.automirrored.filled.VolumeDown
-import androidx.compose.material.icons.automirrored.filled.VolumeUp
-import androidx.compose.material.icons.filled.Accessibility
-import androidx.compose.material.icons.filled.Add
-import androidx.compose.material.icons.filled.DarkMode
-import androidx.compose.material.icons.filled.Delete
-import androidx.compose.material.icons.filled.DeleteSweep
-import androidx.compose.material.icons.filled.Download
-import androidx.compose.material.icons.filled.FastForward
-import androidx.compose.material.icons.filled.FolderOpen
-import androidx.compose.material.icons.filled.KeyboardArrowDown
-import androidx.compose.material.icons.filled.KeyboardArrowUp
-import androidx.compose.material.icons.filled.Lock
-import androidx.compose.material.icons.filled.PlayArrow
-import androidx.compose.material.icons.filled.Remove
-import androidx.compose.material.icons.filled.SlowMotionVideo
-import androidx.compose.material.icons.filled.Upload
-import androidx.compose.material.icons.filled.WarningAmber
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Checkbox
 import androidx.compose.material3.ElevatedCard
@@ -132,7 +112,7 @@ fun SettingsScreen(
                 title = { Text("Réglages") },
                 navigationIcon = {
                     IconButton(onClick = onBack) {
-                        Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = "Retour")
+                        Icon(AppIcons.Back, contentDescription = "Retour")
                     }
                 },
                 scrollBehavior = scrollBehavior,
@@ -197,7 +177,7 @@ internal fun SettingsContent(
 
         SectionGroup("Présets rapides") {
             PresetRow(
-                icon = { Icon(Icons.Default.DarkMode, contentDescription = null) },
+                icon = { Icon(AppIcons.DarkMode, contentDescription = null) },
                 title = "Mode sombre",
                 description = "Thème sombre · Interface sombre",
                 checked = isDarkPresetActive,
@@ -205,7 +185,7 @@ internal fun SettingsContent(
             )
             HorizontalDivider(modifier = Modifier.padding(horizontal = 20.dp))
             PresetRow(
-                icon = { Icon(Icons.Default.Accessibility, contentDescription = null) },
+                icon = { Icon(AppIcons.Accessibility, contentDescription = null) },
                 title = "Accessibilité",
                 description = "OpenDyslexic · 24 sp · Animations réduites · Mode Liste",
                 checked = isAccessibilityPresetActive,
@@ -248,8 +228,8 @@ internal fun SettingsContent(
                 label = "Vitesse d'élocution",
                 value = activeSpeed,
                 range = 0.5f..2.0f,
-                minIcon = Icons.Default.SlowMotionVideo,
-                maxIcon = Icons.Default.FastForward,
+                minIcon = AppIcons.SlowMotionVideo,
+                maxIcon = AppIcons.FastForward,
                 displayFormatter = { "%.1f×".format(it) },
                 onValueChange = { onIntent(SettingsIntent.SetVoiceSpeed(it)) },
             )
@@ -257,8 +237,8 @@ internal fun SettingsContent(
                 label = "Gain audio",
                 value = preferences.audioGain,
                 range = 1.0f..4.0f,
-                minIcon = Icons.AutoMirrored.Filled.VolumeDown,
-                maxIcon = Icons.AutoMirrored.Filled.VolumeUp,
+                minIcon = AppIcons.VolumeDown,
+                maxIcon = AppIcons.Speaking,
                 displayFormatter = { "%.1f×".format(it) },
                 onValueChange = { onIntent(SettingsIntent.SetAudioGain(it)) },
             )
@@ -268,8 +248,8 @@ internal fun SettingsContent(
                 label = "Intonation (pitch)",
                 value = activePitch,
                 range = 0.5f..1.5f,
-                minIcon = Icons.Default.KeyboardArrowDown,
-                maxIcon = Icons.Default.KeyboardArrowUp,
+                minIcon = AppIcons.KeyboardArrowDown,
+                maxIcon = AppIcons.KeyboardArrowUp,
                 displayFormatter = { "%.1f×".format(it) },
                 onValueChange = { onIntent(SettingsIntent.SetVoicePitch(it)) },
             )
@@ -282,7 +262,7 @@ internal fun SettingsContent(
                     .fillMaxWidth()
                     .padding(horizontal = 20.dp, vertical = 8.dp),
             ) {
-                Icon(Icons.Default.PlayArrow, contentDescription = null)
+                Icon(AppIcons.Play, contentDescription = null)
                 Spacer(Modifier.width(8.dp))
                 Text("Écouter un extrait")
             }
@@ -390,7 +370,7 @@ internal fun SettingsContent(
                 }
                 if (!modelsFolderInfo.isEditable) {
                     Icon(
-                        Icons.Default.Lock,
+                        AppIcons.Lock,
                         contentDescription = "Lecture seule",
                         modifier = Modifier.size(16.dp),
                         tint = MaterialTheme.colorScheme.onSurfaceVariant,
@@ -402,14 +382,14 @@ internal fun SettingsContent(
 
             // Action directe, sans confirmation — n'écrase rien de local.
             ActionRow(
-                icon = Icons.Default.Upload,
+                icon = AppIcons.Upload,
                 title = "Exporter les données",
                 subtitle = "Signets, règles de prononciation, progression et statistiques",
                 onClick = onExportData,
             )
             // Avertissement préalable — l'import écrase la configuration courante.
             ActionRow(
-                icon = Icons.Default.Download,
+                icon = AppIcons.Download,
                 title = "Importer une sauvegarde",
                 subtitle = "Remplace les données actuelles par celles du fichier sélectionné",
                 onClick = { showImportWarning = true },
@@ -435,7 +415,7 @@ internal fun SettingsContent(
                     )
                 }
                 TextButton(onClick = { showClearCacheConfirm = true }, enabled = cacheSizeBytes > 0) {
-                    Icon(Icons.Default.DeleteSweep, contentDescription = null)
+                    Icon(AppIcons.DeleteSweep, contentDescription = null)
                     Spacer(Modifier.width(4.dp))
                     Text("Vider")
                 }
@@ -445,7 +425,7 @@ internal fun SettingsContent(
 
             // Couleur d'alerte + icône triangle : signale le côté destructif.
             ActionRow(
-                icon = Icons.Default.WarningAmber,
+                icon = AppIcons.WarningAmber,
                 title = "Réinitialiser les paramètres",
                 subtitle = "Revient aux réglages par défaut — les livres et les données ne sont pas touchés",
                 tint = MaterialTheme.colorScheme.error,
@@ -794,7 +774,7 @@ private fun VoiceDownloadRow(
             }
         } else {
             OutlinedButton(onClick = { showConfirmDialog = true }) {
-                Icon(Icons.Default.Download, contentDescription = null)
+                Icon(AppIcons.Download, contentDescription = null)
                 Spacer(Modifier.width(8.dp))
                 Text("Télécharger une voix neuronale")
             }
@@ -926,7 +906,7 @@ private fun SliderSetting(
 
 /**
  * Lot 6 — Stepper −/+ par pas, désactivé visuellement quand enabled=false.
- * Refonte — de vrais `IconButton` (48x48dp, `Icons.Default.Remove`/`Add`)
+ * Refonte — de vrais `IconButton` (48x48dp, `AppIcons.Remove`/`Add`)
  * remplacent les boutons texte "−"/"+" ; la valeur est encadrée par les deux.
  * Correctif — le libellé porte `Modifier.weight(1f)` pour prendre tout
  * l'espace disponible et repousser le stepper à droite ; le stepper ne
@@ -969,7 +949,7 @@ private fun StepperSetting(
             IconButton(
                 onClick = { onValueChange((value - step).coerceIn(range)) },
                 enabled = enabled && value > range.first,
-            ) { Icon(Icons.Default.Remove, contentDescription = "Diminuer $label") }
+            ) { Icon(AppIcons.Remove, contentDescription = "Diminuer $label") }
             Text(
                 text = displayFormatter(value),
                 style = MaterialTheme.typography.bodyMedium,
@@ -979,7 +959,7 @@ private fun StepperSetting(
             IconButton(
                 onClick = { onValueChange((value + step).coerceIn(range)) },
                 enabled = enabled && value < range.last,
-            ) { Icon(Icons.Default.Add, contentDescription = "Augmenter $label") }
+            ) { Icon(AppIcons.Add, contentDescription = "Augmenter $label") }
         }
     }
 }
@@ -1006,7 +986,7 @@ private fun PronunciationCard(
                 color = MaterialTheme.colorScheme.primary,
             )
             IconButton(onClick = onAddClick) {
-                Icon(Icons.Default.Add, contentDescription = "Ajouter une règle de prononciation")
+                Icon(AppIcons.Add, contentDescription = "Ajouter une règle de prononciation")
             }
         }
         ElevatedCard(shape = RoundedCornerShape(16.dp), modifier = Modifier.fillMaxWidth()) {
@@ -1039,7 +1019,7 @@ private fun PronunciationRuleRow(
         ) {
             Text(rule.originalText, style = MaterialTheme.typography.bodyLarge)
             Icon(
-                Icons.AutoMirrored.Filled.ArrowForward,
+                AppIcons.ArrowForward,
                 contentDescription = null,
                 modifier = Modifier.size(16.dp),
                 tint = MaterialTheme.colorScheme.onSurfaceVariant,
@@ -1058,7 +1038,7 @@ private fun PronunciationRuleRow(
         }
         Switch(checked = rule.isEnabled, onCheckedChange = { onToggle() })
         IconButton(onClick = onDelete) {
-            Icon(Icons.Default.Delete, contentDescription = "Supprimer la règle ${rule.originalText}")
+            Icon(AppIcons.Delete, contentDescription = "Supprimer la règle ${rule.originalText}")
         }
     }
 }
