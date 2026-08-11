@@ -1,4 +1,6 @@
 package com.inktone.feature.settings
+import com.inktone.core.designsystem.AppIcon
+import com.inktone.core.designsystem.AppSymbol
 
 import androidx.compose.foundation.background
 import androidx.compose.foundation.gestures.detectTapGestures
@@ -19,9 +21,6 @@ import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
-import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.automirrored.filled.ArrowBack
-import androidx.compose.material.icons.outlined.ChevronRight
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.ExperimentalMaterial3Api
@@ -87,7 +86,7 @@ fun ThemeGalleryScreen(
                 },
                 navigationIcon = {
                     IconButton(onClick = onBack) {
-                        Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = "Retour")
+                        Icon(AppIcons.Back, contentDescription = "Retour")
                     }
                 },
             )
@@ -157,7 +156,7 @@ fun ThemeGalleryScreen(
                                         onClick = { viewModel.onIntent(ThemeGalleryIntent.OpenStudio(theme.id)) },
                                         modifier = Modifier.align(Alignment.BottomEnd),
                                     ) {
-                                        Icon(AppIcons.Edit, contentDescription = "Modifier « ${theme.displayName} »", tint = theme.textColorHex.toColor())
+                                        AppIcon(AppSymbol.Edit,  contentDescription = "Modifier « ${theme.displayName} »", tint = theme.textColorHex.toColor())
                                     }
                                 },
                                 onClick = { viewModel.onIntent(ThemeGalleryIntent.SelectTheme(theme.id)) },
@@ -292,7 +291,7 @@ private fun CreateThemeCard(modifier: Modifier = Modifier, onClick: () -> Unit) 
             horizontalAlignment = Alignment.CenterHorizontally,
             verticalArrangement = Arrangement.Center,
         ) {
-            Icon(AppIcons.AddCircle, contentDescription = null, tint = MaterialTheme.colorScheme.primary, modifier = Modifier.size(32.dp))
+            AppIcon(AppSymbol.AddCircle,  contentDescription = null, tint = MaterialTheme.colorScheme.primary, modifier = Modifier.size(32.dp))
             Spacer(Modifier.height(8.dp))
             Text("Créer un thème", style = MaterialTheme.typography.labelMedium)
             Text("Studio de création", style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
@@ -335,7 +334,7 @@ private fun AccessibilityRow(theme: ReadingTheme, isActive: Boolean, onClick: ()
             subtitle?.let { Text(it, style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.onSurfaceVariant) }
         }
         IconButton(onClick = onClick) {
-            Icon(Icons.Outlined.ChevronRight, contentDescription = "Appliquer « ${theme.displayName} »")
+            AppIcon(AppSymbol.ChevronRight, contentDescription = "Appliquer « ${theme.displayName} »")
         }
     }
 }
