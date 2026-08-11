@@ -22,14 +22,6 @@ import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.shape.RoundedCornerShape
-import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.outlined.Article
-import androidx.compose.material.icons.outlined.BarChart
-import androidx.compose.material.icons.outlined.CheckCircle
-import androidx.compose.material.icons.outlined.ChevronRight
-import androidx.compose.material.icons.outlined.Download
-import androidx.compose.material.icons.outlined.TrendingUp
-import androidx.compose.material.icons.outlined.ImportContacts
 import androidx.compose.material3.Button
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.ElevatedCard
@@ -70,7 +62,9 @@ import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.hilt.navigation.compose.hiltViewModel
 import coil.compose.SubcomposeAsyncImage
 import coil.request.ImageRequest
+import com.inktone.core.designsystem.AppIcon
 import com.inktone.core.designsystem.AppIcons
+import com.inktone.core.designsystem.AppSymbol
 import com.inktone.core.designsystem.InkToneSpacing
 import com.inktone.domain.model.DailyReadingStats
 import com.inktone.domain.service.ExportFormat
@@ -185,7 +179,7 @@ private fun Section1Kpis(kpi: com.inktone.domain.usecase.KpiState) {
         // vit désormais uniquement au niveau de l'ouvrage (Section 4).
         Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(InkToneSpacing.md)) {
             StatCard(
-                icon = Icons.Outlined.CheckCircle, label = "Livres finis",
+                icon = AppIcons.Success, label = "Livres finis",
                 value = kpi.booksFinished.toString(), modifier = Modifier.weight(1f),
             )
             StatCard(
@@ -193,7 +187,7 @@ private fun Section1Kpis(kpi: com.inktone.domain.usecase.KpiState) {
                 value = kpi.totalPagesReadFormatted, modifier = Modifier.weight(1f),
             )
             StatCard(
-                icon = Icons.Outlined.Article, label = "Mots parcourus",
+                icon = AppIcons.Article, label = "Mots parcourus",
                 value = kpi.totalWordsReadFormatted, modifier = Modifier.weight(1f),
             )
         }
@@ -242,7 +236,7 @@ private fun DailyGoalGauge(kpi: com.inktone.domain.usecase.KpiState) {
             Spacer(Modifier.height(16.dp))
             Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceEvenly) {
                 GoalStreakItem(icon = AppIcons.Streak, label = "Série", value = "${kpi.currentStreakDays} j")
-                GoalStreakItem(icon = Icons.Outlined.TrendingUp, label = "Record", value = "${kpi.maxStreakDays} j")
+                GoalStreakItem(icon = AppIcons.TrendingUp, label = "Record", value = "${kpi.maxStreakDays} j")
             }
             Spacer(Modifier.height(8.dp))
             Text(
@@ -628,7 +622,7 @@ private fun Section3CurrentBook(book: com.inktone.domain.usecase.CurrentBookStat
                         color = MaterialTheme.colorScheme.onSurfaceVariant,
                     )
                 }
-                Icon(Icons.Outlined.ChevronRight, contentDescription = null, tint = MaterialTheme.colorScheme.onSurfaceVariant)
+                Icon(AppIcons.ChevronRight, contentDescription = null, tint = MaterialTheme.colorScheme.onSurfaceVariant)
             }
         }
     }
@@ -682,7 +676,7 @@ private fun ExportButton(viewModel: StatisticsViewModel) {
         onClick = { showSheet = true },
         modifier = Modifier.fillMaxWidth(),
     ) {
-        Icon(Icons.Outlined.Download, contentDescription = null, modifier = Modifier.size(18.dp))
+        Icon(AppIcons.Download, contentDescription = null, modifier = Modifier.size(18.dp))
         Spacer(Modifier.width(8.dp))
         Text("Exporter les statistiques")
     }
@@ -697,7 +691,7 @@ private fun ExportButton(viewModel: StatisticsViewModel) {
             ListItem(
                 headlineContent = { Text("Format CSV") },
                 supportingContent = { Text("Récapitulatif des sessions") },
-                leadingContent = { Icon(Icons.Outlined.BarChart, contentDescription = null) },
+                leadingContent = { Icon(AppIcons.Stats, contentDescription = null) },
                 modifier = Modifier.clickable {
                     showSheet = false
                     viewModel.export(ExportFormat.CSV)
@@ -706,7 +700,7 @@ private fun ExportButton(viewModel: StatisticsViewModel) {
             ListItem(
                 headlineContent = { Text("Format JSON") },
                 supportingContent = { Text("Données brutes d'événements") },
-                leadingContent = { Icon(Icons.Outlined.ImportContacts, contentDescription = null) },
+                leadingContent = { Icon(AppIcons.ReadingModeScroll, contentDescription = null) },
                 modifier = Modifier.clickable {
                     showSheet = false
                     viewModel.export(ExportFormat.JSON)
