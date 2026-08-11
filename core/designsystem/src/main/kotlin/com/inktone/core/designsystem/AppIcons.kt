@@ -13,6 +13,8 @@ import androidx.compose.material.icons.outlined.Close
 import androidx.compose.material.icons.outlined.Download
 import androidx.compose.material.icons.outlined.SearchOff
 import androidx.compose.material.icons.outlined.Speed
+import androidx.compose.material.icons.outlined.Timer
+import androidx.compose.material.icons.outlined.TrendingUp
 import androidx.compose.material.icons.filled.DarkMode
 import androidx.compose.material.icons.filled.DeleteSweep
 import androidx.compose.material.icons.filled.FastForward
@@ -196,6 +198,8 @@ enum class AppSymbol(
     Upload(R.drawable.ic_symbol_upload),
     WarningAmber(R.drawable.ic_symbol_warning_amber),
     SearchOff(R.drawable.ic_symbol_search_off),
+    Timer(R.drawable.ic_symbol_timer),
+    TrendingUp(R.drawable.ic_symbol_trending_up),
 }
 
 /**
@@ -327,4 +331,6 @@ object AppIcons {
     val Upload = Icons.Filled.Upload
     val WarningAmber = Icons.Filled.WarningAmber
     val SearchOff = Icons.Outlined.SearchOff
+    val Timer = Icons.Outlined.Timer
+    val TrendingUp = Icons.Outlined.TrendingUp
 }
