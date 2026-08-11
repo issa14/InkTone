@@ -29,4 +29,23 @@ class PublicationTest {
             validPublication().copy(title = "")
         }
     }
+
+    @Test
+    fun `pageCount nul est rejete`() {
+        assertThrows(IllegalArgumentException::class.java) {
+            validPublication().copy(pageCount = 0)
+        }
+    }
+
+    @Test
+    fun `pageCount negatif est rejete`() {
+        assertThrows(IllegalArgumentException::class.java) {
+            validPublication().copy(pageCount = -5)
+        }
+    }
+
+    @Test
+    fun `pageCount absent est valide pour un format reflowable`() {
+        validPublication().copy(pageCount = null)
+    }
 }

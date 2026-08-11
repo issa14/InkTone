@@ -63,6 +63,23 @@ class LocatorTest {
     }
 
     @Test
+    fun `pageOffsetY hors bornes est rejete`() {
+        assertThrows(IllegalArgumentException::class.java) {
+            Locator(resourceHref = "page-0", chapterIndex = 0, charOffset = 0, pageOffsetY = 1.5f)
+        }
+        assertThrows(IllegalArgumentException::class.java) {
+            Locator(resourceHref = "page-0", chapterIndex = 0, charOffset = 0, pageOffsetY = -0.1f)
+        }
+    }
+
+    @Test
+    fun `pageOffsetY absent ou dans les bornes est valide`() {
+        Locator(resourceHref = "page-0", chapterIndex = 0, charOffset = 0)
+        Locator(resourceHref = "page-0", chapterIndex = 0, charOffset = 0, pageOffsetY = 0f)
+        Locator(resourceHref = "page-0", chapterIndex = 0, charOffset = 0, pageOffsetY = 1f)
+    }
+
+    @Test
     fun `progression est nulle si la publication n'a aucun caractere connu`() {
         val locator = Locator(resourceHref = "ch1.xhtml", chapterIndex = 0, charOffset = 0)
         val progression = Locator.computeProgression(

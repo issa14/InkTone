@@ -267,7 +267,7 @@ une fois l'écran de lecture branché.
 |---|---|
 | 1 | `./gradlew :infrastructure:parser:connectedAndroidTest` passe sur un appareil physique (classe Snapdragon 680 si disponible) — aucun crash natif sur les 5 fixtures |
 | 2 | `./gradlew :infrastructure:database:connectedAndroidTest` passe — migration 24→25 validée sur appareil réel, pas seulement Robolectric |
-| 3 | Sur `fixture-large.pdf` : temps d'ouverture de l'index **mesuré et consigné** (log/profiler) — traité comme un enregistrement de référence, pas un seuil pass/fail : le chiffre « < 50 ms » de la recherche initiale vient de MuPDF, pas de PDFium (décision actée 19), le vrai seuil se fixe en tâche 12.7 |
+| 3 | Sur `fixture-large.pdf` (220 pages) : **mesuré**, `PdfPublicationParserTest.ouvre_un_pdf_volumineux_sans_crash_et_consigne_le_temps` — `264 ms` sur V2206 pour `parse()` complet (ouverture + extraction de texte des 220 pages, plus lourd que la seule ouverture d'index visée par le chiffre MuPDF de la recherche initiale, décision actée 19). Enregistrement de référence, pas un seuil pass/fail — le vrai seuil de rendu se fixe en tâche 12.7 |
 | 4 | Import de `fixture-valid.pdf` déclenché depuis un test instrumenté (ou un écran de debug temporaire) confirme la `Publication` insérée avec les bons champs — en l'absence de sélecteur réel à ce palier |
 
 ---

@@ -3,7 +3,6 @@ package com.inktone.infrastructure.parser
 import android.content.Context
 import androidx.test.core.app.ApplicationProvider
 import androidx.test.ext.junit.runners.AndroidJUnit4
-import com.inktone.domain.service.FileStorageService
 import com.inktone.domain.service.ParseResult
 import kotlinx.coroutines.test.runTest
 import org.junit.Assert.assertEquals
@@ -12,23 +11,6 @@ import org.junit.Assert.assertTrue
 import org.junit.Test
 import org.junit.runner.RunWith
 import java.io.File
-import java.io.InputStream
-
-/**
- * Meme patron que `LocalFileStorageService` de `TxtPublicationParserTest`
- * (src/test) - source set distinct, pas partageable telle quelle. `uri`
- * est ici `file.absolutePath`, jamais une URI SAF reelle.
- */
-private class LocalFileStorageService : FileStorageService {
-    override suspend fun openInputStream(uri: String): InputStream? =
-        File(uri).takeIf { it.exists() }?.inputStream()
-
-    override suspend fun computeSha256(uri: String): String? = null
-    override suspend fun getFileSize(uri: String): Long? = File(uri).takeIf { it.exists() }?.length()
-    override suspend fun getFileName(uri: String): String? = File(uri).name
-    override suspend fun persistReadPermission(uri: String) = Unit
-    override suspend fun writeToUri(uri: String, sourceFile: File): Boolean = false
-}
 
 /**
  * Lot 12, tache 12.3 - verifie que le DocumentModel est construit
@@ -75,5 +57,24 @@ class PdfPublicationParserTest {
         val coverUri = result.metadata.coverUri
         assertFalse("une couverture doit etre sauvegardee", coverUri.isNullOrBlank())
         assertTrue(File(coverUri!!).exists())
+    }
+
+    /**
+     * Mesure et consigne (log, pas d'assertion de seuil) - decision actee
+     * 19 du plan : les chiffres de la recherche initiale sont pour MuPDF,
+     * pas PDFium, le vrai seuil se fixera avec le Palier 2 (tache 12.7).
+     * Ce test verifie seulement la correction (220 pages) sans crash ni
+     * blocage anormal sur un fichier volumineux.
+     */
+    @Test
+    fun ouvre_un_pdf_volumineux_sans_crash_et_consigne_le_temps() = runTest {
+        val file = fixture("fixture-large.pdf")
+        val start = System.nanoTime()
+        val result = parser().parse(file.absolutePath)
+        val elapsedMs = (System.nanoTime() - start) / 1_000_000
+
+        check(result is ParseResult.Success)
+        assertEquals(220, result.documentModel.chapters.size)
+        android.util.Log.i("PdfPublicationParserTest", "fixture-large.pdf (220 pages) parse() = ${elapsedMs}ms sur ${android.os.Build.MODEL}")
     }
 }
