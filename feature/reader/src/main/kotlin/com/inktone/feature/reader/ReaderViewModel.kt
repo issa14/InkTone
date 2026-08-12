@@ -45,6 +45,7 @@ import com.inktone.domain.usecase.GetVoiceProfilesUseCase
 import com.inktone.domain.usecase.UpdateReadingStateUseCase
 import com.inktone.domain.valueobject.Locator
 import dagger.hilt.android.lifecycle.HiltViewModel
+import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.Job
@@ -420,9 +421,26 @@ class ReaderViewModel @Inject constructor(
                     )
                     // Plan v3, Palier 3.6 — initialiser le parsing lazy EPUB
                     if (publication.format == PublicationFormat.EPUB) {
-                        epubResourceResolver.open(publication.fileUri)
                         chapterParser.registerPublication(publicationId, publication.fileUri)
+                        try {
+                            epubResourceResolver.open(publicationId, publication.fileUri)
+                        } catch (e: CancellationException) {
+                            throw e
+                        } catch (e: Exception) {
+                            // Best-effort : le texte (chapterParser) peut encore
+                            // s'ouvrir même si la résolution d'images échoue —
+                            // ne jamais faire planter l'ouverture du lecteur pour
+                            // un chapitre potentiellement illustré (K2/K6).
+                            Log.w("ReaderViewModel", "openPublication: echec ouverture resolveur images", e)
+                        }
                     }
+                    // Bug réel trouvé sur appareil (session Plan v3) : sans cet
+                    // appel, le chapitre COURANT à l'ouverture n'était jamais
+                    // chargé — preloadAdjacentChapters ne précharge que N-1/N+1/
+                    // N+2, jamais N lui-même. Le lecteur s'ouvrait donc sur une
+                    // zone de lecture vide (coquille ChapterContent.Rich sans
+                    // blocks) jusqu'à ce que l'utilisateur navigue et revienne.
+                    loadChapterContentIfNeeded(_state.value.currentChapterIndex)
                     preloadAdjacentChapters(_state.value.currentChapterIndex)
                     observeAnnotations(publicationId)
                     observeBookmarks(publicationId)
@@ -703,13 +721,23 @@ class ReaderViewModel @Inject constructor(
      */
     private fun loadChapterContentIfNeeded(chapterIndex: Int) {
         val chapter = _state.value.chapters.getOrNull(chapterIndex) ?: return
-        if (chapter.content !is ChapterContent.Rich) return
-        val rich = chapter.content as ChapterContent.Rich
+        val rich = chapter.content as? ChapterContent.Rich ?: return
         if (rich.blocks.isNotEmpty()) return // déjà chargé
 
         val publicationId = currentPublicationId ?: return
         viewModelScope.launch {
-            val richChapter = chapterParser.parseChapter(publicationId, chapter.href)
+            // Un href introuvable (K6 : encodage divergent entre le spine
+            // et la ressource, ou EPUB malformé) ne doit jamais crasher le
+            // lecteur — juste laisser ce chapitre vide et le signaler.
+            val richChapter = try {
+                chapterParser.parseChapter(publicationId, chapter.href)
+            } catch (e: CancellationException) {
+                throw e
+            } catch (e: Exception) {
+                Log.w("ReaderViewModel", "loadChapterContentIfNeeded: echec chapitre ${chapter.href}", e)
+                _state.value = _state.value.copy(errorMessage = "Impossible de charger ce chapitre.")
+                return@launch
+            }
             val chapters = _state.value.chapters.toMutableList()
             chapters[chapterIndex] = richChapter
             _state.value = _state.value.copy(chapters = chapters)
@@ -734,9 +762,8 @@ class ReaderViewModel @Inject constructor(
         preloadScope?.launch {
             for (idx in targets) {
                 val chapter = chapters.getOrNull(idx) ?: continue
-                if (chapter.content is ChapterContent.Rich &&
-                    (chapter.content as ChapterContent.Rich).blocks.isNotEmpty()
-                ) continue // déjà chargé
+                val rich = chapter.content as? ChapterContent.Rich
+                if (rich != null && rich.blocks.isNotEmpty()) continue // déjà chargé
                 chapterParser.preload(publicationId, chapter.href, this)
             }
         }
