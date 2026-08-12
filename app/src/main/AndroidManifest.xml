@@ -22,7 +22,7 @@
         android:icon="@mipmap/ic_launcher"
         android:roundIcon="@mipmap/ic_launcher_round"
         android:label="InkTone"
-        android:theme="@android:style/Theme.Material.Light.NoActionBar">
+        android:theme="@style/Theme.InkTone.Starting">
 
         <!-- K10/ADR-014 : le SDK Crashlytics collecte par defaut des son
              initialisation si on ne le desactive pas explicitement — sans
