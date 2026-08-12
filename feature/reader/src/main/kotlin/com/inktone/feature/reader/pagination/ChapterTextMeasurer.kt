@@ -9,6 +9,7 @@ import androidx.compose.ui.unit.Constraints
 import com.inktone.domain.model.BookBlock
 import com.inktone.domain.model.Chapter
 import com.inktone.domain.model.ChapterContent
+import com.inktone.domain.model.Sentence
 import com.inktone.feature.reader.rendering.BookBlockStyleMapper
 
 /**
@@ -18,11 +19,10 @@ import com.inktone.feature.reader.rendering.BookBlockStyleMapper
  * jamais reconstruit par page ni par mot prononcé (voir l'exigence de
  * coût de recomposition de 3a.2). `sentenceStartOffsets[i]` est
  * l'offset, dans ce même `annotatedString`, où commence la phrase
- * d'index global `i` (même indexation que
- * `chapter.paragraphs.flatMap { it.sentences }`) — sa taille indique
- * combien de phrases, depuis le début du chapitre, sont couvertes par
- * cette mesure : moins que le total pour un préfixe, tout le chapitre
- * sinon.
+ * d'index global `i` (même indexation que `chapter.sentences`) — sa
+ * taille indique combien de phrases, depuis le début du chapitre, sont
+ * couvertes par cette mesure : moins que le total pour un préfixe, tout
+ * le chapitre sinon.
  */
 data class ChapterMeasurement(
     val annotatedString: AnnotatedString,
@@ -98,17 +98,19 @@ class ChapterTextMeasurer(private val textMeasurer: TextMeasurer) {
      *
      * ## Algorithme
      *
-     * 1. Découper les [BookBlock.ParagraphBlock] et [BookBlock.HeadingBlock]
-     *    en lots de [MAX_BATCH_CHARS] caractères max. Frontières de lot
-     *    TOUJOURS entre deux blocs (jamais au milieu).
-     * 2. Mesurer chaque lot indépendamment via [measureBuilt].
-     * 3. Accumuler les [LineGeometry] avec `top`/`bottom` ajustés
+     * 1. Borner les [BookBlock.ParagraphBlock]/[BookBlock.HeadingBlock] au
+     *    budget total [maxChars] (préfixe, [measureFirstPage] — jamais
+     *    borné pour [measure], budget = `Int.MAX_VALUE`).
+     * 2. Découper le résultat en lots de [MAX_BATCH_CHARS] caractères max
+     *    — TOUJOURS appliqué, indépendamment de [maxChars] : c'est la
+     *    seule protection contre le dépassement de texture GPU sur un
+     *    chapitre long, y compris pour [measure] (préfixe illimité).
+     *    Frontières de lot TOUJOURS entre deux blocs (jamais au milieu).
+     * 3. Mesurer chaque lot indépendamment via [measureBuilt].
+     * 4. Accumuler les [LineGeometry] avec `top`/`bottom` ajustés
      *    (décalage vertical cumulatif).
-     * 4. Accumuler les `sentenceStartOffsets` dans l'espace global
+     * 5. Accumuler les `sentenceStartOffsets` dans l'espace global
      *    (somme des longueurs de tous les lots précédents).
-     *
-     * [maxChars] borne le nombre total de caractères mesurés (utilisé
-     * par [measureFirstPage]).
      */
     private fun measureRich(
         chapter: Chapter,
@@ -116,28 +118,66 @@ class ChapterTextMeasurer(private val textMeasurer: TextMeasurer) {
         maxWidthPx: Int,
         maxChars: Int,
     ): ChapterMeasurement {
-        val blocks = (chapter.content as ChapterContent.Rich).blocks
-        val textBlocks = blocks.filter {
-            it is BookBlock.ParagraphBlock || it is BookBlock.HeadingBlock
+        val content = chapter.content as? ChapterContent.Rich
+            ?: error("ChapterTextMeasurer.measureRich appelé sur un chapitre sans ChapterContent.Rich (${chapter.href})")
+        // IndexedValue : conserve l'index ORIGINAL dans `content.blocks` — le
+        // même référentiel que Sentence.blockIndex — pour retrouver les
+        // phrases de chaque bloc plus bas malgré le filtrage.
+        val textBlocks = content.blocks.withIndex().filter {
+            it.value is BookBlock.ParagraphBlock || it.value is BookBlock.HeadingBlock
         }
         if (textBlocks.isEmpty()) {
             return ChapterMeasurement(AnnotatedString(""), emptyList(), emptyList())
         }
 
-        // 1. Découper en lots
-        val batches = buildBatches(textBlocks, maxChars)
+        // 1. Borner au budget total demandé — [maxChars] est un budget de
+        //    PRÉFIXE (measureFirstPage), pas une taille de lot. Avant ce
+        //    correctif, [buildBatches] recevait directement [maxChars] comme
+        //    seuil de lot : measure() (maxChars = Int.MAX_VALUE) produisait
+        //    alors un unique lot contenant TOUT le chapitre (aucun
+        //    découpage réel), et measureFirstPage() mesurait la totalité du
+        //    chapitre au lieu de s'arrêter au préfixe — les deux à l'inverse
+        //    de l'intention du Palier 3.5.
+        val boundedBlocks = mutableListOf<IndexedValue<BookBlock>>()
+        var runningChars = 0
+        for (indexed in textBlocks) {
+            boundedBlocks.add(indexed)
+            runningChars += textLengthOf(indexed.value)
+            if (runningChars >= maxChars) break
+        }
+
+        // 2. Découper le préfixe borné en lots de taille structurelle fixe
+        //    (MAX_BATCH_CHARS) — toujours appliqué, indépendamment de
+        //    [maxChars], seule protection réelle contre le dépassement de
+        //    texture GPU sur un chapitre long.
+        val batches = buildBatches(boundedBlocks, MAX_BATCH_CHARS)
         if (batches.isEmpty()) {
             return ChapterMeasurement(AnnotatedString(""), emptyList(), emptyList())
         }
 
-        // 2. Mesurer chaque lot et accumuler
+        // 3. Mesurer chaque lot et accumuler
         val allLines = mutableListOf<LineGeometry>()
         val allSentenceOffsets = mutableListOf<Int>()
         var cumulativeTop = 0f
         var globalOffset = 0
+        var firstBatchAnnotated: AnnotatedString? = null
 
-        for (batch in batches) {
-            val (annotatedString, localOffsets) = buildBatchAnnotatedString(batch)
+        batches.forEachIndexed { batchIndex, batch ->
+            val (annotatedString, localOffsets) = buildBatchAnnotatedString(
+                blocks = batch,
+                sentences = chapter.sentences,
+                // Un "\n" doit séparer TOUT couple de blocs de texte
+                // consécutifs, y compris à une frontière de lot — sinon
+                // l'espace d'offsets global dérive de 1 caractère par
+                // frontière face à celui de JsoupChapterParser (même
+                // convention de séparateur, voir Chapter.sentences), et
+                // les offsets TTS/sélection calculés par ReaderScreen en
+                // mode SCROLL (qui utilise ce même Chapter.sentences)
+                // désynchronisent du rendu pagé pour tout chapitre
+                // dépassant MAX_BATCH_CHARS.
+                leadingSeparator = batchIndex > 0,
+            )
+            if (firstBatchAnnotated == null) firstBatchAnnotated = annotatedString
             val measurement = measureBuilt(annotatedString, localOffsets, baseStyle, maxWidthPx)
 
             // Ajuster les tops/bottoms des lignes
@@ -159,9 +199,9 @@ class ChapterTextMeasurer(private val textMeasurer: TextMeasurer) {
         // AnnotatedString "virtuel" : seul le premier lot est stocké
         // (le contrat de ChapterMeasurement exige un AnnotatedString,
         // mais le rendu paginé tranche par offset — le premier lot suffit
-        // comme référence pour les offsets).
-        val firstBatchAnnotated = buildBatchAnnotatedString(batches.first()).first
-        return ChapterMeasurement(firstBatchAnnotated, allLines, allSentenceOffsets)
+        // comme référence pour les offsets). Déjà construit dans la boucle
+        // ci-dessus — jamais reconstruit une seconde fois.
+        return ChapterMeasurement(firstBatchAnnotated ?: AnnotatedString(""), allLines, allSentenceOffsets)
     }
 
     /**
@@ -169,19 +209,15 @@ class ChapterTextMeasurer(private val textMeasurer: TextMeasurer) {
      * Les frontières tombent toujours entre deux blocs.
      */
     private fun buildBatches(
-        textBlocks: List<BookBlock>,
+        textBlocks: List<IndexedValue<BookBlock>>,
         maxChars: Int,
-    ): List<List<BookBlock>> {
-        val batches = mutableListOf<List<BookBlock>>()
-        var currentBatch = mutableListOf<BookBlock>()
+    ): List<List<IndexedValue<BookBlock>>> {
+        val batches = mutableListOf<List<IndexedValue<BookBlock>>>()
+        var currentBatch = mutableListOf<IndexedValue<BookBlock>>()
         var currentChars = 0
 
-        for (block in textBlocks) {
-            val blockLen = when (block) {
-                is BookBlock.ParagraphBlock -> block.richText.plainText.length
-                is BookBlock.HeadingBlock -> block.richText.plainText.length
-                else -> 0
-            }
+        for (indexed in textBlocks) {
+            val blockLen = textLengthOf(indexed.value)
             // Si ajouter ce bloc dépasserait la limite et le batch
             // courant n'est pas vide, on le ferme.
             if (currentChars > 0 && currentChars + blockLen > maxChars) {
@@ -189,7 +225,7 @@ class ChapterTextMeasurer(private val textMeasurer: TextMeasurer) {
                 currentBatch = mutableListOf()
                 currentChars = 0
             }
-            currentBatch.add(block)
+            currentBatch.add(indexed)
             currentChars += blockLen
         }
         if (currentBatch.isNotEmpty()) {
@@ -198,57 +234,70 @@ class ChapterTextMeasurer(private val textMeasurer: TextMeasurer) {
         return batches
     }
 
+    private fun textLengthOf(block: BookBlock): Int = when (block) {
+        is BookBlock.ParagraphBlock -> block.richText.plainText.length
+        is BookBlock.HeadingBlock -> block.richText.plainText.length
+        else -> 0
+    }
+
     /**
-     * Construit un [AnnotatedString] et les offsets de phrase locaux
-     * pour un lot de blocs.
+     * Construit un [AnnotatedString] et les offsets de DÉBUT DE PHRASE
+     * (pas de bloc) locaux pour un lot de blocs, à partir de [sentences]
+     * (`chapter.sentences`, filtrées par [Sentence.blockIndex] pour
+     * retrouver celles de chaque bloc). Un séparateur (retour à la ligne)
+     * est inséré entre deux blocs consécutifs du même lot, pour ne pas
+     * fusionner visuellement deux paragraphes.
+     *
+     * Repli sur UN offset = le début du bloc lui-même quand aucune
+     * [Sentence] n'a de [Sentence.blockIndex] pointant vers ce bloc —
+     * jamais un bloc sans aucune entrée. Couvre le cas réel où plusieurs
+     * phrases partagent un bloc (le cas voulu, précis), et le cas où
+     * [sentences] ne porte pas de `blockIndex` valide (fixtures qui ne le
+     * renseignent pas) sans jamais désynchroniser `sentenceStartOffsets`
+     * du nombre de blocs mesurés.
      *
      * @return Pair(AnnotatedString, List<Int> des offsets de début de phrase)
      */
     private fun buildBatchAnnotatedString(
-        blocks: List<BookBlock>,
+        blocks: List<IndexedValue<BookBlock>>,
+        sentences: List<Sentence>,
+        leadingSeparator: Boolean,
     ): Pair<AnnotatedString, List<Int>> {
         val sentenceStartOffsets = mutableListOf<Int>()
         val annotatedString = buildAnnotatedString {
-            for (block in blocks) {
-                when (block) {
-                    is BookBlock.ParagraphBlock -> {
-                        val plainText = block.richText.plainText
-                        sentenceStartOffsets.add(length)
-                        // Appliquer les spans inline
-                        val spans = block.richText.spans
-                        var lastEnd = 0
-                        for (span in spans) {
-                            if (span.start > lastEnd) {
-                                append(plainText.substring(lastEnd, span.start))
-                            }
-                            withStyle(BookBlockStyleMapper.spanStyleFor(span.styles)) {
-                                append(plainText.substring(span.start, span.end))
-                            }
-                            lastEnd = span.end
-                        }
-                        if (lastEnd < plainText.length) {
-                            append(plainText.substring(lastEnd))
-                        }
+            blocks.forEachIndexed { position, (originalIndex, block) ->
+                val richText = when (block) {
+                    is BookBlock.ParagraphBlock -> block.richText
+                    is BookBlock.HeadingBlock -> block.richText
+                    else -> null
+                } ?: return@forEachIndexed
+
+                if (position > 0 || leadingSeparator) append('\n')
+                val blockStartInBatch = length
+                val blockGlobalStart = block.globalOffsetRange?.first ?: 0
+                val blockSentences = sentences.filter { it.blockIndex == originalIndex }
+                if (blockSentences.isNotEmpty()) {
+                    blockSentences.forEach { sentence ->
+                        sentenceStartOffsets.add(blockStartInBatch + (sentence.startOffset - blockGlobalStart))
                     }
-                    is BookBlock.HeadingBlock -> {
-                        val plainText = block.richText.plainText
-                        sentenceStartOffsets.add(length)
-                        val spans = block.richText.spans
-                        var lastEnd = 0
-                        for (span in spans) {
-                            if (span.start > lastEnd) {
-                                append(plainText.substring(lastEnd, span.start))
-                            }
-                            withStyle(BookBlockStyleMapper.spanStyleFor(span.styles)) {
-                                append(plainText.substring(span.start, span.end))
-                            }
-                            lastEnd = span.end
-                        }
-                        if (lastEnd < plainText.length) {
-                            append(plainText.substring(lastEnd))
-                        }
+                } else {
+                    sentenceStartOffsets.add(blockStartInBatch)
+                }
+
+                val plainText = richText.plainText
+                val spans = richText.spans
+                var lastEnd = 0
+                for (span in spans) {
+                    if (span.start > lastEnd) {
+                        append(plainText.substring(lastEnd, span.start))
                     }
-                    else -> { /* ImageBlock, SeparatorBlock ignorés */ }
+                    withStyle(BookBlockStyleMapper.spanStyleFor(span.styles)) {
+                        append(plainText.substring(span.start, span.end))
+                    }
+                    lastEnd = span.end
+                }
+                if (lastEnd < plainText.length) {
+                    append(plainText.substring(lastEnd))
                 }
             }
         }
