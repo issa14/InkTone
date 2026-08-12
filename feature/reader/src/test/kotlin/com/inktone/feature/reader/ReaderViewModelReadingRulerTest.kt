@@ -23,6 +23,8 @@ import org.junit.After
 import org.junit.Assert.assertEquals
 import org.junit.Before
 import org.junit.Test
+import com.inktone.core.testing.fake.FakeChapterParser
+import com.inktone.core.testing.fake.FakeEpubResourceResolver
 
 /**
  * Tache 9bis.3.6/9bis.5, seconde reserve levee : `isReadingRulerEnabled`
@@ -68,6 +70,8 @@ class ReaderViewModelReadingRulerTest {
             readingSessionRepository = com.inktone.core.testing.fake.FakeReadingSessionRepository(),
             themeRepository = com.inktone.core.testing.fake.FakeThemeRepository(),
             fixedPageRenderer = com.inktone.core.testing.fake.FakeFixedPageRenderer(),
+            chapterParser = FakeChapterParser(),
+            epubResourceResolver = FakeEpubResourceResolver(),
         )
         dispatcher.scheduler.advanceUntilIdle()
 

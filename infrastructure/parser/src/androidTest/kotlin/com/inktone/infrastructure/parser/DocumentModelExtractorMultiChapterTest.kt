@@ -38,7 +38,7 @@ class DocumentModelExtractorMultiChapterTest {
         // sur un cas à plusieurs ressources, ce test doit le révéler —
         // un test sur un seul chapitre ne le pouvait pas par construction.
         val allSentenceTexts = chapters.map { chapter ->
-            chapter.paragraphs.flatMap { it.sentences }.joinToString(" ") { it.text }
+            chapter.sentences { it.sentences }.joinToString(" ") { it.text }
         }
         assertTrue("chapitre 1 doit contenir son propre texte", allSentenceTexts[0].contains("premier"))
         assertTrue("chapitre 2 doit contenir son propre texte", allSentenceTexts[1].contains("deuxieme"))
@@ -53,7 +53,7 @@ class DocumentModelExtractorMultiChapterTest {
         // chapitres (bug plausible si l'extracteur réutilisait par
         // erreur une variable au mauvais niveau de portée).
         chapters.forEach { chapter ->
-            val firstSentence = chapter.paragraphs.first().sentences.first()
+            val firstSentence = chapter.sentences.first()
             assertEquals("chaque chapitre commence son offset a 0", 0, firstSentence.startOffset)
         }
     }

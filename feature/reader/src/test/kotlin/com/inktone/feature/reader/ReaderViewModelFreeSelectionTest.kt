@@ -14,7 +14,8 @@ import com.inktone.domain.model.AnnotationColor
 import com.inktone.domain.model.Chapter
 import com.inktone.domain.model.ChapterContent
 import com.inktone.domain.model.DocumentModel
-import com.inktone.domain.model.Paragraph
+import com.inktone.domain.model.BookBlock
+import com.inktone.domain.model.StyledText
 import com.inktone.domain.model.Publication
 import com.inktone.domain.model.PublicationFormat
 import com.inktone.domain.model.Sentence
@@ -38,6 +39,8 @@ import org.junit.Assert.assertEquals
 import org.junit.Assert.assertNull
 import org.junit.Before
 import org.junit.Test
+import com.inktone.core.testing.fake.FakeChapterParser
+import com.inktone.core.testing.fake.FakeEpubResourceResolver
 
 /**
  * Sélection libre au mot : `SetFreeSelection`/`ClearFreeSelection` et
@@ -58,14 +61,15 @@ class ReaderViewModelFreeSelectionTest {
         index = 0,
         href = "OEBPS/chapter1.xhtml",
         title = null,
-        content = ChapterContent.Legacy(
-            paragraphs = listOf(
-                Paragraph(
-                    index = 0,
-                    sentences = listOf(Sentence(index = 0, text = "Bonjour le monde.", startOffset = 0, endOffset = 18)),
+        content = ChapterContent.Rich(
+            blocks = listOf(
+                BookBlock.ParagraphBlock(
+                    richText = StyledText.plain("Bonjour le monde."),
+                    globalOffsetRange = 0 until 18,
                 ),
             ),
         ),
+        sentences = listOf(Sentence(index = 0, text = "Bonjour le monde.", startOffset = 0, endOffset = 18)),
     )
 
     private suspend fun buildViewModel(
@@ -106,6 +110,8 @@ class ReaderViewModelFreeSelectionTest {
             readingSessionRepository = FakeReadingSessionRepository(),
             themeRepository = FakeThemeRepository(),
             fixedPageRenderer = com.inktone.core.testing.fake.FakeFixedPageRenderer(),
+            chapterParser = FakeChapterParser(),
+            epubResourceResolver = FakeEpubResourceResolver(),
         )
     }
 

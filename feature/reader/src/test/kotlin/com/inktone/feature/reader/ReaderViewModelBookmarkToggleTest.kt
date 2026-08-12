@@ -13,7 +13,8 @@ import com.inktone.domain.model.AnnotationColor
 import com.inktone.domain.model.Chapter
 import com.inktone.domain.model.ChapterContent
 import com.inktone.domain.model.DocumentModel
-import com.inktone.domain.model.Paragraph
+import com.inktone.domain.model.BookBlock
+import com.inktone.domain.model.StyledText
 import com.inktone.domain.model.Publication
 import com.inktone.domain.model.PublicationFormat
 import com.inktone.domain.model.Sentence
@@ -38,6 +39,8 @@ import org.junit.Assert.assertNull
 import org.junit.Assert.assertTrue
 import org.junit.Before
 import org.junit.Test
+import com.inktone.core.testing.fake.FakeChapterParser
+import com.inktone.core.testing.fake.FakeEpubResourceResolver
 
 /**
  * Tâche 3c.3 (toggle « Marquer cette page ») et 3c.4 (« Note » persiste
@@ -58,14 +61,15 @@ class ReaderViewModelBookmarkToggleTest {
         index = 0,
         href = "OEBPS/chapter1.xhtml",
         title = null,
-        content = ChapterContent.Legacy(
-            paragraphs = listOf(
-                Paragraph(
-                    index = 0,
-                    sentences = listOf(Sentence(index = 0, text = "Phrase unique.", startOffset = 0, endOffset = 14)),
+        content = ChapterContent.Rich(
+            blocks = listOf(
+                BookBlock.ParagraphBlock(
+                    richText = StyledText.plain("Phrase unique."),
+                    globalOffsetRange = 0 until 14,
                 ),
             ),
         ),
+        sentences = listOf(Sentence(index = 0, text = "Phrase unique.", startOffset = 0, endOffset = 14)),
     )
 
     private suspend fun buildViewModel(
@@ -113,6 +117,8 @@ class ReaderViewModelBookmarkToggleTest {
             readingSessionRepository = FakeReadingSessionRepository(),
             themeRepository = com.inktone.core.testing.fake.FakeThemeRepository(),
             fixedPageRenderer = com.inktone.core.testing.fake.FakeFixedPageRenderer(),
+            chapterParser = FakeChapterParser(),
+            epubResourceResolver = FakeEpubResourceResolver(),
         )
     }
 
@@ -227,14 +233,15 @@ class ReaderViewModelBookmarkToggleTest {
         val longText = "a".repeat(400)
         val longChapter = Chapter(
             index = 0, href = "OEBPS/chapter1.xhtml", title = null,
-            content = ChapterContent.Legacy(
-                paragraphs = listOf(
-                    Paragraph(
-                        index = 0,
-                        sentences = listOf(Sentence(index = 0, text = longText, startOffset = 0, endOffset = longText.length)),
+            content = ChapterContent.Rich(
+                blocks = listOf(
+                    BookBlock.ParagraphBlock(
+                        richText = StyledText.plain(longText),
+                        globalOffsetRange = 0 until longText.length,
                     ),
                 ),
             ),
+            sentences = listOf(Sentence(index = 0, text = longText, startOffset = 0, endOffset = longText.length)),
         )
         val readingStateRepository = FakeReadingStateRepository()
         val publicationRepository = FakePublicationRepository()
@@ -278,6 +285,8 @@ class ReaderViewModelBookmarkToggleTest {
             readingSessionRepository = FakeReadingSessionRepository(),
             themeRepository = com.inktone.core.testing.fake.FakeThemeRepository(),
             fixedPageRenderer = com.inktone.core.testing.fake.FakeFixedPageRenderer(),
+            chapterParser = FakeChapterParser(),
+            epubResourceResolver = FakeEpubResourceResolver(),
         )
         viewModel.onIntent(ReaderIntent.OpenPublication("pub-1"))
         dispatcher.scheduler.runCurrent()

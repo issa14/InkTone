@@ -14,7 +14,8 @@ import com.inktone.domain.model.Bookmark
 import com.inktone.domain.model.Chapter
 import com.inktone.domain.model.ChapterContent
 import com.inktone.domain.model.DocumentModel
-import com.inktone.domain.model.Paragraph
+import com.inktone.domain.model.BookBlock
+import com.inktone.domain.model.StyledText
 import com.inktone.domain.model.Publication
 import com.inktone.domain.model.PublicationFormat
 import com.inktone.domain.model.ReadingTheme
@@ -42,6 +43,8 @@ import org.junit.Assert.assertNull
 import org.junit.Assert.assertTrue
 import org.junit.Before
 import org.junit.Test
+import com.inktone.core.testing.fake.FakeChapterParser
+import com.inktone.core.testing.fake.FakeEpubResourceResolver
 
 /**
  * Lot 12, tâche 12.13 — tests du Palier 2 (comportement PDF dans le
@@ -67,20 +70,13 @@ class ReaderViewModelPdfTest {
                 index = pageIndex,
                 href = "page-$pageIndex",
                 title = null,
-                content = ChapterContent.Legacy(
-                    paragraphs = if (pageIndex % 2 == 0) {
+                content = ChapterContent.Rich(
+                    blocks = if (pageIndex % 2 == 0) {
                         // Pages paires : vectorielles avec texte
                         listOf(
-                            Paragraph(
-                                index = 0,
-                                sentences = listOf(
-                                    Sentence(
-                                        index = 0,
-                                        text = "Page $pageIndex contenu texte.",
-                                        startOffset = 0,
-                                        endOffset = 25,
-                                    ),
-                                ),
+                            BookBlock.ParagraphBlock(
+                                richText = StyledText.plain("Page $pageIndex contenu texte."),
+                                globalOffsetRange = 0 until 25,
                             ),
                         )
                     } else {
@@ -88,6 +84,18 @@ class ReaderViewModelPdfTest {
                         emptyList()
                     },
                 ),
+                sentences = if (pageIndex % 2 == 0) {
+                    listOf(
+                        Sentence(
+                            index = 0,
+                            text = "Page $pageIndex contenu texte.",
+                            startOffset = 0,
+                            endOffset = 25,
+                        ),
+                    )
+                } else {
+                    emptyList()
+                },
             )
         }
 
@@ -128,6 +136,8 @@ class ReaderViewModelPdfTest {
             readingSessionRepository = FakeReadingSessionRepository(),
             themeRepository = com.inktone.core.testing.fake.FakeThemeRepository(),
             fixedPageRenderer = FakeFixedPageRenderer(),
+            chapterParser = FakeChapterParser(),
+            epubResourceResolver = FakeEpubResourceResolver(),
         )
     }
 

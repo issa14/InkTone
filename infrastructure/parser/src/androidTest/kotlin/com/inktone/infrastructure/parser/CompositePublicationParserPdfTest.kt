@@ -40,6 +40,6 @@ class CompositePublicationParserPdfTest {
         val result = composite.parse(file.absolutePath)
 
         check(result is ParseResult.Success)
-        assertTrue(result.documentModel.chapters.single().paragraphs.isNotEmpty())
+        assertTrue(result.documentModel.chapters.single().sentences.isNotEmpty())
     }
 }
