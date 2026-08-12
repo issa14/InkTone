@@ -14,8 +14,6 @@ import org.jsoup.nodes.Element
 import org.jsoup.nodes.Node
 import org.jsoup.nodes.TextNode
 import java.io.InputStream
-import javax.inject.Inject
-import javax.inject.Singleton
 
 /**
  * Parseur HTML→[BookBlock] basé sur Jsoup.
@@ -64,10 +62,7 @@ import javax.inject.Singleton
  * `<table>`, `<figure>`, `<math>`, `<svg>`, `<script>`, `<style>`,
  * `<head>`, `<br>` (fusionné comme espace).
  */
-@Singleton
-class JsoupChapterParser @Inject constructor(
-    private val sentenceSplitter: FrenchSentenceSplitter,
-) {
+class JsoupChapterParser {
 
     /**
      * Parse un flux XHTML en [Chapter] avec contenu riche.
@@ -439,7 +434,7 @@ class JsoupChapterParser @Inject constructor(
 
         if (fullText.isBlank()) return emptyList()
 
-        val rawSentences = sentenceSplitter.split(fullText)
+        val rawSentences = FrenchSentenceSplitter.split(fullText)
         return rawSentences.mapIndexed { index, (text, startOffset, endOffset) ->
             // Trouver le bloc contenant cet offset par recherche dichotomique
             val blockIdx = findBlockIndex(textBlocks, startOffset)

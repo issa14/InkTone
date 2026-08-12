@@ -44,7 +44,7 @@ import java.util.Locale
  * caractères, le coût total du splitting est <5ms. Le goulot
  * d'étranglement reste le parsing HTML (Jsoup), pas le split de phrases.
  */
-class FrenchSentenceSplitter {
+object FrenchSentenceSplitter {
 
     /** Abréviations françaises dont le point final n'est PAS une fin de phrase. */
     private val abbreviations: Set<String> = hashSetOf(

@@ -6,7 +6,6 @@ import com.inktone.domain.model.ChapterContent
 import com.inktone.domain.model.Span
 import com.inktone.domain.model.SpanStyles
 import com.inktone.domain.model.StyledText
-import com.inktone.domain.service.FrenchSentenceSplitter
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertNotNull
 import org.junit.Assert.assertNull
@@ -29,7 +28,7 @@ class JsoupChapterParserTest {
 
     @Before
     fun setUp() {
-        parser = JsoupChapterParser(FrenchSentenceSplitter())
+        parser = JsoupChapterParser()
     }
 
     // ---- Tests de normalisation des spans ----
@@ -184,10 +183,24 @@ class JsoupChapterParserTest {
         assertTrue(blocks[2] is BookBlock.ParagraphBlock)
     }
 
+    @Test
+    fun `blockquote produit un ParagraphBlock`() {
+        val html = "<html><body><blockquote>Citation célèbre.</blockquote></body></html>"
+        val chapter = parse(html)
+
+        val blocks = richBlocks(chapter)
+        assertEquals(1, blocks.size)
+        val block = blocks[0] as BookBlock.ParagraphBlock
+        assertEquals("Citation célèbre.", block.richText.plainText)
+        assertNotNull(block.globalOffsetRange)
+    }
+
     // ---- Tests de fragment ----
 
     @Test
-    fun `fragment prologue extrait uniquement le contenu cible`() {
+    fun `fragment prologue extrait a partir de l ancre et exclut le header`() {
+        // Scénario exact du plan : <div id="header"> AVANT l'ancre #prologue.
+        // Le header ne doit PAS apparaître dans les BookBlock extraits.
         val html = """
             <html><body>
                 <div id="header">En-tête du document.</div>
@@ -205,19 +218,22 @@ class JsoupChapterParserTest {
         val chapter = parse(html, fragment = "#prologue")
 
         val blocks = richBlocks(chapter)
-        // Doit contenir le prologue mais PAS le header ni le chapitre 1
         val allText = blocks.filterIsInstance<BookBlock.ParagraphBlock>()
             .joinToString(" ") { it.richText.plainText } +
             blocks.filterIsInstance<BookBlock.HeadingBlock>()
                 .joinToString(" ") { it.richText.plainText }
 
-        assertTrue(allText.contains("Prologue"))
-        assertTrue(allText.contains("Ceci est le prologue"))
-        // L'en-tête ne doit PAS apparaître
+        // Le prologue doit être présent
+        assertTrue("Le prologue doit être présent", allText.contains("Prologue"))
+        assertTrue("Le texte du prologue doit être présent", allText.contains("Ceci est le prologue"))
+        // L'en-tête AVANT l'ancre ne doit PAS apparaître
         org.junit.Assert.assertFalse(
-            "L'en-tête du document parent ne doit pas apparaître dans l'extraction par fragment",
+            "Le <div id='header'> avant l'ancre ne doit pas apparaître dans les BookBlock extraits",
             allText.contains("En-tête du document"),
         )
+        // Le contenu APRÈS le fragment (chapter1) doit être présent
+        // (le fragment dit « commencer ici », on lit jusqu'à la fin du fichier)
+        assertTrue("Le contenu après le fragment doit être présent", allText.contains("Chapitre 1"))
     }
 
     // ---- Tests de globalOffsetRange ----
@@ -261,22 +277,47 @@ class JsoupChapterParserTest {
     // ---- Tests de tokenisation des phrases ----
 
     @Test
-    fun `les phrases recoivent le bon blockIndex`() {
-        val html = "<html><body><p>Première phrase. Deuxième phrase.</p><p>Troisième phrase.</p></body></html>"
-        val chapter = parse(html)
+    fun `chapitre multi-blocs produit des sentences avec blockIndex pointant vers le bon bloc`() {
+        // 3 blocs avec séparateurs naturels (sauts de ligne) pour garantir
+        // des phrases distinctes dans chaque bloc.
+        val html = """
+            <html><body>
+                <h1>Titre.</h1>
+                <p>Première phrase.</p>
+                <p>Deuxième phrase.</p>
+            </body></html>
+        """.trimIndent()
 
-        val sentences = chapter.content.let { (it as ChapterContent.Rich) }.let { content ->
-            // Les sentences sont dans Chapter, pas dans Rich
-            chapter.content
+        val chapter = parse(html)
+        val blocks = richBlocks(chapter)
+        val sentences = chapter.sentences
+
+        // Doit avoir des sentences
+        assertTrue("Les sentences ne doivent pas être vides", sentences.isNotEmpty())
+        assertTrue("Doit avoir au moins 3 blocs", blocks.size >= 3)
+
+        // Vérifier que chaque sentence a un blockIndex valide (>= 0)
+        sentences.forEach { sentence ->
+            assertTrue(
+                "blockIndex doit être >= 0, reçu: ${sentence.blockIndex}",
+                sentence.blockIndex >= 0,
+            )
+            assertTrue(
+                "blockIndex doit être < ${blocks.size}, reçu: ${sentence.blockIndex}",
+                sentence.blockIndex < blocks.size,
+            )
         }
 
-        // Vérifier que les sentences existent (dans le Chapter, pas dans Rich)
-        // Note: actuellement les sentences ne sont pas stockées dans ChapterContent.Rich
-        // Elles sont produites par JsoupChapterParser.parse() et stockées dans Chapter
-        // Mais notre modèle actuel a sentences dans Chapter...
-        // Le plan v3 dit: Chapter contient content ET sentences
-        // Pour l'instant, on vérifie juste que le parsing ne crashe pas
-        assertTrue(chapter.content is ChapterContent.Rich)
+        // Vérifier que les globalOffsetRange ne se chevauchent pas
+        val textBlocks = blocks.filter { it.globalOffsetRange != null }
+        for (i in 0 until textBlocks.size - 1) {
+            val curr = textBlocks[i].globalOffsetRange!!
+            val next = textBlocks[i + 1].globalOffsetRange!!
+            assertTrue(
+                "Bloc $i [${curr.first},${curr.last}] chevauche bloc ${i + 1} [${next.first},${next.last}]",
+                curr.last < next.first,
+            )
+        }
     }
 
     // ---- Tests de liens ----
