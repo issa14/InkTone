@@ -84,7 +84,7 @@ class JsoupChapterParser {
         val document = Jsoup.parse(inputStream, "UTF-8", baseUrl)
         val body = document.body()
 
-        val blocks = extractBlocks(body, fragment)
+        val blocks = extractBlocks(body, fragment, chapterHref)
         val sentences = tokenizeSentences(blocks)
 
         return Chapter(
@@ -103,7 +103,7 @@ class JsoupChapterParser {
      * @param fragment Fragment optionnel : si présent, seuls les nœuds à
      *   partir de l'élément ciblé sont extraits.
      */
-    private fun extractBlocks(body: Element, fragment: String?): List<BookBlock> {
+    private fun extractBlocks(body: Element, fragment: String?, chapterHref: String): List<BookBlock> {
         val blocks = mutableListOf<BookBlock>()
         var runningOffset = 0
 
@@ -132,16 +132,47 @@ class JsoupChapterParser {
         }
 
         for (child in childrenToProcess) {
-            val extracted = extractBlockFromNode(child, runningOffset)
+            val extracted = extractBlockFromNode(child, runningOffset, chapterHref)
             if (extracted != null) {
                 blocks.add(extracted)
                 if (extracted is BookBlock.ParagraphBlock || extracted is BookBlock.HeadingBlock) {
-                    runningOffset = extracted.globalOffsetRange!!.last + 1
+                    // +1 pour la fin exclusive de la plage, +BLOCK_SEPARATOR.length
+                    // pour réserver le caractère séparateur inséré entre blocs
+                    // par tokenizeSentences — sans ce décalage, le texte de deux
+                    // paragraphes consécutifs seraient fusionnés sans espace.
+                    runningOffset = extracted.globalOffsetRange!!.last + 1 + BLOCK_SEPARATOR.length
                 }
             }
         }
 
         return blocks
+    }
+
+    /**
+     * Résout un href relatif (attribut `src`/`href` d'un élément du
+     * chapitre) contre le href du chapitre lui-même, pour obtenir un href
+     * relatif à la racine de la publication — le référentiel utilisé par
+     * `Publication.readingOrder`/`resources` (K6, CLAUDE.md).
+     *
+     * Résolution par segments de chemin (pas d'URI absolue : les hrefs
+     * EPUB sont toujours des chemins relatifs POSIX, jamais un schéma
+     * `http://`/`file://`). Le percent-encoding est normalisé plus tard,
+     * à la résolution effective de la ressource (`resourceWithHref`).
+     */
+    private fun resolveHref(chapterHref: String, relativeHref: String): String {
+        if (relativeHref.contains("://") || relativeHref.startsWith("data:")) return relativeHref
+        val baseDir = chapterHref.substringBeforeLast('/', "")
+        val combined = if (baseDir.isEmpty()) relativeHref else "$baseDir/$relativeHref"
+
+        val resolved = mutableListOf<String>()
+        for (segment in combined.split('/')) {
+            when (segment) {
+                "", "." -> {}
+                ".." -> if (resolved.isNotEmpty()) resolved.removeAt(resolved.size - 1)
+                else -> resolved.add(segment)
+            }
+        }
+        return resolved.joinToString("/")
     }
 
     /**
@@ -164,9 +195,9 @@ class JsoupChapterParser {
      * @return Le bloc extrait, ou null si le nœud ne produit pas de bloc
      *   (commentaire, script, etc.).
      */
-    private fun extractBlockFromNode(node: Node, runningOffset: Int): BookBlock? {
+    private fun extractBlockFromNode(node: Node, runningOffset: Int, chapterHref: String): BookBlock? {
         return when {
-            node is Element -> extractBlockFromElement(node, runningOffset)
+            node is Element -> extractBlockFromElement(node, runningOffset, chapterHref)
             node is TextNode -> {
                 val text = node.wholeText.trim()
                 if (text.isBlank()) return null
@@ -184,7 +215,7 @@ class JsoupChapterParser {
     /**
      * Extrait un [BookBlock] depuis un élément DOM.
      */
-    private fun extractBlockFromElement(element: Element, runningOffset: Int): BookBlock? {
+    private fun extractBlockFromElement(element: Element, runningOffset: Int, chapterHref: String): BookBlock? {
         val tagName = element.normalName()
 
         return when (tagName) {
@@ -200,21 +231,36 @@ class JsoupChapterParser {
             }
             "p", "div", "blockquote", "section", "article", "li", "td", "th" -> {
                 val richText = extractRichText(element)
-                if (richText.plainText.isBlank()) return null
+                if (richText.plainText.isBlank()) {
+                    // Bug réel trouvé sur appareil : les pages de couverture
+                    // générées par Calibre/Sigil (motif standard EPUB3)
+                    // encodent l'image dans un <svg><image xlink:href="…"/>
+                    // sans aucun texte — le bloc entier était silencieusement
+                    // abandonné faute de texte, sans jamais produire
+                    // d'ImageBlock. Repli sur ce motif avant d'abandonner.
+                    return extractSvgImageBlock(element, chapterHref)
+                }
                 BookBlock.ParagraphBlock(
                     richText = richText,
                     globalOffsetRange = runningOffset until (runningOffset + richText.plainText.length),
+                    isBlockquote = tagName == "blockquote",
                 )
             }
             "img" -> {
                 val src = element.attr("src").ifBlank { null } ?: return null
                 BookBlock.ImageBlock(
-                    href = src,
+                    // K6, CLAUDE.md : `src` est relatif au chapitre (ex.
+                    // "../Images/x.jpg"), pas à la racine de la publication
+                    // — résolu ici pour matcher les hrefs de
+                    // Publication.resourceWithHref (ReadiumResourceResolver),
+                    // qui sont eux relatifs à la racine.
+                    href = resolveHref(chapterHref, src),
                     alt = element.attr("alt").takeIf { it.isNotBlank() },
                     intrinsicWidth = element.attr("width").toIntOrNull(),
                     intrinsicHeight = element.attr("height").toIntOrNull(),
                 )
             }
+            "svg" -> extractSvgImageBlock(element, chapterHref)
             "hr" -> BookBlock.SeparatorBlock
             // Éléments ignorés : on extrait le texte des enfants comme
             // paragraphes (ex: <pre>, <code>, <figcaption>, etc.)
@@ -223,13 +269,39 @@ class JsoupChapterParser {
                 if (element.ownText().isBlank() && element.children().isEmpty()) return null
                 // Tenter d'extraire comme paragraphe
                 val richText = extractRichText(element)
-                if (richText.plainText.isBlank()) return null
+                if (richText.plainText.isBlank()) {
+                    return extractSvgImageBlock(element, chapterHref)
+                }
                 BookBlock.ParagraphBlock(
                     richText = richText,
                     globalOffsetRange = runningOffset until (runningOffset + richText.plainText.length),
                 )
             }
         }
+    }
+
+    /**
+     * Extrait un [BookBlock.ImageBlock] depuis un `<svg><image xlink:href="…"/></svg>`
+     * — motif standard EPUB3 pour les pages de couverture/illustrations
+     * pleine page (généré par Calibre, Sigil, etc.), utilisé à la place
+     * d'un simple `<img>` pour préserver le ratio d'aspect via `viewBox`.
+     * Jsoup (parseur HTML, pas XML) traite `xlink:href` comme un nom
+     * d'attribut littéral — pas de résolution d'espace de noms nécessaire.
+     *
+     * @return null si [container] (ou lui-même s'il est déjà un `<svg>`)
+     *   ne contient aucun `<image>` avec un href exploitable.
+     */
+    private fun extractSvgImageBlock(container: Element, chapterHref: String): BookBlock.ImageBlock? {
+        val svg = if (container.normalName() == "svg") container else container.selectFirst("svg")
+        val imageEl = svg?.selectFirst("image") ?: return null
+        val src = imageEl.attr("xlink:href").ifBlank { imageEl.attr("href") }.ifBlank { null } ?: return null
+        return BookBlock.ImageBlock(
+            href = resolveHref(chapterHref, src),
+            alt = imageEl.attr("aria-label").takeIf { it.isNotBlank() }
+                ?: svg.attr("aria-label").takeIf { it.isNotBlank() },
+            intrinsicWidth = imageEl.attr("width").toIntOrNull() ?: svg.attr("width").toIntOrNull(),
+            intrinsicHeight = imageEl.attr("height").toIntOrNull() ?: svg.attr("height").toIntOrNull(),
+        )
     }
 
     /**
@@ -412,18 +484,26 @@ class JsoupChapterParser {
     /**
      * Tokenise les phrases à partir des blocs extraits.
      *
-     * Concatène le [StyledText.plainText] de tous les blocs de texte,
-     * applique le [FrenchSentenceSplitter], puis assigne à chaque
-     * [Sentence] son [Sentence.blockIndex] par recherche dichotomique
-     * sur les [BookBlock.globalOffsetRange].
+     * Concatène le [StyledText.plainText] de tous les blocs de texte (séparés
+     * par [BLOCK_SEPARATOR], comme [extractBlocks] réserve l'espace
+     * correspondant dans les `globalOffsetRange`), applique le
+     * [FrenchSentenceSplitter], puis assigne à chaque [Sentence] son
+     * [Sentence.blockIndex] par recherche dichotomique sur les
+     * [BookBlock.globalOffsetRange].
+     *
+     * [Sentence.blockIndex] doit être l'index du bloc dans la liste
+     * COMPLÈTE [blocks] (celle que `ReaderScreen` affiche telle quelle dans
+     * son `LazyColumn`, images/séparateurs compris) — jamais l'index dans
+     * la sous-liste filtrée des blocs de texte, qui ne correspond à rien
+     * côté rendu dès qu'un chapitre contient une image ou un `<hr>`.
      */
     private fun tokenizeSentences(blocks: List<BookBlock>): List<Sentence> {
-        // Concaténer le texte de tous les blocs de texte
-        val textBlocks = blocks.filter { it.globalOffsetRange != null }
+        val textBlocks = blocks.withIndex().filter { it.value.globalOffsetRange != null }
         if (textBlocks.isEmpty()) return emptyList()
 
         val fullText = buildString {
-            for (block in textBlocks) {
+            textBlocks.forEachIndexed { position, (_, block) ->
+                if (position > 0) append(BLOCK_SEPARATOR)
                 when (block) {
                     is BookBlock.ParagraphBlock -> append(block.richText.plainText)
                     is BookBlock.HeadingBlock -> append(block.richText.plainText)
@@ -452,22 +532,26 @@ class JsoupChapterParser {
      * Trouve l'index du bloc contenant [charOffset] par recherche
      * dichotomique sur les [BookBlock.globalOffsetRange].
      *
-     * @return L'index du bloc dans [textBlocks], ou -1 si non trouvé.
+     * @return L'index ORIGINAL du bloc dans la liste complète des blocs du
+     *   chapitre (pas dans [textBlocks]), ou -1 si non trouvé.
      */
-    private fun findBlockIndex(textBlocks: List<BookBlock>, charOffset: Int): Int {
+    private fun findBlockIndex(textBlocks: List<IndexedValue<BookBlock>>, charOffset: Int): Int {
         var low = 0
         var high = textBlocks.size - 1
         while (low <= high) {
             val mid = (low + high) / 2
-            val range = textBlocks[mid].globalOffsetRange
-            if (range == null) {
-                low = mid + 1
-            } else when {
+            val range = textBlocks[mid].value.globalOffsetRange!! // filtré en amont : jamais null ici
+            when {
                 charOffset < range.first -> high = mid - 1
                 charOffset > range.last -> low = mid + 1
-                else -> return mid // charOffset est dans ce bloc
+                else -> return textBlocks[mid].index // charOffset est dans ce bloc
             }
         }
         return -1
+    }
+
+    private companion object {
+        /** Séparateur inséré entre deux blocs de texte consécutifs (offsets ET tokenisation). */
+        const val BLOCK_SEPARATOR = "\n"
     }
 }

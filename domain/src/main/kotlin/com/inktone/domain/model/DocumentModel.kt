@@ -39,9 +39,10 @@ data class Chapter(
  * conserve les offsets").
  *
  * @property blockIndex Index du [BookBlock] parent dans
- *   [ChapterContent.Rich.blocks] quand le contenu est [ChapterContent.Rich].
- *   Vaut -1 pour [ChapterContent.Legacy] (PDF/TXT) où il n'y a pas de
- *   [BookBlock]. Utilisé pour le pont TTS↔UI (recherche dichotomique O(log n)).
+ *   [ChapterContent.Rich.blocks] (PDF/TXT : toujours `0`, le chapitre/page
+ *   ne contient qu'un unique [BookBlock.ParagraphBlock]). `-1` uniquement
+ *   quand aucun bloc ne contient cette phrase. Utilisé pour le pont TTS↔UI
+ *   (recherche dichotomique O(log n)).
  */
 data class Sentence(
     val index: Int,

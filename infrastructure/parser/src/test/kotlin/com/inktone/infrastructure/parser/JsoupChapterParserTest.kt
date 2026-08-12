@@ -172,6 +172,45 @@ class JsoupChapterParserTest {
     }
 
     @Test
+    fun `svg image xlink href produit ImageBlock (couverture Calibre Sigil)`() {
+        // Bug réel trouvé sur appareil : motif standard EPUB3 pour les
+        // pages de couverture, entièrement ignoré avant ce correctif (le
+        // <div> sans texte était abandonné, aucun ImageBlock produit).
+        val html = """
+            <html><body>
+                <div>
+                    <svg xmlns="http://www.w3.org/2000/svg" xmlns:xlink="http://www.w3.org/1999/xlink" viewBox="0 0 479 706">
+                        <image width="479" height="706" xlink:href="cover.jpeg"/>
+                    </svg>
+                </div>
+            </body></html>
+        """.trimIndent()
+        val chapter = parse(html)
+
+        val blocks = richBlocks(chapter)
+        assertEquals(1, blocks.size)
+        val img = blocks[0] as BookBlock.ImageBlock
+        assertEquals("cover.jpeg", img.href)
+        assertEquals(479, img.intrinsicWidth)
+        assertEquals(706, img.intrinsicHeight)
+    }
+
+    @Test
+    fun `svg direct enfant du body produit aussi ImageBlock`() {
+        val html = """
+            <html><body>
+                <svg xmlns="http://www.w3.org/2000/svg" xmlns:xlink="http://www.w3.org/1999/xlink">
+                    <image xlink:href="illustration.png"/>
+                </svg>
+            </body></html>
+        """.trimIndent()
+        val chapter = parse(html)
+
+        val img = richBlocks(chapter)[0] as BookBlock.ImageBlock
+        assertEquals("illustration.png", img.href)
+    }
+
+    @Test
     fun `hr produit un SeparatorBlock`() {
         val html = "<html><body><p>Avant.</p><hr/><p>Après.</p></body></html>"
         val chapter = parse(html)
@@ -239,7 +278,7 @@ class JsoupChapterParserTest {
     // ---- Tests de globalOffsetRange ----
 
     @Test
-    fun `les globalOffsetRange sont contigus entre blocs`() {
+    fun `les globalOffsetRange sont separes d'un caractere entre blocs`() {
         val html = "<html><body><h1>Titre</h1><p>Premier paragraphe.</p><p>Second paragraphe.</p></body></html>"
         val chapter = parse(html)
 
@@ -249,14 +288,16 @@ class JsoupChapterParserTest {
         // Premier bloc commence à 0
         assertEquals(0, blocks[0].globalOffsetRange!!.first)
 
-        // Les blocs suivants doivent être contigus : le début du bloc N
-        // doit suivre immédiatement la fin du bloc N-1
+        // Les blocs suivants doivent réserver exactement 1 caractère entre
+        // la fin du bloc N-1 et le début du bloc N (le séparateur inséré
+        // par tokenizeSentences — sans ce décalage, deux paragraphes
+        // consécutifs fusionneraient sans espace dans le texte concaténé).
         for (i in 1 until blocks.size) {
             val prevRange = blocks[i - 1].globalOffsetRange!!
             val currRange = blocks[i].globalOffsetRange!!
             assertEquals(
-                "L'offset de début du bloc $i doit suivre immédiatement la fin du bloc ${i - 1}",
-                prevRange.last + 1,
+                "L'offset de début du bloc $i doit laisser 1 caractère de séparateur après la fin du bloc ${i - 1}",
+                prevRange.last + 2,
                 currRange.first,
             )
         }

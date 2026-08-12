@@ -62,8 +62,9 @@ object BookBlockStyleMapper {
      * @param baseStyle Le style de base (taille de police, police, couleur
      *   du thème de lecture).
      */
-    fun textStyleFor(block: BookBlock, baseStyle: TextStyle): TextStyle = when (block) {
-        is BookBlock.HeadingBlock -> headingStyle(block.level, baseStyle)
+    fun textStyleFor(block: BookBlock, baseStyle: TextStyle): TextStyle = when {
+        block is BookBlock.HeadingBlock -> headingStyle(block.level, baseStyle)
+        block is BookBlock.ParagraphBlock && block.isBlockquote -> baseStyle.copy(fontStyle = FontStyle.Italic)
         else -> baseStyle
     }
 

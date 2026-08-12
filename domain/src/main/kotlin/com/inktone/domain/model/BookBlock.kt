@@ -32,10 +32,14 @@ sealed class BookBlock {
      * @param richText Texte enrichi du paragraphe.
      * @param globalOffsetRange Offsets [début, fin[ dans le texte concaténé
      *   du chapitre. Jamais null pour un bloc de texte.
+     * @param isBlockquote `true` pour un `<blockquote>` — seule distinction
+     *   sémantique de bloc conservée face à un `<p>`/`<div>` ordinaire
+     *   (mise en italique par [com.inktone.feature.reader.rendering.BookBlockStyleMapper]).
      */
     data class ParagraphBlock(
         val richText: StyledText,
         override val globalOffsetRange: IntRange,
+        val isBlockquote: Boolean = false,
     ) : BookBlock() {
         override val approxByteSize: Int
             get() = richText.approxByteSize + 16
