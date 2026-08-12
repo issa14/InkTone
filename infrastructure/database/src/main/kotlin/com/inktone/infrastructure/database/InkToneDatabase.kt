@@ -39,7 +39,7 @@ import com.inktone.infrastructure.database.entity.VoiceProfileEntity
         ImportResultEntity::class, CustomThemeEntity::class, PendingConflictEntity::class,
     ],
     views = [LibraryItemView::class],
-    version = 24, // Lot 11, tâche 11.10 : file de conflits de position (MIGRATION_23_24)
+    version = 25, // Lot 12, tâche 12.5 : pageCount sur publications (MIGRATION_24_25)
     exportSchema = true, // condition du harnais de migration — Tâche 2.4
 )
 @TypeConverters(StringListConverter::class)

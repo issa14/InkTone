@@ -887,6 +887,34 @@ class DatabaseMigrationTest {
         v24.close()
     }
 
+    @Test
+    fun migration_24_vers_25_conserve_les_donnees_et_ajoute_pageCount() {
+        val v24 = helper.createDatabase(TEST_DB_NAME, 24)
+        v24.execSQL(
+            """
+            INSERT INTO publications (id, title, subtitle, authors, publisher, language, description, coverUri, format, fileUri, fileHash, fileSize, chapterCount, seriesName, seriesIndex, isFavorite, isPinned, subjects, isDrmProtected, importDate, lastOpened)
+            VALUES ('pub-1', 'Les Miserables', NULL, '', NULL, 'fr', NULL, NULL, 'EPUB', 'content://pub-1', 'hash1', 1000, 20, NULL, NULL, 0, 0, '', 0, 500, NULL)
+            """.trimIndent(),
+        )
+        v24.close()
+
+        val v25 = helper.runMigrationsAndValidate(
+            TEST_DB_NAME, 25, true,
+            MIGRATION_1_2, MIGRATION_2_3, MIGRATION_3_4, MIGRATION_4_5, MIGRATION_5_6, MIGRATION_6_7,
+            MIGRATION_7_8, MIGRATION_8_9, MIGRATION_9_10, MIGRATION_10_11, MIGRATION_11_12, MIGRATION_12_13,
+            MIGRATION_13_14, MIGRATION_14_15, MIGRATION_15_16, MIGRATION_16_17, MIGRATION_17_18, MIGRATION_18_19,
+            MIGRATION_19_20, MIGRATION_20_21, MIGRATION_21_22, MIGRATION_22_23, MIGRATION_23_24, MIGRATION_24_25,
+        )
+
+        v25.query("SELECT title, chapterCount, pageCount FROM publications WHERE id = 'pub-1'").use { cursor ->
+            assertEquals(true, cursor.moveToFirst())
+            assertEquals("Les Miserables", cursor.getString(0)) // aucune perte de donnees
+            assertEquals(20, cursor.getInt(1))
+            assertEquals(true, cursor.isNull(2)) // pageCount absent avant, NULL apres
+        }
+        v25.close()
+    }
+
     companion object {
         private const val TEST_DB_NAME = "migration-test"
     }

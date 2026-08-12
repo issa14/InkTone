@@ -1,6 +1,6 @@
 # ADR-017 : Périmètre PDF différé et borné
 
-**Status :** Accepted
+**Status :** Accepted — premier volet livré (affichage seul, Lot 12, 2026-08-12)
 **Date :** 2026-07-26
 
 ## Context
@@ -17,6 +17,22 @@ La v1 se limite à EPUB et TXT, complets. Le PDF est repoussé en v1.x,
 d'abord en **affichage seul** ; le support TTS sur PDF est conditionné à
 la validation préalable d'une extraction fiable de l'ordre de lecture.
 
+**Volet 1 — Affichage seul ✅ (Lot 12, 2026-08-12) :** import PDF,
+rendu paginé via PDFium (`io.legere:pdfiumandroid:1.0.20`, BSD-3-Clause),
+couverture, navigation page à page, signets, reprise de lecture,
+thèmes sombre/sépia sur pages vectorielles. Le pipeline de parsing/rendu
+est unifié dans le `DocumentModel` existant (page = chapitre), sans
+second système d'adressage. Fonctionnalités non applicables (TTS,
+minuteur de sommeil, bascule SCROLL/PAGED, sélection libre) explicitement
+désactivées pour le format PDF.
+
+**Volet 2 — TTS sur PDF (conditionné) :** extraction de `BoundingBox`
+par mot via l'API texte de PDFium, surlignage synchronisé, désactivation
+du bouton TTS si la page est une image pure sans texte. Les Paliers 1 et 2
+posent déjà la structure nécessaire (`Locator`, `DocumentModel` par page,
+`FixedPageRenderer`) — ce lot futur active des fonctionnalités déjà
+câblées, il ne rouvre pas le modèle de données.
+
 ## Rationale
 
 Mieux vaut exceller sur un périmètre maîtrisé que de moyenner la qualité
@@ -25,7 +41,10 @@ sur deux formats simultanément.
 ## Consequences
 
 Nécessite une communication produit claire sur le périmètre exact de la
-v1 : EPUB et TXT complets, PDF absent jusqu'à v1.x.
+v1 : EPUB et TXT complets, PDF absent jusqu'à v1.x. Le volet « affichage
+seul » étant livré, le PDF est désormais atteignable par l'utilisateur
+(import, bibliothèque, lecture visuelle) — seul le TTS sur PDF reste
+conditionné.
 
 ## Alternatives Considered
 
