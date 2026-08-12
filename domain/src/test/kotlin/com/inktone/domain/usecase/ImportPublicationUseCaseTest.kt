@@ -1,5 +1,6 @@
 package com.inktone.domain.usecase
 
+import com.inktone.core.testing.fake.FakeChapterParser
 import com.inktone.core.testing.fake.FakeFileStorageService
 import com.inktone.core.testing.fake.FakePublicationParser
 import com.inktone.core.testing.fake.FakePublicationRepository
@@ -21,6 +22,7 @@ class ImportPublicationUseCaseTest {
             publicationRepository = publicationRepository,
             fileStorageService = FakeFileStorageService(),
             searchService = FakeSearchService(),
+            chapterParser = FakeChapterParser(),
         )
         val fixtureUri = "content://fake/fixture-minimal.epub"
 
@@ -49,6 +51,7 @@ class ImportPublicationUseCaseTest {
             publicationRepository = publicationRepository,
             fileStorageService = FakeFileStorageService(),
             searchService = FakeSearchService(),
+            chapterParser = FakeChapterParser(),
         )
         val fixtureUri = "content://fake/fixture-minimal.epub"
 

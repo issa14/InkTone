@@ -13,6 +13,7 @@ import com.inktone.domain.repository.SyncAccountRepository
 import com.inktone.domain.service.SyncNowService
 import com.inktone.domain.repository.ThemeRepository
 import com.inktone.domain.repository.VoiceProfileRepository
+import com.inktone.domain.service.ChapterParser
 import com.inktone.domain.service.FileStorageService
 import com.inktone.domain.service.ImportSessionStore
 import com.inktone.domain.service.PublicationParser
@@ -113,8 +114,9 @@ object UseCaseModule {
         publicationRepository: PublicationRepository,
         fileStorageService: FileStorageService,
         searchService: SearchService,
+        chapterParser: ChapterParser,
     ): ImportPublicationUseCase =
-        ImportPublicationUseCase(publicationParser, publicationRepository, fileStorageService, searchService)
+        ImportPublicationUseCase(publicationParser, publicationRepository, fileStorageService, searchService, chapterParser)
 
     @Provides
     fun provideExportLibraryUseCase(
