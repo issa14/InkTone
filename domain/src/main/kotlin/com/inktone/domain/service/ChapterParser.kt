@@ -27,6 +27,12 @@ import com.inktone.domain.model.Chapter
 interface ChapterParser {
 
     /**
+     * Enregistre le mapping [publicationId] → [fileUri].
+     * Doit être appelé après l'import, avant [parseChapter].
+     */
+    fun registerPublication(publicationId: String, fileUri: String)
+
+    /**
      * Parse un chapitre et retourne son contenu.
      *
      * @param publicationId Identifiant unique de la publication (utilisé

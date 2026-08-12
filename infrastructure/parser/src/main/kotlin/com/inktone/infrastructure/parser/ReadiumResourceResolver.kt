@@ -67,7 +67,7 @@ class ReadiumResourceResolver @Inject constructor(
      * Doit être appelé avant [openStream]. Idempotent : si la même
      * publication est déjà ouverte, ne fait rien.
      */
-    suspend fun open(fileUri: String) {
+    override suspend fun open(fileUri: String) {
         if (publication != null && publicationFileUri == fileUri) return
 
         // Fermer l'ancienne si différente

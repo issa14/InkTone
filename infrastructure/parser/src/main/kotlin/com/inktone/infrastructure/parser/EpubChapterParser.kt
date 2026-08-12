@@ -131,7 +131,7 @@ class EpubChapterParser @Inject constructor(
      * Doit être appelé après l'import, avant tout [parseChapter] pour
      * cette publication. Idempotent : un appel ultérieur écrase l'ancien.
      */
-    fun registerPublication(publicationId: String, fileUri: String) {
+    override fun registerPublication(publicationId: String, fileUri: String) {
         publicationFiles[publicationId] = fileUri
     }
 

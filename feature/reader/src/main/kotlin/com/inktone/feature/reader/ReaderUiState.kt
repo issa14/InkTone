@@ -4,6 +4,7 @@ import com.inktone.domain.model.Annotation
 import com.inktone.domain.model.AnnotationColor
 import com.inktone.domain.model.Bookmark
 import com.inktone.domain.model.Chapter
+import com.inktone.domain.model.ChapterContent
 import com.inktone.domain.model.EffectiveReadingSettings
 import com.inktone.domain.model.PublicationFormat
 import com.inktone.domain.model.ReadingOverrides
@@ -11,6 +12,7 @@ import com.inktone.domain.model.ReadingTheme
 import com.inktone.domain.model.SleepTimerState
 import com.inktone.domain.model.TableOfContentsEntry
 import com.inktone.domain.model.VoiceProfile
+import com.inktone.domain.service.EpubResourceResolver
 import com.inktone.domain.valueobject.Locator
 
 /** B.1 — Mode de lecture : défilement vertical ou paginé horizontal. */
@@ -118,6 +120,10 @@ data class ReaderUiState(
     // seul format ouvert avant que ce champ n'existe, aucune valeur
     // initiale ambigue introduite pour l'existant.
     val publicationFormat: PublicationFormat = PublicationFormat.EPUB,
+    // Plan v3, Palier 3.6 — résolveur d'images EPUB, null pour PDF/TXT
+    val epubResourceResolver: EpubResourceResolver? = null,
+    // Plan v3, Palier 3.6 — ID de la publication ouverte (pour EpubImageKey)
+    val publicationId: String = "",
     // Ratio de defilement vertical [0f..1f] au sein de la page PDF
     // courante (decision actee 7 du plan, Palier 1) - seul equivalent de
     // `currentSentenceIndex` pour un format sans notion de phrase.
@@ -129,6 +135,9 @@ data class ReaderUiState(
     val forcePdfInversion: Boolean = false,
 ) {
     val currentChapter: Chapter? get() = chapters.getOrNull(currentChapterIndex)
+    /** Plan v3, Palier 3.6 — type de contenu du chapitre courant (Rich vs Legacy). */
+    val currentChapterContent: ChapterContent?
+        get() = currentChapter?.content
     val hasNextChapter: Boolean get() = currentChapterIndex < chapters.lastIndex
     val hasPreviousChapter: Boolean get() = currentChapterIndex > 0
 
@@ -153,7 +162,7 @@ data class ReaderUiState(
                 return ((currentChapterIndex + pageOffsetY) / chapters.size).coerceIn(0f, 1f)
             }
             val chapter = currentChapter ?: return 0f
-            val sentence = chapter.paragraphs.flatMap { it.sentences }.getOrNull(currentSentenceIndex)
+            val sentence = chapter.sentences.getOrNull(currentSentenceIndex)
             val locator = Locator(
                 resourceHref = chapter.href,
                 chapterIndex = chapter.index,
@@ -190,7 +199,7 @@ data class ReaderUiState(
                 return bookmarks.any { it.locator.chapterIndex == currentChapterIndex }
             }
             val chapter = currentChapter ?: return false
-            val sentence = chapter.paragraphs.flatMap { it.sentences }.getOrNull(currentSentenceIndex) ?: return false
+            val sentence = chapter.sentences.getOrNull(currentSentenceIndex) ?: return false
             return bookmarks.any { bookmark ->
                 bookmark.locator.chapterIndex == chapter.index &&
                     bookmark.locator.charOffset in sentence.startOffset until sentence.endOffset
@@ -216,7 +225,7 @@ const val EYE_REST_REMINDER_COUNTDOWN_S = 60
 data class PendingHighlightTarget(val chapterIndex: Int, val sentenceIndex: Int)
 
 private fun chapterCharCount(chapter: Chapter): Int =
-    chapter.paragraphs.sumOf { paragraph -> paragraph.sentences.sumOf { it.text.length } }
+    chapter.sentences.sumOf { it.text.length }
 
 sealed interface ReaderIntent {
     /**

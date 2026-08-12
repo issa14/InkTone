@@ -608,8 +608,8 @@ fun ReaderScreen(
                                     BookBlockItem(
                                         block = block,
                                         baseTextStyle = textStyle,
-                                        resolver = null, // TODO(3.6): injecter via ReaderViewModel
-                                        publicationId = "",
+                                        resolver = state.epubResourceResolver,
+                                        publicationId = state.publicationId,
                                         modifier = Modifier.fillMaxWidth()
                                     )
                                 }
