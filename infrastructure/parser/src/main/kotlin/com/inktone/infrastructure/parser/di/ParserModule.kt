@@ -1,27 +1,26 @@
 package com.inktone.infrastructure.parser.di
 
+import com.inktone.domain.service.ChapterParser
 import com.inktone.domain.service.FixedPageRenderer
 import com.inktone.domain.service.PublicationParser
 import com.inktone.infrastructure.parser.CompositePublicationParser
+import com.inktone.infrastructure.parser.EpubChapterParser
+import com.inktone.infrastructure.parser.JsoupChapterParser
 import com.inktone.infrastructure.parser.PdfPageRendererImpl
 import dagger.Binds
 import dagger.Module
+import dagger.Provides
 import dagger.hilt.InstallIn
 import dagger.hilt.components.SingletonComponent
 import javax.inject.Singleton
 
 /**
- * Lie le contrat de domaine PublicationParser (Tâche 1.7) à
- * CompositePublicationParser, qui sélectionne le bon parser par format
- * (Readium pour EPUB, TxtPublicationParser pour TXT, PdfPublicationParser
- * pour PDF — Lot 12). Jamais lié directement à ReadiumPublicationParser,
- * contrairement à ce que la Phase 3 faisait implicitement (un seul
- * format alors supporté).
+ * Lie les contrats de domaine aux implémentations dans infrastructure/parser.
  *
- * FixedPageRenderer (Lot 12, tâche 12.7, Palier 2) : contrat de rendu
- * bitmap distinct du parsing (décision actée 14 du plan) — même module
- * d'implémentation (PDFium déjà présent ici), pas de nouveau module
- * `infrastructure/`.
+ * - [PublicationParser] → [CompositePublicationParser] (EPUB/TXT/PDF)
+ * - [ChapterParser] → [EpubChapterParser] (parsing paresseux EPUB)
+ * - [JsoupChapterParser] fourni comme singleton (utilisé par EpubChapterParser)
+ * - [FixedPageRenderer] → [PdfPageRendererImpl] (rendu bitmap PDF)
  */
 @Module
 @InstallIn(SingletonComponent::class)
@@ -32,5 +31,15 @@ abstract class ParserModule {
 
     @Binds
     @Singleton
+    abstract fun bindChapterParser(impl: EpubChapterParser): ChapterParser
+
+    @Binds
+    @Singleton
     abstract fun bindFixedPageRenderer(impl: PdfPageRendererImpl): FixedPageRenderer
+
+    companion object {
+        @Provides
+        @Singleton
+        fun provideJsoupChapterParser(): JsoupChapterParser = JsoupChapterParser()
+    }
 }

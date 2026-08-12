@@ -1,6 +1,7 @@
 package com.inktone.infrastructure.database.search
 
 import com.inktone.domain.model.DocumentModel
+import com.inktone.domain.model.Sentence
 import com.inktone.domain.service.SearchResult
 import com.inktone.domain.service.SearchService
 import com.inktone.domain.valueobject.Locator
@@ -40,6 +41,7 @@ class RoomSearchService @Inject constructor(
 
     override suspend fun indexPublication(publicationId: String, documentModel: DocumentModel) {
         val entities = documentModel.chapters.flatMap { chapter ->
+            @Suppress("DEPRECATION")
             chapter.paragraphs.flatMap { it.sentences }.map { sentence ->
                 SentenceFtsEntity(
                     publicationId = publicationId,
@@ -49,6 +51,24 @@ class RoomSearchService @Inject constructor(
                     text = sentence.text,
                 )
             }
+        }
+        if (entities.isNotEmpty()) sentenceFtsDao.insertAll(entities)
+    }
+
+    override suspend fun indexSentences(
+        publicationId: String,
+        chapterIndex: Int,
+        resourceHref: String,
+        sentences: List<Sentence>,
+    ) {
+        val entities = sentences.map { sentence ->
+            SentenceFtsEntity(
+                publicationId = publicationId,
+                chapterIndex = chapterIndex,
+                resourceHref = resourceHref,
+                charOffset = sentence.startOffset,
+                text = sentence.text,
+            )
         }
         if (entities.isNotEmpty()) sentenceFtsDao.insertAll(entities)
     }

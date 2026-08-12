@@ -3,7 +3,11 @@ package com.inktone.infrastructure.parser
 import android.content.Context
 import android.graphics.Bitmap
 import android.net.Uri
+import com.inktone.domain.model.Chapter
+import com.inktone.domain.model.ChapterContent
+import com.inktone.domain.model.DocumentModel
 import com.inktone.domain.model.PublicationFormat
+import com.inktone.domain.model.TableOfContentsEntry
 import com.inktone.domain.service.ParseResult
 import com.inktone.domain.service.PublicationMetadata
 import com.inktone.domain.service.PublicationParser
@@ -12,6 +16,7 @@ import dagger.hilt.android.qualifiers.ApplicationContext
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
 import org.readium.r2.shared.ExperimentalReadiumApi
+import org.readium.r2.shared.publication.Link
 import org.readium.r2.shared.publication.services.content.DefaultContentService
 import org.readium.r2.shared.publication.services.content.contentServiceFactory
 import org.readium.r2.shared.publication.services.content.iterators.HtmlResourceContentIterator
@@ -119,6 +124,60 @@ class ReadiumPublicationParser @Inject constructor(
     }
 
     /**
+     * Ouvre un EPUB et extrait UNIQUEMENT les métadonnées, la TOC et les
+     * coquilles de chapitres (sans contenu). Les chapitres retournés ont
+     * un [ChapterContent.Rich] avec `blocks` vide — le contenu réel sera
+     * chargé à la demande via [EpubChapterParser.parseChapter].
+     *
+     * L'ancien [parse] continue de fonctionner (backward compat) — il
+     * utilise encore [DocumentModelExtractor] pour un parsing complet.
+     */
+    suspend fun parseLazy(fileUri: String): ParseResult = withContext(Dispatchers.IO) {
+        val url = if (fileUri.contains("://")) {
+            Uri.parse(fileUri).toAbsoluteUrl()
+                ?: return@withContext ParseResult.Corrupted("URI non absolue: $fileUri")
+        } else {
+            File(fileUri).toUrl()
+        }
+
+        val asset = assetRetriever.retrieve(url).getOrElse {
+            return@withContext ParseResult.Corrupted("Echec de lecture de l'asset: $it")
+        }
+
+        val publication = publicationOpener.open(asset, allowUserInteraction = false).getOrElse {
+            return@withContext ParseResult.Corrupted("Echec d'ouverture de la publication: $it")
+        }
+
+        val metadata = publication.metadata.toDomain()
+        val coverUri = extractAndSaveCover(publication, fileUri)
+
+        // Coquilles de chapitres : index, href, title, contenu vide
+        val chapters = publication.readingOrder.mapIndexed { index, link ->
+            Chapter(
+                index = index,
+                href = link.href.toString(),
+                title = link.title?.takeIf { it.isNotBlank() },
+                content = ChapterContent.Rich(blocks = emptyList()),
+                sentences = emptyList(),
+            )
+        }
+
+        // TOC (même logique que DocumentModelExtractor)
+        val readingOrderUrls = publication.readingOrder.map { it.href.resolve().removeFragment() }
+        val toc = publication.tableOfContents.map { link -> toTocEntry(link, readingOrderUrls) }
+
+        ParseResult.Success(
+            documentModel = DocumentModel(
+                chapters = chapters,
+                tableOfContents = toc,
+                resources = emptyList(),
+            ),
+            isDrmProtected = publication.isProtected,
+            metadata = metadata.copy(coverUri = coverUri),
+        )
+    }
+
+    /**
      * Extrait la couverture depuis Readium et la sauvegarde dans le cache
      * interne de l'app. Retourne le chemin local du fichier ou null.
      *
@@ -169,6 +228,20 @@ class ReadiumPublicationParser @Inject constructor(
             seriesName = series?.name,
             seriesIndex = series?.position?.toFloat(),
             subjects = subjects.mapNotNull { it.name },
+        )
+    }
+
+    /**
+     * Convertit un [Link] Readium en [TableOfContentsEntry] avec résolution
+     * du chapterIndex par correspondance de href (sans fragment).
+     * Même logique que [DocumentModelExtractor.toTocEntry].
+     */
+    private fun toTocEntry(link: Link, readingOrderUrls: List<org.readium.r2.shared.util.Url>): TableOfContentsEntry {
+        val chapterIndex = readingOrderUrls.indexOf(link.href.resolve().removeFragment())
+        return TableOfContentsEntry(
+            title = link.title ?: "",
+            chapterIndex = chapterIndex.coerceAtLeast(0),
+            children = link.children.map { child -> toTocEntry(child, readingOrderUrls) },
         )
     }
 }
