@@ -35,6 +35,7 @@ dependencies {
     implementation(libs.readium.shared)
     implementation(libs.readium.streamer)
     implementation(libs.pdfium.android)
+    implementation(libs.jsoup)
     coreLibraryDesugaring(libs.desugar.jdk.libs)
 
     androidTestImplementation(libs.androidx.test.ext.junit)
