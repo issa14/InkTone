@@ -15,6 +15,7 @@ import androidx.compose.foundation.layout.ExperimentalLayoutApi
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.lazy.LazyColumn
+import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.lazy.itemsIndexed
 import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.foundation.layout.padding
@@ -75,12 +76,15 @@ import com.inktone.core.designsystem.AppSymbol
 import com.inktone.core.designsystem.reducedMotionDuration
 import com.inktone.domain.model.Annotation
 import com.inktone.domain.model.AnnotationColor
+import com.inktone.domain.model.ChapterContent
 import com.inktone.domain.model.Paragraph
 import com.inktone.domain.model.PublicationFormat
 import com.inktone.domain.model.ReadingOverrides
 import com.inktone.domain.model.ReadingTheme
 import com.inktone.domain.model.Sentence
 import com.inktone.feature.reader.pagination.rememberChapterPaginationState
+import com.inktone.feature.reader.rendering.BookBlockItem
+import com.inktone.feature.reader.rendering.BookBlockStyleMapper
 import kotlinx.coroutines.delay
 import kotlin.math.roundToInt
 
@@ -579,85 +583,89 @@ fun ReaderScreen(
             } else {
                 when (state.readingMode) {
                 ReadingMode.SCROLL -> {
-                    // Images EPUB indexées une fois par chapitre : la
-                    // recherche par paragraphe se faisait auparavant dans la
-                    // boucle de composition (filterIsInstance + filter sur
-                    // TOUS les blocs structurels, pour CHAQUE paragraphe,
-                    // O(paragraphes × blocs)). Sous `LazyColumn` ce travail
-                    // retomberait dans le chemin de défilement, à chaque
-                    // item recyclé — exactement là où il ne faut pas.
-                    val imagesByParagraph = remember(state.currentChapter) {
-                        state.currentChapter?.structuralBlocks
-                            ?.filterIsInstance<com.inktone.domain.model.StructuralBlock.EpubImage>()
-                            ?.groupBy { it.anchorAfterParagraphIndex }
-                            .orEmpty()
-                    }
-
-                    LazyColumn(
-                        state = scrollState,
-                        modifier = Modifier.fillMaxSize(),
-                        // Priorité du geste de sélection sur le défilement :
-                        // une poignée se saisit par un appui suivi d'un
-                        // glissement, geste que le conteneur défilant
-                        // réclame aussi. Tant qu'une sélection est active,
-                        // le défilement utilisateur est neutralisé — le
-                        // glissement appartient sans ambiguïté aux
-                        // poignées. Un tap sur le texte reste possible (ce
-                        // n'est pas un défilement) et annule la sélection,
-                        // ce qui rend immédiatement le défilement.
-                        userScrollEnabled = freeSelectedRange == null,
-                    ) {
-                        itemsIndexed(
-                            items = paragraphs,
-                            // Clé stable : un paragraphe conserve son état
-                            // (et sa sélection locale) à travers le
-                            // recyclage, et le changement de chapitre ne
-                            // réutilise pas l'état d'un item d'un autre
-                            // chapitre.
-                            key = { _, paragraph -> "${state.currentChapterIndex}-${paragraph.index}" },
-                        ) { paragraphIndex, paragraph ->
-                            if (paragraph.sentences.isNotEmpty()) {
-                                ParagraphText(
-                                    paragraph = paragraph,
-                                    globalStartIndex = firstSentenceIndexPerParagraph[paragraphIndex],
-                                    currentSentenceIndex = state.currentSentenceIndex,
-                                    highlightedWordRange = state.highlightedWordRange,
-                                    annotations = state.annotations,
-                                    chapterIndex = state.currentChapterIndex,
-                                    freeSelectionRange = freeSelectedRange,
-                                    fontSizeSp = state.effectiveSettings.fontSize,
-                                    lineHeightSp = lineHeightSp,
-                                    textColor = ThemeColors.text(state.resolvedTheme),
-                                    fontFamily = effectiveFontFamily,
-                                    // Le texte couvre la quasi-totalité de la zone de
-                                    // lecture : sans ce relais, le tap est consommé par
-                                    // ParagraphText et ne remonte jamais au Box parent,
-                                    // rendant le HUD quasiment impossible à rappeler une
-                                    // fois masqué (bug réel trouvé à l'audit).
-                                    onClick = { handleReadingAreaTap() },
-                                    onFreeSelectionChanged = { anchor, focus ->
-                                        viewModel.onIntent(ReaderIntent.SetFreeSelection(anchor, focus))
+                    val chapter = state.currentChapter
+                    when (chapter?.content) {
+                        is ChapterContent.Rich -> {
+                            val blocks = (chapter.content as ChapterContent.Rich).blocks
+                            val textStyle = TextStyle(
+                                fontSize = state.effectiveSettings.fontSize.sp,
+                                color = ThemeColors.text(state.resolvedTheme),
+                                fontFamily = effectiveFontFamily,
+                            )
+                            LazyColumn(
+                                state = scrollState,
+                                modifier = Modifier.fillMaxSize(),
+                                userScrollEnabled = freeSelectedRange == null,
+                            ) {
+                                items(
+                                    items = blocks,
+                                    key = { block ->
+                                        val range = block.globalOffsetRange
+                                        if (range != null) "${state.currentChapterIndex}-${range.first}"
+                                        else "${state.currentChapterIndex}-img-${(block as? com.inktone.domain.model.BookBlock.ImageBlock)?.href ?: "sep"}"
                                     },
-                                    onFreeSelectionCleared = { viewModel.onIntent(ReaderIntent.ClearFreeSelection) },
-                                    // Identité du paragraphe émetteur (son
-                                    // offset absolu de début) : plusieurs
-                                    // paragraphes restent montés en même
-                                    // temps (ceux visibles) et écrivent dans
-                                    // le même emplacement de bornes — voir
-                                    // resolveSelectionPopupBounds.
-                                    onFreeSelectionBoundsInWindow = { bounds ->
-                                        scrollFreeSelectionBounds = resolveSelectionPopupBounds(
-                                            current = scrollFreeSelectionBounds,
-                                            ownerKey = paragraph.sentences.first().startOffset,
-                                            bounds = bounds,
-                                        )
-                                    },
-                                    onCurrentLineY = { y -> currentLineYDp = y },
-                                )
+                                ) { block ->
+                                    BookBlockItem(
+                                        block = block,
+                                        baseTextStyle = textStyle,
+                                        resolver = null, // TODO(3.6): injecter via ReaderViewModel
+                                        publicationId = "",
+                                        modifier = Modifier.fillMaxWidth()
+                                    )
+                                }
                             }
-                            // B.4 — Images EPUB après le paragraphe
-                            imagesByParagraph[paragraph.index]?.forEach { image ->
-                                EpubImagePlaceholder(href = image.href, altText = image.altText)
+                        }
+                        else -> {
+                            // ---- Legacy path (ChapterContent.Legacy) ----
+                            val imagesByParagraph = remember(state.currentChapter) {
+                                @Suppress("DEPRECATION")
+                                state.currentChapter?.structuralBlocks
+                                    ?.filterIsInstance<com.inktone.domain.model.StructuralBlock.EpubImage>()
+                                    ?.groupBy { it.anchorAfterParagraphIndex }
+                                    .orEmpty()
+                            }
+
+                            LazyColumn(
+                                state = scrollState,
+                                modifier = Modifier.fillMaxSize(),
+                                userScrollEnabled = freeSelectedRange == null,
+                            ) {
+                                itemsIndexed(
+                                    items = paragraphs,
+                                    key = { _, paragraph -> "${state.currentChapterIndex}-${paragraph.index}" },
+                                ) { paragraphIndex, paragraph ->
+                                    if (paragraph.sentences.isNotEmpty()) {
+                                        ParagraphText(
+                                            paragraph = paragraph,
+                                            globalStartIndex = firstSentenceIndexPerParagraph[paragraphIndex],
+                                            currentSentenceIndex = state.currentSentenceIndex,
+                                            highlightedWordRange = state.highlightedWordRange,
+                                            annotations = state.annotations,
+                                            chapterIndex = state.currentChapterIndex,
+                                            freeSelectionRange = freeSelectedRange,
+                                            fontSizeSp = state.effectiveSettings.fontSize,
+                                            lineHeightSp = lineHeightSp,
+                                            textColor = ThemeColors.text(state.resolvedTheme),
+                                            fontFamily = effectiveFontFamily,
+                                            onClick = { handleReadingAreaTap() },
+                                            onFreeSelectionChanged = { anchor, focus ->
+                                                viewModel.onIntent(ReaderIntent.SetFreeSelection(anchor, focus))
+                                            },
+                                            onFreeSelectionCleared = { viewModel.onIntent(ReaderIntent.ClearFreeSelection) },
+                                            onFreeSelectionBoundsInWindow = { bounds ->
+                                                scrollFreeSelectionBounds = resolveSelectionPopupBounds(
+                                                    current = scrollFreeSelectionBounds,
+                                                    ownerKey = paragraph.sentences.first().startOffset,
+                                                    bounds = bounds,
+                                                )
+                                            },
+                                            onCurrentLineY = { y -> currentLineYDp = y },
+                                        )
+                                    }
+                                    imagesByParagraph[paragraph.index]?.forEach { image ->
+                                        EpubImagePlaceholder(href = image.href, altText = image.altText)
+                                    }
+                                }
                             }
                         }
                     }
