@@ -14,6 +14,12 @@ import java.io.File
  * Test-first, K6 : vérifie si le pipeline existant (Href.resolve(),
  * Tâche 3.4) gère déjà correctement le percent-encoding mixte, avant de
  * supposer qu'un correctif custom est nécessaire.
+ *
+ * Plan v3 — `ReadiumPublicationParser.parse()` ne fait plus qu'extraire
+ * des coquilles de chapitre (D2, parsing paresseux) : le contenu réel
+ * (et donc l'exercice du href encodé) vient maintenant d'[EpubChapterParser]
+ * (Palier 2.1), qui doit résoudre le href de chapitre exactement comme
+ * l'ancien [DocumentModelExtractor] le faisait.
  */
 @RunWith(AndroidJUnit4::class)
 class HrefEncodingTest {
@@ -25,9 +31,13 @@ class HrefEncodingTest {
             context.assets.open("fixture-hrefs-encodes.epub").use { i -> outputStream().use { i.copyTo(it) } }
         }
         val result = ReadiumPublicationParser(context).parse(fixtureFile.absolutePath)
-
         check(result is ParseResult.Success)
-        val allSentences = result.documentModel.chapters.flatMap { it.paragraphs }.flatMap { it.sentences }
+
+        val chapterParser = EpubChapterParser(ReadiumPublicationRegistry(context), JsoupChapterParser())
+        chapterParser.registerPublication("test-hrefs-encodes", fixtureFile.absolutePath)
+        val allSentences = result.documentModel.chapters.flatMap { shell ->
+            chapterParser.parseChapter("test-hrefs-encodes", shell.href).sentences
+        }
         assertTrue(
             "le contenu doit etre extrait malgre le href encode differemment entre le spine et le fichier interne",
             allSentences.isNotEmpty(),

@@ -11,7 +11,7 @@ import java.io.InputStream
  */
 class FakeEpubResourceResolver : EpubResourceResolver {
 
-    override suspend fun open(fileUri: String) {
+    override suspend fun open(publicationId: String, fileUri: String) {
         // No-op
     }
 

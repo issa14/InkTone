@@ -13,6 +13,8 @@ import dagger.Binds
 import dagger.Module
 import dagger.Provides
 import dagger.hilt.InstallIn
+import dagger.hilt.android.components.ViewModelComponent
+import dagger.hilt.android.scopes.ViewModelScoped
 import dagger.hilt.components.SingletonComponent
 import javax.inject.Singleton
 
@@ -23,6 +25,9 @@ import javax.inject.Singleton
  * - [ChapterParser] → [EpubChapterParser] (parsing paresseux EPUB)
  * - [JsoupChapterParser] fourni comme singleton (utilisé par EpubChapterParser)
  * - [FixedPageRenderer] → [PdfPageRendererImpl] (rendu bitmap PDF)
+ *
+ * [EpubResourceResolver] est lié séparément, dans [ViewModelScopedParserModule]
+ * ci-dessous — jamais `@Singleton` (voir son KDoc).
  */
 @Module
 @InstallIn(SingletonComponent::class)
@@ -37,10 +42,6 @@ abstract class ParserModule {
 
     @Binds
     @Singleton
-    abstract fun bindEpubResourceResolver(impl: ReadiumResourceResolver): EpubResourceResolver
-
-    @Binds
-    @Singleton
     abstract fun bindFixedPageRenderer(impl: PdfPageRendererImpl): FixedPageRenderer
 
     companion object {
@@ -48,4 +49,22 @@ abstract class ParserModule {
         @Singleton
         fun provideJsoupChapterParser(): JsoupChapterParser = JsoupChapterParser()
     }
+}
+
+/**
+ * [EpubResourceResolver] scopé au ViewModel (plutôt qu'à
+ * [SingletonComponent]) : chaque `ReaderViewModel` reçoit sa propre
+ * instance, jamais partagée entre deux lecteurs ouverts en parallèle.
+ * Une instance `@Singleton` fermerait ici la publication d'un autre
+ * lecteur au moindre chevauchement d'écran (back-stack, navigation
+ * rapide) — la `Publication` Readium elle-même reste partagée via
+ * [com.inktone.infrastructure.parser.ReadiumPublicationRegistry] (K2),
+ * seule l'instance de résolution est isolée par lecteur.
+ */
+@Module
+@InstallIn(ViewModelComponent::class)
+abstract class ViewModelScopedParserModule {
+    @Binds
+    @ViewModelScoped
+    abstract fun bindEpubResourceResolver(impl: ReadiumResourceResolver): EpubResourceResolver
 }

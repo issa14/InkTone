@@ -23,10 +23,10 @@ import java.io.InputStream
  */
 interface EpubResourceResolver {
     /**
-     * Ouvre l'EPUB à [fileUri] pour résoudre les ressources.
-     * Doit être appelé avant [openStream].
+     * Ouvre l'EPUB à [fileUri] (identifié par [publicationId]) pour
+     * résoudre les ressources. Doit être appelé avant [openStream].
      */
-    suspend fun open(fileUri: String)
+    suspend fun open(publicationId: String, fileUri: String)
 
     /**
      * Ouvre un [InputStream] vers la ressource [resourceHref] dans

@@ -1,37 +1,22 @@
 package com.inktone.infrastructure.parser
 
-import android.content.Context
-import android.net.Uri
 import com.inktone.domain.model.Chapter
 import com.inktone.domain.service.ChapterParser
-import dagger.hilt.android.qualifiers.ApplicationContext
+import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.asCoroutineDispatcher
 import kotlinx.coroutines.launch
-import kotlinx.coroutines.sync.Mutex
 import kotlinx.coroutines.sync.Semaphore
-import kotlinx.coroutines.sync.withLock
 import kotlinx.coroutines.sync.withPermit
 import kotlinx.coroutines.withContext
 import org.readium.r2.shared.ExperimentalReadiumApi
 import org.readium.r2.shared.publication.Link
 import org.readium.r2.shared.publication.Publication
-import org.readium.r2.shared.publication.services.content.DefaultContentService
-import org.readium.r2.shared.publication.services.content.contentServiceFactory
-import org.readium.r2.shared.publication.services.content.iterators.HtmlResourceContentIterator
 import org.readium.r2.shared.util.Url
-import org.readium.r2.shared.util.asset.AssetRetriever
 import org.readium.r2.shared.util.getOrElse
-import org.readium.r2.shared.util.http.DefaultHttpClient
 import org.readium.r2.shared.util.resource.Resource
-import org.readium.r2.shared.util.toAbsoluteUrl
-import org.readium.r2.shared.util.toUrl
-import org.readium.r2.streamer.PublicationOpener
-import org.readium.r2.streamer.parser.DefaultPublicationParser
 import java.io.ByteArrayInputStream
-import java.io.File
-import java.util.concurrent.ConcurrentHashMap
 import java.util.concurrent.Executors
 import javax.inject.Inject
 import javax.inject.Singleton
@@ -42,9 +27,10 @@ import javax.inject.Singleton
  *
  * ## Architecture
  *
- * - **Readium** : ouvre le ZIP, expose les `InputStream` des ressources
- *   du spine. Une seule `Publication` par `publicationId`, réutilisée
- *   pour tous les chapitres de la même publication.
+ * - **[ReadiumPublicationRegistry]** : ouvre le ZIP et expose les
+ *   `InputStream` des ressources du spine — partagé avec
+ *   [ReadiumResourceResolver] (K2 : une seule `Publication` Readium par
+ *   `publicationId`, jamais une par consommateur).
  * - **JsoupChapterParser** : parse le XHTML → [Chapter] avec
  *   [com.inktone.domain.model.BookBlock], styles inline et offsets globaux.
  * - **Cache LRU** : 5 MB par octets (pas par entrées), éviction automatique.
@@ -56,47 +42,18 @@ import javax.inject.Singleton
  *
  * - [parseChapter] : parsing synchrone (suspend), avec cache et semaphore.
  * - [preload] : lancement asynchrone, retourne un [Job] annulable.
- * - [invalidate] : ferme la `Publication` Readium et vide le cache pour
- *   une `publicationId` donnée (appelé à la fermeture du lecteur).
+ * - [invalidate] : ferme la `Publication` Readium (via le registre partagé)
+ *   et vide le cache pour une `publicationId` donnée (appelé à la
+ *   fermeture du lecteur).
  * - [registerPublication] : enregistre le mapping `publicationId → fileUri`
  *   avant tout appel à [parseChapter] (appelé après l'import).
  */
 @OptIn(ExperimentalReadiumApi::class)
 @Singleton
 class EpubChapterParser @Inject constructor(
-    @ApplicationContext private val context: Context,
+    private val registry: ReadiumPublicationRegistry,
     private val jsoupParser: JsoupChapterParser,
 ) : ChapterParser {
-
-    // ---- Readium (initialisation paresseuse) ----
-
-    private val httpClient by lazy { DefaultHttpClient() }
-    private val assetRetriever by lazy {
-        AssetRetriever(contentResolver = context.contentResolver, httpClient = httpClient)
-    }
-    private val publicationOpener by lazy {
-        PublicationOpener(
-            publicationParser = DefaultPublicationParser(
-                context,
-                httpClient = httpClient,
-                assetRetriever = assetRetriever,
-                pdfFactory = null,
-            ),
-            onCreatePublication = {
-                servicesBuilder.contentServiceFactory = DefaultContentService.createFactory(
-                    resourceContentIteratorFactories = listOf(HtmlResourceContentIterator.Factory()),
-                )
-            },
-        )
-    }
-
-    // ---- État interne ----
-
-    /** publicationId → fileUri (peuplé via [registerPublication]). */
-    private val publicationFiles = ConcurrentHashMap<String, String>()
-
-    /** publicationId → Publication Readium (ouverte paresseusement). */
-    private val openPublications = ConcurrentHashMap<String, Publication>()
 
     // ---- Cache LRU par octets ----
 
@@ -120,9 +77,6 @@ class EpubChapterParser @Inject constructor(
 
     private val semaphore = Semaphore(2)
 
-    /** Protège l'ouverture paresseuse des [Publication] (race condition). */
-    private val openMutex = Mutex()
-
     // ---- API publique (ChapterParser) ----
 
     /**
@@ -132,7 +86,7 @@ class EpubChapterParser @Inject constructor(
      * cette publication. Idempotent : un appel ultérieur écrase l'ancien.
      */
     override fun registerPublication(publicationId: String, fileUri: String) {
-        publicationFiles[publicationId] = fileUri
+        registry.register(publicationId, fileUri)
     }
 
     override suspend fun parseChapter(
@@ -145,11 +99,10 @@ class EpubChapterParser @Inject constructor(
 
         return semaphore.withPermit {
             withContext(parserDispatcher) {
-                val publication = getOrOpenPublication(publicationId)
-                val stream = openChapterStream(publication, chapterHref)
-                val chapterIndex = publication.readingOrder.indexOfFirst {
-                    it.href.toString() == chapterHref
-                }.coerceAtLeast(0)
+                val publication = registry.getOrOpen(publicationId)
+                val link = resolveChapterLink(publication, chapterHref)
+                val stream = openResourceStream(publication, link, chapterHref)
+                val chapterIndex = publication.readingOrder.indexOf(link).coerceAtLeast(0)
 
                 val chapter = jsoupParser.parse(
                     inputStream = stream,
@@ -173,18 +126,29 @@ class EpubChapterParser @Inject constructor(
             val cacheKey = "$publicationId:$chapterHref"
             if (cache.get(cacheKey) != null) return@withPermit
 
-            val publication = getOrOpenPublication(publicationId)
-            val stream = openChapterStream(publication, chapterHref)
-            val chapterIndex = publication.readingOrder.indexOfFirst {
-                it.href.toString() == chapterHref
-            }.coerceAtLeast(0)
+            // Best-effort : un échec de préchargement ne doit jamais
+            // remonter (structured concurrency ferait planter tout
+            // preloadScope, cf. ReaderViewModel.preloadAdjacentChapters).
+            // parseChapter() est le chemin qui surface l'erreur pour de
+            // vrai quand l'utilisateur navigue effectivement vers ce
+            // chapitre.
+            val chapter = try {
+                val publication = registry.getOrOpen(publicationId)
+                val link = resolveChapterLink(publication, chapterHref)
+                val stream = openResourceStream(publication, link, chapterHref)
+                val chapterIndex = publication.readingOrder.indexOf(link).coerceAtLeast(0)
 
-            val chapter = jsoupParser.parse(
-                inputStream = stream,
-                baseUrl = chapterHref,
-                chapterIndex = chapterIndex,
-                chapterHref = chapterHref,
-            )
+                jsoupParser.parse(
+                    inputStream = stream,
+                    baseUrl = chapterHref,
+                    chapterIndex = chapterIndex,
+                    chapterHref = chapterHref,
+                )
+            } catch (e: CancellationException) {
+                throw e // ne jamais avaler l'annulation coopérative (D9)
+            } catch (e: Exception) {
+                return@withPermit
+            }
             cache.put(cacheKey, chapter)
         }
     }
@@ -194,46 +158,30 @@ class EpubChapterParser @Inject constructor(
         val prefix = "$publicationId:"
         cache.snapshot().keys.filter { it.startsWith(prefix) }.forEach { cache.remove(it) }
 
-        // Fermer la Publication Readium
-        openPublications.remove(publicationId)?.close()
-        publicationFiles.remove(publicationId)
+        registry.release(publicationId)
     }
 
     // ---- Interne ----
 
     /**
-     * Retourne la [Publication] Readium ouverte pour [publicationId],
-     * en l'ouvrant paresseusement si nécessaire.
+     * Résout [chapterHref] en [Link] Readium via [Url] + [Publication.linkWithHref]
+     * — normalise le percent-encoding (K6, CLAUDE.md) au lieu d'une
+     * comparaison de chaîne brute contre [Publication.readingOrder].
+     * (`resourceWithHref(String)` fait la même chose mais est dépréciée en
+     * 3.0.0 ; `Url.fromEpubHref` fait aussi la même chose mais est une API
+     * interne Readium, non appelable ici.)
      */
-    private suspend fun getOrOpenPublication(publicationId: String): Publication {
-        openPublications[publicationId]?.let { return it }
-
-        val fileUri = publicationFiles[publicationId]
-            ?: throw IllegalStateException(
-                "Publication $publicationId non enregistrée — appeler registerPublication() d'abord",
-            )
-
-        // Mutex évite la race condition : deux appels concurrents pour le même
-        // publicationId ne peuvent pas ouvrir deux Publications simultanément.
-        return openMutex.withLock {
-            // Double-check après acquisition du lock
-            openPublications[publicationId]?.let { return@withLock it }
-
-            withContext(parserDispatcher) {
-                openPublication(fileUri).also { pub ->
-                    openPublications[publicationId] = pub
-                }
-            }
-        }
+    private fun resolveChapterLink(publication: Publication, chapterHref: String): Link {
+        val url = Url(chapterHref)
+            ?: throw IllegalStateException("Href de chapitre invalide : $chapterHref")
+        return publication.linkWithHref(url)
+            ?: throw IllegalStateException("Chapitre non trouvé dans le readingOrder : $chapterHref")
     }
 
     /**
      * Ouvre un [ByteArrayInputStream] sur la ressource XHTML d'un chapitre.
      */
-    private suspend fun openChapterStream(publication: Publication, chapterHref: String): ByteArrayInputStream {
-        val link = publication.readingOrder.find { it.href.toString() == chapterHref }
-            ?: throw IllegalStateException("Chapitre non trouvé dans le readingOrder : $chapterHref")
-
+    private suspend fun openResourceStream(publication: Publication, link: Link, chapterHref: String): ByteArrayInputStream {
         val resource: Resource = publication.get(link)
             ?: throw IllegalStateException("Ressource non trouvée dans l'EPUB : $chapterHref")
 
@@ -246,26 +194,6 @@ class EpubChapterParser @Inject constructor(
         }
 
         return ByteArrayInputStream(bytes)
-    }
-
-    /**
-     * Ouvre un EPUB via Readium et retourne la [Publication].
-     */
-    private suspend fun openPublication(fileUri: String): Publication {
-        val url = if (fileUri.contains("://")) {
-            Uri.parse(fileUri).toAbsoluteUrl()
-                ?: throw IllegalStateException("URI non absolue: $fileUri")
-        } else {
-            File(fileUri).toUrl()
-        }
-
-        val asset = assetRetriever.retrieve(url).getOrElse {
-            throw IllegalStateException("Echec de lecture de l'asset EPUB: $it")
-        }
-
-        return publicationOpener.open(asset, allowUserInteraction = false).getOrElse {
-            throw IllegalStateException("Echec d'ouverture de la publication EPUB: $it")
-        }
     }
 
     private companion object {

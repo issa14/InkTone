@@ -16,6 +16,10 @@ import java.io.File
  * DocumentModelExtractor n'avait jamais été vérifié au-delà d'un fixture
  * à un seul chapitre. Ce test ne modifie pas l'extracteur — il le met à
  * l'épreuve.
+ *
+ * Plan v3 — le contenu réel par chapitre vient maintenant d'[EpubChapterParser]
+ * (Palier 2.1, parsing paresseux D2) ; [ReadiumPublicationParser.parse]
+ * ne fournit plus que les coquilles (href/index/titre).
  */
 @RunWith(AndroidJUnit4::class)
 class DocumentModelExtractorMultiChapterTest {
@@ -28,18 +32,20 @@ class DocumentModelExtractorMultiChapterTest {
 
         val result = parser.parse(fixtureFile.absolutePath)
         check(result is ParseResult.Success)
-        val chapters = result.documentModel.chapters
+        val shells = result.documentModel.chapters
 
-        assertEquals("le fixture a 3 chapitres", 3, chapters.size)
+        assertEquals("le fixture a 3 chapitres", 3, shells.size)
+
+        val chapterParser = EpubChapterParser(ReadiumPublicationRegistry(context), JsoupChapterParser())
+        chapterParser.registerPublication("test-multi-chapitre", fixtureFile.absolutePath)
+        val chapters = shells.map { shell -> chapterParser.parseChapter("test-multi-chapitre", shell.href) }
 
         // Le test critique : le contenu de chaque chapitre doit être
         // DISTINCT et ne pas fuiter dans les chapitres voisins. Si le
         // filtrage par href (Href.resolve(), Tâche 3.4) a une régression
         // sur un cas à plusieurs ressources, ce test doit le révéler —
         // un test sur un seul chapitre ne le pouvait pas par construction.
-        val allSentenceTexts = chapters.map { chapter ->
-            chapter.sentences { it.sentences }.joinToString(" ") { it.text }
-        }
+        val allSentenceTexts = chapters.map { chapter -> chapter.sentences.joinToString(" ") { it.text } }
         assertTrue("chapitre 1 doit contenir son propre texte", allSentenceTexts[0].contains("premier"))
         assertTrue("chapitre 2 doit contenir son propre texte", allSentenceTexts[1].contains("deuxieme"))
         assertTrue("chapitre 3 doit contenir son propre texte", allSentenceTexts[2].contains("troisieme"))
