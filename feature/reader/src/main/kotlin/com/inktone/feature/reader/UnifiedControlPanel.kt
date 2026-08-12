@@ -64,6 +64,12 @@ fun UnifiedControlPanel(
     onTtsClick: () -> Unit = {},
     onReadingModeClick: () -> Unit = {},
     onBrightnessClick: () -> Unit = {},
+    // Lot 12, tache 12.10 — TTS, minuteur de sommeil et bascule de mode
+    // hors perimetre pour le format PDF (decision actee 16 du plan) :
+    // emplacements vides plutot que retires de la Row (les slots en
+    // Modifier.weight(1f) evitent le decalage deja corrige au lot 3b,
+    // voir commentaire plus bas), jamais un bouton visible sans effet.
+    showTtsControls: Boolean = true,
 ) {
     val haptic = LocalHapticFeedback.current
     val accentColor = MaterialTheme.colorScheme.primary
@@ -100,20 +106,22 @@ fun UnifiedControlPanel(
                     SecondaryAction(icon = AppIcons.Bookmark, label = "Marque-pages", tint = iconTint, onClick = onBookmarksClick)
                 }
                 Box(Modifier.weight(1f), contentAlignment = Alignment.Center) {
-                    FilledIconButton(
-                        onClick = {
-                            haptic.performHapticFeedback(HapticFeedbackType.LongPress)
-                            onPlayPause()
-                        },
-                        modifier = Modifier.size(56.dp),
-                        colors = IconButtonDefaults.filledIconButtonColors(containerColor = accentColor),
-                        shape = InkToneShapes.large,
-                    ) {
-                        Icon(
-                            if (isPlaying) AppIcons.Pause else AppIcons.Play,
-                            contentDescription = if (isPlaying) "Pause" else "Lire",
-                            tint = MaterialTheme.colorScheme.surface,
-                        )
+                    if (showTtsControls) {
+                        FilledIconButton(
+                            onClick = {
+                                haptic.performHapticFeedback(HapticFeedbackType.LongPress)
+                                onPlayPause()
+                            },
+                            modifier = Modifier.size(56.dp),
+                            colors = IconButtonDefaults.filledIconButtonColors(containerColor = accentColor),
+                            shape = InkToneShapes.large,
+                        ) {
+                            Icon(
+                                if (isPlaying) AppIcons.Pause else AppIcons.Play,
+                                contentDescription = if (isPlaying) "Pause" else "Lire",
+                                tint = MaterialTheme.colorScheme.surface,
+                            )
+                        }
                     }
                 }
                 Box(Modifier.weight(1f), contentAlignment = Alignment.Center) {
@@ -133,6 +141,9 @@ fun UnifiedControlPanel(
                 verticalAlignment = Alignment.CenterVertically,
             ) {
                 Box(Modifier.weight(1f), contentAlignment = Alignment.Center) {
+                    // Toujours visible, meme pour un PDF (decision actee
+                    // 16) : ce bouton ouvre aussi le repos oculaire,
+                    // independant du TTS - voir SleepTimerPanel.showSleepTimer.
                     SecondaryAction(
                         icon = AppIcons.SleepTimer,
                         label = "Minuteur",
@@ -141,10 +152,14 @@ fun UnifiedControlPanel(
                     )
                 }
                 Box(Modifier.weight(1f), contentAlignment = Alignment.Center) {
-                    SecondaryAction(icon = AppIcons.Speaking, label = "Haut-parleur", tint = iconTint, onClick = onTtsClick)
+                    if (showTtsControls) {
+                        SecondaryAction(icon = AppIcons.Speaking, label = "Haut-parleur", tint = iconTint, onClick = onTtsClick)
+                    }
                 }
                 Box(Modifier.weight(1f), contentAlignment = Alignment.Center) {
-                    SecondaryAction(icon = AppIcons.ReadingModePaged, label = "Mode", tint = iconTint, onClick = onReadingModeClick)
+                    if (showTtsControls) {
+                        SecondaryAction(icon = AppIcons.ReadingModePaged, label = "Mode", tint = iconTint, onClick = onReadingModeClick)
+                    }
                 }
                 Box(Modifier.weight(1f), contentAlignment = Alignment.Center) {
                     SecondaryAction(icon = AppIcons.Search, label = "Recherche", tint = iconTint, onClick = onSearchClick)

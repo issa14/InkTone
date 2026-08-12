@@ -9,10 +9,13 @@ enum class PublicationFormat { EPUB, TXT, PDF }
  * modèle dès la v1 (acquis K11 — extraction via `belongsTo` Readium et
  * `subjects` peuplés à l'import, pas une évolution future).
  *
- * `pageCount` est délibérément absent (revue B5) : un EPUB reflowable
- * n'a pas de pages ; un compte de pages sera introduit avec une
- * définition précise si un format paginé (PDF) l'exige un jour — jamais
- * comme champ générique ambigu.
+ * `pageCount` (Lot 12, tâche 12.4) — la définition précise annoncée ici
+ * depuis la revue B5 : `null` pour un format reflowable (EPUB/TXT, pas de
+ * pagination fixe), un entier strictement positif pour un format paginé
+ * (PDF). Distinct de `chapterCount`, qui reste la structure de lecture/
+ * recherche générique — les deux coïncident numériquement pour un PDF
+ * (page = chapitre, `PdfPublicationParser`) mais portent des intentions
+ * différentes, jamais fusionnés en un champ générique ambigu.
  */
 data class Publication(
     val id: String,
@@ -28,6 +31,7 @@ data class Publication(
     val fileHash: String,
     val fileSize: Long,
     val chapterCount: Int,
+    val pageCount: Int? = null,
     val seriesName: String? = null,
     val seriesIndex: Float? = null,
     val isFavorite: Boolean = false,
@@ -40,6 +44,7 @@ data class Publication(
     init {
         require(title.isNotBlank()) { "title ne peut pas être vide" }
         require(chapterCount >= 0) { "chapterCount doit être positif ou nul" }
+        require(pageCount == null || pageCount > 0) { "pageCount doit être strictement positif si renseigné" }
         require(fileSize >= 0) { "fileSize doit être positif ou nul" }
         require(fileHash.isNotBlank()) { "fileHash ne peut pas être vide (détection de doublons K-issue)" }
     }

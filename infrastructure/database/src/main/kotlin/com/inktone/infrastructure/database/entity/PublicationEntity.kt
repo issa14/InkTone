@@ -25,6 +25,7 @@ data class PublicationEntity(
     val fileHash: String,
     val fileSize: Long,
     val chapterCount: Int,
+    val pageCount: Int? = null,
     val seriesName: String?,
     val seriesIndex: Float?,
     val isFavorite: Boolean,

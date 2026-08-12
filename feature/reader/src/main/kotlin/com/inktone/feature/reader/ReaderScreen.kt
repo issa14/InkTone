@@ -76,6 +76,7 @@ import com.inktone.core.designsystem.reducedMotionDuration
 import com.inktone.domain.model.Annotation
 import com.inktone.domain.model.AnnotationColor
 import com.inktone.domain.model.Paragraph
+import com.inktone.domain.model.PublicationFormat
 import com.inktone.domain.model.ReadingOverrides
 import com.inktone.domain.model.ReadingTheme
 import com.inktone.domain.model.Sentence
@@ -503,9 +504,14 @@ fun ReaderScreen(
         val effectiveFontFamily = remember(state.effectiveSettings.fontFamily, state.resolvedTheme.fontFamily) {
             ThemeColors.toComposeFontFamily(ThemeColors.effectiveFontFamily(state.effectiveSettings, state.resolvedTheme))
         }
+        // Lot 12, tache 12.9 — jamais de mesure de pagination texte pour
+        // un PDF (chapter = null neutralise rememberChapterPaginationState,
+        // deja nullable) : ce format est rendu par FixedPageContent
+        // (bitmap), la pagination EPUB/TXT n'a pas de sens pour lui.
+        val isPdf = state.publicationFormat == PublicationFormat.PDF
         val pagination = rememberChapterPaginationState(
-            chapter = state.currentChapter,
-            nextChapter = state.chapters.getOrNull(state.currentChapterIndex + 1),
+            chapter = if (isPdf) null else state.currentChapter,
+            nextChapter = if (isPdf) null else state.chapters.getOrNull(state.currentChapterIndex + 1),
             currentSentenceIndex = state.currentSentenceIndex,
             fontSizeSp = state.effectiveSettings.fontSize,
             lineHeightSp = lineHeightSp,
@@ -537,11 +543,41 @@ fun ReaderScreen(
                 .fillMaxSize()
                 .onGloballyPositioned { coordinates -> readingAreaSize = coordinates.size },
         ) {
-            if (state.isReadingRulerEnabled) {
+            if (state.isReadingRulerEnabled && !isPdf) {
                 ReadingRuler(currentLineY = currentLineYDp, enabled = true)
             }
 
-            when (state.readingMode) {
+            if (isPdf) {
+                // Lot 12, tache 12.9 — branchement par format, jamais de
+                // reflow (ADR-017). Le chrome (TopBar, panneaux, ligne de
+                // statut) reste commun aux deux formats, defini plus bas
+                // dans ce meme composable — aucune duplication.
+                FixedPageContent(
+                    pageCount = state.chapters.size,
+                    currentPageIndex = state.currentChapterIndex,
+                    onPageIndexChanged = { pageIndex -> viewModel.onIntent(ReaderIntent.JumpToChapter(pageIndex)) },
+                    onPageOffsetChanged = { offsetY -> viewModel.onIntent(ReaderIntent.UpdatePageOffset(offsetY)) },
+                    renderPage = viewModel::renderPdfPage,
+                    // Tâche 12.11 — inversion de luminance pour les thèmes
+                    // sombres (Obsidienne, Noir Absolu AMOLED) et Sépia
+                    // Vintage sur les pages vectorielles. Les pages
+                    // scannées (sans texte) ne sont pas inversées par
+                    // défaut — sauf si l'utilisateur a activé l'option
+                    // « Forcer l'inversion » (ToggleForcePdfInversion).
+                    invertColors = { pageIndex ->
+                        val chapter = state.chapters.getOrNull(pageIndex)
+                        val hasText = chapter?.paragraphs?.isNotEmpty() == true
+                        if (hasText) {
+                            val bgHex = state.resolvedTheme.backgroundColorHex
+                            bgHex == "#000000" || state.resolvedTheme.id == "sepia_vintage"
+                        } else {
+                            state.forcePdfInversion
+                        }
+                    },
+                    reduceMotion = state.reduceMotion,
+                )
+            } else {
+                when (state.readingMode) {
                 ReadingMode.SCROLL -> {
                     // Images EPUB indexées une fois par chapitre : la
                     // recherche par paragraphe se faisait auparavant dans la
@@ -657,6 +693,7 @@ fun ReaderScreen(
                         },
                     )
                 }
+                }
             }
 
             // B.7 — Overlay visuel des captions retiré (UX §Lecture — couche
@@ -734,7 +771,12 @@ fun ReaderScreen(
                     // unifié (navigation par chapitre, retirée du panneau au lot
                     // 3b) ; le panneau complet ne revient que par l'overlay A5 ou
                     // à l'arrêt de la lecture.
-                    if (state.isPlaying && !showFullPanelOverlay) {
+                    // Lot 12, tache 12.10 — la barre pilule TTS n'a pas
+                    // lieu d'apparaitre pour un PDF (isPlaying reste faux,
+                    // playCurrentSentence se neutralise pour ce format,
+                    // decision actee 16) : garde explicite, pas seulement
+                    // transitive.
+                    if (state.isPlaying && !showFullPanelOverlay && !isPdf) {
                         // 3e.2 — repli en bouton unique après 4s (isPillCollapsed,
                         // voir onAutoHide plus haut).
                         //
@@ -822,6 +864,7 @@ fun ReaderScreen(
                             onAaClick = { keepHudVisible(); showSettingsPanel = true },
                             onTtsClick = { keepHudVisible(); showTtsPanel = true },
                             onReadingModeClick = { keepHudVisible(); viewModel.onIntent(ReaderIntent.ToggleReadingMode) },
+                            showTtsControls = !isPdf,
                             onBrightnessClick = {
                                 // Bug réel corrigé (vérification device, lot 3d) : masque le
                                 // HUD au lieu de le garder visible — la barre prend sa place
@@ -939,6 +982,7 @@ fun ReaderScreen(
                 onSetEyeRestReminderEnabled = { enabled -> viewModel.onIntent(ReaderIntent.SetEyeRestReminderEnabled(enabled)) },
                 onSetEyeRestReminderInterval = { minutes -> viewModel.onIntent(ReaderIntent.SetEyeRestReminderInterval(minutes)) },
                 onDismiss = { showSleepTimerPanel = false },
+                showSleepTimer = !isPdf,
             )
         }
 

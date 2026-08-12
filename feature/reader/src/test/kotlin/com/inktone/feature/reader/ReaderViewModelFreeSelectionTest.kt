@@ -103,6 +103,7 @@ class ReaderViewModelFreeSelectionTest {
             getVoiceProfiles = GetVoiceProfilesUseCase(FakeVoiceProfileRepository()),
             readingSessionRepository = FakeReadingSessionRepository(),
             themeRepository = FakeThemeRepository(),
+            fixedPageRenderer = com.inktone.core.testing.fake.FakeFixedPageRenderer(),
         )
     }
 

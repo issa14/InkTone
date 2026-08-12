@@ -84,6 +84,7 @@ class ReaderViewModelOverrideTest {
             getVoiceProfiles = com.inktone.domain.usecase.GetVoiceProfilesUseCase(com.inktone.core.testing.fake.FakeVoiceProfileRepository()),
             readingSessionRepository = com.inktone.core.testing.fake.FakeReadingSessionRepository(),
             themeRepository = FakeThemeRepository(),
+            fixedPageRenderer = com.inktone.core.testing.fake.FakeFixedPageRenderer(),
         )
 
         // 3d.5 — le rappel de repos oculaire (activé par défaut, recurrent)
