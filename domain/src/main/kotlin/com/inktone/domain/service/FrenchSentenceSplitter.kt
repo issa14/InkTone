@@ -86,26 +86,29 @@ object FrenchSentenceSplitter {
             return if (trimmed.isNotEmpty()) listOf(Triple(trimmed, 0, trimmed.length)) else emptyList()
         }
 
-        // Fusion des segments qui se terminent par une abréviation
+        // Fusion des segments qui se terminent par une abréviation, puis
+        // recalcul des offsets sur le texte TRIMMÉ (un seul passage — le
+        // contrat de stabilité des offsets exige que `text.substring(start,
+        // end)` reste exactement égal à la phrase retournée).
         val merged = mergeAbbreviationSplits(text, rawBoundaries)
-        return merged.map { (s, e) ->
-            val sentenceText = text.substring(s, e).trim()
-            Triple(sentenceText, s, e - s + s) // startOffset = s, endOffset = e
-        }.filter { it.first.isNotBlank() }
-            .map { (text, startOffset, endOffset) ->
-                // Recalculer les offsets pour le texte trimme
-                val trimmed = text.trim()
-                val leadingSpaces = text.length - text.trimStart().length
-                Triple(trimmed, startOffset + leadingSpaces, endOffset)
-            }
+        return merged.mapNotNull { (s, e) ->
+            val raw = text.substring(s, e)
+            val trimmed = raw.trim()
+            if (trimmed.isEmpty()) return@mapNotNull null
+            val leadingSpaces = raw.length - raw.trimStart().length
+            val start = s + leadingSpaces
+            Triple(trimmed, start, start + trimmed.length)
+        }
     }
 
     /**
      * Fusionne les coupures qui surviennent après une abréviation.
      *
-     * Stratégie : parcourir les frontières 2 par 2. Si le segment entre
-     * [i] et [i+1] se termine par une abréviation connue suivie d'un point,
-     * fusionner avec le segment suivant.
+     * Stratégie : parcourir les frontières 2 par 2. Si le segment courant
+     * se termine par une abréviation connue suivie d'un point, l'étendre
+     * jusqu'au segment suivant — et RÉÉVALUER : une chaîne d'abréviations
+     * consécutives ("M. Dr. Dubois est venu.") doit fusionner tous ses
+     * segments, pas seulement les deux premiers.
      */
     private fun mergeAbbreviationSplits(
         text: String,
@@ -119,16 +122,15 @@ object FrenchSentenceSplitter {
         val merged = mutableListOf<Pair<Int, Int>>()
         var i = 0
         while (i < segments.size) {
-            val (segStart, segEnd) = segments[i]
-            if (i + 1 < segments.size && endsWithAbbreviation(text, segStart, segEnd)) {
-                // Fusionner ce segment avec le suivant
-                val (_, nextEnd) = segments[i + 1]
-                merged.add(segStart to nextEnd)
-                i += 2
-            } else {
-                merged.add(segStart to segEnd)
-                i++
+            val segStart = segments[i].first
+            var segEnd = segments[i].second
+            var next = i + 1
+            while (next < segments.size && endsWithAbbreviation(text, segStart, segEnd)) {
+                segEnd = segments[next].second
+                next++
             }
+            merged.add(segStart to segEnd)
+            i = next
         }
         return merged
     }

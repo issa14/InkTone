@@ -145,7 +145,11 @@ class PdfPublicationParser @Inject constructor(
         var offset = 0
         val sentences = sentenceBoundary.split(text).mapIndexed { index, raw ->
             val trimmed = raw.trim()
-            val sentence = Sentence(index = index, text = trimmed, startOffset = offset, endOffset = offset + trimmed.length)
+            // blockIndex = 0 : la page produit toujours exactement un
+            // BookBlock.ParagraphBlock unique (ci-dessous) quand du texte
+            // existe — jamais le défaut -1, sinon l'auto-scroll TTS
+            // (ReaderScreen) ne trouve jamais son bloc pour un PDF.
+            val sentence = Sentence(index = index, text = trimmed, startOffset = offset, endOffset = offset + trimmed.length, blockIndex = 0)
             offset += trimmed.length + 1
             sentence
         }.filter { it.text.isNotBlank() }
