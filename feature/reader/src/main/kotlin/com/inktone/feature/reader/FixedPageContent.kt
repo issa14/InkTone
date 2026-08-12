@@ -3,7 +3,8 @@ package com.inktone.feature.reader
 import android.graphics.Bitmap
 import android.util.LruCache
 import androidx.compose.foundation.background
-import androidx.compose.foundation.gestures.detectTransformGestures
+import androidx.compose.foundation.gestures.awaitEachGesture
+import androidx.compose.foundation.gestures.awaitFirstDown
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.pager.HorizontalPager
@@ -17,6 +18,7 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.ColorFilter
 import androidx.compose.ui.graphics.ColorMatrix
@@ -194,21 +196,72 @@ private fun FixedPage(
             .fillMaxSize()
             .background(Color.Black)
             .onSizeChanged { viewportSizePx = it }
+            // Lot 12, tâche 12.8 — zoom/pinch. On ne consomme les
+            // événements que si ≥2 pointeurs (pinch) ou page déjà zoomée.
+            // Un swipe 1 doigt non zoomé traverse jusqu'au HorizontalPager
+            // (la navigation entre pages fonctionne sans conflit).
             .pointerInput(pageIndex) {
-                detectTransformGestures { _, pan, zoom, _ ->
-                    val newScale = (scale * zoom).coerceIn(1f, MAX_GESTURE_SCALE)
-                    scale = newScale
-                    offsetX += pan.x
-                    offsetY += pan.y
-                    if (newScale > 1f && viewportSizePx.height > 0) {
-                        val maxOffsetY = viewportSizePx.height * (newScale - 1f) / 2f
-                        offsetY = offsetY.coerceIn(-maxOffsetY, maxOffsetY)
-                        onPageOffsetChanged(((offsetY + maxOffsetY) / (maxOffsetY * 2f)).coerceIn(0f, 1f))
-                    } else {
-                        offsetX = 0f
-                        offsetY = 0f
-                        onPageOffsetChanged(0f)
-                    }
+                awaitEachGesture {
+                    // Capture l'état initial des pointeurs pour calculer
+                    // le zoom (ratio des distances) et le pan (centroïde).
+                    var prevCentroid = Offset.Zero
+                    var prevDistance = 0f
+                    var gestureStarted = false
+                    var isMultiTouch = false
+
+                    awaitFirstDown(requireUnconsumed = false)
+                    do {
+                        val event = awaitPointerEvent()
+                        val pressedCount = event.changes.count { it.pressed }
+                        isMultiTouch = isMultiTouch || pressedCount >= 2
+                        val isZoomedIn = scale > 1.01f
+
+                        if (isMultiTouch || isZoomedIn) {
+                            val currentCentroid = event.changes
+                                .filter { it.pressed }
+                                .map { it.position }
+                                .let { positions ->
+                                    if (positions.isEmpty()) Offset.Zero
+                                    else Offset(
+                                        positions.sumOf { it.x.toDouble() }.toFloat() / positions.size,
+                                        positions.sumOf { it.y.toDouble() }.toFloat() / positions.size,
+                                    )
+                                }
+
+                            val currentDistance = if (pressedCount >= 2) {
+                                val pts = event.changes.filter { it.pressed }.map { it.position }
+                                val (p1, p2) = pts[0] to pts[1]
+                                (p1 - p2).getDistance()
+                            } else {
+                                0f
+                            }
+
+                            if (gestureStarted && prevDistance > 0f && currentDistance > 0f) {
+                                val zoomChange = currentDistance / prevDistance
+                                val panChange = currentCentroid - prevCentroid
+
+                                val newScale = (scale * zoomChange).coerceIn(1f, MAX_GESTURE_SCALE)
+                                scale = newScale
+                                offsetY += panChange.y
+                                if (newScale > 1f && viewportSizePx.height > 0) {
+                                    val maxOffsetY = viewportSizePx.height * (newScale - 1f) / 2f
+                                    offsetY = offsetY.coerceIn(-maxOffsetY, maxOffsetY)
+                                    onPageOffsetChanged(((offsetY + maxOffsetY) / (maxOffsetY * 2f)).coerceIn(0f, 1f))
+                                } else {
+                                    offsetX = 0f
+                                    offsetY = 0f
+                                    onPageOffsetChanged(0f)
+                                }
+                            }
+
+                            prevCentroid = currentCentroid
+                            prevDistance = currentDistance
+                            gestureStarted = true
+                            event.changes.forEach { it.consume() }
+                        }
+                        // Swipe 1 doigt non zoomé : on ne consomme pas →
+                        // HorizontalPager reçoit le geste et navigue.
+                    } while (event.changes.any { it.pressed })
                 }
             },
         contentAlignment = Alignment.Center,
