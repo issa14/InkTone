@@ -39,8 +39,6 @@ import com.inktone.domain.service.EpubResourceResolver
  *
  * @param block Le bloc à rendre.
  * @param baseTextStyle Style de texte de base (taille, police, couleur du thème).
- * @param highlightedWordRange Plage de surlignage TTS dans l'espace LOCAL au bloc,
- *   ou null si pas de surlignage actif pour ce bloc.
  * @param resolver Résolveur de ressources EPUB (pour les images).
  * @param publicationId ID de la publication (pour les images).
  */
@@ -48,7 +46,6 @@ import com.inktone.domain.service.EpubResourceResolver
 fun BookBlockItem(
     block: BookBlock,
     baseTextStyle: TextStyle,
-    highlightedWordRange: IntRange? = null,
     resolver: EpubResourceResolver? = null,
     publicationId: String = "",
     modifier: Modifier = Modifier,
@@ -57,7 +54,7 @@ fun BookBlockItem(
         is BookBlock.ParagraphBlock -> {
             val textStyle = BookBlockStyleMapper.textStyleFor(block, baseTextStyle)
             val annotated = remember(block.richText) {
-                buildBookBlockAnnotatedString(block.richText.plainText, block.richText.spans, textStyle)
+                buildBookBlockAnnotatedString(block.richText)
             }
             val textFieldValue = remember(annotated) { TextFieldValue(annotated) }
             BasicTextField(
@@ -141,26 +138,25 @@ fun BookBlockItem(
 /**
  * Construit un [androidx.compose.ui.text.AnnotatedString] à partir du
  * texte brut et des [com.inktone.domain.model.Span] stylés.
+ * Le style de base (taille, couleur) est appliqué au niveau du
+ * composable ([BasicTextField.textStyle], [Text.style]).
  */
 private fun buildBookBlockAnnotatedString(
-    plainText: String,
-    spans: List<com.inktone.domain.model.Span>,
-    baseStyle: TextStyle,
+    richText: com.inktone.domain.model.StyledText,
 ): androidx.compose.ui.text.AnnotatedString = buildAnnotatedString {
+    val plainText = richText.plainText
+    val spans = richText.spans
     var lastEnd = 0
     for (span in spans) {
-        // Texte sans style avant ce span
         if (span.start > lastEnd) {
             append(plainText.substring(lastEnd, span.start))
         }
-        // Texte avec style
         val spanStyle = BookBlockStyleMapper.spanStyleFor(span.styles)
         withStyle(spanStyle) {
             append(plainText.substring(span.start, span.end))
         }
         lastEnd = span.end
     }
-    // Texte restant après le dernier span
     if (lastEnd < plainText.length) {
         append(plainText.substring(lastEnd))
     }
