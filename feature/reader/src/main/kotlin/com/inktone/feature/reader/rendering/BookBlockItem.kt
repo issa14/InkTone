@@ -54,7 +54,7 @@ fun BookBlockItem(
         is BookBlock.ParagraphBlock -> {
             val textStyle = BookBlockStyleMapper.textStyleFor(block, baseTextStyle)
             val annotated = remember(block.richText) {
-                buildBookBlockAnnotatedString(block.richText)
+                BookBlockStyleMapper.buildAnnotatedString(block.richText)
             }
             val textFieldValue = remember(annotated) { TextFieldValue(annotated) }
             BasicTextField(
@@ -132,32 +132,5 @@ fun BookBlockItem(
                 color = Color.Gray.copy(alpha = 0.3f),
             )
         }
-    }
-}
-
-/**
- * Construit un [androidx.compose.ui.text.AnnotatedString] à partir du
- * texte brut et des [com.inktone.domain.model.Span] stylés.
- * Le style de base (taille, couleur) est appliqué au niveau du
- * composable ([BasicTextField.textStyle], [Text.style]).
- */
-private fun buildBookBlockAnnotatedString(
-    richText: com.inktone.domain.model.StyledText,
-): androidx.compose.ui.text.AnnotatedString = buildAnnotatedString {
-    val plainText = richText.plainText
-    val spans = richText.spans
-    var lastEnd = 0
-    for (span in spans) {
-        if (span.start > lastEnd) {
-            append(plainText.substring(lastEnd, span.start))
-        }
-        val spanStyle = BookBlockStyleMapper.spanStyleFor(span.styles)
-        withStyle(spanStyle) {
-            append(plainText.substring(span.start, span.end))
-        }
-        lastEnd = span.end
-    }
-    if (lastEnd < plainText.length) {
-        append(plainText.substring(lastEnd))
     }
 }

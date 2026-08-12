@@ -3,14 +3,17 @@ package com.inktone.feature.reader.rendering
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.text.SpanStyle
 import androidx.compose.ui.text.TextStyle
+import androidx.compose.ui.text.buildAnnotatedString
 import androidx.compose.ui.text.font.FontStyle
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.BaselineShift
 import androidx.compose.ui.text.style.TextDecoration
+import androidx.compose.ui.text.withStyle
 import androidx.compose.ui.unit.TextUnit
 import androidx.compose.ui.unit.em
 import com.inktone.domain.model.BookBlock
 import com.inktone.domain.model.SpanStyles
+import com.inktone.domain.model.StyledText
 
 /**
  * Mapping sémantique → visuel pour les [SpanStyles] et [BookBlock].
@@ -104,4 +107,32 @@ object BookBlockStyleMapper {
         SpanStyles.SUPERSCRIPT in styles || SpanStyles.SUBSCRIPT in styles -> 0.7.em
         else -> TextUnit.Unspecified
     }
+
+    // ---- Build AnnotatedString (partagé avec ChapterTextMeasurer) ----
+
+    /**
+     * Construit un [androidx.compose.ui.text.AnnotatedString] à partir
+     * d'un [StyledText] avec ses spans appliqués. Le style de base
+     * (taille, couleur) est appliqué au niveau du composable ou du
+     * `TextMeasurer`, pas ici.
+     */
+    internal fun buildAnnotatedString(richText: StyledText): androidx.compose.ui.text.AnnotatedString =
+        buildAnnotatedString {
+            val plainText = richText.plainText
+            val spans = richText.spans
+            var lastEnd = 0
+            for (span in spans) {
+                if (span.start > lastEnd) {
+                    append(plainText.substring(lastEnd, span.start))
+                }
+                val spanStyle = spanStyleFor(span.styles)
+                withStyle(spanStyle) {
+                    append(plainText.substring(span.start, span.end))
+                }
+                lastEnd = span.end
+            }
+            if (lastEnd < plainText.length) {
+                append(plainText.substring(lastEnd))
+            }
+        }
 }
