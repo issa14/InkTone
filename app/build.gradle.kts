@@ -95,6 +95,7 @@ dependencies {
     // complete, hors de portee de la marche a blanc (Phase 4).
     implementation("androidx.activity:activity-compose:1.9.1")
     implementation(libs.androidx.hilt.navigation.compose)
+    implementation(libs.androidx.core.splashscreen)
 
     // Tache 9bis.0.1/9bis.2 : Compose Navigation 2.8+ a routes typees
     // (@Serializable), remplace l'etat AppScreen a 3 cas (Phase 7).

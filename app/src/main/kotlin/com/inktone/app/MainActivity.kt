@@ -7,8 +7,12 @@ import androidx.compose.material3.Surface
 import androidx.compose.material3.windowsizeclass.ExperimentalMaterial3WindowSizeClassApi
 import androidx.compose.material3.windowsizeclass.calculateWindowSizeClass
 import androidx.compose.runtime.CompositionLocalProvider
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.setValue
+import androidx.core.splashscreen.SplashScreen.Companion.installSplashScreen
 import androidx.hilt.navigation.compose.hiltViewModel
 import com.inktone.core.designsystem.InkToneTheme
 import com.inktone.core.designsystem.LocalWindowSizeClass
@@ -37,7 +41,13 @@ class MainActivity : ComponentActivity() {
 
     @OptIn(ExperimentalMaterial3WindowSizeClassApi::class)
     override fun onCreate(savedInstanceState: Bundle?) {
+        val splashScreen = installSplashScreen()
         super.onCreate(savedInstanceState)
+        // Sous-lot 2d, D5 — le splash couvre exactement le frame vide que
+        // `hasSeenOnboarding == null` contournait deja plus bas (Lot 10) :
+        // il reste a l'ecran tant que la preference n'est pas chargee.
+        var isReady by mutableStateOf(false)
+        splashScreen.setKeepOnScreenCondition { !isReady }
         setContent {
             // Tache 9.0.2 : calculee une seule fois ici, fournie a toute
             // l'arborescence via LocalWindowSizeClass (core:designsystem) -
@@ -53,6 +63,9 @@ class MainActivity : ComponentActivity() {
                 // qu'un flash sur LibraryRoute avant redirection vers
                 // l'onboarding (piège explicite du plan, Tâche 10.4).
                 val hasSeenOnboarding by appThemeViewModel.hasSeenOnboarding.collectAsState()
+                LaunchedEffect(hasSeenOnboarding) {
+                    if (hasSeenOnboarding != null) isReady = true
+                }
                 InkToneTheme(useDynamicColor = useDynamicColor, appTheme = appTheme) {
                     Surface {
                         if (hasSeenOnboarding == null) return@Surface
