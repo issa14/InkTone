@@ -9,7 +9,9 @@ import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.asCoroutineDispatcher
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.sync.Mutex
 import kotlinx.coroutines.sync.Semaphore
+import kotlinx.coroutines.sync.withLock
 import kotlinx.coroutines.sync.withPermit
 import kotlinx.coroutines.withContext
 import org.readium.r2.shared.ExperimentalReadiumApi
@@ -118,6 +120,9 @@ class EpubChapterParser @Inject constructor(
 
     private val semaphore = Semaphore(2)
 
+    /** Protège l'ouverture paresseuse des [Publication] (race condition). */
+    private val openMutex = Mutex()
+
     // ---- API publique (ChapterParser) ----
 
     /**
@@ -208,9 +213,16 @@ class EpubChapterParser @Inject constructor(
                 "Publication $publicationId non enregistrée — appeler registerPublication() d'abord",
             )
 
-        return withContext(parserDispatcher) {
-            openPublication(fileUri).also { pub ->
-                openPublications[publicationId] = pub
+        // Mutex évite la race condition : deux appels concurrents pour le même
+        // publicationId ne peuvent pas ouvrir deux Publications simultanément.
+        return openMutex.withLock {
+            // Double-check après acquisition du lock
+            openPublications[publicationId]?.let { return@withLock it }
+
+            withContext(parserDispatcher) {
+                openPublication(fileUri).also { pub ->
+                    openPublications[publicationId] = pub
+                }
             }
         }
     }
