@@ -1,6 +1,7 @@
 package com.inktone.feature.reader
 
 import android.graphics.Bitmap
+import android.util.LruCache
 import androidx.compose.foundation.background
 import androidx.compose.foundation.gestures.detectTransformGestures
 import androidx.compose.foundation.layout.Box
@@ -31,6 +32,7 @@ import com.inktone.domain.model.RenderedPage
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.isActive
 import kotlin.math.roundToInt
+import java.nio.IntBuffer
 
 /**
  * Rendu d'un PDF page par page (Lot 12, Palier 2, tâche 12.8) — bitmap
@@ -67,6 +69,13 @@ fun FixedPageContent(
 
     val pagerState = rememberPagerState(initialPage = currentPageIndex.coerceIn(0, pageCount - 1)) { pageCount }
 
+    // Lot 12, tache 12.8 — cache LruCache limite a 5 pages (active,
+    // N-1, N+1, N-2, N+2) avec recyclage Bitmap.inBitmap sur les entrees
+    // evincees pour eviter les a-coups du ramasse-miettes (decision
+    // actee du plan). Cree UNE fois par FixedPageContent, partage entre
+    // toutes les pages du HorizontalPager.
+    val bitmapCache = remember { BitmapCache(maxSize = 5) }
+
     // Meme garde que le mode SCROLL/PAGED existant (isProgrammaticScroll,
     // voir ReaderScreen) : une navigation programmatique (table des
     // matieres, reprise de lecture, recherche) ne doit pas etre reprise
@@ -101,6 +110,7 @@ fun FixedPageContent(
             renderPage = renderPage,
             invertColors = invertColors(pageIndex),
             onPageOffsetChanged = onPageOffsetChanged,
+            bitmapCache = bitmapCache,
         )
     }
 }
@@ -112,6 +122,7 @@ private fun FixedPage(
     renderPage: suspend (pageIndex: Int, targetWidthPx: Int) -> RenderedPage?,
     invertColors: Boolean,
     onPageOffsetChanged: (Float) -> Unit,
+    bitmapCache: BitmapCache,
 ) {
     var viewportSizePx by remember { mutableStateOf(IntSize.Zero) }
 
@@ -137,18 +148,35 @@ private fun FixedPage(
     var renderedScale by remember(pageIndex) { mutableFloatStateOf(1f) }
     var bitmap by remember(pageIndex) { mutableStateOf<ImageBitmap?>(null) }
 
+    // Lot 12, tache 12.8 — LruCache partage (5 pages max) + recyclage
+    // Bitmap.inBitmap : une page deja rendue est servie depuis le cache
+    // sans nouvel appel JNI ; une page evincee du cache est conservee
+    // dans un pool d'une entree pour etre reutilisee via
+    // copyPixelsFromBuffer (inBitmap n'est pas applicable aux IntArray
+    // de RenderedPage — pixels bruts, pas de decodage BitmapFactory).
     LaunchedEffect(pageIndex, viewportSizePx) {
         if (viewportSizePx.width <= 0) return@LaunchedEffect
-        val rendered = renderPage(pageIndex, viewportSizePx.width)
-        if (rendered != null) {
-            bitmap = rendered.toImageBitmap()
+
+        val cached = bitmapCache.get(pageIndex)
+        if (cached != null && cached.width == viewportSizePx.width) {
+            bitmap = cached.asImageBitmap()
             renderedScale = 1f
+            return@LaunchedEffect
         }
+
+        val rendered = renderPage(pageIndex, viewportSizePx.width) ?: return@LaunchedEffect
+        val bmp = bitmapCache.createBitmap(rendered)
+        bitmapCache.put(pageIndex, bmp)
+        bitmap = bmp.asImageBitmap()
+        renderedScale = 1f
     }
 
     // Rasterisation haute definition au relachement du geste (debounce) -
     // jamais a chaque frame du pincement, qui saturerait le dispatcher
     // JNI a un seul thread (decision actee, tache 12.2/12.7).
+    // Cette re-rasterisation n'est pas mise en cache (dimensions
+    // differentes de celle au repos, usage ponctuel) — seul le rendu
+    // standard a la largeur du viewport est conserve dans le LruCache.
     LaunchedEffect(pageIndex, scale) {
         if (scale <= 1.01f || viewportSizePx.width <= 0) return@LaunchedEffect
         delay(250)
@@ -156,7 +184,8 @@ private fun FixedPage(
         val targetScale = scale.coerceAtMost(MAX_RENDER_SCALE)
         val targetWidthPx = (viewportSizePx.width * targetScale).roundToInt()
         val rendered = renderPage(pageIndex, targetWidthPx) ?: return@LaunchedEffect
-        bitmap = rendered.toImageBitmap()
+        val bmp = Bitmap.createBitmap(rendered.pixelsArgb, rendered.widthPx, rendered.heightPx, Bitmap.Config.ARGB_8888)
+        bitmap = bmp.asImageBitmap()
         renderedScale = targetScale
     }
 
@@ -224,3 +253,48 @@ private val invertedColorFilter = ColorFilter.colorMatrix(
 
 private const val MAX_RENDER_SCALE = 3f
 private const val MAX_GESTURE_SCALE = 5f
+
+/**
+ * Cache de bitmaps PDF avec recyclage (Lot 12, tâche 12.8).
+ *
+ * **LruCache (5 pages max)** : les pages N-2, N-1, N (active), N+1, N+2
+ * restent en mémoire pour une navigation séquentielle fluide. Au-delà,
+ * la page la moins récemment utilisée est évincée.
+ *
+ * **Recyclage Bitmap** : `inBitmap` (BitmapFactory) n'est pas applicable
+ * ici car [RenderedPage] transporte des pixels bruts (`IntArray`), pas
+ * un flux encodé. À la place, le bitmap évincé est conservé dans un pool
+ * d'une entrée et réutilisé via [Bitmap.copyPixelsFromBuffer] si ses
+ * dimensions correspondent — une allocation de `IntBuffer` temporaire
+ * (négligeable) remplace une allocation de `Bitmap` (coûteuse).
+ */
+private class BitmapCache(maxSize: Int) : LruCache<Int, Bitmap>(maxSize) {
+
+    /** Pool d'un bitmap évincé, conservé pour recyclage. */
+    private var spare: Bitmap? = null
+
+    /**
+     * Crée ou recycle un [Bitmap] depuis [page] rendue. Si un bitmap
+     * de mêmes dimensions est disponible dans le pool, ses pixels sont
+     * écrasés plutôt que de créer un nouvel objet — évite une allocation
+     * native + GC pendant la navigation séquentielle.
+     */
+    fun createBitmap(page: RenderedPage): Bitmap {
+        val reusable = spare
+        if (reusable != null && !reusable.isRecycled &&
+            reusable.width == page.widthPx && reusable.height == page.heightPx
+        ) {
+            spare = null
+            reusable.copyPixelsFromBuffer(IntBuffer.wrap(page.pixelsArgb))
+            return reusable
+        }
+        return Bitmap.createBitmap(page.pixelsArgb, page.widthPx, page.heightPx, Bitmap.Config.ARGB_8888)
+    }
+
+    override fun entryRemoved(evicted: Boolean, key: Int, oldValue: Bitmap, newValue: Bitmap?) {
+        if (evicted && !oldValue.isRecycled) {
+            spare?.recycle()
+            spare = oldValue
+        }
+    }
+}

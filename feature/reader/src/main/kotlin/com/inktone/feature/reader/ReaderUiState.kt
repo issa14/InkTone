@@ -122,6 +122,11 @@ data class ReaderUiState(
     // courante (decision actee 7 du plan, Palier 1) - seul equivalent de
     // `currentSentenceIndex` pour un format sans notion de phrase.
     val pageOffsetY: Float = 0f,
+    // Lot 12, tâche 12.11 — inversion forcee sur pages scannees (sans
+    // texte extrait). Desactivee par defaut : une page image pure
+    // conserve son rendu original. Activee manuellement via l'intent
+    // ToggleForcePdfInversion (pas de persistence, ecart declare).
+    val forcePdfInversion: Boolean = false,
 ) {
     val currentChapter: Chapter? get() = chapters.getOrNull(currentChapterIndex)
     val hasNextChapter: Boolean get() = currentChapterIndex < chapters.lastIndex
@@ -368,4 +373,12 @@ sealed interface ReaderIntent {
      * l'intervalle configuré).
      */
     data object SnoozeEyeRestReminder : ReaderIntent
+
+    /**
+     * Lot 12, tâche 12.11 — force l'inversion de luminance sur les pages
+     * PDF scannées (sans texte extrait), normalement exclues de
+     * l'inversion automatique. Désactivé par défaut, non persisté
+     * (écart déclaré : pas d'UI de réglage encore exposée).
+     */
+    data object ToggleForcePdfInversion : ReaderIntent
 }

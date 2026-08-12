@@ -169,6 +169,12 @@ class ReaderViewModel @Inject constructor(
             is ReaderIntent.DismissError -> _state.value = _state.value.copy(errorMessage = null)
             is ReaderIntent.DismissVoiceDownloadPrompt -> _state.value = _state.value.copy(showVoiceDownloadPrompt = false)
             is ReaderIntent.ToggleReadingMode -> {
+                // Lot 12, tâche 12.10 — un PDF est nativement paginé,
+                // la bascule SCROLL/PAGED n'a pas de sens pour ce format
+                // (décision actée 16). Le bouton est déjà masqué dans
+                // UnifiedControlPanel (showTtsControls = !isPdf) ; cette
+                // garde couvre un déclencheur externe éventuel.
+                if (_state.value.publicationFormat == PublicationFormat.PDF) return
                 val newMode = if (_state.value.readingMode == ReadingMode.SCROLL) ReadingMode.PAGED else ReadingMode.SCROLL
                 _state.value = _state.value.copy(readingMode = newMode)
                 // B.1 — persiste le mode de lecture
@@ -205,6 +211,9 @@ class ReaderViewModel @Inject constructor(
             is ReaderIntent.ResumeFromEyeRestReminder -> resumeFromEyeRestReminder()
             is ReaderIntent.SnoozeEyeRestReminder -> snoozeEyeRestReminder()
             is ReaderIntent.UpdatePageOffset -> updatePageOffset(intent.offsetY)
+            is ReaderIntent.ToggleForcePdfInversion -> _state.value = _state.value.copy(
+                forcePdfInversion = !_state.value.forcePdfInversion,
+            )
         }
     }
 
@@ -720,6 +729,12 @@ class ReaderViewModel @Inject constructor(
      * de la phrase en cours avant que l'annulation ne soit observée.
      */
     private fun playCurrentSentence() {
+        // Lot 12, tache 12.10 — TTS hors perimetre pour un PDF (decision
+        // actee 16). Le bouton declencheur est deja masque (UnifiedControlPanel,
+        // ReaderTtsPanel inatteignable) ; cette garde couvre un
+        // declencheur externe eventuel (MediaSession/ecran verrouille),
+        // jamais audite pour ce format.
+        if (_state.value.publicationFormat == PublicationFormat.PDF) return
         playbackJob = viewModelScope.launch {
             val chapter = _state.value.currentChapter ?: return@launch
             val sentences = chapter.paragraphs.flatMap { it.sentences }

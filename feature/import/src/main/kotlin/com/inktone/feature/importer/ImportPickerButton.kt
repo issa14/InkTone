@@ -9,9 +9,9 @@ import androidx.hilt.navigation.compose.hiltViewModel
 
 /**
  * Sélecteur SAF multi-fichiers (Tâche 6.2bis) — seul geste utilisateur qui
- * déclenche réellement `ImportWorker` (via [ImportViewModel]). EPUB et TXT
- * uniquement, cohérent avec `CompositePublicationParser`
- * (infrastructure/parser) — PDF hors périmètre v1 (ADR-017).
+ * déclenche réellement `ImportWorker` (via [ImportViewModel]). EPUB, TXT
+ * et PDF (Lot 12, Palier 2, tâche 12.12 — affichage seul, ADR-017),
+ * cohérent avec `CompositePublicationParser` (infrastructure/parser).
  */
 @Composable
 fun ImportPickerButton(viewModel: ImportViewModel = hiltViewModel()) {
@@ -24,7 +24,7 @@ fun ImportPickerButton(viewModel: ImportViewModel = hiltViewModel()) {
     }
 
     Button(onClick = {
-        launcher.launch(arrayOf("application/epub+zip", "text/plain"))
+        launcher.launch(arrayOf("application/epub+zip", "text/plain", "application/pdf"))
     }) {
         Text("Importer des livres")
     }

@@ -558,11 +558,22 @@ fun ReaderScreen(
                     onPageIndexChanged = { pageIndex -> viewModel.onIntent(ReaderIntent.JumpToChapter(pageIndex)) },
                     onPageOffsetChanged = { offsetY -> viewModel.onIntent(ReaderIntent.UpdatePageOffset(offsetY)) },
                     renderPage = viewModel::renderPdfPage,
-                    // Tache 12.11 (pas celle-ci) branche la vraie decision
-                    // (luminance du theme actif) - aucune inversion tant
-                    // qu'elle n'est pas cablee, jamais une valeur qui
-                    // simulerait un comportement non implemente.
-                    invertColors = { false },
+                    // Tâche 12.11 — inversion de luminance pour les thèmes
+                    // sombres (Obsidienne, Noir Absolu AMOLED) et Sépia
+                    // Vintage sur les pages vectorielles. Les pages
+                    // scannées (sans texte) ne sont pas inversées par
+                    // défaut — sauf si l'utilisateur a activé l'option
+                    // « Forcer l'inversion » (ToggleForcePdfInversion).
+                    invertColors = { pageIndex ->
+                        val chapter = state.chapters.getOrNull(pageIndex)
+                        val hasText = chapter?.paragraphs?.isNotEmpty() == true
+                        if (hasText) {
+                            val bgHex = state.resolvedTheme.backgroundColorHex
+                            bgHex == "#000000" || state.resolvedTheme.id == "sepia_vintage"
+                        } else {
+                            state.forcePdfInversion
+                        }
+                    },
                     reduceMotion = state.reduceMotion,
                 )
             } else {
@@ -760,7 +771,12 @@ fun ReaderScreen(
                     // unifié (navigation par chapitre, retirée du panneau au lot
                     // 3b) ; le panneau complet ne revient que par l'overlay A5 ou
                     // à l'arrêt de la lecture.
-                    if (state.isPlaying && !showFullPanelOverlay) {
+                    // Lot 12, tache 12.10 — la barre pilule TTS n'a pas
+                    // lieu d'apparaitre pour un PDF (isPlaying reste faux,
+                    // playCurrentSentence se neutralise pour ce format,
+                    // decision actee 16) : garde explicite, pas seulement
+                    // transitive.
+                    if (state.isPlaying && !showFullPanelOverlay && !isPdf) {
                         // 3e.2 — repli en bouton unique après 4s (isPillCollapsed,
                         // voir onAutoHide plus haut).
                         //
@@ -848,6 +864,7 @@ fun ReaderScreen(
                             onAaClick = { keepHudVisible(); showSettingsPanel = true },
                             onTtsClick = { keepHudVisible(); showTtsPanel = true },
                             onReadingModeClick = { keepHudVisible(); viewModel.onIntent(ReaderIntent.ToggleReadingMode) },
+                            showTtsControls = !isPdf,
                             onBrightnessClick = {
                                 // Bug réel corrigé (vérification device, lot 3d) : masque le
                                 // HUD au lieu de le garder visible — la barre prend sa place
@@ -965,6 +982,7 @@ fun ReaderScreen(
                 onSetEyeRestReminderEnabled = { enabled -> viewModel.onIntent(ReaderIntent.SetEyeRestReminderEnabled(enabled)) },
                 onSetEyeRestReminderInterval = { minutes -> viewModel.onIntent(ReaderIntent.SetEyeRestReminderInterval(minutes)) },
                 onDismiss = { showSleepTimerPanel = false },
+                showSleepTimer = !isPdf,
             )
         }
 
