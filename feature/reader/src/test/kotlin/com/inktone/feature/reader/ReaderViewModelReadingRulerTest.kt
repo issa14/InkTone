@@ -67,6 +67,7 @@ class ReaderViewModelReadingRulerTest {
             getVoiceProfiles = com.inktone.domain.usecase.GetVoiceProfilesUseCase(com.inktone.core.testing.fake.FakeVoiceProfileRepository()),
             readingSessionRepository = com.inktone.core.testing.fake.FakeReadingSessionRepository(),
             themeRepository = com.inktone.core.testing.fake.FakeThemeRepository(),
+            fixedPageRenderer = com.inktone.core.testing.fake.FakeFixedPageRenderer(),
         )
         dispatcher.scheduler.advanceUntilIdle()
 

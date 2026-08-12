@@ -566,7 +566,7 @@ Règle héritée du legacy (K6) : la résolution des ressources normalise les hr
 | Phase produit | Formats | Périmètre |
 |---|---|---|
 | **v1** | EPUB, TXT | Expérience complète : lecture, TTS, annotations, recherche |
-| v1.x | PDF | **Affichage seul** dans un premier temps (rendu paginé) ; TTS sur PDF conditionné à une extraction fiable de l'ordre de lecture (ADR-017) |
+| v1.x | PDF | ✅ **Affichage seul livré** (Lot 12, 2026-08-12) : rendu paginé PDFium, import, couverture, navigation, signets, reprise, thèmes sombre/sépia. TTS sur PDF conditionné à une extraction fiable de l'ordre de lecture (ADR-017, second volet). |
 | v2.x | HTML, Markdown, FB2 | Selon demande |
 | Étude | DOCX, MOBI, AZW3 | Sous réserve de faisabilité technique et légale |
 
@@ -1364,7 +1364,7 @@ Objectif : une base irréprochable sur un périmètre maîtrisé.
 
 ## 16.4 Version 1.x+ — Advanced Reading
 
-Collections personnalisées ; entité Tag normalisée au-delà des `subjects` ; **PDF en affichage** (ADR-017) ; thèmes avancés ; dictionnaire intégré ; améliorations typographiques (césure, justification).
+Collections personnalisées ; entité Tag normalisée au-delà des `subjects` ; **PDF en affichage ✅ (Lot 12, 2026-08-12)** — rendu paginé sans reflow (PDFium), import, couverture, navigation page à page, signets, reprise de lecture, thèmes sombre/sépia sur pages vectorielles. TTS sur PDF conditionné à l'extraction d'ordre de lecture (ADR-017, volet 2) ; thèmes avancés ; dictionnaire intégré ; améliorations typographiques (césure, justification).
 
 ## 16.5 Version 2.x — Sync & Beyond
 

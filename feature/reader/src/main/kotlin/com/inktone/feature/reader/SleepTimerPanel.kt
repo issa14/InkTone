@@ -60,6 +60,12 @@ fun SleepTimerPanel(
     onSetEyeRestReminderEnabled: (Boolean) -> Unit,
     onSetEyeRestReminderInterval: (Int) -> Unit,
     onDismiss: () -> Unit,
+    // Lot 12, tache 12.10 — le minuteur de sommeil n'a pas de sens sans
+    // lecture audio a mettre en pause (decision actee 16 du plan) ; le
+    // repos oculaire (Section 2 ci-dessous), independant du TTS, reste
+    // toujours accessible — c'est pourquoi ce panneau reste ouvrable pour
+    // un PDF plutot que de masquer son bouton declencheur en bloc.
+    showSleepTimer: Boolean = true,
 ) {
     val sheetState = rememberModalBottomSheetState(skipPartiallyExpanded = true)
 
@@ -69,42 +75,44 @@ fun SleepTimerPanel(
                 .fillMaxWidth()
                 .padding(horizontal = 24.dp, vertical = 16.dp),
         ) {
-            Text(
-                "Minuteur de sommeil",
-                style = MaterialTheme.typography.titleMedium,
-                fontWeight = FontWeight.Bold,
-            )
-            Spacer(Modifier.height(4.dp))
-
-            if (remainingMinutes != null) {
+            if (showSleepTimer) {
                 Text(
-                    "Actif — $remainingMinutes min restantes",
-                    style = MaterialTheme.typography.bodyMedium,
-                    color = MaterialTheme.colorScheme.primary,
+                    "Minuteur de sommeil",
+                    style = MaterialTheme.typography.titleMedium,
+                    fontWeight = FontWeight.Bold,
                 )
-                TextButton(onClick = { onSetSleepTimer(null) }) { Text("Annuler") }
-            }
+                Spacer(Modifier.height(4.dp))
 
-            Spacer(Modifier.height(12.dp))
-
-            Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                SLEEP_TIMER_CHIP_MINUTES.forEach { minutes ->
-                    FilterChip(
-                        selected = remainingMinutes == minutes,
-                        onClick = { onSetSleepTimer(minutes) },
-                        label = { Text("$minutes min") },
+                if (remainingMinutes != null) {
+                    Text(
+                        "Actif — $remainingMinutes min restantes",
+                        style = MaterialTheme.typography.bodyMedium,
+                        color = MaterialTheme.colorScheme.primary,
                     )
+                    TextButton(onClick = { onSetSleepTimer(null) }) { Text("Annuler") }
                 }
+
+                Spacer(Modifier.height(12.dp))
+
+                Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                    SLEEP_TIMER_CHIP_MINUTES.forEach { minutes ->
+                        FilterChip(
+                            selected = remainingMinutes == minutes,
+                            onClick = { onSetSleepTimer(minutes) },
+                            label = { Text("$minutes min") },
+                        )
+                    }
+                }
+
+                Spacer(Modifier.height(20.dp))
+                Text("Durée personnalisée", style = MaterialTheme.typography.labelLarge)
+                Spacer(Modifier.height(8.dp))
+                CustomDurationWheel(onConfirm = { totalMinutes -> onSetSleepTimer(totalMinutes) })
+
+                Spacer(Modifier.height(24.dp))
+                HorizontalDivider()
+                Spacer(Modifier.height(16.dp))
             }
-
-            Spacer(Modifier.height(20.dp))
-            Text("Durée personnalisée", style = MaterialTheme.typography.labelLarge)
-            Spacer(Modifier.height(8.dp))
-            CustomDurationWheel(onConfirm = { totalMinutes -> onSetSleepTimer(totalMinutes) })
-
-            Spacer(Modifier.height(24.dp))
-            HorizontalDivider()
-            Spacer(Modifier.height(16.dp))
 
             // ── Section 2 — Repos oculaire, indépendant du TTS (3d.5) ──
             Row(

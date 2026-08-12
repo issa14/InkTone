@@ -27,6 +27,7 @@ import androidx.compose.ui.unit.dp
 import com.inktone.core.designsystem.AppIcons
 import com.inktone.core.designsystem.AppSymbol
 import com.inktone.domain.model.Publication
+import com.inktone.domain.model.PublicationFormat
 import java.text.DateFormat
 import java.util.Date
 import kotlin.math.log10
@@ -145,7 +146,18 @@ fun BookDetailsSheet(publication: Publication, onDismiss: () -> Unit) {
             publication.language?.let { DetailRow("Langue", it) }
             DetailRow("Format", publication.format.name)
             DetailRow("Taille", formatFileSize(publication.fileSize))
-            DetailRow("Chapitres", publication.chapterCount.toString())
+            // Lot 12, tâche 12.12 — libellé conditionnel selon le format :
+            // « Pages » pour un PDF (pagination fixe), « Chapitres » pour
+            // EPUB/TXT (structure reflowable). pageCount et chapterCount
+            // coïncident numériquement pour un PDF par construction
+            // (décision actée 6 du plan) mais portent des intentions
+            // différentes — on affiche pageCount pour un PDF car c'est
+            // l'information que l'utilisateur attend.
+            if (publication.format == PublicationFormat.PDF) {
+                DetailRow("Pages", (publication.pageCount ?: publication.chapterCount).toString())
+            } else {
+                DetailRow("Chapitres", publication.chapterCount.toString())
+            }
             if (publication.subjects.isNotEmpty()) DetailRow("Sujets", publication.subjects.joinToString())
             DetailRow("Importé le", DateFormat.getDateInstance().format(Date(publication.importDate)))
             if (!publication.description.isNullOrBlank()) {

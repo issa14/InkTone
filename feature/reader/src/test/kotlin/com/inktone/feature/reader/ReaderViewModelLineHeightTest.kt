@@ -77,6 +77,7 @@ class ReaderViewModelLineHeightTest {
             getVoiceProfiles = GetVoiceProfilesUseCase(voiceProfileRepository),
             readingSessionRepository = FakeReadingSessionRepository(),
             themeRepository = FakeThemeRepository(),
+            fixedPageRenderer = com.inktone.core.testing.fake.FakeFixedPageRenderer(),
         )
         dispatcher.scheduler.advanceUntilIdle()
 

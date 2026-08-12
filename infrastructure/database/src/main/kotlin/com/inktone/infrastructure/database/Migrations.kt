@@ -377,3 +377,14 @@ val MIGRATION_23_24 = object : Migration(23, 24) {
         )
     }
 }
+
+/**
+ * Lot 12, tâche 12.5 — comptage de pages pour un format paginé (PDF).
+ * Colonne nullable à défaut neutre : une ligne existante (EPUB/TXT) se
+ * retrouve simplement à `pageCount IS NULL`, jamais en échec.
+ */
+val MIGRATION_24_25 = object : Migration(24, 25) {
+    override fun migrate(db: SupportSQLiteDatabase) {
+        db.execSQL("ALTER TABLE publications ADD COLUMN pageCount INTEGER DEFAULT NULL")
+    }
+}

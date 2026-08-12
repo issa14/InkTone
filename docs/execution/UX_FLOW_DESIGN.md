@@ -852,6 +852,43 @@ Les 7 icônes (Sommaire, Marque-pages, Play, Thème, TT, Minuteur, Haut-parleur)
 
 ---
 
+## Lecture PDF — Matrice des fonctionnalités (Lot 12, tâche 12.14)
+
+**Contexte :** le support PDF en affichage seul (ADR-017, volet 1) est livré au Lot 12 (2026-08-12). Aucune maquette préalable n'existait pour `FixedPageContent` — exception assumée (décision actée 20 du plan), sur le même modèle que `SyncConflictBottomSheet` au Lot 11 : la conception a été faite directement en code, consignée ici a posteriori.
+
+### Fonctionnalités désactivées pour le format PDF
+
+Chaque désactivation est explicite et visible dans le code — jamais un bouton qui reste actif sans effet (décision actée 16 du plan).
+
+| Fonctionnalité | Statut en lecture PDF | Raison |
+|---|---|---|
+| **TTS / Lecture audio** | ❌ Masqué (`playCurrentSentence` neutralisé, `showTtsControls = false`) | Pas de « phrase courante » en navigation manuelle page à page ; le TTS sur PDF est un lot distinct conditionné (ADR-017, volet 2) |
+| **Minuteur de sommeil** | ❌ Masqué (`showSleepTimer = false`) | Sans TTS actif, un minuteur d'arrêt automatique n'a pas de sens |
+| **Bascule SCROLL/PAGED** | ❌ Masqué (`showTtsControls = false` masque le bouton Mode ; `ToggleReadingMode` neutralisé dans le ViewModel) | Un PDF est nativement paginé — le défilement vertical n'a pas de sens pour un format à mise en page fixe |
+| **Sélection libre au mot / Annotations** | ❌ Non déclenché | Un rendu bitmap sous `Canvas` n'offre pas la sélection native de `BasicTextField` ; l'ajout demanderait un hit-testing dédié sur les `BoundingBox` de mots (hors périmètre) |
+| **Repos oculaire** | ✅ Conservé | Indépendant du TTS — simple rappel de pause visuelle, fonctionne déjà en lecture purement visuelle |
+| **Signets** | ✅ Adapté | Même `Locator`, mêmes Use Cases — granularité page (`chapterIndex`), pas phrase |
+| **Recherche plein texte** | ✅ Compatible | Texte extrait au parsing (PDF vectoriel) indexé en FTS, navigation via `chapterIndex` sans code spécifique |
+| **Thèmes sombre/sépia** | ✅ Vectoriel seulement | `ColorMatrix` d'inversion appliqué si la page contient du texte extrait (`paragraphs.isNotEmpty()`). Page scannée (image pure) : rendu original conservé |
+| **Reprise de lecture** | ✅ Conservée | `pageOffsetY` stocké dans le `Locator`, restaure la page ET le défilement intra-page |
+
+### Principe de navigation
+
+- **Page = Chapitre** dans le `DocumentModel` (décision actée 4 du plan) : `currentChapterIndex` = page courante, `NextChapter`/`PreviousChapter`/`JumpToChapter` fonctionnent sans code spécifique.
+- **`HorizontalPager`** pour la navigation entre pages (Compose Foundation).
+- **Pas de reflow** : le bitmap PDFium est affiché tel quel (ADR-017).
+- **Zoom** : transformation GPU (`graphicsLayer`) pendant le geste de pincement ; re-rasterisation haute définition au relâchement (debounce 250 ms).
+- **Cache** : `LruCache` limité à 5 pages (active, N-1, N+1, N-2, N+2).
+
+### Écarts déclarés
+
+1. **Pas de maquette préalable** — `FixedPageContent` conçu directement en code (même exception que `SyncConflictBottomSheet` au Lot 11).
+2. **Rendu en tuiles simplifié** — une seule re-rasterisation à résolution supérieure au lieu d'un vrai découpage en grille de tuiles indépendantes.
+3. **Pas de mode paysage / double-page tablette** — à ouvrir seulement sur demande explicite.
+4. **Pas de « Forcer l'inversion » sur pages scannées** — l'option de réglage n'est pas encore exposée dans l'interface des préférences.
+
+---
+
 ## Prochain palier
 
 **Le flux général de niveau 1 est entièrement conçu.** Prochaines pistes possibles pour une future session, à définir avec Issa :
