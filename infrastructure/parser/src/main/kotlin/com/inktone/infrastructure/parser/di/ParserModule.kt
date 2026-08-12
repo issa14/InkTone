@@ -37,6 +37,10 @@ abstract class ParserModule {
 
     @Binds
     @Singleton
+    abstract fun bindEpubResourceResolver(impl: ReadiumResourceResolver): EpubResourceResolver
+
+    @Binds
+    @Singleton
     abstract fun bindFixedPageRenderer(impl: PdfPageRendererImpl): FixedPageRenderer
 
     companion object {
