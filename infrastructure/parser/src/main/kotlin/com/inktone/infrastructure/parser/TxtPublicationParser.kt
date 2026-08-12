@@ -1,6 +1,7 @@
 package com.inktone.infrastructure.parser
 
 import com.inktone.domain.model.Chapter
+import com.inktone.domain.model.ChapterContent
 import com.inktone.domain.model.DocumentModel
 import com.inktone.domain.model.Paragraph
 import com.inktone.domain.model.PublicationFormat
@@ -52,7 +53,7 @@ class TxtPublicationParser @Inject constructor(
 
         val fileName = fileStorageService.getFileName(fileUri) ?: fileUri.substringAfterLast('/')
         val titleWithoutExtension = fileName.substringBeforeLast('.', fileName)
-        val chapter = Chapter(index = 0, href = fileName, title = null, paragraphs = listOf(Paragraph(0, sentences)))
+        val chapter = Chapter(index = 0, href = fileName, title = null, content = ChapterContent.Legacy(paragraphs = listOf(Paragraph(0, sentences))))
         return ParseResult.Success(
             documentModel = DocumentModel(chapters = listOf(chapter), tableOfContents = emptyList(), resources = emptyList()),
             isDrmProtected = false, // TXT n'a jamais de DRM par définition

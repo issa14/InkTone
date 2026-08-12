@@ -12,6 +12,7 @@ import com.inktone.core.testing.fake.FakeTtsEngine
 import com.inktone.core.testing.fake.FakeVoiceProfileRepository
 import com.inktone.domain.model.Bookmark
 import com.inktone.domain.model.Chapter
+import com.inktone.domain.model.ChapterContent
 import com.inktone.domain.model.DocumentModel
 import com.inktone.domain.model.Paragraph
 import com.inktone.domain.model.Publication
@@ -66,25 +67,27 @@ class ReaderViewModelPdfTest {
                 index = pageIndex,
                 href = "page-$pageIndex",
                 title = null,
-                paragraphs = if (pageIndex % 2 == 0) {
-                    // Pages paires : vectorielles avec texte
-                    listOf(
-                        Paragraph(
-                            index = 0,
-                            sentences = listOf(
-                                Sentence(
-                                    index = 0,
-                                    text = "Page $pageIndex contenu texte.",
-                                    startOffset = 0,
-                                    endOffset = 25,
+                content = ChapterContent.Legacy(
+                    paragraphs = if (pageIndex % 2 == 0) {
+                        // Pages paires : vectorielles avec texte
+                        listOf(
+                            Paragraph(
+                                index = 0,
+                                sentences = listOf(
+                                    Sentence(
+                                        index = 0,
+                                        text = "Page $pageIndex contenu texte.",
+                                        startOffset = 0,
+                                        endOffset = 25,
+                                    ),
                                 ),
                             ),
-                        ),
-                    )
-                } else {
-                    // Pages impaires : scannées sans texte (image pure)
-                    emptyList()
-                },
+                        )
+                    } else {
+                        // Pages impaires : scannées sans texte (image pure)
+                        emptyList()
+                    },
+                ),
             )
         }
 

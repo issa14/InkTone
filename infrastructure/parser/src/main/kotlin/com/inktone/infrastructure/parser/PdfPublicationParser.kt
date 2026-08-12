@@ -3,6 +3,7 @@ package com.inktone.infrastructure.parser
 import android.content.Context
 import android.graphics.Bitmap
 import com.inktone.domain.model.Chapter
+import com.inktone.domain.model.ChapterContent
 import com.inktone.domain.model.DocumentModel
 import com.inktone.domain.model.Paragraph
 import com.inktone.domain.model.PublicationFormat
@@ -93,7 +94,9 @@ class PdfPublicationParser @Inject constructor(
                         index = pageIndex,
                         href = "page-$pageIndex",
                         title = null,
-                        paragraphs = if (sentences.isEmpty()) emptyList() else listOf(Paragraph(0, sentences)),
+                        content = ChapterContent.Legacy(
+                            paragraphs = if (sentences.isEmpty()) emptyList() else listOf(Paragraph(0, sentences)),
+                        ),
                     )
                 }
             }

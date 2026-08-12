@@ -11,6 +11,7 @@ import com.inktone.core.testing.fake.FakeTtsEngine
 import com.inktone.core.testing.fake.FakeVoiceProfileRepository
 import com.inktone.domain.model.AnnotationColor
 import com.inktone.domain.model.Chapter
+import com.inktone.domain.model.ChapterContent
 import com.inktone.domain.model.DocumentModel
 import com.inktone.domain.model.Paragraph
 import com.inktone.domain.model.Publication
@@ -57,10 +58,12 @@ class ReaderViewModelBookmarkToggleTest {
         index = 0,
         href = "OEBPS/chapter1.xhtml",
         title = null,
-        paragraphs = listOf(
-            Paragraph(
-                index = 0,
-                sentences = listOf(Sentence(index = 0, text = "Phrase unique.", startOffset = 0, endOffset = 14)),
+        content = ChapterContent.Legacy(
+            paragraphs = listOf(
+                Paragraph(
+                    index = 0,
+                    sentences = listOf(Sentence(index = 0, text = "Phrase unique.", startOffset = 0, endOffset = 14)),
+                ),
             ),
         ),
     )
@@ -224,10 +227,12 @@ class ReaderViewModelBookmarkToggleTest {
         val longText = "a".repeat(400)
         val longChapter = Chapter(
             index = 0, href = "OEBPS/chapter1.xhtml", title = null,
-            paragraphs = listOf(
-                Paragraph(
-                    index = 0,
-                    sentences = listOf(Sentence(index = 0, text = longText, startOffset = 0, endOffset = longText.length)),
+            content = ChapterContent.Legacy(
+                paragraphs = listOf(
+                    Paragraph(
+                        index = 0,
+                        sentences = listOf(Sentence(index = 0, text = longText, startOffset = 0, endOffset = longText.length)),
+                    ),
                 ),
             ),
         )

@@ -10,6 +10,7 @@ import com.inktone.core.testing.fake.FakeReadingStateRepository
 import com.inktone.core.testing.fake.FakeTtsEngine
 import com.inktone.core.testing.fake.FakeVoiceProfileRepository
 import com.inktone.domain.model.Chapter
+import com.inktone.domain.model.ChapterContent
 import com.inktone.domain.model.DocumentModel
 import com.inktone.domain.model.Paragraph
 import com.inktone.domain.model.Publication
@@ -59,13 +60,15 @@ class ReaderViewModelScrollPositionTest {
         index = 0,
         href = "OEBPS/chapter1.xhtml",
         title = null,
-        paragraphs = listOf(
-            Paragraph(
-                index = 0,
-                sentences = listOf(
-                    Sentence(index = 0, text = "Phrase un.", startOffset = 0, endOffset = 10),
-                    Sentence(index = 1, text = "Phrase deux.", startOffset = 11, endOffset = 23),
-                    Sentence(index = 2, text = "Phrase trois.", startOffset = 24, endOffset = 37),
+        content = ChapterContent.Legacy(
+            paragraphs = listOf(
+                Paragraph(
+                    index = 0,
+                    sentences = listOf(
+                        Sentence(index = 0, text = "Phrase un.", startOffset = 0, endOffset = 10),
+                        Sentence(index = 1, text = "Phrase deux.", startOffset = 11, endOffset = 23),
+                        Sentence(index = 2, text = "Phrase trois.", startOffset = 24, endOffset = 37),
+                    ),
                 ),
             ),
         ),

@@ -28,6 +28,7 @@ import androidx.compose.ui.unit.IntSize
 import androidx.compose.ui.unit.dp
 import com.inktone.domain.model.Annotation
 import com.inktone.domain.model.Chapter
+import com.inktone.domain.model.ChapterContent
 import com.inktone.domain.model.Paragraph
 import com.inktone.domain.model.ParagraphStyle
 import com.inktone.domain.model.Sentence
@@ -138,9 +139,11 @@ class PagedChapterContentTest {
             index = 0,
             href = "c.xhtml",
             title = null,
-            paragraphs = listOf(
-                Paragraph(0, listOf(sentence(0, "$headingText.", 0)), ParagraphStyle.HEADING),
-                Paragraph(1, listOf(sentence(1, "Texte normal qui suit le titre.", 40)), ParagraphStyle.NORMAL),
+            content = ChapterContent.Legacy(
+                paragraphs = listOf(
+                    Paragraph(0, listOf(sentence(0, "$headingText.", 0)), ParagraphStyle.HEADING),
+                    Paragraph(1, listOf(sentence(1, "Texte normal qui suit le titre.", 40)), ParagraphStyle.NORMAL),
+                ),
             ),
         )
 
@@ -290,6 +293,6 @@ class PagedChapterContentTest {
             offset += text.length + 10
             p
         }
-        return Chapter(index = 0, href = "c.xhtml", title = null, paragraphs = paragraphs) to texts
+        return Chapter(index = 0, href = "c.xhtml", title = null, content = ChapterContent.Legacy(paragraphs = paragraphs)) to texts
     }
 }

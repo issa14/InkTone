@@ -1,6 +1,7 @@
 package com.inktone.feature.reader
 
 import com.inktone.domain.model.Chapter
+import com.inktone.domain.model.ChapterContent
 import com.inktone.domain.model.Paragraph
 import com.inktone.domain.model.Sentence
 import org.junit.Assert.assertEquals
@@ -17,8 +18,10 @@ class ReaderUiStateProgressionTest {
         index = index,
         href = "chapter$index.xhtml",
         title = null,
-        paragraphs = listOf(
-            Paragraph(index = 0, sentences = listOf(Sentence(index = 0, text = text, startOffset = 0, endOffset = text.length))),
+        content = ChapterContent.Legacy(
+            paragraphs = listOf(
+                Paragraph(index = 0, sentences = listOf(Sentence(index = 0, text = text, startOffset = 0, endOffset = text.length))),
+            ),
         ),
     )
 

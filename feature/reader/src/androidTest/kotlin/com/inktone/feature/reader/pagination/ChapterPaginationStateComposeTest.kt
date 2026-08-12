@@ -9,6 +9,7 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.test.junit4.createComposeRule
 import androidx.compose.ui.unit.dp
 import com.inktone.domain.model.Chapter
+import com.inktone.domain.model.ChapterContent
 import com.inktone.domain.model.Paragraph
 import com.inktone.domain.model.ParagraphStyle
 import com.inktone.domain.model.Sentence
@@ -44,7 +45,7 @@ class ChapterPaginationStateComposeTest {
             offset += text.length + 10
             p
         }
-        return Chapter(index = 0, href = "c.xhtml", title = null, paragraphs = paragraphs)
+        return Chapter(index = 0, href = "c.xhtml", title = null, content = ChapterContent.Legacy(paragraphs = paragraphs))
     }
 
     @Test

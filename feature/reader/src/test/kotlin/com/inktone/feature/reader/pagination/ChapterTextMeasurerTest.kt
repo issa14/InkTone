@@ -9,6 +9,7 @@ import androidx.compose.ui.unit.LayoutDirection
 import androidx.compose.ui.unit.sp
 import androidx.test.core.app.ApplicationProvider
 import com.inktone.domain.model.Chapter
+import com.inktone.domain.model.ChapterContent
 import com.inktone.domain.model.Paragraph
 import com.inktone.domain.model.ParagraphStyle
 import com.inktone.domain.model.Sentence
@@ -70,15 +71,17 @@ class ChapterTextMeasurerTest {
             index = 0,
             href = "chap1.xhtml",
             title = "Chapitre 1",
-            paragraphs = listOf(
-                Paragraph(index = 0, sentences = listOf(sentence(0, "Titre.", 0)), style = ParagraphStyle.HEADING),
-                Paragraph(
-                    index = 1,
-                    sentences = listOf(
-                        sentence(1, "Première phrase.", 10),
-                        sentence(2, "Deuxième phrase.", 30),
+            content = ChapterContent.Legacy(
+                paragraphs = listOf(
+                    Paragraph(index = 0, sentences = listOf(sentence(0, "Titre.", 0)), style = ParagraphStyle.HEADING),
+                    Paragraph(
+                        index = 1,
+                        sentences = listOf(
+                            sentence(1, "Première phrase.", 10),
+                            sentence(2, "Deuxième phrase.", 30),
+                        ),
+                        style = ParagraphStyle.NORMAL,
                     ),
-                    style = ParagraphStyle.NORMAL,
                 ),
             ),
         )
@@ -94,19 +97,17 @@ class ChapterTextMeasurerTest {
             index = 0,
             href = "chap1.xhtml",
             title = null,
-            paragraphs = listOf(
-                Paragraph(
-                    index = 0,
-                    sentences = listOf(
-                        // Offsets ressource choisis pour ne PAS coïncider avec
-                        // les offsets locaux qu'ils produiront (0, 7, 13) — sinon
-                        // le test ne distinguerait pas les deux espaces de
-                        // coordonnées par coïncidence numérique.
-                        sentence(0, "Alpha.", 4),
-                        sentence(1, "Beta.", 19),
-                        sentence(2, "Gamma.", 41),
+            content = ChapterContent.Legacy(
+                paragraphs = listOf(
+                    Paragraph(
+                        index = 0,
+                        sentences = listOf(
+                            sentence(0, "Alpha.", 4),
+                            sentence(1, "Beta.", 19),
+                            sentence(2, "Gamma.", 41),
+                        ),
+                        style = ParagraphStyle.NORMAL,
                     ),
-                    style = ParagraphStyle.NORMAL,
                 ),
             ),
         )
@@ -134,13 +135,13 @@ class ChapterTextMeasurerTest {
             index = 0,
             href = "h.xhtml",
             title = null,
-            paragraphs = listOf(Paragraph(0, listOf(sentence(0, text, 0)), ParagraphStyle.HEADING)),
+            content = ChapterContent.Legacy(paragraphs = listOf(Paragraph(0, listOf(sentence(0, text, 0)), ParagraphStyle.HEADING))),
         )
         val normalChapter = Chapter(
             index = 0,
             href = "n.xhtml",
             title = null,
-            paragraphs = listOf(Paragraph(0, listOf(sentence(0, text, 0)), ParagraphStyle.NORMAL)),
+            content = ChapterContent.Legacy(paragraphs = listOf(Paragraph(0, listOf(sentence(0, text, 0)), ParagraphStyle.NORMAL))),
         )
 
         val style = TextStyle(fontSize = 18.sp)
@@ -158,7 +159,7 @@ class ChapterTextMeasurerTest {
 
     @Test
     fun `chapitre vide produit un AnnotatedString vide et aucune ligne`() {
-        val chapter = Chapter(index = 0, href = "e.xhtml", title = null, paragraphs = emptyList())
+        val chapter = Chapter(index = 0, href = "e.xhtml", title = null, content = ChapterContent.Legacy(paragraphs = emptyList()))
 
         val result = measurer.measure(chapter, TextStyle(fontSize = 18.sp), maxWidthPx = 2000)
 

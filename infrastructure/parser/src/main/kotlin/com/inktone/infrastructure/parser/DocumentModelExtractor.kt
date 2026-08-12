@@ -1,6 +1,7 @@
 package com.inktone.infrastructure.parser
 
 import com.inktone.domain.model.Chapter
+import com.inktone.domain.model.ChapterContent
 import com.inktone.domain.model.DocumentModel
 import com.inktone.domain.model.Paragraph
 import com.inktone.domain.model.ParagraphStyle
@@ -172,8 +173,10 @@ class DocumentModelExtractor {
             index = chapterIndex,
             href = link.href.toString(),
             title = null,
-            paragraphs = paragraphs,
-            structuralBlocks = structuralBlocks,
+            content = ChapterContent.Legacy(
+                paragraphs = paragraphs,
+                structuralBlocks = structuralBlocks,
+            ),
         )
     }
 }

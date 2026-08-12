@@ -12,6 +12,7 @@ import com.inktone.core.testing.fake.FakeTtsEngine
 import com.inktone.core.testing.fake.FakeVoiceProfileRepository
 import com.inktone.domain.model.AnnotationColor
 import com.inktone.domain.model.Chapter
+import com.inktone.domain.model.ChapterContent
 import com.inktone.domain.model.DocumentModel
 import com.inktone.domain.model.Paragraph
 import com.inktone.domain.model.Publication
@@ -53,15 +54,16 @@ class ReaderViewModelFreeSelectionTest {
     @After
     fun tearDown() { Dispatchers.resetMain() }
 
-    // "Bonjour le monde." — le mot "monde" est aux offsets locaux 11-16.
     private fun oneSentenceChapter() = Chapter(
         index = 0,
         href = "OEBPS/chapter1.xhtml",
         title = null,
-        paragraphs = listOf(
-            Paragraph(
-                index = 0,
-                sentences = listOf(Sentence(index = 0, text = "Bonjour le monde.", startOffset = 0, endOffset = 18)),
+        content = ChapterContent.Legacy(
+            paragraphs = listOf(
+                Paragraph(
+                    index = 0,
+                    sentences = listOf(Sentence(index = 0, text = "Bonjour le monde.", startOffset = 0, endOffset = 18)),
+                ),
             ),
         ),
     )
