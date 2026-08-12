@@ -147,7 +147,41 @@ fun PagedChapterContent(
     // pager plutôt que de le contredire.
     var lastManuallyEmittedSentenceIndex by remember { mutableStateOf<Int?>(null) }
 
-    LaunchedEffect(pagerState.currentPage, pageCount) {
+    // Bug réel trouvé sur appareil (chapitre sauté après un swipe en fin
+    // de chapitre, ex. "Chapitre 2" → "Chapitre 4") : au swipe au-delà de
+    // la dernière page (page fantôme ci-dessus), onNextChapter() fait
+    // avancer le chapitre côté parent, mais rien ne remettait
+    // `pagerState` à la page 0 — contrairement au mode SCROLL
+    // (ReaderScreen, `scrollState.scrollToItem(0)` sur changement de
+    // chapitre). Une première version de ce correctif utilisait un
+    // `LaunchedEffect(chapter?.index)` SÉPARÉ pour ce reset : le
+    // changement de chapitre pouvait alors faire recomposer/relancer cet
+    // effet-ci (`pagerState.currentPage, pageCount`) AVANT que l'effet de
+    // reset n'ait eu la main (deux coroutines distinctes, ordre non
+    // garanti) — avec `pageCount` déjà celui du NOUVEAU chapitre mais
+    // `pagerState.currentPage` encore l'ancien index (page fantôme de
+    // l'ancien chapitre), `currentPage >= pageCount` pouvait redevenir
+    // vrai et redéclencher onNextChapter() une seconde fois, sautant le
+    // chapitre qui vient tout juste de s'ouvrir. Le détecteur de
+    // changement de chapitre est donc fusionné dans CET effet, comme
+    // première instruction séquentielle d'une seule et même coroutine :
+    // aucune autre branche de cet effet ne peut s'exécuter avant que le
+    // reset n'ait eu lieu.
+    var previousChapterIndex by remember { mutableStateOf(chapter?.index) }
+
+    LaunchedEffect(chapter?.index, pagerState.currentPage, pageCount) {
+        if (chapter?.index != previousChapterIndex) {
+            previousChapterIndex = chapter?.index
+            if (pagerState.currentPage != 0) {
+                isProgrammaticPageChange = true
+                try {
+                    pagerState.scrollToPage(0)
+                } finally {
+                    isProgrammaticPageChange = false
+                }
+            }
+            return@LaunchedEffect
+        }
         if (pagerState.currentPage >= pageCount) {
             onNextChapter()
         } else {
