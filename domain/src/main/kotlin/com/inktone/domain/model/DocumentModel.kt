@@ -14,86 +14,22 @@ data class DocumentModel(
 )
 
 /**
- * Contenu d'un chapitre — sealed pour transition compiler-checked entre
- * l'ancien modèle (Legacy) et le nouveau (Rich, basé sur [BookBlock]).
- *
- * Au Palier 5, [Legacy] est supprimé et [Rich] devient le seul variant.
+ * Contenu d'un chapitre — modèle Rich unifié (Plan v3, Palier 5).
+ * L'ancien modèle Legacy (Paragraph, ParagraphStyle, StructuralBlock) a
+ * été supprimé.
  */
 sealed class ChapterContent {
-    /** Ancien modèle : paragraphes + blocs structurels ancrés. */
-    data class Legacy(
-        val paragraphs: List<Paragraph>,
-        val structuralBlocks: List<StructuralBlock> = emptyList(),
-    ) : ChapterContent()
-
-    /** Nouveau modèle : blocs de rendu atomiques avec styles inline. */
     data class Rich(
         val blocks: List<BookBlock>,
     ) : ChapterContent()
-}
-
-/**
- * Style de rendu d'un paragraphe — n'affecte JAMAIS le texte lu par le
- * TTS, l'alignement CTC ou l'indexation FTS, uniquement l'affichage.
- * Extension non cassante de [Paragraph] (Tâche 1.3.1, Partie 1) —
- * valeur par défaut NORMAL, tout code existant continue de fonctionner
- * sans modification.
- *
- * @deprecated Remplacé par [BookBlock] (HeadingBlock, ParagraphBlock).
- *   Conservé uniquement pour [ChapterContent.Legacy] — sera supprimé au Palier 5.
- */
-@Deprecated("Remplacé par BookBlock (HeadingBlock, ParagraphBlock)")
-enum class ParagraphStyle { NORMAL, HEADING, BLOCK_QUOTE, POEM_LINE }
-
-/**
- * Blocs purement structurels, SANS texte participant au flux de
- * phrases — jamais vus par TTS/CTC/FTS, uniquement intercalés au rendu
- * (même principe que le legacy `computeStructuralBlockAnchors`).
- *
- * @deprecated Remplacé par [BookBlock] (ImageBlock, SeparatorBlock).
- *   Conservé uniquement pour [ChapterContent.Legacy] — sera supprimé au Palier 5.
- */
-@Deprecated("Remplacé par BookBlock (ImageBlock, SeparatorBlock)")
-sealed interface StructuralBlock {
-    /** Index du paragraphe APRÈS lequel ce bloc doit être intercalé. */
-    val anchorAfterParagraphIndex: Int
-
-    /** Image intercalée (EPUB `<img>`, etc.). */
-    data class EpubImage(
-        override val anchorAfterParagraphIndex: Int,
-        val href: String,
-        val altText: String?,
-    ) : StructuralBlock
-
-    /** Séparateur de section (ligne blanche, `* * *`, etc.). */
-    data class SectionBreak(
-        override val anchorAfterParagraphIndex: Int,
-    ) : StructuralBlock
 }
 
 data class Chapter(
     val index: Int,
     val href: String,
     val title: String?,
-    val content: ChapterContent, // NOUVEAU (Plan v3) : remplace paragraphs + structuralBlocks
-    val sentences: List<Sentence> = emptyList(), // NOUVEAU (Plan v3) : conservé pour TTS, avec blockIndex vers BookBlock
-) {
-    /** @deprecated Utiliser [content] (Legacy.paragraphs). */
-    @Deprecated("Utiliser content (Legacy.paragraphs)")
-    val paragraphs: List<Paragraph>
-        get() = (content as? ChapterContent.Legacy)?.paragraphs ?: emptyList()
-
-    /** @deprecated Utiliser [content] (Legacy.structuralBlocks). */
-    @Deprecated("Utiliser content (Legacy.structuralBlocks)")
-    val structuralBlocks: List<StructuralBlock>
-        get() = (content as? ChapterContent.Legacy)?.structuralBlocks ?: emptyList()
-}
-
-data class Paragraph(
-    val index: Int,
-    val sentences: List<Sentence>,
-    @Deprecated("Remplacé par BookBlock (HeadingBlock, ParagraphBlock)")
-    val style: ParagraphStyle = ParagraphStyle.NORMAL, // NOUVEAU, défaut non cassant
+    val content: ChapterContent,
+    val sentences: List<Sentence> = emptyList(),
 )
 
 /**

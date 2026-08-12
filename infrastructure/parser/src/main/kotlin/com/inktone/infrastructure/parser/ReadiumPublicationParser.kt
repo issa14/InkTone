@@ -56,8 +56,6 @@ class ReadiumPublicationParser @Inject constructor(
 
     override val supportedFormats = listOf(PublicationFormat.EPUB)
 
-    private val documentModelExtractor = DocumentModelExtractor()
-
     // Instanciation paresseuse — coûteuse, un seul jeu de composants
     // Readium réutilisé pour tous les parses de la durée de vie du singleton.
     private val httpClient by lazy { DefaultHttpClient() }
@@ -85,43 +83,7 @@ class ReadiumPublicationParser @Inject constructor(
         )
     }
 
-    override suspend fun parse(fileUri: String): ParseResult = withContext(Dispatchers.IO) {
-        // Tache 4.11 : accepte desormais aussi bien un chemin de fichier
-        // local de test (sans schema, ex. fixtures/marche a blanc) qu'une
-        // vraie URI SAF content:// (import reel) - Uri.toAbsoluteUrl()
-        // (Readium) gere les deux schemas (file/content) uniformement,
-        // contrairement a File(fileUri).toUrl() qui ne comprend que des
-        // chemins filesystem bruts.
-        val url = if (fileUri.contains("://")) {
-            Uri.parse(fileUri).toAbsoluteUrl()
-                ?: return@withContext ParseResult.Corrupted("URI non absolue: $fileUri")
-        } else {
-            File(fileUri).toUrl()
-        }
-
-        val asset = assetRetriever.retrieve(url).getOrElse {
-            return@withContext ParseResult.Corrupted("Echec de lecture de l'asset: $it")
-        }
-
-        val publication = publicationOpener.open(asset, allowUserInteraction = false).getOrElse {
-            return@withContext ParseResult.Corrupted("Echec d'ouverture de la publication: $it")
-        }
-
-        // DRM : verifie contre les sources reelles (Tache 3.2) — Publication.isProtected
-        // (org.readium.r2.shared.publication.services) reflete la presence d'un
-        // ContentProtectionService, enregistre par FallbackContentProtection meme
-        // sans module readium-lcp/adept integre des qu'un format LCP ou Adobe ADEPT
-        // est detecte a la racine du conteneur. Suffisant pour K7 : detection, pas
-        // dechiffrement (hors perimetre v1).
-        val metadata = publication.metadata.toDomain()
-        val coverUri = extractAndSaveCover(publication, fileUri)
-
-        ParseResult.Success(
-            documentModel = documentModelExtractor.extract(publication),
-            isDrmProtected = publication.isProtected,
-            metadata = metadata.copy(coverUri = coverUri),
-        )
-    }
+    override suspend fun parse(fileUri: String): ParseResult = parseLazy(fileUri)
 
     /**
      * Ouvre un EPUB et extrait UNIQUEMENT les métadonnées, la TOC et les

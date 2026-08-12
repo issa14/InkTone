@@ -655,7 +655,7 @@ class ReaderViewModel @Inject constructor(
         if (target.chapterIndex != chapterIndex) return
         pendingHighlightTimeoutJob?.cancel()
         val sentence = _state.value.chapters.getOrNull(chapterIndex)
-            ?.paragraphs?.flatMap { it.sentences }?.getOrNull(target.sentenceIndex)
+            ?.sentences?.getOrNull(target.sentenceIndex)
         _state.value = _state.value.copy(
             pendingHighlightTarget = null,
             highlightedWordRange = sentence?.let { 0 until it.text.length },

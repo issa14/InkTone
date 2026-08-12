@@ -41,8 +41,7 @@ class RoomSearchService @Inject constructor(
 
     override suspend fun indexPublication(publicationId: String, documentModel: DocumentModel) {
         val entities = documentModel.chapters.flatMap { chapter ->
-            @Suppress("DEPRECATION")
-            chapter.paragraphs.flatMap { it.sentences }.map { sentence ->
+            chapter.sentences.map { sentence ->
                 SentenceFtsEntity(
                     publicationId = publicationId,
                     chapterIndex = chapter.index,

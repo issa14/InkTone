@@ -47,71 +47,18 @@ data class ChapterMeasurement(
  */
 class ChapterTextMeasurer(private val textMeasurer: TextMeasurer) {
 
-    /** Mesure le chapitre entier. Coût proportionnel à sa longueur — voir `measureFirstPage` pour l'ouverture (3a.3). */
+    /** Mesure le chapitre entier. Coût proportionnel à sa longueur. */
     fun measure(chapter: Chapter, baseStyle: TextStyle, maxWidthPx: Int): ChapterMeasurement {
-        return when (chapter.content) {
-            is ChapterContent.Rich -> measureRich(chapter, baseStyle, maxWidthPx, maxChars = Int.MAX_VALUE)
-            is ChapterContent.Legacy -> {
-                val (annotatedString, sentenceStartOffsets) = buildAnnotatedText(chapter)
-                measureBuilt(annotatedString, sentenceStartOffsets, baseStyle, maxWidthPx)
-            }
-        }
+        return measureRich(chapter, baseStyle, maxWidthPx, maxChars = Int.MAX_VALUE)
     }
 
-    /**
-     * Mesure seulement un préfixe borné du chapitre (Tâche 3a.3) — peu
-     * coûteux car indépendant de la longueur totale du chapitre, ce qui
-     * permet de l'appeler de façon synchrone/quasi immédiate en
-     * composition pour afficher la première page sans reflux ni écran
-     * vide, pendant que le reste se mesure en arrière-plan
-     * (`measure` complet, sur `Dispatchers.Default`).
-     *
-     * [prefixCharBudget] est une borne heuristique, pas un calcul exact
-     * de « ce qui remplit le viewport » : l'API `TextMeasurer` ne permet
-     * pas d'arrêter la mesure en cours de layout, seule la **taille du
-     * texte fourni en entrée** borne son coût. Une valeur généreuse
-     * (6000 caractères par défaut) couvre confortablement une page dans
-     * l'immense majorité des tailles de police et de viewport réalistes
-     * — assez pour rester bon marché sans dépendre de la longueur du
-     * chapitre. L'appelant élargit ce budget par doublements successifs
-     * tant que la phrase visée (reprise de lecture en milieu de
-     * chapitre) n'est pas encore couverte, voir `PagedChapterContent`.
-     */
     fun measureFirstPage(
         chapter: Chapter,
         baseStyle: TextStyle,
         maxWidthPx: Int,
         prefixCharBudget: Int = DEFAULT_PREFIX_CHAR_BUDGET,
     ): ChapterMeasurement {
-        return when (chapter.content) {
-            is ChapterContent.Rich -> measureRich(chapter, baseStyle, maxWidthPx, maxChars = prefixCharBudget)
-            is ChapterContent.Legacy -> {
-                val (annotatedString, sentenceStartOffsets) = buildAnnotatedText(chapter, maxChars = prefixCharBudget)
-                measureBuilt(annotatedString, sentenceStartOffsets, baseStyle, maxWidthPx)
-            }
-        }
-    }
-
-    private fun buildAnnotatedText(chapter: Chapter, maxChars: Int = Int.MAX_VALUE): Pair<AnnotatedString, List<Int>> {
-        val sentenceStartOffsets = mutableListOf<Int>()
-        val annotatedString = buildAnnotatedString paragraphs@{
-            for ((paragraphIndex, paragraph) in chapter.paragraphs.withIndex()) {
-                if (length >= maxChars) return@paragraphs
-                if (paragraphIndex > 0) append("\n")
-                for ((indexInParagraph, sentence) in paragraph.sentences.withIndex()) {
-                    if (indexInParagraph > 0) append(" ")
-                    sentenceStartOffsets.add(length)
-                    withStyle(spanStyleFor(paragraph.style)) {
-                        append(sentence.text)
-                    }
-                    // On s'arrête après une phrase entière, jamais au
-                    // milieu : sentenceStartOffsets doit toujours décrire
-                    // des phrases complètement présentes dans le texte.
-                    if (length >= maxChars) return@paragraphs
-                }
-            }
-        }
-        return annotatedString to sentenceStartOffsets
+        return measureRich(chapter, baseStyle, maxWidthPx, maxChars = prefixCharBudget)
     }
 
     private fun measureBuilt(

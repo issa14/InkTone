@@ -1,11 +1,12 @@
 package com.inktone.infrastructure.parser
 
+import com.inktone.domain.model.BookBlock
 import com.inktone.domain.model.Chapter
 import com.inktone.domain.model.ChapterContent
 import com.inktone.domain.model.DocumentModel
-import com.inktone.domain.model.Paragraph
 import com.inktone.domain.model.PublicationFormat
 import com.inktone.domain.model.Sentence
+import com.inktone.domain.model.StyledText
 import com.inktone.domain.service.FileStorageService
 import com.inktone.domain.service.ParseResult
 import com.inktone.domain.service.PublicationMetadata
@@ -43,8 +44,9 @@ class TxtPublicationParser @Inject constructor(
 
         if (text.isBlank()) return ParseResult.Corrupted("Fichier TXT vide")
 
+        val trimmedText = text.trim()
         var offset = 0
-        val sentences = sentenceBoundary.split(text.trim()).mapIndexed { index, raw ->
+        val sentences = sentenceBoundary.split(trimmedText).mapIndexed { index, raw ->
             val trimmed = raw.trim()
             val sentence = Sentence(index = index, text = trimmed, startOffset = offset, endOffset = offset + trimmed.length)
             offset += trimmed.length + 1
@@ -53,7 +55,20 @@ class TxtPublicationParser @Inject constructor(
 
         val fileName = fileStorageService.getFileName(fileUri) ?: fileUri.substringAfterLast('/')
         val titleWithoutExtension = fileName.substringBeforeLast('.', fileName)
-        val chapter = Chapter(index = 0, href = fileName, title = null, content = ChapterContent.Legacy(paragraphs = listOf(Paragraph(0, sentences))))
+        val chapter = Chapter(
+            index = 0,
+            href = fileName,
+            title = null,
+            content = ChapterContent.Rich(
+                blocks = listOf(
+                    BookBlock.ParagraphBlock(
+                        richText = StyledText.plain(trimmedText),
+                        globalOffsetRange = 0 until trimmedText.length,
+                    ),
+                ),
+            ),
+            sentences = sentences,
+        )
         return ParseResult.Success(
             documentModel = DocumentModel(chapters = listOf(chapter), tableOfContents = emptyList(), resources = emptyList()),
             isDrmProtected = false, // TXT n'a jamais de DRM par définition
