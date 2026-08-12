@@ -471,6 +471,8 @@ fun ReaderScreen(
                 author = state.author,
                 onBack = onBack,
                 modifier = Modifier.align(Alignment.TopCenter).zIndex(1f),
+                surfaceColor = ThemeColors.barSurface(state.resolvedTheme),
+                contentColor = ThemeColors.barContent(state.resolvedTheme),
             )
         }
 
@@ -870,6 +872,8 @@ fun ReaderScreen(
                             onTtsClick = { keepHudVisible(); showTtsPanel = true },
                             onReadingModeClick = { keepHudVisible(); viewModel.onIntent(ReaderIntent.ToggleReadingMode) },
                             showTtsControls = !isPdf,
+                            surfaceColor = ThemeColors.barSurface(state.resolvedTheme),
+                            accentColor = ThemeColors.accent(state.resolvedTheme),
                             onBrightnessClick = {
                                 // Bug réel corrigé (vérification device, lot 3d) : masque le
                                 // HUD au lieu de le garder visible — la barre prend sa place
