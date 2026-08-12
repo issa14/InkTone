@@ -47,6 +47,7 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.layout.LayoutCoordinates
 import androidx.compose.ui.layout.onGloballyPositioned
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.platform.LocalLifecycleOwner
 import androidx.compose.ui.platform.LocalTextToolbar
@@ -68,6 +69,7 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.compose.ui.window.Dialog
 import androidx.compose.ui.window.DialogProperties
+import androidx.compose.ui.zIndex
 import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.lifecycle.Lifecycle
 import androidx.lifecycle.LifecycleEventObserver
@@ -82,8 +84,11 @@ import com.inktone.domain.model.ReadingOverrides
 import com.inktone.domain.model.ReadingTheme
 import com.inktone.domain.model.Sentence
 import com.inktone.feature.reader.pagination.rememberChapterPaginationState
+import coil.ImageLoader
+import coil.compose.LocalImageLoader
 import com.inktone.feature.reader.rendering.BookBlockItem
 import com.inktone.feature.reader.rendering.BookBlockStyleMapper
+import com.inktone.feature.reader.rendering.EpubImageFetcher
 import kotlinx.coroutines.delay
 import kotlin.math.roundToInt
 
@@ -347,13 +352,6 @@ fun ReaderScreen(
         var currentLineYDp by remember { mutableStateOf(0.dp) }
         val density = LocalDensity.current
 
-        // Index de phrase → item LazyColumn : les sentences sont plates
-        // (plus de Paragraph), chaque sentence = un item potentiel.
-        val allSentences = state.currentChapter?.sentences.orEmpty()
-        val firstSentenceIndexPerItem = remember(state.currentChapter) {
-            allSentences.mapIndexed { index, _ -> index }
-        }
-
         // 3c.1 — drapeau posé explicitement autour du seul appel
         // programmatique au défilement (auto-scroll TTS), levé à sa fin.
         // Discrimine l'origine réelle du défilement pour la détection de
@@ -460,11 +458,19 @@ fun ReaderScreen(
         // Overlay pur (`align(TopCenter)`) : ne modifie plus jamais les
         // bornes de la zone de lecture (voir commentaire de tête ci-dessus).
         if (isHudVisible) {
+            // Bug réel trouvé sur appareil : déclarée avant la zone de
+            // lecture (Box.fillMaxSize() plus bas dans ce même Box), la
+            // topbar se retrouvait dessous dans l'ordre d'empilement de
+            // Compose (un enfant déclaré plus tard est peint ET intercepte
+            // les taps AU-DESSUS des précédents, sans zIndex) — la flèche
+            // retour ne recevait donc jamais le tap, absorbé par
+            // onClick = handleReadingAreaTap() du bloc/pager en dessous.
+            // zIndex la remonte au-dessus sans changer sa position.
             ReaderTopBar(
                 title = state.title,
                 author = state.author,
                 onBack = onBack,
-                modifier = Modifier.align(Alignment.TopCenter),
+                modifier = Modifier.align(Alignment.TopCenter).zIndex(1f),
             )
         }
 
@@ -530,6 +536,29 @@ fun ReaderScreen(
             }
         }
 
+        // Bug réel trouvé sur appareil : aucune image EPUB ne s'affichait
+        // jamais (ni couverture intégrée au flux, ni illustrations) — le
+        // chaînon D5 du plan (construire un ImageLoader Coil avec
+        // EpubImageFetcher.Factory(resolver) enregistré) n'était jamais
+        // implémenté. AsyncImage retombait alors sur l'ImageLoader PAR
+        // DÉFAUT de l'app, qui ignore totalement EpubImageKey (aucun
+        // Fetcher.Factory compatible) — la requête échouait silencieusement,
+        // BookBlockItem ne réagissant pas à l'état d'erreur de Coil.
+        // null pour PDF/TXT (pas de resolver) : CompositionLocalProvider
+        // n'est alors pas ouvert plus bas, Coil retombe sur son
+        // ImageLoader par défaut — comportement inchangé pour ces formats.
+        val context = LocalContext.current
+        val epubImageLoader = remember(state.epubResourceResolver) {
+            state.epubResourceResolver?.let { resolver ->
+                ImageLoader.Builder(context)
+                    .components { add(EpubImageFetcher.Factory(resolver)) }
+                    .build()
+            }
+        }
+
+        CompositionLocalProvider(
+            LocalImageLoader provides (epubImageLoader ?: LocalImageLoader.current),
+        ) {
         Box(
             modifier = Modifier
                 .fillMaxSize()
@@ -573,34 +602,70 @@ fun ReaderScreen(
                 ReadingMode.SCROLL -> {
                     val chapter = state.currentChapter
                     val blocks = (chapter?.content as? ChapterContent.Rich)?.blocks.orEmpty()
-                            val textStyle = TextStyle(
-                                fontSize = state.effectiveSettings.fontSize.sp,
-                                color = ThemeColors.text(state.resolvedTheme),
-                                fontFamily = effectiveFontFamily,
-                            )
-                            LazyColumn(
-                                state = scrollState,
-                                modifier = Modifier.fillMaxSize(),
-                                userScrollEnabled = freeSelectedRange == null,
-                            ) {
-                                items(
-                                    items = blocks,
-                                    key = { block ->
-                                        val range = block.globalOffsetRange
-                                        if (range != null) "${state.currentChapterIndex}-${range.first}"
-                                        else "${state.currentChapterIndex}-img-${(block as? com.inktone.domain.model.BookBlock.ImageBlock)?.href ?: "sep"}"
-                                    },
-                                ) { block ->
-                                    BookBlockItem(
-                                        block = block,
-                                        baseTextStyle = textStyle,
-                                        resolver = state.epubResourceResolver,
-                                        publicationId = state.publicationId,
-                                        modifier = Modifier.fillMaxWidth()
-                                    )
-                                }
-                            }
+                    val textStyle = TextStyle(
+                        fontSize = state.effectiveSettings.fontSize.sp,
+                        color = ThemeColors.text(state.resolvedTheme),
+                        fontFamily = effectiveFontFamily,
+                    )
+
+                    // Parité avec le mode PAGED (absoluteHighlightedRange dans
+                    // PagedChapterContent) : offset absolu (espace chapitre)
+                    // du mot TTS actif, dérivé de Chapter.sentences —
+                    // aligné avec ChapterTextMeasurer depuis la correction
+                    // du séparateur de bloc (voir ChapterTextMeasurer.kt).
+                    val scrollHighlightedRange = state.highlightedWordRange?.let { wordRange ->
+                        chapter?.sentences?.getOrNull(state.currentSentenceIndex)?.startOffset?.let { sentenceStart ->
+                            (sentenceStart + wordRange.first)..(sentenceStart + wordRange.last)
+                        }
                     }
+                    // Lues en phase de dessin (drawWithContent dans
+                    // BookBlockItem), jamais en paramètre direct — un mot
+                    // prononcé n'invalide donc que le dessin, jamais la
+                    // mesure du BasicTextField (même contrainte que PageBlock).
+                    val scrollHighlightedRangeState = rememberUpdatedState(scrollHighlightedRange)
+                    val scrollFreeSelectedRangeState = rememberUpdatedState(freeSelectedRange)
+
+                    LazyColumn(
+                        state = scrollState,
+                        modifier = Modifier.fillMaxSize(),
+                        userScrollEnabled = freeSelectedRange == null,
+                    ) {
+                        items(
+                            items = blocks,
+                            key = { block ->
+                                val range = block.globalOffsetRange
+                                if (range != null) "${state.currentChapterIndex}-${range.first}"
+                                else "${state.currentChapterIndex}-img-${(block as? com.inktone.domain.model.BookBlock.ImageBlock)?.href ?: "sep"}"
+                            },
+                        ) { block ->
+                            BookBlockItem(
+                                block = block,
+                                baseTextStyle = textStyle,
+                                resolver = state.epubResourceResolver,
+                                publicationId = state.publicationId,
+                                chapterIndex = state.currentChapterIndex,
+                                annotations = state.annotations,
+                                highlightedRange = scrollHighlightedRangeState,
+                                freeSelectedRange = scrollFreeSelectedRangeState,
+                                onFreeSelectionChanged = { anchor, focus ->
+                                    viewModel.onIntent(ReaderIntent.SetFreeSelection(anchor, focus))
+                                },
+                                onFreeSelectionCleared = { viewModel.onIntent(ReaderIntent.ClearFreeSelection) },
+                                onFreeSelectionBoundsInWindow = { ownerKey, bounds ->
+                                    scrollFreeSelectionBounds = resolveSelectionPopupBounds(
+                                        current = scrollFreeSelectionBounds,
+                                        ownerKey = ownerKey,
+                                        bounds = bounds,
+                                    )
+                                },
+                                onClick = { handleReadingAreaTap() },
+                                isReadingRulerEnabled = state.isReadingRulerEnabled,
+                                onCurrentLineY = { y -> currentLineYDp = y },
+                                modifier = Modifier.fillMaxWidth(),
+                            )
+                        }
+                    }
+                }
                 ReadingMode.PAGED -> {
                     PagedChapterContent(
                         chapter = state.currentChapter,
@@ -641,6 +706,7 @@ fun ReaderScreen(
             // perdre l'accessibilité, a été retirée après vérification sur
             // appareil (lot 1, point 11) : elle fait doublon avec la voix
             // TTS déjà active et les deux se chevauchent à l'oreille.
+        }
         }
 
         // 3c.4 — remplace AnnotationColorPicker (position fixe basse

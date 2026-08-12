@@ -574,7 +574,7 @@ private fun PageBlock(
     }
 }
 
-private fun rangeBoundsInWindow(
+internal fun rangeBoundsInWindow(
     layout: TextLayoutResult?,
     coords: LayoutCoordinates?,
     pageOffsetRange: IntRange,
@@ -591,7 +591,7 @@ private fun rangeBoundsInWindow(
     return Rect(topLeft, bottomRight)
 }
 
-private fun DrawScope.drawAbsoluteRangeHighlight(
+internal fun DrawScope.drawAbsoluteRangeHighlight(
     layout: TextLayoutResult,
     pageOffsetRange: IntRange,
     absoluteRange: IntRange,
@@ -604,8 +604,8 @@ private fun DrawScope.drawAbsoluteRangeHighlight(
     drawPath(layout.getPathForRange(localStart, localEndExclusive), color = color)
 }
 
-private val WordHighlightColor = Color(0xFFFFEB3B)
-private val SelectionHighlightColor = Color(0x664FC3F7)
+internal val WordHighlightColor = Color(0xFFFFEB3B)
+internal val SelectionHighlightColor = Color(0x664FC3F7)
 
 internal fun buildPageAnnotatedString(
     full: AnnotatedString,

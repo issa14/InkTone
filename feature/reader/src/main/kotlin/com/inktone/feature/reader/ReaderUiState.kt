@@ -4,7 +4,6 @@ import com.inktone.domain.model.Annotation
 import com.inktone.domain.model.AnnotationColor
 import com.inktone.domain.model.Bookmark
 import com.inktone.domain.model.Chapter
-import com.inktone.domain.model.ChapterContent
 import com.inktone.domain.model.EffectiveReadingSettings
 import com.inktone.domain.model.PublicationFormat
 import com.inktone.domain.model.ReadingOverrides
@@ -135,9 +134,6 @@ data class ReaderUiState(
     val forcePdfInversion: Boolean = false,
 ) {
     val currentChapter: Chapter? get() = chapters.getOrNull(currentChapterIndex)
-    /** Plan v3, Palier 3.6 — type de contenu du chapitre courant (Rich vs Legacy). */
-    val currentChapterContent: ChapterContent?
-        get() = currentChapter?.content
     val hasNextChapter: Boolean get() = currentChapterIndex < chapters.lastIndex
     val hasPreviousChapter: Boolean get() = currentChapterIndex > 0
 
