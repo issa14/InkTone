@@ -98,6 +98,18 @@ class ReadiumPublicationRegistry @Inject constructor(
         publicationFiles.remove(publicationId)
     }
 
+    /**
+     * Repli quand `Publication.linkWithHref` ne trouve pas [entryHref] —
+     * bug réel Android : l'accès aux entrées ZIP est sensible à la casse
+     * (contrairement à Windows/macOS, où l'EPUB a pu être généré/édité).
+     * Lecture ZIP directe via [EpubZipAccess], hors du manifeste Readium.
+     */
+    suspend fun readAssetIgnoreCase(publicationId: String, entryHref: String): ByteArray? =
+        withContext(Dispatchers.IO) {
+            val fileUri = publicationFiles[publicationId] ?: return@withContext null
+            EpubZipAccess.readEntryBytes(context, fileUri, entryHref, ignoreCase = true)
+        }
+
     private suspend fun openPublication(fileUri: String): Publication {
         val url = if (fileUri.contains("://")) {
             Uri.parse(fileUri).toAbsoluteUrl()

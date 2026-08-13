@@ -57,7 +57,7 @@ class ReadiumResourceResolver @Inject constructor(
     ): InputStream? {
         val pub = registry.getOrOpen(publicationId)
 
-        return withContext(Dispatchers.IO) {
+        val viaManifest = withContext(Dispatchers.IO) {
             // K6, CLAUDE.md : Url + linkWithHref normalisent le
             // percent-encoding au lieu d'une comparaison de chaîne brute
             // contre readingOrder/resources (resourceWithHref(String)
@@ -66,9 +66,18 @@ class ReadiumResourceResolver @Inject constructor(
             val link = pub.linkWithHref(url) ?: return@withContext null
             val resource: Resource = pub.get(link) ?: return@withContext null
             val length = resource.length().getOrElse { return@withContext null }.toLong()
-            val bytes = resource.read(0L until length).getOrElse { return@withContext null }
-            ByteArrayInputStream(bytes)
+            resource.read(0L until length).getOrElse { null }
         }
+        if (viaManifest != null) return ByteArrayInputStream(viaManifest)
+
+        // Bug réel : accès aux entrées ZIP sensible à la casse sur Android
+        // (contrairement à Windows/macOS, où l'EPUB a pu être généré ou
+        // édité) — le HTML référence p.ex. "Images/Cover.JPG" alors que
+        // l'entrée réelle est "images/cover.jpg". `linkWithHref` échoue
+        // silencieusement dans ce cas ; repli sur une lecture ZIP directe
+        // insensible à la casse.
+        val viaZipFallback = registry.readAssetIgnoreCase(publicationId, resourceHref)
+        return viaZipFallback?.let { ByteArrayInputStream(it) }
     }
 
     override fun close() {
