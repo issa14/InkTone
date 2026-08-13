@@ -1,10 +1,10 @@
 package com.inktone.feature.reader.rendering
 
 import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.aspectRatio
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.padding
-import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.text.BasicTextField
 import androidx.compose.foundation.text.selection.LocalTextSelectionColors
 import androidx.compose.foundation.text.selection.TextSelectionColors
@@ -152,15 +152,22 @@ fun BookBlockItem(
         is BookBlock.ImageBlock -> {
             val imgWidth = block.intrinsicWidth
             val imgHeight = block.intrinsicHeight
+            // Bug réel trouvé sur appareil : une couverture SVG a des
+            // attributs width/height en PIXELS (ex. 479x706), pas en dp —
+            // `Modifier.size(imgWidth.dp, imgHeight.dp)` traitait ces
+            // pixels comme des dp, produisant soit une boîte énorme
+            // débordant l'écran, soit — si un SVG déclare width/height
+            // sans viewBox et qu'un parent en amont impose une contrainte
+            // nulle — une mesure à 0x0 qui fait disparaître l'image sans
+            // erreur visible. Modifier.aspectRatio garde le ratio réel de
+            // l'image tout en occupant la largeur disponible du
+            // conteneur (réactif, jamais une taille fixe en pixels bruts).
             Box(
                 modifier = modifier
                     .fillMaxWidth()
                     .then(
-                        if (imgWidth != null && imgHeight != null) {
-                            Modifier.size(
-                                width = imgWidth.dp,
-                                height = imgHeight.dp,
-                            )
+                        if (imgWidth != null && imgHeight != null && imgWidth > 0 && imgHeight > 0) {
+                            Modifier.aspectRatio(imgWidth.toFloat() / imgHeight.toFloat())
                         } else {
                             Modifier.heightIn(min = 100.dp, max = 300.dp)
                         },
