@@ -114,7 +114,7 @@ class ReadiumPublicationParser @Inject constructor(
         val coverUri = extractAndSaveCover(publication, fileUri)
 
         // Coquilles de chapitres : index, href, title, contenu vide
-        val chapters = publication.readingOrder.mapIndexed { index, link ->
+        val readingOrderChapters = publication.readingOrder.mapIndexed { index, link ->
             Chapter(
                 index = index,
                 href = link.href.toString(),
@@ -124,9 +124,38 @@ class ReadiumPublicationParser @Inject constructor(
             )
         }
 
-        // TOC (même logique que DocumentModelExtractor)
+        // Bug réel trouvé sur appareil (éditions fantasy type "La Première
+        // Loi", "L'Arcane des Épées") : écran noir, bloqué sur
+        // "Chapitre 1 (1/1)", 0,0% de progression — la page de couverture
+        // est marquée linear="no" dans l'OPF (donc absente de
+        // readingOrder, reléguée dans Publication.resources) ou identifiable
+        // uniquement via le <guide> EPUB2 (que Readium 3.0.0 n'analyse pas
+        // du tout). Sans repli, le seul chapitre réellement chargé est une
+        // page de titre quasi vide.
+        val coverHref = resolveCoverHref(publication, fileUri)
+        val coverPrepended = coverHref != null && readingOrderChapters.none { it.href.sameHrefAs(coverHref) }
+        val chapters = if (coverPrepended) {
+            val coverChapter = Chapter(
+                index = 0,
+                href = coverHref!!,
+                title = null,
+                content = ChapterContent.Rich(blocks = emptyList()),
+                sentences = emptyList(),
+            )
+            listOf(coverChapter) + readingOrderChapters.map { it.copy(index = it.index + 1) }
+        } else {
+            readingOrderChapters
+        }
+
+        // TOC (même logique que DocumentModelExtractor). Bug réel trouvé
+        // sur appareil : quand la couverture est ajoutée en tête (ci-dessus),
+        // `chapterIndex` doit être décalé du même montant, sinon chaque
+        // entrée de la TOC pointe vers le chapitre PRÉCÉDENT le sien
+        // (celui qu'elle référençait avant le décalage) — et la dernière
+        // entrée de la TOC ne pointe plus vers rien de valide.
+        val chapterIndexOffset = if (coverPrepended) 1 else 0
         val readingOrderUrls = publication.readingOrder.map { it.href.resolve().removeFragment() }
-        val toc = publication.tableOfContents.map { link -> toTocEntry(link, readingOrderUrls) }
+        val toc = publication.tableOfContents.map { link -> toTocEntry(link, readingOrderUrls, chapterIndexOffset) }
 
         ParseResult.Success(
             documentModel = DocumentModel(
@@ -137,6 +166,27 @@ class ReadiumPublicationParser @Inject constructor(
             isDrmProtected = publication.isProtected,
             metadata = metadata.copy(coverUri = coverUri),
         )
+    }
+
+    /**
+     * Identifie le href de la page/image de couverture, même quand elle
+     * est absente de `readingOrder` (linear="no" ou repérable uniquement
+     * via `<guide>` EPUB2).
+     *
+     * 1. `Publication.linkWithRel("cover")` : couvre déjà `properties=
+     *    "cover-image"` du manifeste ET `<meta name="cover">` EPUB2 —
+     *    `ResourceAdapter` (Readium) calcule ce rel à partir des deux
+     *    (vérifié par décompilation du jar `readium-streamer-3.0.0`),
+     *    et `Manifest.linkWithRel` cherche dans `readingOrder`,
+     *    `resources` PUIS `links` — donc déjà robuste au linear="no".
+     * 2. [EpubGuideCoverResolver] : seul repli nécessaire, pour le cas où
+     *    Readium ne peut rien déduire (`<guide><reference type="cover">`
+     *    seul, sans marqueur manifeste).
+     */
+    @OptIn(ExperimentalReadiumApi::class)
+    private fun resolveCoverHref(publication: org.readium.r2.shared.publication.Publication, fileUri: String): String? {
+        publication.linkWithRel("cover")?.let { return it.href.toString() }
+        return EpubGuideCoverResolver.findCoverHref(context, fileUri)
     }
 
     /**
@@ -197,13 +247,36 @@ class ReadiumPublicationParser @Inject constructor(
      * Convertit un [Link] Readium en [TableOfContentsEntry] avec résolution
      * du chapterIndex par correspondance de href (sans fragment).
      * Même logique que [DocumentModelExtractor.toTocEntry].
+     *
+     * @param chapterIndexOffset décalage à appliquer (1 quand la couverture
+     *   a été ajoutée en tête de `chapters` — voir [parseLazy], sinon 0).
+     *   Bug réel trouvé sur appareil : `readingOrderUrls` reste indexé sur
+     *   `publication.readingOrder` (non décalé), alors que `chapters`
+     *   (utilisé par le lecteur pour charger le contenu par index) l'est —
+     *   sans ce décalage, chaque entrée de la TOC ouvrait le chapitre
+     *   PRÉCÉDENT le sien, et la dernière entrée pointait au-delà de la fin.
      */
-    private fun toTocEntry(link: Link, readingOrderUrls: List<org.readium.r2.shared.util.Url>): TableOfContentsEntry {
+    private fun toTocEntry(
+        link: Link,
+        readingOrderUrls: List<org.readium.r2.shared.util.Url>,
+        chapterIndexOffset: Int,
+    ): TableOfContentsEntry {
         val chapterIndex = readingOrderUrls.indexOf(link.href.resolve().removeFragment())
         return TableOfContentsEntry(
             title = link.title ?: "",
-            chapterIndex = chapterIndex.coerceAtLeast(0),
-            children = link.children.map { child -> toTocEntry(child, readingOrderUrls) },
+            chapterIndex = chapterIndex.coerceAtLeast(0) + chapterIndexOffset,
+            children = link.children.map { child -> toTocEntry(child, readingOrderUrls, chapterIndexOffset) },
         )
     }
+
+    /**
+     * Compare deux hrefs sans fragment, insensible à la casse — même bug
+     * réel qu'ailleurs (accès ZIP Android sensible à la casse, K variante) :
+     * sans ce repli, un href de couverture retrouvé sous une casse
+     * différente de celle déjà présente dans `readingOrder` créerait un
+     * doublon (couverture affichée deux fois) au lieu d'être reconnu comme
+     * déjà présent.
+     */
+    private fun String.sameHrefAs(other: String): Boolean =
+        substringBefore('#').equals(other.substringBefore('#'), ignoreCase = true)
 }
