@@ -3,7 +3,11 @@ package com.inktone.infrastructure.parser
 import android.content.Context
 import android.graphics.Bitmap
 import android.net.Uri
+import com.inktone.domain.model.Chapter
+import com.inktone.domain.model.ChapterContent
+import com.inktone.domain.model.DocumentModel
 import com.inktone.domain.model.PublicationFormat
+import com.inktone.domain.model.TableOfContentsEntry
 import com.inktone.domain.service.ParseResult
 import com.inktone.domain.service.PublicationMetadata
 import com.inktone.domain.service.PublicationParser
@@ -12,6 +16,7 @@ import dagger.hilt.android.qualifiers.ApplicationContext
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
 import org.readium.r2.shared.ExperimentalReadiumApi
+import org.readium.r2.shared.publication.Link
 import org.readium.r2.shared.publication.services.content.DefaultContentService
 import org.readium.r2.shared.publication.services.content.contentServiceFactory
 import org.readium.r2.shared.publication.services.content.iterators.HtmlResourceContentIterator
@@ -51,8 +56,6 @@ class ReadiumPublicationParser @Inject constructor(
 
     override val supportedFormats = listOf(PublicationFormat.EPUB)
 
-    private val documentModelExtractor = DocumentModelExtractor()
-
     // Instanciation paresseuse — coûteuse, un seul jeu de composants
     // Readium réutilisé pour tous les parses de la durée de vie du singleton.
     private val httpClient by lazy { DefaultHttpClient() }
@@ -80,13 +83,18 @@ class ReadiumPublicationParser @Inject constructor(
         )
     }
 
-    override suspend fun parse(fileUri: String): ParseResult = withContext(Dispatchers.IO) {
-        // Tache 4.11 : accepte desormais aussi bien un chemin de fichier
-        // local de test (sans schema, ex. fixtures/marche a blanc) qu'une
-        // vraie URI SAF content:// (import reel) - Uri.toAbsoluteUrl()
-        // (Readium) gere les deux schemas (file/content) uniformement,
-        // contrairement a File(fileUri).toUrl() qui ne comprend que des
-        // chemins filesystem bruts.
+    override suspend fun parse(fileUri: String): ParseResult = parseLazy(fileUri)
+
+    /**
+     * Ouvre un EPUB et extrait UNIQUEMENT les métadonnées, la TOC et les
+     * coquilles de chapitres (sans contenu). Les chapitres retournés ont
+     * un [ChapterContent.Rich] avec `blocks` vide — le contenu réel sera
+     * chargé à la demande via [EpubChapterParser.parseChapter].
+     *
+     * L'ancien [parse] continue de fonctionner (backward compat) — il
+     * utilise encore [DocumentModelExtractor] pour un parsing complet.
+     */
+    suspend fun parseLazy(fileUri: String): ParseResult = withContext(Dispatchers.IO) {
         val url = if (fileUri.contains("://")) {
             Uri.parse(fileUri).toAbsoluteUrl()
                 ?: return@withContext ParseResult.Corrupted("URI non absolue: $fileUri")
@@ -102,20 +110,83 @@ class ReadiumPublicationParser @Inject constructor(
             return@withContext ParseResult.Corrupted("Echec d'ouverture de la publication: $it")
         }
 
-        // DRM : verifie contre les sources reelles (Tache 3.2) — Publication.isProtected
-        // (org.readium.r2.shared.publication.services) reflete la presence d'un
-        // ContentProtectionService, enregistre par FallbackContentProtection meme
-        // sans module readium-lcp/adept integre des qu'un format LCP ou Adobe ADEPT
-        // est detecte a la racine du conteneur. Suffisant pour K7 : detection, pas
-        // dechiffrement (hors perimetre v1).
         val metadata = publication.metadata.toDomain()
         val coverUri = extractAndSaveCover(publication, fileUri)
 
+        // Coquilles de chapitres : index, href, title, contenu vide
+        val readingOrderChapters = publication.readingOrder.mapIndexed { index, link ->
+            Chapter(
+                index = index,
+                href = link.href.toString(),
+                title = link.title?.takeIf { it.isNotBlank() },
+                content = ChapterContent.Rich(blocks = emptyList()),
+                sentences = emptyList(),
+            )
+        }
+
+        // Bug réel trouvé sur appareil (éditions fantasy type "La Première
+        // Loi", "L'Arcane des Épées") : écran noir, bloqué sur
+        // "Chapitre 1 (1/1)", 0,0% de progression — la page de couverture
+        // est marquée linear="no" dans l'OPF (donc absente de
+        // readingOrder, reléguée dans Publication.resources) ou identifiable
+        // uniquement via le <guide> EPUB2 (que Readium 3.0.0 n'analyse pas
+        // du tout). Sans repli, le seul chapitre réellement chargé est une
+        // page de titre quasi vide.
+        val coverHref = resolveCoverHref(publication, fileUri)
+        val coverPrepended = coverHref != null && readingOrderChapters.none { it.href.sameHrefAs(coverHref) }
+        val chapters = if (coverPrepended) {
+            val coverChapter = Chapter(
+                index = 0,
+                href = coverHref!!,
+                title = null,
+                content = ChapterContent.Rich(blocks = emptyList()),
+                sentences = emptyList(),
+            )
+            listOf(coverChapter) + readingOrderChapters.map { it.copy(index = it.index + 1) }
+        } else {
+            readingOrderChapters
+        }
+
+        // TOC (même logique que DocumentModelExtractor). Bug réel trouvé
+        // sur appareil : quand la couverture est ajoutée en tête (ci-dessus),
+        // `chapterIndex` doit être décalé du même montant, sinon chaque
+        // entrée de la TOC pointe vers le chapitre PRÉCÉDENT le sien
+        // (celui qu'elle référençait avant le décalage) — et la dernière
+        // entrée de la TOC ne pointe plus vers rien de valide.
+        val chapterIndexOffset = if (coverPrepended) 1 else 0
+        val readingOrderUrls = publication.readingOrder.map { it.href.resolve().removeFragment() }
+        val toc = publication.tableOfContents.map { link -> toTocEntry(link, readingOrderUrls, chapterIndexOffset) }
+
         ParseResult.Success(
-            documentModel = documentModelExtractor.extract(publication),
+            documentModel = DocumentModel(
+                chapters = chapters,
+                tableOfContents = toc,
+                resources = emptyList(),
+            ),
             isDrmProtected = publication.isProtected,
             metadata = metadata.copy(coverUri = coverUri),
         )
+    }
+
+    /**
+     * Identifie le href de la page/image de couverture, même quand elle
+     * est absente de `readingOrder` (linear="no" ou repérable uniquement
+     * via `<guide>` EPUB2).
+     *
+     * 1. `Publication.linkWithRel("cover")` : couvre déjà `properties=
+     *    "cover-image"` du manifeste ET `<meta name="cover">` EPUB2 —
+     *    `ResourceAdapter` (Readium) calcule ce rel à partir des deux
+     *    (vérifié par décompilation du jar `readium-streamer-3.0.0`),
+     *    et `Manifest.linkWithRel` cherche dans `readingOrder`,
+     *    `resources` PUIS `links` — donc déjà robuste au linear="no".
+     * 2. [EpubGuideCoverResolver] : seul repli nécessaire, pour le cas où
+     *    Readium ne peut rien déduire (`<guide><reference type="cover">`
+     *    seul, sans marqueur manifeste).
+     */
+    @OptIn(ExperimentalReadiumApi::class)
+    private fun resolveCoverHref(publication: org.readium.r2.shared.publication.Publication, fileUri: String): String? {
+        publication.linkWithRel("cover")?.let { return it.href.toString() }
+        return EpubGuideCoverResolver.findCoverHref(context, fileUri)
     }
 
     /**
@@ -171,4 +242,41 @@ class ReadiumPublicationParser @Inject constructor(
             subjects = subjects.mapNotNull { it.name },
         )
     }
+
+    /**
+     * Convertit un [Link] Readium en [TableOfContentsEntry] avec résolution
+     * du chapterIndex par correspondance de href (sans fragment).
+     * Même logique que [DocumentModelExtractor.toTocEntry].
+     *
+     * @param chapterIndexOffset décalage à appliquer (1 quand la couverture
+     *   a été ajoutée en tête de `chapters` — voir [parseLazy], sinon 0).
+     *   Bug réel trouvé sur appareil : `readingOrderUrls` reste indexé sur
+     *   `publication.readingOrder` (non décalé), alors que `chapters`
+     *   (utilisé par le lecteur pour charger le contenu par index) l'est —
+     *   sans ce décalage, chaque entrée de la TOC ouvrait le chapitre
+     *   PRÉCÉDENT le sien, et la dernière entrée pointait au-delà de la fin.
+     */
+    private fun toTocEntry(
+        link: Link,
+        readingOrderUrls: List<org.readium.r2.shared.util.Url>,
+        chapterIndexOffset: Int,
+    ): TableOfContentsEntry {
+        val chapterIndex = readingOrderUrls.indexOf(link.href.resolve().removeFragment())
+        return TableOfContentsEntry(
+            title = link.title ?: "",
+            chapterIndex = chapterIndex.coerceAtLeast(0) + chapterIndexOffset,
+            children = link.children.map { child -> toTocEntry(child, readingOrderUrls, chapterIndexOffset) },
+        )
+    }
+
+    /**
+     * Compare deux hrefs sans fragment, insensible à la casse — même bug
+     * réel qu'ailleurs (accès ZIP Android sensible à la casse, K variante) :
+     * sans ce repli, un href de couverture retrouvé sous une casse
+     * différente de celle déjà présente dans `readingOrder` créerait un
+     * doublon (couverture affichée deux fois) au lieu d'être reconnu comme
+     * déjà présent.
+     */
+    private fun String.sameHrefAs(other: String): Boolean =
+        substringBefore('#').equals(other.substringBefore('#'), ignoreCase = true)
 }

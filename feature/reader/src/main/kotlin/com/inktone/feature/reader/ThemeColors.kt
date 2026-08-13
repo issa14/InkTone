@@ -22,6 +22,26 @@ object ThemeColors {
     fun highlight(theme: ReadingTheme): Color = theme.highlightColorHex.toColor()
 
     /**
+     * Couleur des barres HUD (topbar, panneau de contrôle), dérivée du
+     * thème de LECTURE actif plutôt que du thème CHROME de l'app
+     * (`MaterialTheme.colorScheme.surface`).
+     *
+     * Bug réel rapporté sur appareil : les deux thèmes sont volontairement
+     * découplés (voir Theme.kt), mais `colorScheme.surface` peut se
+     * retrouver proche en luminosité du fond de page en dessous quand le
+     * thème de lecture choisi diverge du mode chrome — la barre paraît
+     * alors « presque transparente ». En dérivant la couleur de la barre
+     * du fond de lecture lui-même (mélangé vers la couleur de texte du
+     * même thème, qui est déjà garantie lisible dessus), le contraste
+     * reste correct quel que soit le thème choisi, par construction.
+     */
+    fun barSurface(theme: ReadingTheme): Color =
+        androidx.compose.ui.graphics.lerp(background(theme), text(theme), 0.10f)
+
+    /** Couleur de contenu (texte, icônes) des barres HUD — voir [barSurface]. */
+    fun barContent(theme: ReadingTheme): Color = text(theme)
+
+    /**
      * Police effectivement rendue (Tâche 9.2) : la préférence globale
      * explicite gagne quand elle est définie (ex. OpenDyslexic imposé par
      * le préréglage d'accessibilité) ; `FontFamily.DEFAULT` signifie

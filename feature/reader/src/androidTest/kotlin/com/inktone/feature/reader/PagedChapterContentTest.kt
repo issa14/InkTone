@@ -28,8 +28,10 @@ import androidx.compose.ui.unit.IntSize
 import androidx.compose.ui.unit.dp
 import com.inktone.domain.model.Annotation
 import com.inktone.domain.model.Chapter
+import com.inktone.domain.model.ChapterContent
 import com.inktone.domain.model.Paragraph
-import com.inktone.domain.model.ParagraphStyle
+import com.inktone.domain.model.BookBlock
+import com.inktone.domain.model.StyledText
 import com.inktone.domain.model.Sentence
 import com.inktone.feature.reader.pagination.rememberChapterPaginationState
 import org.junit.Assert.assertNotEquals
@@ -138,9 +140,22 @@ class PagedChapterContentTest {
             index = 0,
             href = "c.xhtml",
             title = null,
-            paragraphs = listOf(
-                Paragraph(0, listOf(sentence(0, "$headingText.", 0)), ParagraphStyle.HEADING),
-                Paragraph(1, listOf(sentence(1, "Texte normal qui suit le titre.", 40)), ParagraphStyle.NORMAL),
+            content = ChapterContent.Rich(
+                blocks = listOf(
+                    BookBlock.HeadingBlock(
+                        level = 1,
+                        richText = StyledText.plain("$headingText."),
+                        globalOffsetRange = 0..headingText.length,
+                    ),
+                    BookBlock.ParagraphBlock(
+                        richText = StyledText.plain("Texte normal qui suit le titre."),
+                        globalOffsetRange = (headingText.length + 2)..(headingText.length + 36),
+                    ),
+                ),
+            ),
+            sentences = listOf(
+                sentence(0, "$headingText.", 0),
+                sentence(1, "Texte normal qui suit le titre.", 40),
             ),
         )
 
@@ -167,7 +182,7 @@ class PagedChapterContentTest {
             }
         }
         assertTrue(
-            "le texte du titre EPUB doit porter un SpanStyle gras (ParagraphStyle.HEADING) en mode pagé",
+            "le texte du titre EPUB doit porter un SpanStyle gras (HeadingBlock) en mode pagé",
             hasBoldSpanOverHeading,
         )
     }
@@ -285,11 +300,22 @@ class PagedChapterContentTest {
     private fun manyShortSentencesChapter(): Pair<Chapter, List<String>> {
         val texts = (0 until 8).map { i -> "Phrase numero $i." }
         var offset = 0
-        val paragraphs = texts.mapIndexed { i, text ->
-            val p = Paragraph(i, listOf(sentence(i, text, offset)), ParagraphStyle.NORMAL)
-            offset += text.length + 10
-            p
+        val blocks = texts.mapIndexed { i, text ->
+            val len = text.length
+            val block = BookBlock.ParagraphBlock(
+                richText = StyledText.plain(text),
+                globalOffsetRange = offset until (offset + len),
+            )
+            offset += len
+            block
         }
-        return Chapter(index = 0, href = "c.xhtml", title = null, paragraphs = paragraphs) to texts
+        val sentences = texts.mapIndexed { i, text ->
+            sentence(i, text, i * (text.length + 10))
+        }
+        return Chapter(
+            index = 0, href = "c.xhtml", title = null,
+            content = ChapterContent.Rich(blocks = blocks),
+            sentences = sentences,
+        ) to texts
     }
 }

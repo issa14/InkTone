@@ -3,11 +3,13 @@ package com.inktone.domain.usecase
 import com.inktone.domain.model.Publication
 import com.inktone.domain.model.PublicationFormat
 import com.inktone.domain.repository.PublicationRepository
+import com.inktone.domain.service.ChapterParser
 import com.inktone.domain.service.FileStorageService
 import com.inktone.domain.service.ParseResult
 import com.inktone.domain.service.PublicationMetadata
 import com.inktone.domain.service.PublicationParser
 import com.inktone.domain.service.SearchService
+import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.sync.Mutex
 import kotlinx.coroutines.sync.withLock
 import java.util.UUID
@@ -30,6 +32,7 @@ class ImportPublicationUseCase(
     private val publicationRepository: PublicationRepository,
     private val fileStorageService: FileStorageService,
     private val searchService: SearchService,
+    private val chapterParser: ChapterParser,
 ) {
     // Protege la section verification+insertion (Tache 6.3, K2) : plusieurs
     // invocations concurrentes de la meme instance (ImportWorker parallelise,
@@ -69,23 +72,55 @@ class ImportPublicationUseCase(
         // section vraiment critique. Persistance de la permission SAF
         // AVANT insertion — si l'app est tuee entre les deux, mieux vaut
         // une permission orpheline qu'une Publication en base pointant
-        // vers un URI inaccessible.
-        return duplicateCheckMutex.withLock {
+        // vers un URI inaccessible. L'indexation (couteuse, cf. commentaire
+        // du Mutex) reste HORS verrou, comme le parsing — sinon elle
+        // serialiserait tous les imports concurrents (Tache 6.3) sur une
+        // section censee ne proteger que la verification de doublon.
+        val insertResult = duplicateCheckMutex.withLock {
             publicationRepository.getByFileHash(hash)?.let {
                 return@withLock ImportResult.Duplicate(existingPublicationId = it.id)
             }
             fileStorageService.persistReadPermission(fileUri)
             publicationRepository.insert(publication)
-            // Peuplement de l'index a l'import (Tache 7.3.2, decision
-            // actee) : le DocumentModel est deja extrait par le parsing
-            // ci-dessus, pas de second passage. Si l'app est tuee entre
-            // l'insertion et l'indexation, la publication devient
-            // durablement non trouvable par recherche jusqu'a reimport -
-            // limite connue, non traitee ici (pas une perte de donnees,
-            // juste une fonctionnalite degradee).
-            searchService.indexPublication(publication.id, documentModel)
             ImportResult.Success(publication)
         }
+        if (insertResult !is ImportResult.Success) return insertResult
+
+        // Peuplement de l'index a l'import (Tache 7.3.2, decision actee).
+        // Best-effort, jamais fatal a l'import (Blueprint §7.11, contrat de
+        // classe ci-dessus) : la publication est deja inseree a ce stade,
+        // un echec d'indexation degrade juste la recherche pour ce livre,
+        // jamais l'import lui-meme. Si l'app est tuee avant que ceci
+        // s'execute, meme degradation - limite connue, non traitee ici
+        // (pas une perte de donnees).
+        //
+        // Plan v3 : pour l'EPUB, le DocumentModel issu du parsing plus haut
+        // n'est plus qu'une coquille (parsing paresseux, D2) -
+        // chapter.sentences y est toujours vide, donc indexPublication
+        // n'indexerait rien. On parse chaque chapitre via ChapterParser
+        // (seul point du plan qui accepte ce cout : Tache 7.3, mesure par
+        // ImportBenchmarkTest) et on indexe le contenu reel via
+        // indexSentences. PDF/TXT restent inchanges : leur DocumentModel
+        // est deja eagerly peuple par leur parseur respectif.
+        try {
+            if (publication.format == PublicationFormat.EPUB) {
+                chapterParser.registerPublication(publication.id, fileUri)
+                documentModel.chapters.forEach { shell ->
+                    val chapter = chapterParser.parseChapter(publication.id, shell.href)
+                    searchService.indexSentences(publication.id, chapter.index, chapter.href, chapter.sentences)
+                }
+                chapterParser.invalidate(publication.id)
+            } else {
+                searchService.indexPublication(publication.id, documentModel)
+            }
+        } catch (e: CancellationException) {
+            throw e
+        } catch (e: Exception) {
+            // Degradation silencieuse assumee (voir commentaire ci-dessus) —
+            // rien a logger ici, ImportPublicationUseCase est un module
+            // domain pur (pas de dependance Android/Log, ADR-011).
+        }
+        return insertResult
     }
 
     private suspend fun buildPublication(

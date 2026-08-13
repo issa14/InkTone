@@ -8,6 +8,7 @@ import androidx.work.WorkerFactory
 import androidx.work.WorkerParameters
 import androidx.work.testing.TestListenableWorkerBuilder
 import androidx.work.workDataOf
+import com.inktone.core.testing.fake.FakeChapterParser
 import com.inktone.core.testing.fake.FakeFileStorageService
 import com.inktone.core.testing.fake.FakeImportResultsStore
 import com.inktone.core.testing.fake.FakePublicationParser
@@ -51,6 +52,7 @@ class ImportWorkerTest {
             publicationRepository = publicationRepository,
             fileStorageService = FakeFileStorageService(),
             searchService = FakeSearchService(),
+            chapterParser = FakeChapterParser(),
         )
 
         val worker = TestListenableWorkerBuilder<ImportWorker>(context)
@@ -84,6 +86,7 @@ class ImportWorkerTest {
             publicationRepository = publicationRepository,
             fileStorageService = FakeFileStorageService(),
             searchService = FakeSearchService(),
+            chapterParser = FakeChapterParser(),
         )
 
         val worker = TestListenableWorkerBuilder<ImportWorker>(context)
@@ -112,6 +115,7 @@ class ImportWorkerTest {
             publicationRepository = FakePublicationRepository(),
             fileStorageService = FakeFileStorageService(),
             searchService = FakeSearchService(),
+            chapterParser = FakeChapterParser(),
         )
 
         val worker = TestListenableWorkerBuilder<ImportWorker>(context)

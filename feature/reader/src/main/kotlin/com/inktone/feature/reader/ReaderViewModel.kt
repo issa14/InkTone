@@ -6,7 +6,9 @@ import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.inktone.domain.model.Annotation
 import com.inktone.domain.model.AnnotationColor
+import com.inktone.domain.model.BookBlock
 import com.inktone.domain.model.Bookmark
+import com.inktone.domain.model.ChapterContent
 import com.inktone.domain.model.EffectiveReadingSettings
 import com.inktone.domain.model.PublicationFormat
 import com.inktone.domain.model.ReadingMode as DomainReadingMode
@@ -26,6 +28,8 @@ import com.inktone.domain.repository.PublicationRepository
 import com.inktone.domain.repository.ReadingSessionRepository
 import com.inktone.domain.repository.ThemeRepository
 import com.inktone.domain.repository.VoiceProfileRepository
+import com.inktone.domain.service.ChapterParser
+import com.inktone.domain.service.EpubResourceResolver
 import com.inktone.domain.service.FixedPageDocument
 import com.inktone.domain.service.FixedPageOpenResult
 import com.inktone.domain.service.FixedPageRenderer
@@ -41,6 +45,8 @@ import com.inktone.domain.usecase.GetVoiceProfilesUseCase
 import com.inktone.domain.usecase.UpdateReadingStateUseCase
 import com.inktone.domain.valueobject.Locator
 import dagger.hilt.android.lifecycle.HiltViewModel
+import kotlinx.coroutines.CancellationException
+import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.delay
@@ -82,6 +88,9 @@ class ReaderViewModel @Inject constructor(
     // infrastructure/parser/di/ParserModule). Jamais le binding PDFium
     // directement (règle de dépendance, Blueprint §4.7).
     private val fixedPageRenderer: FixedPageRenderer,
+    // Plan v3, Palier 3.6 — parsing lazy EPUB + résolveur d'images
+    private val chapterParser: ChapterParser,
+    private val epubResourceResolver: EpubResourceResolver,
 ) : ViewModel() {
 
     private val _state = MutableStateFlow(ReaderUiState())
@@ -109,7 +118,8 @@ class ReaderViewModel @Inject constructor(
 
     // C.5 — exposé pour clé sharedElement dans ReaderScreen
     internal var currentPublicationId: String? = null
-    private val chapterPreloader = ChapterPreloader(viewModelScope)
+    /** Plan v4 — scope dédié aux préchargements, annulé indépendamment du chargement courant. */
+    private var preloadScope: CoroutineScope? = null
     private val sentenceAudioBuffer = SentenceAudioBuffer(viewModelScope, ttsEngine)
     private val annotationSelectionHandler = AnnotationSelectionHandler()
     private var sleepTimerJob: Job? = null
@@ -403,8 +413,35 @@ class ReaderViewModel @Inject constructor(
                         // Lot 12, tache 12.9 — jamais reporte avant ce lot.
                         publicationFormat = publication.format,
                         pageOffsetY = restored?.locator?.pageOffsetY ?: 0f,
+                        // Plan v3, Palier 3.6 — ID de publication + résolveur images EPUB
+                        publicationId = publicationId,
+                        epubResourceResolver = if (publication.format == PublicationFormat.EPUB) {
+                            this@ReaderViewModel.epubResourceResolver
+                        } else null,
                     )
-                    triggerPreload(_state.value.currentChapterIndex)
+                    // Plan v3, Palier 3.6 — initialiser le parsing lazy EPUB
+                    if (publication.format == PublicationFormat.EPUB) {
+                        chapterParser.registerPublication(publicationId, publication.fileUri)
+                        try {
+                            epubResourceResolver.open(publicationId, publication.fileUri)
+                        } catch (e: CancellationException) {
+                            throw e
+                        } catch (e: Exception) {
+                            // Best-effort : le texte (chapterParser) peut encore
+                            // s'ouvrir même si la résolution d'images échoue —
+                            // ne jamais faire planter l'ouverture du lecteur pour
+                            // un chapitre potentiellement illustré (K2/K6).
+                            Log.w("ReaderViewModel", "openPublication: echec ouverture resolveur images", e)
+                        }
+                    }
+                    // Bug réel trouvé sur appareil (session Plan v3) : sans cet
+                    // appel, le chapitre COURANT à l'ouverture n'était jamais
+                    // chargé — preloadAdjacentChapters ne précharge que N-1/N+1/
+                    // N+2, jamais N lui-même. Le lecteur s'ouvrait donc sur une
+                    // zone de lecture vide (coquille ChapterContent.Rich sans
+                    // blocks) jusqu'à ce que l'utilisateur navigue et revienne.
+                    loadChapterContentIfNeeded(_state.value.currentChapterIndex)
+                    preloadAdjacentChapters(_state.value.currentChapterIndex)
                     observeAnnotations(publicationId)
                     observeBookmarks(publicationId)
                     if (prefs.eyeRestReminderEnabled) scheduleEyeRestReminder(prefs.eyeRestReminderIntervalMinutes)
@@ -471,7 +508,7 @@ class ReaderViewModel @Inject constructor(
     private fun confirmAnnotation(color: AnnotationColor, content: String? = null) {
         val chapter = _state.value.currentChapter ?: return
         val publicationId = currentPublicationId ?: return
-        val sentences = chapter.paragraphs.flatMap { it.sentences }
+        val sentences = chapter.sentences
 
         val freeRange = _state.value.freeSelectionRange ?: return
         val endOffsetExclusive = freeRange.last + 1
@@ -551,7 +588,7 @@ class ReaderViewModel @Inject constructor(
         }
 
         val chapter = _state.value.currentChapter ?: return
-        val sentence = chapter.paragraphs.flatMap { it.sentences }.getOrNull(_state.value.currentSentenceIndex) ?: return
+        val sentence = chapter.sentences.getOrNull(_state.value.currentSentenceIndex) ?: return
         val existing = _state.value.bookmarks.firstOrNull { bookmark ->
             bookmark.locator.chapterIndex == chapter.index &&
                 bookmark.locator.charOffset in sentence.startOffset until sentence.endOffset
@@ -583,7 +620,7 @@ class ReaderViewModel @Inject constructor(
     private fun navigateToLocator(locator: Locator, flashOnArrival: Boolean = false) {
         val chapters = _state.value.chapters
         if (locator.chapterIndex !in chapters.indices) return
-        val sentences = chapters[locator.chapterIndex].paragraphs.flatMap { it.sentences }
+        val sentences = chapters[locator.chapterIndex].sentences
         val sentenceIndex = sentences.indexOfFirst { locator.charOffset in it.startOffset..it.endOffset }.coerceAtLeast(0)
 
         // Bug réel trouvé à l'audit, même famille que Pause avant
@@ -603,7 +640,7 @@ class ReaderViewModel @Inject constructor(
             highlightedWordRange = null, isTocVisible = false, isBookmarkListVisible = false,
         )
         persistPosition(chapterIndex = locator.chapterIndex, sentenceIndex = sentenceIndex)
-        triggerPreload(locator.chapterIndex)
+        preloadAdjacentChapters(locator.chapterIndex)
         if (wasPlaying) playCurrentSentence()
         if (flashOnArrival) armPendingHighlight(PendingHighlightTarget(locator.chapterIndex, sentenceIndex))
     }
@@ -636,7 +673,7 @@ class ReaderViewModel @Inject constructor(
         if (target.chapterIndex != chapterIndex) return
         pendingHighlightTimeoutJob?.cancel()
         val sentence = _state.value.chapters.getOrNull(chapterIndex)
-            ?.paragraphs?.flatMap { it.sentences }?.getOrNull(target.sentenceIndex)
+            ?.sentences?.getOrNull(target.sentenceIndex)
         _state.value = _state.value.copy(
             pendingHighlightTarget = null,
             highlightedWordRange = sentence?.let { 0 until it.text.length },
@@ -671,13 +708,65 @@ class ReaderViewModel @Inject constructor(
             highlightedWordRange = null, isTocVisible = false,
         )
         persistPosition(chapterIndex = targetIndex, sentenceIndex = 0)
-        triggerPreload(targetIndex)
+        // Plan v3, Palier 3.6 — charger le contenu Rich si chapitre vide
+        loadChapterContentIfNeeded(targetIndex)
+        preloadAdjacentChapters(targetIndex)
         if (wasPlaying) playCurrentSentence()
     }
 
-    private fun triggerPreload(currentIndex: Int) {
-        val nextChapter = _state.value.chapters.getOrNull(currentIndex + 1)
-        chapterPreloader.preload(nextChapter) { /* chapitre pret, no-op pour l'instant */ }
+    /**
+     * Plan v3, Palier 3.6 — charge le contenu d'un chapitre Rich vide
+     * via [ChapterParser.parseChapter]. Les chapitres Legacy (PDF/TXT)
+     * ou déjà chargés sont ignorés.
+     */
+    private fun loadChapterContentIfNeeded(chapterIndex: Int) {
+        val chapter = _state.value.chapters.getOrNull(chapterIndex) ?: return
+        val rich = chapter.content as? ChapterContent.Rich ?: return
+        if (rich.blocks.isNotEmpty()) return // déjà chargé
+
+        val publicationId = currentPublicationId ?: return
+        viewModelScope.launch {
+            // Un href introuvable (K6 : encodage divergent entre le spine
+            // et la ressource, ou EPUB malformé) ne doit jamais crasher le
+            // lecteur — juste laisser ce chapitre vide et le signaler.
+            val richChapter = try {
+                chapterParser.parseChapter(publicationId, chapter.href)
+            } catch (e: CancellationException) {
+                throw e
+            } catch (e: Exception) {
+                Log.w("ReaderViewModel", "loadChapterContentIfNeeded: echec chapitre ${chapter.href}", e)
+                _state.value = _state.value.copy(errorMessage = "Impossible de charger ce chapitre.")
+                return@launch
+            }
+            val chapters = _state.value.chapters.toMutableList()
+            chapters[chapterIndex] = richChapter
+            _state.value = _state.value.copy(chapters = chapters)
+        }
+    }
+
+    /**
+     * Plan v4 — lance le préchargement asynchrone des chapitres adjacents
+     * (N+1 prioritaire, N-1, N+2). Annule les préchargements précédents
+     * (anti-starvation). Les chapitres déjà chargés (Rich avec blocks non
+     * vides) sont sautés. Fire-and-forget : pas de joinAll.
+     */
+    private fun preloadAdjacentChapters(centerIndex: Int) {
+        preloadScope?.coroutineContext[Job]?.cancel()
+        val publicationId = currentPublicationId ?: return
+        val chapters = _state.value.chapters
+        preloadScope = CoroutineScope(
+            viewModelScope.coroutineContext + Job(viewModelScope.coroutineContext[Job]),
+        )
+        // N+1 en premier (direction de lecture probable), puis N-1, puis N+2
+        val targets = sequenceOf(centerIndex + 1, centerIndex - 1, centerIndex + 2)
+        preloadScope?.launch {
+            for (idx in targets) {
+                val chapter = chapters.getOrNull(idx) ?: continue
+                val rich = chapter.content as? ChapterContent.Rich
+                if (rich != null && rich.blocks.isNotEmpty()) continue // déjà chargé
+                chapterParser.preload(publicationId, chapter.href, this)
+            }
+        }
     }
 
     /**
@@ -703,7 +792,7 @@ class ReaderViewModel @Inject constructor(
                 )
             } else {
                 val chapter = _state.value.chapters.getOrNull(chapterIndex) ?: return@launch
-                val sentence = chapter.paragraphs.flatMap { it.sentences }.getOrNull(sentenceIndex) ?: return@launch
+                val sentence = chapter.sentences.getOrNull(sentenceIndex) ?: return@launch
                 sentence.startLocator(chapterIndex = chapterIndex, resourceHref = chapter.href)
             }
             updateReadingState(
@@ -737,7 +826,7 @@ class ReaderViewModel @Inject constructor(
         if (_state.value.publicationFormat == PublicationFormat.PDF) return
         playbackJob = viewModelScope.launch {
             val chapter = _state.value.currentChapter ?: return@launch
-            val sentences = chapter.paragraphs.flatMap { it.sentences }
+            val sentences = chapter.sentences
             val index = _state.value.currentSentenceIndex
             val publicationId = currentPublicationId ?: return@launch
 
@@ -844,7 +933,7 @@ class ReaderViewModel @Inject constructor(
      */
     private fun skipSentence(delta: Int) {
         val chapter = _state.value.currentChapter ?: return
-        val sentences = chapter.paragraphs.flatMap { it.sentences }
+        val sentences = chapter.sentences
         if (sentences.isEmpty()) return
         val wasPlaying = _state.value.isPlaying
         pausePlayback()
@@ -1002,6 +1091,10 @@ class ReaderViewModel @Inject constructor(
         pageOffsetPersistJob?.cancel()
         fixedPageDocument?.close()
         fixedPageDocument = null
+        // Plan v4 — libère le cache LRU du ChapterParser + ferme le resolver EPUB
+        preloadScope?.coroutineContext[Job]?.cancel()
+        currentPublicationId?.let { chapterParser.invalidate(it) }
+        epubResourceResolver.close()
     }
 
     // ═══════════════════════════════════════════════

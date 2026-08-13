@@ -10,8 +10,10 @@ import com.inktone.core.testing.fake.FakeReadingStateRepository
 import com.inktone.core.testing.fake.FakeTtsEngine
 import com.inktone.core.testing.fake.FakeVoiceProfileRepository
 import com.inktone.domain.model.Chapter
+import com.inktone.domain.model.ChapterContent
 import com.inktone.domain.model.DocumentModel
-import com.inktone.domain.model.Paragraph
+import com.inktone.domain.model.BookBlock
+import com.inktone.domain.model.StyledText
 import com.inktone.domain.model.Publication
 import com.inktone.domain.model.PublicationFormat
 import com.inktone.domain.model.Sentence
@@ -36,6 +38,8 @@ import org.junit.Assert.assertNotNull
 import org.junit.Assert.assertNull
 import org.junit.Before
 import org.junit.Test
+import com.inktone.core.testing.fake.FakeChapterParser
+import com.inktone.core.testing.fake.FakeEpubResourceResolver
 
 /**
  * Lot 4, tâche 4.7/4.8 — flash différé du passage visé depuis « Marque-
@@ -60,14 +64,17 @@ class ReaderViewModelPendingHighlightTest {
         index = 0,
         href = "OEBPS/chapter1.xhtml",
         title = null,
-        paragraphs = listOf(
-            Paragraph(
-                index = 0,
-                sentences = listOf(
-                    Sentence(index = 0, text = "Premiere phrase.", startOffset = 0, endOffset = 17),
-                    Sentence(index = 1, text = "Deuxieme phrase plus longue.", startOffset = 18, endOffset = 46),
+        content = ChapterContent.Rich(
+            blocks = listOf(
+                BookBlock.ParagraphBlock(
+                    richText = StyledText.plain("Premiere phrase. Deuxieme phrase plus longue."),
+                    globalOffsetRange = 0 until 46,
                 ),
             ),
+        ),
+        sentences = listOf(
+            Sentence(index = 0, text = "Premiere phrase.", startOffset = 0, endOffset = 17),
+            Sentence(index = 1, text = "Deuxieme phrase plus longue.", startOffset = 18, endOffset = 46),
         ),
     )
 
@@ -108,6 +115,8 @@ class ReaderViewModelPendingHighlightTest {
             readingSessionRepository = FakeReadingSessionRepository(),
             themeRepository = com.inktone.core.testing.fake.FakeThemeRepository(),
             fixedPageRenderer = com.inktone.core.testing.fake.FakeFixedPageRenderer(),
+            chapterParser = FakeChapterParser(),
+            epubResourceResolver = FakeEpubResourceResolver(),
         )
     }
 

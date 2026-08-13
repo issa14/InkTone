@@ -173,7 +173,7 @@ fun rememberChapterPaginationState(
 
     LaunchedEffect(chapter?.index, styleKey) {
         if (chapter == null || contentWidthPx <= 0) return@LaunchedEffect
-        val sentences = chapter.paragraphs.flatMap { it.sentences }
+        val sentences = chapter.sentences
         val totalSentenceCount = sentences.size
         val targetSentenceIndex = currentSentenceIndexAtOpen.value
 

@@ -43,8 +43,8 @@ class PdfPublicationParserTest {
         assertEquals(1, result.documentModel.chapters.size)
         val chapter = result.documentModel.chapters.single()
         assertEquals("page-0", chapter.href)
-        assertTrue("le texte de la page doit etre extrait", chapter.paragraphs.isNotEmpty())
-        val text = chapter.paragraphs.flatMap { it.sentences }.joinToString(" ") { it.text }
+        assertTrue("le texte de la page doit etre extrait", chapter.sentences.isNotEmpty())
+        val text = chapter.sentences.joinToString(" ") { it.text }
         assertTrue(text.contains("InkTone"))
     }
 

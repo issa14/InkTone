@@ -53,6 +53,7 @@ dependencies {
     implementation(libs.androidx.lifecycle.viewmodel.compose)
     implementation(libs.androidx.lifecycle.runtime.compose)
     implementation(libs.androidx.hilt.navigation.compose)
+    implementation(libs.coil.compose)
     // Tache 7.0 : SelectionContainer (androidx.compose.foundation.text.selection)
     implementation("androidx.compose.foundation:foundation")
     // Tache 9bis.3.1 : WindowInsetsControllerCompat (mode immersif)
