@@ -34,6 +34,7 @@ appauth = "0.11.1"
 securityCrypto = "1.1.0-alpha06"
 pdfiumAndroid = "1.0.20"
 jsoup = "1.18.1"
+androidxCoreSplashscreen = "1.0.1"
 
 [libraries]
 onnxruntime-android = { group = "com.microsoft.onnxruntime", name = "onnxruntime-android", version.ref = "onnxruntimeAndroid" }
@@ -81,6 +82,7 @@ okhttp-mockwebserver = { group = "com.squareup.okhttp3", name = "mockwebserver",
 appauth = { group = "net.openid", name = "appauth", version.ref = "appauth" }
 androidx-security-crypto = { group = "androidx.security", name = "security-crypto", version.ref = "securityCrypto" }
 jsoup = { module = "org.jsoup:jsoup", version.ref = "jsoup" }
+androidx-core-splashscreen = { group = "androidx.core", name = "core-splashscreen", version.ref = "androidxCoreSplashscreen" }
 
 [plugins]
 android-application = { id = "com.android.application", version.ref = "agp" }
