@@ -132,15 +132,14 @@ class JsoupChapterParser {
         }
 
         for (child in childrenToProcess) {
-            val extracted = extractBlockFromNode(child, runningOffset, chapterHref)
-            if (extracted != null) {
-                blocks.add(extracted)
-                if (extracted is BookBlock.ParagraphBlock || extracted is BookBlock.HeadingBlock) {
+            for (block in extractBlocksFromNode(child, runningOffset, chapterHref)) {
+                blocks.add(block)
+                if (block is BookBlock.ParagraphBlock || block is BookBlock.HeadingBlock) {
                     // +1 pour la fin exclusive de la plage, +BLOCK_SEPARATOR.length
                     // pour réserver le caractère séparateur inséré entre blocs
                     // par tokenizeSentences — sans ce décalage, le texte de deux
                     // paragraphes consécutifs seraient fusionnés sans espace.
-                    runningOffset = extracted.globalOffsetRange!!.last + 1 + BLOCK_SEPARATOR.length
+                    runningOffset = block.globalOffsetRange!!.last + 1 + BLOCK_SEPARATOR.length
                 }
             }
         }
@@ -188,94 +187,109 @@ class JsoupChapterParser {
     }
 
     /**
-     * Extrait un [BookBlock] depuis un nœud DOM.
+     * Extrait les [BookBlock] depuis un nœud DOM.
      *
      * @param node Nœud DOM à traiter.
-     * @param runningOffset Offset global courant (début du bloc).
-     * @return Le bloc extrait, ou null si le nœud ne produit pas de bloc
-     *   (commentaire, script, etc.).
+     * @param runningOffset Offset global courant (début du premier bloc).
+     * @return Les blocs extraits (vide si le nœud ne produit aucun bloc :
+     *   commentaire, script, etc.).
      */
-    private fun extractBlockFromNode(node: Node, runningOffset: Int, chapterHref: String): BookBlock? {
+    private fun extractBlocksFromNode(node: Node, runningOffset: Int, chapterHref: String): List<BookBlock> {
         return when {
-            node is Element -> extractBlockFromElement(node, runningOffset, chapterHref)
+            node is Element -> extractBlocksFromElement(node, runningOffset, chapterHref)
             node is TextNode -> {
                 val text = node.wholeText.trim()
-                if (text.isBlank()) return null
-                // Texte hors balise de bloc : on le traite comme un
-                // paragraphe implicite.
-                BookBlock.ParagraphBlock(
-                    richText = StyledText.plain(text),
-                    globalOffsetRange = runningOffset until (runningOffset + text.length),
+                if (text.isBlank()) emptyList()
+                else listOf(
+                    // Texte hors balise de bloc : on le traite comme un
+                    // paragraphe implicite.
+                    BookBlock.ParagraphBlock(
+                        richText = StyledText.plain(text),
+                        globalOffsetRange = runningOffset until (runningOffset + text.length),
+                    ),
                 )
             }
-            else -> null // Commentaires, etc.
+            else -> emptyList() // Commentaires, etc.
         }
     }
 
     /**
-     * Extrait un [BookBlock] depuis un élément DOM.
+     * Extrait les [BookBlock] depuis un élément DOM.
+     *
+     * Un élément de paragraphe contenant des images inline (`<img>`/`<svg>`)
+     * est scindé en segments texte/image/texte par [extractInlineBlocks] —
+     * voir cette méthode pour la continuité des [BookBlock.globalOffsetRange].
      */
-    private fun extractBlockFromElement(element: Element, runningOffset: Int, chapterHref: String): BookBlock? {
+    private fun extractBlocksFromElement(element: Element, runningOffset: Int, chapterHref: String): List<BookBlock> {
         val tagName = element.normalName()
 
         return when (tagName) {
             "h1", "h2", "h3", "h4", "h5", "h6" -> {
                 val level = tagName[1].digitToInt()
                 val richText = extractRichText(element)
-                if (richText.plainText.isBlank()) return null
-                BookBlock.HeadingBlock(
-                    level = level,
-                    richText = richText,
-                    globalOffsetRange = runningOffset until (runningOffset + richText.plainText.length),
+                if (richText.plainText.isBlank()) emptyList()
+                else listOf(
+                    BookBlock.HeadingBlock(
+                        level = level,
+                        richText = richText,
+                        globalOffsetRange = runningOffset until (runningOffset + richText.plainText.length),
+                    ),
                 )
             }
             "p", "div", "blockquote", "section", "article", "li", "td", "th" -> {
-                val richText = extractRichText(element)
-                if (richText.plainText.isBlank()) {
-                    // Bug réel trouvé sur appareil : les pages de couverture
-                    // générées par Calibre/Sigil (motif standard EPUB3)
-                    // encodent l'image dans un <svg><image xlink:href="…"/>
-                    // sans aucun texte — le bloc entier était silencieusement
-                    // abandonné faute de texte, sans jamais produire
-                    // d'ImageBlock. Repli sur ce motif avant d'abandonner.
-                    return extractImageBlock(element, chapterHref)
+                if (element.selectFirst("img, svg") != null) {
+                    // Image inline (ou conteneur d'image) : scinder le flux
+                    // en segments texte/image/texte.
+                    extractInlineBlocks(element, runningOffset, chapterHref)
+                } else {
+                    val richText = extractRichText(element)
+                    if (richText.plainText.isBlank()) emptyList()
+                    else listOf(
+                        BookBlock.ParagraphBlock(
+                            richText = richText,
+                            globalOffsetRange = runningOffset until (runningOffset + richText.plainText.length),
+                            isBlockquote = tagName == "blockquote",
+                        ),
+                    )
                 }
-                BookBlock.ParagraphBlock(
-                    richText = richText,
-                    globalOffsetRange = runningOffset until (runningOffset + richText.plainText.length),
-                    isBlockquote = tagName == "blockquote",
-                )
             }
             "img" -> {
-                val src = element.attr("src").ifBlank { null } ?: return null
-                BookBlock.ImageBlock(
-                    // K6, CLAUDE.md : `src` est relatif au chapitre (ex.
-                    // "../Images/x.jpg"), pas à la racine de la publication
-                    // — résolu ici pour matcher les hrefs de
-                    // Publication.resourceWithHref (ReadiumResourceResolver),
-                    // qui sont eux relatifs à la racine.
-                    href = resolveHref(chapterHref, src),
-                    alt = element.attr("alt").takeIf { it.isNotBlank() },
-                    intrinsicWidth = element.attr("width").toIntOrNull(),
-                    intrinsicHeight = element.attr("height").toIntOrNull(),
+                val src = element.attr("src").ifBlank { null }
+                if (src == null) emptyList()
+                else listOf(
+                    BookBlock.ImageBlock(
+                        // K6, CLAUDE.md : `src` est relatif au chapitre (ex.
+                        // "../Images/x.jpg"), pas à la racine de la publication
+                        // — résolu ici pour matcher les hrefs de
+                        // Publication.resourceWithHref (ReadiumResourceResolver),
+                        // qui sont eux relatifs à la racine.
+                        href = resolveHref(chapterHref, src),
+                        alt = element.attr("alt").takeIf { it.isNotBlank() },
+                        intrinsicWidth = element.attr("width").toIntOrNull(),
+                        intrinsicHeight = element.attr("height").toIntOrNull(),
+                    ),
                 )
             }
-            "svg" -> extractSvgImageBlock(element, chapterHref)
-            "hr" -> BookBlock.SeparatorBlock
+            "svg" -> listOfNotNull(extractSvgImageBlock(element, chapterHref))
+            "hr" -> listOf(BookBlock.SeparatorBlock)
             // Éléments ignorés : on extrait le texte des enfants comme
             // paragraphes (ex: <pre>, <code>, <figcaption>, etc.)
             else -> {
                 // Vérifier si l'élément contient du texte significatif
-                if (element.ownText().isBlank() && element.children().isEmpty()) return null
-                // Tenter d'extraire comme paragraphe
-                val richText = extractRichText(element)
-                if (richText.plainText.isBlank()) {
-                    return extractImageBlock(element, chapterHref)
+                if (element.ownText().isBlank() && element.children().isEmpty()) emptyList()
+                else if (element.selectFirst("img, svg") != null) {
+                    // <figure><img/></figure>, <pre> avec image, etc.
+                    extractInlineBlocks(element, runningOffset, chapterHref)
+                } else {
+                    val richText = extractRichText(element)
+                    if (richText.plainText.isBlank()) emptyList()
+                    else listOf(
+                        BookBlock.ParagraphBlock(
+                            richText = richText,
+                            globalOffsetRange = runningOffset until (runningOffset + richText.plainText.length),
+                        ),
+                    )
                 }
-                BookBlock.ParagraphBlock(
-                    richText = richText,
-                    globalOffsetRange = runningOffset until (runningOffset + richText.plainText.length),
-                )
             }
         }
     }
@@ -329,6 +343,49 @@ class JsoupChapterParser {
     }
 
     /**
+     * Extrait les blocs d'un élément de paragraphe contenant des images
+     * inline. Parcourt les enfants en ordre de document et scinde le flux
+     * en [BookBlock.ParagraphBlock] autour des [BookBlock.ImageBlock], avec
+     * des [BookBlock.globalOffsetRange] consécutifs — même convention de
+     * séparateur ([BLOCK_SEPARATOR]) que [tokenizeSentences] et
+     * [extractBlocks], pour ne pas désynchroniser les offsets TTS/sélection.
+     */
+    private fun extractInlineBlocks(
+        element: Element,
+        startOffset: Int,
+        chapterHref: String,
+    ): List<BookBlock> {
+        val blocks = mutableListOf<BookBlock>()
+        val textBuilder = StringBuilder()
+        val rawSpans = mutableListOf<RawSpan>()
+        var runningOffset = startOffset
+
+        fun flushText() {
+            val plainText = textBuilder.toString()
+            if (plainText.isNotBlank()) {
+                blocks.add(
+                    BookBlock.ParagraphBlock(
+                        richText = StyledText(plainText, normalizeSpans(plainText, rawSpans)),
+                        globalOffsetRange = runningOffset until (runningOffset + plainText.length),
+                        isBlockquote = element.normalName() == "blockquote",
+                    ),
+                )
+                runningOffset = runningOffset + plainText.length + BLOCK_SEPARATOR.length
+            }
+            textBuilder.setLength(0)
+            rawSpans.clear()
+        }
+
+        collectInlineContent(element, SpanStyles.NONE, null, textBuilder, rawSpans) { imageEl ->
+            flushText()
+            extractImageBlock(imageEl, chapterHref)?.let { blocks.add(it) }
+        }
+        flushText()
+
+        return blocks
+    }
+
+    /**
      * Extrait le [StyledText] d'un sous-arbre DOM.
      *
      * Parcourt récursivement les nœuds enfants, accumule le texte brut et
@@ -359,14 +416,19 @@ class JsoupChapterParser {
     )
 
     /**
-     * Parcourt récursivement le DOM et accumule le texte + les spans bruts.
+     * Parcourt récursivement le DOM en ordre de document et accumule le
+     * texte + les spans bruts, en signalant chaque image inline via
+     * [onImage] (sans descendre dans celle-ci). Base commune de
+     * [collectTextAndSpans] (callback no-op) et de [extractInlineBlocks]
+     * (callback qui émet un [BookBlock.ImageBlock]).
      */
-    private fun collectTextAndSpans(
+    private fun collectInlineContent(
         node: Node,
         inheritedStyles: SpanStyles,
         inheritedHref: String?,
         textBuilder: StringBuilder,
         rawSpans: MutableList<RawSpan>,
+        onImage: (Element) -> Unit,
     ) {
         when (node) {
             is TextNode -> {
@@ -388,6 +450,16 @@ class JsoupChapterParser {
             }
             is Element -> {
                 val tagName = node.normalName()
+                when (tagName) {
+                    // Image inline : signaler et ne pas descendre dedans
+                    // (aucun texte à en extraire).
+                    "img", "svg" -> {
+                        onImage(node)
+                        return
+                    }
+                    // Éléments à ignorer entièrement
+                    "script", "style", "head", "meta", "link" -> return
+                }
                 val (newStyles, newHref) = when (tagName) {
                     "b", "strong" -> inheritedStyles + SpanStyles.STRONG to inheritedHref
                     "i", "em" -> inheritedStyles + SpanStyles.EMPHASIS to inheritedHref
@@ -404,16 +476,28 @@ class JsoupChapterParser {
                         textBuilder.append(' ')
                         return
                     }
-                    // Éléments à ignorer entièrement
-                    "script", "style", "head", "meta", "link" -> return
                     else -> inheritedStyles to inheritedHref
                 }
 
                 for (child in node.childNodes()) {
-                    collectTextAndSpans(child, newStyles, newHref, textBuilder, rawSpans)
+                    collectInlineContent(child, newStyles, newHref, textBuilder, rawSpans, onImage)
                 }
             }
         }
+    }
+
+    /**
+     * Parcourt récursivement le DOM et accumule le texte + les spans bruts.
+     */
+    private fun collectTextAndSpans(
+        node: Node,
+        inheritedStyles: SpanStyles,
+        inheritedHref: String?,
+        textBuilder: StringBuilder,
+        rawSpans: MutableList<RawSpan>,
+    ) {
+        // Comportement historique : les images sont ignorées (callback no-op).
+        collectInlineContent(node, inheritedStyles, inheritedHref, textBuilder, rawSpans) {}
     }
 
     /**

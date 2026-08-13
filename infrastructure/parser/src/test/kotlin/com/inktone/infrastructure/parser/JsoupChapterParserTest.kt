@@ -237,6 +237,46 @@ class JsoupChapterParserTest {
     }
 
     @Test
+    fun `img inline dans un paragraphe scinde en texte image texte`() {
+        val html = """<html><body><p>Voici la carte <img src="../Images/carte.jpg" alt="Carte"/> ci-dessous.</p><p>Suite.</p></body></html>"""
+        val chapter = parse(html)
+
+        val blocks = richBlocks(chapter)
+        assertEquals(4, blocks.size)
+
+        val avant = blocks[0] as BookBlock.ParagraphBlock
+        assertEquals("Voici la carte ", avant.richText.plainText)
+
+        val img = blocks[1] as BookBlock.ImageBlock
+        assertEquals("Images/carte.jpg", img.href)
+        assertEquals("Carte", img.alt)
+
+        val apres = blocks[2] as BookBlock.ParagraphBlock
+        assertEquals(" ci-dessous.", apres.richText.plainText)
+
+        // Continuité des offsets (pont TTS) : le séparateur '\n' (1 char)
+        // est réservé entre le texte avant et le texte après.
+        assertEquals(avant.globalOffsetRange!!.last + 2, apres.globalOffsetRange!!.first)
+
+        // Le paragraphe suivant continue l'espace d'offsets.
+        val suite = blocks[3] as BookBlock.ParagraphBlock
+        assertEquals("Suite.", suite.richText.plainText)
+        assertEquals(apres.globalOffsetRange!!.last + 2, suite.globalOffsetRange!!.first)
+    }
+
+    @Test
+    fun `figure avec image et legende scinde en texte et image`() {
+        val html = """<html><body><figure><img src="carte.png" alt="Carte"/><figcaption>Carte du monde.</figcaption></figure></body></html>"""
+        val chapter = parse(html)
+
+        val blocks = richBlocks(chapter)
+        assertEquals(2, blocks.size)
+        assertTrue(blocks[0] is BookBlock.ImageBlock)
+        val legende = blocks[1] as BookBlock.ParagraphBlock
+        assertEquals("Carte du monde.", legende.richText.plainText)
+    }
+
+    @Test
     fun `hr produit un SeparatorBlock`() {
         val html = "<html><body><p>Avant.</p><hr/><p>Après.</p></body></html>"
         val chapter = parse(html)
