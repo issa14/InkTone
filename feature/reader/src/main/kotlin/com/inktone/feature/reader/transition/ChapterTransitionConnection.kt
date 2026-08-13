@@ -25,16 +25,16 @@ class ChapterTransitionConnection(
         // UserInput = drag utilisateur (Drag est déprécié en 1.7 au profit de UserInput).
         if (source != NestedScrollSource.UserInput) return Offset.Zero
         val delta = if (orientation == Orientation.Vertical) available.y else available.x
-        // Signe scroll : delta < 0 = tirer vers le bas/droite (chapitre
-        // précédent), delta > 0 = pousser vers le haut/gauche (suivant). On
-        // inverse pour que `pullPx` soit positif côté « précédent ».
+        // Signe vérifié sur appareil : delta > 0 = tirer vers le bas/droite
+        // (doigt vers le bas/droite = chapitre précédent), delta < 0 =
+        // pousser vers le haut/gauche (chapitre suivant).
         return when {
-            delta < 0f && canPullPrevious() -> {
-                state.onDrag(-delta, ChapterTransitionDirection.PREVIOUS)
+            delta > 0f && canPullPrevious() -> {
+                state.onDrag(delta, ChapterTransitionDirection.PREVIOUS)
                 consume(delta)
             }
-            delta > 0f && canPullNext() -> {
-                state.onDrag(-delta, ChapterTransitionDirection.NEXT)
+            delta < 0f && canPullNext() -> {
+                state.onDrag(delta, ChapterTransitionDirection.NEXT)
                 consume(delta)
             }
             else -> Offset.Zero
