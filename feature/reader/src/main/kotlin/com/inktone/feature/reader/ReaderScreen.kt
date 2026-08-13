@@ -788,6 +788,15 @@ fun ReaderScreen(
                         isReadingRulerEnabled = state.isReadingRulerEnabled,
                         onClick = { handleReadingAreaTap() },
                         onNextChapter = { viewModel.onIntent(ReaderIntent.NextChapter) },
+                        onPreviousChapter = { viewModel.onIntent(ReaderIntent.PreviousChapter) },
+                        hasPreviousChapter = state.hasPreviousChapter,
+                        hasNextChapter = state.hasNextChapter,
+                        reduceMotion = state.reduceMotion,
+                        surfaceColor = ThemeColors.barSurface(state.resolvedTheme),
+                        isChapterReady = { index ->
+                            val c = state.chapters.getOrNull(index)
+                            c != null && (c.content as? ChapterContent.Rich)?.blocks?.isNotEmpty() == true
+                        },
                         onCurrentLineY = { y -> currentLineYDp = y },
                         onPageChanged = { pageIndex -> pagedLivePageIndex = pageIndex },
                         onManualPageChange = { sentenceIndex ->
