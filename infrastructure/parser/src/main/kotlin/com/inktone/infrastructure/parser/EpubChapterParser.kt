@@ -101,20 +101,51 @@ class EpubChapterParser @Inject constructor(
             withContext(parserDispatcher) {
                 val publication = registry.getOrOpen(publicationId)
                 val link = resolveChapterLink(publication, chapterHref)
-                val stream = openResourceStream(publication, link, chapterHref)
                 val chapterIndex = publication.readingOrder.indexOf(link).coerceAtLeast(0)
 
-                val chapter = jsoupParser.parse(
-                    inputStream = stream,
-                    baseUrl = chapterHref,
-                    chapterIndex = chapterIndex,
-                    chapterHref = chapterHref,
-                    fragment = fragment,
-                )
+                val chapter = imageChapterOrNull(link, chapterHref, chapterIndex) ?: run {
+                    val stream = openResourceStream(publication, link, chapterHref)
+                    jsoupParser.parse(
+                        inputStream = stream,
+                        baseUrl = chapterHref,
+                        chapterIndex = chapterIndex,
+                        chapterHref = chapterHref,
+                        fragment = fragment,
+                    )
+                }
                 cache.put(cacheKey, chapter)
                 chapter
             }
         }
+    }
+
+    /**
+     * Bug réel trouvé sur appareil : certains générateurs d'EPUB placent
+     * directement l'item binaire (ex. `image/jpeg`, la couverture) dans le
+     * `<spine>` au lieu d'un fichier XHTML qui l'enveloppe. Tenter un
+     * parsing Jsoup sur des octets JPEG/PNG produit un document HTML vide
+     * (aucun texte extractible) — écran noir, chapitre silencieusement
+     * vide. Contourne complètement Jsoup pour ce cas : construit
+     * directement un [Chapter] à un seul [BookBlock.ImageBlock].
+     */
+    private fun imageChapterOrNull(link: Link, chapterHref: String, chapterIndex: Int): Chapter? {
+        if (link.mediaType?.type?.equals("image", ignoreCase = true) != true) return null
+        return Chapter(
+            index = chapterIndex,
+            href = chapterHref,
+            title = null,
+            content = com.inktone.domain.model.ChapterContent.Rich(
+                blocks = listOf(
+                    com.inktone.domain.model.BookBlock.ImageBlock(
+                        href = chapterHref,
+                        alt = null,
+                        intrinsicWidth = null,
+                        intrinsicHeight = null,
+                    ),
+                ),
+            ),
+            sentences = emptyList(),
+        )
     }
 
     override fun preload(
@@ -135,15 +166,17 @@ class EpubChapterParser @Inject constructor(
             val chapter = try {
                 val publication = registry.getOrOpen(publicationId)
                 val link = resolveChapterLink(publication, chapterHref)
-                val stream = openResourceStream(publication, link, chapterHref)
                 val chapterIndex = publication.readingOrder.indexOf(link).coerceAtLeast(0)
 
-                jsoupParser.parse(
-                    inputStream = stream,
-                    baseUrl = chapterHref,
-                    chapterIndex = chapterIndex,
-                    chapterHref = chapterHref,
-                )
+                imageChapterOrNull(link, chapterHref, chapterIndex) ?: run {
+                    val stream = openResourceStream(publication, link, chapterHref)
+                    jsoupParser.parse(
+                        inputStream = stream,
+                        baseUrl = chapterHref,
+                        chapterIndex = chapterIndex,
+                        chapterHref = chapterHref,
+                    )
+                }
             } catch (e: CancellationException) {
                 throw e // ne jamais avaler l'annulation coopérative (D9)
             } catch (e: Exception) {
