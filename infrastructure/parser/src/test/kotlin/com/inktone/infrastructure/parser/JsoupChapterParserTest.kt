@@ -277,6 +277,22 @@ class JsoupChapterParserTest {
     }
 
     @Test
+    fun `section couverture avec img sans texte produit ImageBlock`() {
+        // Motif réel de « L'arcane des épées » : les cartes sont des
+        // <section class="couverture"><img alt="" src="images/T1carteN.jpg"/></section>
+        // sans aucun texte — silencieusement abandonnées avant le correctif.
+        val html = """<html><body><section class="couverture"><img alt="" class="img" src="images/T1carte1.jpg"/></section></body></html>"""
+        val chapter = parse(html)
+
+        val blocks = richBlocks(chapter)
+        assertEquals(1, blocks.size)
+        val img = blocks[0] as BookBlock.ImageBlock
+        assertEquals("images/T1carte1.jpg", img.href)
+        assertNull(img.alt) // alt="" → null, pas de description d'accessibilité
+        assertNull(img.intrinsicWidth)
+    }
+
+    @Test
     fun `hr produit un SeparatorBlock`() {
         val html = "<html><body><p>Avant.</p><hr/><p>Après.</p></body></html>"
         val chapter = parse(html)
