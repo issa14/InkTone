@@ -48,6 +48,12 @@ private class InMemoryPublicationRepository : PublicationRepository {
 private class NoOpSearchService : SearchService {
     override suspend fun search(query: String, publicationId: String?) = emptyList<com.inktone.domain.service.SearchResult>()
     override suspend fun indexPublication(publicationId: String, documentModel: DocumentModel) = Unit
+    override suspend fun indexSentences(
+        publicationId: String,
+        chapterIndex: Int,
+        resourceHref: String,
+        sentences: List<com.inktone.domain.model.Sentence>,
+    ) = Unit
 }
 
 /**
@@ -69,6 +75,9 @@ class ImportPublicationUseCasePdfTest {
             publicationRepository = repository,
             fileStorageService = fileStorageService,
             searchService = NoOpSearchService(),
+            // Format PDF : indexation via indexPublication (eager), le
+            // chapterParser n'est exercé que pour l'EPUB.
+            chapterParser = com.inktone.core.testing.fake.FakeChapterParser(),
         )
 
         val file = File(context.cacheDir, "fixture-valid.pdf").apply {

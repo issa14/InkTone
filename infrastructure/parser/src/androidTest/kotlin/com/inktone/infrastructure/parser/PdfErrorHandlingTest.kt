@@ -34,7 +34,7 @@ class PdfErrorHandlingTest {
 
         check(result is ParseResult.Success)
         val chapter = result.documentModel.chapters.single()
-        assertTrue("une page sans texte extractible reste un chapitre valide", chapter.paragraphs.isEmpty())
+        assertTrue("une page sans texte extractible reste un chapitre valide", chapter.sentences.isEmpty())
     }
 
     @Test

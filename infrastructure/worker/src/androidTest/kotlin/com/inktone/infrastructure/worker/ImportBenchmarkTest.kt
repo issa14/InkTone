@@ -11,7 +11,10 @@ import com.inktone.domain.usecase.ImportPublicationUseCase
 import com.inktone.domain.usecase.ImportResult
 import com.inktone.infrastructure.database.InkToneDatabase
 import com.inktone.infrastructure.database.search.RoomSearchService
+import com.inktone.infrastructure.parser.EpubChapterParser
+import com.inktone.infrastructure.parser.JsoupChapterParser
 import com.inktone.infrastructure.parser.ReadiumPublicationParser
+import com.inktone.infrastructure.parser.ReadiumPublicationRegistry
 import com.inktone.infrastructure.storage.SafFileStorageService
 import kotlinx.coroutines.async
 import kotlinx.coroutines.awaitAll
@@ -93,6 +96,10 @@ class ImportBenchmarkTest {
             // Tache 7.3 : indexation FTS reelle a l'import - le benchmark
             // doit refleter le cout ajoute, pas le contourner avec un fake.
             searchService = RoomSearchService(db.sentenceFtsDao()),
+            // Plan v3 : l'indexation EPUB passe par ChapterParser (parsing
+            // paresseux, D2) - le vrai EpubChapterParser ici aussi, pour la
+            // meme raison que RoomSearchService ci-dessus (mesurer le vrai cout).
+            chapterParser = EpubChapterParser(ReadiumPublicationRegistry(context), JsoupChapterParser()),
         )
 
         var successCount = 0

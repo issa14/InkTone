@@ -15,6 +15,7 @@ import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import com.inktone.core.designsystem.AppIcon
@@ -34,10 +35,16 @@ fun ReaderTopBar(
     author: String?,
     onBack: () -> Unit,
     modifier: Modifier = Modifier,
+    // Contraste garanti avec la page de lecture par défaut (voir
+    // ThemeColors.barSurface/barContent) — les défauts au thème chrome
+    // ne servent qu'aux previews/tests qui n'ont pas de ReadingTheme.
+    surfaceColor: Color = MaterialTheme.colorScheme.surface,
+    contentColor: Color = MaterialTheme.colorScheme.onSurface,
 ) {
     Surface(
         modifier = modifier.fillMaxWidth(),
-        color = MaterialTheme.colorScheme.surface.copy(alpha = 0.95f),
+        color = surfaceColor,
+        contentColor = contentColor,
         shape = RoundedCornerShape(bottomStart = 20.dp, bottomEnd = 20.dp),
     ) {
         Row(
@@ -45,13 +52,14 @@ fun ReaderTopBar(
             verticalAlignment = Alignment.CenterVertically,
         ) {
             IconButton(onClick = onBack) {
-                AppIcon(AppSymbol.Back,  contentDescription = "Retour")
+                AppIcon(AppSymbol.Back, contentDescription = "Retour", tint = contentColor)
             }
             Spacer(Modifier.width(4.dp))
             Column(modifier = Modifier.padding(end = 16.dp)) {
                 Text(
                     text = title ?: "",
                     style = MaterialTheme.typography.titleSmall,
+                    color = contentColor,
                     maxLines = 1,
                     overflow = TextOverflow.Ellipsis,
                 )
@@ -59,7 +67,7 @@ fun ReaderTopBar(
                     Text(
                         text = author,
                         style = MaterialTheme.typography.bodySmall,
-                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                        color = contentColor.copy(alpha = 0.75f),
                         maxLines = 1,
                         overflow = TextOverflow.Ellipsis,
                     )
