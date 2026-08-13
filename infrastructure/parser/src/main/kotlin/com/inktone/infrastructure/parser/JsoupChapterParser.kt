@@ -236,7 +236,7 @@ class JsoupChapterParser {
                     ),
                 )
             }
-            "p", "div", "blockquote", "section", "article", "li", "td", "th" -> {
+            "p", "blockquote", "li", "td", "th" -> {
                 if (element.selectFirst("img, svg") != null) {
                     // Image inline (ou conteneur d'image) : scinder le flux
                     // en segments texte/image/texte.
@@ -249,6 +249,28 @@ class JsoupChapterParser {
                             richText = richText,
                             globalOffsetRange = runningOffset until (runningOffset + richText.plainText.length),
                             isBlockquote = tagName == "blockquote",
+                        ),
+                    )
+                }
+            }
+            // Conteneurs structurels : descendre dans leurs enfants de
+            // niveau bloc pour préserver la granularité des paragraphes.
+            // Sans cette récursion, un chapitre entièrement enveloppé dans
+            // un <div> (motif courant des EPUB du commerce) était aplati en
+            // UN SEUL ParagraphBlock — gelant le compteur de page du mode
+            // SCROLL (qui dérive la position du premier bloc visible).
+            "div", "section", "article", "main" -> {
+                if (hasBlockLevelChild(element)) {
+                    extractContainerBlocks(element, runningOffset, chapterHref)
+                } else if (element.selectFirst("img, svg") != null) {
+                    extractInlineBlocks(element, runningOffset, chapterHref)
+                } else {
+                    val richText = extractRichText(element)
+                    if (richText.plainText.isBlank()) emptyList()
+                    else listOf(
+                        BookBlock.ParagraphBlock(
+                            richText = richText,
+                            globalOffsetRange = runningOffset until (runningOffset + richText.plainText.length),
                         ),
                     )
                 }
@@ -292,6 +314,35 @@ class JsoupChapterParser {
                 }
             }
         }
+    }
+
+    /**
+     * Vrai si [element] contient au moins un enfant de niveau bloc — auquel
+     * cas il est traité comme conteneur structurel (ses enfants deviennent
+     * des [BookBlock] distincts) plutôt que comme paragraphe aplati.
+     */
+    private fun hasBlockLevelChild(element: Element): Boolean =
+        element.children().any { it.normalName() in BLOCK_LEVEL_TAGS }
+
+    /**
+     * Extrait les blocs d'un conteneur structurel (`<div>`, `<section>`,
+     * `<article>`, `<main>`) en descendant récursivement dans ses enfants,
+     * en ordre de document, avec des [BookBlock.globalOffsetRange]
+     * consécutifs — même convention de séparateur ([BLOCK_SEPARATOR]) que
+     * [extractBlocks] et [tokenizeSentences].
+     */
+    private fun extractContainerBlocks(container: Element, startOffset: Int, chapterHref: String): List<BookBlock> {
+        val blocks = mutableListOf<BookBlock>()
+        var runningOffset = startOffset
+        for (child in container.childNodes()) {
+            for (block in extractBlocksFromNode(child, runningOffset, chapterHref)) {
+                blocks.add(block)
+                if (block is BookBlock.ParagraphBlock || block is BookBlock.HeadingBlock) {
+                    runningOffset = block.globalOffsetRange!!.last + 1 + BLOCK_SEPARATOR.length
+                }
+            }
+        }
+        return blocks
     }
 
     /**
@@ -661,5 +712,20 @@ class JsoupChapterParser {
     private companion object {
         /** Séparateur inséré entre deux blocs de texte consécutifs (offsets ET tokenisation). */
         const val BLOCK_SEPARATOR = "\n"
+
+        /**
+         * Éléments de niveau bloc déclenchant la récursion d'un conteneur
+         * (`<div>`, `<section>`, …). `<img>`/`<svg>` en sont exclus
+         * volontairement : un conteneur qui ne contient que du texte et des
+         * images inline est traité par [extractInlineBlocks], pas découpé en
+         * blocs (cela préserverait mal les spans d'un flux inline).
+         */
+        val BLOCK_LEVEL_TAGS = setOf(
+            "p", "h1", "h2", "h3", "h4", "h5", "h6",
+            "div", "section", "article", "main", "header", "footer", "nav", "aside",
+            "blockquote", "ul", "ol", "li", "table", "figure", "figcaption", "hr",
+            "pre", "address", "details", "summary", "dl", "dt", "dd", "fieldset",
+            "form", "center",
+        )
     }
 }
