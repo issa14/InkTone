@@ -238,7 +238,7 @@ class JsoupChapterParser {
                     // sans aucun texte — le bloc entier était silencieusement
                     // abandonné faute de texte, sans jamais produire
                     // d'ImageBlock. Repli sur ce motif avant d'abandonner.
-                    return extractSvgImageBlock(element, chapterHref)
+                    return extractImageBlock(element, chapterHref)
                 }
                 BookBlock.ParagraphBlock(
                     richText = richText,
@@ -270,7 +270,7 @@ class JsoupChapterParser {
                 // Tenter d'extraire comme paragraphe
                 val richText = extractRichText(element)
                 if (richText.plainText.isBlank()) {
-                    return extractSvgImageBlock(element, chapterHref)
+                    return extractImageBlock(element, chapterHref)
                 }
                 BookBlock.ParagraphBlock(
                     richText = richText,
@@ -301,6 +301,30 @@ class JsoupChapterParser {
                 ?: svg.attr("aria-label").takeIf { it.isNotBlank() },
             intrinsicWidth = imageEl.attr("width").toIntOrNull() ?: svg.attr("width").toIntOrNull(),
             intrinsicHeight = imageEl.attr("height").toIntOrNull() ?: svg.attr("height").toIntOrNull(),
+        )
+    }
+
+    /**
+     * Extrait un [BookBlock.ImageBlock] depuis un conteneur qui n'a produit
+     * aucun texte exploitable. Gère deux motifs d'image embarquée :
+     *
+     * 1. `<svg><image xlink:href="…"/></svg>` (couverture EPUB3 Calibre/Sigil) ;
+     * 2. un `<img>` descendant — cas des cartes/illustrations enveloppées
+     *    dans un `<div>`, `<p>` ou `<figure>`, auparavant silencieusement
+     *    abandonnées (bug réel « L'arcane des épées »).
+     *
+     * @return null si [container] ne contient aucune image exploitable.
+     */
+    private fun extractImageBlock(container: Element, chapterHref: String): BookBlock.ImageBlock? {
+        extractSvgImageBlock(container, chapterHref)?.let { return it }
+
+        val img = container.selectFirst("img") ?: return null
+        val src = img.attr("src").ifBlank { null } ?: return null
+        return BookBlock.ImageBlock(
+            href = resolveHref(chapterHref, src),
+            alt = img.attr("alt").takeIf { it.isNotBlank() },
+            intrinsicWidth = img.attr("width").toIntOrNull(),
+            intrinsicHeight = img.attr("height").toIntOrNull(),
         )
     }
 

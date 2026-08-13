@@ -211,6 +211,32 @@ class JsoupChapterParserTest {
     }
 
     @Test
+    fun `img imbrique dans un div sans texte produit ImageBlock`() {
+        // Bug réel « L'arcane des épées » : une carte enveloppée dans un
+        // <div> (sans texte) était silencieusement abandonnée — le repli
+        // ne cherchait que <svg><image>, jamais un <img> descendant.
+        val html = """<html><body><div class="illustration"><img src="../Images/carte.jpg" alt="Carte"/></div></body></html>"""
+        val chapter = parse(html)
+
+        val blocks = richBlocks(chapter)
+        assertEquals(1, blocks.size)
+        val img = blocks[0] as BookBlock.ImageBlock
+        assertEquals("Images/carte.jpg", img.href)
+        assertEquals("Carte", img.alt)
+    }
+
+    @Test
+    fun `img dans un figure sans legende produit ImageBlock`() {
+        val html = """<html><body><figure><img src="carte.png" alt="Carte"/></figure></body></html>"""
+        val chapter = parse(html)
+
+        val blocks = richBlocks(chapter)
+        assertEquals(1, blocks.size)
+        assertTrue(blocks[0] is BookBlock.ImageBlock)
+        assertEquals("Carte", (blocks[0] as BookBlock.ImageBlock).alt)
+    }
+
+    @Test
     fun `hr produit un SeparatorBlock`() {
         val html = "<html><body><p>Avant.</p><hr/><p>Après.</p></body></html>"
         val chapter = parse(html)
