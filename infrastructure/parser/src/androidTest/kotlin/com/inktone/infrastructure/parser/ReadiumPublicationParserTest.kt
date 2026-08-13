@@ -38,7 +38,7 @@ class ReadiumPublicationParserTest {
         // vide de la Tache 3.2.
         assertEquals("le fixture n'a qu'un chapitre", 1, success.documentModel.chapters.size)
         val chapter = success.documentModel.chapters.first()
-        val sentences = chapter.paragraphs.flatMap { it.sentences }
+        val sentences = chapter.sentences
         assertTrue("au moins une phrase attendue dans le chapitre", sentences.isNotEmpty())
         assertTrue(
             "le texte extrait doit correspondre au contenu du fixture",

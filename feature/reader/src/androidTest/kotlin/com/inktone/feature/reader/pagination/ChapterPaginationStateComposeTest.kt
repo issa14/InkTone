@@ -9,8 +9,10 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.test.junit4.createComposeRule
 import androidx.compose.ui.unit.dp
 import com.inktone.domain.model.Chapter
+import com.inktone.domain.model.ChapterContent
 import com.inktone.domain.model.Paragraph
-import com.inktone.domain.model.ParagraphStyle
+import com.inktone.domain.model.BookBlock
+import com.inktone.domain.model.StyledText
 import com.inktone.domain.model.Sentence
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertTrue
@@ -35,16 +37,23 @@ class ChapterPaginationStateComposeTest {
     private fun fixtureChapter(): Chapter {
         val texts = (0 until 20).map { i -> "Phrase numéro $i, suffisamment longue pour occuper une ligne entière du viewport de test." }
         var offset = 0
-        val paragraphs = texts.mapIndexed { i, text ->
-            val p = Paragraph(
-                i,
-                listOf(Sentence(index = i, text = text, startOffset = offset, endOffset = offset + text.length)),
-                ParagraphStyle.NORMAL,
+        val blocks = texts.mapIndexed { i, text ->
+            val len = text.length
+            val block = BookBlock.ParagraphBlock(
+                richText = StyledText.plain(text),
+                globalOffsetRange = offset until (offset + len),
             )
-            offset += text.length + 10
-            p
+            offset += len
+            block
         }
-        return Chapter(index = 0, href = "c.xhtml", title = null, paragraphs = paragraphs)
+        val sentences = texts.mapIndexed { i, text ->
+            Sentence(index = i, text = text, startOffset = i * (text.length + 10), endOffset = i * (text.length + 10) + text.length)
+        }
+        return Chapter(
+            index = 0, href = "c.xhtml", title = null,
+            content = ChapterContent.Rich(blocks = blocks),
+            sentences = sentences,
+        )
     }
 
     @Test

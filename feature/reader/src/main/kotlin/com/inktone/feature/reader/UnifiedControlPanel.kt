@@ -70,14 +70,18 @@ fun UnifiedControlPanel(
     // Modifier.weight(1f) evitent le decalage deja corrige au lot 3b,
     // voir commentaire plus bas), jamais un bouton visible sans effet.
     showTtsControls: Boolean = true,
+    // Contraste garanti avec la page de lecture par défaut (voir
+    // ThemeColors.barSurface/barContent) — les défauts au thème chrome ne
+    // servent qu'aux previews/tests qui n'ont pas de ReadingTheme.
+    surfaceColor: Color = MaterialTheme.colorScheme.surface,
+    accentColor: Color = MaterialTheme.colorScheme.primary,
 ) {
     val haptic = LocalHapticFeedback.current
-    val accentColor = MaterialTheme.colorScheme.primary
-    val iconTint = accentColor.copy(alpha = 0.5f)
+    val iconTint = accentColor.copy(alpha = 0.7f)
 
     Surface(
         modifier = Modifier.fillMaxWidth(),
-        color = MaterialTheme.colorScheme.surface.copy(alpha = 0.95f),
+        color = surfaceColor,
         shape = RoundedCornerShape(topStart = 20.dp, topEnd = 20.dp),
     ) {
         Column(
@@ -119,7 +123,7 @@ fun UnifiedControlPanel(
                             Icon(
                                 if (isPlaying) AppIcons.Pause else AppIcons.Play,
                                 contentDescription = if (isPlaying) "Pause" else "Lire",
-                                tint = MaterialTheme.colorScheme.surface,
+                                tint = surfaceColor,
                             )
                         }
                     }

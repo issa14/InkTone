@@ -31,6 +31,8 @@ import org.junit.Assert.assertEquals
 import org.junit.Assert.assertNotNull
 import org.junit.Before
 import org.junit.Test
+import com.inktone.core.testing.fake.FakeChapterParser
+import com.inktone.core.testing.fake.FakeEpubResourceResolver
 
 /**
  * 3d.6, tests 1 et 2 — non-régression de l'antipattern « contrôle
@@ -76,6 +78,8 @@ class ReaderViewModelVoiceSpeedTest {
             readingSessionRepository = FakeReadingSessionRepository(),
             themeRepository = com.inktone.core.testing.fake.FakeThemeRepository(),
             fixedPageRenderer = com.inktone.core.testing.fake.FakeFixedPageRenderer(),
+            chapterParser = FakeChapterParser(),
+            epubResourceResolver = FakeEpubResourceResolver(),
         )
     }
 

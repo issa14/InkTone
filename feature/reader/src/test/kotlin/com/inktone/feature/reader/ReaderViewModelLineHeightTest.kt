@@ -29,6 +29,8 @@ import org.junit.After
 import org.junit.Assert.assertEquals
 import org.junit.Before
 import org.junit.Test
+import com.inktone.core.testing.fake.FakeChapterParser
+import com.inktone.core.testing.fake.FakeEpubResourceResolver
 
 /**
  * 3d.6, test 4 (moitié ViewModel — la moitié "styleKey pur" est déjà
@@ -78,6 +80,8 @@ class ReaderViewModelLineHeightTest {
             readingSessionRepository = FakeReadingSessionRepository(),
             themeRepository = FakeThemeRepository(),
             fixedPageRenderer = com.inktone.core.testing.fake.FakeFixedPageRenderer(),
+            chapterParser = FakeChapterParser(),
+            epubResourceResolver = FakeEpubResourceResolver(),
         )
         dispatcher.scheduler.advanceUntilIdle()
 

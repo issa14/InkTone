@@ -41,7 +41,7 @@ class TxtPublicationParserTest {
         val result = parser.parse(file.absolutePath)
         check(result is ParseResult.Success)
 
-        val sentences = result.documentModel.chapters.single().paragraphs.single().sentences
+        val sentences = result.documentModel.chapters.single().sentences
         assertEquals(3, sentences.size)
         assertEquals("Bonjour le monde.", sentences[0].text)
         assertEquals("Il fonctionne !", sentences[2].text)

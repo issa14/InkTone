@@ -12,8 +12,10 @@ import com.inktone.core.testing.fake.FakeTtsEngine
 import com.inktone.core.testing.fake.FakeVoiceProfileRepository
 import com.inktone.domain.model.Bookmark
 import com.inktone.domain.model.Chapter
+import com.inktone.domain.model.ChapterContent
 import com.inktone.domain.model.DocumentModel
-import com.inktone.domain.model.Paragraph
+import com.inktone.domain.model.BookBlock
+import com.inktone.domain.model.StyledText
 import com.inktone.domain.model.Publication
 import com.inktone.domain.model.PublicationFormat
 import com.inktone.domain.model.ReadingTheme
@@ -41,6 +43,8 @@ import org.junit.Assert.assertNull
 import org.junit.Assert.assertTrue
 import org.junit.Before
 import org.junit.Test
+import com.inktone.core.testing.fake.FakeChapterParser
+import com.inktone.core.testing.fake.FakeEpubResourceResolver
 
 /**
  * Lot 12, tâche 12.13 — tests du Palier 2 (comportement PDF dans le
@@ -66,23 +70,30 @@ class ReaderViewModelPdfTest {
                 index = pageIndex,
                 href = "page-$pageIndex",
                 title = null,
-                paragraphs = if (pageIndex % 2 == 0) {
-                    // Pages paires : vectorielles avec texte
-                    listOf(
-                        Paragraph(
-                            index = 0,
-                            sentences = listOf(
-                                Sentence(
-                                    index = 0,
-                                    text = "Page $pageIndex contenu texte.",
-                                    startOffset = 0,
-                                    endOffset = 25,
-                                ),
+                content = ChapterContent.Rich(
+                    blocks = if (pageIndex % 2 == 0) {
+                        // Pages paires : vectorielles avec texte
+                        listOf(
+                            BookBlock.ParagraphBlock(
+                                richText = StyledText.plain("Page $pageIndex contenu texte."),
+                                globalOffsetRange = 0 until 25,
                             ),
+                        )
+                    } else {
+                        // Pages impaires : scannées sans texte (image pure)
+                        emptyList()
+                    },
+                ),
+                sentences = if (pageIndex % 2 == 0) {
+                    listOf(
+                        Sentence(
+                            index = 0,
+                            text = "Page $pageIndex contenu texte.",
+                            startOffset = 0,
+                            endOffset = 25,
                         ),
                     )
                 } else {
-                    // Pages impaires : scannées sans texte (image pure)
                     emptyList()
                 },
             )
@@ -124,7 +135,18 @@ class ReaderViewModelPdfTest {
             getVoiceProfiles = GetVoiceProfilesUseCase(FakeVoiceProfileRepository()),
             readingSessionRepository = FakeReadingSessionRepository(),
             themeRepository = com.inktone.core.testing.fake.FakeThemeRepository(),
-            fixedPageRenderer = FakeFixedPageRenderer(),
+            // FakeFixedPageRenderer() par defaut renvoie Failed("non
+            // configure par le test") — ces tests exercent le comportement
+            // PDF normal, jamais le chemin d'echec d'ouverture, donc un
+            // Success exploitable ici (sinon Log.w non mocke en JUnit pur
+            // fait tout planter, cf. openPublication ligne ~451).
+            fixedPageRenderer = FakeFixedPageRenderer(
+                result = com.inktone.domain.service.FixedPageOpenResult.Success(
+                    com.inktone.core.testing.fake.FakeFixedPageDocument(pageCount = 3),
+                ),
+            ),
+            chapterParser = FakeChapterParser(),
+            epubResourceResolver = FakeEpubResourceResolver(),
         )
     }
 
@@ -158,6 +180,9 @@ class ReaderViewModelPdfTest {
             false,
             viewModel.state.value.isPlaying,
         )
+
+        viewModel.cancelCheckpointTimerForTest()
+        dispatcher.scheduler.runCurrent()
     }
 
     // ──────────────────────────────────────────────────────────────
@@ -187,6 +212,9 @@ class ReaderViewModelPdfTest {
             modeAvant,
             viewModel.state.value.readingMode,
         )
+
+        viewModel.cancelCheckpointTimerForTest()
+        dispatcher.scheduler.runCurrent()
     }
 
     // ──────────────────────────────────────────────────────────────
@@ -231,6 +259,9 @@ class ReaderViewModelPdfTest {
         viewModel.onIntent(ReaderIntent.ToggleBookmarkAtCurrentPosition)
         dispatcher.scheduler.runCurrent()
         assertEquals("le signet doit être retiré au second toggle", 0, viewModel.state.value.bookmarks.size)
+
+        viewModel.cancelCheckpointTimerForTest()
+        dispatcher.scheduler.runCurrent()
     }
 
     @Test
@@ -265,6 +296,9 @@ class ReaderViewModelPdfTest {
             "le signet doit rester détecté après défilement intra-page (décision actée 21)",
             viewModel.state.value.isCurrentPageBookmarked,
         )
+
+        viewModel.cancelCheckpointTimerForTest()
+        dispatcher.scheduler.runCurrent()
     }
 
     // ──────────────────────────────────────────────────────────────
@@ -321,6 +355,12 @@ class ReaderViewModelPdfTest {
         dispatcher.scheduler.runCurrent()
 
         assertEquals(0.75f, viewModel.state.value.pageOffsetY)
+
+        // Casse le timer de checkpoint (auto-récurrent) comme le ferait
+        // onCleared() sur un vrai ViewModel détruit — sinon le drain
+        // implicite de fin de runTest boucle indéfiniment.
+        viewModel.cancelCheckpointTimerForTest()
+        dispatcher.scheduler.runCurrent()
     }
 
     // ──────────────────────────────────────────────────────────────
@@ -393,6 +433,9 @@ class ReaderViewModelPdfTest {
         viewModel.onIntent(ReaderIntent.OpenPublication("pdf-2"))
         dispatcher.scheduler.runCurrent()
         assertEquals("pdf-2", viewModel.currentPublicationId)
+
+        viewModel.cancelCheckpointTimerForTest()
+        dispatcher.scheduler.runCurrent()
     }
 
     // ──────────────────────────────────────────────────────────────
@@ -414,6 +457,9 @@ class ReaderViewModelPdfTest {
         dispatcher.scheduler.runCurrent()
 
         assertEquals(false, viewModel.state.value.forcePdfInversion)
+
+        viewModel.cancelCheckpointTimerForTest()
+        dispatcher.scheduler.runCurrent()
     }
 
     @Test
@@ -437,5 +483,8 @@ class ReaderViewModelPdfTest {
         viewModel.onIntent(ReaderIntent.ToggleForcePdfInversion)
         dispatcher.scheduler.runCurrent()
         assertEquals(false, viewModel.state.value.forcePdfInversion)
+
+        viewModel.cancelCheckpointTimerForTest()
+        dispatcher.scheduler.runCurrent()
     }
 }

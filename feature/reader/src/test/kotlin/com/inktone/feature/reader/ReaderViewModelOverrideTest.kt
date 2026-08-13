@@ -28,6 +28,8 @@ import org.junit.After
 import org.junit.Assert.assertEquals
 import org.junit.Before
 import org.junit.Test
+import com.inktone.core.testing.fake.FakeChapterParser
+import com.inktone.core.testing.fake.FakeEpubResourceResolver
 
 /**
  * Tache 8.2 — verifie EffectiveReadingSettings.resolve() (Tache 1.3) en
@@ -85,6 +87,8 @@ class ReaderViewModelOverrideTest {
             readingSessionRepository = com.inktone.core.testing.fake.FakeReadingSessionRepository(),
             themeRepository = FakeThemeRepository(),
             fixedPageRenderer = com.inktone.core.testing.fake.FakeFixedPageRenderer(),
+            chapterParser = FakeChapterParser(),
+            epubResourceResolver = FakeEpubResourceResolver(),
         )
 
         // 3d.5 — le rappel de repos oculaire (activé par défaut, recurrent)

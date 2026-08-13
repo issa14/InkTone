@@ -2,7 +2,9 @@
 
 **TL;DR** — Remplacer l'extraction de texte brut par un modèle de document structuré (`BookBlock` sealed + `StyledText` avec `SpanStyles` bitmask) pour afficher les EPUB avec leur formatage réel (gras, italique, images, liens) et corriger le bug des fragments (`#prologue`). Readium = gestionnaire d'archives uniquement (ZIP + manifest + flux). Jsoup = parseur DOM avec normalisation des spans imbriqués. Parsing paresseux (un chapitre à la fois, dispatcher dédié avec annulation explicite). Refonte en 5 paliers additifs — jamais de big bang, build vert à chaque commit. **Ce plan incorpore les 12 corrections de l'audit Google Senior Android Dev du 2026-08-12 PLUS 5 corrections architecturales critiques (concurrence, offsets TTS/UI, pagination par lots, fragment Jsoup, scoping Coil).**
 
-**Portée** : EPUB uniquement. TXT et PDF conservent leur pipeline, adaptés pour produire `BookBlock` (compatibilité transparente).
+**Portée** : le *rendu enrichi* (`BookBlock`, spans, images) est EPUB uniquement — TXT et PDF continuent d'afficher du texte brut / des pages fixes, aucun changement visuel pour eux. Mais au niveau *domaine*, TXT et PDF ne sont **pas** inchangés : `Chapter.paragraphs` devient `Chapter.content: ChapterContent`, donc `TxtPublicationParser` et `PdfPublicationParser` doivent chacun être adaptés (une ligne : envelopper leur sortie existante dans `ChapterContent.Legacy(paragraphs, structuralBlocks)`) pour continuer à compiler — voir note Palier 1.1 ci-dessous. Le rendu PDF reste sur `FixedPageContent` (bitmap PDFium, ADR-017), totalement découplé de `ChapterTextMeasurer`/`BookBlockItem` — il n'est donc affecté par aucun palier de ce plan au-delà de cette adaptation de compilation.
+
+**Note (2026-08-12, post-vérification code)** : `docs/execution/LOT_12_SUPPORT_PDF.md` est mergé sur `main` (PR #64) au moment de l'écriture de cette note. `PdfPublicationParser.kt` (180 lignes, `infrastructure/parser`) construit déjà directement `Chapter/Paragraph/Sentence` — c'est donc bien le pipeline existant décrit dans la colonne « Actuel » du tableau ci-dessous, sans ambiguïté de séquencement avec un lot encore en chantier.
 
 ---
 
@@ -33,7 +35,7 @@
 
 Le TTS, la recherche FTS, la navigation et les signets dépendent de `Sentence` (texte + offsets). `Sentence` n'est pas supprimé. `Chapter` contient `content: ChapterContent` (pour le rendu) ET `sentences: List<Sentence>` (pour le TTS). Les deux sont produits en une seule passe de parsing.
 
-**Nouveau (v3)** : chaque `Sentence` porte un champ `val blockIndex: Int` qui référence l'index du `BookBlock` parent dans `Chapter.blocks`. Chaque `ParagraphBlock` expose `val globalOffsetRange: IntRange` (offsets début/fin dans le texte concaténé du chapitre). Ce double indexage permet une **recherche dichotomique O(log n)** : quand le TTS surligne un mot à l'offset global `C`, on trouve le bloc contenant `C` via `blocks.binarySearch { it.globalOffsetRange.start.compareTo(C) }`, puis on calcule l'offset local au bloc pour le rendu — sans parcourir tous les blocs linéairement.
+**Nouveau (v3)** : chaque `Sentence` porte un champ `val blockIndex: Int = -1` qui référence l'index du `BookBlock` parent dans `Chapter.blocks` quand `content` est `Rich` (`-1` pour `Legacy` — PDF/TXT, voir correction Palier 1.1). Chaque `ParagraphBlock` expose `val globalOffsetRange: IntRange` (offsets début/fin dans le texte concaténé du chapitre). Ce double indexage permet une **recherche dichotomique O(log n)** : quand le TTS surligne un mot à l'offset global `C`, on trouve le bloc contenant `C` via `blocks.binarySearch { it.globalOffsetRange.start.compareTo(C) }`, puis on calcule l'offset local au bloc pour le rendu — sans parcourir tous les blocs linéairement.
 
 ### D2 — Parsing paresseux avec cache par octets
 
@@ -143,18 +145,20 @@ const val I = SpanStyles.EMPHASIS
 
 ## Phases et Étapes
 
-### Palier 0 — Spike bloquant : Compatibilité des tokenizers
+### Palier 0 — Spike bloquant : Créer et valider un tokenizer de phrases unifié
 
-*Dépend de rien. Bloque le Palier 1.3. Ne produit pas de code de production.*
+*Dépend de rien. Bloque le Palier 1.3. Ne produit pas de code de production (hors le splitter lui-même, en `core` ou `domain`, testé mais pas encore branché).*
 
-#### 0.1 — Comparer `FrenchSentenceSplitter` vs `TextContentTokenizer` Readium
+**Correction (2026-08-12, post-vérification code)** : ce palier supposait à tort qu'un `FrenchSentenceSplitter` existe déjà dans le projet (« déjà dans le projet »). Vérification faite : aucun fichier, classe ou fonction de ce nom ni d'un équivalent (`SentenceSplitter`, `sentenceSplit`) n'existe dans le repo. La tokenisation actuelle est assurée par deux mécanismes différents et non partagés : `TextContentTokenizer(Language("fr"))` de Readium pour l'EPUB (`DocumentModelExtractor.kt`), et une regex naïve `Regex("""(?<=[.!?])\s+""")` pour PDF/TXT. Le Palier 0 doit donc **créer** ce splitter avant de pouvoir le comparer — la portée du palier change en conséquence.
 
-Prendre un EPUB réel (Les Misérables Tome I, fixture existante), extraire les phrases avec les deux tokenizers, comparer offset par offset.
+#### 0.1 — Créer `FrenchSentenceSplitter` (BreakIterator) et le comparer à `TextContentTokenizer` Readium
+
+Implémenter un splitter de phrases basé sur `java.text.BreakIterator` (locale `fr`) — candidat à terme pour unifier la tokenisation EPUB/PDF/TXT sous un seul algorithme testé, au lieu de la regex naïve actuelle pour PDF/TXT et du tokenizer Readium pour l'EPUB. Puis, sur un EPUB réel (Les Misérables Tome I, fixture existante), extraire les phrases avec les deux tokenizers (le nouveau splitter et `TextContentTokenizer`) et comparer offset par offset.
 
 **Livrable** : `docs/spikes/sentence-tokenizer-comparison.md` contenant :
 - Tableau comparatif : nombre de phrases, offsets de début/fin pour les 50 premières phrases
 - Cas de divergence (abréviations, ponctuation, tirets) avec explication
-- Décision : utiliser `FrenchSentenceSplitter` comme source unique, ou conserver `TextContentTokenizer` pour la tokenisation
+- Décision : utiliser `FrenchSentenceSplitter` comme source unique (EPUB **et** PDF/TXT, remplaçant la regex naïve), ou conserver `TextContentTokenizer` pour l'EPUB et ne pas toucher au pipeline PDF/TXT dans ce lot
 - Si divergence > 0 et `FrenchSentenceSplitter` retenu : liste des corrections à appliquer au `FrenchSentenceSplitter`
 
 **Critère de succès** : divergence ≤ 2 caractères par phrase sur 95% des phrases.
@@ -229,8 +233,10 @@ Prendre un EPUB réel (Les Misérables Tome I, fixture existante), extraire les 
 - `domain/src/main/kotlin/com/inktone/domain/model/DocumentModel.kt`
   - Ajouter `ChapterContent` sealed class et `Chapter.content: ChapterContent`
   - `Chapter` conserve `index`, `href`, `title`, `sentences`
-  - **Nouveau (v3)** : `Sentence` gagne `val blockIndex: Int` — référence l'index du `BookBlock` contenant cette phrase dans `Chapter.blocks`. Invariant : `blockIndex >= 0`.
+  - **Nouveau (v3)** : `Sentence` gagne `val blockIndex: Int = -1` — référence l'index du `BookBlock` contenant cette phrase dans `Chapter.blocks` **quand `content` est `Rich`**. Valeur par défaut `-1` = « pas de bloc » pour les `Sentence` produites par un `ChapterContent.Legacy` (PDF/TXT — voir correction ci-dessous). Invariant : `blockIndex >= -1`, jamais `>= 0` seul (sinon la construction PDF/TXT ne compile plus).
   - `Chapter.paragraphs` et `structuralBlocks` restent mais dépréciés (accédés via `content` quand c'est `Legacy`)
+
+**Correction (2026-08-12)** — impact sur les parseurs non-EPUB : dès que `Chapter.paragraphs`/`structuralBlocks` sont remplacés par `Chapter.content: ChapterContent`, `PdfPublicationParser.kt` et `TxtPublicationParser.kt` (qui construisent aujourd'hui `Chapter(paragraphs = …)` directement) cessent de compiler. Ce même commit doit donc les adapter pour émettre `Chapter(content = ChapterContent.Legacy(paragraphs, structuralBlocks), …)` — changement mécanique, sans modification de logique de parsing PDF/TXT. À lister explicitement comme sous-tâche 1.1 bis pour ne pas la découvrir en cours de build. **Sentence** : ces deux parseurs construisent aussi `Sentence(index=…, text=…, startOffset=…, endOffset=…)` (`PdfPublicationParser.kt:141`, `TxtPublicationParser.kt:48`) sans jamais avoir de `BookBlock` — le défaut `blockIndex = -1` ci-dessus leur évite toute modification ; ils compilent tels quels.
 
 **Tests :**
 - `domain/src/test/kotlin/com/inktone/domain/model/StyledTextTest.kt` — invariants, fusion de spans

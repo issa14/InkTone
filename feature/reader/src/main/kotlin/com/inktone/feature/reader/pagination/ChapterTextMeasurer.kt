@@ -6,7 +6,11 @@ import androidx.compose.ui.text.TextStyle
 import androidx.compose.ui.text.buildAnnotatedString
 import androidx.compose.ui.text.withStyle
 import androidx.compose.ui.unit.Constraints
+import com.inktone.domain.model.BookBlock
 import com.inktone.domain.model.Chapter
+import com.inktone.domain.model.ChapterContent
+import com.inktone.domain.model.Sentence
+import com.inktone.feature.reader.rendering.BookBlockStyleMapper
 
 /**
  * Résultat de la mesure d'un chapitre — entier ou d'un préfixe borné
@@ -15,11 +19,10 @@ import com.inktone.domain.model.Chapter
  * jamais reconstruit par page ni par mot prononcé (voir l'exigence de
  * coût de recomposition de 3a.2). `sentenceStartOffsets[i]` est
  * l'offset, dans ce même `annotatedString`, où commence la phrase
- * d'index global `i` (même indexation que
- * `chapter.paragraphs.flatMap { it.sentences }`) — sa taille indique
- * combien de phrases, depuis le début du chapitre, sont couvertes par
- * cette mesure : moins que le total pour un préfixe, tout le chapitre
- * sinon.
+ * d'index global `i` (même indexation que `chapter.sentences`) — sa
+ * taille indique combien de phrases, depuis le début du chapitre, sont
+ * couvertes par cette mesure : moins que le total pour un préfixe, tout
+ * le chapitre sinon.
  */
 data class ChapterMeasurement(
     val annotatedString: AnnotatedString,
@@ -44,61 +47,18 @@ data class ChapterMeasurement(
  */
 class ChapterTextMeasurer(private val textMeasurer: TextMeasurer) {
 
-    /** Mesure le chapitre entier. Coût proportionnel à sa longueur — voir `measureFirstPage` pour l'ouverture (3a.3). */
+    /** Mesure le chapitre entier. Coût proportionnel à sa longueur. */
     fun measure(chapter: Chapter, baseStyle: TextStyle, maxWidthPx: Int): ChapterMeasurement {
-        val (annotatedString, sentenceStartOffsets) = buildAnnotatedText(chapter)
-        return measureBuilt(annotatedString, sentenceStartOffsets, baseStyle, maxWidthPx)
+        return measureRich(chapter, baseStyle, maxWidthPx, maxChars = Int.MAX_VALUE)
     }
 
-    /**
-     * Mesure seulement un préfixe borné du chapitre (Tâche 3a.3) — peu
-     * coûteux car indépendant de la longueur totale du chapitre, ce qui
-     * permet de l'appeler de façon synchrone/quasi immédiate en
-     * composition pour afficher la première page sans reflux ni écran
-     * vide, pendant que le reste se mesure en arrière-plan
-     * (`measure` complet, sur `Dispatchers.Default`).
-     *
-     * [prefixCharBudget] est une borne heuristique, pas un calcul exact
-     * de « ce qui remplit le viewport » : l'API `TextMeasurer` ne permet
-     * pas d'arrêter la mesure en cours de layout, seule la **taille du
-     * texte fourni en entrée** borne son coût. Une valeur généreuse
-     * (6000 caractères par défaut) couvre confortablement une page dans
-     * l'immense majorité des tailles de police et de viewport réalistes
-     * — assez pour rester bon marché sans dépendre de la longueur du
-     * chapitre. L'appelant élargit ce budget par doublements successifs
-     * tant que la phrase visée (reprise de lecture en milieu de
-     * chapitre) n'est pas encore couverte, voir `PagedChapterContent`.
-     */
     fun measureFirstPage(
         chapter: Chapter,
         baseStyle: TextStyle,
         maxWidthPx: Int,
         prefixCharBudget: Int = DEFAULT_PREFIX_CHAR_BUDGET,
     ): ChapterMeasurement {
-        val (annotatedString, sentenceStartOffsets) = buildAnnotatedText(chapter, maxChars = prefixCharBudget)
-        return measureBuilt(annotatedString, sentenceStartOffsets, baseStyle, maxWidthPx)
-    }
-
-    private fun buildAnnotatedText(chapter: Chapter, maxChars: Int = Int.MAX_VALUE): Pair<AnnotatedString, List<Int>> {
-        val sentenceStartOffsets = mutableListOf<Int>()
-        val annotatedString = buildAnnotatedString paragraphs@{
-            for ((paragraphIndex, paragraph) in chapter.paragraphs.withIndex()) {
-                if (length >= maxChars) return@paragraphs
-                if (paragraphIndex > 0) append("\n")
-                for ((indexInParagraph, sentence) in paragraph.sentences.withIndex()) {
-                    if (indexInParagraph > 0) append(" ")
-                    sentenceStartOffsets.add(length)
-                    withStyle(spanStyleFor(paragraph.style)) {
-                        append(sentence.text)
-                    }
-                    // On s'arrête après une phrase entière, jamais au
-                    // milieu : sentenceStartOffsets doit toujours décrire
-                    // des phrases complètement présentes dans le texte.
-                    if (length >= maxChars) return@paragraphs
-                }
-            }
-        }
-        return annotatedString to sentenceStartOffsets
+        return measureRich(chapter, baseStyle, maxWidthPx, maxChars = prefixCharBudget)
     }
 
     private fun measureBuilt(
@@ -129,7 +89,224 @@ class ChapterTextMeasurer(private val textMeasurer: TextMeasurer) {
         return ChapterMeasurement(annotatedString, lines, sentenceStartOffsets)
     }
 
+    // ---- Rich measurement (batching, Palier 3.5) ----
+
+    /**
+     * Mesure un chapitre [ChapterContent.Rich] par lots de ~10 000
+     * caractères pour éviter les crashs de texture Compose sur les longs
+     * chapitres (dépassement de la taille maximale de texture GPU).
+     *
+     * ## Algorithme
+     *
+     * 1. Borner les [BookBlock.ParagraphBlock]/[BookBlock.HeadingBlock] au
+     *    budget total [maxChars] (préfixe, [measureFirstPage] — jamais
+     *    borné pour [measure], budget = `Int.MAX_VALUE`).
+     * 2. Découper le résultat en lots de [MAX_BATCH_CHARS] caractères max
+     *    — TOUJOURS appliqué, indépendamment de [maxChars] : c'est la
+     *    seule protection contre le dépassement de texture GPU sur un
+     *    chapitre long, y compris pour [measure] (préfixe illimité).
+     *    Frontières de lot TOUJOURS entre deux blocs (jamais au milieu).
+     * 3. Mesurer chaque lot indépendamment via [measureBuilt].
+     * 4. Accumuler les [LineGeometry] avec `top`/`bottom` ajustés
+     *    (décalage vertical cumulatif).
+     * 5. Accumuler les `sentenceStartOffsets` dans l'espace global
+     *    (somme des longueurs de tous les lots précédents).
+     */
+    private fun measureRich(
+        chapter: Chapter,
+        baseStyle: TextStyle,
+        maxWidthPx: Int,
+        maxChars: Int,
+    ): ChapterMeasurement {
+        val content = chapter.content as? ChapterContent.Rich
+            ?: error("ChapterTextMeasurer.measureRich appelé sur un chapitre sans ChapterContent.Rich (${chapter.href})")
+        // IndexedValue : conserve l'index ORIGINAL dans `content.blocks` — le
+        // même référentiel que Sentence.blockIndex — pour retrouver les
+        // phrases de chaque bloc plus bas malgré le filtrage.
+        val textBlocks = content.blocks.withIndex().filter {
+            it.value is BookBlock.ParagraphBlock || it.value is BookBlock.HeadingBlock
+        }
+        if (textBlocks.isEmpty()) {
+            return ChapterMeasurement(AnnotatedString(""), emptyList(), emptyList())
+        }
+
+        // 1. Borner au budget total demandé — [maxChars] est un budget de
+        //    PRÉFIXE (measureFirstPage), pas une taille de lot. Avant ce
+        //    correctif, [buildBatches] recevait directement [maxChars] comme
+        //    seuil de lot : measure() (maxChars = Int.MAX_VALUE) produisait
+        //    alors un unique lot contenant TOUT le chapitre (aucun
+        //    découpage réel), et measureFirstPage() mesurait la totalité du
+        //    chapitre au lieu de s'arrêter au préfixe — les deux à l'inverse
+        //    de l'intention du Palier 3.5.
+        val boundedBlocks = mutableListOf<IndexedValue<BookBlock>>()
+        var runningChars = 0
+        for (indexed in textBlocks) {
+            boundedBlocks.add(indexed)
+            runningChars += textLengthOf(indexed.value)
+            if (runningChars >= maxChars) break
+        }
+
+        // 2. Découper le préfixe borné en lots de taille structurelle fixe
+        //    (MAX_BATCH_CHARS) — toujours appliqué, indépendamment de
+        //    [maxChars], seule protection réelle contre le dépassement de
+        //    texture GPU sur un chapitre long.
+        val batches = buildBatches(boundedBlocks, MAX_BATCH_CHARS)
+        if (batches.isEmpty()) {
+            return ChapterMeasurement(AnnotatedString(""), emptyList(), emptyList())
+        }
+
+        // 3. Mesurer chaque lot et accumuler
+        val allLines = mutableListOf<LineGeometry>()
+        val allSentenceOffsets = mutableListOf<Int>()
+        var cumulativeTop = 0f
+        var globalOffset = 0
+        var firstBatchAnnotated: AnnotatedString? = null
+
+        batches.forEachIndexed { batchIndex, batch ->
+            val (annotatedString, localOffsets) = buildBatchAnnotatedString(
+                blocks = batch,
+                sentences = chapter.sentences,
+                // Un "\n" doit séparer TOUT couple de blocs de texte
+                // consécutifs, y compris à une frontière de lot — sinon
+                // l'espace d'offsets global dérive de 1 caractère par
+                // frontière face à celui de JsoupChapterParser (même
+                // convention de séparateur, voir Chapter.sentences), et
+                // les offsets TTS/sélection calculés par ReaderScreen en
+                // mode SCROLL (qui utilise ce même Chapter.sentences)
+                // désynchronisent du rendu pagé pour tout chapitre
+                // dépassant MAX_BATCH_CHARS.
+                leadingSeparator = batchIndex > 0,
+            )
+            if (firstBatchAnnotated == null) firstBatchAnnotated = annotatedString
+            val measurement = measureBuilt(annotatedString, localOffsets, baseStyle, maxWidthPx)
+
+            // Ajuster les tops/bottoms des lignes
+            for (line in measurement.lines) {
+                allLines.add(
+                    line.copy(top = line.top + cumulativeTop, bottom = line.bottom + cumulativeTop),
+                )
+            }
+
+            // Ajuster les offsets de phrase dans l'espace global
+            for (offset in measurement.sentenceStartOffsets) {
+                allSentenceOffsets.add(offset + globalOffset)
+            }
+
+            cumulativeTop += measurement.lines.lastOrNull()?.bottom ?: 0f
+            globalOffset += annotatedString.text.length
+        }
+
+        // AnnotatedString "virtuel" : seul le premier lot est stocké
+        // (le contrat de ChapterMeasurement exige un AnnotatedString,
+        // mais le rendu paginé tranche par offset — le premier lot suffit
+        // comme référence pour les offsets). Déjà construit dans la boucle
+        // ci-dessus — jamais reconstruit une seconde fois.
+        return ChapterMeasurement(firstBatchAnnotated ?: AnnotatedString(""), allLines, allSentenceOffsets)
+    }
+
+    /**
+     * Découpe les blocs de texte en lots de [maxChars] caractères max.
+     * Les frontières tombent toujours entre deux blocs.
+     */
+    private fun buildBatches(
+        textBlocks: List<IndexedValue<BookBlock>>,
+        maxChars: Int,
+    ): List<List<IndexedValue<BookBlock>>> {
+        val batches = mutableListOf<List<IndexedValue<BookBlock>>>()
+        var currentBatch = mutableListOf<IndexedValue<BookBlock>>()
+        var currentChars = 0
+
+        for (indexed in textBlocks) {
+            val blockLen = textLengthOf(indexed.value)
+            // Si ajouter ce bloc dépasserait la limite et le batch
+            // courant n'est pas vide, on le ferme.
+            if (currentChars > 0 && currentChars + blockLen > maxChars) {
+                batches.add(currentBatch.toList())
+                currentBatch = mutableListOf()
+                currentChars = 0
+            }
+            currentBatch.add(indexed)
+            currentChars += blockLen
+        }
+        if (currentBatch.isNotEmpty()) {
+            batches.add(currentBatch.toList())
+        }
+        return batches
+    }
+
+    private fun textLengthOf(block: BookBlock): Int = when (block) {
+        is BookBlock.ParagraphBlock -> block.richText.plainText.length
+        is BookBlock.HeadingBlock -> block.richText.plainText.length
+        else -> 0
+    }
+
+    /**
+     * Construit un [AnnotatedString] et les offsets de DÉBUT DE PHRASE
+     * (pas de bloc) locaux pour un lot de blocs, à partir de [sentences]
+     * (`chapter.sentences`, filtrées par [Sentence.blockIndex] pour
+     * retrouver celles de chaque bloc). Un séparateur (retour à la ligne)
+     * est inséré entre deux blocs consécutifs du même lot, pour ne pas
+     * fusionner visuellement deux paragraphes.
+     *
+     * Repli sur UN offset = le début du bloc lui-même quand aucune
+     * [Sentence] n'a de [Sentence.blockIndex] pointant vers ce bloc —
+     * jamais un bloc sans aucune entrée. Couvre le cas réel où plusieurs
+     * phrases partagent un bloc (le cas voulu, précis), et le cas où
+     * [sentences] ne porte pas de `blockIndex` valide (fixtures qui ne le
+     * renseignent pas) sans jamais désynchroniser `sentenceStartOffsets`
+     * du nombre de blocs mesurés.
+     *
+     * @return Pair(AnnotatedString, List<Int> des offsets de début de phrase)
+     */
+    private fun buildBatchAnnotatedString(
+        blocks: List<IndexedValue<BookBlock>>,
+        sentences: List<Sentence>,
+        leadingSeparator: Boolean,
+    ): Pair<AnnotatedString, List<Int>> {
+        val sentenceStartOffsets = mutableListOf<Int>()
+        val annotatedString = buildAnnotatedString {
+            blocks.forEachIndexed { position, (originalIndex, block) ->
+                val richText = when (block) {
+                    is BookBlock.ParagraphBlock -> block.richText
+                    is BookBlock.HeadingBlock -> block.richText
+                    else -> null
+                } ?: return@forEachIndexed
+
+                if (position > 0 || leadingSeparator) append('\n')
+                val blockStartInBatch = length
+                val blockGlobalStart = block.globalOffsetRange?.first ?: 0
+                val blockSentences = sentences.filter { it.blockIndex == originalIndex }
+                if (blockSentences.isNotEmpty()) {
+                    blockSentences.forEach { sentence ->
+                        sentenceStartOffsets.add(blockStartInBatch + (sentence.startOffset - blockGlobalStart))
+                    }
+                } else {
+                    sentenceStartOffsets.add(blockStartInBatch)
+                }
+
+                val plainText = richText.plainText
+                val spans = richText.spans
+                var lastEnd = 0
+                for (span in spans) {
+                    if (span.start > lastEnd) {
+                        append(plainText.substring(lastEnd, span.start))
+                    }
+                    withStyle(BookBlockStyleMapper.spanStyleFor(span.styles)) {
+                        append(plainText.substring(span.start, span.end))
+                    }
+                    lastEnd = span.end
+                }
+                if (lastEnd < plainText.length) {
+                    append(plainText.substring(lastEnd))
+                }
+            }
+        }
+        return annotatedString to sentenceStartOffsets
+    }
+
     private companion object {
         const val DEFAULT_PREFIX_CHAR_BUDGET = 6000
+        /** Taille max d'un lot en caractères (Plan v3, Palier 3.5). */
+        const val MAX_BATCH_CHARS = 10_000
     }
 }

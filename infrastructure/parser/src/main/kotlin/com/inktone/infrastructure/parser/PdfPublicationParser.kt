@@ -2,11 +2,13 @@ package com.inktone.infrastructure.parser
 
 import android.content.Context
 import android.graphics.Bitmap
+import com.inktone.domain.model.BookBlock
 import com.inktone.domain.model.Chapter
+import com.inktone.domain.model.ChapterContent
 import com.inktone.domain.model.DocumentModel
-import com.inktone.domain.model.Paragraph
 import com.inktone.domain.model.PublicationFormat
 import com.inktone.domain.model.Sentence
+import com.inktone.domain.model.StyledText
 import com.inktone.domain.service.FileStorageService
 import com.inktone.domain.service.ParseResult
 import com.inktone.domain.service.PublicationMetadata
@@ -82,18 +84,25 @@ class PdfPublicationParser @Inject constructor(
                 return@withContext ParseResult.Corrupted("PDF sans page exploitable : $fileUri")
             }
 
-            // Un Chapter par page (decision actee 4 du plan) - paragraphs
-            // vient du texte reellement extrait via PdfTextPage, liste
-            // vide si la page est une image scannee sans texte (jamais un
-            // objet vide de facade pour les autres pages).
             val chapters = (0 until pageCount).map { pageIndex ->
                 document.openPage(pageIndex).use { page ->
-                    val sentences = extractSentences(page)
+                    val (fullText, sentences) = extractPageContent(page)
+                    val blocks = if (fullText.isNotBlank()) {
+                        listOf(
+                            BookBlock.ParagraphBlock(
+                                richText = StyledText.plain(fullText),
+                                globalOffsetRange = 0 until fullText.length,
+                            ),
+                        )
+                    } else {
+                        emptyList<BookBlock>()
+                    }
                     Chapter(
                         index = pageIndex,
                         href = "page-$pageIndex",
                         title = null,
-                        paragraphs = if (sentences.isEmpty()) emptyList() else listOf(Paragraph(0, sentences)),
+                        content = ChapterContent.Rich(blocks = blocks),
+                        sentences = sentences,
                     )
                 }
             }
@@ -122,26 +131,29 @@ class PdfPublicationParser @Inject constructor(
     }
 
     /**
-     * Texte reellement extrait de la page via l'API texte de PDFium
-     * (`PdfTextPage`/`FPDFText_*`) - directive Issa (Lot 12) : indispensable
-     * des ce palier pour que le `Locator` (page = chapterIndex, charOffset
-     * dans ce texte) soit deja la structure que Sherpa-ONNX consommera au
-     * lot TTS futur, jamais une extraction differee. Liste vide si la page
-     * n'a aucun texte extractible (image scannee).
+     * Extrait le texte complet et les phrases d'une page PDF.
+     *
+     * @return Pair(texte complet trimé, liste de phrases avec offsets).
+     *   Texte vide si la page est une image scannée sans texte.
      */
-    private fun extractSentences(page: PdfPage): List<Sentence> = page.openTextPage().use { textPage ->
+    private fun extractPageContent(page: PdfPage): Pair<String, List<Sentence>> = page.openTextPage().use { textPage ->
         val charCount = textPage.textPageCountChars()
-        if (charCount <= 0) return@use emptyList()
+        if (charCount <= 0) return@use "" to emptyList()
         val text = textPage.textPageGetText(0, charCount)?.trim()
-        if (text.isNullOrBlank()) return@use emptyList()
+        if (text.isNullOrBlank()) return@use "" to emptyList()
 
         var offset = 0
-        sentenceBoundary.split(text).mapIndexed { index, raw ->
+        val sentences = sentenceBoundary.split(text).mapIndexed { index, raw ->
             val trimmed = raw.trim()
-            val sentence = Sentence(index = index, text = trimmed, startOffset = offset, endOffset = offset + trimmed.length)
+            // blockIndex = 0 : la page produit toujours exactement un
+            // BookBlock.ParagraphBlock unique (ci-dessous) quand du texte
+            // existe — jamais le défaut -1, sinon l'auto-scroll TTS
+            // (ReaderScreen) ne trouve jamais son bloc pour un PDF.
+            val sentence = Sentence(index = index, text = trimmed, startOffset = offset, endOffset = offset + trimmed.length, blockIndex = 0)
             offset += trimmed.length + 1
             sentence
         }.filter { it.text.isNotBlank() }
+        text to sentences
     }
 
     /**
