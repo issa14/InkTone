@@ -54,6 +54,7 @@ import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
+import kotlinx.coroutines.flow.combine
 import kotlinx.coroutines.launch
 import java.util.UUID
 import javax.inject.Inject
@@ -146,13 +147,32 @@ class ReaderViewModel @Inject constructor(
             }
         }
 
-        // Lot 15 (Tâche 4.1) — le surlignage mot reste piloté par les
-        // wordTimestamps (mécanique delay() inchangée), déclenché par la
-        // phrase courante de l'ordonnanceur.
+        // Lot 16 (Tâche 2.2) — le surlignage mot suit la position réelle de
+        // l'ordonnanceur (getTimestamp, repli delay() géré ci-dessous).
         viewModelScope.launch {
-            playbackOrchestrator.currentWordTimestamps.collect { timestamps ->
-                if (_state.value.isPlaying) startWordHighlight(timestamps)
+            playbackOrchestrator.currentWordRange.collect { range ->
+                if (_state.value.isPlaying) {
+                    _state.value = _state.value.copy(highlightedWordRange = range)
+                }
             }
+        }
+
+        // Lot 16 (Tâche 2.2) — repli delay() quand la position est invalide :
+        // l'ancien startWordHighlight devient le filet de sécurité, déclenché
+        // uniquement si l'ordonnanceur n'a pas de position exploitable.
+        viewModelScope.launch {
+            combine(
+                playbackOrchestrator.currentWordTimestamps,
+                playbackOrchestrator.positionValid,
+            ) { timestamps, valid -> timestamps to valid }
+                .collect { (timestamps, valid) ->
+                    if (!_state.value.isPlaying) return@collect
+                    if (!valid) {
+                        startWordHighlight(timestamps)
+                    } else {
+                        highlightJob?.cancel()
+                    }
+                }
         }
 
         // Lot 15 (Tâche 4.1) — `currentSentenceIndex` suit l'ordonnanceur
@@ -908,9 +928,9 @@ class ReaderViewModel @Inject constructor(
     }
 
     /**
-     * Lance le surlignage mot-à-mot (mécanique delay() inchangée depuis le
-     * Lot 14) pour les [timestamps] de la phrase courante. Annule et
-     * remplace le job précédent.
+     * Repli `delay()` du surlignage mot-à-mot (mécanique inchangée depuis le
+     * Lot 14), déclenché uniquement quand la position réelle est invalide
+     * (Lot 16, Tâche 2.2). Annule et remplace le job précédent.
      */
     private fun startWordHighlight(timestamps: List<WordTimestamp>) {
         highlightJob?.cancel()
