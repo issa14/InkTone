@@ -287,9 +287,10 @@ private fun CatalogCard(
     }
 }
 
-/** Catalogues par défaut proposés en pré-remplissage (décision actée §10, jamais imposés). */
+/** Catalogues par défaut proposés en pré-remplissage (décision actée §10, jamais imposés).
+ * Gutenberg a été écarté : son endpoint OPDS renvoie 403 à tout client (bot policy serveur). */
 private object DefaultCatalogs {
-    val GUTENBERG = "Gutenberg" to "https://www.gutenberg.org/ebooks.opds"
+    val EBOOKS_GRATUITS = "Ebooks gratuits" to "https://www.ebooksgratuits.com/opds/"
     val FEEDBOOKS = "Feedbooks" to "https://catalog.feedbooks.com/catalog.atom"
 }
 
@@ -318,9 +319,9 @@ private fun AddCatalogBottomSheet(
             // des lignes non supprimables imposées (décision actée §1.4).
             Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                 OutlinedButton(onClick = {
-                    name = DefaultCatalogs.GUTENBERG.first
-                    rootUrl = DefaultCatalogs.GUTENBERG.second
-                }) { Text("Gutenberg") }
+                    name = DefaultCatalogs.EBOOKS_GRATUITS.first
+                    rootUrl = DefaultCatalogs.EBOOKS_GRATUITS.second
+                }) { Text("Ebooks gratuits") }
                 OutlinedButton(onClick = {
                     name = DefaultCatalogs.FEEDBOOKS.first
                     rootUrl = DefaultCatalogs.FEEDBOOKS.second

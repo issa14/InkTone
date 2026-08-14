@@ -114,4 +114,38 @@ class OpdsFeedParserTest {
 
         assertEquals(null, feed.searchTemplateUrl)
     }
+
+    @Test
+    fun les_entites_html_non_declarees_sont_decodees_sans_planter() {
+        val xml = """
+            <feed xmlns="http://www.w3.org/2005/Atom">
+              <title>Résumé</title>
+              <entry>
+                <title>Caf&eacute; &laquo;&nbsp;noir&nbsp;&raquo;</title>
+                <link rel="http://opds-spec.org/acquisition" type="application/epub+zip" href="/book.epub"/>
+              </entry>
+            </feed>
+        """.trimIndent()
+
+        val feed = (parser.parse(xml, "https://example.com/opds") as OpdsParseResult.Success).feed
+
+        assertEquals("Café «\u00A0noir\u00A0»", (feed.items[0] as OpdsItem.Book).title)
+    }
+
+    @Test
+    fun une_entite_html_inconnue_est_retiree_plutot_que_de_planter() {
+        val xml = """
+            <feed xmlns="http://www.w3.org/2005/Atom">
+              <title>T</title>
+              <entry>
+                <title>A &weirdentity; B</title>
+                <link rel="http://opds-spec.org/acquisition" type="application/epub+zip" href="/book.epub"/>
+              </entry>
+            </feed>
+        """.trimIndent()
+
+        val feed = (parser.parse(xml, "https://example.com/opds") as OpdsParseResult.Success).feed
+
+        assertEquals("A  B", (feed.items[0] as OpdsItem.Book).title)
+    }
 }

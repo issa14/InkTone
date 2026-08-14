@@ -25,7 +25,11 @@ import javax.inject.Inject
 class XmlOpdsFeedParser @Inject constructor() : OpdsFeedParser {
 
     override fun parse(xml: String, baseUrl: String): OpdsParseResult = try {
-        OpdsParseResult.Success(parseFeed(xml, baseUrl))
+        // Certains serveurs non conformes émettent des entités HTML
+        // (`&nbsp;`, `&eacute;`, …) non déclarées dans le flux —
+        // `XmlPullParser` les refuse (« Undetermined entity ref »). On les
+        // décode en amont pour ne pas planter (Lot 13, retour device).
+        OpdsParseResult.Success(parseFeed(decodeHtmlEntities(xml), baseUrl))
     } catch (e: Exception) {
         OpdsParseResult.Failure(OpdsFailureReason.MALFORMED_FEED, e.message ?: "Flux OPDS malformé")
     }
@@ -182,5 +186,42 @@ class XmlOpdsFeedParser @Inject constructor() : OpdsFeedParser {
             event = parser.next()
         }
         return text.trim()
+    }
+
+    /**
+     * Décode les entités HTML nommées que `XmlPullParser` ne connaît pas.
+     * Les 5 entités XML (`amp`, `lt`, `gt`, `quot`, `apos`) et les
+     * références numériques (`&#…;`) sont laissées intactes — le parseur
+     * les résout nativement. Une entité nommée inconnue est retirée plutôt
+     * que de faire planter le parseur.
+     */
+    private fun decodeHtmlEntities(xml: String): String =
+        ENTITY_REGEX.replace(xml) { match ->
+            val name = match.groupValues[1]
+            when {
+                name in XML_ENTITIES -> match.value
+                HTML_ENTITIES.containsKey(name) -> HTML_ENTITIES.getValue(name)
+                else -> ""
+            }
+        }
+
+    private companion object {
+        val ENTITY_REGEX = Regex("&([a-zA-Z][a-zA-Z0-9]{0,31});")
+        val XML_ENTITIES = setOf("amp", "lt", "gt", "quot", "apos")
+
+        val HTML_ENTITIES = mapOf(
+            "nbsp" to "\u00A0",
+            "eacute" to "é", "egrave" to "è", "ecirc" to "ê", "euml" to "ë",
+            "agrave" to "à", "acirc" to "â", "auml" to "ä",
+            "ccedil" to "ç", "ocirc" to "ô", "oelig" to "œ",
+            "icirc" to "î", "iuml" to "ï", "ucirc" to "û", "uuml" to "ü",
+            "Eacute" to "É", "Egrave" to "È", "Ecirc" to "Ê",
+            "Agrave" to "À", "Ccedil" to "Ç", "OElig" to "Œ",
+            "laquo" to "«", "raquo" to "»",
+            "rsquo" to "’", "lsquo" to "‘", "rdquo" to "”", "ldquo" to "“",
+            "hellip" to "…", "mdash" to "—", "ndash" to "–",
+            "copy" to "©", "reg" to "®", "trade" to "™",
+            "deg" to "°", "middot" to "·", "bull" to "•",
+        )
     }
 }

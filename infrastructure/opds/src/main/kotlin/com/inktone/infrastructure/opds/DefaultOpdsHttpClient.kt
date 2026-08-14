@@ -38,6 +38,9 @@ class DefaultOpdsHttpClient @Inject constructor(
                     response.code == 401 -> OpdsFetchResult.Failure(
                         OpdsFailureReason.UNAUTHORIZED, "Authentification refusée pour ce catalogue",
                     )
+                    response.code == 403 -> OpdsFetchResult.Failure(
+                        OpdsFailureReason.NETWORK, "Accès refusé (403) — le catalogue bloque ce client",
+                    )
                     response.code == 404 -> OpdsFetchResult.Failure(
                         OpdsFailureReason.NOT_FOUND, "Flux introuvable",
                     )
