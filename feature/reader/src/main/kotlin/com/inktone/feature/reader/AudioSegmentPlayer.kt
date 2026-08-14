@@ -5,19 +5,31 @@ import android.media.AudioFormat
 import android.media.AudioManager
 import android.media.AudioTrack
 import com.inktone.domain.service.AudioSegment
+import kotlinx.coroutines.suspendCancellableCoroutine
 import javax.inject.Inject
+import kotlin.coroutines.resume
 
 /**
- * Lecture minimale pour la marche à blanc (Tâche 3.8) — un AudioTrack
- * par segment, aucune file d'attente, aucune lecture en arrière-plan.
- * AudioPlaybackService (Phase 5) remplacera ceci pour l'usage réel.
+ * Lecture d'un segment via [AudioTrack] (Tâche 3.8). Correctif Lot 14 :
+ * [play] est désormais **bloquant** — il suspend jusqu'à la fin RÉELLE de
+ * l'audio (notification de position AudioTrack), au lieu de retourner
+ * immédiatement pendant qu'un thread détaché libérait le track. La boucle de
+ * lecture pilotait par des `delay()` de durées de mots (dont la somme < durée
+ * audio réelle) et coupait l'audio en cours — mots et phrases sautés.
+ * Le pipeline gapless complet (file d'attente, MODE_STREAM) reste le Lot 15.
  */
 class AudioSegmentPlayer @Inject constructor() {
 
     private var currentTrack: AudioTrack? = null
 
-    fun play(segment: AudioSegment) {
+    /** Joue le segment et suspend jusqu'à la fin réelle de l'audio. Retourne la durée jouée en ms. */
+    suspend fun play(segment: AudioSegment): Long = suspendCancellableCoroutine { cont ->
         stop()
+        val frameCount = segment.audioData.size / 2
+        if (frameCount == 0) {
+            cont.resume(0L)
+            return@suspendCancellableCoroutine
+        }
         val minBufferSize = AudioTrack.getMinBufferSize(
             segment.sampleRate,
             AudioFormat.CHANNEL_OUT_MONO,
@@ -38,24 +50,29 @@ class AudioSegmentPlayer @Inject constructor() {
             AudioManager.AUDIO_SESSION_ID_GENERATE,
         )
         currentTrack = audioTrack
+
+        audioTrack.setPlaybackPositionUpdateListener(object : AudioTrack.OnPlaybackPositionUpdateListener {
+            override fun onMarkerReached(track: AudioTrack) {
+                currentTrack = null
+                runCatching { track.stop() }
+                runCatching { track.release() }
+                if (cont.isActive) cont.resume((frameCount * 1000L) / segment.sampleRate)
+            }
+
+            override fun onPeriodicNotification(track: AudioTrack) {}
+        })
+        // Notification à l'avant-dernière frame : la doc exige une position
+        // strictement inférieure à la taille du buffer.
+        audioTrack.setNotificationMarkerPosition((frameCount - 1).coerceAtLeast(1))
+
         audioTrack.write(segment.audioData, 0, segment.audioData.size)
         audioTrack.play()
 
-        // Libération différée — ne nettoie QUE si ce track est toujours
-        // le currentTrack (évite de stopper un track déjà remplacé par
-        // l'auto-advance TTS : A.1 enchaîne les phrases, le stop() du
-        // prochain play() libère déjà l'ancien track).
-        Thread {
-            Thread.sleep(segment.durationMs + 200)
-            if (currentTrack === audioTrack) {
-                try {
-                    audioTrack.stop()
-                    audioTrack.release()
-                } catch (_: IllegalStateException) {
-                    // déjà libéré, rien à faire
-                }
-            }
-        }.start()
+        cont.invokeOnCancellation {
+            currentTrack = null
+            runCatching { audioTrack.stop() }
+            runCatching { audioTrack.release() }
+        }
     }
 
     /**
