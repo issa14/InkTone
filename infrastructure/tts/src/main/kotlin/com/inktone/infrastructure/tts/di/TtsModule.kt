@@ -5,7 +5,9 @@ import com.inktone.domain.service.PronunciationRuleApplier
 import com.inktone.domain.service.TtsEngine
 import com.inktone.domain.service.VoiceModelDownloadService
 import com.inktone.infrastructure.tts.AndroidNativeTtsEngine
+import com.inktone.infrastructure.tts.EdgeTtsEngine
 import com.inktone.infrastructure.tts.FallbackTtsEngine
+import com.inktone.infrastructure.tts.SelectiveTtsEngine
 import com.inktone.infrastructure.tts.SherpaOnnxTtsEngine
 import com.inktone.infrastructure.tts.SherpaOnnxVoiceModelDownloadService
 import dagger.Binds
@@ -16,20 +18,28 @@ import dagger.hilt.components.SingletonComponent
 import javax.inject.Singleton
 
 /**
- * Lie le contrat de domaine TtsEngine (Tache 1.7) a FallbackTtsEngine
- * (Tache 5.8), qui essaie le Palier 2 (Sherpa-ONNX) et bascule
- * automatiquement vers le Palier 1 (Android natif) en cas d'echec -
- * decision de selection actee par ADR-021 ("detection au runtime"),
- * plus le binding direct au seul Palier 1 de la Phase 3. Les deux
- * moteurs concrets sont qualifies (@Palier1/@Palier2) pour que
- * FallbackTtsEngine puisse les distinguer dans le graphe Hilt.
+ * Lie le contrat de domaine TtsEngine (Tache 1.7) a SelectiveTtsEngine
+ * (Lot 14, ADR-024) : facade qui route selon `VoiceProfile.engine` entre
+ * l'adaptateur Edge TTS (cloud, optionnel) et la chaine offline
+ * FallbackTtsEngine (Palier 2 Sherpa-ONNX -> Palier 1 Android natif,
+ * ADR-021). Les trois moteurs concrets sont qualifies pour etre
+ * distinguables dans le graphe Hilt : @EdgeTtsEngine/@OfflineTtsEngine
+ * pour la facade, @Palier1/@Palier2 pour FallbackTtsEngine.
  */
 @Module
 @InstallIn(SingletonComponent::class)
 abstract class TtsModule {
     @Binds
     @Singleton
-    abstract fun bindTtsEngine(impl: FallbackTtsEngine): TtsEngine
+    abstract fun bindTtsEngine(impl: SelectiveTtsEngine): TtsEngine
+
+    @Binds
+    @EdgeEngine
+    abstract fun bindEdgeTtsEngine(impl: EdgeTtsEngine): TtsEngine
+
+    @Binds
+    @OfflineTtsEngine
+    abstract fun bindOfflineTtsEngine(impl: FallbackTtsEngine): TtsEngine
 
     @Binds
     @Palier2
