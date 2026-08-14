@@ -11,6 +11,7 @@ import com.inktone.domain.usecase.GetCatalogsUseCase
 import com.inktone.domain.usecase.OpdsBrowseResult
 import com.inktone.domain.usecase.RemoveCatalogUseCase
 import com.inktone.domain.usecase.SearchOpdsFeedUseCase
+import com.inktone.domain.usecase.UpdateCatalogUseCase
 import com.inktone.domain.service.OpdsDownloadObserver
 import com.inktone.domain.service.OpdsHttpClient
 import dagger.hilt.android.lifecycle.HiltViewModel
@@ -36,6 +37,7 @@ class OpdsViewModel @Inject constructor(
     getCatalogsUseCase: GetCatalogsUseCase,
     private val addCatalog: AddCatalogUseCase,
     private val removeCatalog: RemoveCatalogUseCase,
+    private val updateCatalog: UpdateCatalogUseCase,
     private val browse: BrowseOpdsFeedUseCase,
     private val search: SearchOpdsFeedUseCase,
     private val downloadBook: DownloadOpdsBookUseCase,
@@ -94,6 +96,9 @@ class OpdsViewModel @Inject constructor(
                 addCatalog(intent.name, intent.rootUrl, intent.username, intent.password)
             }
             is OpdsIntent.RemoveCatalog -> viewModelScope.launch { removeCatalog(intent.id) }
+            is OpdsIntent.UpdateCatalog -> viewModelScope.launch {
+                updateCatalog(intent.id, intent.name, intent.rootUrl, intent.username, intent.password)
+            }
             is OpdsIntent.LoadNextPage -> loadNextPage(intent.nextPageUrl)
             is OpdsIntent.Search -> doSearch(intent.query)
             is OpdsIntent.DownloadBook -> onDownloadBook(intent.item)

@@ -69,6 +69,8 @@ fun CatalogDashboardScreen(
     val state by viewModel.state.collectAsState()
     var showSearch by remember { mutableStateOf(false) }
     var searchQuery by remember { mutableStateOf("") }
+    var showSheet by remember { mutableStateOf(false) }
+    var editingCatalog by remember { mutableStateOf<OpdsCatalog?>(null) }
     val snackbarHostState = remember { SnackbarHostState() }
 
     LaunchedEffect(Unit) {
@@ -119,20 +121,9 @@ fun CatalogDashboardScreen(
             )
         },
         floatingActionButton = {
-            val onDashboard = state is OpdsUiState.Dashboard
-            if (onDashboard) {
-                var showSheet by remember { mutableStateOf(false) }
-                FloatingActionButton(onClick = { showSheet = true }) {
+            if (state is OpdsUiState.Dashboard) {
+                FloatingActionButton(onClick = { editingCatalog = null; showSheet = true }) {
                     AppIcon(AppSymbol.Add, contentDescription = "Ajouter un catalogue")
-                }
-                if (showSheet) {
-                    AddCatalogBottomSheet(
-                        onConfirm = { name, url, username, password ->
-                            viewModel.onIntent(OpdsIntent.AddCatalog(name, url, username, password))
-                            showSheet = false
-                        },
-                        onDismiss = { showSheet = false },
-                    )
                 }
             }
         },
@@ -143,6 +134,8 @@ fun CatalogDashboardScreen(
                     state = s,
                     onOpenCatalog = { viewModel.onIntent(OpdsIntent.OpenCatalog(it)) },
                     onRemoveCatalog = { viewModel.onIntent(OpdsIntent.RemoveCatalog(it)) },
+                    onEditCatalog = { editingCatalog = it; showSheet = true },
+                    onAddDefault = { name, url -> viewModel.onIntent(OpdsIntent.AddCatalog(name, url, null, null)) },
                 )
                 is OpdsUiState.Feed -> OpdsFeedScreen(
                     state = s,
@@ -153,6 +146,22 @@ fun CatalogDashboardScreen(
                 )
             }
         }
+    }
+
+    if (showSheet) {
+        val editing = editingCatalog
+        AddCatalogBottomSheet(
+            initial = editing,
+            onConfirm = { name, url, username, password ->
+                if (editing == null) {
+                    viewModel.onIntent(OpdsIntent.AddCatalog(name, url, username, password))
+                } else {
+                    viewModel.onIntent(OpdsIntent.UpdateCatalog(editing.id, name, url, username, password))
+                }
+                showSheet = false
+            },
+            onDismiss = { showSheet = false },
+        )
     }
 
     if (showSearch) {
@@ -190,17 +199,35 @@ private fun CatalogDashboardContent(
     state: OpdsUiState.Dashboard,
     onOpenCatalog: (OpdsCatalog) -> Unit,
     onRemoveCatalog: (String) -> Unit,
+    onEditCatalog: (OpdsCatalog) -> Unit,
+    onAddDefault: (String, String) -> Unit,
 ) {
     when {
         state.isLoading -> Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
             CircularProgressIndicator()
         }
-        state.catalogs.isEmpty() -> Box(Modifier.fillMaxSize().padding(24.dp), contentAlignment = Alignment.Center) {
+        state.catalogs.isEmpty() -> Column(
+            Modifier.fillMaxSize().padding(24.dp),
+            verticalArrangement = Arrangement.Center,
+            horizontalAlignment = Alignment.CenterHorizontally,
+        ) {
             Text(
-                "Aucun catalogue.\nAjoutez-en un avec le bouton + (ex. Gutenberg ou Feedbooks).",
+                "Aucun catalogue.\nAjoutez-en un avec le bouton +, ou partez d'un catalogue suggéré.",
                 style = MaterialTheme.typography.bodyLarge,
                 textAlign = androidx.compose.ui.text.style.TextAlign.Center,
                 color = MaterialTheme.colorScheme.onSurfaceVariant,
+            )
+            Spacer(Modifier.height(16.dp))
+            DefaultCatalogSuggestion(
+                label = DefaultCatalogs.EBOOKS_GRATUITS.first,
+                url = DefaultCatalogs.EBOOKS_GRATUITS.second,
+                onAdd = onAddDefault,
+            )
+            Spacer(Modifier.height(8.dp))
+            DefaultCatalogSuggestion(
+                label = DefaultCatalogs.UNGLUE_IT.first,
+                url = DefaultCatalogs.UNGLUE_IT.second,
+                onAdd = onAddDefault,
             )
         }
         else -> LazyVerticalGrid(
@@ -213,9 +240,39 @@ private fun CatalogDashboardContent(
                 CatalogCard(
                     catalog = catalog,
                     onClick = { onOpenCatalog(catalog) },
+                    onEdit = { onEditCatalog(catalog) },
                     onRemove = { onRemoveCatalog(catalog.id) },
                 )
             }
+        }
+    }
+}
+
+/** Carte d'un catalogue par défaut, ajoutable en un geste depuis le Dashboard vide. */
+@Composable
+private fun DefaultCatalogSuggestion(
+    label: String,
+    url: String,
+    onAdd: (String, String) -> Unit,
+) {
+    Card(onClick = { onAdd(label, url) }) {
+        Column(Modifier.fillMaxWidth().padding(16.dp)) {
+            Row(verticalAlignment = Alignment.CenterVertically) {
+                AppIcon(AppSymbol.AddCircle, contentDescription = null)
+                Spacer(Modifier.width(8.dp))
+                Text(
+                    label,
+                    style = MaterialTheme.typography.titleMedium,
+                    fontWeight = FontWeight.Medium,
+                )
+            }
+            Text(
+                url,
+                style = MaterialTheme.typography.bodySmall,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                maxLines = 1,
+                overflow = TextOverflow.Ellipsis,
+            )
         }
     }
 }
@@ -224,6 +281,7 @@ private fun CatalogDashboardContent(
 private fun CatalogCard(
     catalog: OpdsCatalog,
     onClick: () -> Unit,
+    onEdit: () -> Unit,
     onRemove: () -> Unit,
 ) {
     var confirmRemove by remember { mutableStateOf(false) }
@@ -241,6 +299,9 @@ private fun CatalogCard(
                     overflow = TextOverflow.Ellipsis,
                     modifier = Modifier.weight(1f),
                 )
+                IconButton(onClick = onEdit) {
+                    AppIcon(AppSymbol.Edit, contentDescription = "Modifier ${catalog.name}")
+                }
                 IconButton(onClick = { confirmRemove = true }) {
                     AppIcon(AppSymbol.Delete, contentDescription = "Supprimer ${catalog.name}")
                 }
@@ -298,15 +359,17 @@ private object DefaultCatalogs {
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 private fun AddCatalogBottomSheet(
+    initial: OpdsCatalog?,
     onConfirm: (name: String, rootUrl: String, username: String?, password: String?) -> Unit,
     onDismiss: () -> Unit,
 ) {
-    var name by remember { mutableStateOf("") }
-    var rootUrl by remember { mutableStateOf("") }
+    var name by remember { mutableStateOf(initial?.name.orEmpty()) }
+    var rootUrl by remember { mutableStateOf(initial?.rootUrl.orEmpty()) }
     var username by remember { mutableStateOf("") }
     var password by remember { mutableStateOf("") }
     var passwordVisible by remember { mutableStateOf(false) }
 
+    val isEdit = initial != null
     val sheetState = rememberModalBottomSheetState(skipPartiallyExpanded = true)
 
     ModalBottomSheet(onDismissRequest = onDismiss, sheetState = sheetState) {
@@ -314,19 +377,25 @@ private fun AddCatalogBottomSheet(
             Modifier.fillMaxWidth().padding(horizontal = 24.dp).padding(bottom = 32.dp),
             verticalArrangement = Arrangement.spacedBy(12.dp),
         ) {
-            Text("Ajouter un catalogue", style = MaterialTheme.typography.titleLarge, fontWeight = FontWeight.Bold)
+            Text(
+                if (isEdit) "Modifier le catalogue" else "Ajouter un catalogue",
+                style = MaterialTheme.typography.titleLarge,
+                fontWeight = FontWeight.Bold,
+            )
 
-            // Catalogues par défaut : pré-remplissage du formulaire, pas
-            // des lignes non supprimables imposées (décision actée §1.4).
-            Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                OutlinedButton(onClick = {
-                    name = DefaultCatalogs.EBOOKS_GRATUITS.first
-                    rootUrl = DefaultCatalogs.EBOOKS_GRATUITS.second
-                }) { Text("Ebooks gratuits") }
-                OutlinedButton(onClick = {
-                    name = DefaultCatalogs.UNGLUE_IT.first
-                    rootUrl = DefaultCatalogs.UNGLUE_IT.second
-                }) { Text("Unglue.it") }
+            if (!isEdit) {
+                // Catalogues par défaut : pré-remplissage du formulaire
+                // (décision actée §1.4), uniquement en mode ajout.
+                Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                    OutlinedButton(onClick = {
+                        name = DefaultCatalogs.EBOOKS_GRATUITS.first
+                        rootUrl = DefaultCatalogs.EBOOKS_GRATUITS.second
+                    }) { Text("Ebooks gratuits") }
+                    OutlinedButton(onClick = {
+                        name = DefaultCatalogs.UNGLUE_IT.first
+                        rootUrl = DefaultCatalogs.UNGLUE_IT.second
+                    }) { Text("Unglue.it") }
+                }
             }
 
             OutlinedTextField(
@@ -346,14 +415,14 @@ private fun AddCatalogBottomSheet(
             OutlinedTextField(
                 value = username,
                 onValueChange = { username = it },
-                label = { Text("Nom d'utilisateur (optionnel)") },
+                label = { Text(if (isEdit) "Nom d'utilisateur (laisser vide pour conserver)" else "Nom d'utilisateur (optionnel)") },
                 singleLine = true,
                 modifier = Modifier.fillMaxWidth(),
             )
             OutlinedTextField(
                 value = password,
                 onValueChange = { password = it },
-                label = { Text("Mot de passe (optionnel)") },
+                label = { Text(if (isEdit) "Mot de passe (laisser vide pour conserver)" else "Mot de passe (optionnel)") },
                 singleLine = true,
                 visualTransformation = if (passwordVisible) VisualTransformation.None else PasswordVisualTransformation(),
                 trailingIcon = {
@@ -393,7 +462,7 @@ private fun AddCatalogBottomSheet(
                 onClick = { onConfirm(name.trim(), rootUrl.trim(), username.trim().ifBlank { null }, password.ifBlank { null }) },
                 enabled = formValid,
                 modifier = Modifier.align(Alignment.End),
-            ) { Text("Ajouter") }
+            ) { Text(if (isEdit) "Enregistrer" else "Ajouter") }
         }
     }
 }

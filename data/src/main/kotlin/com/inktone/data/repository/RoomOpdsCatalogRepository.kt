@@ -27,7 +27,12 @@ class RoomOpdsCatalogRepository @Inject constructor(
     override suspend fun getById(id: String): OpdsCatalog? =
         dao.getById(id)?.toDomain(credentialsStore.hasCredentials(id))
 
-    override suspend fun add(catalog: OpdsCatalog) = dao.upsert(catalog.toEntity())
+    override suspend fun add(catalog: OpdsCatalog) {
+        // Upsert : on préserve `createdAt` d'un catalogue déjà en base
+        // (l'édition ne doit pas réordonner la liste).
+        val createdAt = dao.getById(catalog.id)?.createdAt ?: System.currentTimeMillis()
+        dao.upsert(catalog.toEntity(createdAt))
+    }
 
     override suspend fun remove(id: String) = dao.delete(id)
 
@@ -44,10 +49,10 @@ private fun CatalogEntity.toDomain(hasCredentials: Boolean) = OpdsCatalog(
     hasCredentials = hasCredentials,
 )
 
-private fun OpdsCatalog.toEntity() = CatalogEntity(
+private fun OpdsCatalog.toEntity(createdAt: Long) = CatalogEntity(
     id = id,
     name = name,
     rootUrl = rootUrl,
     searchTemplateUrl = searchTemplateUrl,
-    createdAt = System.currentTimeMillis(),
+    createdAt = createdAt,
 )

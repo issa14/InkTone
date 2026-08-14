@@ -49,6 +49,13 @@ sealed interface OpdsIntent {
         val password: String?,
     ) : OpdsIntent
     data class RemoveCatalog(val id: String) : OpdsIntent
+    data class UpdateCatalog(
+        val id: String,
+        val name: String,
+        val rootUrl: String,
+        val username: String?,
+        val password: String?,
+    ) : OpdsIntent
     data class LoadNextPage(val nextPageUrl: String) : OpdsIntent
     data class Search(val query: String) : OpdsIntent
     data class DownloadBook(val item: OpdsItem.Book) : OpdsIntent

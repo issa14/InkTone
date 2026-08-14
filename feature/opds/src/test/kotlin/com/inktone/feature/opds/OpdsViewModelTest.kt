@@ -13,6 +13,7 @@ import com.inktone.domain.usecase.DownloadOpdsBookUseCase
 import com.inktone.domain.usecase.GetCatalogsUseCase
 import com.inktone.domain.usecase.RemoveCatalogUseCase
 import com.inktone.domain.usecase.SearchOpdsFeedUseCase
+import com.inktone.domain.usecase.UpdateCatalogUseCase
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.launch
@@ -45,6 +46,7 @@ class OpdsViewModelTest {
         getCatalogsUseCase = GetCatalogsUseCase(repo),
         addCatalog = AddCatalogUseCase(repo, FakeOpdsCredentialsStore()),
         removeCatalog = RemoveCatalogUseCase(repo, FakeOpdsCredentialsStore()),
+        updateCatalog = UpdateCatalogUseCase(repo, FakeOpdsCredentialsStore()),
         browse = BrowseOpdsFeedUseCase(FakeOpdsHttpClient(), FakeOpdsFeedParser(), repo),
         search = SearchOpdsFeedUseCase(BrowseOpdsFeedUseCase(FakeOpdsHttpClient(), FakeOpdsFeedParser(), repo)),
         downloadBook = DownloadOpdsBookUseCase(FakeOpdsDownloadScheduler()),

@@ -42,6 +42,7 @@ import com.inktone.domain.usecase.BrowseOpdsFeedUseCase
 import com.inktone.domain.usecase.DownloadOpdsBookUseCase
 import com.inktone.domain.usecase.RemoveCatalogUseCase
 import com.inktone.domain.usecase.SearchOpdsFeedUseCase
+import com.inktone.domain.usecase.UpdateCatalogUseCase
 import com.inktone.domain.usecase.GetVoiceProfilesUseCase
 import com.inktone.domain.usecase.ImportPublicationUseCase
 import com.inktone.domain.usecase.ObserveSyncUiStateUseCase
@@ -236,6 +237,12 @@ object UseCaseModule {
         catalogRepository: OpdsCatalogRepository,
         credentialsStore: OpdsCredentialsStore,
     ): RemoveCatalogUseCase = RemoveCatalogUseCase(catalogRepository, credentialsStore)
+
+    @Provides
+    fun provideUpdateCatalogUseCase(
+        catalogRepository: OpdsCatalogRepository,
+        credentialsStore: OpdsCredentialsStore,
+    ): UpdateCatalogUseCase = UpdateCatalogUseCase(catalogRepository, credentialsStore)
 
     @Provides
     @Singleton
