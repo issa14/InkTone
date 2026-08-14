@@ -45,6 +45,19 @@ class DefaultOpdsHttpClient @Inject constructor(
                         OpdsFailureReason.NETWORK, "Erreur HTTP ${response.code}",
                     )
                     else -> {
+                        // Lot 13, tâche 13.4.1 — un flux annonçant
+                        // `application/opds+json` sans variante Atom est rejeté
+                        // avec un message clair plutôt qu'un crash de parsing
+                        // XML (ADR-023 : OPDS 2.0/JSON hors périmètre).
+                        val contentType = response.header("Content-Type").orEmpty()
+                        if (contentType.contains("application/opds+json", ignoreCase = true) &&
+                            !contentType.contains("atom", ignoreCase = true)
+                        ) {
+                            return@use OpdsFetchResult.Failure(
+                                OpdsFailureReason.UNSUPPORTED_FORMAT,
+                                "Flux OPDS 2.0 (JSON) non supporté — seul OPDS 1.2/Atom est accepté",
+                            )
+                        }
                         val body = response.body?.string()
                             ?: return@use OpdsFetchResult.Failure(OpdsFailureReason.NETWORK, "Réponse vide")
                         OpdsFetchResult.Success(body = body, finalUrl = response.request.url.toString())

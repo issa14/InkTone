@@ -71,4 +71,17 @@ class OpdsHttpClientTest {
         assertTrue(result is OpdsFetchResult.Failure)
         assertEquals(OpdsFailureReason.UNAUTHORIZED, (result as OpdsFetchResult.Failure).reason)
     }
+
+    @Test
+    fun fetch_sur_un_flux_opds_json_sans_variante_atom_renvoie_unsupported_format() = runTest {
+        val http = DefaultOpdsHttpClient(client, FakeOpdsCredentialsStore())
+        server.enqueue(
+            MockResponse().setHeader("Content-Type", "application/opds+json").setBody("""{"metadata":{}}"""),
+        )
+
+        val result = http.fetch(server.url("/catalog").toString(), "cat-1")
+
+        assertTrue(result is OpdsFetchResult.Failure)
+        assertEquals(OpdsFailureReason.UNSUPPORTED_FORMAT, (result as OpdsFetchResult.Failure).reason)
+    }
 }
