@@ -45,13 +45,10 @@ import com.inktone.domain.model.VoiceProfile
  * règle de prononciation.
  *
  * Le bouton Stop du B.3 d'origine est retiré : `ReaderViewModel.pausePlayback()`
- * coupe déjà entièrement l'`AudioTrack` et annule la coroutine de lecture —
- * il n'existe aucun pause/resume réel dans l'architecture actuelle
- * (`AudioSegmentPlayer` en `MODE_STATIC`, pas de reprise à mi-phrase), donc
- * aucun comportement distinct à donner à un second bouton. Un vrai Stop
- * nécessiterait de migrer vers `AudioPlaybackService`/Media3 (déjà utilisé
- * par `feature/player`), hors périmètre du lot 3d (voir doc, tâche 3d.1 et
- * consignation 3d.7).
+ * coupe déjà entièrement l'audio et vide la file du lecteur (Lot 15 :
+ * `PlaybackOrchestrator.stop()`). Le bouton Pause reste un arrêt complet —
+ * le `pause()`/`resume()` réel de l'ordonnanceur est réservé à l'intégration
+ * MediaSession/notification, hors périmètre (ADR-025).
  *
  * Les puces de minuteur de sommeil, présentes ici avant ce lot, sont
  * retirées : elles vivent désormais dans le panneau Minuteur dédié

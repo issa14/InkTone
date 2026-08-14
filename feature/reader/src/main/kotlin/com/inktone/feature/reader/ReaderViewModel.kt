@@ -37,6 +37,7 @@ import com.inktone.domain.service.ParseResult
 import com.inktone.domain.service.PublicationParser
 import com.inktone.domain.service.ReadingSessionTracker
 import com.inktone.domain.service.TtsEngine
+import com.inktone.domain.service.WordTimestamp
 import com.inktone.domain.usecase.AddAnnotationUseCase
 import com.inktone.domain.usecase.CreateBookmarkUseCase
 import com.inktone.domain.usecase.DeleteBookmarkUseCase
@@ -60,14 +61,14 @@ import javax.inject.Inject
 /**
  * MVI complet du Reader (Tâche 4.5) — remplace le squelette à une seule
  * phrase de la Phase 3 par la navigation par chapitre, la TOC et la
- * reprise de position réelle. L'audio est joué via [AudioSegmentPlayer]
- * (AudioTrack, Tâche 3.8) ; AudioPlaybackService (Phase 5) le
- * remplacera pour la lecture en arrière-plan.
+ * reprise de position réelle. L'audio est joué via [PlaybackOrchestrator]
+ * (pipeline gapless, Lot 15) ; `isPlaying`/`isAudioActive`/
+ * `currentSentenceIndex` dérivent de l'état de l'ordonnanceur.
  */
 @HiltViewModel
 class ReaderViewModel @Inject constructor(
     private val ttsEngine: TtsEngine, // injecte AndroidNativeTtsEngine (Palier 1) via Hilt (infrastructure/tts/di/TtsModule)
-    private val audioSegmentPlayer: AudioSegmentPlayer,
+    private val playbackOrchestrator: PlaybackOrchestrator,
     private val publicationParser: PublicationParser, // CompositePublicationParser via Hilt (infrastructure/parser/di/ParserModule)
     private val updateReadingState: UpdateReadingStateUseCase,
     private val getReadingState: GetReadingStateUseCase,
@@ -114,18 +115,62 @@ class ReaderViewModel @Inject constructor(
                 )
             }
         }
+
+        // Lot 15 (Tâche 4.1) — `isAudioActive` dérive de l'état de
+        // l'ordonnanceur ; la fin naturelle d'un chapitre (Idle alors que la
+        // lecture était engagée) déclenche l'auto-avance.
+        viewModelScope.launch {
+            playbackOrchestrator.state.collect { status ->
+                when (status) {
+                    PlaybackOrchestrator.PlaybackStatus.Idle -> {
+                        val wasPlaying = _state.value.isPlaying
+                        _state.value = _state.value.copy(
+                            isPlaying = false, isAudioActive = false, highlightedWordRange = null,
+                        )
+                        if (wasPlaying) onChapterPlaybackCompleted()
+                    }
+                    PlaybackOrchestrator.PlaybackStatus.Buffering ->
+                        _state.value = _state.value.copy(isAudioActive = false)
+                    PlaybackOrchestrator.PlaybackStatus.Playing -> {
+                        _state.value = _state.value.copy(isAudioActive = true)
+                        checkVoiceDownloadPrompt()
+                    }
+                    PlaybackOrchestrator.PlaybackStatus.Paused ->
+                        _state.value = _state.value.copy(isAudioActive = false)
+                    is PlaybackOrchestrator.PlaybackStatus.Error ->
+                        _state.value = _state.value.copy(
+                            isPlaying = false, isAudioActive = false, highlightedWordRange = null,
+                            errorMessage = status.message,
+                        )
+                }
+            }
+        }
+
+        // Lot 15 (Tâche 4.1) — le surlignage mot reste piloté par les
+        // wordTimestamps (mécanique delay() inchangée), déclenché par la
+        // phrase courante de l'ordonnanceur.
+        viewModelScope.launch {
+            playbackOrchestrator.currentWordTimestamps.collect { timestamps ->
+                if (_state.value.isPlaying) startWordHighlight(timestamps)
+            }
+        }
+
+        // Lot 15 (Tâche 4.1) — `currentSentenceIndex` suit l'ordonnanceur
+        // pendant la lecture ; hors lecture, la navigation manuelle reste
+        // propriétaire de cet index (K3, chemins jamais simultanés).
+        viewModelScope.launch {
+            playbackOrchestrator.currentSentenceIndex.collect { index ->
+                if (_state.value.isPlaying) {
+                    _state.value = _state.value.copy(currentSentenceIndex = index)
+                }
+            }
+        }
     }
 
     // C.5 — exposé pour clé sharedElement dans ReaderScreen
     internal var currentPublicationId: String? = null
     /** Plan v4 — scope dédié aux préchargements, annulé indépendamment du chargement courant. */
     private var preloadScope: CoroutineScope? = null
-    private val sentenceAudioBuffer = SentenceAudioBuffer(viewModelScope, ttsEngine)
-
-    // Correctif Lot 14 — vide le buffer de préchargement quand le chapitre
-    // change (les indices de phrase sont locaux au chapitre : un préchargement
-    // périmé du chapitre précédent serait rejoué à tort).
-    private var bufferedChapterHref: String? = null
     private val annotationSelectionHandler = AnnotationSelectionHandler()
     private var sleepTimerJob: Job? = null
 
@@ -144,12 +189,10 @@ class ReaderViewModel @Inject constructor(
     private var eyeRestCountdownJob: Job? = null
     private var wasPlayingBeforeEyeRest: Boolean = false
 
-    // A.1bis — job de la coroutine de lecture TTS en cours (une phrase, ou
-    // la chaîne auto-avance). Annulé par pausePlayback()/skipSentence() en
-    // plus de audioSegmentPlayer.stop() : sans ça, la boucle de surlignage
-    // mot-à-mot de playCurrentSentence() continuait d'avancer silencieusement
-    // après une pause, seul le son s'arrêtait (bug réel trouvé à l'audit).
-    private var playbackJob: Job? = null
+    // Lot 15 (Tâche 4.1) — job du surlignage mot-à-mot courant, remplacé à
+    // chaque nouvelle phrase (mécanique delay() sur les wordTimestamps,
+    // inchangée par rapport au Lot 14 — seul le déclencheur change).
+    private var highlightJob: Job? = null
 
     // Lot 4, tâche 4.7 — flash différé : pendingHighlightTimeoutJob est la
     // sortie de secours (mise en page qui n'aboutit jamais) ; flashClearJob
@@ -825,16 +868,11 @@ class ReaderViewModel @Inject constructor(
     }
 
     /**
-     * A.1 — Lecture TTS continue phrase à phrase. Après avoir joué la
-     * phrase courante, avance automatiquement à la phrase suivante dans
-     * le même chapitre, puis au chapitre suivant si le chapitre en cours
-     * est terminé. La récursion est trampolinée par coroutine (pas de
-     * stack overflow).
-     *
-     * L'arrêt se fait via [ReaderIntent.Pause] → [pausePlayback], qui
-     * annule ce job et coupe l'audio — la boucle vérifie aussi `isPlaying`
-     * avant chaque avancement pour les cas où le job irait jusqu'au bout
-     * de la phrase en cours avant que l'annulation ne soit observée.
+     * A.1 (Lot 15, Tâche 4.1) — délègue la lecture continue au
+     * [PlaybackOrchestrator] (producteur/consommateur gapless). Le ViewModel
+     * ne fait plus la synthèse ni la boucle : il résout le profil vocal et
+     * passe la main. Le surlignage et l'auto-avance sont pilotés par l'état
+     * de l'ordonnanceur (voir init).
      */
     private fun playCurrentSentence() {
         // Lot 12, tache 12.10 — TTS hors perimetre pour un PDF (decision
@@ -843,136 +881,92 @@ class ReaderViewModel @Inject constructor(
         // declencheur externe eventuel (MediaSession/ecran verrouille),
         // jamais audite pour ce format.
         if (_state.value.publicationFormat == PublicationFormat.PDF) return
-        playbackJob = viewModelScope.launch {
-            val chapter = _state.value.currentChapter ?: return@launch
-            val sentences = chapter.sentences
-            val index = _state.value.currentSentenceIndex
-            val publicationId = currentPublicationId ?: return@launch
+        val chapter = _state.value.currentChapter ?: return
+        val sentences = chapter.sentences
+        if (sentences.isEmpty()) return
+        val publicationId = currentPublicationId ?: return
 
-            // Correctif Lot 14 — changement de chapitre : vide les
-            // préchargements du chapitre précédent.
-            if (bufferedChapterHref != chapter.href) {
-                sentenceAudioBuffer.clear()
-                bufferedChapterHref = chapter.href
-            }
+        // ───── Lot Sessions : bascule en mode TTS ─────
+        sessionTracker?.switchMode(DomainReadingMode.AUDIO)
+        // ───── Fin Lot Sessions ─────
 
-            // ───── Lot Sessions : bascule en mode TTS ─────
-            sessionTracker?.switchMode(DomainReadingMode.AUDIO)
-            // ───── Fin Lot Sessions ─────
+        _state.value = _state.value.copy(isPlaying = true, isAudioActive = false)
+        val startFrom = _state.value.currentSentenceIndex
 
-            if (index >= sentences.size) {
-                // Fin de chapitre → auto-avance chapitre suivant si possible.
-                // navigateToChapter() (appelée par NextChapter) relance elle-même
-                // playCurrentSentence() sur le nouveau chapitre puisque isPlaying
-                // est encore vrai ici — pas besoin de le refaire depuis ce
-                // point, qui de toute façon ne serait jamais atteint : cette
-                // coroutine est annulée par le pausePlayback() interne à
-                // navigateToChapter avant d'y revenir.
-                if (_state.value.hasNextChapter) {
-                    onIntent(ReaderIntent.NextChapter)
-                } else {
-                    _state.value = _state.value.copy(isPlaying = false, isAudioActive = false)
-                }
-                return@launch
-            }
-
-            // 3e.3 — isAudioActive reste faux pendant la synthèse
-            // (sentenceAudioBuffer.get, potentiellement lente si le
-            // segment n'est pas déjà préchargé) : isPlaying seul ne suffit
-            // pas à distinguer « TTS engagé » de « audio effectivement en
-            // train de sortir », voir ReaderUiState.isAudioActive.
-            _state.value = _state.value.copy(isPlaying = true, isAudioActive = false)
-
-            val sentence = sentences[index]
-            // A.5 — résout le profil vocal actif depuis les préférences utilisateur
+        viewModelScope.launch {
             val prefs = preferencesRepository.get()
             val voiceProfile = resolveVoiceProfile(prefs)
+            playbackOrchestrator.play(
+                sentences = sentences,
+                voiceProfile = voiceProfile,
+                startFrom = startFrom,
+                publicationId = publicationId,
+                chapterIndex = chapter.index,
+                resourceHref = chapter.href,
+            )
+        }
+    }
 
-            // Correctif Lot 14 — préchauffe les phrases suivantes AVANT de
-            // jouer la courante : la synthèse chevauche ainsi la lecture
-            // (LOOKAHEAD=3), au lieu d'être déclenchée après le play() et de
-            // créer un trou audible face à la latence de synthèse.
-            sentenceAudioBuffer.preloadAhead(sentences, index, voiceProfile)
-
-            val segment = sentenceAudioBuffer.get(sentence, voiceProfile)
-
-            // Surlignage mot-à-mot dans une coroutine parallèle — le rythme de
-            // lecture est désormais celui de l'audio (play() bloquant
-            // ci-dessous), plus une somme de delay() qui coupait l'audio en
-            // cours (mots/phrases sautés).
-            val highlightJob = viewModelScope.launch {
-                segment.wordTimestamps.forEach { wt ->
-                    _state.value = _state.value.copy(
-                        highlightedWordRange = wt.charOffset until (wt.charOffset + wt.word.length),
-                    )
-                    delay((wt.endMs - wt.startMs).coerceAtLeast(0L))
-                }
+    /**
+     * Lance le surlignage mot-à-mot (mécanique delay() inchangée depuis le
+     * Lot 14) pour les [timestamps] de la phrase courante. Annule et
+     * remplace le job précédent.
+     */
+    private fun startWordHighlight(timestamps: List<WordTimestamp>) {
+        highlightJob?.cancel()
+        if (timestamps.isEmpty()) {
+            _state.value = _state.value.copy(highlightedWordRange = null)
+            return
+        }
+        highlightJob = viewModelScope.launch {
+            timestamps.forEach { wt ->
+                _state.value = _state.value.copy(
+                    highlightedWordRange = wt.charOffset until (wt.charOffset + wt.word.length),
+                )
+                delay((wt.endMs - wt.startMs).coerceAtLeast(0L))
             }
+            _state.value = _state.value.copy(highlightedWordRange = null)
+        }
+    }
 
-            // Lot 10 — retour Issa (vérification device) : proposition
-            // proactive au premier usage réel du TTS, plutôt que de
-            // laisser le repli Android natif (ADR-021, FallbackTtsEngine)
-            // silencieux sans jamais suggérer la voix neuronale.
-            // ttsEngine.id reflète le moteur RÉELLEMENT actif après ce
-            // synthesize() (jamais figé, voir FallbackTtsEngine), donc
-            // couvre aussi bien "réglé sur Android natif" que "Sherpa-ONNX
-            // a échoué et le repli vient de se produire".
-            if (ttsEngine.id == TtsEngineId.ANDROID_NATIVE && !prefs.hasPromptedVoiceDownload) {
+    /**
+     * Lot 10 (préservé) — proposition proactive de la voix neuronale au
+     * premier usage réel du TTS. Déclenchée quand l'ordonnanceur passe en
+     * lecture : la première synthèse a eu lieu, donc `ttsEngine.id` reflète
+     * le moteur réellement actif, repli compris (voir FallbackTtsEngine).
+     */
+    private fun checkVoiceDownloadPrompt() {
+        if (ttsEngine.id != TtsEngineId.ANDROID_NATIVE) return
+        viewModelScope.launch {
+            val prefs = preferencesRepository.get()
+            if (!prefs.hasPromptedVoiceDownload) {
                 _state.value = _state.value.copy(showVoiceDownloadPrompt = true)
                 preferencesRepository.update(prefs.copy(hasPromptedVoiceDownload = true))
             }
-
-            _state.value = _state.value.copy(isAudioActive = true)
-            // Bloquant : revient quand l'AudioTrack a réellement fini.
-            audioSegmentPlayer.play(segment)
-            highlightJob.cancel()
-            _state.value = _state.value.copy(highlightedWordRange = null, isAudioActive = false)
-
-            // Silence inter-phrases selon la ponctuation (naturel, pas un trou).
-            delay(silenceDurationFor(sentence.text))
-
-            updateReadingState(
-                ReadingState(
-                    publicationId = publicationId,
-                    locator = sentence.startLocator(chapterIndex = chapter.index, resourceHref = chapter.href),
-                    lastReadAt = System.currentTimeMillis(),
-                ),
-            )
-
-            // Avance à la phrase suivante UNIQUEMENT si toujours en lecture
-            if (_state.value.isPlaying) {
-                _state.value = _state.value.copy(currentSentenceIndex = index + 1)
-                playCurrentSentence()
-            }
         }
     }
 
     /**
-     * Correctif Lot 14 — silence naturel entre phrases selon la ponctuation
-     * (aligné sur le legacy : 150 ms virgule/point-virgule, 650 ms fin de
-     * phrase). Sans lui, les phrases s'enchaînent à la volée, donnant une
-     * impression hachée.
+     * Fin naturelle d'un chapitre (l'ordonnanceur passe Idle alors que la
+     * lecture était engagée) : auto-avance au chapitre suivant et reprend,
+     * ou s'arrête en fin de livre.
      */
-    private fun silenceDurationFor(text: String): Long {
-        val trimmed = text.trimEnd()
-        if (trimmed.isEmpty()) return 650L
-        return when (trimmed.last()) {
-            ',', ';' -> 150L
-            else -> 650L
-        }
+    private fun onChapterPlaybackCompleted() {
+        if (!_state.value.hasNextChapter) return
+        navigateToChapter(_state.value.currentChapterIndex + 1)
+        playCurrentSentence()
     }
 
     /**
-     * Interrompt réellement la lecture en cours : annule la coroutine de
-     * [playCurrentSentence] (sinon la boucle de surlignage mot-à-mot
-     * continue d'avancer silencieusement) et coupe l'`AudioTrack` sous-
-     * jacent (sinon la phrase en cours continue de se faire entendre
-     * jusqu'à sa fin après un appui sur Pause).
+     * Interrompt réellement la lecture en cours : arrête l'ordonnanceur
+     * (le pipeline producteur/consommateur est annulé et la file du lecteur
+     * vidée). `isPlaying` repasse à faux avant l'arrêt — l'état Idle qui
+     * suit est un arrêt volontaire, pas une fin naturelle de chapitre.
      */
     private fun pausePlayback() {
-        playbackJob?.cancel()
-        audioSegmentPlayer.stop()
         _state.value = _state.value.copy(isPlaying = false, isAudioActive = false, highlightedWordRange = null)
+        highlightJob?.cancel()
+        playbackOrchestrator.stop()
 
         // ───── Lot Sessions : retour en mode visuel ─────
         sessionTracker?.switchMode(DomainReadingMode.VISUAL)
@@ -1135,7 +1129,7 @@ class ReaderViewModel @Inject constructor(
         // ───── Fin Lot Sessions ─────
 
         super.onCleared()
-        audioSegmentPlayer.stop()
+        playbackOrchestrator.stop()
         sleepTimerJob?.cancel()
         scrollPersistJob?.cancel()
         eyeRestReminderJob?.cancel()
