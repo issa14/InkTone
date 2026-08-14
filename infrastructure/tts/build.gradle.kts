@@ -80,6 +80,10 @@ dependencies {
     // :domain seul concerne les dependances inter-modules).
     implementation(libs.okhttp)
 
+    // Lot 14, Tache 2.1 — MockWebServer pour les tests JVM du client
+    // EdgeTtsClient (protocole WebSocket, auth, retry) sans reseau reel.
+    testImplementation(libs.okhttp.mockwebserver)
+
     androidTestImplementation(libs.androidx.test.ext.junit)
     androidTestImplementation(libs.androidx.test.core)
     androidTestImplementation(libs.kotlinx.coroutines.test)
