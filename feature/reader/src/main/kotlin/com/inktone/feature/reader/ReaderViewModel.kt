@@ -506,15 +506,27 @@ class ReaderViewModel @Inject constructor(
      * ci-dessous (garde-fou : `ReaderViewModelFreeSelectionTest`).
      */
     private fun confirmAnnotation(color: AnnotationColor, content: String? = null) {
-        val chapter = _state.value.currentChapter ?: return
-        val publicationId = currentPublicationId ?: return
+        val chapter = _state.value.currentChapter ?: run {
+            Log.w("ReaderViewModel", "confirmAnnotation: aucun chapitre courant, annotation abandonnee")
+            return
+        }
+        val publicationId = currentPublicationId ?: run {
+            Log.w("ReaderViewModel", "confirmAnnotation: aucune publication courante, annotation abandonnee")
+            return
+        }
         val sentences = chapter.sentences
 
-        val freeRange = _state.value.freeSelectionRange ?: return
+        val freeRange = _state.value.freeSelectionRange ?: run {
+            Log.w("ReaderViewModel", "confirmAnnotation: freeSelectionRange deja nul, annotation abandonnee")
+            return
+        }
         val endOffsetExclusive = freeRange.last + 1
         val (startLocator, endLocator) = annotationSelectionHandler.resolveCharRange(
             freeRange.first, endOffsetExclusive, chapter.index, chapter.href,
-        ) ?: return
+        ) ?: run {
+            Log.w("ReaderViewModel", "confirmAnnotation: resolveCharRange a echoue pour $freeRange, annotation abandonnee")
+            return
+        }
         val excerpt = sliceChapterText(sentences, freeRange.first, endOffsetExclusive)
             .take(Annotation.MAX_EXCERPT_LENGTH)
 
@@ -739,7 +751,21 @@ class ReaderViewModel @Inject constructor(
                 return@launch
             }
             val chapters = _state.value.chapters.toMutableList()
-            chapters[chapterIndex] = richChapter
+            // Bug réel trouvé à l'audit (livres à couverture prépendue, ex.
+            // "L'Arcane des Épées") : EpubChapterParser recalcule
+            // `chapterIndex` depuis `publication.readingOrder.indexOf(link)`,
+            // sans connaître le décalage +1 appliqué par
+            // ReadiumPublicationParser.parseLazy quand une couverture est
+            // insérée en tête. `richChapter.index` peut donc diverger de sa
+            // position réelle dans `chapters` — invisible pour la pagination
+            // (auto-cohérente, toujours indexée par `chapter.index`), mais
+            // fatal pour le surlignage : `confirmAnnotation` sauvegarde le
+            // Locator avec ce `chapter.index` faux, alors que le rendu
+            // (BookBlockItem/PagedChapterContent) filtre par
+            // `state.currentChapterIndex` (la position, correcte) — les deux
+            // ne matchent jamais, la couleur ne s'affiche donc jamais.
+            // Seule source de vérité désormais : la position dans `chapters`.
+            chapters[chapterIndex] = richChapter.copy(index = chapterIndex)
             _state.value = _state.value.copy(chapters = chapters)
         }
     }

@@ -104,6 +104,7 @@ fun PagedChapterContent(
     highlightedWordRange: IntRange?,
     annotations: List<Annotation>,
     currentChapterIndex: Int,
+    chapterCount: Int = currentChapterIndex + 1,
     textColor: Color,
     isReadingRulerEnabled: Boolean,
     onClick: () -> Unit,
@@ -320,6 +321,7 @@ fun PagedChapterContent(
     val latestHasPrevious = rememberUpdatedState(hasPreviousChapter)
     val latestHasNext = rememberUpdatedState(hasNextChapter)
     val latestChapterIndex = rememberUpdatedState(currentChapterIndex)
+    val latestChapterCount = rememberUpdatedState(chapterCount)
     val latestOnPrevious = rememberUpdatedState(onPreviousChapter)
     val latestOnNext = rememberUpdatedState(onNextChapter)
     val latestIsChapterReady = rememberUpdatedState(isChapterReady)
@@ -330,10 +332,22 @@ fun PagedChapterContent(
             orientation = Orientation.Horizontal,
             canPullPrevious = { pagerState.currentPage == 0 && latestHasPrevious.value },
             canPullNext = { pagerState.currentPage == pagerState.pageCount - 1 && latestHasNext.value },
+            // Bug réel trouvé à l'audit : sans cette garde, un glissement de
+            // sélection de texte au bord du chapitre pouvait être capté par
+            // ce geste de tirage plutôt que par le champ de texte.
+            isSelectionActive = { freeSelectedRangeState.value != null },
             onCommit = { direction ->
+                // Parité avec le mode SCROLL (ReaderScreen) : bornage
+                // défensif — canPullPrevious/canPullNext ne devraient jamais
+                // laisser `target` sortir de [0, lastIndex], mais un état
+                // transitoirement désynchronisé pendant une transition
+                // rapide ne doit jamais produire un index de chapitre
+                // invalide (sinon `beginLoading` bloque le spinner : voir
+                // KDoc de `isChapterReady`).
                 val target = when (direction) {
-                    ChapterTransitionDirection.PREVIOUS -> latestChapterIndex.value - 1
-                    ChapterTransitionDirection.NEXT -> latestChapterIndex.value + 1
+                    ChapterTransitionDirection.PREVIOUS -> (latestChapterIndex.value - 1).coerceAtLeast(0)
+                    ChapterTransitionDirection.NEXT ->
+                        (latestChapterIndex.value + 1).coerceAtMost(latestChapterCount.value - 1)
                 }
                 chapterTransition.beginLoading(target)
                 if (direction == ChapterTransitionDirection.PREVIOUS) latestOnPrevious.value() else latestOnNext.value()

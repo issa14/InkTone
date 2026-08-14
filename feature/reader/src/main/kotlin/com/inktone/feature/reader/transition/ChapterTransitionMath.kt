@@ -40,6 +40,11 @@ object ChapterTransitionMath {
     fun shouldCommit(pullPx: Float, thresholdPx: Float, velocity: Float, committed: Boolean): Boolean {
         if (committed) return true
         if (thresholdPx > 0f && abs(pullPx) >= thresholdPx) return true
-        return abs(velocity) >= MIN_FLING_VELOCITY_PX_S
+        // Une vélocité de relâchement ne valide QUE si elle pousse dans le
+        // même sens que le tirage en cours — sinon un flick rapide en sens
+        // inverse (geste d'ANNULATION) confirmerait à tort la transition.
+        if (pullPx == 0f) return false
+        val sameDirection = (pullPx > 0f) == (velocity > 0f)
+        return sameDirection && abs(velocity) >= MIN_FLING_VELOCITY_PX_S
     }
 }

@@ -673,6 +673,11 @@ fun ReaderScreen(
                             orientation = Orientation.Vertical,
                             canPullPrevious = { !scrollState.canScrollBackward && latestState.value.hasPreviousChapter },
                             canPullNext = { !scrollState.canScrollForward && latestState.value.hasNextChapter },
+                            // Bug réel trouvé à l'audit : sans cette garde, un
+                            // glissement de sélection de texte au bord du
+                            // chapitre pouvait être capté par ce geste de
+                            // tirage plutôt que par le champ de texte.
+                            isSelectionActive = { scrollFreeSelectedRangeState.value != null },
                             onCommit = { direction ->
                                 val target = when (direction) {
                                     ChapterTransitionDirection.PREVIOUS ->
@@ -784,6 +789,7 @@ fun ReaderScreen(
                         highlightedWordRange = state.highlightedWordRange,
                         annotations = state.annotations,
                         currentChapterIndex = state.currentChapterIndex,
+                        chapterCount = state.chapters.size,
                         textColor = ThemeColors.text(state.resolvedTheme),
                         isReadingRulerEnabled = state.isReadingRulerEnabled,
                         onClick = { handleReadingAreaTap() },

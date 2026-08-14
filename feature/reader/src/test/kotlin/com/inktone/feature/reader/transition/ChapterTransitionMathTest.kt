@@ -34,8 +34,19 @@ class ChapterTransitionMathTest {
     @Test
     fun `shouldCommit valide par distance par velocite ou par hysteresis`() {
         assertTrue(ChapterTransitionMath.shouldCommit(200f, 200f, 0f, false)) // distance = seuil
-        assertTrue(ChapterTransitionMath.shouldCommit(100f, 200f, 1500f, false)) // vélocité
+        assertTrue(ChapterTransitionMath.shouldCommit(100f, 200f, 1500f, false)) // vélocité, même sens
         assertTrue(ChapterTransitionMath.shouldCommit(50f, 200f, 0f, true)) // hystérésis
         assertFalse(ChapterTransitionMath.shouldCommit(100f, 200f, 500f, false)) // sous les deux
+    }
+
+    @Test
+    fun `shouldCommit ignore une velocite de sens oppose au tirage`() {
+        // Bug réel trouvé à l'audit : un flick rapide en sens INVERSE du
+        // tirage (geste d'annulation) ne doit jamais confirmer la
+        // transition, même si sa magnitude dépasse MIN_FLING_VELOCITY_PX_S.
+        assertFalse(ChapterTransitionMath.shouldCommit(100f, 200f, -1500f, false))
+        assertFalse(ChapterTransitionMath.shouldCommit(-100f, 200f, 1500f, false))
+        // L'hystérésis (committed = true) reste prioritaire, quel que soit le sens.
+        assertTrue(ChapterTransitionMath.shouldCommit(100f, 200f, -1500f, true))
     }
 }

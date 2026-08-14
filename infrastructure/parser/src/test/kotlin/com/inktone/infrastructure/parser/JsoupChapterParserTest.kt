@@ -389,6 +389,44 @@ class JsoupChapterParserTest {
         assertTrue(block.richText.spans.any { SpanStyles.STRONG in it.styles })
     }
 
+    @Test
+    fun `div melangeant texte inline et p regroupe le texte inline en un seul paragraphe`() {
+        // Bug réel trouvé à l'audit de la branche : avant ce correctif,
+        // hasBlockLevelChild(div) déclenchait extractContainerBlocks, qui
+        // traitait alors CHAQUE nœud enfant individuellement — le texte nu
+        // et le <b> se retrouvaient chacun scindés en leur propre
+        // ParagraphBlock isolé au lieu de rester un seul paragraphe fluide.
+        val html = """<html><body><div>Some <b>bold</b> text<p>Next paragraph.</p></div></body></html>"""
+        val chapter = parse(html)
+
+        val blocks = richBlocks(chapter)
+        assertEquals(2, blocks.size)
+
+        val first = blocks[0] as BookBlock.ParagraphBlock
+        assertEquals("Some bold text", first.richText.plainText)
+        assertTrue(first.richText.spans.any { SpanStyles.STRONG in it.styles })
+
+        val second = blocks[1] as BookBlock.ParagraphBlock
+        assertEquals("Next paragraph.", second.richText.plainText)
+    }
+
+    @Test
+    fun `div melangeant texte inline et img preserve l image et regroupe le texte`() {
+        // Même bug que ci-dessus, variante image : <img>/<svg> sont hors de
+        // BLOCK_LEVEL_TAGS (volontairement, voir sa KDoc) mais ne doivent
+        // jamais être fondues dans le texte inline environnant — sinon
+        // l'image est silencieusement perdue (extractRichTextFromNodes
+        // ignore les images).
+        val html = """<html><body><div>Avant <img src="x.png" alt="X"/><p>Après.</p></div></body></html>"""
+        val chapter = parse(html)
+
+        val blocks = richBlocks(chapter)
+        assertEquals(3, blocks.size)
+        assertEquals("Avant", (blocks[0] as BookBlock.ParagraphBlock).richText.plainText.trim())
+        assertEquals("x.png", (blocks[1] as BookBlock.ImageBlock).href)
+        assertEquals("Après.", (blocks[2] as BookBlock.ParagraphBlock).richText.plainText)
+    }
+
     // ---- Tests de fragment ----
 
     @Test
