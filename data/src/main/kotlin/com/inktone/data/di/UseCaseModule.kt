@@ -21,6 +21,8 @@ import com.inktone.domain.service.PublicationParser
 import com.inktone.domain.service.SearchService
 import com.inktone.domain.service.SyncOperationTracker
 import com.inktone.domain.service.OpdsCredentialsStore
+import com.inktone.domain.service.OpdsFeedParser
+import com.inktone.domain.service.OpdsHttpClient
 import com.inktone.domain.service.StatisticsExportService
 import com.inktone.domain.usecase.AddAnnotationUseCase
 import com.inktone.domain.usecase.ApplyAccessibilityPresetUseCase
@@ -35,7 +37,9 @@ import com.inktone.domain.usecase.GetReadingStateUseCase
 import com.inktone.domain.usecase.GetStatisticsUseCase
 import com.inktone.domain.usecase.GetCatalogsUseCase
 import com.inktone.domain.usecase.AddCatalogUseCase
+import com.inktone.domain.usecase.BrowseOpdsFeedUseCase
 import com.inktone.domain.usecase.RemoveCatalogUseCase
+import com.inktone.domain.usecase.SearchOpdsFeedUseCase
 import com.inktone.domain.usecase.GetVoiceProfilesUseCase
 import com.inktone.domain.usecase.ImportPublicationUseCase
 import com.inktone.domain.usecase.ObserveSyncUiStateUseCase
@@ -230,4 +234,17 @@ object UseCaseModule {
         catalogRepository: OpdsCatalogRepository,
         credentialsStore: OpdsCredentialsStore,
     ): RemoveCatalogUseCase = RemoveCatalogUseCase(catalogRepository, credentialsStore)
+
+    @Provides
+    @Singleton
+    fun provideBrowseOpdsFeedUseCase(
+        httpClient: OpdsHttpClient,
+        parser: OpdsFeedParser,
+        catalogRepository: OpdsCatalogRepository,
+    ): BrowseOpdsFeedUseCase = BrowseOpdsFeedUseCase(httpClient, parser, catalogRepository)
+
+    @Provides
+    fun provideSearchOpdsFeedUseCase(
+        browse: BrowseOpdsFeedUseCase,
+    ): SearchOpdsFeedUseCase = SearchOpdsFeedUseCase(browse)
 }

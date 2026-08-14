@@ -26,6 +26,8 @@ import androidx.compose.material3.ModalBottomSheet
 import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Scaffold
+import androidx.compose.material3.SnackbarHost
+import androidx.compose.material3.SnackbarHostState
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.material3.TopAppBar
@@ -63,11 +65,15 @@ fun CatalogDashboardScreen(
     onBack: () -> Unit = {},
 ) {
     val state by viewModel.state.collectAsState()
+    var showSearch by remember { mutableStateOf(false) }
+    var searchQuery by remember { mutableStateOf("") }
+    val snackbarHostState = remember { SnackbarHostState() }
 
     LaunchedEffect(Unit) {
         viewModel.effects.collect { effect ->
             when (effect) {
                 OpdsEffect.CloseScreen -> onBack()
+                is OpdsEffect.ShowMessage -> snackbarHostState.showSnackbar(effect.message)
             }
         }
     }
@@ -75,6 +81,7 @@ fun CatalogDashboardScreen(
     BackHandler { viewModel.onIntent(OpdsIntent.GoBack) }
 
     Scaffold(
+        snackbarHost = { SnackbarHost(snackbarHostState) },
         topBar = {
             TopAppBar(
                 title = {
@@ -88,6 +95,14 @@ fun CatalogDashboardScreen(
                 navigationIcon = {
                     IconButton(onClick = { viewModel.onIntent(OpdsIntent.GoBack) }) {
                         AppIcon(AppSymbol.Back, contentDescription = "Retour")
+                    }
+                },
+                actions = {
+                    val s = state
+                    if (s is OpdsUiState.Feed && s.searchTemplateUrl != null) {
+                        IconButton(onClick = { showSearch = true }) {
+                            AppIcon(AppSymbol.Search, contentDescription = "Rechercher")
+                        }
                     }
                 },
             )
@@ -118,9 +133,43 @@ fun CatalogDashboardScreen(
                     onOpenCatalog = { viewModel.onIntent(OpdsIntent.OpenCatalog(it)) },
                     onRemoveCatalog = { viewModel.onIntent(OpdsIntent.RemoveCatalog(it)) },
                 )
-                is OpdsUiState.Feed -> OpdsFeedPlaceholder(state = s)
+                is OpdsUiState.Feed -> OpdsFeedScreen(
+                    state = s,
+                    onOpenNavigation = { viewModel.onIntent(OpdsIntent.OpenNavigation(it)) },
+                    onLoadNextPage = { viewModel.onIntent(OpdsIntent.LoadNextPage(it)) },
+                    httpClient = viewModel.httpClient,
+                )
             }
         }
+    }
+
+    if (showSearch) {
+        AlertDialog(
+            onDismissRequest = { showSearch = false },
+            title = { Text("Rechercher") },
+            text = {
+                OutlinedTextField(
+                    value = searchQuery,
+                    onValueChange = { searchQuery = it },
+                    singleLine = true,
+                    label = { Text("Titre, auteur…") },
+                    modifier = Modifier.fillMaxWidth(),
+                )
+            },
+            confirmButton = {
+                TextButton(
+                    onClick = {
+                        viewModel.onIntent(OpdsIntent.Search(searchQuery))
+                        showSearch = false
+                        searchQuery = ""
+                    },
+                    enabled = searchQuery.isNotBlank(),
+                ) { Text("Rechercher") }
+            },
+            dismissButton = {
+                TextButton(onClick = { showSearch = false }) { Text("Annuler") }
+            },
+        )
     }
 }
 
@@ -223,18 +272,6 @@ private fun CatalogCard(
                 TextButton(onClick = { confirmRemove = false }) { Text("Annuler") }
             },
         )
-    }
-}
-
-/** Placeholder du flux — remplacé par `OpdsFeedScreen` au Palier 2. */
-@Composable
-private fun OpdsFeedPlaceholder(state: OpdsUiState.Feed) {
-    Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
-        if (state.isLoading) {
-            CircularProgressIndicator()
-        } else {
-            Text("Flux OPDS (Palier 2)", color = MaterialTheme.colorScheme.onSurfaceVariant)
-        }
     }
 }
 

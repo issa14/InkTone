@@ -2,10 +2,14 @@ package com.inktone.feature.opds
 
 import com.inktone.core.testing.fake.FakeOpdsCatalogRepository
 import com.inktone.core.testing.fake.FakeOpdsCredentialsStore
+import com.inktone.core.testing.fake.FakeOpdsFeedParser
+import com.inktone.core.testing.fake.FakeOpdsHttpClient
 import com.inktone.domain.model.OpdsCatalog
 import com.inktone.domain.usecase.AddCatalogUseCase
+import com.inktone.domain.usecase.BrowseOpdsFeedUseCase
 import com.inktone.domain.usecase.GetCatalogsUseCase
 import com.inktone.domain.usecase.RemoveCatalogUseCase
+import com.inktone.domain.usecase.SearchOpdsFeedUseCase
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.launch
@@ -38,7 +42,14 @@ class OpdsViewModelTest {
         getCatalogsUseCase = GetCatalogsUseCase(repo),
         addCatalog = AddCatalogUseCase(repo, FakeOpdsCredentialsStore()),
         removeCatalog = RemoveCatalogUseCase(repo, FakeOpdsCredentialsStore()),
+        browse = BrowseOpdsFeedUseCase(FakeOpdsHttpClient(), FakeOpdsFeedParser(), repo),
+        search = SearchOpdsFeedUseCase(BrowseOpdsFeedUseCase(FakeOpdsHttpClient(), FakeOpdsFeedParser(), repo)),
+        httpClient = FakeOpdsHttpClient(),
     )
+
+    /** Souscrit à l'état pour démarrer le `stateIn(WhileSubscribed)` — sinon `state.value` reste l'état initial. */
+    private fun kotlinx.coroutines.test.TestScope.collectState(vm: OpdsViewModel): kotlinx.coroutines.Job =
+        launch(dispatcher) { vm.state.collect {} }
 
     @Test
     fun le_tableau_de_bord_affiche_les_catalogues_du_repository() = runTest {
@@ -47,10 +58,13 @@ class OpdsViewModelTest {
         repo.add(catalog("cat-2"))
 
         val vm = viewModel(repo)
+        val job = collectState(vm)
         dispatcher.scheduler.advanceUntilIdle()
 
         val state = vm.state.value as OpdsUiState.Dashboard
         assertEquals(listOf("cat-1", "cat-2"), state.catalogs.map { it.id })
+
+        job.cancel()
     }
 
     @Test
@@ -58,6 +72,7 @@ class OpdsViewModelTest {
         val repo = FakeOpdsCatalogRepository()
         repo.add(catalog("cat-1"))
         val vm = viewModel(repo)
+        val job = collectState(vm)
         dispatcher.scheduler.advanceUntilIdle()
 
         vm.onIntent(OpdsIntent.OpenCatalog(catalog("cat-1")))
@@ -67,22 +82,26 @@ class OpdsViewModelTest {
         vm.onIntent(OpdsIntent.GoBack)
         dispatcher.scheduler.advanceUntilIdle()
         assertTrue(vm.state.value is OpdsUiState.Dashboard)
+
+        job.cancel()
     }
 
     @Test
     fun retour_sur_dashboard_ferme_l_ecran_quand_la_pile_est_vide() = runTest {
         val repo = FakeOpdsCatalogRepository()
         val vm = viewModel(repo)
+        val job = collectState(vm)
         dispatcher.scheduler.advanceUntilIdle()
 
         var effect: OpdsEffect? = null
-        val job = launch(dispatcher) { vm.effects.collect { effect = it } }
+        val effectJob = launch(dispatcher) { vm.effects.collect { effect = it } }
         dispatcher.scheduler.advanceUntilIdle()
 
         vm.onIntent(OpdsIntent.GoBack)
         dispatcher.scheduler.advanceUntilIdle()
-        job.cancel()
 
         assertEquals(OpdsEffect.CloseScreen, effect)
+        effectJob.cancel()
+        job.cancel()
     }
 }

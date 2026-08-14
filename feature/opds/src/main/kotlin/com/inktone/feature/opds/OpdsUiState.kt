@@ -27,6 +27,8 @@ sealed interface OpdsUiState {
         val isLoading: Boolean = true,
         val isLoadingMore: Boolean = false,
         val error: OpdsErrorUi? = null,
+        /** Catalogue courant — résout l'auth Basic Auth des couvertures, jamais affiché. */
+        val catalogId: String? = null,
     ) : OpdsUiState
 }
 
@@ -38,6 +40,7 @@ data class OpdsErrorUi(
 
 sealed interface OpdsIntent {
     data class OpenCatalog(val catalog: OpdsCatalog) : OpdsIntent
+    data class OpenNavigation(val item: OpdsItem.Navigation) : OpdsIntent
     data object GoBack : OpdsIntent
     data class AddCatalog(
         val name: String,
@@ -46,9 +49,12 @@ sealed interface OpdsIntent {
         val password: String?,
     ) : OpdsIntent
     data class RemoveCatalog(val id: String) : OpdsIntent
+    data class LoadNextPage(val nextPageUrl: String) : OpdsIntent
+    data class Search(val query: String) : OpdsIntent
 }
 
 /** Effets ponctuels (canal dédié MVI) — jamais dérivés de l'état. */
 sealed interface OpdsEffect {
     data object CloseScreen : OpdsEffect
+    data class ShowMessage(val message: String) : OpdsEffect
 }

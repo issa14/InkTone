@@ -3,9 +3,14 @@ package com.inktone.feature.opds
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.inktone.domain.model.OpdsCatalog
+import com.inktone.domain.model.OpdsItem
 import com.inktone.domain.usecase.AddCatalogUseCase
+import com.inktone.domain.usecase.BrowseOpdsFeedUseCase
 import com.inktone.domain.usecase.GetCatalogsUseCase
+import com.inktone.domain.usecase.OpdsBrowseResult
 import com.inktone.domain.usecase.RemoveCatalogUseCase
+import com.inktone.domain.usecase.SearchOpdsFeedUseCase
+import com.inktone.domain.service.OpdsHttpClient
 import dagger.hilt.android.lifecycle.HiltViewModel
 import kotlinx.coroutines.flow.MutableSharedFlow
 import kotlinx.coroutines.flow.MutableStateFlow
@@ -23,16 +28,16 @@ import javax.inject.Inject
  * navigation (`urlStack`) est un `ArrayDeque<String>` d'URLs — un état
  * de présentation pur, jamais persisté comme position de lecture
  * (ADR-023 : la navigation OPDS ne touche jamais `Locator`).
- *
- * Palier 1 : le Dashboard est branché sur le vrai repository ; la
- * transition Dashboard↔Feed est en place sur données de mock (le flux
- * réel arrive au Palier 2 via `BrowseOpdsFeedUseCase`).
  */
 @HiltViewModel
 class OpdsViewModel @Inject constructor(
     getCatalogsUseCase: GetCatalogsUseCase,
     private val addCatalog: AddCatalogUseCase,
     private val removeCatalog: RemoveCatalogUseCase,
+    private val browse: BrowseOpdsFeedUseCase,
+    private val search: SearchOpdsFeedUseCase,
+    /** Exposé à l'écran pour construire l'ImageLoader Coil des couvertures (interface domaine, comme `epubResourceResolver` du reader). */
+    val httpClient: OpdsHttpClient,
 ) : ViewModel() {
 
     private val catalogs = getCatalogsUseCase()
@@ -42,6 +47,11 @@ class OpdsViewModel @Inject constructor(
 
     /** Titres alignés sur [urlStack] pour le fil d'Ariane du flux. */
     private val titleStack = ArrayDeque<String>()
+
+    private var currentCatalogId: String? = null
+
+    /** Vrai quand l'utilisateur regarde des résultats de recherche : le retour re-navigue, ne dépile pas. */
+    private var isSearchResult = false
 
     private val navigation = MutableStateFlow<OpdsUiState>(OpdsUiState.Dashboard())
 
@@ -58,28 +68,46 @@ class OpdsViewModel @Inject constructor(
     fun onIntent(intent: OpdsIntent) {
         when (intent) {
             is OpdsIntent.OpenCatalog -> openCatalog(intent.catalog)
+            is OpdsIntent.OpenNavigation -> openNavigation(intent.item)
             OpdsIntent.GoBack -> goBack()
             is OpdsIntent.AddCatalog -> viewModelScope.launch {
                 addCatalog(intent.name, intent.rootUrl, intent.username, intent.password)
             }
             is OpdsIntent.RemoveCatalog -> viewModelScope.launch { removeCatalog(intent.id) }
+            is OpdsIntent.LoadNextPage -> loadNextPage(intent.nextPageUrl)
+            is OpdsIntent.Search -> doSearch(intent.query)
         }
     }
 
     private fun openCatalog(catalog: OpdsCatalog) {
+        browse.resetSession()
         urlStack.clear()
         titleStack.clear()
+        currentCatalogId = catalog.id
+        isSearchResult = false
         urlStack.addLast(catalog.rootUrl)
         titleStack.addLast(catalog.name)
-        navigation.value = OpdsUiState.Feed(
-            title = catalog.name,
-            breadcrumb = titleStack.toList(),
-            isLoading = true,
-        )
-        // Palier 2 — remplacer le mock par un vrai `BrowseOpdsFeedUseCase`.
+        loadFeed(catalog.rootUrl)
+    }
+
+    private fun openNavigation(item: OpdsItem.Navigation) {
+        isSearchResult = false
+        urlStack.addLast(item.href)
+        titleStack.addLast(item.title)
+        loadFeed(item.href)
     }
 
     private fun goBack() {
+        if (isSearchResult) {
+            // Retour depuis les résultats de recherche : re-naviguer sur le flux courant.
+            isSearchResult = false
+            if (urlStack.isEmpty()) {
+                navigation.value = OpdsUiState.Dashboard()
+            } else {
+                loadFeed(urlStack.last())
+            }
+            return
+        }
         if (urlStack.isEmpty()) {
             viewModelScope.launch { _effects.emit(OpdsEffect.CloseScreen) }
             return
@@ -87,14 +115,103 @@ class OpdsViewModel @Inject constructor(
         urlStack.removeLast()
         titleStack.removeLast()
         if (urlStack.isEmpty()) {
+            currentCatalogId = null
             navigation.value = OpdsUiState.Dashboard()
         } else {
-            navigation.value = OpdsUiState.Feed(
-                title = titleStack.last(),
-                breadcrumb = titleStack.toList(),
-                isLoading = true,
-            )
-            // Palier 2 — re-naviguer sur l'URL parente via BrowseOpdsFeedUseCase.
+            loadFeed(urlStack.last())
+        }
+    }
+
+    private fun loadFeed(url: String) {
+        val breadcrumb = titleStack.toList()
+        navigation.value = OpdsUiState.Feed(
+            title = breadcrumb.lastOrNull() ?: "",
+            breadcrumb = breadcrumb,
+            isLoading = true,
+            catalogId = currentCatalogId,
+        )
+        viewModelScope.launch {
+            when (val result = browse(url, currentCatalogId)) {
+                is OpdsBrowseResult.Success -> {
+                    val s = navigation.value as? OpdsUiState.Feed ?: return@launch
+                    navigation.value = s.copy(
+                        title = result.feed.title.ifBlank { breadcrumb.lastOrNull() ?: "" },
+                        items = result.feed.items,
+                        nextPageUrl = result.feed.nextPageUrl,
+                        searchTemplateUrl = result.feed.searchTemplateUrl,
+                        isLoading = false,
+                        error = null,
+                    )
+                }
+                is OpdsBrowseResult.Failure -> {
+                    val s = navigation.value as? OpdsUiState.Feed ?: return@launch
+                    navigation.value = s.copy(isLoading = false, error = OpdsErrorUi(result.reason, result.message))
+                }
+                OpdsBrowseResult.LoopDetected -> {
+                    val s = navigation.value as? OpdsUiState.Feed ?: return@launch
+                    navigation.value = s.copy(isLoading = false)
+                }
+            }
+        }
+    }
+
+    private fun loadNextPage(nextPageUrl: String) {
+        val current = navigation.value as? OpdsUiState.Feed ?: return
+        if (current.isLoadingMore) return
+        navigation.value = current.copy(isLoadingMore = true)
+        viewModelScope.launch {
+            when (val result = browse.loadNextPage(nextPageUrl, currentCatalogId)) {
+                is OpdsBrowseResult.Success -> {
+                    val s = navigation.value as? OpdsUiState.Feed ?: return@launch
+                    navigation.value = s.copy(
+                        items = s.items + result.feed.items,
+                        nextPageUrl = result.feed.nextPageUrl,
+                        isLoadingMore = false,
+                    )
+                }
+                OpdsBrowseResult.LoopDetected -> {
+                    val s = navigation.value as? OpdsUiState.Feed ?: return@launch
+                    navigation.value = s.copy(isLoadingMore = false, nextPageUrl = null)
+                }
+                is OpdsBrowseResult.Failure -> {
+                    val s = navigation.value as? OpdsUiState.Feed ?: return@launch
+                    navigation.value = s.copy(isLoadingMore = false, error = OpdsErrorUi(result.reason, result.message))
+                }
+            }
+        }
+    }
+
+    private fun doSearch(query: String) {
+        val current = navigation.value as? OpdsUiState.Feed ?: return
+        val template = current.searchTemplateUrl ?: return
+        isSearchResult = true
+        navigation.value = current.copy(
+            title = "Recherche : $query",
+            breadcrumb = current.breadcrumb + "Recherche",
+            items = emptyList(),
+            isLoading = true,
+            isLoadingMore = false,
+            error = null,
+        )
+        viewModelScope.launch {
+            when (val result = search(query, template, currentCatalogId)) {
+                is OpdsBrowseResult.Success -> {
+                    val s = navigation.value as? OpdsUiState.Feed ?: return@launch
+                    navigation.value = s.copy(
+                        items = result.feed.items,
+                        nextPageUrl = result.feed.nextPageUrl,
+                        isLoading = false,
+                    )
+                }
+                OpdsBrowseResult.LoopDetected -> {
+                    val s = navigation.value as? OpdsUiState.Feed ?: return@launch
+                    navigation.value = s.copy(isLoading = false)
+                }
+                is OpdsBrowseResult.Failure -> {
+                    val s = navigation.value as? OpdsUiState.Feed ?: return@launch
+                    navigation.value = s.copy(isLoading = false, error = OpdsErrorUi(result.reason, result.message))
+                }
+            }
         }
     }
 }
