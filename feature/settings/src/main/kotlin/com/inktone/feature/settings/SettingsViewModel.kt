@@ -96,8 +96,7 @@ class SettingsViewModel @Inject constructor(
                 is SettingsIntent.SetTheme -> preferencesRepository.update(current.copy(theme = intent.themeId))
                 is SettingsIntent.SetFontSize -> preferencesRepository.update(current.copy(fontSize = intent.fontSize))
                 is SettingsIntent.SetFontFamily -> preferencesRepository.update(current.copy(fontFamily = intent.fontFamily))
-                is SettingsIntent.SetDefaultTtsEngine ->
-                    preferencesRepository.update(current.copy(defaultTtsEngine = intent.engine))
+                is SettingsIntent.SetDefaultTtsEngine -> setDefaultTtsEngine(current, intent.engine)
                 is SettingsIntent.SetLanguage -> preferencesRepository.update(current.copy(language = intent.language))
                 is SettingsIntent.SetCrashReportingEnabled ->
                     preferencesRepository.update(current.copy(crashReportingEnabled = intent.enabled))
@@ -234,6 +233,29 @@ class SettingsViewModel @Inject constructor(
         }
         // Recharger les profils pour mettre à jour l'UI
         _state.value = _state.value.copy(voiceProfiles = getVoiceProfiles())
+    }
+
+    /**
+     * Lot 14, Tâche 4.1 — corrige le défaut préalable n°2 du plan : changer
+     * de moteur mettait à jour `defaultTtsEngine` SANS synchroniser le
+     * `VoiceProfile` actif. Or `SelectiveTtsEngine` route sur
+     * `voiceProfile.engine` : sans cette synchronisation, sélectionner Edge
+     * ne routerait jamais vers Edge (resolveVoiceProfile retombe sur l'ancien
+     * profil ou le repli ANDROID_NATIVE).
+     */
+    private suspend fun setDefaultTtsEngine(prefs: UserPreferences, engine: TtsEngineId) {
+        preferencesRepository.update(prefs.copy(defaultTtsEngine = engine))
+        updateActiveVoiceProfile(prefs.copy(defaultTtsEngine = engine)) {
+            it.copy(engine = engine, voice = defaultVoiceFor(engine))
+        }
+    }
+
+    /** Voix par défaut de chaque moteur — aligné sur les moteurs réels (Palier 1/2/Edge). */
+    private fun defaultVoiceFor(engine: TtsEngineId): String = when (engine) {
+        TtsEngineId.SHERPA_ONNX -> "ff_siwis"
+        TtsEngineId.ANDROID_NATIVE -> "fr-fr-default"
+        TtsEngineId.EDGE_TTS -> "fr-FR-VivienneNeural"
+        TtsEngineId.PIPER -> "default"
     }
 
     /**
