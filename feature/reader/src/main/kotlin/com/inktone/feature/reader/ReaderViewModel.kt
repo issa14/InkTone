@@ -506,27 +506,15 @@ class ReaderViewModel @Inject constructor(
      * ci-dessous (garde-fou : `ReaderViewModelFreeSelectionTest`).
      */
     private fun confirmAnnotation(color: AnnotationColor, content: String? = null) {
-        val chapter = _state.value.currentChapter ?: run {
-            Log.w("ReaderViewModel", "confirmAnnotation: aucun chapitre courant, annotation abandonnee")
-            return
-        }
-        val publicationId = currentPublicationId ?: run {
-            Log.w("ReaderViewModel", "confirmAnnotation: aucune publication courante, annotation abandonnee")
-            return
-        }
+        val chapter = _state.value.currentChapter ?: return
+        val publicationId = currentPublicationId ?: return
         val sentences = chapter.sentences
 
-        val freeRange = _state.value.freeSelectionRange ?: run {
-            Log.w("ReaderViewModel", "confirmAnnotation: freeSelectionRange deja nul, annotation abandonnee")
-            return
-        }
+        val freeRange = _state.value.freeSelectionRange ?: return
         val endOffsetExclusive = freeRange.last + 1
         val (startLocator, endLocator) = annotationSelectionHandler.resolveCharRange(
             freeRange.first, endOffsetExclusive, chapter.index, chapter.href,
-        ) ?: run {
-            Log.w("ReaderViewModel", "confirmAnnotation: resolveCharRange a echoue pour $freeRange, annotation abandonnee")
-            return
-        }
+        ) ?: return
         val excerpt = sliceChapterText(sentences, freeRange.first, endOffsetExclusive)
             .take(Annotation.MAX_EXCERPT_LENGTH)
 
