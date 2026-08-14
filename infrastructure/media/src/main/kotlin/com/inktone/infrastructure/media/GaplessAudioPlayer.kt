@@ -2,9 +2,11 @@ package com.inktone.infrastructure.media
 
 import android.media.AudioAttributes
 import android.media.AudioFormat
+import android.media.AudioTimestamp
 import android.media.AudioTrack
 import com.inktone.domain.service.AudioPlayer
 import com.inktone.domain.service.AudioSegment
+import com.inktone.domain.service.PlaybackPosition
 import com.inktone.domain.service.PlayerState
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
@@ -76,6 +78,8 @@ class GaplessAudioPlayer @Inject constructor() : AudioPlayer, GaplessPlaybackCor
 
     override val pendingCount: Int get() = core.pendingCount
 
+    override val playbackPosition: StateFlow<PlaybackPosition> get() = core.playbackPosition
+
     // ── PcmSink (couche I/O AudioTrack, appelée sous le verrou du cœur) ──
 
     override fun ensureTrack(sampleRate: Int) {
@@ -136,6 +140,26 @@ class GaplessAudioPlayer @Inject constructor() : AudioPlayer, GaplessPlaybackCor
         track?.setVolume(volume)
     }
 
+    override fun samplePlaybackPosition(): PlaybackPosition {
+        val t = track ?: return INVALID_POSITION
+        val sr = trackSampleRate
+        if (sr <= 0) return INVALID_POSITION
+        val ts = AudioTimestamp()
+        return if (t.getTimestamp(ts)) {
+            // Position corrigée de la latence (Lot 16, spike positif).
+            PlaybackPosition(
+                playedFrame = estimatePlayedFrame(ts.framePosition, ts.nanoTime, System.nanoTime(), sr),
+                sampleRate = sr,
+                timestampNanos = ts.nanoTime,
+                valid = true,
+            )
+        } else {
+            // Repli : tête de lecture (frames joués sur ce device, cf. spike).
+            val head = t.playbackHeadPosition.toLong() and 0xFFFFFFFFL
+            PlaybackPosition(playedFrame = head, sampleRate = sr, timestampNanos = null, valid = true)
+        }
+    }
+
     private fun releaseTrackInternal() {
         track?.let { t ->
             runCatching {
@@ -151,5 +175,6 @@ class GaplessAudioPlayer @Inject constructor() : AudioPlayer, GaplessPlaybackCor
 
     private companion object {
         const val MIN_BUFFER_SIZE_BYTES = 4096 * 8
+        val INVALID_POSITION = PlaybackPosition(playedFrame = 0, sampleRate = 0, timestampNanos = null, valid = false)
     }
 }

@@ -77,8 +77,38 @@ class PlaybackOrchestrator @Inject constructor(
     private val _currentWordTimestamps = MutableStateFlow<List<WordTimestamp>>(emptyList())
     val currentWordTimestamps: StateFlow<List<WordTimestamp>> = _currentWordTimestamps.asStateFlow()
 
+    /**
+     * Intervalle de caractères du mot courant, déduit de la position jouée
+     * (Lot 16, Tâche 2.1). `null` hors des bornes de tout mot ou quand la
+     * position est invalide — le consommateur (ReaderViewModel) retombe alors
+     * sur son repli `delay()`.
+     */
+    private val _currentWordRange = MutableStateFlow<IntRange?>(null)
+    val currentWordRange: StateFlow<IntRange?> = _currentWordRange.asStateFlow()
+
+    /**
+     * Vrai quand [AudioPlayer.playbackPosition] est valide. Reflète le flux du
+     * lecteur : faux avant le premier échantillon, vrai pendant la lecture,
+     * faux à l'arrêt. Consommé par le ReaderViewModel pour choisir entre le
+     * surlignage par position et le repli `delay()`.
+     */
+    private val _positionValid = MutableStateFlow(false)
+    val positionValid: StateFlow<Boolean> = _positionValid.asStateFlow()
+
     private val playGeneration = AtomicLong(0)
     private var playbackJob: Job? = null
+    private var wordTrackingJob: Job? = null
+
+    init {
+        // Miroir de la validité de la position du lecteur, sans verrou ni
+        // contention (simple collecte d'un StateFlow) — c'est le signal qui
+        // fait basculer le ReaderViewModel vers le repli `delay()`.
+        scope.launch {
+            audioPlayer.playbackPosition.collect { position ->
+                _positionValid.value = position.valid
+            }
+        }
+    }
 
     /** Sérialise pause/resume/stop (appelés depuis UI, MediaSession, etc.). */
     private val stateLock = ReentrantLock()
@@ -136,7 +166,11 @@ class PlaybackOrchestrator @Inject constructor(
             playGeneration.incrementAndGet()
             playbackJob?.cancel()
             playbackJob = null
+            wordTrackingJob?.cancel()
+            wordTrackingJob = null
             audioPlayer.stop()
+            _currentWordRange.value = null
+            _positionValid.value = false
             _state.value = PlaybackStatus.Idle
         } finally {
             stateLock.unlock()
@@ -224,6 +258,9 @@ class PlaybackOrchestrator @Inject constructor(
             val sentence = sentences.getOrNull(index)
             val silenceMs = silenceDurationFor(sentence?.text ?: "")
             val phraseDurationMs = segment.durationMs + silenceMs
+            // Position jouée au début de l'audio de cette phrase (cumul des
+            // durées précédentes) — repère du surlignage mot par position.
+            val sentenceStartMs = nextPhraseStartMs
 
             audioPlayer.sampleRate = segment.sampleRate
             audioPlayer.enqueue(segment)
@@ -244,6 +281,7 @@ class PlaybackOrchestrator @Inject constructor(
                 if (waitMs > 0) pace(generation, waitMs)
                 advanceTo(generation, index, publicationId, chapterIndex, resourceHref, sentence, segment.wordTimestamps)
             }
+            launchWordTracking(generation, sentenceStartMs, segment.wordTimestamps)
             nextPhraseStartMs += phraseDurationMs
             index++
         }
@@ -304,6 +342,39 @@ class PlaybackOrchestrator @Inject constructor(
         }
     }
 
+    /**
+     * Surlignage mot par position (Lot 16, Tâche 2.1) : un coroutine par
+     * phrase déduit [wordRangeAt] de la position jouée et met à jour
+     * [_currentWordRange]. Si la position est invalide, aucune plage n'est
+     * émise (le consommateur retombe sur le repli `delay()`). Sort dès que la
+     * position dépasse le dernier mot, ou que la génération est périmée.
+     */
+    private fun launchWordTracking(generation: Long, sentenceStartMs: Long, wordTimestamps: List<WordTimestamp>) {
+        wordTrackingJob?.cancel()
+        _currentWordRange.value = null
+        if (wordTimestamps.isEmpty()) return
+        val lastEndMs = sentenceStartMs + wordTimestamps.last().endMs
+        wordTrackingJob = scope.launch {
+            while (isCurrent(generation)) {
+                if (_state.value == PlaybackStatus.Paused) {
+                    delay(WORD_TRACKING_STEP_MS)
+                    continue
+                }
+                val position = audioPlayer.playbackPosition.value
+                val range = if (position.valid) {
+                    wordRangeAt(position.playedMs, sentenceStartMs, wordTimestamps)
+                } else {
+                    null
+                }
+                if (_currentWordRange.value != range) {
+                    _currentWordRange.value = range
+                }
+                if (position.valid && position.playedMs >= lastEndMs) return@launch
+                delay(WORD_TRACKING_STEP_MS)
+            }
+        }
+    }
+
     private fun isCurrent(generation: Long): Boolean = playGeneration.get() == generation
 
     /** Génère un silence PCM16 de [durationMs] au [sampleRate] donné. */
@@ -335,6 +406,7 @@ class PlaybackOrchestrator @Inject constructor(
         /** Silence injecté après une synthèse en échec. */
         const val TIMEOUT_SILENCE_MS = 50L
         const val PACE_STEP_MS = 50L
+        const val WORD_TRACKING_STEP_MS = 20L
         const val SILENCE_COMMA_MS = 150L
         const val SILENCE_SENTENCE_MS = 650L
         const val SILENCE_PARAGRAPH_MS = 1000L
