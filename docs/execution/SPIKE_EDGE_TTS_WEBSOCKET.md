@@ -133,28 +133,56 @@ Reprendre la Partie A avec `wordBoundaryEnabled: true`.
 4. Un extrait de log **brut** (une trame wordboundary complète) est capturé
    dans ce document — jamais un résumé.
 
-## 6. Résultats (à remplir — Tâche 1.2 / 1.3)
-
-<!-- À remplir avec les logs device réels, pas avant exécution. -->
+## 6. Résultats (device V2206, 2026-08-14)
 
 ### 6.1 Partie A — Round-trip
 
-- Handshake : `[À REMPLIR]`
-- Chunks binaires / octets MP3 : `[À REMPLIR]`
-- PCM décodé / sampleRate / durée : `[À REMPLIR]`
-- Trame `turn.end` : `[À REMPLIR]`
+- Handshake : `101` (WebSocket accepté)
+- Chunks binaires / octets MP3 : `23` chunks / `18 661` octets
+- PCM décodé / sampleRate / durée : `62 784` échantillons / `24 000` Hz / `1 308` ms
+- Trame `turn.end` : reçue (`chunks=23, octets=18661`)
 
 ### 6.2 Partie B — Word boundaries
 
-- Trames `Path:wordboundary` reçues : `[À REMPLIR]`
-- Extrait brut d'une trame : `[À REMPLIR]`
-- Offsets / couverture de la phrase : `[À REMPLIR]`
+- Trames reçues : **7**, sous le chemin **`Path:audio.metadata`** —
+  **pas** `Path:wordboundary` (supposition du legacy, infirmée).
+- Extrait brut d'une trame (corps JSON, en-têtes retirés) :
 
-## 7. Verdict (à remplir — Tâche 1.3)
+```json
+{
+  "Type": "WordBoundary",
+  "Offset": 500000,
+  "Duration": 6000000,
+  "text": { "Text": "Bonjour", "BoundaryType": "WordBoundary" }
+}
+```
 
-- **Round-trip** : `[FONCTIONNE / ÉCHEC — raison]`
-- **Word boundaries** : `[EXTRACTIBLES / NON EXTRACTIBLES / NON FIABLES — raison]`
-- **`wordTimestamps` cible pour `EdgeTtsEngine`** : `[true / false]`
+  `Offset`/`Duration` sont en **ticks 100 ns** (même époque FILETIME que
+  `Sec-MS-GEC`) → `ms = ticks / 10_000`.
+- Offsets reconstitués (couverture de la phrase « Bonjour, ceci est une
+  phrase de test. », ordre respecté, sans chevauchement) :
 
-Le verdict est la seule source autorisée pour la valeur de
-`TtsCapabilities.wordTimestamps` au Palier 3. Aucune autre inférence.
+| Mot | Début (ms) | Fin (ms) |
+|---|---|---|
+| `Bonjour` | 50 | 650 |
+| `ceci` | 937 | 1 212 |
+| `est` | 1 212 | 1 237 |
+| `une` | 1 237 | 1 400 |
+| … (3 mots restants) | — | — |
+
+  Cohérence vérifiée : la dernière frontière aboutit à ~1,4 s, contre une
+  durée audio décodée de 1 308 ms (écart d'arrondi de tranche, cohérent).
+
+## 7. Verdict
+
+- **Round-trip** : `FONCTIONNE` — chaîne WebSocket → MP3 → PCM complète.
+- **Word boundaries** : `EXTRACTIBLES` — via `Path:audio.metadata`
+  (`Type: WordBoundary`, `Offset`/`Duration` en ticks 100 ns, `Text` par mot).
+- **`wordTimestamps` cible pour `EdgeTtsEngine`** : **`true`** — le Palier 3
+  doit implémenter le parsing de `Path:audio.metadata` et le mapping
+  `ticks → ms` + `Text → charOffset` (remappé sur le texte affiché via
+  `PronunciationRuleApplier`, même mécanique que `SherpaOnnxTtsEngine`).
+
+**Correction de protocole à capitaliser (K13) :** le legacy supposait
+`Path:wordboundary` ; la vérité device est `Path:audio.metadata`. Ne pas
+réintroduire la supposition dans le client de production (Tâche 2.2).
