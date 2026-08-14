@@ -121,6 +121,11 @@ class ReaderViewModel @Inject constructor(
     /** Plan v4 — scope dédié aux préchargements, annulé indépendamment du chargement courant. */
     private var preloadScope: CoroutineScope? = null
     private val sentenceAudioBuffer = SentenceAudioBuffer(viewModelScope, ttsEngine)
+
+    // Correctif Lot 14 — vide le buffer de préchargement quand le chapitre
+    // change (les indices de phrase sont locaux au chapitre : un préchargement
+    // périmé du chapitre précédent serait rejoué à tort).
+    private var bufferedChapterHref: String? = null
     private val annotationSelectionHandler = AnnotationSelectionHandler()
     private var sleepTimerJob: Job? = null
 
@@ -844,6 +849,13 @@ class ReaderViewModel @Inject constructor(
             val index = _state.value.currentSentenceIndex
             val publicationId = currentPublicationId ?: return@launch
 
+            // Correctif Lot 14 — changement de chapitre : vide les
+            // préchargements du chapitre précédent.
+            if (bufferedChapterHref != chapter.href) {
+                sentenceAudioBuffer.clear()
+                bufferedChapterHref = chapter.href
+            }
+
             // ───── Lot Sessions : bascule en mode TTS ─────
             sessionTracker?.switchMode(DomainReadingMode.AUDIO)
             // ───── Fin Lot Sessions ─────
@@ -875,9 +887,27 @@ class ReaderViewModel @Inject constructor(
             // A.5 — résout le profil vocal actif depuis les préférences utilisateur
             val prefs = preferencesRepository.get()
             val voiceProfile = resolveVoiceProfile(prefs)
+
+            // Correctif Lot 14 — préchauffe les phrases suivantes AVANT de
+            // jouer la courante : la synthèse chevauche ainsi la lecture
+            // (LOOKAHEAD=3), au lieu d'être déclenchée après le play() et de
+            // créer un trou audible face à la latence de synthèse.
+            sentenceAudioBuffer.preloadAhead(sentences, index, voiceProfile)
+
             val segment = sentenceAudioBuffer.get(sentence, voiceProfile)
-            audioSegmentPlayer.play(segment)
-            _state.value = _state.value.copy(isAudioActive = true)
+
+            // Surlignage mot-à-mot dans une coroutine parallèle — le rythme de
+            // lecture est désormais celui de l'audio (play() bloquant
+            // ci-dessous), plus une somme de delay() qui coupait l'audio en
+            // cours (mots/phrases sautés).
+            val highlightJob = viewModelScope.launch {
+                segment.wordTimestamps.forEach { wt ->
+                    _state.value = _state.value.copy(
+                        highlightedWordRange = wt.charOffset until (wt.charOffset + wt.word.length),
+                    )
+                    delay((wt.endMs - wt.startMs).coerceAtLeast(0L))
+                }
+            }
 
             // Lot 10 — retour Issa (vérification device) : proposition
             // proactive au premier usage réel du TTS, plutôt que de
@@ -892,19 +922,14 @@ class ReaderViewModel @Inject constructor(
                 preferencesRepository.update(prefs.copy(hasPromptedVoiceDownload = true))
             }
 
-            // Précharge la phrase suivante pendant que celle-ci se joue
-            sentences.getOrNull(index + 1)?.let {
-                sentenceAudioBuffer.preloadNext(it, voiceProfile)
-            }
-
-            segment.wordTimestamps.forEach { wt ->
-                _state.value = _state.value.copy(
-                    highlightedWordRange = wt.charOffset until (wt.charOffset + wt.word.length),
-                )
-                delay((wt.endMs - wt.startMs).coerceAtLeast(0L))
-            }
-
+            _state.value = _state.value.copy(isAudioActive = true)
+            // Bloquant : revient quand l'AudioTrack a réellement fini.
+            audioSegmentPlayer.play(segment)
+            highlightJob.cancel()
             _state.value = _state.value.copy(highlightedWordRange = null, isAudioActive = false)
+
+            // Silence inter-phrases selon la ponctuation (naturel, pas un trou).
+            delay(silenceDurationFor(sentence.text))
 
             updateReadingState(
                 ReadingState(
@@ -919,6 +944,21 @@ class ReaderViewModel @Inject constructor(
                 _state.value = _state.value.copy(currentSentenceIndex = index + 1)
                 playCurrentSentence()
             }
+        }
+    }
+
+    /**
+     * Correctif Lot 14 — silence naturel entre phrases selon la ponctuation
+     * (aligné sur le legacy : 150 ms virgule/point-virgule, 650 ms fin de
+     * phrase). Sans lui, les phrases s'enchaînent à la volée, donnant une
+     * impression hachée.
+     */
+    private fun silenceDurationFor(text: String): Long {
+        val trimmed = text.trimEnd()
+        if (trimmed.isEmpty()) return 650L
+        return when (trimmed.last()) {
+            ',', ';' -> 150L
+            else -> 650L
         }
     }
 
