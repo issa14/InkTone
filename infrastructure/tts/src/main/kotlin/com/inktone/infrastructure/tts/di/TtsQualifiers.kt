@@ -21,3 +21,21 @@ annotation class Palier1
 @Qualifier
 @Retention(AnnotationRetention.BINARY)
 annotation class EdgeTts
+
+/**
+ * Qualifie l'adaptateur `TtsEngine` Edge TTS (cloud) — pour que
+ * `SelectiveTtsEngine` (Lot 14) le distingue de la chaîne offline dans le
+ * graphe Hilt (même principe que `@Palier1`/`@Palier2`).
+ */
+@Qualifier
+@Retention(AnnotationRetention.BINARY)
+annotation class EdgeEngine
+
+/**
+ * Qualifie la chaîne offline `FallbackTtsEngine` — pour que
+ * `SelectiveTtsEngine` route vers elle quand `VoiceProfile.engine` n'est
+ * pas `EDGE_TTS`, ou en repli après une erreur réseau Edge.
+ */
+@Qualifier
+@Retention(AnnotationRetention.BINARY)
+annotation class OfflineTtsEngine
