@@ -112,6 +112,23 @@ class SettingsViewModelTest {
     }
 
     @Test
+    fun `choisir une voix met a jour le profil actif - Henri et Vivienne`() = runTest {
+        val preferencesRepository = FakePreferencesRepository()
+        val voiceProfileRepository = FakeVoiceProfileRepository()
+        val vm = viewModel(preferencesRepository, voiceProfileRepository)
+        dispatcher.scheduler.advanceUntilIdle()
+
+        vm.onIntent(SettingsIntent.SetDefaultTtsEngine(TtsEngineId.EDGE_TTS))
+        dispatcher.scheduler.advanceUntilIdle()
+        vm.onIntent(SettingsIntent.SetActiveVoiceProfileVoice("fr-FR-HenriNeural"))
+        dispatcher.scheduler.advanceUntilIdle()
+
+        val prefs = preferencesRepository.get()
+        val activeProfile = voiceProfileRepository.getById(prefs.activeVoiceProfileId!!)
+        assertEquals("fr-FR-HenriNeural", activeProfile!!.voice)
+    }
+
+    @Test
     fun `desactiver le preset Mode sombre revient aux valeurs par defaut`() = runTest {
         val preferencesRepository = FakePreferencesRepository()
         val vm = viewModel(preferencesRepository)
