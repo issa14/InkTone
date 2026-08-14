@@ -51,10 +51,12 @@ sealed interface OpdsIntent {
     data class RemoveCatalog(val id: String) : OpdsIntent
     data class LoadNextPage(val nextPageUrl: String) : OpdsIntent
     data class Search(val query: String) : OpdsIntent
+    data class DownloadBook(val item: OpdsItem.Book) : OpdsIntent
 }
 
 /** Effets ponctuels (canal dédié MVI) — jamais dérivés de l'état. */
 sealed interface OpdsEffect {
     data object CloseScreen : OpdsEffect
     data class ShowMessage(val message: String) : OpdsEffect
+    data class DownloadComplete(val bookTitle: String, val publicationId: String) : OpdsEffect
 }

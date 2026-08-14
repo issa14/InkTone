@@ -1,4 +1,8 @@
 <?xml version="1.0" encoding="utf-8"?>
 <paths>
     <cache-path name="exports" path="exports/" />
+    <!-- Lot 13, tâche 13.3.2 — fichiers EPUB téléchargés depuis un catalogue
+         OPDS, écrits dans le stockage privé de l'app puis exposés en
+         content:// au pipeline d'import via le FileProvider app-scopé. -->
+    <external-files-path name="opds_downloads" path="opds_downloads/" />
 </paths>

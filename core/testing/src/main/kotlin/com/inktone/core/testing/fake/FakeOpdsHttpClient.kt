@@ -9,9 +9,11 @@ class FakeOpdsHttpClient(
     var onFetch: (url: String, catalogId: String?) -> OpdsFetchResult = { url, _ ->
         OpdsFetchResult.Success("<feed/>", url)
     },
+    var onDownload: (url: String, catalogId: String?) -> OpdsDownloadResult = { _, _ ->
+        OpdsDownloadResult.Success(ByteArray(0))
+    },
 ) : OpdsHttpClient {
     override suspend fun fetch(url: String, catalogId: String?): OpdsFetchResult = onFetch(url, catalogId)
 
-    override suspend fun download(url: String, catalogId: String?): OpdsDownloadResult =
-        OpdsDownloadResult.Success(ByteArray(0))
+    override suspend fun download(url: String, catalogId: String?): OpdsDownloadResult = onDownload(url, catalogId)
 }

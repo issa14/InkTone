@@ -48,6 +48,7 @@ fun OpdsFeedScreen(
     state: OpdsUiState.Feed,
     onOpenNavigation: (OpdsItem.Navigation) -> Unit,
     onLoadNextPage: (String) -> Unit,
+    onDownloadBook: (OpdsItem.Book) -> Unit,
     httpClient: OpdsHttpClient,
 ) {
     val context = LocalContext.current
@@ -75,6 +76,7 @@ fun OpdsFeedScreen(
                 state = state,
                 onOpenNavigation = onOpenNavigation,
                 onLoadNextPage = onLoadNextPage,
+                onDownloadBook = onDownloadBook,
             )
         }
     }
@@ -100,6 +102,7 @@ private fun FeedError(message: String) {
 private fun FeedGrid(
     state: OpdsUiState.Feed,
     onOpenNavigation: (OpdsItem.Navigation) -> Unit,
+    onDownloadBook: (OpdsItem.Book) -> Unit,
     onLoadNextPage: (String) -> Unit,
 ) {
     val gridState = rememberLazyGridState()
@@ -128,7 +131,7 @@ private fun FeedGrid(
         items(state.items, key = { itemKey(it) }) { item ->
             when (item) {
                 is OpdsItem.Navigation -> DirectoryCard(item, onOpenNavigation)
-                is OpdsItem.Book -> BookCard(item, state.catalogId)
+                is OpdsItem.Book -> BookCard(item, state.catalogId, onDownloadBook)
             }
         }
         if (state.isLoadingMore) {
@@ -172,7 +175,7 @@ private fun DirectoryCard(
 }
 
 @Composable
-private fun BookCard(item: OpdsItem.Book, catalogId: String?) {
+private fun BookCard(item: OpdsItem.Book, catalogId: String?, onDownloadBook: (OpdsItem.Book) -> Unit) {
     val coverUrl = item.coverUrl
     Card {
         Column(Modifier.fillMaxWidth()) {
@@ -207,6 +210,9 @@ private fun BookCard(item: OpdsItem.Book, catalogId: String?) {
                         maxLines = 1,
                         overflow = TextOverflow.Ellipsis,
                     )
+                }
+                androidx.compose.material3.IconButton(onClick = { onDownloadBook(item) }) {
+                    AppIcon(AppSymbol.Download, contentDescription = "Télécharger ${item.title}")
                 }
             }
         }

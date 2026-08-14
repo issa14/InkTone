@@ -2,11 +2,14 @@ package com.inktone.feature.opds
 
 import com.inktone.core.testing.fake.FakeOpdsCatalogRepository
 import com.inktone.core.testing.fake.FakeOpdsCredentialsStore
+import com.inktone.core.testing.fake.FakeOpdsDownloadObserver
+import com.inktone.core.testing.fake.FakeOpdsDownloadScheduler
 import com.inktone.core.testing.fake.FakeOpdsFeedParser
 import com.inktone.core.testing.fake.FakeOpdsHttpClient
 import com.inktone.domain.model.OpdsCatalog
 import com.inktone.domain.usecase.AddCatalogUseCase
 import com.inktone.domain.usecase.BrowseOpdsFeedUseCase
+import com.inktone.domain.usecase.DownloadOpdsBookUseCase
 import com.inktone.domain.usecase.GetCatalogsUseCase
 import com.inktone.domain.usecase.RemoveCatalogUseCase
 import com.inktone.domain.usecase.SearchOpdsFeedUseCase
@@ -44,6 +47,8 @@ class OpdsViewModelTest {
         removeCatalog = RemoveCatalogUseCase(repo, FakeOpdsCredentialsStore()),
         browse = BrowseOpdsFeedUseCase(FakeOpdsHttpClient(), FakeOpdsFeedParser(), repo),
         search = SearchOpdsFeedUseCase(BrowseOpdsFeedUseCase(FakeOpdsHttpClient(), FakeOpdsFeedParser(), repo)),
+        downloadBook = DownloadOpdsBookUseCase(FakeOpdsDownloadScheduler()),
+        downloadObserver = FakeOpdsDownloadObserver(),
         httpClient = FakeOpdsHttpClient(),
     )
 

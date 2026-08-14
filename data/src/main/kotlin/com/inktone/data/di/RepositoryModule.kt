@@ -1,6 +1,7 @@
 package com.inktone.data.di
 
 import com.inktone.data.repository.DeviceIdentityRepositoryImpl
+import com.inktone.data.repository.InMemoryOpdsDownloadObserver
 import com.inktone.data.repository.InMemorySyncOperationTracker
 import com.inktone.data.repository.RoomAnnotationRepository
 import com.inktone.data.repository.RoomBookmarkRepository
@@ -34,6 +35,7 @@ import com.inktone.domain.repository.SyncActivityLogRepository
 import com.inktone.domain.repository.SyncFleetRepository
 import com.inktone.domain.repository.ThemeRepository
 import com.inktone.domain.repository.VoiceProfileRepository
+import com.inktone.domain.service.OpdsDownloadObserver
 import com.inktone.domain.service.SyncNowService
 import com.inktone.domain.service.SyncOperationTracker
 import dagger.Binds
@@ -62,5 +64,6 @@ abstract class RepositoryModule {
     @Binds @Singleton abstract fun bindSyncActivityLogRepository(impl: RemoteSyncActivityLogRepository): SyncActivityLogRepository
     @Binds @Singleton abstract fun bindSyncNowService(impl: SyncNowManager): SyncNowService
     @Binds @Singleton abstract fun bindConflictQueueRepository(impl: RoomConflictQueueRepository): ConflictQueueRepository
+    @Binds @Singleton abstract fun bindOpdsDownloadObserver(impl: InMemoryOpdsDownloadObserver): OpdsDownloadObserver
     @Binds @Singleton abstract fun bindOpdsCatalogRepository(impl: RoomOpdsCatalogRepository): OpdsCatalogRepository
 }

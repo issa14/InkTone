@@ -28,6 +28,7 @@ import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.SnackbarHost
 import androidx.compose.material3.SnackbarHostState
+import androidx.compose.material3.SnackbarResult
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.material3.TopAppBar
@@ -63,6 +64,7 @@ import com.inktone.domain.model.OpdsCatalog
 fun CatalogDashboardScreen(
     viewModel: OpdsViewModel = hiltViewModel(),
     onBack: () -> Unit = {},
+    onOpenPublication: (String) -> Unit = {},
 ) {
     val state by viewModel.state.collectAsState()
     var showSearch by remember { mutableStateOf(false) }
@@ -74,6 +76,15 @@ fun CatalogDashboardScreen(
             when (effect) {
                 OpdsEffect.CloseScreen -> onBack()
                 is OpdsEffect.ShowMessage -> snackbarHostState.showSnackbar(effect.message)
+                is OpdsEffect.DownloadComplete -> {
+                    val result = snackbarHostState.showSnackbar(
+                        message = "« ${effect.bookTitle} » ajouté à la bibliothèque",
+                        actionLabel = "Lire maintenant",
+                    )
+                    if (result == SnackbarResult.ActionPerformed) {
+                        onOpenPublication(effect.publicationId)
+                    }
+                }
             }
         }
     }
@@ -137,6 +148,7 @@ fun CatalogDashboardScreen(
                     state = s,
                     onOpenNavigation = { viewModel.onIntent(OpdsIntent.OpenNavigation(it)) },
                     onLoadNextPage = { viewModel.onIntent(OpdsIntent.LoadNextPage(it)) },
+                    onDownloadBook = { viewModel.onIntent(OpdsIntent.DownloadBook(it)) },
                     httpClient = viewModel.httpClient,
                 )
             }

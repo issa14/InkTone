@@ -21,6 +21,7 @@ import com.inktone.domain.service.PublicationParser
 import com.inktone.domain.service.SearchService
 import com.inktone.domain.service.SyncOperationTracker
 import com.inktone.domain.service.OpdsCredentialsStore
+import com.inktone.domain.service.OpdsDownloadScheduler
 import com.inktone.domain.service.OpdsFeedParser
 import com.inktone.domain.service.OpdsHttpClient
 import com.inktone.domain.service.StatisticsExportService
@@ -38,6 +39,7 @@ import com.inktone.domain.usecase.GetStatisticsUseCase
 import com.inktone.domain.usecase.GetCatalogsUseCase
 import com.inktone.domain.usecase.AddCatalogUseCase
 import com.inktone.domain.usecase.BrowseOpdsFeedUseCase
+import com.inktone.domain.usecase.DownloadOpdsBookUseCase
 import com.inktone.domain.usecase.RemoveCatalogUseCase
 import com.inktone.domain.usecase.SearchOpdsFeedUseCase
 import com.inktone.domain.usecase.GetVoiceProfilesUseCase
@@ -247,4 +249,9 @@ object UseCaseModule {
     fun provideSearchOpdsFeedUseCase(
         browse: BrowseOpdsFeedUseCase,
     ): SearchOpdsFeedUseCase = SearchOpdsFeedUseCase(browse)
+
+    @Provides
+    fun provideDownloadOpdsBookUseCase(
+        scheduler: OpdsDownloadScheduler,
+    ): DownloadOpdsBookUseCase = DownloadOpdsBookUseCase(scheduler)
 }

@@ -244,7 +244,10 @@ fun InkToneNavHost(navController: NavHostController = rememberNavController(), s
             }
         }
         composable<OpdsRoute> {
-            CatalogDashboardScreen(onBack = navController::popBackStack)
+            CatalogDashboardScreen(
+                onBack = navController::popBackStack,
+                onOpenPublication = { publicationId -> navController.navigate(ReaderRoute(publicationId)) },
+            )
         }
         composable<SyncRoute> {
             // Lot 11, tâche 11.6 — même pont que BackupViewModel : le

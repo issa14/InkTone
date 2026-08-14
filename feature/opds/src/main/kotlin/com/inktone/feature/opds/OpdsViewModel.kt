@@ -6,10 +6,12 @@ import com.inktone.domain.model.OpdsCatalog
 import com.inktone.domain.model.OpdsItem
 import com.inktone.domain.usecase.AddCatalogUseCase
 import com.inktone.domain.usecase.BrowseOpdsFeedUseCase
+import com.inktone.domain.usecase.DownloadOpdsBookUseCase
 import com.inktone.domain.usecase.GetCatalogsUseCase
 import com.inktone.domain.usecase.OpdsBrowseResult
 import com.inktone.domain.usecase.RemoveCatalogUseCase
 import com.inktone.domain.usecase.SearchOpdsFeedUseCase
+import com.inktone.domain.service.OpdsDownloadObserver
 import com.inktone.domain.service.OpdsHttpClient
 import dagger.hilt.android.lifecycle.HiltViewModel
 import kotlinx.coroutines.flow.MutableSharedFlow
@@ -36,6 +38,8 @@ class OpdsViewModel @Inject constructor(
     private val removeCatalog: RemoveCatalogUseCase,
     private val browse: BrowseOpdsFeedUseCase,
     private val search: SearchOpdsFeedUseCase,
+    private val downloadBook: DownloadOpdsBookUseCase,
+    private val downloadObserver: OpdsDownloadObserver,
     /** Exposé à l'écran pour construire l'ImageLoader Coil des couvertures (interface domaine, comme `epubResourceResolver` du reader). */
     val httpClient: OpdsHttpClient,
 ) : ViewModel() {
@@ -65,6 +69,22 @@ class OpdsViewModel @Inject constructor(
     private val _effects = MutableSharedFlow<OpdsEffect>(extraBufferCapacity = 16)
     val effects: SharedFlow<OpdsEffect> = _effects
 
+    init {
+        // Fin de téléchargement (worker → UI) : snackbar « Lire maintenant ».
+        viewModelScope.launch {
+            downloadObserver.observe().collect { event ->
+                if (event.success) {
+                    val publicationId = event.publicationId
+                    if (publicationId != null) {
+                        _effects.emit(OpdsEffect.DownloadComplete(event.bookTitle, publicationId))
+                    }
+                } else {
+                    _effects.emit(OpdsEffect.ShowMessage("Échec du téléchargement de « ${event.bookTitle} »"))
+                }
+            }
+        }
+    }
+
     fun onIntent(intent: OpdsIntent) {
         when (intent) {
             is OpdsIntent.OpenCatalog -> openCatalog(intent.catalog)
@@ -76,6 +96,18 @@ class OpdsViewModel @Inject constructor(
             is OpdsIntent.RemoveCatalog -> viewModelScope.launch { removeCatalog(intent.id) }
             is OpdsIntent.LoadNextPage -> loadNextPage(intent.nextPageUrl)
             is OpdsIntent.Search -> doSearch(intent.query)
+            is OpdsIntent.DownloadBook -> onDownloadBook(intent.item)
+        }
+    }
+
+    private fun onDownloadBook(item: OpdsItem.Book) {
+        viewModelScope.launch {
+            when (val result = downloadBook(item, currentCatalogId)) {
+                is com.inktone.domain.usecase.DownloadOpdsBookResult.Scheduled ->
+                    _effects.emit(OpdsEffect.ShowMessage("Téléchargement de « ${item.title} » démarré"))
+                is com.inktone.domain.usecase.DownloadOpdsBookResult.Failure ->
+                    _effects.emit(OpdsEffect.ShowMessage(result.message))
+            }
         }
     }
 
