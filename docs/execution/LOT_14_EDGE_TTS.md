@@ -314,8 +314,13 @@ Fichier `infrastructure/tts/src/main/kotlin/com/inktone/infrastructure/tts/EdgeT
      `AudioSegment(audioData, durationMs, wordTimestamps, sampleRate)`.
 - `durationMs` calculée depuis `audioData.size / sampleRate` (PCM16 mono :
   `(octets / 2) / sampleRate * 1000`), jamais supposée.
-- `wordTimestamps` : `emptyList()` si verdict faux ; sinon rempli depuis les
-  frontières parsées (remappées sur le texte affiché via `remapToOriginal`).
+- `wordTimestamps` : verdict du Palier 1 = **`true` (prouvé sur device)**.
+  Remplir depuis les trames `Path:audio.metadata` (corps JSON
+  `Type: WordBoundary`, `Offset`/`Duration` en ticks 100 ns →
+  `ms = ticks / 10_000`, `text.Text`), mapper `Text` → offset caractère du
+  texte affiché via `PronunciationRuleApplier.remapToOriginal` (même
+  mécanique que `SherpaOnnxTtsEngine`). Ne **jamais** supposer
+  `Path:wordboundary` (infirmé par le spike — K13).
 - `observePlaybackEvents()` : flux d'événements phrase uniquement
   (`SentenceStarted`/`SentenceCompleted`) tant que `wordTimestamps` est faux —
   cohérent avec §8.9 (jamais d'événements mot inventés).
