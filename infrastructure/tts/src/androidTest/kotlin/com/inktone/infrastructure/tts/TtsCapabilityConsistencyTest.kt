@@ -12,6 +12,7 @@ import org.junit.Assert.assertTrue
 import org.junit.Assume.assumeTrue
 import com.inktone.core.testing.fake.FakePronunciationRuleRepository
 import com.inktone.domain.service.PronunciationRuleApplier
+import okhttp3.OkHttpClient
 import org.junit.Test
 import org.junit.runner.RunWith
 import java.io.File
@@ -110,6 +111,27 @@ class TtsCapabilityConsistencyTest {
         val fallback = AndroidNativeTtsEngine(context, PronunciationRuleApplier(FakePronunciationRuleRepository()))
         val engine = FallbackTtsEngine(primary, fallback)
         val voiceProfile = VoiceProfile(id = "vp-fallback-fr", engine = TtsEngineId.SHERPA_ONNX, voice = "ff_siwis", language = "fr-FR")
+        assertCapabilityMatchesBehavior(engine, voiceProfile)
+    }
+
+    /**
+     * Edge TTS (Lot 14, ADR-024) : `wordTimestamps = true` est prouvé par le
+     * spike device (`Path:audio.metadata`) et doit donc produire de vrais
+     * `WordTimestamp` à la synthèse — jamais un moteur qui prétend sans
+     * fournir. Nécessite le réseau (moteur cloud) ; l'absence de réseau
+     * fait échouer le test, ce qui est un signal réel, pas un faux négatif.
+     */
+    @Test
+    fun edge_respecte_sa_capacite_wordTimestamps() {
+        val engine = EdgeTtsEngine(
+            EdgeTtsClient(OkHttpClient.Builder().build()),
+            Mp3Decoder(),
+            PronunciationRuleApplier(FakePronunciationRuleRepository()),
+            context,
+        )
+        val voiceProfile = VoiceProfile(id = "vp-edge-fr", engine = TtsEngineId.EDGE_TTS, voice = "fr-FR-VivienneNeural", language = "fr-FR")
+        assertTrue("Edge declare wordTimestamps=true (prouve par le spike)", engine.capabilities.wordTimestamps)
+        assertTrue("Edge declare offline=false (moteur cloud)", !engine.capabilities.offline)
         assertCapabilityMatchesBehavior(engine, voiceProfile)
     }
 }
