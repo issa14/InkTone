@@ -150,7 +150,7 @@ class EdgeTtsWebSocketSpikeTest {
                 // Capture du corps COMPLET (pas tronqué) pour preuve.
                 if (text.contains("Path:audio.metadata") || text.contains("Path:wordboundary")) {
                     wordBoundaryEvents.add(text)
-                    Log.i(TAG, "METADATA | ${text.take(600)}")
+                    Log.i(TAG, "METADATA_JSON | ${text.replace('\n', ' ').replace('\r', ' ')}")
                 } else if (text.contains("Path:turn.end")) {
                     Log.i(TAG, "turn.end reçu — chunks=$chunkCount, octets=${audioChunks.size()}")
                     webSocket.close(1000, "OK")
