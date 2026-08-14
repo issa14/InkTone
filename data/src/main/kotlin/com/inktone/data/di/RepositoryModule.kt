@@ -5,6 +5,7 @@ import com.inktone.data.repository.InMemorySyncOperationTracker
 import com.inktone.data.repository.RoomAnnotationRepository
 import com.inktone.data.repository.RoomBookmarkRepository
 import com.inktone.data.repository.RoomLibraryItemRepository
+import com.inktone.data.repository.RoomOpdsCatalogRepository
 import com.inktone.data.repository.RoomPreferencesRepository
 import com.inktone.data.repository.RoomPronunciationRuleRepository
 import com.inktone.data.repository.RemoteDeviceFleetRepository
@@ -22,6 +23,7 @@ import com.inktone.domain.repository.BookmarkRepository
 import com.inktone.domain.repository.ConflictQueueRepository
 import com.inktone.domain.repository.DeviceIdentityRepository
 import com.inktone.domain.repository.LibraryItemRepository
+import com.inktone.domain.repository.OpdsCatalogRepository
 import com.inktone.domain.repository.PreferencesRepository
 import com.inktone.domain.repository.PronunciationRuleRepository
 import com.inktone.domain.repository.PublicationRepository
@@ -60,4 +62,5 @@ abstract class RepositoryModule {
     @Binds @Singleton abstract fun bindSyncActivityLogRepository(impl: RemoteSyncActivityLogRepository): SyncActivityLogRepository
     @Binds @Singleton abstract fun bindSyncNowService(impl: SyncNowManager): SyncNowService
     @Binds @Singleton abstract fun bindConflictQueueRepository(impl: RoomConflictQueueRepository): ConflictQueueRepository
+    @Binds @Singleton abstract fun bindOpdsCatalogRepository(impl: RoomOpdsCatalogRepository): OpdsCatalogRepository
 }

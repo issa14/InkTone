@@ -6,6 +6,7 @@ import androidx.room.TypeConverters
 import com.inktone.infrastructure.database.converter.StringListConverter
 import com.inktone.infrastructure.database.dao.AnnotationDao
 import com.inktone.infrastructure.database.dao.BookmarkDao
+import com.inktone.infrastructure.database.dao.CatalogDao
 import com.inktone.infrastructure.database.dao.CustomThemeDao
 import com.inktone.infrastructure.database.dao.ImportResultDao
 import com.inktone.infrastructure.database.dao.LibraryItemDao
@@ -19,6 +20,7 @@ import com.inktone.infrastructure.database.dao.UserPreferencesDao
 import com.inktone.infrastructure.database.dao.VoiceProfileDao
 import com.inktone.infrastructure.database.entity.AnnotationEntity
 import com.inktone.infrastructure.database.entity.BookmarkEntity
+import com.inktone.infrastructure.database.entity.CatalogEntity
 import com.inktone.infrastructure.database.entity.CustomThemeEntity
 import com.inktone.infrastructure.database.entity.ImportResultEntity
 import com.inktone.infrastructure.database.entity.LibraryItemView
@@ -37,9 +39,10 @@ import com.inktone.infrastructure.database.entity.VoiceProfileEntity
         BookmarkEntity::class, AnnotationEntity::class, VoiceProfileEntity::class,
         UserPreferencesEntity::class, SentenceFtsEntity::class, PronunciationRuleEntity::class,
         ImportResultEntity::class, CustomThemeEntity::class, PendingConflictEntity::class,
+        CatalogEntity::class,
     ],
     views = [LibraryItemView::class],
-    version = 25, // Lot 12, tâche 12.5 : pageCount sur publications (MIGRATION_24_25)
+    version = 26, // Lot 13, tâche 13.1 : table opds_catalogs (MIGRATION_25_26)
     exportSchema = true, // condition du harnais de migration — Tâche 2.4
 )
 @TypeConverters(StringListConverter::class)
@@ -57,4 +60,5 @@ abstract class InkToneDatabase : RoomDatabase() {
     abstract fun importResultDao(): ImportResultDao
     abstract fun customThemeDao(): CustomThemeDao
     abstract fun pendingConflictDao(): PendingConflictDao
+    abstract fun catalogDao(): CatalogDao
 }

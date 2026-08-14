@@ -9,6 +9,7 @@ import com.inktone.domain.repository.PublicationRepository
 import com.inktone.domain.repository.ReadingSessionRepository
 import com.inktone.domain.repository.ReadingStateRepository
 import com.inktone.domain.repository.ConflictQueueRepository
+import com.inktone.domain.repository.OpdsCatalogRepository
 import com.inktone.domain.repository.SyncAccountRepository
 import com.inktone.domain.service.SyncNowService
 import com.inktone.domain.repository.ThemeRepository
@@ -19,6 +20,7 @@ import com.inktone.domain.service.ImportSessionStore
 import com.inktone.domain.service.PublicationParser
 import com.inktone.domain.service.SearchService
 import com.inktone.domain.service.SyncOperationTracker
+import com.inktone.domain.service.OpdsCredentialsStore
 import com.inktone.domain.service.StatisticsExportService
 import com.inktone.domain.usecase.AddAnnotationUseCase
 import com.inktone.domain.usecase.ApplyAccessibilityPresetUseCase
@@ -31,6 +33,9 @@ import com.inktone.domain.usecase.ExportLibraryUseCase
 import com.inktone.domain.usecase.GetCurrentBookUseCase
 import com.inktone.domain.usecase.GetReadingStateUseCase
 import com.inktone.domain.usecase.GetStatisticsUseCase
+import com.inktone.domain.usecase.GetCatalogsUseCase
+import com.inktone.domain.usecase.AddCatalogUseCase
+import com.inktone.domain.usecase.RemoveCatalogUseCase
 import com.inktone.domain.usecase.GetVoiceProfilesUseCase
 import com.inktone.domain.usecase.ImportPublicationUseCase
 import com.inktone.domain.usecase.ObserveSyncUiStateUseCase
@@ -208,4 +213,21 @@ object UseCaseModule {
         readingSessionDao: ReadingSessionDao,
         @ApplicationContext context: Context,
     ): StatisticsExportService = ExportStatisticsUseCase(readingSessionDao, context)
+
+    @Provides
+    fun provideGetCatalogsUseCase(
+        catalogRepository: OpdsCatalogRepository,
+    ): GetCatalogsUseCase = GetCatalogsUseCase(catalogRepository)
+
+    @Provides
+    fun provideAddCatalogUseCase(
+        catalogRepository: OpdsCatalogRepository,
+        credentialsStore: OpdsCredentialsStore,
+    ): AddCatalogUseCase = AddCatalogUseCase(catalogRepository, credentialsStore)
+
+    @Provides
+    fun provideRemoveCatalogUseCase(
+        catalogRepository: OpdsCatalogRepository,
+        credentialsStore: OpdsCredentialsStore,
+    ): RemoveCatalogUseCase = RemoveCatalogUseCase(catalogRepository, credentialsStore)
 }

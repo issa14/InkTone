@@ -388,3 +388,25 @@ val MIGRATION_24_25 = object : Migration(24, 25) {
         db.execSQL("ALTER TABLE publications ADD COLUMN pageCount INTEGER DEFAULT NULL")
     }
 }
+
+/**
+ * Lot 13, tâche 13.1 — table des catalogues OPDS (Volet 1, ADR-023).
+ * Aucune colonne d'identifiants ici : les credentials Basic Auth vivent
+ * chiffrés dans `SecureOpdsCredentialsStore`, jamais en clair en base.
+ */
+val MIGRATION_25_26 = object : Migration(25, 26) {
+    override fun migrate(db: SupportSQLiteDatabase) {
+        db.execSQL(
+            """
+            CREATE TABLE IF NOT EXISTS `opds_catalogs` (
+                `id` TEXT NOT NULL,
+                `name` TEXT NOT NULL,
+                `rootUrl` TEXT NOT NULL,
+                `searchTemplateUrl` TEXT,
+                `createdAt` INTEGER NOT NULL,
+                PRIMARY KEY(`id`)
+            )
+            """.trimIndent(),
+        )
+    }
+}

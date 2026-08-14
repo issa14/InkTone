@@ -43,6 +43,7 @@ import com.inktone.feature.library.LibraryItemsScreen
 import com.inktone.feature.library.LibraryScreen
 import com.inktone.feature.library.RecentsScreen
 import com.inktone.feature.onboarding.OnboardingScreen
+import com.inktone.feature.opds.CatalogDashboardScreen
 import com.inktone.feature.reader.ReaderIntent
 import com.inktone.feature.reader.ReaderScreen
 import com.inktone.feature.reader.ReaderViewModel
@@ -113,6 +114,7 @@ fun InkToneNavHost(navController: NavHostController = rememberNavController(), s
                 onOpenAbout = { navController.navigate(AboutRoute) },
                 onOpenThemes = { navController.navigate(ThemeGalleryRoute) },
                 onOpenSync = { navController.navigate(SyncRoute) },
+                onOpenOpds = { navController.navigate(OpdsRoute) },
                 onNavigateToSeriesDetail = { series -> navController.navigate(LibraryDetailRoute("series", series)) },
                 onNavigateToTagDetail = { tag -> navController.navigate(LibraryDetailRoute("tag", tag)) },
                 onImportClick = { importLauncher.launch(arrayOf("application/epub+zip", "text/plain")) },
@@ -240,6 +242,9 @@ fun InkToneNavHost(navController: NavHostController = rememberNavController(), s
                     onDismiss = { pendingImportUri = null },
                 )
             }
+        }
+        composable<OpdsRoute> {
+            CatalogDashboardScreen(onBack = navController::popBackStack)
         }
         composable<SyncRoute> {
             // Lot 11, tâche 11.6 — même pont que BackupViewModel : le

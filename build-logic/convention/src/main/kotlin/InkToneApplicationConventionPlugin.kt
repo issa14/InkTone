@@ -55,11 +55,13 @@ class InkToneApplicationConventionPlugin : Plugin<Project> {
                     "feature:library", "feature:reader", "feature:player",
                     "feature:search", "feature:import", "feature:settings",
                     "feature:statistics", "feature:onboarding", "feature:sync",
+                    "feature:opds",
                     "data",
                     "infrastructure:database", "infrastructure:storage",
                     "infrastructure:parser", "infrastructure:tts",
                     "infrastructure:media", "infrastructure:worker",
                     "infrastructure:crashreporting", "infrastructure:sync",
+                    "infrastructure:opds",
                     "core:designsystem", "core:ui", "core:common",
                 ).forEach { add("implementation", project(":$it")) }
 
