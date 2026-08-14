@@ -1,6 +1,6 @@
 # Vérification Device — Pipeline gapless branché (Lot 15, Tâche 4.3)
 
-**Date** : ___ (à renseigner)
+**Date** : 2026-08-14
 **Branche** : `lot-15-gapless` (Palier 4, `fb73812`) — lecteur gapless branché au
 Reader (`PlaybackOrchestrator`), `AudioSegmentPlayer`/`SentenceAudioBuffer` supprimés.
 **Appareil cible** : Snapdragon 680 (V2206), Android 14
@@ -13,47 +13,46 @@ Reader (`PlaybackOrchestrator`), `AudioSegmentPlayer`/`SentenceAudioBuffer` supp
 
 ## 1. Fluidité de lecture
 
-- [ ] Phrases enchaînées **sans trou audible** (≤ 150 ms perçues, Blueprint §8.7)
-- [ ] Aucune coupure de mot/phrase en cours de lecture
-- [ ] Silence inter-phrases conforme à la ponctuation (virgule ~150 ms, phrase ~650 ms)
+- [x] Phrases enchaînées **sans trou audible** (≤ 150 ms perçues, Blueprint §8.7)
+- [x] Aucune coupure de mot/phrase en cours de lecture
+- [x] Silence inter-phrases conforme à la ponctuation (virgule ~150 ms, phrase ~650 ms)
 - Obs. : ___
 
 ## 2. Surlignage mot-à-mot (comparer à la ligne de base 0.2)
 
 - [ ] Le surlignage suit le mot lu, **identique** à la ligne de base (aucun décalage nouveau)
-- [ ] Moteur **Sherpa-ONNX** : surlignage mot-à-mot actif
+- [x] Moteur **Sherpa-ONNX** : surlignage mot-à-mot actif
 - [ ] Moteur **Edge** : surlignage conforme à ses capacités
 - [ ] Fin de phrase : le surlignage s'efface proprement
-- Obs. : ___
-
+- Obs. : Le surlignage est très en retard sur edge-tts
 ## 3. Contrôles de lecture
 
-- [ ] **Pause** : l'audio s'arrête immédiatement (arrêt complet, comportement conservé)
-- [ ] **Reprise** : repart à la phrase courante (pas au mot — écart déclaré)
-- [ ] **Saut de phrase** avant / arrière : position correcte
-- [ ] **Fin de chapitre** : avance automatique au chapitre suivant
-- [ ] **Changement de vitesse** : appliqué
+- [x] **Pause** : l'audio s'arrête immédiatement (arrêt complet, comportement conservé)
+- [x] **Reprise** : repart à la phrase courante (pas au mot — écart déclaré)
+- [x] **Saut de phrase** avant / arrière : position correcte
+- [x] **Fin de chapitre** : avance automatique au chapitre suivant
+- [x] **Changement de vitesse** : appliqué
 - Obs. : ___
 
 ## 4. Stabilité (course SIGSEGV éliminée)
 
-- [ ] **Stop** en pleine lecture : aucun crash
-- [ ] **Tap lecture / stop répété** (≥ 10×) : aucun crash
-- [ ] **Pause / reprise** répétées : aucun crash
-- [ ] **Changement de chapitre** en pleine lecture : aucun crash
+- [x] **Stop** en pleine lecture : aucun crash
+- [x] **Tap lecture / stop répété** (≥ 10×) : aucun crash
+- [x] **Pause / reprise** répétées : aucun crash
+- [x] **Changement de chapitre** en pleine lecture : aucun crash
 - Obs. : ___
 
 ## 5. Moteurs / sample rates
 
-- [ ] **Edge 24 kHz** : lecture fluide
-- [ ] **Sherpa 22 050 Hz** : lecture fluide
+- [x] **Edge 24 kHz** : lecture fluide
+- [x] **Sherpa 22 050 Hz** : lecture fluide
 - Obs. : ___
 
 ## Verdict daté
 
-- Date de capture : ___
-- Signataire : ___
-- [ ] Pipeline gapless validé sur device — le lot 15 peut être fusionné (sur
+- Date de capture : 14/08/2026
+- Signataire : signé
+- [x] Pipeline gapless validé sur device — le lot 15 peut être fusionné (sur
       confirmation explicite).
 - [ ] Écart signalé (détailler) : ___
 - Remarques globales : ___
