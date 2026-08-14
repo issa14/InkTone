@@ -94,7 +94,12 @@ class XmlOpdsFeedParser @Inject constructor() : OpdsFeedParser {
                         when {
                             rel == null && resolved == null -> Unit
                             inEntry -> {
-                                val isAcquisition = rel?.startsWith("http://opds-spec.org/acquisition") == true
+                                // Acquisition : rel explicite OU lien EPUB direct.
+                                // Certains flux (ebooksgratuits) émettent le lien
+                                // EPUB SANS rel="...acquisition", seulement
+                                // type="application/epub+zip".
+                                val isAcquisition = rel?.startsWith("http://opds-spec.org/acquisition") == true ||
+                                    type?.contains("epub", ignoreCase = true) == true
                                 val isCover = rel?.startsWith("http://opds-spec.org/image") == true ||
                                     rel == "http://opds-spec.org/cover" ||
                                     type?.startsWith("image/", ignoreCase = true) == true
@@ -162,7 +167,8 @@ class XmlOpdsFeedParser @Inject constructor() : OpdsFeedParser {
     ): OpdsItem? {
         val itemTitle = title ?: return null
         return when {
-            navHref != null -> OpdsItem.Navigation(title = itemTitle, href = navHref)
+            // L'acquisition prime sur la navigation : une entrée avec un lien
+            // EPUB ET un lien atom est un livre, pas un dossier.
             acqHref != null -> OpdsItem.Book(
                 title = itemTitle,
                 authors = authors,
@@ -170,6 +176,7 @@ class XmlOpdsFeedParser @Inject constructor() : OpdsFeedParser {
                 acquisitionHref = acqHref,
                 mimeType = acqType ?: "",
             )
+            navHref != null -> OpdsItem.Navigation(title = itemTitle, href = navHref)
             else -> null
         }
     }

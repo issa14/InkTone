@@ -191,4 +191,29 @@ class OpdsFeedParserTest {
         assertEquals("Popular", nav.title)
         assertEquals("https://unglue.it/api/opds/all/?order_by=popular", nav.href)
     }
+
+    @Test
+    fun un_lien_epub_sans_rel_est_reconnu_comme_acquisition_et_prime_sur_la_navigation() {
+        // Fixture type ebooksgratuits : le lien EPUB n'a PAS de rel,
+        // seulement type="application/epub+zip" — et l'entrée porte aussi
+        // un lien atom (Du même auteur). L'acquisition doit gagner.
+        val xml = """
+            <feed xmlns="http://www.w3.org/2005/Atom">
+              <title>T</title>
+              <entry>
+                <title>Le Livre</title>
+                <link type="application/epub+zip" href="/newsendbook.php?id=2081&amp;format=epub"/>
+                <link type="application/atom+xml" href="/opds/feed.php?mode=author&amp;id=51" rel="related" title="Du même auteur"/>
+              </entry>
+            </feed>
+        """.trimIndent()
+
+        val feed = (parser.parse(xml, "https://www.ebooksgratuits.com/opds/feed.php") as OpdsParseResult.Success).feed
+
+        assertEquals(1, feed.items.size)
+        val book = feed.items[0] as OpdsItem.Book
+        assertEquals("Le Livre", book.title)
+        assertEquals("https://www.ebooksgratuits.com/newsendbook.php?id=2081&format=epub", book.acquisitionHref)
+        assertEquals("application/epub+zip", book.mimeType)
+    }
 }
