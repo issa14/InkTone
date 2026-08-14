@@ -47,6 +47,7 @@ fun StatusLineBar(
     pageCountInChapter: Int,
     bookProgression: Float,
     modifier: Modifier = Modifier,
+    showPageCounter: Boolean = true,
 ) {
     val timeText by rememberAlignedClockText()
 
@@ -61,11 +62,30 @@ fun StatusLineBar(
     ) {
         Text(timeText, style = MaterialTheme.typography.labelSmall)
         Text(
-            "Chapitre $chapterNumber ($pageInChapter/$pageCountInChapter)",
+            chapterCounterText(chapterNumber, pageInChapter, pageCountInChapter, showPageCounter),
             style = MaterialTheme.typography.labelSmall,
         )
         Text(formatProgressionFr(bookProgression), style = MaterialTheme.typography.labelSmall)
     }
+}
+
+/**
+ * Texte du compteur de chapitre de la ligne de statut. Sans compteur
+ * (`showPageCounter = false`, mesure de pagination encore partielle),
+ * seul le numéro de chapitre est affiché : jamais un total partiel
+ * présenté comme final (« Chapitre 12 (54/54) » alors que le chapitre
+ * continue — voir NOTE_REGRESSION_CLIGNOTEMENT_PAGE_HUD.md et la cause
+ * racine de `pageIndexAt` sur mesure partielle).
+ */
+internal fun chapterCounterText(
+    chapterNumber: Int,
+    pageInChapter: Int,
+    pageCountInChapter: Int,
+    showPageCounter: Boolean,
+): String = if (showPageCounter) {
+    "Chapitre $chapterNumber ($pageInChapter/$pageCountInChapter)"
+} else {
+    "Chapitre $chapterNumber"
 }
 
 /**

@@ -226,15 +226,13 @@ fun PagedChapterContent(
     // repositionner via pageIndexAt à chaque recalcul de pagination
     // (rotation, taille de police...) — jamais un index de page persisté.
     //
-    // Régression connue, documentée, non corrigée (voir
-    // docs/execution/NOTE_REGRESSION_CLIGNOTEMENT_PAGE_HUD.md) : cet
-    // effet se relance à CHAQUE écriture intermédiaire de
-    // pagination.measurement pendant une mesure progressive (pas
-    // seulement la finale) — si currentSentenceIndex est profond dans le
-    // chapitre, pageIndexAt calculé contre une mesure encore partielle
-    // peut être transitoirement faux, causant un saut de page visible.
-    // Le HUD (ReaderScreen.readingAreaSize) redéclenche ce genre de
-    // remesure à chaque bascule visible/masqué.
+    // Ne réagit QU'à une mesure complète (isMeasurementComplete) : pendant
+    // la mesure progressive (3a.3), `pageIndexAt` peut renvoyer
+    // `pages.lastIndex` pour une phrase profonde non encore mesurée —
+    // se recaler sur lui ferait sauter le pager vers la dernière page du
+    // préfixe (page fausse, voire page vide). La remesure HUD (autrefois
+    // cause de clignotement) a par ailleurs été supprimée à la racine
+    // (ReaderScreen : HUD en overlay, zone de lecture à hauteur constante).
     LaunchedEffect(chapter?.index, pagination.measurement, currentSentenceIndex) {
         if (currentSentenceIndex == lastManuallyEmittedSentenceIndex) {
             // Écho de notre propre swipe (voir commentaire ci-dessus) :
@@ -242,7 +240,9 @@ fun PagedChapterContent(
             lastManuallyEmittedSentenceIndex = null
             return@LaunchedEffect
         }
-        if (chapter != null && pagination.measurement != null && pageCount > 0) {
+        if (chapter != null && pagination.measurement != null && pageCount > 0 &&
+            pagination.isMeasurementComplete(chapter)
+        ) {
             val targetPage = pagination.pageIndexAt(chapter.index, currentSentenceIndex)
             if (pagerState.currentPage != targetPage) {
                 isProgrammaticPageChange = true

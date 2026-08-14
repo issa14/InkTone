@@ -545,9 +545,7 @@ fun ReaderScreen(
             val target = pendingHighlightTarget ?: return@LaunchedEffect
             val chapter = state.currentChapter ?: return@LaunchedEffect
             if (chapter.index != target.chapterIndex) return@LaunchedEffect
-            val totalSentences = chapter.sentences.size
-            val measuredSentences = pagination.measurement?.sentenceStartOffsets?.size ?: 0
-            if (measuredSentences >= totalSentences) {
+            if (pagination.isMeasurementComplete(chapter)) {
                 viewModel.onIntent(ReaderIntent.ChapterLayoutCompleted(chapter.index))
             }
         }
@@ -1041,16 +1039,29 @@ fun ReaderScreen(
                 // d'estimation par fraction de défilement, qui supposait à tort une
                 // densité de texte uniforme sur le chapitre.
                 state.currentChapter?.let { chapter ->
-                    val pageCountInChapter = pagination.pageCount(chapter.index)
-                    val pageIndexInChapter = when (state.readingMode) {
-                        ReadingMode.PAGED -> pagedLivePageIndex
-                        ReadingMode.SCROLL -> pagination.pageIndexAt(chapter.index, state.currentSentenceIndex)
+                    // Mesure complète uniquement : tant que la pagination
+                    // n'a pas couvert toutes les phrases du chapitre,
+                    // `pageCount` et `pageIndexAt` reflètent un préfixe
+                    // borné (3a.3) — les présenter ferait un faux total
+                    // (« Chapitre 12 (54/54) » alors que le chapitre
+                    // continue). Sans compteur, seule la ligne « Chapitre N »
+                    // est affichée (voir StatusLineBar.chapterCounterText).
+                    val complete = pagination.isMeasurementComplete(chapter)
+                    val pageCountInChapter = if (complete) pagination.pageCount(chapter.index) else 0
+                    val pageIndexInChapter = if (complete) {
+                        when (state.readingMode) {
+                            ReadingMode.PAGED -> pagedLivePageIndex
+                            ReadingMode.SCROLL -> pagination.pageIndexAt(chapter.index, state.currentSentenceIndex)
+                        }
+                    } else {
+                        0
                     }
                     StatusLineBar(
                         chapterNumber = state.currentChapterIndex + 1,
                         pageInChapter = pageIndexInChapter + 1,
                         pageCountInChapter = pageCountInChapter,
                         bookProgression = state.bookProgression,
+                        showPageCounter = complete,
                     )
                 }
             }

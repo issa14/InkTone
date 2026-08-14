@@ -34,4 +34,16 @@ class StatusLineBarTest {
         assertEquals(60_000L, alignedDelayToNextMinuteMillis(0L))
         assertEquals(60_000L, alignedDelayToNextMinuteMillis(120_000L))
     }
+
+    @Test
+    fun `chapterCounterText affiche le compteur quand showPageCounter est vrai`() {
+        assertEquals("Chapitre 12 (54/54)", chapterCounterText(12, 54, 54, showPageCounter = true))
+        assertEquals("Chapitre 3 (1/47)", chapterCounterText(3, 1, 47, showPageCounter = true))
+    }
+
+    @Test
+    fun `chapterCounterText masque le compteur quand showPageCounter est faux`() {
+        // Mesure partielle : jamais de total partiel présenté comme final.
+        assertEquals("Chapitre 12", chapterCounterText(12, 54, 54, showPageCounter = false))
+    }
 }
