@@ -90,6 +90,28 @@ class SettingsViewModelTest {
     }
 
     @Test
+    fun `changer de moteur synchronise le VoiceProfile actif - defaut prealable n2`() = runTest {
+        val preferencesRepository = FakePreferencesRepository()
+        val voiceProfileRepository = FakeVoiceProfileRepository()
+        val vm = viewModel(preferencesRepository, voiceProfileRepository)
+        dispatcher.scheduler.advanceUntilIdle()
+
+        vm.onIntent(SettingsIntent.SetDefaultTtsEngine(TtsEngineId.EDGE_TTS))
+        dispatcher.scheduler.advanceUntilIdle()
+
+        val prefs = preferencesRepository.get()
+        assertEquals(TtsEngineId.EDGE_TTS, prefs.defaultTtsEngine)
+
+        // Le profil actif doit exister et porter le moteur Edge — sans cela,
+        // SelectiveTtsEngine (qui route sur voiceProfile.engine) ne routerait
+        // jamais vers Edge : resolveVoiceProfile retomberait sur le repli.
+        val activeProfile = voiceProfileRepository.getById(prefs.activeVoiceProfileId!!)
+        assertTrue("un profil actif doit être créé", activeProfile != null)
+        assertEquals(TtsEngineId.EDGE_TTS, activeProfile!!.engine)
+        assertEquals("fr-FR-VivienneNeural", activeProfile.voice)
+    }
+
+    @Test
     fun `desactiver le preset Mode sombre revient aux valeurs par defaut`() = runTest {
         val preferencesRepository = FakePreferencesRepository()
         val vm = viewModel(preferencesRepository)
