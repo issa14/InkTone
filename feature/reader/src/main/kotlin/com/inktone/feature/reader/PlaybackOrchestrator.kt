@@ -6,6 +6,7 @@ import com.inktone.domain.model.VoiceProfile
 import com.inktone.domain.service.AudioPlayer
 import com.inktone.domain.service.AudioSegment
 import com.inktone.domain.service.TtsEngine
+import com.inktone.domain.service.WordTimestamp
 import com.inktone.domain.usecase.UpdateReadingStateUseCase
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.CoroutineScope
@@ -71,6 +72,10 @@ class PlaybackOrchestrator @Inject constructor(
     /** Index de la phrase en cours de lecture (surlignage, progression). */
     private val _currentSentenceIndex = MutableStateFlow(0)
     val currentSentenceIndex: StateFlow<Int> = _currentSentenceIndex.asStateFlow()
+
+    /** Timestamps mot-à-mot de la phrase courante — consommés par le surlignage. */
+    private val _currentWordTimestamps = MutableStateFlow<List<WordTimestamp>>(emptyList())
+    val currentWordTimestamps: StateFlow<List<WordTimestamp>> = _currentWordTimestamps.asStateFlow()
 
     private val playGeneration = AtomicLong(0)
     private var playbackJob: Job? = null
@@ -223,11 +228,11 @@ class PlaybackOrchestrator @Inject constructor(
             if (first) {
                 audioPlayer.play()
                 _state.value = PlaybackStatus.Playing
-                advanceTo(generation, index, publicationId, chapterIndex, resourceHref, sentence)
+                advanceTo(generation, index, publicationId, chapterIndex, resourceHref, sentence, segment.wordTimestamps)
                 first = false
             } else {
                 pace(generation, pendingDurationMs)
-                advanceTo(generation, index, publicationId, chapterIndex, resourceHref, sentence)
+                advanceTo(generation, index, publicationId, chapterIndex, resourceHref, sentence, segment.wordTimestamps)
             }
             pendingDurationMs = segment.durationMs + silenceMs
             index++
@@ -250,9 +255,11 @@ class PlaybackOrchestrator @Inject constructor(
         chapterIndex: Int,
         resourceHref: String,
         sentence: Sentence?,
+        wordTimestamps: List<WordTimestamp>,
     ) {
         if (!isCurrent(generation)) return
         _currentSentenceIndex.value = index
+        _currentWordTimestamps.value = wordTimestamps
         if (publicationId.isNotEmpty() && sentence != null) {
             updateReadingState(
                 ReadingState(

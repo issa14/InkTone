@@ -5,18 +5,13 @@ import com.inktone.domain.model.Sentence
 import com.inktone.domain.model.TtsEngineId
 import com.inktone.domain.model.VoiceProfile
 import com.inktone.domain.repository.ReadingStateRepository
-import com.inktone.domain.service.AudioPlayer
 import com.inktone.domain.service.AudioSegment
 import com.inktone.domain.service.PlaybackEvent
-import com.inktone.domain.service.PlayerState
 import com.inktone.domain.service.TtsCapabilities
 import com.inktone.domain.service.TtsEngine
 import com.inktone.domain.usecase.UpdateReadingStateUseCase
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.Flow
-import kotlinx.coroutines.flow.MutableStateFlow
-import kotlinx.coroutines.flow.StateFlow
-import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.emptyFlow
 import kotlinx.coroutines.runBlocking
 import org.junit.Assert.assertEquals
@@ -198,47 +193,6 @@ class PlaybackOrchestratorTest {
         }
 
         override fun observePlaybackEvents(): Flow<PlaybackEvent> = emptyFlow()
-    }
-
-    private class FakeAudioPlayer : AudioPlayer {
-        val enqueued = CopyOnWriteArrayList<AudioSegment>()
-        val events = CopyOnWriteArrayList<String>()
-        override var sampleRate: Int = 22_050
-
-        private val _state = MutableStateFlow<PlayerState>(PlayerState.Idle)
-        override val state: StateFlow<PlayerState> = _state.asStateFlow()
-        override val pendingCount: Int get() = enqueued.size
-
-        override fun enqueue(segment: AudioSegment) {
-            enqueued.add(segment)
-        }
-
-        override fun play() {
-            events.add("play")
-            _state.value = PlayerState.Playing
-        }
-
-        override fun pause() {
-            events.add("pause")
-            _state.value = PlayerState.Paused
-        }
-
-        override fun resume() {
-            events.add("resume")
-            _state.value = PlayerState.Playing
-        }
-
-        override fun stop() {
-            events.add("stop")
-            enqueued.clear()
-            _state.value = PlayerState.Stopped
-        }
-
-        override fun release() {
-            events.add("release")
-        }
-
-        override fun setVolume(volume: Float) = Unit
     }
 
     private class FakeReadingStateRepository : ReadingStateRepository {

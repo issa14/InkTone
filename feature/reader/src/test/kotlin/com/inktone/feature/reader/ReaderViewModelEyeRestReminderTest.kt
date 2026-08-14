@@ -56,7 +56,7 @@ class ReaderViewModelEyeRestReminderTest {
         val voiceProfileRepository = FakeVoiceProfileRepository()
         return ReaderViewModel(
             ttsEngine = FakeTtsEngine(),
-            audioSegmentPlayer = AudioSegmentPlayer(),
+            playbackOrchestrator = PlaybackOrchestrator(FakeTtsEngine(), FakeAudioPlayer(), UpdateReadingStateUseCase(readingStateRepository)),
             publicationParser = FakePublicationParser(),
             updateReadingState = UpdateReadingStateUseCase(readingStateRepository),
             getReadingState = GetReadingStateUseCase(readingStateRepository),
