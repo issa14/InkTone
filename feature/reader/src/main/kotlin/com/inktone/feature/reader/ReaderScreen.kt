@@ -471,7 +471,10 @@ fun ReaderScreen(
         // avec le panneau, jamais indépendamment (même gate isHudVisible).
         // Overlay pur (`align(TopCenter)`) : ne modifie plus jamais les
         // bornes de la zone de lecture (voir commentaire de tête ci-dessus).
-        if (isHudVisible) {
+        // Lot 14 — masquée dès le lancement TTS (lecture immersive) ; ne
+        // revient que via l'overlay panneau complet (showFullPanelOverlay),
+        // qui conserve l'accès au bouton retour pendant la lecture.
+        if (isHudVisible && (!state.isPlaying || showFullPanelOverlay)) {
             // Bug réel trouvé sur appareil : déclarée avant la zone de
             // lecture (Box.fillMaxSize() plus bas dans ce même Box), la
             // topbar se retrouvait dessous dans l'ordre d'empilement de
