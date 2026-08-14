@@ -46,6 +46,10 @@ object SettingsRoute
 @Serializable
 object SyncRoute
 
+/** Lot 13, tâche 13.6 — destination « Catalogues OPDS » (drawer b4, ADR-023). */
+@Serializable
+object OpdsRoute
+
 @Serializable
 object PronunciationRulesRoute
 

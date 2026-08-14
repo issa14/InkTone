@@ -915,6 +915,35 @@ class DatabaseMigrationTest {
         v25.close()
     }
 
+    @Test
+    fun migration_25_vers_26_cree_la_table_opds_catalogs_utilisable() {
+        val v25 = helper.createDatabase(TEST_DB_NAME, 25)
+        v25.close()
+
+        val v26 = helper.runMigrationsAndValidate(
+            TEST_DB_NAME, 26, true,
+            MIGRATION_1_2, MIGRATION_2_3, MIGRATION_3_4, MIGRATION_4_5, MIGRATION_5_6, MIGRATION_6_7,
+            MIGRATION_7_8, MIGRATION_8_9, MIGRATION_9_10, MIGRATION_10_11, MIGRATION_11_12, MIGRATION_12_13,
+            MIGRATION_13_14, MIGRATION_14_15, MIGRATION_15_16, MIGRATION_16_17, MIGRATION_17_18, MIGRATION_18_19,
+            MIGRATION_19_20, MIGRATION_20_21, MIGRATION_21_22, MIGRATION_22_23, MIGRATION_23_24, MIGRATION_24_25,
+            MIGRATION_25_26,
+        )
+
+        v26.execSQL(
+            """
+            INSERT INTO opds_catalogs (id, name, rootUrl, searchTemplateUrl, createdAt)
+            VALUES ('cat-1', 'Gutenberg', 'https://www.gutenberg.org/ebooks.opds', NULL, 100)
+            """.trimIndent(),
+        )
+        v26.query("SELECT name, rootUrl, searchTemplateUrl FROM opds_catalogs WHERE id = 'cat-1'").use { cursor ->
+            assertEquals(true, cursor.moveToFirst())
+            assertEquals("Gutenberg", cursor.getString(0))
+            assertEquals("https://www.gutenberg.org/ebooks.opds", cursor.getString(1))
+            assertEquals(true, cursor.isNull(2)) // searchTemplateUrl absent par défaut
+        }
+        v26.close()
+    }
+
     companion object {
         private const val TEST_DB_NAME = "migration-test"
     }

@@ -105,6 +105,7 @@ fun LibraryScreen(
     onOpenAbout: () -> Unit = {},
     onOpenThemes: () -> Unit = {},
     onOpenSync: () -> Unit = {},
+    onOpenOpds: () -> Unit = {},
     onNavigateToSeriesDetail: (String) -> Unit = {},
     onNavigateToTagDetail: (String) -> Unit = {},
 ) {
@@ -166,6 +167,10 @@ fun LibraryScreen(
                     onOpenSync = {
                         scope.launch { drawerState.close() }
                         onOpenSync()
+                    },
+                    onOpenOpds = {
+                        scope.launch { drawerState.close() }
+                        onOpenOpds()
                     },
                 )
             }
@@ -265,6 +270,7 @@ internal fun LibraryDrawerContent(
     onOpenAbout: () -> Unit = {},
     onOpenThemes: () -> Unit = {},
     onOpenSync: () -> Unit = {},
+    onOpenOpds: () -> Unit = {},
 ) {
     Column {
         // C.1 — Header avec dégradé brand (legacy §1.2)
@@ -319,10 +325,21 @@ internal fun LibraryDrawerContent(
             selected = false,
             onClick = onOpenBookmarks,
         )
+        // Lot 13, tâche 13.6 — « Catalogues OPDS » réactivée en b4
+        // (ADR-023) : seule destination encore masquée à l'issue du lot 11,
+        // désormais navigable vers `CatalogDashboardScreen`. Icône
+        // `AppSymbol.Article` (bibliothèque de sources), pas un ajout ad hoc
+        // hors du registre Material Symbols.
+        NavigationDrawerItem(
+            label = { Text("Catalogues OPDS") },
+            icon = { AppIcon(AppSymbol.Article,  contentDescription = null) },
+            selected = false,
+            onClick = onOpenOpds,
+        )
         // Lot 11, tâche 11.6 — "Synchronisation" réactivée en b5
         // (UX_FLOW_DESIGN.md §Drawer), entre Marque-pages (b3) et
-        // Statistiques (b6) — b4 (Catalogues OPDS) reste masqué, différé
-        // à v1.x. Retour Issa (vérification) : ce n'est PAS un item de
+        // Statistiques (b6) — b4 (Catalogues OPDS) est réactivée par le
+        // Lot 13. Retour Issa (vérification) : ce n'est PAS un item de
         // pied de drawer, une première version l'y avait placé à tort.
         NavigationDrawerItem(
             label = { Text("Synchronisation") },

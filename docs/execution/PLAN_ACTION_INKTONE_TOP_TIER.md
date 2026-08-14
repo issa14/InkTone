@@ -829,13 +829,14 @@ Le popup de navigation (Tâche C.4) expose `BY_AUTHOR` comme catégorie à part 
 
 | Fonctionnalité | Raison |
 |---|---|
-| OPDS | Réintégré en v1.x, borné au Volet 1 — voir `ADR-023` et `docs/execution/LOT_13_CATALOGUES_OPDS.md` |
 | Sync cloud | Hors périmètre Blueprint — v1.x |
 | PDF natif | ADR-017 — reporté |
 | TXT renderer riche | Format trop ambigu structurellement |
 | Double page tablette | Fondation WindowSizeClass posée, layout hors périmètre v1 |
 | Navigation 3 | Alpha instable — Navigation 2.8+ typée retenu |
 | `CustomHighlightToolbar` char-level | API publique Compose insuffisante (vérifié empiriquement) |
+
+*Note : OPDS, initialement listé dans cette table, est réintégré en v1.x (Volet 1, Lot 13) — voir `ADR-023` et `docs/execution/LOT_13_CATALOGUES_OPDS.md`.*
 
 ---
 
