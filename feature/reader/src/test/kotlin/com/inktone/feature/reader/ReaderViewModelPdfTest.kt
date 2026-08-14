@@ -120,7 +120,7 @@ class ReaderViewModelPdfTest {
 
         return ReaderViewModel(
             ttsEngine = FakeTtsEngine(),
-            audioSegmentPlayer = AudioSegmentPlayer(),
+            playbackOrchestrator = PlaybackOrchestrator(FakeTtsEngine(), FakeAudioPlayer(), UpdateReadingStateUseCase(readingStateRepository)),
             publicationParser = parser,
             updateReadingState = UpdateReadingStateUseCase(readingStateRepository),
             getReadingState = GetReadingStateUseCase(readingStateRepository),
