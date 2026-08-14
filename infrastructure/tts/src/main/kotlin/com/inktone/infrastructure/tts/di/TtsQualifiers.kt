@@ -11,3 +11,13 @@ annotation class Palier2
 @Qualifier
 @Retention(AnnotationRetention.BINARY)
 annotation class Palier1
+
+/**
+ * Qualifie l'`OkHttpClient` dédié à Edge TTS (WebSocket Bing) — distinct de
+ * celui de `SyncNetworkModule` (Lot 11) pour des timeouts propres à la
+ * synthèse, et pour éviter un conflit de binding Hilt sur `OkHttpClient`
+ * non qualifié (même raison que `@OpdsClient`, Lot 13).
+ */
+@Qualifier
+@Retention(AnnotationRetention.BINARY)
+annotation class EdgeTts
