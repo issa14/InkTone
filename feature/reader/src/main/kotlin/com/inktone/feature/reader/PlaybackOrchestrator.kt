@@ -1,0 +1,237 @@
+package com.inktone.feature.reader
+
+import com.inktone.domain.model.Sentence
+import com.inktone.domain.model.VoiceProfile
+import com.inktone.domain.service.AudioPlayer
+import com.inktone.domain.service.AudioSegment
+import com.inktone.domain.service.TtsEngine
+import kotlinx.coroutines.CancellationException
+import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.Job
+import kotlinx.coroutines.SupervisorJob
+import kotlinx.coroutines.TimeoutCancellationException
+import kotlinx.coroutines.channels.Channel
+import kotlinx.coroutines.delay
+import kotlinx.coroutines.flow.MutableStateFlow
+import kotlinx.coroutines.flow.StateFlow
+import kotlinx.coroutines.flow.asStateFlow
+import kotlinx.coroutines.launch
+import kotlinx.coroutines.withTimeout
+import java.util.concurrent.atomic.AtomicLong
+import javax.inject.Inject
+import javax.inject.Singleton
+
+/**
+ * Ordonnanceur de lecture gapless (Lot 15, ADR-025) — **borné**, sans preWarm,
+ * sans seuils d'erreur adaptatifs, sans sleep timer, sans audio focus. Il ne
+ * connaît que les contrats domaine [TtsEngine] et [AudioPlayer] — jamais
+ * `AudioTrack`, jamais un moteur concret.
+ *
+ * Architecture producteur/consommateur :
+ * - **Producteur** : synthétise les phrases dans l'ordre, avec un [Channel]
+ *   borné à [LOOKAHEAD] (la synthèse de la phrase n+2 chevauche ainsi la
+ *   lecture de la phrase n, sans courir plus loin que nécessaire). Un timeout
+ *   de synthèse **unique** pour tous les moteurs ; en cas d'échec, un silence
+ *   court est injecté et la lecture poursuit.
+ * - **Consommateur** : enfile chaque [AudioSegment] + son silence ponctué dans
+ *   le lecteur, appelle `play()` au premier, puis **pace** l'avancement de
+ *   l'index de phrase à la vitesse de lecture (durées cumulées) — c'est ce qui
+ *   déclenche le surlignage côté ViewModel, sans flux de position (LOT 16).
+ *
+ * [playGeneration] (AtomicLong) invalide les coroutines d'une génération
+ * précédente : toute relance (ou arrêt, Tâche 3.2) fait sortir proprement le
+ * producteur et le consommateur de l'ancienne génération — jamais deux
+ * pipelines en concurrence.
+ */
+@Singleton
+class PlaybackOrchestrator @Inject constructor(
+    private val ttsEngine: TtsEngine,
+    private val audioPlayer: AudioPlayer,
+) {
+
+    /** État de lecture exposé à la couche présentation. */
+    sealed interface PlaybackStatus {
+        data object Idle : PlaybackStatus
+        data object Buffering : PlaybackStatus
+        data object Playing : PlaybackStatus
+        data object Paused : PlaybackStatus
+        data class Error(val message: String) : PlaybackStatus
+    }
+
+    private val scope = CoroutineScope(SupervisorJob() + Dispatchers.IO)
+
+    private val _state = MutableStateFlow<PlaybackStatus>(PlaybackStatus.Idle)
+    val state: StateFlow<PlaybackStatus> = _state.asStateFlow()
+
+    /** Index de la phrase en cours de lecture (surlignage, progression). */
+    private val _currentSentenceIndex = MutableStateFlow(0)
+    val currentSentenceIndex: StateFlow<Int> = _currentSentenceIndex.asStateFlow()
+
+    private val playGeneration = AtomicLong(0)
+    private var playbackJob: Job? = null
+
+    /**
+     * Lance la lecture gapless à partir de [startFrom]. Requiert `startFrom`
+     * dans les bornes de [sentences] (garanti par l'appelant).
+     */
+    fun play(sentences: List<Sentence>, voiceProfile: VoiceProfile, startFrom: Int) {
+        if (sentences.isEmpty()) return
+        val generation = playGeneration.incrementAndGet()
+        playbackJob?.cancel()
+        audioPlayer.stop()
+        _currentSentenceIndex.value = startFrom
+        _state.value = PlaybackStatus.Buffering
+        playbackJob = scope.launch { run(generation, sentences, voiceProfile, startFrom) }
+    }
+
+    private suspend fun run(
+        generation: Long,
+        sentences: List<Sentence>,
+        voiceProfile: VoiceProfile,
+        startFrom: Int,
+    ) {
+        val channel = Channel<AudioSegment>(LOOKAHEAD)
+        val producer = scope.launch { produce(generation, channel, sentences, voiceProfile, startFrom) }
+        try {
+            consume(generation, channel, sentences, startFrom)
+        } catch (e: CancellationException) {
+            throw e
+        } catch (e: Exception) {
+            if (isCurrent(generation)) {
+                _state.value = PlaybackStatus.Error(e.message ?: "Erreur de lecture")
+            }
+        } finally {
+            producer.cancel()
+            channel.close()
+        }
+    }
+
+    /** Producteur : synthétise dans l'ordre, timeout unique, silence court sur erreur. */
+    private suspend fun produce(
+        generation: Long,
+        channel: Channel<AudioSegment>,
+        sentences: List<Sentence>,
+        voiceProfile: VoiceProfile,
+        startFrom: Int,
+    ) {
+        try {
+            for (i in startFrom until sentences.size) {
+                if (!isCurrent(generation)) break
+                val segment = try {
+                    withTimeout(SYNTHESIS_TIMEOUT_MS) {
+                        ttsEngine.synthesize(sentences[i], voiceProfile)
+                    }
+                } catch (e: TimeoutCancellationException) {
+                    silence(TIMEOUT_SILENCE_MS, audioPlayer.sampleRate)
+                } catch (e: CancellationException) {
+                    throw e
+                } catch (e: Exception) {
+                    silence(TIMEOUT_SILENCE_MS, audioPlayer.sampleRate)
+                }
+                if (!isCurrent(generation)) break
+                channel.send(segment)
+            }
+        } finally {
+            channel.close()
+        }
+    }
+
+    /**
+     * Consommateur : enfile segment + silence, `play()` au premier, et pace
+     * l'index de phrase à la vitesse de lecture. Chaque segment suivant est
+     * enfilé une phrase à l'avance pour rester gapless.
+     */
+    private suspend fun consume(
+        generation: Long,
+        channel: Channel<AudioSegment>,
+        sentences: List<Sentence>,
+        startFrom: Int,
+    ) {
+        var index = startFrom
+        var pendingDurationMs = 0L
+        var first = true
+
+        for (segment in channel) {
+            if (!isCurrent(generation)) return
+            val sentence = sentences.getOrNull(index)
+            val silenceMs = silenceDurationFor(sentence?.text ?: "")
+
+            audioPlayer.sampleRate = segment.sampleRate
+            audioPlayer.enqueue(segment)
+            audioPlayer.enqueue(silence(silenceMs, segment.sampleRate))
+
+            if (first) {
+                audioPlayer.play()
+                _state.value = PlaybackStatus.Playing
+                _currentSentenceIndex.value = index
+                first = false
+            } else {
+                pace(generation, pendingDurationMs)
+                _currentSentenceIndex.value = index
+            }
+            pendingDurationMs = segment.durationMs + silenceMs
+            index++
+        }
+
+        if (isCurrent(generation)) {
+            if (!first) pace(generation, pendingDurationMs)
+            _state.value = PlaybackStatus.Idle
+        }
+    }
+
+    /**
+     * Attend [durationMs] par pas courts, en suspendant pendant une pause et
+     * en s'interrompant si la génération est périmée. Approximatif par nature
+     * (durées cumulées, pas position AudioTrack) — la synchronisation « par
+     * position réelle » est reportée au LOT 16.
+     */
+    private suspend fun pace(generation: Long, durationMs: Long) {
+        var remaining = durationMs
+        while (remaining > 0 && isCurrent(generation)) {
+            if (_state.value == PlaybackStatus.Paused) {
+                delay(PACE_STEP_MS)
+                continue
+            }
+            val step = minOf(remaining, PACE_STEP_MS)
+            delay(step)
+            remaining -= step
+        }
+    }
+
+    private fun isCurrent(generation: Long): Boolean = playGeneration.get() == generation
+
+    /** Génère un silence PCM16 de [durationMs] au [sampleRate] donné. */
+    private fun silence(durationMs: Long, sampleRate: Int): AudioSegment {
+        val frameCount = (sampleRate * durationMs / 1000L).toInt().coerceAtLeast(1)
+        return AudioSegment(
+            audioData = ByteArray(frameCount * 2),
+            durationMs = durationMs,
+            wordTimestamps = emptyList(),
+            sampleRate = sampleRate,
+        )
+    }
+
+    private fun silenceDurationFor(text: String): Long {
+        val trimmed = text.trimEnd()
+        if (trimmed.isEmpty()) return SILENCE_SENTENCE_MS
+        return when (trimmed.last()) {
+            ',', ';' -> SILENCE_COMMA_MS
+            '.', '!', '?', '\u2026' -> SILENCE_SENTENCE_MS
+            '\n' -> SILENCE_PARAGRAPH_MS
+            else -> SILENCE_SENTENCE_MS
+        }
+    }
+
+    private companion object {
+        const val LOOKAHEAD = 3
+        /** Timeout de synthèse unique (Edge cloud et Sherpa-ONNX confondus). */
+        const val SYNTHESIS_TIMEOUT_MS = 20_000L
+        /** Silence injecté après une synthèse en échec. */
+        const val TIMEOUT_SILENCE_MS = 50L
+        const val PACE_STEP_MS = 50L
+        const val SILENCE_COMMA_MS = 150L
+        const val SILENCE_SENTENCE_MS = 650L
+        const val SILENCE_PARAGRAPH_MS = 1000L
+    }
+}
