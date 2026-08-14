@@ -131,18 +131,58 @@ class JsoupChapterParser {
             body.childNodes()
         }
 
-        for (child in childrenToProcess) {
+        return extractBlocksFromChildren(childrenToProcess, runningOffset, chapterHref)
+    }
+
+    /**
+     * Extrait les [BookBlock] d'une liste de nœuds enfants (corps du
+     * document ou conteneur structurel), en groupant les nœuds inline
+     * consécutifs (texte nu, `<b>`/`<i>`/…) en UN SEUL paragraphe implicite
+     * — comme le ferait un `<p>` — plutôt que d'émettre un bloc isolé par
+     * nœud enfant. Seuls les nœuds de niveau bloc ([isStandaloneBlockNode])
+     * interrompent ce regroupement et sont dispatchés individuellement.
+     *
+     * Base commune à [extractBlocks] (racine du document) et
+     * [extractContainerBlocks] (conteneur structurel) : mêmes règles
+     * d'accumulation d'offset ([BLOCK_SEPARATOR]) dans les deux cas, un
+     * seul endroit à faire évoluer si cette convention change.
+     */
+    private fun extractBlocksFromChildren(children: List<Node>, startOffset: Int, chapterHref: String): List<BookBlock> {
+        val blocks = mutableListOf<BookBlock>()
+        var runningOffset = startOffset
+        val inlineBuffer = mutableListOf<Node>()
+
+        fun flushInlineBuffer() {
+            if (inlineBuffer.isEmpty()) return
+            val richText = extractRichTextFromNodes(inlineBuffer)
+            inlineBuffer.clear()
+            if (richText.plainText.isBlank()) return
+            val block = BookBlock.ParagraphBlock(
+                richText = richText,
+                globalOffsetRange = runningOffset until (runningOffset + richText.plainText.length),
+            )
+            blocks.add(block)
+            // +1 pour la fin exclusive de la plage, +BLOCK_SEPARATOR.length
+            // pour réserver le caractère séparateur inséré entre blocs par
+            // tokenizeSentences — sans ce décalage, le texte de deux
+            // paragraphes consécutifs seraient fusionnés sans espace.
+            runningOffset = block.globalOffsetRange!!.last + 1 + BLOCK_SEPARATOR.length
+        }
+
+        for (child in children) {
+            if (!isStandaloneBlockNode(child)) {
+                inlineBuffer.add(child)
+                continue
+            }
+            flushInlineBuffer()
             for (block in extractBlocksFromNode(child, runningOffset, chapterHref)) {
                 blocks.add(block)
                 if (block is BookBlock.ParagraphBlock || block is BookBlock.HeadingBlock) {
-                    // +1 pour la fin exclusive de la plage, +BLOCK_SEPARATOR.length
-                    // pour réserver le caractère séparateur inséré entre blocs
-                    // par tokenizeSentences — sans ce décalage, le texte de deux
-                    // paragraphes consécutifs seraient fusionnés sans espace.
                     runningOffset = block.globalOffsetRange!!.last + 1 + BLOCK_SEPARATOR.length
                 }
             }
         }
+        flushInlineBuffer()
 
         return blocks
     }
@@ -236,7 +276,7 @@ class JsoupChapterParser {
                     ),
                 )
             }
-            "p", "div", "blockquote", "section", "article", "li", "td", "th" -> {
+            "p", "blockquote", "li", "td", "th" -> {
                 if (element.selectFirst("img, svg") != null) {
                     // Image inline (ou conteneur d'image) : scinder le flux
                     // en segments texte/image/texte.
@@ -249,6 +289,28 @@ class JsoupChapterParser {
                             richText = richText,
                             globalOffsetRange = runningOffset until (runningOffset + richText.plainText.length),
                             isBlockquote = tagName == "blockquote",
+                        ),
+                    )
+                }
+            }
+            // Conteneurs structurels : descendre dans leurs enfants de
+            // niveau bloc pour préserver la granularité des paragraphes.
+            // Sans cette récursion, un chapitre entièrement enveloppé dans
+            // un <div> (motif courant des EPUB du commerce) était aplati en
+            // UN SEUL ParagraphBlock — gelant le compteur de page du mode
+            // SCROLL (qui dérive la position du premier bloc visible).
+            "div", "section", "article", "main" -> {
+                if (hasBlockLevelChild(element)) {
+                    extractContainerBlocks(element, runningOffset, chapterHref)
+                } else if (element.selectFirst("img, svg") != null) {
+                    extractInlineBlocks(element, runningOffset, chapterHref)
+                } else {
+                    val richText = extractRichText(element)
+                    if (richText.plainText.isBlank()) emptyList()
+                    else listOf(
+                        BookBlock.ParagraphBlock(
+                            richText = richText,
+                            globalOffsetRange = runningOffset until (runningOffset + richText.plainText.length),
                         ),
                     )
                 }
@@ -293,6 +355,35 @@ class JsoupChapterParser {
             }
         }
     }
+
+    /**
+     * Vrai si [element] contient au moins un enfant de niveau bloc — auquel
+     * cas il est traité comme conteneur structurel (ses enfants deviennent
+     * des [BookBlock] distincts) plutôt que comme paragraphe aplati.
+     */
+    private fun hasBlockLevelChild(element: Element): Boolean =
+        element.children().any { it.normalName() in BLOCK_LEVEL_TAGS }
+
+    /**
+     * Vrai si [node] doit être dispatché comme son propre bloc plutôt que
+     * regroupé avec le texte inline environnant — un enfant de niveau bloc
+     * ([BLOCK_LEVEL_TAGS]) ou une image (`<img>`/`<svg>`, volontairement
+     * hors de [BLOCK_LEVEL_TAGS] — voir sa KDoc — mais qui doit tout de
+     * même produire son propre [BookBlock.ImageBlock] plutôt que d'être
+     * silencieusement avalée par [extractRichTextFromNodes], qui ignore
+     * les images).
+     */
+    private fun isStandaloneBlockNode(node: Node): Boolean =
+        node is Element && (node.normalName() in BLOCK_LEVEL_TAGS || node.normalName() in STANDALONE_IMAGE_TAGS)
+
+    /**
+     * Extrait les blocs d'un conteneur structurel (`<div>`, `<section>`,
+     * `<article>`, `<main>`) en descendant récursivement dans ses enfants,
+     * en ordre de document — voir [extractBlocksFromChildren], base commune
+     * avec [extractBlocks].
+     */
+    private fun extractContainerBlocks(container: Element, startOffset: Int, chapterHref: String): List<BookBlock> =
+        extractBlocksFromChildren(container.childNodes(), startOffset, chapterHref)
 
     /**
      * Extrait un [BookBlock.ImageBlock] depuis un `<svg><image xlink:href="…"/></svg>`
@@ -391,11 +482,22 @@ class JsoupChapterParser {
      * Parcourt récursivement les nœuds enfants, accumule le texte brut et
      * les spans bruts, puis normalise (split aux frontières → bitmask).
      */
-    fun extractRichText(node: Node): StyledText {
+    fun extractRichText(node: Node): StyledText = extractRichTextFromNodes(listOf(node))
+
+    /**
+     * Comme [extractRichText], mais accumule le texte et les spans de
+     * PLUSIEURS nœuds frères dans un même [StyledText] continu — utilisé
+     * par [extractBlocksFromChildren] pour regrouper du texte inline
+     * consécutif (texte nu, `<b>`/`<i>`/…) en un seul paragraphe implicite,
+     * exactement comme si ces nœuds étaient les enfants d'un `<p>` commun.
+     */
+    private fun extractRichTextFromNodes(nodes: List<Node>): StyledText {
         val rawSpans = mutableListOf<RawSpan>()
         val textBuilder = StringBuilder()
 
-        collectTextAndSpans(node, SpanStyles.NONE, null, textBuilder, rawSpans)
+        for (node in nodes) {
+            collectTextAndSpans(node, SpanStyles.NONE, null, textBuilder, rawSpans)
+        }
 
         val plainText = textBuilder.toString()
         if (plainText.isEmpty()) return StyledText.plain("")
@@ -661,5 +763,23 @@ class JsoupChapterParser {
     private companion object {
         /** Séparateur inséré entre deux blocs de texte consécutifs (offsets ET tokenisation). */
         const val BLOCK_SEPARATOR = "\n"
+
+        /**
+         * Éléments de niveau bloc déclenchant la récursion d'un conteneur
+         * (`<div>`, `<section>`, …). `<img>`/`<svg>` en sont exclus
+         * volontairement : un conteneur qui ne contient que du texte et des
+         * images inline est traité par [extractInlineBlocks], pas découpé en
+         * blocs (cela préserverait mal les spans d'un flux inline).
+         */
+        val BLOCK_LEVEL_TAGS = setOf(
+            "p", "h1", "h2", "h3", "h4", "h5", "h6",
+            "div", "section", "article", "main", "header", "footer", "nav", "aside",
+            "blockquote", "ul", "ol", "li", "table", "figure", "figcaption", "hr",
+            "pre", "address", "details", "summary", "dl", "dt", "dd", "fieldset",
+            "form", "center",
+        )
+
+        /** Cf. [isStandaloneBlockNode] — exclues de [BLOCK_LEVEL_TAGS] mais jamais fondues dans du texte inline. */
+        val STANDALONE_IMAGE_TAGS = setOf("img", "svg")
     }
 }

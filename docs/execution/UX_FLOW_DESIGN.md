@@ -18,7 +18,7 @@ Premier lancement → Onboarding → Bibliothèque (centre de navigation)
                    Import                    Drawer (menu latéral)
                                               ├── Récents
                                               ├── Marque-pages et notes (global)
-                                              ├── Catalogues OPDS (placeholder v1.x)
+                                              ├── Catalogues OPDS (Lot 13, ADR-023)
                                               ├── Synchronisation
                                               ├── Statistiques de lecture
                                               └── Pied : Réglages / Thèmes / À propos
@@ -121,7 +121,7 @@ Onboarding câblé au premier lancement (`OnboardingRoute`, `startDestination` d
 - b1 — Liste des récents
 - b2 — Bibliothèque (surligné par défaut, élément actif)
 - b3 — Marque-pages et Notes (ajouté après coup — oublié dans la description initiale, confirmé par Issa) — placé ici, juste après Bibliothèque, par cohérence avec les autres destinations de contenu réel. Positionnement proposé par Claude, **confirmé depuis** par Issa.
-- b4 — Catalogues OPDS — **placeholder, prévu pour v1.x** (cohérent avec la décision Blueprint déjà actée de différer OPDS)
+- b4 — Catalogues OPDS — réintégré en v1.x, borné au Volet 1 (`ADR-023`), planifié par `docs/execution/LOT_13_CATALOGUES_OPDS.md`
 - b5 — Synchronisation — **écran de réglages**, distinct de l'action ponctuelle du bottom sheet : ouvre la configuration du service de sync **et** regroupe l'import/export local (rejoint `BackupManager`, déjà construit en Phase 8 — pas à reconstruire, juste à brancher visuellement ici)
 - b6 — Statistiques de lecture
 - b7 — Pied de drawer : Options/Paramètres, À propos, Thèmes
@@ -231,7 +231,7 @@ Cinq actions, dans l'ordre :
   - Récents
   - Bibliothèque (surligné par défaut, élément actif)
   - Marque-pages et Notes
-  - Catalogues OPDS — **placeholder v1.x**, étiqueté visuellement (badge discret, pas grisé/désactivé — à reconsidérer si un style désactivé est préféré)
+  - Catalogues OPDS — réintégré en v1.x (`ADR-023`, Lot 13), pas d'étiquette de placeholder une fois l'écran conçu — badge/style transitoire à reconsidérer seulement si l'écran reste masqué au moment de son propre lot (règle du Lot 1 : jamais de destination affichée sans écran derrière)
   - Synchronisation (écran de réglages, distinct de l'action ponctuelle du bottom sheet — regroupe aussi l'import/export local, `BackupManager` déjà construit en Phase 8)
   - Statistiques de lecture
 - **Pied de page**, rangée compacte à 3 boutons (pas empilés verticalement) : Paramètres / À propos / Thèmes.
@@ -240,12 +240,12 @@ Cinq actions, dans l'ordre :
 - Récents (b1) → ✅ écran conçu (§ Écran Récents).
 - Bibliothèque (b2) → ✅ élément actif par défaut, écran déjà entièrement conçu.
 - Marque-pages et Notes (b3) → ✅ écran conçu (§ Marque-pages et notes — vue globale). Distinct du panneau par livre (§ Marque-pages — panneau latéral).
-- Catalogues OPDS (b4) → placeholder v1.x, différé volontairement, pas conçu dans cette session.
+- Catalogues OPDS (b4) → non conçu dans cette session ; réintégré en v1.x et planifié séparément (`ADR-023`, `docs/execution/LOT_13_CATALOGUES_OPDS.md`).
 - Synchronisation (b5) → ✅ écran conçu (§ Écran Synchronisation — Configuration + Opérationnel).
 - Statistiques de lecture (b6) → ✅ écran conçu (§ Écran Statistiques de lecture, 4 sections).
 - Pied de page (b7) : **Paramètres** → ✅ pointe vers l'écran **Réglages** entièrement conçu (6 cartes). **Thèmes** → ✅ pointe vers la **Galerie de thèmes** entièrement conçue (Studio de création inclus). **À propos** → ✅ écran conçu (§ Écran À propos).
 
-**Tous les items du drawer sont désormais conçus, à l'exception d'OPDS (différé volontairement à v1.x).**
+**Tous les items du drawer sont désormais conçus, à l'exception d'OPDS — hors périmètre de cette session de conception UX, planifié à part (`ADR-023`, `docs/execution/LOT_13_CATALOGUES_OPDS.md`).**
 
 **État d'implémentation (lot 1) :** le drawer portait 3 destinations (Bibliothèque, Marque-pages et Notes, Statistiques de lecture) et 2 boutons de pied (Paramètres, À propos). Récents, Catalogues OPDS, Synchronisation et Thèmes étaient **volontairement masqués** tant que leur écran n'existait pas — décision actée : aucune destination affichée sans écran derrière. Séries / Auteurs / Tags restent transitoirement dans le drawer jusqu'au lot 2, qui les déplace vers le flyout du titre.
 
@@ -829,7 +829,7 @@ Centralise l'identité visuelle d'InkTone, ses engagements de confidentialité (
 
 Mockup validé sans correction après les deux corrections apportées (Kokoro, cohérence des couleurs de licence).
 
-**Le flux général de niveau 1 est maintenant entièrement conçu** (hors Catalogues OPDS, différé volontairement à v1.x).
+**Le flux général de niveau 1 est maintenant entièrement conçu** (hors Catalogues OPDS, hors périmètre de cette session — planifié à part, `ADR-023`).
 
 ---
 
@@ -843,8 +843,8 @@ Les 7 icônes (Sommaire, Marque-pages, Play, Thème, TT, Minuteur, Haut-parleur)
 
 **Fait — flux de niveau 1 entièrement conçu :** Onboarding (3 cartes) · Bibliothèque (barre du haut, état vide, état peuplé mosaïque/liste, menu déroulant + écran de détail Séries/Tags, popup de filtrage, bottom sheet 3-points, drawer, avertissement de suppression en cascade des marque-pages/notes) · Import (progression, retours) · Lecture (vue silencieuse, HUD, popup de sélection, 7 sous-écrans du panneau unifié + luminosité, couche TTS complète — barre de contrôle et FAB replié, panneau Marque-pages par livre entièrement conçu avec ses trois onglets Notes/Surlignages/Marque-pages) · Récents (états peuplé et vide) · Réglages (écran entièrement conçu, 6 cartes) · Marque-pages et notes — vue globale (drawer b3) · Statistiques de lecture (écran entièrement conçu, 4 sections) · Synchronisation (écran entièrement conçu — Configuration + Opérationnel) · Galerie de thèmes entièrement conçue (Studio de création inclus) · **À propos (écran entièrement conçu, avec correction factuelle Piper→Kokoro).**
 
-**Seul point différé volontairement, hors scope de cette session :**
-- Catalogues OPDS (b4) — placeholder v1.x, cohérent avec ADR différant OPDS
+**Seul point hors scope de cette session :**
+- Catalogues OPDS (b4) — non conçu ici ; réintégré en v1.x et planifié séparément (`ADR-023`, `docs/execution/LOT_13_CATALOGUES_OPDS.md`)
 
 **Toutes les questions en suspens ont été tranchées, y compris les deux derniers points ouverts identifiés lors de l'audit de fin de session :**
 - Icône hamburger comme déclencheur du drawer, et positionnement de b3 juste après Bibliothèque — **confirmés explicitement par Issa**.
