@@ -79,7 +79,32 @@ class ChapterPaginationState internal constructor(
         paginationVersion
         return engine.pageIndexAtOffset(chapterIndex, charOffset)
     }
+
+    /**
+     * Vrai si la mesure courante couvre TOUTES les phrases du chapitre
+     * (mesure complète) — c'est-à-dire qu'aucune page n'est encore en
+     * attente d'une mesure partielle. Tant que c'est faux, `pageCount` et
+     * `pageIndexAt` peuvent refléter un préfixe borné (3a.3) : la ligne de
+     * statut ne doit pas les présenter comme un total final, et l'ancrage
+     * de position du mode pagé ne doit pas se recaler sur eux (sinon saut
+     * vers `pages.lastIndex` d'une mesure partielle — régression « N/N » et
+     * page noire documentée).
+     */
+    fun isMeasurementComplete(chapter: Chapter?): Boolean =
+        isMeasurementComplete(
+            measuredSentences = measurement?.sentenceStartOffsets?.size ?: 0,
+            totalSentences = chapter?.sentences?.size ?: 0,
+        )
 }
+
+/**
+ * Complétude d'une mesure de pagination : vraie dès que le nombre de
+ * phrases mesurées couvre toutes les phrases du chapitre (ou qu'il n'y a
+ * aucune phrase — chapitre vide, considéré complet). Fonction pure,
+ * extraite pour être testée en JVM sans instancier [ChapterPaginationState].
+ */
+internal fun isMeasurementComplete(measuredSentences: Int, totalSentences: Int): Boolean =
+    measuredSentences >= totalSentences
 
 /**
  * Construit la clé d'invalidation à partir des valeurs **réellement

@@ -110,6 +110,7 @@ class PagedChapterContentTest {
                 annotations = emptyList<Annotation>(),
                 currentChapterIndex = 0,
                 textColor = Color.Black,
+                surfaceColor = Color.White,
                 isReadingRulerEnabled = false,
                 onClick = onClick,
                 onNextChapter = {},

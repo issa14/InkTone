@@ -1,6 +1,24 @@
 package com.inktone.feature.reader
 
+import android.os.SystemClock
+import androidx.compose.animation.core.Animatable
+import androidx.compose.animation.core.Spring
+import androidx.compose.animation.core.spring
 import androidx.compose.foundation.ExperimentalFoundationApi
+import androidx.compose.foundation.gestures.Orientation
+import androidx.compose.runtime.snapshotFlow
+import androidx.compose.ui.Alignment
+import androidx.compose.ui.graphics.graphicsLayer
+import androidx.compose.ui.input.nestedscroll.nestedScroll
+import androidx.compose.ui.layout.onSizeChanged
+import com.inktone.feature.reader.transition.ChapterTransitionConnection
+import com.inktone.feature.reader.transition.ChapterTransitionDirection
+import com.inktone.feature.reader.transition.ChapterTransitionIndicator
+import com.inktone.feature.reader.transition.ChapterTransitionMath
+import com.inktone.feature.reader.transition.ChapterTransitionState
+import kotlinx.coroutines.delay
+import kotlinx.coroutines.flow.collect
+import kotlinx.coroutines.flow.first
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.padding
@@ -86,10 +104,17 @@ fun PagedChapterContent(
     highlightedWordRange: IntRange?,
     annotations: List<Annotation>,
     currentChapterIndex: Int,
+    chapterCount: Int = currentChapterIndex + 1,
     textColor: Color,
     isReadingRulerEnabled: Boolean,
     onClick: () -> Unit,
     onNextChapter: () -> Unit,
+    onPreviousChapter: () -> Unit = {},
+    hasPreviousChapter: Boolean = false,
+    hasNextChapter: Boolean = false,
+    reduceMotion: Boolean = false,
+    surfaceColor: Color,
+    isChapterReady: (Int) -> Boolean = { true },
     onCurrentLineY: (Dp) -> Unit,
     onPageChanged: (Int) -> Unit = {},
     onManualPageChange: (sentenceIndex: Int) -> Unit = {},
@@ -113,11 +138,10 @@ fun PagedChapterContent(
 
     val pageCount = if (chapter != null) pagination.pageCount(chapter.index) else 1
 
-    // Page fantôme au-delà de la dernière (conservée telle quelle, 3a.1 —
-    // ne pas refactoriser : c'est le correctif d'un bug réel déjà trouvé
-    // à l'audit, signal non ambigu d'un swipe volontaire au-delà du
-    // chapitre).
-    val pagerState = rememberPagerState(pageCount = { pageCount + 1 })
+    // Le swipe au-delà de la dernière page est désormais géré par la
+    // transition à résistance spatiale (ChapterTransitionConnection) :
+    // plus de page fantôme.
+    val pagerState = rememberPagerState(pageCount = { pageCount })
 
     // 3c.1bis — bug réel trouvé sur appareil pendant la vérification du
     // lot 3c : le compteur de PAGE suit déjà le swipe manuel
@@ -182,22 +206,18 @@ fun PagedChapterContent(
             }
             return@LaunchedEffect
         }
-        if (pagerState.currentPage >= pageCount) {
-            onNextChapter()
-        } else {
-            // Remonte la page réellement affichée — swipe manuel inclus,
-            // pas seulement la progression pilotée par le TTS. Bug réel
-            // trouvé sur appareil (lot 3b) : le compteur de la ligne de
-            // statut restait figé à 1 pendant un swipe manuel, puisque
-            // rien ne faisait remonter la position du pager avant ceci.
-            onPageChanged(pagerState.currentPage)
+        // Remonte la page réellement affichée — swipe manuel inclus,
+        // pas seulement la progression pilotée par le TTS. Bug réel
+        // trouvé sur appareil (lot 3b) : le compteur de la ligne de
+        // statut restait figé à 1 pendant un swipe manuel, puisque
+        // rien ne faisait remonter la position du pager avant ceci.
+        onPageChanged(pagerState.currentPage)
 
-            if (!isProgrammaticPageChange && chapter != null) {
-                val sentenceRange = pagination.sentenceRangeOf(chapter.index, pagerState.currentPage)
-                if (!sentenceRange.isEmpty()) {
-                    lastManuallyEmittedSentenceIndex = sentenceRange.first
-                    onManualPageChange(sentenceRange.first)
-                }
+        if (!isProgrammaticPageChange && chapter != null) {
+            val sentenceRange = pagination.sentenceRangeOf(chapter.index, pagerState.currentPage)
+            if (!sentenceRange.isEmpty()) {
+                lastManuallyEmittedSentenceIndex = sentenceRange.first
+                onManualPageChange(sentenceRange.first)
             }
         }
     }
@@ -206,15 +226,13 @@ fun PagedChapterContent(
     // repositionner via pageIndexAt à chaque recalcul de pagination
     // (rotation, taille de police...) — jamais un index de page persisté.
     //
-    // Régression connue, documentée, non corrigée (voir
-    // docs/execution/NOTE_REGRESSION_CLIGNOTEMENT_PAGE_HUD.md) : cet
-    // effet se relance à CHAQUE écriture intermédiaire de
-    // pagination.measurement pendant une mesure progressive (pas
-    // seulement la finale) — si currentSentenceIndex est profond dans le
-    // chapitre, pageIndexAt calculé contre une mesure encore partielle
-    // peut être transitoirement faux, causant un saut de page visible.
-    // Le HUD (ReaderScreen.readingAreaSize) redéclenche ce genre de
-    // remesure à chaque bascule visible/masqué.
+    // Ne réagit QU'à une mesure complète (isMeasurementComplete) : pendant
+    // la mesure progressive (3a.3), `pageIndexAt` peut renvoyer
+    // `pages.lastIndex` pour une phrase profonde non encore mesurée —
+    // se recaler sur lui ferait sauter le pager vers la dernière page du
+    // préfixe (page fausse, voire page vide). La remesure HUD (autrefois
+    // cause de clignotement) a par ailleurs été supprimée à la racine
+    // (ReaderScreen : HUD en overlay, zone de lecture à hauteur constante).
     LaunchedEffect(chapter?.index, pagination.measurement, currentSentenceIndex) {
         if (currentSentenceIndex == lastManuallyEmittedSentenceIndex) {
             // Écho de notre propre swipe (voir commentaire ci-dessus) :
@@ -222,7 +240,9 @@ fun PagedChapterContent(
             lastManuallyEmittedSentenceIndex = null
             return@LaunchedEffect
         }
-        if (chapter != null && pagination.measurement != null && pageCount > 0) {
+        if (chapter != null && pagination.measurement != null && pageCount > 0 &&
+            pagination.isMeasurementComplete(chapter)
+        ) {
             val targetPage = pagination.pageIndexAt(chapter.index, currentSentenceIndex)
             if (pagerState.currentPage != targetPage) {
                 isProgrammaticPageChange = true
@@ -279,13 +299,86 @@ fun PagedChapterContent(
     // par PageBlock), aucune conversion à faire ici.
     val freeSelectedRangeState = rememberUpdatedState(freeSelectedRange)
 
-    HorizontalPager(
-        state = pagerState,
-        modifier = modifier.fillMaxSize(),
-        beyondViewportPageCount = 1,
-    ) { pageIndex ->
-        Box(modifier = Modifier.fillMaxSize().padding(16.dp)) {
-            if (chapter != null && currentMeasurement != null && pageIndex < pageCount) {
+    // Transition de chapitre par résistance spatiale (overscroll horizontal).
+    val chapterTransition = remember { ChapterTransitionState() }
+    var pagerWidthPx by remember { mutableStateOf(0) }
+    LaunchedEffect(pagerWidthPx) {
+        chapterTransition.thresholdPx = pagerWidthPx * 0.25f
+    }
+
+    val visualPull = remember { Animatable(0f) }
+    LaunchedEffect(chapterTransition.isDragging) {
+        if (chapterTransition.isDragging) {
+            snapshotFlow { chapterTransition.pullPx }.collect { visualPull.snapTo(it) }
+        } else {
+            visualPull.animateTo(
+                0f,
+                spring(dampingRatio = Spring.DampingRatioMediumBouncy, stiffness = Spring.StiffnessMediumLow),
+            )
+        }
+    }
+
+    val latestHasPrevious = rememberUpdatedState(hasPreviousChapter)
+    val latestHasNext = rememberUpdatedState(hasNextChapter)
+    val latestChapterIndex = rememberUpdatedState(currentChapterIndex)
+    val latestChapterCount = rememberUpdatedState(chapterCount)
+    val latestOnPrevious = rememberUpdatedState(onPreviousChapter)
+    val latestOnNext = rememberUpdatedState(onNextChapter)
+    val latestIsChapterReady = rememberUpdatedState(isChapterReady)
+
+    val chapterTransitionConnection = remember(chapterTransition, pagerState) {
+        ChapterTransitionConnection(
+            state = chapterTransition,
+            orientation = Orientation.Horizontal,
+            canPullPrevious = { pagerState.currentPage == 0 && latestHasPrevious.value },
+            canPullNext = { pagerState.currentPage == pagerState.pageCount - 1 && latestHasNext.value },
+            // Bug réel trouvé à l'audit : sans cette garde, un glissement de
+            // sélection de texte au bord du chapitre pouvait être capté par
+            // ce geste de tirage plutôt que par le champ de texte.
+            isSelectionActive = { freeSelectedRangeState.value != null },
+            onCommit = { direction ->
+                // Parité avec le mode SCROLL (ReaderScreen) : bornage
+                // défensif — canPullPrevious/canPullNext ne devraient jamais
+                // laisser `target` sortir de [0, lastIndex], mais un état
+                // transitoirement désynchronisé pendant une transition
+                // rapide ne doit jamais produire un index de chapitre
+                // invalide (sinon `beginLoading` bloque le spinner : voir
+                // KDoc de `isChapterReady`).
+                val target = when (direction) {
+                    ChapterTransitionDirection.PREVIOUS -> (latestChapterIndex.value - 1).coerceAtLeast(0)
+                    ChapterTransitionDirection.NEXT ->
+                        (latestChapterIndex.value + 1).coerceAtMost(latestChapterCount.value - 1)
+                }
+                chapterTransition.beginLoading(target)
+                if (direction == ChapterTransitionDirection.PREVIOUS) latestOnPrevious.value() else latestOnNext.value()
+            },
+            onCancel = { chapterTransition.cancel() },
+        )
+    }
+
+    LaunchedEffect(chapterTransition.isLoading) {
+        if (!chapterTransition.isLoading) return@LaunchedEffect
+        val target = chapterTransition.targetChapterIndex
+        val startedAt = SystemClock.uptimeMillis()
+        snapshotFlow { latestIsChapterReady.value(target) }.first { it }
+        val elapsed = SystemClock.uptimeMillis() - startedAt
+        if (elapsed < ChapterTransitionMath.MIN_LOADING_MS) {
+            delay(ChapterTransitionMath.MIN_LOADING_MS - elapsed)
+        }
+        chapterTransition.finish()
+    }
+
+    Box(modifier = Modifier.fillMaxSize().onSizeChanged { pagerWidthPx = it.width }) {
+        HorizontalPager(
+            state = pagerState,
+            modifier = modifier
+                .fillMaxSize()
+                .graphicsLayer { translationX = visualPull.value }
+                .nestedScroll(chapterTransitionConnection),
+            beyondViewportPageCount = 1,
+        ) { pageIndex ->
+            Box(modifier = Modifier.fillMaxSize().padding(16.dp)) {
+                if (chapter != null && currentMeasurement != null && pageIndex < pageCount) {
                 val pageOffsetRange = pagination.pageOffsetRange(chapter.index, pageIndex)
                 if (!pageOffsetRange.isEmpty()) {
                     val pageText = remember(currentMeasurement, pageOffsetRange, annotations) {
@@ -317,6 +410,25 @@ fun PagedChapterContent(
                     )
                 }
             }
+        }
+        }
+
+        val transitionDirection = chapterTransition.direction
+        if (transitionDirection != null) {
+            ChapterTransitionIndicator(
+                direction = transitionDirection,
+                fraction = ChapterTransitionMath.fraction(visualPull.value, chapterTransition.thresholdPx),
+                isLoading = chapterTransition.isLoading,
+                reduceMotion = reduceMotion,
+                contentColor = textColor,
+                surfaceColor = surfaceColor,
+                modifier = Modifier
+                    .align(
+                        if (transitionDirection == ChapterTransitionDirection.PREVIOUS)
+                            Alignment.CenterStart else Alignment.CenterEnd
+                    )
+                    .padding(horizontal = 8.dp),
+            )
         }
     }
 }

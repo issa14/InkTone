@@ -6,7 +6,9 @@ import androidx.compose.ui.unit.sp
 import com.inktone.domain.model.ReadingTheme
 import com.inktone.feature.reader.ThemeColors
 import org.junit.Assert.assertEquals
+import org.junit.Assert.assertFalse
 import org.junit.Assert.assertNotEquals
+import org.junit.Assert.assertTrue
 import org.junit.Test
 
 /**
@@ -114,5 +116,31 @@ class ChapterPaginationStateTest {
             fontSizeSp = 18, viewportWidthPx = 1000, viewportHeightPx = 2000, paddingPx = 16,
         )
         assertNotEquals(keyA, keyB)
+    }
+
+    // ───── Complétude d'une mesure de pagination — gate la ligne de statut
+    // et l'ancrage du mode pagé pour ne jamais présenter un total partiel
+    // comme final (régression « Chapitre 12 (54/54) » alors que le chapitre
+    // continue). ─────
+
+    @Test
+    fun `mesure partielle n est pas complete`() {
+        assertFalse(isMeasurementComplete(measuredSentences = 53, totalSentences = 100))
+        assertFalse(isMeasurementComplete(measuredSentences = 0, totalSentences = 1))
+    }
+
+    @Test
+    fun `mesure couvrant toutes les phrases est complete`() {
+        assertTrue(isMeasurementComplete(measuredSentences = 100, totalSentences = 100))
+    }
+
+    @Test
+    fun `mesure au dela du total est complete`() {
+        assertTrue(isMeasurementComplete(measuredSentences = 120, totalSentences = 100))
+    }
+
+    @Test
+    fun `chapitre vide est complete`() {
+        assertTrue(isMeasurementComplete(measuredSentences = 0, totalSentences = 0))
     }
 }

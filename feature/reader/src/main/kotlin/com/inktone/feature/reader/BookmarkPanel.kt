@@ -181,6 +181,16 @@ private fun NotesTab(notes: List<Annotation>, onClick: (Annotation) -> Unit) {
                     style = MaterialTheme.typography.bodyMedium,
                     fontWeight = FontWeight.Bold,
                 )
+                annotation.excerpt?.takeIf { it.isNotBlank() }?.let { excerpt ->
+                    Spacer(Modifier.height(4.dp))
+                    Text(
+                        excerpt,
+                        style = MaterialTheme.typography.bodySmall,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                        maxLines = 2,
+                        overflow = TextOverflow.Ellipsis,
+                    )
+                }
                 Spacer(Modifier.height(4.dp))
                 Text(
                     "Chapitre ${annotation.startLocator.chapterIndex + 1} · ${formatAnnotationDate(annotation.createdAt)}",
@@ -219,14 +229,15 @@ private fun HighlightsTab(highlights: List<Annotation>, onClick: (Annotation) ->
                 Spacer(Modifier.width(12.dp))
                 Column(modifier = Modifier.weight(1f)) {
                     Text(
-                        "Chapitre ${annotation.startLocator.chapterIndex + 1}",
+                        annotation.excerpt?.takeIf { it.isNotBlank() }
+                            ?: "Chapitre ${annotation.startLocator.chapterIndex + 1}",
                         style = MaterialTheme.typography.bodyMedium,
                         maxLines = 2,
                         overflow = TextOverflow.Ellipsis,
                     )
                     Spacer(Modifier.height(4.dp))
                     Text(
-                        formatAnnotationDate(annotation.createdAt),
+                        "Chapitre ${annotation.startLocator.chapterIndex + 1} · ${formatAnnotationDate(annotation.createdAt)}",
                         style = MaterialTheme.typography.labelSmall,
                         color = MaterialTheme.colorScheme.onSurfaceVariant,
                     )

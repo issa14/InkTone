@@ -316,6 +316,117 @@ class JsoupChapterParserTest {
         assertNotNull(block.globalOffsetRange)
     }
 
+    @Test
+    fun `div contenant plusieurs p produit un bloc par paragraphe`() {
+        // Motif courant des EPUB du commerce : tout le chapitre est enveloppé
+        // dans un <div>, les paragraphes étant ses enfants directs. Avant la
+        // récursion des conteneurs, ce chapitre était aplati en UN SEUL
+        // ParagraphBlock — gelant le compteur de page du mode SCROLL.
+        val html = """
+            <html><body>
+                <div class="div-chap">
+                    <p>Premier paragraphe.</p>
+                    <p>Deuxième paragraphe.</p>
+                    <p>Troisième paragraphe.</p>
+                </div>
+            </body></html>
+        """.trimIndent()
+        val chapter = parse(html)
+
+        val blocks = richBlocks(chapter)
+        assertEquals(3, blocks.size)
+        assertEquals("Premier paragraphe.", (blocks[0] as BookBlock.ParagraphBlock).richText.plainText)
+        assertEquals("Deuxième paragraphe.", (blocks[1] as BookBlock.ParagraphBlock).richText.plainText)
+        assertEquals("Troisième paragraphe.", (blocks[2] as BookBlock.ParagraphBlock).richText.plainText)
+
+        // Les offsets restent consécutifs (1 caractère de séparateur entre blocs).
+        assertEquals(blocks[0].globalOffsetRange!!.last + 2, blocks[1].globalOffsetRange!!.first)
+        assertEquals(blocks[1].globalOffsetRange!!.last + 2, blocks[2].globalOffsetRange!!.first)
+
+        // Chaque phrase pointe vers le bloc qui la contient.
+        val sentences = chapter.sentences
+        assertEquals(3, sentences.size)
+        assertEquals(0, sentences[0].blockIndex)
+        assertEquals(1, sentences[1].blockIndex)
+        assertEquals(2, sentences[2].blockIndex)
+    }
+
+    @Test
+    fun `div imbrique produit des blocs a tous les niveaux`() {
+        // Structure profonde : body > div > div > p (comme les EPUB
+        // « Le Trône de Fer » : <div class="div-chap"><div class="div-dev"><p>).
+        val html = """
+            <html><body>
+                <div class="div-chap">
+                    <h1>Chapitre</h1>
+                    <div class="div-dev">
+                        <p>Paragraphe un.</p>
+                        <p>Paragraphe deux.</p>
+                    </div>
+                </div>
+            </body></html>
+        """.trimIndent()
+        val chapter = parse(html)
+
+        val blocks = richBlocks(chapter)
+        assertEquals(3, blocks.size)
+        assertTrue(blocks[0] is BookBlock.HeadingBlock)
+        assertEquals("Paragraphe un.", (blocks[1] as BookBlock.ParagraphBlock).richText.plainText)
+        assertEquals("Paragraphe deux.", (blocks[2] as BookBlock.ParagraphBlock).richText.plainText)
+    }
+
+    @Test
+    fun `div de texte inline sans bloc enfant reste un seul paragraphe`() {
+        // Un <div> qui n'enveloppe que du contenu inline (aucun <p>/<h1>/…)
+        // ne doit PAS être découpé : il reste un paragraphe aplati.
+        val html = """<html><body><div class="note">Une simple note <b>en gras</b>.</div></body></html>"""
+        val chapter = parse(html)
+
+        val blocks = richBlocks(chapter)
+        assertEquals(1, blocks.size)
+        val block = blocks[0] as BookBlock.ParagraphBlock
+        assertEquals("Une simple note en gras.", block.richText.plainText)
+        assertTrue(block.richText.spans.any { SpanStyles.STRONG in it.styles })
+    }
+
+    @Test
+    fun `div melangeant texte inline et p regroupe le texte inline en un seul paragraphe`() {
+        // Bug réel trouvé à l'audit de la branche : avant ce correctif,
+        // hasBlockLevelChild(div) déclenchait extractContainerBlocks, qui
+        // traitait alors CHAQUE nœud enfant individuellement — le texte nu
+        // et le <b> se retrouvaient chacun scindés en leur propre
+        // ParagraphBlock isolé au lieu de rester un seul paragraphe fluide.
+        val html = """<html><body><div>Some <b>bold</b> text<p>Next paragraph.</p></div></body></html>"""
+        val chapter = parse(html)
+
+        val blocks = richBlocks(chapter)
+        assertEquals(2, blocks.size)
+
+        val first = blocks[0] as BookBlock.ParagraphBlock
+        assertEquals("Some bold text", first.richText.plainText)
+        assertTrue(first.richText.spans.any { SpanStyles.STRONG in it.styles })
+
+        val second = blocks[1] as BookBlock.ParagraphBlock
+        assertEquals("Next paragraph.", second.richText.plainText)
+    }
+
+    @Test
+    fun `div melangeant texte inline et img preserve l image et regroupe le texte`() {
+        // Même bug que ci-dessus, variante image : <img>/<svg> sont hors de
+        // BLOCK_LEVEL_TAGS (volontairement, voir sa KDoc) mais ne doivent
+        // jamais être fondues dans le texte inline environnant — sinon
+        // l'image est silencieusement perdue (extractRichTextFromNodes
+        // ignore les images).
+        val html = """<html><body><div>Avant <img src="x.png" alt="X"/><p>Après.</p></div></body></html>"""
+        val chapter = parse(html)
+
+        val blocks = richBlocks(chapter)
+        assertEquals(3, blocks.size)
+        assertEquals("Avant", (blocks[0] as BookBlock.ParagraphBlock).richText.plainText.trim())
+        assertEquals("x.png", (blocks[1] as BookBlock.ImageBlock).href)
+        assertEquals("Après.", (blocks[2] as BookBlock.ParagraphBlock).richText.plainText)
+    }
+
     // ---- Tests de fragment ----
 
     @Test

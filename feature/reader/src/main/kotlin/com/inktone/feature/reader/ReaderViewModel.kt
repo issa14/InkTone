@@ -739,7 +739,21 @@ class ReaderViewModel @Inject constructor(
                 return@launch
             }
             val chapters = _state.value.chapters.toMutableList()
-            chapters[chapterIndex] = richChapter
+            // Bug réel trouvé à l'audit (livres à couverture prépendue, ex.
+            // "L'Arcane des Épées") : EpubChapterParser recalcule
+            // `chapterIndex` depuis `publication.readingOrder.indexOf(link)`,
+            // sans connaître le décalage +1 appliqué par
+            // ReadiumPublicationParser.parseLazy quand une couverture est
+            // insérée en tête. `richChapter.index` peut donc diverger de sa
+            // position réelle dans `chapters` — invisible pour la pagination
+            // (auto-cohérente, toujours indexée par `chapter.index`), mais
+            // fatal pour le surlignage : `confirmAnnotation` sauvegarde le
+            // Locator avec ce `chapter.index` faux, alors que le rendu
+            // (BookBlockItem/PagedChapterContent) filtre par
+            // `state.currentChapterIndex` (la position, correcte) — les deux
+            // ne matchent jamais, la couleur ne s'affiche donc jamais.
+            // Seule source de vérité désormais : la position dans `chapters`.
+            chapters[chapterIndex] = richChapter.copy(index = chapterIndex)
             _state.value = _state.value.copy(chapters = chapters)
         }
     }
