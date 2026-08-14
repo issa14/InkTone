@@ -9,30 +9,41 @@ import kotlinx.coroutines.Deferred
 import kotlinx.coroutines.async
 
 /**
- * Précharge la synthèse de la phrase suivante pendant la lecture de la
- * phrase courante (Blueprint §8.7). Un seul slot d'avance — pas de file
- * profonde, la lecture est séquentielle par nature (une phrase à la
- * fois), inutile de précharger plus loin qu'une phrase.
+ * Précharge les phrases suivantes pendant la lecture de la phrase courante
+ * (Blueprint §8.7). Correctif Lot 14 : passe de 1 à [LOOKAHEAD] slots — un
+ * seul slot ne suffisait pas face à la latence de synthèse (Edge ~1 s) et
+ * la lecture retombait en synthèse à la volée (trou audible). [clear] est
+ * appelé au changement de chapitre (les indices de phrase sont locaux).
  */
 class SentenceAudioBuffer(private val scope: CoroutineScope, private val ttsEngine: TtsEngine) {
 
-    private var preloadedNext: Deferred<AudioSegment>? = null
-    private var preloadedForSentenceIndex: Int? = null
+    private val preloaded = mutableMapOf<Int, Deferred<AudioSegment>>()
 
-    fun preloadNext(sentence: Sentence, voiceProfile: VoiceProfile) {
-        if (preloadedForSentenceIndex == sentence.index) return // deja en cours ou fait
-        preloadedNext = scope.async { ttsEngine.synthesize(sentence, voiceProfile) }
-        preloadedForSentenceIndex = sentence.index
+    fun preload(sentence: Sentence, voiceProfile: VoiceProfile) {
+        if (preloaded.containsKey(sentence.index)) return
+        preloaded[sentence.index] = scope.async { ttsEngine.synthesize(sentence, voiceProfile) }
     }
 
-    /** Consomme le segment preload s'il correspond, sinon synthetise a la volee (repli, ex. saut manuel). */
-    suspend fun get(sentence: Sentence, voiceProfile: VoiceProfile): AudioSegment {
-        if (preloadedForSentenceIndex == sentence.index) {
-            val segment = preloadedNext!!.await()
-            preloadedNext = null
-            preloadedForSentenceIndex = null
-            return segment
+    /** Précharge jusqu'à [LOOKAHEAD] phrases après [fromIndex]. */
+    fun preloadAhead(sentences: List<Sentence>, fromIndex: Int, voiceProfile: VoiceProfile) {
+        for (i in 1..LOOKAHEAD) {
+            sentences.getOrNull(fromIndex + i)?.let { preload(it, voiceProfile) }
         }
-        return ttsEngine.synthesize(sentence, voiceProfile)
+    }
+
+    /** Consomme le segment préchargé s'il correspond, sinon synthétise à la volée (repli, ex. saut manuel). */
+    suspend fun get(sentence: Sentence, voiceProfile: VoiceProfile): AudioSegment {
+        val deferred = preloaded.remove(sentence.index)
+        return if (deferred != null) deferred.await() else ttsEngine.synthesize(sentence, voiceProfile)
+    }
+
+    /** Annule et vide les préchargements (changement de chapitre). */
+    fun clear() {
+        preloaded.values.forEach { it.cancel() }
+        preloaded.clear()
+    }
+
+    private companion object {
+        const val LOOKAHEAD = 3
     }
 }
