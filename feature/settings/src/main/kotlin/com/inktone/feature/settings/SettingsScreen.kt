@@ -205,8 +205,17 @@ internal fun SettingsContent(
         SectionGroup("Lecture") {
             SettingRow(
                 label = "Moteur de synthèse",
-                value = preferences.defaultTtsEngine.name,
+                value = ttsEngineLabel(preferences.defaultTtsEngine),
                 onClick = { showEnginePicker = true },
+            )
+            // Lot 14 — signaler les capacités du moteur sélectionné (§8.10) :
+            // jamais un changement silencieux. Edge (cloud) porte
+            // l'avertissement réseau ; les moteurs locaux sont explicites.
+            Text(
+                text = ttsEngineDescription(preferences.defaultTtsEngine),
+                style = MaterialTheme.typography.bodySmall,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                modifier = Modifier.padding(horizontal = 20.dp),
             )
             // Passage du cycle au dialogue : avec plusieurs profils, cycler devient impraticable.
             SettingRow(
@@ -501,9 +510,9 @@ internal fun SettingsContent(
         if (showEnginePicker) {
             PickerDialog(
                 title = "Moteur TTS",
-                options = TtsEngineId.entries.toList(),
+                options = TtsEngineId.entries.filter { it != TtsEngineId.PIPER },
                 selected = preferences.defaultTtsEngine,
-                label = { it.name },
+                label = { ttsEngineLabel(it) },
                 onSelect = { onIntent(SettingsIntent.SetDefaultTtsEngine(it)); showEnginePicker = false },
                 onDismiss = { showEnginePicker = false },
             )
@@ -1133,6 +1142,23 @@ private fun ConfirmDialog(
  * Correction (audit initial) : "Annuler" est dans dismissButton, pas confirmButton.
  * La sélection au clic est défendable ; le libellé dans le mauvais slot ne l'était pas.
  */
+
+/** Lot 14 — libellé lisible du moteur TTS (jamais `enum.name` brut, K12 : pas d'emoji). */
+private fun ttsEngineLabel(engine: TtsEngineId): String = when (engine) {
+    TtsEngineId.SHERPA_ONNX -> "Sherpa-ONNX (Kokoro)"
+    TtsEngineId.ANDROID_NATIVE -> "Voix système"
+    TtsEngineId.EDGE_TTS -> "Edge (cloud)"
+    TtsEngineId.PIPER -> "Piper (indisponible)"
+}
+
+/** Lot 14 — description des capacités par moteur (§8.10 : signaler pertes/gains, jamais silencieux). */
+private fun ttsEngineDescription(engine: TtsEngineId): String = when (engine) {
+    TtsEngineId.SHERPA_ONNX -> "Voix neuronale locale · surlignage mot à mot"
+    TtsEngineId.ANDROID_NATIVE -> "Voix du système · hors ligne · surlignage mot à mot"
+    TtsEngineId.EDGE_TTS -> "En ligne — nécessite une connexion. Repli automatique vers une voix locale hors connexion."
+    TtsEngineId.PIPER -> ""
+}
+
 @Composable
 private fun <T> PickerDialog(
     title: String,
