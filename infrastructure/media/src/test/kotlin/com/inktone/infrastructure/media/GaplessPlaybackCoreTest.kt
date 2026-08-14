@@ -1,6 +1,7 @@
 package com.inktone.infrastructure.media
 
 import com.inktone.domain.service.AudioSegment
+import com.inktone.domain.service.PlaybackPosition
 import com.inktone.domain.service.PlayerState
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
@@ -149,6 +150,28 @@ class GaplessPlaybackCoreTest {
     }
 
     @Test
+    fun positionEstEchantillonneePendantLecriture_etInvalideApresStop() = runBlocking {
+        val sink = FakePcmSink()
+        sink.sampledPosition = PlaybackPosition(playedFrame = 4_410, sampleRate = 22_050, timestampNanos = 123L, valid = true)
+        val scope = CoroutineScope(Dispatchers.IO + SupervisorJob())
+        try {
+            val core = GaplessPlaybackCore(sink, scope, pollTimeoutMs = 50)
+            assertFalse("position invalide avant lecture", core.playbackPosition.value.valid)
+
+            core.enqueue(segment(ByteArray(16)))
+            core.play()
+            awaitUntil { core.playbackPosition.value.valid }
+            assertEquals(4_410L, core.playbackPosition.value.playedFrame)
+            assertEquals(22_050, core.playbackPosition.value.sampleRate)
+
+            core.stop()
+            assertFalse("position invalide après stop", core.playbackPosition.value.valid)
+        } finally {
+            scope.cancel()
+        }
+    }
+
+    @Test
     fun stopPendantEcriture_attendLaFinPuisLibere() = runBlocking {
         val sink = FakePcmSink()
         sink.blockWrites = true
@@ -213,5 +236,10 @@ class GaplessPlaybackCoreTest {
         }
 
         override fun setTrackVolume(volume: Float) = Unit
+
+        @Volatile
+        var sampledPosition = PlaybackPosition(playedFrame = 0, sampleRate = 0, timestampNanos = null, valid = false)
+
+        override fun samplePlaybackPosition(): PlaybackPosition = sampledPosition
     }
 }

@@ -1,6 +1,7 @@
 package com.inktone.infrastructure.media
 
 import com.inktone.domain.service.AudioSegment
+import com.inktone.domain.service.PlaybackPosition
 import com.inktone.domain.service.PlayerState
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Job
@@ -39,8 +40,9 @@ import java.util.concurrent.locks.ReentrantLock
  * consommateur passif. L'ordre des segments et des silences est la
  * responsabilité de l'ordonnanceur (couche présentation).
  *
- * **Aucun flux de position** : la synchronisation du surlignage par position
- * réelle est reportée au LOT 16.
+ * **Position estimée** : [playbackPosition] est échantillonnée périodiquement
+ * depuis le track (Lot 16, spike positif) — un estimateur de la frame jouée,
+ * pas une vérité exacte au frame.
  *
  * @param sink couche I/O fine (l'`AudioTrack`) — jamais `AudioTrack` ici.
  * @param scope scope possédé par le lecteur ; les coroutines de consommation
@@ -79,6 +81,9 @@ class GaplessPlaybackCore(
 
         /** Règle le volume du track (`0.0` = silence, `1.0` = max). */
         fun setTrackVolume(volume: Float)
+
+        /** Échantillonne la position de lecture réelle (track nul → [PlaybackPosition] invalide). */
+        fun samplePlaybackPosition(): PlaybackPosition
     }
 
     private val queue = ConcurrentLinkedQueue<AudioSegment>()
@@ -105,6 +110,10 @@ class GaplessPlaybackCore(
 
     /** Nombre de segments encore en attente (non écrits). */
     val pendingCount: Int get() = queue.size
+
+    /** Position de lecture estimée, échantillonnée périodiquement depuis le track. */
+    private val _playbackPosition = MutableStateFlow<PlaybackPosition>(INVALID_POSITION)
+    val playbackPosition: StateFlow<PlaybackPosition> = _playbackPosition.asStateFlow()
 
     /** Fréquence d'échantillonnage (Hz) de configuration du track. */
     @Volatile
@@ -146,6 +155,7 @@ class GaplessPlaybackCore(
         willStop = true
         _state.value = PlayerState.Stopped
         consumerJob?.cancel()
+        _playbackPosition.value = INVALID_POSITION
 
         queue.clear()
         queueSemaphore.drainPermits()
@@ -215,6 +225,11 @@ class GaplessPlaybackCore(
                 val written = sink.write(data, offset, length)
                 if (written <= 0) return
                 offset += written
+                // Échantillonner la position à chaque chunk, sous le verrou déjà
+                // tenu : la lecture de position touche l'AudioTrack natif, comme
+                // l'écriture et la libération. Échantillonner ici (et non dans un
+                // coroutine séparé) évite l'affame par le verrou d'écriture.
+                _playbackPosition.value = sink.samplePlaybackPosition()
             } finally {
                 writeLock.unlock()
             }
@@ -225,5 +240,6 @@ class GaplessPlaybackCore(
         const val DEFAULT_POLL_TIMEOUT_MS = 200L
         const val DEFAULT_SAMPLE_RATE = 22_050
         const val CHUNK_SIZE_BYTES = 8192
+        val INVALID_POSITION = PlaybackPosition(playedFrame = 0, sampleRate = 0, timestampNanos = null, valid = false)
     }
 }
