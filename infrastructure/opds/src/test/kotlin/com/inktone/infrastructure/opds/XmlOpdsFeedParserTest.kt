@@ -148,4 +148,47 @@ class OpdsFeedParserTest {
 
         assertEquals("A  B", (feed.items[0] as OpdsItem.Book).title)
     }
+
+    @Test
+    fun un_lien_atom_sans_rel_est_reconnu_comme_navigation() {
+        // Fixture type ebooksgratuits : lien de navigation SANS rel,
+        // seulement type="application/atom+xml".
+        val xml = """
+            <feed xmlns="http://www.w3.org/2005/Atom">
+              <title>T</title>
+              <entry>
+                <title>Dernières parutions</title>
+                <link type="application/atom+xml" href="/opds/feed.php"/>
+              </entry>
+            </feed>
+        """.trimIndent()
+
+        val feed = (parser.parse(xml, "https://www.ebooksgratuits.com/opds/index.php") as OpdsParseResult.Success).feed
+
+        assertEquals(1, feed.items.size)
+        val nav = feed.items[0] as OpdsItem.Navigation
+        assertEquals("Dernières parutions", nav.title)
+        assertEquals("https://www.ebooksgratuits.com/opds/feed.php", nav.href)
+    }
+
+    @Test
+    fun un_lien_rel_sort_avec_type_atom_est_aussi_une_navigation() {
+        // Fixture type unglue.it : rel="http://opds-spec.org/sort/popular"
+        // + type application/atom+xml.
+        val xml = """
+            <feed xmlns="http://www.w3.org/2005/Atom">
+              <title>T</title>
+              <entry>
+                <title>Popular</title>
+                <link rel="http://opds-spec.org/sort/popular" type="application/atom+xml" href="all/?order_by=popular"/>
+              </entry>
+            </feed>
+        """.trimIndent()
+
+        val feed = (parser.parse(xml, "https://unglue.it/api/opds/") as OpdsParseResult.Success).feed
+
+        val nav = feed.items[0] as OpdsItem.Navigation
+        assertEquals("Popular", nav.title)
+        assertEquals("https://unglue.it/api/opds/all/?order_by=popular", nav.href)
+    }
 }

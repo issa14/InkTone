@@ -92,21 +92,35 @@ class XmlOpdsFeedParser @Inject constructor() : OpdsFeedParser {
                         val template = parser.getAttributeValue(null, "template")
                         val resolved = href?.let { resolve(baseUrl, it) }
                         when {
-                            rel == null || resolved == null -> Unit
-                            inEntry -> when {
-                                rel == "subsection" || rel == "collection" || rel == "http://opds-spec.org/group" -> {
-                                    if (entryNavHref == null) entryNavHref = resolved
-                                }
-                                rel.startsWith("http://opds-spec.org/acquisition") -> {
-                                    // Préfère le lien EPUB direct s'il y a plusieurs liens d'acquisition.
-                                    if (entryAcqHref == null || (isEpub(type) && !isEpub(entryAcqType))) {
-                                        entryAcqHref = resolved
-                                        entryAcqType = type
+                            rel == null && resolved == null -> Unit
+                            inEntry -> {
+                                val isAcquisition = rel?.startsWith("http://opds-spec.org/acquisition") == true
+                                val isCover = rel?.startsWith("http://opds-spec.org/image") == true ||
+                                    rel == "http://opds-spec.org/cover" ||
+                                    type?.startsWith("image/", ignoreCase = true) == true
+                                // Navigation : rel explicite OU lien vers un flux Atom/OPDS.
+                                // Le repli sur le type couvre les flux non conformes
+                                // (ebooksgratuits, unglue.it) qui n'émettent pas de
+                                // rel="subsection".
+                                val isNavigation = rel == "subsection" || rel == "collection" ||
+                                    rel == "http://opds-spec.org/group" ||
+                                    type?.contains("atom", ignoreCase = true) == true ||
+                                    type?.contains("opds", ignoreCase = true) == true
+                                when {
+                                    isAcquisition -> {
+                                        // Préfère le lien EPUB direct s'il y a plusieurs liens d'acquisition.
+                                        if (entryAcqHref == null || (isEpub(type) && !isEpub(entryAcqType))) {
+                                            entryAcqHref = resolved
+                                            entryAcqType = type
+                                        }
                                     }
-                                }
-                                rel.startsWith("http://opds-spec.org/image") || rel == "http://opds-spec.org/cover" -> {
-                                    // Préfère la vignette (`.../thumbnail`) à l'image pleine.
-                                    if (entryCoverUrl == null || rel.endsWith("/thumbnail")) entryCoverUrl = resolved
+                                    isCover -> {
+                                        // Préfère la vignette (`.../thumbnail`) à l'image pleine.
+                                        if (entryCoverUrl == null || rel.endsWith("/thumbnail")) entryCoverUrl = resolved
+                                    }
+                                    isNavigation -> {
+                                        if (entryNavHref == null) entryNavHref = resolved
+                                    }
                                 }
                             }
                             rel == "next" -> nextPageUrl = resolved

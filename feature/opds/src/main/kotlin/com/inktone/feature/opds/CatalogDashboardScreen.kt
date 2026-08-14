@@ -288,10 +288,11 @@ private fun CatalogCard(
 }
 
 /** Catalogues par défaut proposés en pré-remplissage (décision actée §10, jamais imposés).
- * Gutenberg a été écarté : son endpoint OPDS renvoie 403 à tout client (bot policy serveur). */
+ * Gutenberg (403), Feedbooks (flux vide depuis Cantook Market) et Gallica (403)
+ * sont écartés — vérifié empiriquement le 2026-08-14, pas supposé. */
 private object DefaultCatalogs {
     val EBOOKS_GRATUITS = "Ebooks gratuits" to "https://www.ebooksgratuits.com/opds/"
-    val FEEDBOOKS = "Feedbooks" to "https://catalog.feedbooks.com/catalog.atom"
+    val UNGLUE_IT = "Unglue.it" to "https://unglue.it/api/opds/"
 }
 
 @OptIn(ExperimentalMaterial3Api::class)
@@ -323,9 +324,9 @@ private fun AddCatalogBottomSheet(
                     rootUrl = DefaultCatalogs.EBOOKS_GRATUITS.second
                 }) { Text("Ebooks gratuits") }
                 OutlinedButton(onClick = {
-                    name = DefaultCatalogs.FEEDBOOKS.first
-                    rootUrl = DefaultCatalogs.FEEDBOOKS.second
-                }) { Text("Feedbooks") }
+                    name = DefaultCatalogs.UNGLUE_IT.first
+                    rootUrl = DefaultCatalogs.UNGLUE_IT.second
+                }) { Text("Unglue.it") }
             }
 
             OutlinedTextField(
