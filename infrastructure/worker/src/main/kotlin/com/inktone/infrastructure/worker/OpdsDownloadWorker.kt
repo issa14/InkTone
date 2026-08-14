@@ -23,9 +23,15 @@ import java.util.UUID
  * réutilise le pipeline d'import EPUB existant ([ImportPublicationUseCase],
  * qui détecte le DRM — K7 — et normalise les hrefs — K6), jamais un second
  * chemin. Le fichier est écrit dans le stockage privé de l'app
- * (`getExternalFilesDir`, jamais `MANAGE_EXTERNAL_STORAGE`, K5 respecté),
- * exposé en `content://` via un `FileProvider` app-scopé, puis purgé une
- * fois l'import terminé (succès ou échec).
+ * (`getExternalFilesDir`, jamais `MANAGE_EXTERNAL_STORAGE`, K5 respecté) et
+ * exposé en `content://` via un `FileProvider` app-scopé.
+ *
+ * Cycle de vie du fichier : il EST le stockage du livre importé — conservé
+ * en cas de succès (le Reader le lit via cette URI), purgé en cas d'échec
+ * (DRM, corrompu, format non supporté), de doublon ou d'annulation, pour ne
+ * jamais laisser d'orphelin. Nom unique (UUID) : deux livres homonymes ne
+ * s'écrasent pas, et un re-téléchargement du même titre ne supprime pas le
+ * fichier du livre déjà importé.
  */
 @HiltWorker
 class OpdsDownloadWorker @AssistedInject constructor(
@@ -49,13 +55,12 @@ class OpdsDownloadWorker @AssistedInject constructor(
         }
         if (isStopped) return Result.failure()
 
-        // 2. Écriture dans le stockage privé de l'app.
+        // 2. Écriture dans le stockage privé de l'app — nom unique pour ne
+        // jamais écraser un autre livre.
         val file = withContext(Dispatchers.IO) {
             val dir = File(applicationContext.getExternalFilesDir(null), DIR_DOWNLOADS)
             dir.mkdirs()
-            val safeName = bookTitle.replace(Regex("[^A-Za-z0-9._ -]"), "_")
-                .take(MAX_NAME_LENGTH).ifBlank { "download" }
-            val target = File(dir, "$safeName.epub")
+            val target = File(dir, "${UUID.randomUUID()}.epub")
             target.writeBytes((download as OpdsDownloadResult.Success).bytes)
             target
         }
@@ -73,19 +78,22 @@ class OpdsDownloadWorker @AssistedInject constructor(
         )
         val result = importPublication(uri.toString())
 
-        // 4. Purge du stockage privé (succès OU échec).
-        file.delete()
-
         return when (result) {
             is ImportResult.Success -> {
+                // Le fichier téléchargé est désormais le stockage du livre :
+                // il reste en place, le Reader le lit via son URI.
                 downloadObserver.publish(OpdsDownloadEvent(bookTitle, result.publication.id, true))
                 Result.success()
             }
             is ImportResult.Duplicate -> {
+                // Doublon : le livre existe déjà, ce fichier est orphelin.
+                file.delete()
                 downloadObserver.publish(OpdsDownloadEvent(bookTitle, result.existingPublicationId, true))
                 Result.success()
             }
             else -> {
+                // Échec (DRM, corrompu, non supporté) : on purge l'orphelin.
+                file.delete()
                 downloadObserver.publish(OpdsDownloadEvent(bookTitle, null, false))
                 Result.failure()
             }
@@ -97,6 +105,5 @@ class OpdsDownloadWorker @AssistedInject constructor(
         const val KEY_CATALOG_ID = "catalog_id"
         const val KEY_BOOK_TITLE = "book_title"
         private const val DIR_DOWNLOADS = "opds_downloads"
-        private const val MAX_NAME_LENGTH = 100
     }
 }
