@@ -63,6 +63,8 @@ import com.inktone.domain.model.ReadingTheme
 import com.inktone.domain.model.TtsEngineId
 import com.inktone.domain.model.UserPreferences
 import com.inktone.domain.model.VoiceProfile
+import com.inktone.domain.model.availableVoicesFor
+import com.inktone.domain.model.voiceLabel
 
 /**
  * Écran Réglages (Tâche 8.1).
@@ -198,7 +200,7 @@ internal fun SettingsContent(
         var showVoicePicker by remember { mutableStateOf(false) }
 
         val activeVoiceProfile = voiceProfiles.find { it.id == preferences.activeVoiceProfileId }
-        val activeVoiceName = activeVoiceProfile?.voice ?: "Voix par défaut"
+        val activeVoiceName = activeVoiceProfile?.voice?.let(::voiceLabel) ?: "Voix par défaut"
         val activeSpeed = activeVoiceProfile?.speed ?: 1.0f
         val activePitch = activeVoiceProfile?.pitch ?: 1.0f
 
@@ -518,13 +520,15 @@ internal fun SettingsContent(
             )
         }
         if (showVoicePicker) {
-            // Si aucun profil disponible, afficher un dialogue vide (cas sans modèle téléchargé)
+            // Lot 14 — liste les VOIX du moteur sélectionné (pas les profils) :
+            // Edge expose Vivienne et Henri, le legacy les avait toutes deux.
+            val engineVoices = availableVoicesFor(preferences.defaultTtsEngine)
             PickerDialog(
                 title = "Voix",
-                options = voiceProfiles,
-                selected = activeVoiceProfile,
-                label = { it.voice },
-                onSelect = { onIntent(SettingsIntent.SetActiveVoiceProfile(it.id)); showVoicePicker = false },
+                options = engineVoices,
+                selected = activeVoiceProfile?.voice,
+                label = { voiceLabel(it) },
+                onSelect = { onIntent(SettingsIntent.SetActiveVoiceProfileVoice(it)); showVoicePicker = false },
                 onDismiss = { showVoicePicker = false },
             )
         }
