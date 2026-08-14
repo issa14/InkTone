@@ -1,6 +1,20 @@
 package com.inktone.feature.reader
 
+import android.os.SystemClock
+import androidx.compose.animation.core.Animatable
+import androidx.compose.animation.core.Spring
 import androidx.compose.animation.core.animateFloatAsState
+import androidx.compose.animation.core.spring
+import androidx.compose.foundation.gestures.Orientation
+import androidx.compose.runtime.snapshotFlow
+import androidx.compose.ui.input.nestedscroll.nestedScroll
+import com.inktone.feature.reader.transition.ChapterTransitionConnection
+import com.inktone.feature.reader.transition.ChapterTransitionDirection
+import com.inktone.feature.reader.transition.ChapterTransitionIndicator
+import com.inktone.feature.reader.transition.ChapterTransitionMath
+import com.inktone.feature.reader.transition.ChapterTransitionState
+import kotlinx.coroutines.flow.collect
+import kotlinx.coroutines.flow.first
 import androidx.compose.animation.core.animateIntAsState
 import androidx.compose.animation.core.tween
 import androidx.compose.animation.ExperimentalSharedTransitionApi
@@ -531,9 +545,7 @@ fun ReaderScreen(
             val target = pendingHighlightTarget ?: return@LaunchedEffect
             val chapter = state.currentChapter ?: return@LaunchedEffect
             if (chapter.index != target.chapterIndex) return@LaunchedEffect
-            val totalSentences = chapter.sentences.size
-            val measuredSentences = pagination.measurement?.sentenceStartOffsets?.size ?: 0
-            if (measuredSentences >= totalSentences) {
+            if (pagination.isMeasurementComplete(chapter)) {
                 viewModel.onIntent(ReaderIntent.ChapterLayoutCompleted(chapter.index))
             }
         }
@@ -627,43 +639,142 @@ fun ReaderScreen(
                     val scrollHighlightedRangeState = rememberUpdatedState(scrollHighlightedRange)
                     val scrollFreeSelectedRangeState = rememberUpdatedState(freeSelectedRange)
 
-                    LazyColumn(
-                        state = scrollState,
-                        modifier = Modifier.fillMaxSize(),
-                        userScrollEnabled = freeSelectedRange == null,
-                    ) {
-                        items(
-                            items = blocks,
-                            key = { block ->
-                                val range = block.globalOffsetRange
-                                if (range != null) "${state.currentChapterIndex}-${range.first}"
-                                else "${state.currentChapterIndex}-img-${(block as? com.inktone.domain.model.BookBlock.ImageBlock)?.href ?: "sep"}"
+                    // Transition de chapitre par résistance spatiale (overscroll).
+                    // État local au geste — jamais dans ReaderUiState (MVI) : la
+                    // navigation réelle reste ReaderIntent.Next/PreviousChapter.
+                    val chapterTransition = remember { ChapterTransitionState() }
+                    LaunchedEffect(readingAreaSize) {
+                        chapterTransition.thresholdPx = readingAreaSize.height * 0.25f
+                    }
+
+                    // Décalage visuel : suit le doigt instantanément (snapTo) pendant
+                    // le tirage, puis rebond élastique (spring) au relâchement.
+                    val visualPull = remember { Animatable(0f) }
+                    LaunchedEffect(chapterTransition.isDragging) {
+                        if (chapterTransition.isDragging) {
+                            snapshotFlow { chapterTransition.pullPx }.collect { visualPull.snapTo(it) }
+                        } else {
+                            visualPull.animateTo(
+                                0f,
+                                spring(
+                                    dampingRatio = Spring.DampingRatioMediumBouncy,
+                                    stiffness = Spring.StiffnessMediumLow,
+                                ),
+                            )
+                        }
+                    }
+
+                    val latestState = rememberUpdatedState(state)
+                    val chapterTransitionConnection = remember(chapterTransition, scrollState) {
+                        ChapterTransitionConnection(
+                            state = chapterTransition,
+                            orientation = Orientation.Vertical,
+                            canPullPrevious = { !scrollState.canScrollBackward && latestState.value.hasPreviousChapter },
+                            canPullNext = { !scrollState.canScrollForward && latestState.value.hasNextChapter },
+                            // Bug réel trouvé à l'audit : sans cette garde, un
+                            // glissement de sélection de texte au bord du
+                            // chapitre pouvait être capté par ce geste de
+                            // tirage plutôt que par le champ de texte.
+                            isSelectionActive = { scrollFreeSelectedRangeState.value != null },
+                            onCommit = { direction ->
+                                val target = when (direction) {
+                                    ChapterTransitionDirection.PREVIOUS ->
+                                        (latestState.value.currentChapterIndex - 1).coerceAtLeast(0)
+                                    ChapterTransitionDirection.NEXT ->
+                                        (latestState.value.currentChapterIndex + 1)
+                                            .coerceAtMost(latestState.value.chapters.lastIndex)
+                                }
+                                chapterTransition.beginLoading(target)
+                                viewModel.onIntent(
+                                    if (direction == ChapterTransitionDirection.PREVIOUS)
+                                        ReaderIntent.PreviousChapter else ReaderIntent.NextChapter
+                                )
                             },
-                        ) { block ->
-                            BookBlockItem(
-                                block = block,
-                                baseTextStyle = textStyle,
-                                resolver = state.epubResourceResolver,
-                                publicationId = state.publicationId,
-                                chapterIndex = state.currentChapterIndex,
-                                annotations = state.annotations,
-                                highlightedRange = scrollHighlightedRangeState,
-                                freeSelectedRange = scrollFreeSelectedRangeState,
-                                onFreeSelectionChanged = { anchor, focus ->
-                                    viewModel.onIntent(ReaderIntent.SetFreeSelection(anchor, focus))
-                                },
-                                onFreeSelectionCleared = { viewModel.onIntent(ReaderIntent.ClearFreeSelection) },
-                                onFreeSelectionBoundsInWindow = { ownerKey, bounds ->
-                                    scrollFreeSelectionBounds = resolveSelectionPopupBounds(
-                                        current = scrollFreeSelectionBounds,
-                                        ownerKey = ownerKey,
-                                        bounds = bounds,
+                            onCancel = { chapterTransition.cancel() },
+                        )
+                    }
+
+                    // Spinner maintenu jusqu'à ce que le chapitre cible soit prêt
+                    // (parse paresseux), avec un minimum de 400 ms anti-flash.
+                    LaunchedEffect(chapterTransition.isLoading) {
+                        if (!chapterTransition.isLoading) return@LaunchedEffect
+                        val target = chapterTransition.targetChapterIndex
+                        val startedAt = SystemClock.uptimeMillis()
+                        snapshotFlow {
+                            val chapter = latestState.value.chapters.getOrNull(target)
+                            chapter != null &&
+                                (chapter.content as? ChapterContent.Rich)?.blocks?.isNotEmpty() == true
+                        }.first { it }
+                        val elapsed = SystemClock.uptimeMillis() - startedAt
+                        if (elapsed < ChapterTransitionMath.MIN_LOADING_MS) {
+                            delay(ChapterTransitionMath.MIN_LOADING_MS - elapsed)
+                        }
+                        chapterTransition.finish()
+                    }
+
+                    Box(modifier = Modifier.fillMaxSize()) {
+                        LazyColumn(
+                                state = scrollState,
+                                modifier = Modifier
+                                    .fillMaxSize()
+                                    .graphicsLayer { translationY = visualPull.value }
+                                    .nestedScroll(chapterTransitionConnection),
+                                userScrollEnabled = freeSelectedRange == null,
+                            ) {
+                                items(
+                                    items = blocks,
+                                    key = { block ->
+                                        val range = block.globalOffsetRange
+                                        if (range != null) "${state.currentChapterIndex}-${range.first}"
+                                        else "${state.currentChapterIndex}-img-${(block as? com.inktone.domain.model.BookBlock.ImageBlock)?.href ?: "sep"}"
+                                    },
+                                ) { block ->
+                                    BookBlockItem(
+                                        block = block,
+                                        baseTextStyle = textStyle,
+                                        resolver = state.epubResourceResolver,
+                                        publicationId = state.publicationId,
+                                        chapterIndex = state.currentChapterIndex,
+                                        annotations = state.annotations,
+                                        highlightedRange = scrollHighlightedRangeState,
+                                        freeSelectedRange = scrollFreeSelectedRangeState,
+                                        onFreeSelectionChanged = { anchor, focus ->
+                                            viewModel.onIntent(ReaderIntent.SetFreeSelection(anchor, focus))
+                                        },
+                                        onFreeSelectionCleared = { viewModel.onIntent(ReaderIntent.ClearFreeSelection) },
+                                        onFreeSelectionBoundsInWindow = { ownerKey, bounds ->
+                                            scrollFreeSelectionBounds = resolveSelectionPopupBounds(
+                                                current = scrollFreeSelectionBounds,
+                                                ownerKey = ownerKey,
+                                                bounds = bounds,
+                                            )
+                                        },
+                                        onClick = { handleReadingAreaTap() },
+                                        isReadingRulerEnabled = state.isReadingRulerEnabled,
+                                        onCurrentLineY = { y -> currentLineYDp = y },
+                                        modifier = Modifier.fillMaxWidth(),
                                     )
-                                },
-                                onClick = { handleReadingAreaTap() },
-                                isReadingRulerEnabled = state.isReadingRulerEnabled,
-                                onCurrentLineY = { y -> currentLineYDp = y },
-                                modifier = Modifier.fillMaxWidth(),
+                                }
+                            }
+
+                        val transitionDirection = chapterTransition.direction
+                        if (transitionDirection != null) {
+                            ChapterTransitionIndicator(
+                                direction = transitionDirection,
+                                fraction = ChapterTransitionMath.fraction(
+                                    visualPull.value,
+                                    chapterTransition.thresholdPx,
+                                ),
+                                isLoading = chapterTransition.isLoading,
+                                reduceMotion = state.reduceMotion,
+                                contentColor = ThemeColors.text(state.resolvedTheme),
+                                surfaceColor = ThemeColors.barSurface(state.resolvedTheme),
+                                modifier = Modifier
+                                    .align(
+                                        if (transitionDirection == ChapterTransitionDirection.PREVIOUS)
+                                            Alignment.TopCenter else Alignment.BottomCenter
+                                    )
+                                    .padding(vertical = 8.dp),
                             )
                         }
                     }
@@ -676,10 +787,20 @@ fun ReaderScreen(
                         highlightedWordRange = state.highlightedWordRange,
                         annotations = state.annotations,
                         currentChapterIndex = state.currentChapterIndex,
+                        chapterCount = state.chapters.size,
                         textColor = ThemeColors.text(state.resolvedTheme),
                         isReadingRulerEnabled = state.isReadingRulerEnabled,
                         onClick = { handleReadingAreaTap() },
                         onNextChapter = { viewModel.onIntent(ReaderIntent.NextChapter) },
+                        onPreviousChapter = { viewModel.onIntent(ReaderIntent.PreviousChapter) },
+                        hasPreviousChapter = state.hasPreviousChapter,
+                        hasNextChapter = state.hasNextChapter,
+                        reduceMotion = state.reduceMotion,
+                        surfaceColor = ThemeColors.barSurface(state.resolvedTheme),
+                        isChapterReady = { index ->
+                            val c = state.chapters.getOrNull(index)
+                            c != null && (c.content as? ChapterContent.Rich)?.blocks?.isNotEmpty() == true
+                        },
                         onCurrentLineY = { y -> currentLineYDp = y },
                         onPageChanged = { pageIndex -> pagedLivePageIndex = pageIndex },
                         onManualPageChange = { sentenceIndex ->
@@ -918,16 +1039,29 @@ fun ReaderScreen(
                 // d'estimation par fraction de défilement, qui supposait à tort une
                 // densité de texte uniforme sur le chapitre.
                 state.currentChapter?.let { chapter ->
-                    val pageCountInChapter = pagination.pageCount(chapter.index)
-                    val pageIndexInChapter = when (state.readingMode) {
-                        ReadingMode.PAGED -> pagedLivePageIndex
-                        ReadingMode.SCROLL -> pagination.pageIndexAt(chapter.index, state.currentSentenceIndex)
+                    // Mesure complète uniquement : tant que la pagination
+                    // n'a pas couvert toutes les phrases du chapitre,
+                    // `pageCount` et `pageIndexAt` reflètent un préfixe
+                    // borné (3a.3) — les présenter ferait un faux total
+                    // (« Chapitre 12 (54/54) » alors que le chapitre
+                    // continue). Sans compteur, seule la ligne « Chapitre N »
+                    // est affichée (voir StatusLineBar.chapterCounterText).
+                    val complete = pagination.isMeasurementComplete(chapter)
+                    val pageCountInChapter = if (complete) pagination.pageCount(chapter.index) else 0
+                    val pageIndexInChapter = if (complete) {
+                        when (state.readingMode) {
+                            ReadingMode.PAGED -> pagedLivePageIndex
+                            ReadingMode.SCROLL -> pagination.pageIndexAt(chapter.index, state.currentSentenceIndex)
+                        }
+                    } else {
+                        0
                     }
                     StatusLineBar(
                         chapterNumber = state.currentChapterIndex + 1,
                         pageInChapter = pageIndexInChapter + 1,
                         pageCountInChapter = pageCountInChapter,
                         bookProgression = state.bookProgression,
+                        showPageCounter = complete,
                     )
                 }
             }
