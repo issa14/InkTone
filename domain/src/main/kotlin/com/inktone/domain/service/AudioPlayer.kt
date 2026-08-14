@@ -15,9 +15,11 @@ import kotlinx.coroutines.flow.StateFlow
  * l'ordre des segments et des silences ponctués — le lecteur n'a aucune
  * notion de phrase, de chapitre ou de surlignage.
  *
- * **Aucun flux de position** dans ce contrat : la synchronisation du
- * surlignage par position réelle est reportée au LOT 16 (spike d'abord). Tant
- * que ce flux n'existe pas, rien ne consomme la position `AudioTrack`.
+ * **Flux de position estimée** : [playbackPosition] expose une position de
+ * lecture estimée depuis la tête réelle du lecteur (`getTimestamp()`, Lot 16,
+ * spike positif). [PlaybackPosition.valid] est faux à l'arrêt — le
+ * consommateur doit prévoir un repli. La position est un **estimateur** (frame
+ * jouée déduite), pas une vérité exacte au frame.
  *
  * Garanties de contrat pour toute implémentation :
  * - **Thread-safe** : les méthodes peuvent être appelées depuis n'importe
@@ -78,6 +80,14 @@ interface AudioPlayer {
 
     /** Nombre de segments encore en attente dans la file (non écrits). */
     val pendingCount: Int
+
+    /**
+     * Position de lecture estimée depuis la tête réelle du lecteur
+     * (`getTimestamp()`, avec repli `getPlaybackHeadPosition()`). [PlaybackPosition.valid]
+     * est faux quand le lecteur est à l'arrêt — le consommateur doit alors
+     * retomber sur son propre repli (surlignage `delay()`-based).
+     */
+    val playbackPosition: StateFlow<PlaybackPosition>
 }
 
 /**
@@ -96,4 +106,22 @@ sealed interface PlayerState {
 
     /** Lecture arrêtée, file vidée par [AudioPlayer.stop]. */
     data object Stopped : PlayerState
+}
+
+/**
+ * Position de lecture estimée (Lot 16, spike positif). [playedFrame] est la
+ * frame jouée déduite de la tête réelle ; [sampleRate] le taux auquel cette
+ * frame est exprimée ; [timestampNanos] l'horodatage du dernier échantillon
+ * `getTimestamp()` (null si le repli `getPlaybackHeadPosition()` a été utilisé).
+ * [valid] est faux à l'arrêt — jamais interpréter [playedFrame] dans ce cas.
+ */
+data class PlaybackPosition(
+    val playedFrame: Long,
+    val sampleRate: Int,
+    val timestampNanos: Long?,
+    val valid: Boolean,
+) {
+    /** Position jouée en millisecondes (dérivée, jamais stockée). */
+    val playedMs: Long
+        get() = if (sampleRate > 0) playedFrame * 1_000L / sampleRate else 0L
 }

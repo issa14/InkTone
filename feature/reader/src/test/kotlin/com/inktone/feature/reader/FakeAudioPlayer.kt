@@ -2,6 +2,7 @@ package com.inktone.feature.reader
 
 import com.inktone.domain.service.AudioPlayer
 import com.inktone.domain.service.AudioSegment
+import com.inktone.domain.service.PlaybackPosition
 import com.inktone.domain.service.PlayerState
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
@@ -22,6 +23,14 @@ class FakeAudioPlayer : AudioPlayer {
     private val _state = MutableStateFlow<PlayerState>(PlayerState.Idle)
     override val state: StateFlow<PlayerState> = _state.asStateFlow()
     override val pendingCount: Int get() = enqueued.size
+
+    private val _playbackPosition = MutableStateFlow<PlaybackPosition>(INVALID_POSITION)
+    override val playbackPosition: StateFlow<PlaybackPosition> = _playbackPosition.asStateFlow()
+
+    /** Règle la position que le fake expose (tests de surlignage par position). */
+    fun emitPosition(position: PlaybackPosition) {
+        _playbackPosition.value = position
+    }
 
     override fun enqueue(segment: AudioSegment) {
         enqueued.add(segment)
@@ -53,4 +62,8 @@ class FakeAudioPlayer : AudioPlayer {
     }
 
     override fun setVolume(volume: Float) = Unit
+
+    private companion object {
+        val INVALID_POSITION = PlaybackPosition(playedFrame = 0, sampleRate = 0, timestampNanos = null, valid = false)
+    }
 }
