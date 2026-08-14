@@ -75,4 +75,20 @@ class SafFileStorageServiceTest {
         source.delete()
         destination.delete()
     }
+
+    @Test
+    fun une_uri_fileprovider_app_scope_est_reconnue_comme_possedee_par_l_app() {
+        val appOwned = "content://${context.packageName}.fileprovider/opds_downloads/livre.epub"
+        val foreign = "content://com.autre.app.documents/document/42"
+
+        assertEquals(true, service.isAppOwned(appOwned))
+        assertEquals(false, service.isAppOwned(foreign))
+    }
+
+    @Test
+    fun persistReadPermission_est_un_no_op_sur_une_uri_app_scope() = runTest {
+        // Ne doit pas lever — takePersistableUriPermission serait invalide ici
+        // (URI FileProvider app-scopée, jamais une URI de picker SAF).
+        service.persistReadPermission("content://${context.packageName}.fileprovider/opds_downloads/livre.epub")
+    }
 }

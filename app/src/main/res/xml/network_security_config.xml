@@ -1,0 +1,23 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+  Lot 13, tâche 13.2.1 (ADR-023, décision actée §10) :
+  `cleartextTrafficPermitted="true"` en base-config autorise le HTTP en
+  clair app-large pour les catalogues OPDS personnels (serveur local
+  type Calibre-Web en http://).
+
+  Pourquoi un flag global plutôt qu'une liste blanche par domaine :
+  l'API Android `NetworkSecurityConfig` est statique — il n'existe pas
+  d'API publique pour enregistrer un domaine cleartext à l'exécution.
+  Le garde-fou réel est donc applicatif, pas réseau :
+    (a) les catalogues par défaut (Gutenberg, Feedbooks) sont codés en
+        dur en HTTPS et non éditables vers http:// depuis l'UI ;
+    (b) `AddCatalogBottomSheet` affiche un avertissement explicite et
+        non désactivable si l'URL saisie est http://.
+
+  Aucun contournement TLS ici : un catalogue https:// avec certificat
+  invalide échoue normalement — ce n'est pas la même chose que le
+  http:// assumé.
+-->
+<network-security-config>
+    <base-config cleartextTrafficPermitted="true" />
+</network-security-config>

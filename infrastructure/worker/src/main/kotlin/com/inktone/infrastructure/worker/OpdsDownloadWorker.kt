@@ -1,0 +1,109 @@
+package com.inktone.infrastructure.worker
+
+import android.content.Context
+import androidx.core.content.FileProvider
+import androidx.hilt.work.HiltWorker
+import androidx.work.CoroutineWorker
+import androidx.work.WorkerParameters
+import com.inktone.domain.service.OpdsDownloadEvent
+import com.inktone.domain.service.OpdsDownloadObserver
+import com.inktone.domain.service.OpdsDownloadResult
+import com.inktone.domain.service.OpdsHttpClient
+import com.inktone.domain.usecase.ImportPublicationUseCase
+import com.inktone.domain.usecase.ImportResult
+import dagger.assisted.Assisted
+import dagger.assisted.AssistedInject
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.withContext
+import java.io.File
+import java.util.UUID
+
+/**
+ * Téléchargement d'un livre OPDS en tâche de fond (Lot 13, tâche 13.3.2) —
+ * réutilise le pipeline d'import EPUB existant ([ImportPublicationUseCase],
+ * qui détecte le DRM — K7 — et normalise les hrefs — K6), jamais un second
+ * chemin. Le fichier est écrit dans le stockage privé de l'app
+ * (`getExternalFilesDir`, jamais `MANAGE_EXTERNAL_STORAGE`, K5 respecté) et
+ * exposé en `content://` via un `FileProvider` app-scopé.
+ *
+ * Cycle de vie du fichier : il EST le stockage du livre importé — conservé
+ * en cas de succès (le Reader le lit via cette URI), purgé en cas d'échec
+ * (DRM, corrompu, format non supporté), de doublon ou d'annulation, pour ne
+ * jamais laisser d'orphelin. Nom unique (UUID) : deux livres homonymes ne
+ * s'écrasent pas, et un re-téléchargement du même titre ne supprime pas le
+ * fichier du livre déjà importé.
+ */
+@HiltWorker
+class OpdsDownloadWorker @AssistedInject constructor(
+    @Assisted appContext: Context,
+    @Assisted params: WorkerParameters,
+    private val httpClient: OpdsHttpClient,
+    private val importPublication: ImportPublicationUseCase,
+    private val downloadObserver: OpdsDownloadObserver,
+) : CoroutineWorker(appContext, params) {
+
+    override suspend fun doWork(): Result {
+        val href = inputData.getString(KEY_ACQUISITION_HREF) ?: return Result.failure()
+        val catalogId = inputData.getString(KEY_CATALOG_ID)
+        val bookTitle = inputData.getString(KEY_BOOK_TITLE).orEmpty()
+
+        // 1. Téléchargement (annulable de façon coopérative via `isStopped`).
+        val download = httpClient.download(href, catalogId)
+        if (download is OpdsDownloadResult.Failure) {
+            downloadObserver.publish(OpdsDownloadEvent(bookTitle, null, false))
+            return Result.failure()
+        }
+        if (isStopped) return Result.failure()
+
+        // 2. Écriture dans le stockage privé de l'app — nom unique pour ne
+        // jamais écraser un autre livre.
+        val file = withContext(Dispatchers.IO) {
+            val dir = File(applicationContext.getExternalFilesDir(null), DIR_DOWNLOADS)
+            dir.mkdirs()
+            val target = File(dir, "${UUID.randomUUID()}.epub")
+            target.writeBytes((download as OpdsDownloadResult.Success).bytes)
+            target
+        }
+        if (isStopped) {
+            file.delete() // fichier partiel nettoyé, pas d'import
+            return Result.failure()
+        }
+
+        // 3. Import via le pipeline EPUB existant — l'URI FileProvider
+        // app-scopée est acceptée par `persistReadPermission` en no-op.
+        val uri = FileProvider.getUriForFile(
+            applicationContext,
+            "${applicationContext.packageName}.fileprovider",
+            file,
+        )
+        val result = importPublication(uri.toString())
+
+        return when (result) {
+            is ImportResult.Success -> {
+                // Le fichier téléchargé est désormais le stockage du livre :
+                // il reste en place, le Reader le lit via son URI.
+                downloadObserver.publish(OpdsDownloadEvent(bookTitle, result.publication.id, true))
+                Result.success()
+            }
+            is ImportResult.Duplicate -> {
+                // Doublon : le livre existe déjà, ce fichier est orphelin.
+                file.delete()
+                downloadObserver.publish(OpdsDownloadEvent(bookTitle, result.existingPublicationId, true))
+                Result.success()
+            }
+            else -> {
+                // Échec (DRM, corrompu, non supporté) : on purge l'orphelin.
+                file.delete()
+                downloadObserver.publish(OpdsDownloadEvent(bookTitle, null, false))
+                Result.failure()
+            }
+        }
+    }
+
+    companion object {
+        const val KEY_ACQUISITION_HREF = "acquisition_href"
+        const val KEY_CATALOG_ID = "catalog_id"
+        const val KEY_BOOK_TITLE = "book_title"
+        private const val DIR_DOWNLOADS = "opds_downloads"
+    }
+}
