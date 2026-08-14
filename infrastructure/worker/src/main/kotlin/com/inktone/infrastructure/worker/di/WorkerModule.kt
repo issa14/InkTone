@@ -4,9 +4,11 @@ import android.content.Context
 import androidx.work.WorkManager
 import com.inktone.domain.service.ImportProgressObserver
 import com.inktone.domain.service.ImportScheduler
+import com.inktone.domain.service.OpdsDownloadScheduler
 import com.inktone.domain.service.SyncScheduler
 import com.inktone.infrastructure.worker.WorkManagerImportProgressObserver
 import com.inktone.infrastructure.worker.WorkManagerImportScheduler
+import com.inktone.infrastructure.worker.WorkManagerOpdsDownloadScheduler
 import com.inktone.infrastructure.worker.WorkManagerSyncScheduler
 import dagger.Binds
 import dagger.Module
@@ -38,4 +40,8 @@ abstract class ImportSchedulerModule {
     @Binds
     @Singleton
     abstract fun bindSyncScheduler(impl: WorkManagerSyncScheduler): SyncScheduler
+
+    @Binds
+    @Singleton
+    abstract fun bindOpdsDownloadScheduler(impl: WorkManagerOpdsDownloadScheduler): OpdsDownloadScheduler
 }

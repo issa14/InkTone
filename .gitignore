@@ -21,6 +21,9 @@ google-services.json
 .vscode/
 *.iml
 
+# AI assistant local config (project-level skills live in .github/skills/)
+.claude/
+
 # OS
 .DS_Store
 

@@ -72,10 +72,23 @@ class SafFileStorageService @Inject constructor(
     }
 
     override suspend fun persistReadPermission(uri: String) = withContext(Dispatchers.IO) {
+        val parsed = Uri.parse(uri)
+        // No-op gracieux quand l'URI est déjà possédée par l'app
+        // (FileProvider app-scopé, Lot 13 tâche 13.3.2) :
+        // `takePersistableUriPermission` n'est valide que pour une URI de
+        // picker (`ACTION_OPEN_DOCUMENT`), pas pour un fichier que l'app
+        // vient d'écrire elle-même.
+        if (isAppOwned(uri)) return@withContext
         runCatching {
-            resolver.takePersistableUriPermission(Uri.parse(uri), Intent.FLAG_GRANT_READ_URI_PERMISSION)
+            resolver.takePersistableUriPermission(parsed, Intent.FLAG_GRANT_READ_URI_PERMISSION)
         }
         Unit
+    }
+
+    /** Vrai si l'URI est servie par un provider de l'app (FileProvider app-scopé). */
+    internal fun isAppOwned(uri: String): Boolean {
+        val authority = Uri.parse(uri).authority ?: return false
+        return authority == context.packageName || authority == "${context.packageName}.fileprovider"
     }
 
     override suspend fun writeToUri(uri: String, sourceFile: File): Boolean = withContext(Dispatchers.IO) {
