@@ -97,6 +97,8 @@ class SettingsViewModel @Inject constructor(
                 is SettingsIntent.SetFontSize -> preferencesRepository.update(current.copy(fontSize = intent.fontSize))
                 is SettingsIntent.SetFontFamily -> preferencesRepository.update(current.copy(fontFamily = intent.fontFamily))
                 is SettingsIntent.SetDefaultTtsEngine -> setDefaultTtsEngine(current, intent.engine)
+                is SettingsIntent.SetActiveVoiceProfileVoice ->
+                    updateActiveVoiceProfile(current) { it.copy(voice = intent.voice) }
                 is SettingsIntent.SetLanguage -> preferencesRepository.update(current.copy(language = intent.language))
                 is SettingsIntent.SetCrashReportingEnabled ->
                     preferencesRepository.update(current.copy(crashReportingEnabled = intent.enabled))
