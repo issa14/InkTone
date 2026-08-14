@@ -200,8 +200,10 @@ class PlaybackOrchestrator @Inject constructor(
 
     /**
      * Consommateur : enfile segment + silence, `play()` au premier, et pace
-     * l'index de phrase à la vitesse de lecture. Chaque segment suivant est
-     * enfilé une phrase à l'avance pour rester gapless.
+     * l'index de phrase sur une **timeline absolue** (cumul des durées depuis
+     * le `play()`), indépendamment du temps passé à attendre la synthèse.
+     * Chaque segment suivant est enfilé dès qu'il arrive (le producteur court
+     * à LOOKAHEAD) pour rester gapless.
      */
     private suspend fun consume(
         generation: Long,
@@ -213,13 +215,15 @@ class PlaybackOrchestrator @Inject constructor(
         resourceHref: String,
     ) {
         var index = startFrom
-        var pendingDurationMs = 0L
+        var playStartNanos = 0L
+        var nextPhraseStartMs = 0L
         var first = true
 
         for (segment in channel) {
             if (!isCurrent(generation)) return
             val sentence = sentences.getOrNull(index)
             val silenceMs = silenceDurationFor(sentence?.text ?: "")
+            val phraseDurationMs = segment.durationMs + silenceMs
 
             audioPlayer.sampleRate = segment.sampleRate
             audioPlayer.enqueue(segment)
@@ -228,18 +232,28 @@ class PlaybackOrchestrator @Inject constructor(
             if (first) {
                 audioPlayer.play()
                 _state.value = PlaybackStatus.Playing
+                playStartNanos = System.nanoTime()
                 advanceTo(generation, index, publicationId, chapterIndex, resourceHref, sentence, segment.wordTimestamps)
                 first = false
             } else {
-                pace(generation, pendingDurationMs)
+                // Pace jusqu'au début ABSOLU de cette phrase (cumul des durées),
+                // pas un délai relatif : le temps passé à attendre la synthèse
+                // de cette phrase ne doit pas décaler le surlignage.
+                val elapsedMs = (System.nanoTime() - playStartNanos) / 1_000_000L
+                val waitMs = nextPhraseStartMs - elapsedMs
+                if (waitMs > 0) pace(generation, waitMs)
                 advanceTo(generation, index, publicationId, chapterIndex, resourceHref, sentence, segment.wordTimestamps)
             }
-            pendingDurationMs = segment.durationMs + silenceMs
+            nextPhraseStartMs += phraseDurationMs
             index++
         }
 
         if (isCurrent(generation)) {
-            if (!first) pace(generation, pendingDurationMs)
+            if (!first) {
+                val elapsedMs = (System.nanoTime() - playStartNanos) / 1_000_000L
+                val waitMs = nextPhraseStartMs - elapsedMs
+                if (waitMs > 0) pace(generation, waitMs)
+            }
             _state.value = PlaybackStatus.Idle
         }
     }

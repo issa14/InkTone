@@ -158,6 +158,30 @@ class PlaybackOrchestratorTest {
         assertEquals(4, repo.saved[1].locator.charOffset)
     }
 
+    @Test
+    fun lAvancementDePhrase_naPasDeRetardDeSynthese() = runBlocking {
+        // Synthèse plus lente que la lecture (300 ms) mais qui reste en
+        // avance (durée de phrase 350+150=500 ms) : sans la timeline absolue,
+        // l'index de phrase se décalait du temps de synthèse (~800 ms au lieu
+        // de ~500 ms) — le surlignage mot-à-mot prenait du retard sur Edge.
+        val tts = FakeTtsEngine(segmentDurationMs = 350, synthesisDelayMs = 300)
+        val player = FakeAudioPlayer()
+        val orchestrator = PlaybackOrchestrator(tts, player, UpdateReadingStateUseCase(FakeReadingStateRepository()))
+        val sentences = listOf(sentence(0, "Un,", 0), sentence(1, "Deux,", 4))
+
+        orchestrator.play(sentences, profile, 0, "pub1", 0, "ch.xhtml")
+        awaitUntil { orchestrator.currentSentenceIndex.value == 0 && orchestrator.state.value == PlaybackOrchestrator.PlaybackStatus.Playing }
+        val t0 = System.nanoTime()
+        awaitUntil { orchestrator.currentSentenceIndex.value == 1 }
+        val gapMs = (System.nanoTime() - t0) / 1_000_000L
+
+        assertTrue(
+            "passage phrase 0 → 1 en ${gapMs}ms, attendu ~500ms (pas ~800ms décalé de la synthèse)",
+            gapMs < 650,
+        )
+        orchestrator.stop()
+    }
+
     // ── Fakes ──────────────────────────────────────────────
 
     private class FakeTtsEngine(
