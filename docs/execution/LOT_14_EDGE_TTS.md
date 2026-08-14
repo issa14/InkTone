@@ -181,6 +181,13 @@ complet config + SSML → MP3 → PCM audible) ; (b) les frontières de mot SSML
 - Connexion WebSocket OkHttp brute à l'endpoint Bing, envoi de la trame
   `speech.config` puis du SSML, collecte des chunks binaires MP3, fermeture
   sur `Path:turn.end`.
+- **Ajouter `implementation(libs.okhttp)` à `infrastructure/tts` dans ce
+  commit** (le spike en dépend : c'est le premier fichier du module qui
+  utilise OkHttp, pas la Tâche 2.2 — la séquence « la dépendance arrive
+  avec le premier fichier qui l'utilise » commence ici). La justification
+  du choix OkHttp (ni Retrofit ni Ktor, même sobriété que
+  `infrastructure/sync`/`opds`) est posée en commentaire dans ce commit,
+  pas reportée à 2.1.
 - Décodage MP3 → PCM via `MediaCodec`/`MediaExtractor` (pipeline minimal,
   pas encore factorisé en `Mp3Decoder` de production).
 - Preuve exigée : log du nombre de chunks, octets MP3 totaux, échantillons
@@ -213,15 +220,15 @@ Le Palier 2 livre les deux composants techniques du client, sans aucune
 exposition au domaine au-delà de ce que le Palier 3 consommera. Aucune
 classe de ce palier n'implémente `TtsEngine`.
 
-## Tâche 2.1 — Ajouter OkHttp au module tts
+## Tâche 2.1 — Ajouter MockWebServer au module tts
 
-- `infrastructure/tts/build.gradle.kts` : `implementation(libs.okhttp)` et
-  `testImplementation(libs.okhttp.mockwebserver)`.
-- Justifier le choix OkHttp par commentaire (le projet n'embarque ni
-  Retrofit ni Ktor ; `infrastructure/sync` et `infrastructure/opds`
-  construisent déjà leurs clients sur `OkHttpClient` brut — même sobriété).
-- Ne rien coder d'autre dans ce commit : la dépendance arrive avec le
-  premier fichier qui l'utilise (Tâche 2.2), pas seule.
+- `implementation(libs.okhttp)` a déjà été ajouté au Palier 1 (Tâche 1.2,
+  premier fichier utilisateur). Ici : `testImplementation(libs.okhttp.mockwebserver)`
+  pour les tests JVM du Palier 2.4.
+- Compléter le commentaire de justification du choix OkHttp dans
+  `build.gradle.kts` s'il n'a pas été posé en Tâche 1.2.
+- Ne rien coder d'autre dans ce commit : la dépendance de test arrive avec
+  le premier test qui l'utilise (Tâche 2.4), pas seule.
 
 `Ajoute OkHttp au module tts`
 
