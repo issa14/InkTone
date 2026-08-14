@@ -154,3 +154,24 @@ naturellement un moteur de plus.
   stockage ; Edge TTS est un moteur de synthèse, sémantique différente
   (même logique que le rejet du détournement de `SyncProvider` pour OPDS,
   ADR-023).
+
+## Addendum (Spike Lot 14 Palier 1, device V2206, 2026-08-14)
+
+Le spike `EdgeTtsWebSocketSpikeTest` (device réel) a prouvé :
+
+1. **Round-trip fonctionnel** : handshake `101`, 23 chunks MP3, PCM 24 kHz
+   décodé, `Path:turn.end` reçu — la chaîne WebSocket → MP3 → PCM est valide
+   sur le device de référence.
+2. **Word boundaries extractibles**, sous le chemin **`Path:audio.metadata`**
+   (pas `Path:wordboundary`, supposition du legacy infirmée) : chaque trame
+   porte `Type: WordBoundary`, `Offset`/`Duration` en ticks 100 ns
+   (`ms = ticks / 10_000`) et `text.Text` par mot — couverture ordonnée et
+   cohérente de la phrase de test.
+
+En conséquence, la règle 3 de la décision est résolue :
+**`wordTimestamps = true` est la cible** pour `EdgeTtsEngine`, car la capacité
+est désormais prouvée sur device (même standard de preuve exigé que le CTC).
+Le parsing de `Path:audio.metadata` et le mapping `ticks → ms` +
+`Text → charOffset` (remappé via `PronunciationRuleApplier`) font partie de
+l'implémentation du Palier 3. Cette correction de protocole est capitalisée
+(K13) : ne pas réintroduire `Path:wordboundary` dans le client de production.
