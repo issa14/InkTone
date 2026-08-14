@@ -1,10 +1,12 @@
 package com.inktone.feature.reader
 
+import com.inktone.domain.model.ReadingState
 import com.inktone.domain.model.Sentence
 import com.inktone.domain.model.VoiceProfile
 import com.inktone.domain.service.AudioPlayer
 import com.inktone.domain.service.AudioSegment
 import com.inktone.domain.service.TtsEngine
+import com.inktone.domain.usecase.UpdateReadingStateUseCase
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
@@ -19,6 +21,7 @@ import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withTimeout
 import java.util.concurrent.atomic.AtomicLong
+import java.util.concurrent.locks.ReentrantLock
 import javax.inject.Inject
 import javax.inject.Singleton
 
@@ -48,6 +51,7 @@ import javax.inject.Singleton
 class PlaybackOrchestrator @Inject constructor(
     private val ttsEngine: TtsEngine,
     private val audioPlayer: AudioPlayer,
+    private val updateReadingState: UpdateReadingStateUseCase,
 ) {
 
     /** État de lecture exposé à la couche présentation. */
@@ -71,18 +75,67 @@ class PlaybackOrchestrator @Inject constructor(
     private val playGeneration = AtomicLong(0)
     private var playbackJob: Job? = null
 
+    /** Sérialise pause/resume/stop (appelés depuis UI, MediaSession, etc.). */
+    private val stateLock = ReentrantLock()
+
     /**
      * Lance la lecture gapless à partir de [startFrom]. Requiert `startFrom`
      * dans les bornes de [sentences] (garanti par l'appelant).
      */
-    fun play(sentences: List<Sentence>, voiceProfile: VoiceProfile, startFrom: Int) {
+    fun play(
+        sentences: List<Sentence>,
+        voiceProfile: VoiceProfile,
+        startFrom: Int,
+        publicationId: String,
+        chapterIndex: Int,
+        resourceHref: String,
+    ) {
         if (sentences.isEmpty()) return
+        stop()
         val generation = playGeneration.incrementAndGet()
-        playbackJob?.cancel()
-        audioPlayer.stop()
         _currentSentenceIndex.value = startFrom
         _state.value = PlaybackStatus.Buffering
-        playbackJob = scope.launch { run(generation, sentences, voiceProfile, startFrom) }
+        playbackJob = scope.launch {
+            run(generation, sentences, voiceProfile, startFrom, publicationId, chapterIndex, resourceHref)
+        }
+    }
+
+    /** Suspend la lecture sans vider la file ni perdre la position. */
+    fun pause() {
+        stateLock.lock()
+        try {
+            if (_state.value != PlaybackStatus.Playing) return
+            _state.value = PlaybackStatus.Paused
+            audioPlayer.pause()
+        } finally {
+            stateLock.unlock()
+        }
+    }
+
+    /** Reprend la lecture après [pause]. */
+    fun resume() {
+        stateLock.lock()
+        try {
+            if (_state.value != PlaybackStatus.Paused) return
+            _state.value = PlaybackStatus.Playing
+            audioPlayer.resume()
+        } finally {
+            stateLock.unlock()
+        }
+    }
+
+    /** Arrête la lecture, vide la file du lecteur et invalide la génération courante. */
+    fun stop() {
+        stateLock.lock()
+        try {
+            playGeneration.incrementAndGet()
+            playbackJob?.cancel()
+            playbackJob = null
+            audioPlayer.stop()
+            _state.value = PlaybackStatus.Idle
+        } finally {
+            stateLock.unlock()
+        }
     }
 
     private suspend fun run(
@@ -90,11 +143,14 @@ class PlaybackOrchestrator @Inject constructor(
         sentences: List<Sentence>,
         voiceProfile: VoiceProfile,
         startFrom: Int,
+        publicationId: String,
+        chapterIndex: Int,
+        resourceHref: String,
     ) {
         val channel = Channel<AudioSegment>(LOOKAHEAD)
         val producer = scope.launch { produce(generation, channel, sentences, voiceProfile, startFrom) }
         try {
-            consume(generation, channel, sentences, startFrom)
+            consume(generation, channel, sentences, startFrom, publicationId, chapterIndex, resourceHref)
         } catch (e: CancellationException) {
             throw e
         } catch (e: Exception) {
@@ -147,6 +203,9 @@ class PlaybackOrchestrator @Inject constructor(
         channel: Channel<AudioSegment>,
         sentences: List<Sentence>,
         startFrom: Int,
+        publicationId: String,
+        chapterIndex: Int,
+        resourceHref: String,
     ) {
         var index = startFrom
         var pendingDurationMs = 0L
@@ -164,11 +223,11 @@ class PlaybackOrchestrator @Inject constructor(
             if (first) {
                 audioPlayer.play()
                 _state.value = PlaybackStatus.Playing
-                _currentSentenceIndex.value = index
+                advanceTo(generation, index, publicationId, chapterIndex, resourceHref, sentence)
                 first = false
             } else {
                 pace(generation, pendingDurationMs)
-                _currentSentenceIndex.value = index
+                advanceTo(generation, index, publicationId, chapterIndex, resourceHref, sentence)
             }
             pendingDurationMs = segment.durationMs + silenceMs
             index++
@@ -177,6 +236,31 @@ class PlaybackOrchestrator @Inject constructor(
         if (isCurrent(generation)) {
             if (!first) pace(generation, pendingDurationMs)
             _state.value = PlaybackStatus.Idle
+        }
+    }
+
+    /**
+     * Avance l'index de phrase courant et persiste la position de reprise
+     * (progression à la phrase — jamais au mot, écart déclaré).
+     */
+    private suspend fun advanceTo(
+        generation: Long,
+        index: Int,
+        publicationId: String,
+        chapterIndex: Int,
+        resourceHref: String,
+        sentence: Sentence?,
+    ) {
+        if (!isCurrent(generation)) return
+        _currentSentenceIndex.value = index
+        if (publicationId.isNotEmpty() && sentence != null) {
+            updateReadingState(
+                ReadingState(
+                    publicationId = publicationId,
+                    locator = sentence.startLocator(chapterIndex = chapterIndex, resourceHref = resourceHref),
+                    lastReadAt = System.currentTimeMillis(),
+                ),
+            )
         }
     }
 
