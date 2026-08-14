@@ -1,0 +1,15 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+  Manifeste du test APK de la bibliothèque infrastructure/tts.
+
+  Le module est une bibliothèque sans AndroidManifest propre : le test APK
+  construit par connectedDebugAndroidTest n'hérite pas des permissions du
+  manifeste de l'application (app/), qui déclare pourtant INTERNET. Le spike
+  WebSocket Edge TTS (Lot 14, Palier 1) a besoin du réseau : sans ce
+  manifeste, toute résolution DNS lève SecurityException « missing INTERNET
+  permission ». Permissions de test uniquement, jamais fusionnées dans l'APK
+  de production.
+-->
+<manifest xmlns:android="http://schemas.android.com/apk/res/android">
+    <uses-permission android:name="android.permission.INTERNET" />
+</manifest>

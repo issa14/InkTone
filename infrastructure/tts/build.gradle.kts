@@ -72,6 +72,14 @@ dependencies {
     // le commentaire packaging.jniLibs.pickFirsts ci-dessus.
     implementation(libs.onnxruntime.android)
 
+    // Lot 14, Tache 1.2 (spike Edge TTS) — OkHttp pour le client WebSocket
+    // Bing. Choix delibere : ni Retrofit ni Ktor, meme sobriete que
+    // infrastructure/sync et infrastructure/opds qui construisent deja
+    // leurs clients sur OkHttpClient brut. Les bibliotheques externes ne
+    // sont pas bornees par checkArchitectureRules (:infrastructure ->
+    // :domain seul concerne les dependances inter-modules).
+    implementation(libs.okhttp)
+
     androidTestImplementation(libs.androidx.test.ext.junit)
     androidTestImplementation(libs.androidx.test.core)
     androidTestImplementation(libs.kotlinx.coroutines.test)
