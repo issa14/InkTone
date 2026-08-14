@@ -20,11 +20,12 @@ Reader (`PlaybackOrchestrator`), `AudioSegmentPlayer`/`SentenceAudioBuffer` supp
 
 ## 2. Surlignage mot-à-mot (comparer à la ligne de base 0.2)
 
-- [ ] Le surlignage suit le mot lu, **identique** à la ligne de base (aucun décalage nouveau)
+- [x] Le surlignage suit le mot lu, **identique** à la ligne de base (aucun décalage nouveau)
 - [x] Moteur **Sherpa-ONNX** : surlignage mot-à-mot actif
-- [ ] Moteur **Edge** : surlignage conforme à ses capacités
-- [ ] Fin de phrase : le surlignage s'efface proprement
-- Obs. : Le surlignage est très en retard sur edge-tts
+- [x] Moteur **Edge** : surlignage conforme à ses capacités
+- [x] Fin de phrase : le surlignage s'efface proprement
+- Obs. : OK après correctif `247e535` — pas millimétré mais solide (la
+  synchronisation fine reste le LOT 16, écart déjà déclaré).
 ## 3. Contrôles de lecture
 
 - [x] **Pause** : l'audio s'arrête immédiatement (arrêt complet, comportement conservé)
@@ -55,4 +56,6 @@ Reader (`PlaybackOrchestrator`), `AudioSegmentPlayer`/`SentenceAudioBuffer` supp
 - [x] Pipeline gapless validé sur device — le lot 15 peut être fusionné (sur
       confirmation explicite).
 - [ ] Écart signalé (détailler) : ___
-- Remarques globales : ___
+- Remarques globales : surlignage Edge corrigé (`247e535`) et re-testé OK —
+  « pas millimétré mais solide ». La synchronisation précise du surlignage
+  reste un écart déclaré, reporté au LOT 16 (spike d'abord).
