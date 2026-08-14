@@ -6,12 +6,12 @@ import com.inktone.domain.service.OpdsFailureReason
 import com.inktone.domain.service.OpdsFetchResult
 import com.inktone.domain.service.OpdsHttpClient
 import com.inktone.infrastructure.opds.di.OpdsClient
+import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
 import okhttp3.Credentials
 import okhttp3.OkHttpClient
 import okhttp3.Request
-import java.io.IOException
 import javax.inject.Inject
 import javax.inject.Singleton
 
@@ -67,7 +67,11 @@ class DefaultOpdsHttpClient @Inject constructor(
                     }
                 }
             }
-        } catch (e: IOException) {
+        } catch (e: CancellationException) {
+            throw e
+        } catch (e: Exception) {
+            // Une URL invalide (ex. hôte avec un espace) lève
+            // IllegalArgumentException — jamais un crash, un échec typé.
             OpdsFetchResult.Failure(OpdsFailureReason.NETWORK, e.message ?: "Erreur réseau")
         }
     }
@@ -106,7 +110,9 @@ class DefaultOpdsHttpClient @Inject constructor(
                     }
                 }
             }
-        } catch (e: IOException) {
+        } catch (e: CancellationException) {
+            throw e
+        } catch (e: Exception) {
             OpdsDownloadResult.Failure(OpdsFailureReason.NETWORK, e.message ?: "Erreur réseau")
         }
     }

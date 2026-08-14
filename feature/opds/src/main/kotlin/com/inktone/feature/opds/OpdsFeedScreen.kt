@@ -10,7 +10,7 @@ import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.lazy.grid.GridCells
 import androidx.compose.foundation.lazy.grid.LazyVerticalGrid
-import androidx.compose.foundation.lazy.grid.items
+import androidx.compose.foundation.lazy.grid.itemsIndexed
 import androidx.compose.foundation.lazy.grid.rememberLazyGridState
 import androidx.compose.material3.Card
 import androidx.compose.material3.CircularProgressIndicator
@@ -128,7 +128,7 @@ private fun FeedGrid(
         verticalArrangement = Arrangement.spacedBy(12.dp),
         horizontalArrangement = Arrangement.spacedBy(12.dp),
     ) {
-        items(state.items, key = { itemKey(it) }) { item ->
+        itemsIndexed(state.items, key = { index, item -> "$index:${itemKey(item)}" }) { _, item ->
             when (item) {
                 is OpdsItem.Navigation -> DirectoryCard(item, onOpenNavigation)
                 is OpdsItem.Book -> BookCard(item, state.catalogId, onDownloadBook)
