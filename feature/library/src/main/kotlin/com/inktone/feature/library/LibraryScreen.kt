@@ -11,6 +11,7 @@ import androidx.compose.foundation.layout.aspectRatio
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.fillMaxHeight
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
@@ -272,7 +273,7 @@ internal fun LibraryDrawerContent(
     onOpenSync: () -> Unit = {},
     onOpenOpds: () -> Unit = {},
 ) {
-    Column {
+    Column(Modifier.fillMaxHeight()) {
         // C.1 — Header avec dégradé brand (legacy §1.2)
         Box(
             modifier = Modifier
@@ -296,7 +297,7 @@ internal fun LibraryDrawerContent(
                 fontWeight = FontWeight.Bold,
             )
         }
-        Column(Modifier.padding(16.dp)) {
+        Column(Modifier.weight(1f).padding(16.dp)) {
         // Récents — Lot 8, en première position des destinations (cible
         // UX). Destination à part entière qui navigue vers un écran
         // dédié : ne JAMAIS reproduire le défaut de l'item mort supprimé
@@ -355,7 +356,7 @@ internal fun LibraryDrawerContent(
         )
 
         // ──── #2 Footer drawer ────
-        Spacer(Modifier.height(24.dp))
+        Spacer(Modifier.weight(1f))
         HorizontalDivider()
         Row(
             modifier = Modifier.fillMaxWidth().padding(vertical = 12.dp),
