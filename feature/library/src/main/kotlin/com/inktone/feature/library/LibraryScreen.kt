@@ -781,7 +781,7 @@ private fun ImportProgressBanner(progress: ImportProgress) {
                 progress = { progress.current.toFloat() / progress.total },
                 modifier = Modifier.fillMaxWidth(),
             )
-            Text("Import : ${progress.current} / ${progress.total}")
+            Text("Import en cours · ${progress.current}/${progress.total}")
         } else {
             LinearProgressIndicator(modifier = Modifier.fillMaxWidth())
             Text("Import en attente…")
