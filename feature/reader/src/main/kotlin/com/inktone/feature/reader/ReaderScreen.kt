@@ -1066,6 +1066,7 @@ fun ReaderScreen(
                         pageCountInChapter = pageCountInChapter,
                         bookProgression = state.bookProgression,
                         showPageCounter = complete,
+                        contentColor = ThemeColors.barContent(state.resolvedTheme),
                     )
                 }
             }
