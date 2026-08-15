@@ -26,6 +26,7 @@ import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.ExperimentalLayoutApi
+import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.lazy.LazyColumn
@@ -336,8 +337,7 @@ fun ReaderScreen(
             .clickable(
                 interactionSource = remember { MutableInteractionSource() },
                 indication = null,
-            ) { handleReadingAreaTap() }
-            .padding(16.dp),
+            ) { handleReadingAreaTap() },
     ) {
         // A.3 — État d'erreur : affiché quand le parsing ou l'ouverture
         // échoue, avec boutons Réessayer et Retour.
@@ -723,6 +723,7 @@ fun ReaderScreen(
                                     .graphicsLayer { translationY = visualPull.value }
                                     .nestedScroll(chapterTransitionConnection),
                                 userScrollEnabled = freeSelectedRange == null,
+                                contentPadding = PaddingValues(16.dp),
                             ) {
                                 items(
                                     items = blocks,
