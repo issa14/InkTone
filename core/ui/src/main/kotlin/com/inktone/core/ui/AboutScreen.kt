@@ -185,7 +185,7 @@ private fun EngagementsGrid() {
         EngagementPillar(
             icon = AppSymbol.CloudDisconnected,
             title = "Hors-Ligne",
-            subtitle = "Zéro serveur",
+            subtitle = "Lecture sans connexion",
             modifier = Modifier.weight(1f),
         )
     }
