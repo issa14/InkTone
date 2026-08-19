@@ -228,8 +228,6 @@ Cinq actions, dans l'ordre :
 
 ## Écran : Drawer (menu latéral)
 
-**Couleur des top bars des 6 destinations — décision actée (Lot 18).** Ce document ne spécifiait que le *contenu* des barres du haut (flèche/hamburger, titre, icônes), jamais leur rôle de couleur : le code avait divergé en deux conventions (Bibliothèque et Récents en `primary`/`onPrimary`, Marque-pages, OPDS, Synchronisation et Statistiques sur le défaut `surface`), écart invisible tant que le drawer n'était atteignable que depuis la Bibliothèque, et flagrant une fois les 6 écrans devenus destinations pairs. **Les 6 barres utilisent le conteneur neutre par défaut de `TopAppBar`, aucune n'est peinte en `primary`.** Motif : `docs/design/IDENTITE_INKTONE.md` §3.2 fonde la marque sur le « silent chrome » — le bordeaux d'origine y a précisément été écarté pour l'usage répété en interface parce que « trop saturé pour une app dont la promesse repose sur le calme de lecture » — et §3.4 redit que « le chrome reste discret par défaut ». La rampe d'accent (`Accent700` clair / `Accent500` sombre) y est définie pour les icônes actives, boutons, liens et TTS, pas comme aplat de fond d'une barre pleine largeur. Le dégradé de l'en-tête du drawer ci-dessous n'est pas concerné : il est spécifié par ce document et reste la touche de marque du menu.
-
 - **En-tête :** nom de l'application (« InkTone »), fond dégradé léger.
 - **Navigation :**
   - Récents
