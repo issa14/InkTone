@@ -7,10 +7,13 @@ import com.inktone.domain.model.ReadingState
 import com.inktone.domain.repository.PreferencesRepository
 import com.inktone.domain.repository.PublicationRepository
 import com.inktone.domain.repository.ReadingStateRepository
+import com.inktone.domain.repository.SyncAccountRepository
 import com.inktone.domain.service.ImportProgressObserver
 import com.inktone.domain.service.ImportResultsStore
 import com.inktone.domain.service.ImportSessionStore
 import com.inktone.domain.usecase.DeletePublicationUseCase
+import com.inktone.domain.usecase.RegenerateCoversUseCase
+import com.inktone.domain.usecase.SynchronizeNowUseCase
 import com.inktone.domain.usecase.ToggleFavoriteUseCase
 import com.inktone.domain.usecase.TogglePinUseCase
 import dagger.hilt.android.lifecycle.HiltViewModel
@@ -36,6 +39,10 @@ class LibraryViewModel @Inject constructor(
     private val importResultsStore: ImportResultsStore,
     private val importSessionStore: ImportSessionStore,
     private val preferencesRepository: PreferencesRepository,
+    // Lot 19 — actions du menu 3-points
+    private val synchronizeNow: SynchronizeNowUseCase,
+    private val syncAccountRepository: SyncAccountRepository,
+    private val regenerateCovers: RegenerateCoversUseCase,
 ) : ViewModel() {
 
     private val _state = MutableStateFlow(LibraryUiState())
@@ -133,6 +140,38 @@ class LibraryViewModel @Inject constructor(
             }
             is LibraryIntent.OpenImportDetails -> {
                 _state.value = _state.value.copy(showImportDetails = true)
+            }
+            LibraryIntent.OpenRandomBook -> {
+                val random = _state.value.displayedPublications.randomOrNull()
+                if (random != null) {
+                    viewModelScope.launch { _effects.send(LibraryEffect.NavigateToReader(random.id)) }
+                } else {
+                    viewModelScope.launch { _effects.send(LibraryEffect.RandomBookUnavailable) }
+                }
+            }
+            LibraryIntent.SyncNow -> viewModelScope.launch {
+                // UX §Bottom sheet 3-points (tranché) : si aucun service de
+                // sync n'est configuré, le tap ouvre directement l'écran de
+                // configuration — jamais un bouton désactivé.
+                if (syncAccountRepository.get() == null) {
+                    _effects.send(LibraryEffect.NavigateToSync)
+                } else {
+                    val result = synchronizeNow()
+                    _effects.send(LibraryEffect.SyncCompleted(result))
+                }
+            }
+            LibraryIntent.RegenerateCovers -> viewModelScope.launch {
+                if (_state.value.isRegeneratingCovers) return@launch
+                _state.value = _state.value.copy(isRegeneratingCovers = true, coverRegeneration = CoverRegenerationProgress(0, 0))
+                val result = regenerateCovers { processed, total ->
+                    _state.value = _state.value.copy(coverRegeneration = CoverRegenerationProgress(processed, total))
+                }
+                _state.value = _state.value.copy(isRegeneratingCovers = false, coverRegeneration = null)
+                _effects.send(LibraryEffect.CoversRegenerated(result))
+            }
+            LibraryIntent.ResetCovers -> viewModelScope.launch {
+                publicationRepository.resetAllCoversToDefault()
+                _effects.send(LibraryEffect.CoversReset)
             }
         }
     }

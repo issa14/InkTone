@@ -7,6 +7,7 @@ import com.inktone.domain.model.DocumentModel
 import com.inktone.domain.model.PublicationFormat
 import com.inktone.domain.model.Sentence
 import com.inktone.domain.model.StyledText
+import com.inktone.domain.service.CoverExtractionResult
 import com.inktone.domain.service.FileStorageService
 import com.inktone.domain.service.ParseResult
 import com.inktone.domain.service.PublicationMetadata
@@ -36,6 +37,11 @@ class TxtPublicationParser @Inject constructor(
     override val supportedFormats = listOf(PublicationFormat.TXT)
 
     private val sentenceBoundary = Regex("""(?<=[.!?])\s+""")
+
+    // Lot 19 — un TXT n'a pas de couverture : résultat valide, jamais un
+    // échec, jamais un écrasement fautif de la couverture existante.
+    override suspend fun extractCover(fileUri: String): CoverExtractionResult =
+        CoverExtractionResult.Success(null)
 
     override suspend fun parse(fileUri: String): ParseResult {
         val text = fileStorageService.openInputStream(fileUri)

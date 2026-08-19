@@ -46,6 +46,7 @@ import com.inktone.domain.usecase.UpdateCatalogUseCase
 import com.inktone.domain.usecase.GetVoiceProfilesUseCase
 import com.inktone.domain.usecase.ImportPublicationUseCase
 import com.inktone.domain.usecase.ObserveSyncUiStateUseCase
+import com.inktone.domain.usecase.RegenerateCoversUseCase
 import com.inktone.domain.usecase.ResolvePositionConflictUseCase
 import com.inktone.domain.usecase.SynchronizeNowUseCase
 import com.inktone.domain.usecase.SearchPublicationUseCase
@@ -150,6 +151,12 @@ object UseCaseModule {
     fun provideDeletePublicationUseCase(
         publicationRepository: PublicationRepository,
     ): DeletePublicationUseCase = DeletePublicationUseCase(publicationRepository)
+
+    @Provides
+    fun provideRegenerateCoversUseCase(
+        publicationRepository: PublicationRepository,
+        publicationParser: PublicationParser,
+    ): RegenerateCoversUseCase = RegenerateCoversUseCase(publicationRepository, publicationParser)
 
     @Provides
     fun provideAddAnnotationUseCase(

@@ -78,6 +78,14 @@ interface PublicationDao {
     @Query("UPDATE publications SET lastOpened = :lastOpened WHERE id = :id")
     suspend fun setLastOpened(id: String, lastOpened: Long)
 
+    // ───── Lot 19 : couvertures ─────
+
+    @Query("UPDATE publications SET coverUri = :coverUri WHERE id = :id")
+    suspend fun setCoverUri(id: String, coverUri: String?)
+
+    @Query("UPDATE publications SET coverUri = NULL")
+    suspend fun resetAllCovers()
+
     // ───── Audit fix : COUNT pour le dashboard (pas .first().size) ─────
 
     @Query(
