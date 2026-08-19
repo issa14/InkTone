@@ -2,6 +2,12 @@
 
 **Status : Accepted** · **Date : 2026-07-28**
 
+> **Note (ADR-026, 2026-08-20)** — la prémisse « application commerciale à
+> code source fermé » invoquée ici n'est plus vraie : le code est publié sous
+> licence MIT. La décision de cet ADR reste valide pour des raisons
+> indépendantes de cette prémisse — voir
+> [ADR-026](ADR-026-licence-mit-ouverture-du-code.md).
+
 **Context :** ADR-021 a posé l'architecture à paliers (Palier 1 Android natif, Palier 2 neuronal + alignement CTC). Trois candidats ont été évalués pour le Palier 2, chacun mesuré sur trois axes — latence réelle (device V2206, Snapdragon 680), qualité vocale (écoute humaine, référence 8/10 déjà établie), et licence (vérifiée à la source primaire, pas supposée) :
 
 | Candidat | RTF mesuré | Qualité | Licence |

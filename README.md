@@ -227,7 +227,8 @@ commit, le fichier ou le test qui la démontre.
 ## Licence
 
 Le code source d'InkTone est publié sous licence **MIT** — voir
-[`LICENSE`](LICENSE).
+[`LICENSE`](LICENSE), et [ADR-026](docs/adr/ADR-026-licence-mit-ouverture-du-code.md)
+pour le raisonnement et ses conséquences.
 
 Cette licence couvre le code écrit pour ce projet, et lui seul. Elle ne
 s'étend ni au code tiers présent dans le dépôt, ni aux bibliothèques

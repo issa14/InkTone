@@ -3,6 +3,12 @@
 **Status :** Accepted
 **Date :** 2026-07-26
 
+> **Note (ADR-026, 2026-08-20)** — la prémisse « application commerciale à
+> code source fermé » invoquée ici n'est plus vraie : le code est publié sous
+> licence MIT. La décision de cet ADR reste valide pour des raisons
+> indépendantes de cette prémisse — voir
+> [ADR-026](ADR-026-licence-mit-ouverture-du-code.md).
+
 ## Context
 
 ADR-013 supposait que Sherpa-ONNX fournissait des timestamps natifs
