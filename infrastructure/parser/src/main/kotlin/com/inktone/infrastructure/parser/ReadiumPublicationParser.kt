@@ -86,6 +86,25 @@ class ReadiumPublicationParser @Inject constructor(
     override suspend fun parse(fileUri: String): ParseResult = parseLazy(fileUri)
 
     /**
+     * Lot 19 — ré-extrait la couverture sans re-parser le contenu. Ouvre
+     * l'EPUB (une seconde ouverture ZIP dédiée, hors import — K2 ne
+     * s'applique qu'à l'import, jamais à une opération ponctuelle de
+     * reconstruction) et réutilise [extractAndSaveCover].
+     */
+    override suspend fun extractCover(fileUri: String): String? = withContext(Dispatchers.IO) {
+        val url = if (fileUri.contains("://")) {
+            Uri.parse(fileUri).toAbsoluteUrl()
+                ?: return@withContext null
+        } else {
+            File(fileUri).toUrl()
+        }
+
+        val asset = assetRetriever.retrieve(url).getOrElse { return@withContext null }
+        val publication = publicationOpener.open(asset, allowUserInteraction = false).getOrElse { return@withContext null }
+        extractAndSaveCover(publication, fileUri)
+    }
+
+    /**
      * Ouvre un EPUB et extrait UNIQUEMENT les métadonnées, la TOC et les
      * coquilles de chapitres (sans contenu). Les chapitres retournés ont
      * un [ChapterContent.Rich] avec `blocks` vide — le contenu réel sera

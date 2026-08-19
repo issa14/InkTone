@@ -27,12 +27,26 @@ class FakePublicationParser(
 ) : PublicationParser {
     override val supportedFormats = listOf(PublicationFormat.EPUB)
 
+    private var coverUri: String? = null
+    private var extractCoverHandler: ((String) -> String?)? = null
+
     fun setNextResult(result: ParseResult) {
         this.result = result
+    }
+
+    fun setCoverResult(coverUri: String?) {
+        this.coverUri = coverUri
+    }
+
+    fun setExtractCoverHandler(handler: (String) -> String?) {
+        this.extractCoverHandler = handler
     }
 
     override suspend fun parse(fileUri: String): ParseResult {
         if (delayMs > 0) delay(delayMs)
         return result
     }
+
+    override suspend fun extractCover(fileUri: String): String? =
+        extractCoverHandler?.invoke(fileUri) ?: coverUri
 }

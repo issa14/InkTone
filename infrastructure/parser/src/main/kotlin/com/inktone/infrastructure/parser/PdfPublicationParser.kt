@@ -131,6 +131,32 @@ class PdfPublicationParser @Inject constructor(
     }
 
     /**
+     * Lot 19 — ré-extrait la couverture (page 0) sans re-parser le texte.
+     * Un fichier illisible, sans signature PDF ou protégé retourne `null`
+     * (repli sur la couverture procédurale par défaut), jamais une
+     * exception qui remonte au hasard.
+     */
+    override suspend fun extractCover(fileUri: String): String? = withContext(pdfiumDispatcher) {
+        val bytes = fileStorageService.openInputStream(fileUri)
+            ?.use { stream -> runCatching { stream.readBytes() }.getOrNull() }
+            ?: return@withContext null
+
+        if (!hasPdfMagicBytes(bytes)) return@withContext null
+
+        val document = try {
+            pdfiumCore.newDocument(bytes)
+        } catch (e: Exception) {
+            return@withContext null
+        }
+
+        try {
+            extractAndSaveCover(document, fileUri)
+        } finally {
+            document.close()
+        }
+    }
+
+    /**
      * Extrait le texte complet et les phrases d'une page PDF.
      *
      * @return Pair(texte complet trimé, liste de phrases avec offsets).

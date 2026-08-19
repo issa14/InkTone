@@ -41,4 +41,14 @@ class CompositePublicationParser @Inject constructor(
         }
         return delegate.parse(fileUri)
     }
+
+    override suspend fun extractCover(fileUri: String): String? {
+        val fileName = fileStorageService.getFileName(fileUri) ?: fileUri
+        val delegate = when {
+            fileName.endsWith(".txt", ignoreCase = true) -> txtParser
+            fileName.endsWith(".pdf", ignoreCase = true) -> pdfParser
+            else -> readiumParser
+        }
+        return delegate.extractCover(fileUri)
+    }
 }

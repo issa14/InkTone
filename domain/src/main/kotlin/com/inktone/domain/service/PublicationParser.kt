@@ -10,6 +10,16 @@ import com.inktone.domain.model.PublicationFormat
 interface PublicationParser {
     val supportedFormats: List<PublicationFormat>
     suspend fun parse(fileUri: String): ParseResult
+
+    /**
+     * Ré-extrait la seule couverture depuis le fichier source, sans
+     * re-parser le contenu (Lot 19 — « Reconstruire les couvertures »).
+     * Retourne le chemin local du fichier extrait, ou `null` si le format
+     * n'a pas de couverture extractible (TXT) ou si aucune couverture
+     * n'est présente. Jamais un échec silencieux : un fichier illisible
+     * retourne `null` (repli sur la couverture procédurale par défaut).
+     */
+    suspend fun extractCover(fileUri: String): String? = null
 }
 
 /**
