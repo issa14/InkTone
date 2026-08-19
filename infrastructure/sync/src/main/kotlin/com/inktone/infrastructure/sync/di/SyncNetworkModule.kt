@@ -3,9 +3,11 @@ package com.inktone.infrastructure.sync.di
 import com.inktone.domain.service.SyncProvider
 import com.inktone.domain.service.WebDavSyncService
 import com.inktone.infrastructure.sync.SyncProviderRouter
+import com.inktone.infrastructure.sync.drive.GoogleDriveSyncProvider
 import com.inktone.infrastructure.sync.webdav.WebDavCredentialsStore
 import com.inktone.infrastructure.sync.webdav.WebDavCredentialsStoreContract
 import com.inktone.infrastructure.sync.webdav.WebDavSyncManager
+import com.inktone.infrastructure.sync.webdav.WebDavSyncProvider
 import dagger.Binds
 import dagger.Module
 import dagger.Provides
@@ -24,6 +26,10 @@ abstract class SyncNetworkModule {
      * implémenté, l'aiguillage lit le compte persisté.
      */
     @Binds @Singleton abstract fun bindSyncProvider(impl: SyncProviderRouter): SyncProvider
+
+    /** Deux implémentations [SyncProvider], qualifiées pour que [SyncProviderRouter] puisse les distinguer. */
+    @Binds @Singleton @GoogleDriveProvider abstract fun bindGoogleDriveProvider(impl: GoogleDriveSyncProvider): SyncProvider
+    @Binds @Singleton @WebDavProvider abstract fun bindWebDavProvider(impl: WebDavSyncProvider): SyncProvider
 
     /** Connexion WebDAV (test/connect/déconnecter), consommée par `data` (`WebDavSyncLinker`). */
     @Binds @Singleton abstract fun bindWebDavSyncService(impl: WebDavSyncManager): WebDavSyncService

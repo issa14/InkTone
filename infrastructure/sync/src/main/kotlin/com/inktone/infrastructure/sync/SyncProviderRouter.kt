@@ -5,8 +5,8 @@ import com.inktone.domain.repository.SyncAccountRepository
 import com.inktone.domain.service.SyncOperationResult
 import com.inktone.domain.service.SyncProvider
 import com.inktone.domain.service.SyncRemoteFile
-import com.inktone.infrastructure.sync.drive.GoogleDriveSyncProvider
-import com.inktone.infrastructure.sync.webdav.WebDavSyncProvider
+import com.inktone.infrastructure.sync.di.GoogleDriveProvider
+import com.inktone.infrastructure.sync.di.WebDavProvider
 import javax.inject.Inject
 import javax.inject.Singleton
 
@@ -19,21 +19,20 @@ import javax.inject.Singleton
  */
 @Singleton
 class SyncProviderRouter @Inject constructor(
-    private val googleDriveSyncProvider: GoogleDriveSyncProvider,
-    private val webDavSyncProvider: WebDavSyncProvider,
+    @GoogleDriveProvider private val googleDriveSyncProvider: SyncProvider,
+    @WebDavProvider private val webDavSyncProvider: SyncProvider,
     private val syncAccountRepository: SyncAccountRepository,
 ) : SyncProvider {
 
-    @Volatile
-    private var activeId: SyncProviderId = SyncProviderId.GOOGLE_DRIVE
+    /**
+     * Non consommé par la production : le routeur sélectionne le délégué
+     * à chaque opération suspendue via le compte persisté. Valeur
+     * documentaire (interface [SyncProvider]), pas une source de vérité.
+     */
+    override val id: SyncProviderId = SyncProviderId.GOOGLE_DRIVE
 
-    override val id: SyncProviderId get() = activeId
-
-    private suspend fun delegate(): SyncProvider {
-        val provider = syncAccountRepository.get()?.provider ?: SyncProviderId.GOOGLE_DRIVE
-        activeId = provider
-        return if (provider == SyncProviderId.WEBDAV) webDavSyncProvider else googleDriveSyncProvider
-    }
+    private suspend fun delegate(): SyncProvider =
+        if (syncAccountRepository.get()?.provider == SyncProviderId.WEBDAV) webDavSyncProvider else googleDriveSyncProvider
 
     override suspend fun upload(fileName: String, bytes: ByteArray): SyncOperationResult =
         delegate().upload(fileName, bytes)
