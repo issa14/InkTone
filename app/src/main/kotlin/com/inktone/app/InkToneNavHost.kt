@@ -199,7 +199,7 @@ fun InkToneNavHost(navController: NavHostController = rememberNavController(), s
         composable<RecentsRoute> {
             RecentsScreen(
                 onNavigateToReader = { publicationId -> navController.navigate(ReaderRoute(publicationId)) },
-                onBack = navController::popBackStack,
+                onMenuClick = openDrawer,
             )
         }
         composable<ReaderRoute> { entry ->
@@ -311,6 +311,7 @@ fun InkToneNavHost(navController: NavHostController = rememberNavController(), s
         composable<OpdsRoute> {
             CatalogDashboardScreen(
                 onBack = navController::popBackStack,
+                onMenuClick = openDrawer,
                 onOpenPublication = { publicationId -> navController.navigate(ReaderRoute(publicationId)) },
             )
         }
@@ -329,6 +330,7 @@ fun InkToneNavHost(navController: NavHostController = rememberNavController(), s
 
             SyncConfigurationScreen(
                 onBack = navController::popBackStack,
+                onMenuClick = openDrawer,
                 onOpenLocalBackup = { navController.navigate(SettingsRoute) },
                 isGoogleAuthenticating = isAuthenticating,
                 isGoogleConfigured = syncAuthViewModel.isGoogleConfigured,
@@ -351,13 +353,12 @@ fun InkToneNavHost(navController: NavHostController = rememberNavController(), s
             }
         }
         composable<StatisticsRoute> {
-            BackScaffold(title = "Statistiques", onBack = navController::popBackStack) {
-                StatisticsScreen(
-                    onNavigateToBookDetail = { bookId ->
-                        navController.navigate(BookStatisticsRoute(bookId))
-                    },
-                )
-            }
+            StatisticsScreen(
+                onNavigateToBookDetail = { bookId ->
+                    navController.navigate(BookStatisticsRoute(bookId))
+                },
+                onMenuClick = openDrawer,
+            )
         }
         composable<BookStatisticsRoute> { entry ->
             val route = entry.toRoute<BookStatisticsRoute>()
@@ -368,7 +369,7 @@ fun InkToneNavHost(navController: NavHostController = rememberNavController(), s
         }
         composable<BookmarksRoute> {
             LibraryItemsScreen(
-                onBack = navController::popBackStack,
+                onMenuClick = openDrawer,
                 onNavigateToReader = { publicationId, resourceHref, chapterIndex, charOffset ->
                     navController.navigate(
                         ReaderRoute(

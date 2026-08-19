@@ -30,7 +30,10 @@ import androidx.compose.material3.Icon
 import androidx.compose.material3.LinearProgressIndicator
 import androidx.compose.material3.ListItem
 import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.IconButton
 import androidx.compose.material3.ModalBottomSheet
+import androidx.compose.material3.Scaffold
+import androidx.compose.material3.TopAppBar
 import androidx.compose.material3.SegmentedButton
 import androidx.compose.material3.SegmentedButtonDefaults
 import androidx.compose.material3.SingleChoiceSegmentedButtonRow
@@ -85,6 +88,7 @@ import java.time.LocalDate
 @Composable
 fun StatisticsScreen(
     onNavigateToBookDetail: (String) -> Unit = {},
+    onMenuClick: () -> Unit = {},
     viewModel: StatisticsViewModel = hiltViewModel(),
 ) {
     val state by viewModel.state.collectAsStateWithLifecycle()
@@ -113,9 +117,28 @@ fun StatisticsScreen(
         }
     }
 
-    when (val s = state) {
-        is com.inktone.domain.usecase.StatisticsUiState.Loading -> LoadingContent()
-        is com.inktone.domain.usecase.StatisticsUiState.Ready -> DashboardContent(s, onNavigateToBookDetail, viewModel)
+    // Lot 18 — cet écran n'avait aucune top bar (le `BackScaffold`
+    // générique d'`InkToneNavHost` en tenait lieu). Destination principale
+    // du drawer, il porte désormais la sienne, hamburger compris, comme
+    // les 5 autres.
+    Scaffold(
+        topBar = {
+            TopAppBar(
+                title = { Text("Statistiques") },
+                navigationIcon = {
+                    IconButton(onClick = onMenuClick) {
+                        AppIcon(AppSymbol.Menu, contentDescription = "Ouvrir le menu")
+                    }
+                },
+            )
+        },
+    ) { innerPadding ->
+        Box(Modifier.padding(innerPadding)) {
+            when (val s = state) {
+                is com.inktone.domain.usecase.StatisticsUiState.Loading -> LoadingContent()
+                is com.inktone.domain.usecase.StatisticsUiState.Ready -> DashboardContent(s, onNavigateToBookDetail, viewModel)
+            }
+        }
     }
 }
 

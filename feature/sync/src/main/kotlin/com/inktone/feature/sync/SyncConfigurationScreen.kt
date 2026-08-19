@@ -73,6 +73,11 @@ import com.inktone.domain.model.SyncUiState
 @Composable
 fun SyncConfigurationScreen(
     viewModel: SyncViewModel = hiltViewModel(),
+    // Lot 18 — la flèche de retour cède la place au hamburger du drawer
+    // partagé ; [onBack] reste utilisé par le bouton « Enregistrer », qui
+    // quitte l'écran une fois la configuration validée (comportement
+    // inchangé, ce n'est pas l'icône de navigation).
+    onMenuClick: () -> Unit = {},
     onBack: () -> Unit = {},
     onOpenLocalBackup: () -> Unit = {},
     isGoogleAuthenticating: Boolean = false,
@@ -91,8 +96,8 @@ fun SyncConfigurationScreen(
             TopAppBar(
                 title = { Text(if (showOperational) "Synchronisation" else "Configuration Sync") },
                 navigationIcon = {
-                    IconButton(onClick = onBack) {
-                        AppIcon(AppSymbol.Back, contentDescription = "Retour")
+                    IconButton(onClick = onMenuClick) {
+                        AppIcon(AppSymbol.Menu, contentDescription = "Ouvrir le menu")
                     }
                 },
                 actions = {

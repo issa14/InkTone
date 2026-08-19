@@ -70,7 +70,7 @@ import java.util.Locale
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun LibraryItemsScreen(
-    onBack: () -> Unit,
+    onMenuClick: () -> Unit,
     onNavigateToReader: (publicationId: String, resourceHref: String, chapterIndex: Int, charOffset: Int) -> Unit,
     viewModel: LibraryItemsViewModel = hiltViewModel(),
 ) {
@@ -102,8 +102,8 @@ fun LibraryItemsScreen(
                     }
                 },
                 navigationIcon = {
-                    IconButton(onClick = onBack) {
-                        AppIcon(AppSymbol.Back, contentDescription = "Retour")
+                    IconButton(onClick = onMenuClick) {
+                        AppIcon(AppSymbol.Menu, contentDescription = "Ouvrir le menu")
                     }
                 },
                 actions = {
