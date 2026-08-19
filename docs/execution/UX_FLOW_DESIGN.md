@@ -228,6 +228,12 @@ Cinq actions, dans l'ordre :
 
 ## Écran : Drawer (menu latéral)
 
+**Couleur des top bars des 6 destinations — décision actée (Lot 18).** Ce document ne spécifiait que le *contenu* des barres du haut (flèche/hamburger, titre, icônes), jamais leur rôle de couleur : le code avait divergé en deux conventions — Bibliothèque et Récents en `primary`/`onPrimary`, Marque-pages, OPDS, Synchronisation et Statistiques sur le conteneur neutre par défaut. Écart invisible tant que le drawer n'était atteignable que depuis la Bibliothèque, flagrant une fois les 6 écrans devenus destinations pairs. **Les 6 barres sont peintes en `primary` avec contenu `onPrimary`**, alignées sur Bibliothèque et Récents.
+
+Arbitrage : `docs/design/IDENTITE_INKTONE.md` §3.2 pose le principe du « silent chrome » et énumère pour la rampe d'accent les usages « icônes actives, boutons, liens, TTS ». Cette énumération n'est pas une interdiction — la charte n'exclut nulle part un conteneur de barre — et le rendu existant est conforme sur la valeur comme sur l'accessibilité : `primary` vaut bien `Accent700` (`#2C1E67`) en clair et `Accent500` (`#7661D1`) en sombre, et le blanc sur ces fonds donne 14,11:1 et 4,77:1, tous deux au-dessus du seuil WCAG AA texte. La règle « `Accent500` strictement non-texte » vise l'accent posé *sur* le fond de l'app, pas le blanc posé *sur* l'accent. La cohérence entre destinations pairs l'emporte donc, en gardant l'identité déjà validée de l'écran d'accueil (Bibliothèque) et de Récents (Lot 8).
+
+Conséquence technique à ne pas reperdre : sur une barre peinte en `primary`, tout `TextButton` doit recevoir explicitement `ButtonDefaults.textButtonColors(contentColor = onPrimary, …)` — sa couleur par défaut est `primary`, donc invisible sur ce fond (cas des boutons « Gérer »/« Enregistrer » de l'écran Synchronisation).
+
 - **En-tête :** nom de l'application (« InkTone »), fond dégradé léger.
 - **Navigation :**
   - Récents

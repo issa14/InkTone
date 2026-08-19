@@ -39,6 +39,8 @@ import androidx.compose.material3.Switch
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.material3.TopAppBar
+import androidx.compose.material3.ButtonDefaults
+import androidx.compose.material3.TopAppBarDefaults
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
@@ -101,15 +103,29 @@ fun SyncConfigurationScreen(
                     }
                 },
                 actions = {
+                    // Lot 18 — la barre est peinte en `primary` : sans
+                    // couleur explicite, un TextButton rendrait son
+                    // libellé en `primary` sur `primary`, donc invisible.
+                    val barButtonColors = ButtonDefaults.textButtonColors(
+                        contentColor = MaterialTheme.colorScheme.onPrimary,
+                        disabledContentColor = MaterialTheme.colorScheme.onPrimary.copy(alpha = 0.38f),
+                    )
                     if (showOperational) {
-                        TextButton(onClick = { manualShowConfig = true }) { Text("Gérer") }
+                        TextButton(onClick = { manualShowConfig = true }, colors = barButtonColors) { Text("Gérer") }
                     } else {
                         TextButton(
                             onClick = { manualShowConfig = false; onBack() },
                             enabled = isConfigured,
+                            colors = barButtonColors,
                         ) { Text("Enregistrer") }
                     }
                 },
+                colors = TopAppBarDefaults.topAppBarColors(
+                    containerColor = MaterialTheme.colorScheme.primary,
+                    titleContentColor = MaterialTheme.colorScheme.onPrimary,
+                    actionIconContentColor = MaterialTheme.colorScheme.onPrimary,
+                    navigationIconContentColor = MaterialTheme.colorScheme.onPrimary,
+                ),
             )
         },
     ) { innerPadding ->
