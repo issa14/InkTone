@@ -22,8 +22,6 @@ import androidx.compose.foundation.lazy.grid.GridItemSpan
 import androidx.compose.foundation.lazy.grid.LazyVerticalGrid
 import androidx.compose.foundation.lazy.grid.items as gridItems
 import androidx.compose.foundation.lazy.items as listItems
-import androidx.compose.material3.DismissibleDrawerSheet
-import androidx.compose.material3.DismissibleNavigationDrawer
 import androidx.compose.material3.ElevatedCard
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.HorizontalDivider
@@ -40,9 +38,7 @@ import androidx.compose.material3.TextField
 import androidx.compose.material3.TopAppBar
 import androidx.compose.material3.TopAppBarDefaults
 import androidx.compose.material3.Button
-import androidx.compose.material3.rememberDrawerState
 import androidx.compose.material3.rememberModalBottomSheetState
-import androidx.compose.material3.DrawerValue
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.LaunchedEffect
@@ -50,7 +46,6 @@ import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
-import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -70,7 +65,6 @@ import com.inktone.core.designsystem.AppSymbol
 import com.inktone.domain.model.FilterMode
 import com.inktone.domain.model.Publication
 import com.inktone.domain.service.ImportProgress
-import kotlinx.coroutines.launch
 
 /**
  * Tache 9bis.4 — reconstruction complete : drawer (filtres/series/tags),
@@ -98,21 +92,16 @@ fun LibraryScreen(
     viewModel: LibraryViewModel = hiltViewModel(),
     floatingActionButton: @Composable () -> Unit = {},
     floatingAudioButton: @Composable () -> Unit = {},
-    onOpenRecents: () -> Unit = {},
-    onOpenBookmarks: () -> Unit = {},
     onOpenStats: () -> Unit = {},
     onImportClick: () -> Unit = {},
-    onOpenSettings: () -> Unit = {},
-    onOpenAbout: () -> Unit = {},
-    onOpenThemes: () -> Unit = {},
-    onOpenSync: () -> Unit = {},
-    onOpenOpds: () -> Unit = {},
+    // Lot 18 — le drawer est hoisté dans InkToneNavHost (partagé par les
+    // 6 destinations principales) : cet écran ne porte plus que le bouton
+    // hamburger, les callbacks de destinations vivent avec le drawer.
+    onMenuClick: () -> Unit = {},
     onNavigateToSeriesDetail: (String) -> Unit = {},
     onNavigateToTagDetail: (String) -> Unit = {},
 ) {
     val state by viewModel.state.collectAsState()
-    val drawerState = rememberDrawerState(DrawerValue.Closed)
-    val scope = rememberCoroutineScope()
 
     // Phase 4 — rafraîchissement au retour du Reader (ON_RESUME)
     val lifecycleOwner = LocalLifecycleOwner.current
@@ -135,126 +124,83 @@ fun LibraryScreen(
         }
     }
 
-    DismissibleNavigationDrawer(
-        drawerState = drawerState,
-        drawerContent = {
-            DismissibleDrawerSheet {
-                LibraryDrawerContent(
-                    onSelectLibrary = { scope.launch { drawerState.close() } },
-                    onOpenRecents = {
-                        scope.launch { drawerState.close() }
-                        onOpenRecents()
-                    },
-                    onOpenBookmarks = {
-                        scope.launch { drawerState.close() }
-                        onOpenBookmarks()
-                    },
-                    onOpenStats = {
-                        scope.launch { drawerState.close() }
-                        onOpenStats()
-                    },
-                    onOpenSettings = {
-                        scope.launch { drawerState.close() }
-                        onOpenSettings()
-                    },
-                    onOpenAbout = {
-                        scope.launch { drawerState.close() }
-                        onOpenAbout()
-                    },
-                    onOpenThemes = {
-                        scope.launch { drawerState.close() }
-                        onOpenThemes()
-                    },
-                    onOpenSync = {
-                        scope.launch { drawerState.close() }
-                        onOpenSync()
-                    },
-                    onOpenOpds = {
-                        scope.launch { drawerState.close() }
-                        onOpenOpds()
-                    },
-                )
+    Scaffold(
+        floatingActionButton = {
+            Row(verticalAlignment = Alignment.Bottom) {
+                floatingAudioButton()
+                Spacer(Modifier.width(12.dp))
+                floatingActionButton()
             }
         },
-    ) {
-        Scaffold(
-            floatingActionButton = {
-                Row(verticalAlignment = Alignment.Bottom) {
-                    floatingAudioButton()
-                    Spacer(Modifier.width(12.dp))
-                    floatingActionButton()
-                }
-            },
-            topBar = {
-                LibraryTopBar(
-                    searchQuery = state.searchQuery,
-                    onSearchQueryChange = { viewModel.onIntent(LibraryIntent.SetSearchQuery(it)) },
-                    sortOrder = state.sortOrder,
-                    onSortOrderChange = { viewModel.onIntent(LibraryIntent.SetSortOrder(it)) },
-                    layoutMode = state.layoutMode,
-                    onLayoutModeChange = { viewModel.onIntent(LibraryIntent.SetLayoutMode(it)) },
-                    selectedFormats = state.selectedFormats,
-                    onToggleFormat = { viewModel.onIntent(LibraryIntent.ToggleFileFormat(it)) },
-                    onClearFormats = { viewModel.onIntent(LibraryIntent.ClearFileFormats) },
-                    onRefresh = { viewModel.onIntent(LibraryIntent.Refresh) },
-                    onImportClick = onImportClick,
-                    activeFilter = state.activeFilter,
-                    filterValue = state.filterValue,
-                    onSelectFilter = { filter, value -> viewModel.onIntent(LibraryIntent.ChangeFilter(filter, value)) },
-                    onMenuClick = { scope.launch { drawerState.open() } },
-                    availableSeries = state.availableSeries,
-                    seriesCounts = state.seriesCounts,
-                    availableTags = state.availableTags,
-                    tagCounts = state.tagCounts,
-                    onNavigateToSeriesDetail = onNavigateToSeriesDetail,
-                    onNavigateToTagDetail = onNavigateToTagDetail,
+        topBar = {
+            LibraryTopBar(
+                searchQuery = state.searchQuery,
+                onSearchQueryChange = { viewModel.onIntent(LibraryIntent.SetSearchQuery(it)) },
+                sortOrder = state.sortOrder,
+                onSortOrderChange = { viewModel.onIntent(LibraryIntent.SetSortOrder(it)) },
+                layoutMode = state.layoutMode,
+                onLayoutModeChange = { viewModel.onIntent(LibraryIntent.SetLayoutMode(it)) },
+                selectedFormats = state.selectedFormats,
+                onToggleFormat = { viewModel.onIntent(LibraryIntent.ToggleFileFormat(it)) },
+                onClearFormats = { viewModel.onIntent(LibraryIntent.ClearFileFormats) },
+                onRefresh = { viewModel.onIntent(LibraryIntent.Refresh) },
+                onImportClick = onImportClick,
+                activeFilter = state.activeFilter,
+                filterValue = state.filterValue,
+                onSelectFilter = { filter, value -> viewModel.onIntent(LibraryIntent.ChangeFilter(filter, value)) },
+                onMenuClick = onMenuClick,
+                availableSeries = state.availableSeries,
+                seriesCounts = state.seriesCounts,
+                availableTags = state.availableTags,
+                tagCounts = state.tagCounts,
+                onNavigateToSeriesDetail = onNavigateToSeriesDetail,
+                onNavigateToTagDetail = onNavigateToTagDetail,
+            )
+        },
+    ) { innerPadding ->
+        Column(Modifier.fillMaxSize().padding(innerPadding)) {
+            // Lot 5 — résumé de fin d'import ou bannière de progression.
+            // Pas de résumé ici quand les détails sont ouverts :
+            // ImportResultDetail affiche déjà son propre en-tête résumé
+            // (double affichage sinon).
+            if (state.importResults.isNotEmpty() && !state.showImportDetails) {
+                ImportResultSummary(
+                    results = state.importResults,
+                    onDetailsClick = { viewModel.onIntent(LibraryIntent.OpenImportDetails) },
+                    onDismiss = { viewModel.onIntent(LibraryIntent.DismissImportResults) },
                 )
-            },
-        ) { innerPadding ->
-            Column(Modifier.fillMaxSize().padding(innerPadding)) {
-                // Lot 5 — résumé de fin d'import ou bannière de progression.
-                // Pas de résumé ici quand les détails sont ouverts :
-                // ImportResultDetail affiche déjà son propre en-tête résumé
-                // (double affichage sinon).
-                if (state.importResults.isNotEmpty() && !state.showImportDetails) {
-                    ImportResultSummary(
-                        results = state.importResults,
-                        onDetailsClick = { viewModel.onIntent(LibraryIntent.OpenImportDetails) },
-                        onDismiss = { viewModel.onIntent(LibraryIntent.DismissImportResults) },
-                    )
-                } else if (state.importResults.isEmpty()) {
-                    ImportProgressBanner(state.importProgress)
-                }
+            } else if (state.importResults.isEmpty()) {
+                ImportProgressBanner(state.importProgress)
+            }
 
-                // Lot 5 — détail des résultats d'import
-                if (state.showImportDetails && state.importResults.isNotEmpty()) {
-                    ImportResultDetail(
-                        results = state.importResults,
-                        onOpenPublication = { id ->
-                            viewModel.onIntent(LibraryIntent.OpenPublication(id))
-                        },
-                        onDismiss = { viewModel.onIntent(LibraryIntent.DismissImportResults) },
+            // Lot 5 — détail des résultats d'import
+            if (state.showImportDetails && state.importResults.isNotEmpty()) {
+                ImportResultDetail(
+                    results = state.importResults,
+                    onOpenPublication = { id ->
+                        viewModel.onIntent(LibraryIntent.OpenPublication(id))
+                    },
+                    onDismiss = { viewModel.onIntent(LibraryIntent.DismissImportResults) },
+                )
+            } else when {
+                state.isLoading -> LibraryShimmerGrid()
+                state.errorMessage != null -> ErrorState(
+                    message = state.errorMessage!!,
+                    onRetry = { viewModel.onIntent(LibraryIntent.Refresh) },
+                    onDismiss = { viewModel.onIntent(LibraryIntent.DismissError) },
+                )
+                state.displayedPublications.isEmpty() -> EmptyState(
+                    hasActiveImport = state.importProgress.total > 0 || state.importProgress.hasQueuedChunks,
+                    onImportClick = onImportClick,
+                )
+                else -> {
+                    LibraryContent(
+                        state = state,
+                        onOpen = { id -> viewModel.onIntent(LibraryIntent.OpenPublication(id)) },
+                        onToggleFavorite = { id, isFavorite -> viewModel.onIntent(LibraryIntent.ToggleFavorite(id, isFavorite)) },
+                        onTogglePin = { id, isPinned -> viewModel.onIntent(LibraryIntent.TogglePin(id, isPinned)) },
+                        onDelete = { id -> viewModel.onIntent(LibraryIntent.DeletePublication(id)) },
                     )
-                } else when {
-                    state.isLoading -> LibraryShimmerGrid()
-                    state.errorMessage != null -> ErrorState(
-                        message = state.errorMessage!!,
-                        onRetry = { viewModel.onIntent(LibraryIntent.Refresh) },
-                        onDismiss = { viewModel.onIntent(LibraryIntent.DismissError) },
-                    )
-                    state.displayedPublications.isEmpty() -> EmptyState(
-                        hasActiveImport = state.importProgress.total > 0 || state.importProgress.hasQueuedChunks,
-                        onImportClick = onImportClick,
-                    )
-                    else -> {
-                        LibraryContent(
-                            state = state,
-                            onOpen = { id -> viewModel.onIntent(LibraryIntent.OpenPublication(id)) },
-                            onToggleFavorite = { id, isFavorite -> viewModel.onIntent(LibraryIntent.ToggleFavorite(id, isFavorite)) },
-                            onTogglePin = { id, isPinned -> viewModel.onIntent(LibraryIntent.TogglePin(id, isPinned)) },
-                            onDelete = { id -> viewModel.onIntent(LibraryIntent.DeletePublication(id)) },
-                        )
-                    }
                 }
             }
         }
