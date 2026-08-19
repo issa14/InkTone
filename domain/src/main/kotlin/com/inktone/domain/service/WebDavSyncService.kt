@@ -1,7 +1,7 @@
 package com.inktone.domain.service
 
 /**
- * Connexion WebDAV (Lot 19) — tester, connecter, déconnecter. Consommé
+ * Connexion WebDAV (Lot 19) — connecter, déconnecter. Consommé
  * uniquement depuis `data` (`WebDavSyncLinker`), qui le traduit vers
  * `app` sans exposer un type `domain` (Blueprint §12.4). L'implémentation
  * (`infrastructure/sync`) détient le réseau et les identifiants ; le
@@ -13,13 +13,10 @@ package com.inktone.domain.service
  * WebDAV est actif (et réciproquement).
  */
 interface WebDavSyncService {
-    /** Teste la connexion sans rien persister — aucune écriture de compte ni d'identifiants. */
-    suspend fun testConnection(url: String, username: String, password: String): SyncOperationResult
-
     /**
-     * Teste puis, en cas de succès, persiste les identifiants et le
-     * compte WebDAV (`accountLabel` = hôte de l'URL). En cas d'échec,
-     * ne persiste rien.
+     * Teste la connexion puis, en cas de succès, persiste les identifiants
+     * et le compte WebDAV (`accountLabel` = hôte de l'URL). En cas
+     * d'échec, ne persiste rien.
      */
     suspend fun connect(url: String, username: String, password: String): SyncOperationResult
 

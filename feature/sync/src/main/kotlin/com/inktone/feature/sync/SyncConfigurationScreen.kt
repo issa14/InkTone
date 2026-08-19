@@ -447,7 +447,7 @@ private fun WebDavCard(
                         CircularProgressIndicator(modifier = Modifier.size(18.dp), strokeWidth = 2.dp)
                         Spacer(Modifier.width(4.dp))
                     }
-                    Text("Tester")
+                    Text("Tester et connecter")
                 }
             }
         }

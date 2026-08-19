@@ -23,9 +23,6 @@ class WebDavSyncManager @Inject constructor(
     private val syncAccountRepository: SyncAccountRepository,
 ) : WebDavSyncService {
 
-    override suspend fun testConnection(url: String, username: String, password: String): SyncOperationResult =
-        webDavSyncProvider.testConnection(url, username, password)
-
     override suspend fun connect(url: String, username: String, password: String): SyncOperationResult {
         val result = webDavSyncProvider.testConnection(url, username, password)
         if (result is SyncOperationResult.Success) {
