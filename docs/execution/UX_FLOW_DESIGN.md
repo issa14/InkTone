@@ -234,6 +234,8 @@ Arbitrage : `docs/design/IDENTITE_INKTONE.md` §3.2 pose le principe du « silen
 
 Conséquence technique à ne pas reperdre : sur une barre peinte en `primary`, tout `TextButton` doit recevoir explicitement `ButtonDefaults.textButtonColors(contentColor = onPrimary, …)` — sa couleur par défaut est `primary`, donc invisible sur ce fond (cas des boutons « Gérer »/« Enregistrer » de l'écran Synchronisation).
 
+Point connu et déjà planifié, pas un oubli : la barre de statut système reste peinte avec le fond de l'app (crème `#FFFBF5` / sombre `#0F1419`), ce qui crée une couture visible au-dessus de la top bar accentuée. Corrigé par l'edge-to-edge du lot SDK 36 — voir `PLAN_2D_THEME_SPLASH.md`, D2 rouverte au Lot 18 et §6.
+
 - **En-tête :** nom de l'application (« InkTone »), fond dégradé léger.
 - **Navigation :**
   - Récents
