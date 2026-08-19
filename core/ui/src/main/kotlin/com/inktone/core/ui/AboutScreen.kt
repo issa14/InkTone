@@ -60,9 +60,15 @@ private const val SUPPORT_EMAIL = "issadotnet@gmail.com"
  *
  * [versionName] permet au caller (module `app`) de fournir
  * `BuildConfig.VERSION_NAME` — `core:ui` n'a pas `buildConfig` activé.
+ * [ttsEngineLabel] est fourni de la meme facon (`AboutViewModel`) : le
+ * diagnostic annoncait auparavant un moteur en dur, donc faux des que
+ * l'utilisateur en changeait.
  */
 @Composable
-fun AboutScreen(versionName: String = "0.1.0") {
+fun AboutScreen(
+    versionName: String = "0.1.0",
+    ttsEngineLabel: String = "Non determine",
+) {
     val context = LocalContext.current
     val clipboardManager = LocalClipboardManager.current
     val snackbarHostState = remember { SnackbarHostState() }
@@ -87,7 +93,7 @@ fun AboutScreen(versionName: String = "0.1.0") {
                     scope.launch { snackbarHostState.showSnackbar("Version officielle") }
                 },
                 onLongClick = {
-                    clipboardManager.setText(AnnotatedString(buildDiagnostics(versionName)))
+                    clipboardManager.setText(AnnotatedString(buildDiagnostics(versionName, ttsEngineLabel)))
                     scope.launch { snackbarHostState.showSnackbar("Diagnostic copié dans le presse-papier") }
                 },
             )
@@ -95,9 +101,12 @@ fun AboutScreen(versionName: String = "0.1.0") {
             Spacer(Modifier.height(20.dp))
 
             InfoCard(
-                "InkTone est un lecteur EPUB avec narration TTS neuronale synchronisée " +
-                    "mot à mot, entièrement local, conçu pour transformer vos livres numériques " +
-                    "en expérience d'écoute fluide et accessible, directement sur votre appareil.",
+                "InkTone est un lecteur EPUB et PDF avec narration TTS neuronale synchronisée " +
+                    "mot à mot, conçu pour transformer vos livres numériques en expérience " +
+                    "d'écoute fluide et accessible, directement sur votre appareil. La lecture " +
+                    "et la synthèse vocale fonctionnent hors ligne ; les services en ligne " +
+                    "(synchronisation, catalogues OPDS, voix cloud) restent optionnels et " +
+                    "desactives par defaut.",
             )
 
             Spacer(Modifier.height(16.dp))
@@ -113,7 +122,7 @@ fun AboutScreen(versionName: String = "0.1.0") {
                         data = Uri.parse("mailto:")
                         putExtra(Intent.EXTRA_EMAIL, arrayOf(SUPPORT_EMAIL))
                         putExtra(Intent.EXTRA_SUBJECT, "Problème InkTone")
-                        putExtra(Intent.EXTRA_TEXT, buildDiagnostics(versionName))
+                        putExtra(Intent.EXTRA_TEXT, buildDiagnostics(versionName, ttsEngineLabel))
                     }
                     runCatching { context.startActivity(Intent.createChooser(intent, "Signaler un problème")) }
                 },
@@ -135,11 +144,11 @@ fun AboutScreen(versionName: String = "0.1.0") {
 }
 
 /** Diagnostics système copiés au presse-papier (clic long sur le badge de version). */
-private fun buildDiagnostics(versionName: String): String = buildString {
+private fun buildDiagnostics(versionName: String, ttsEngineLabel: String): String = buildString {
     appendLine("Version : $versionName")
     appendLine("Modèle : ${android.os.Build.MODEL}")
     appendLine("OS : Android ${android.os.Build.VERSION.RELEASE} (API ${android.os.Build.VERSION.SDK_INT})")
-    appendLine("Moteur TTS : Sherpa-ONNX (Kokoro)")
+    appendLine("Moteur TTS : $ttsEngineLabel")
 }
 
 @OptIn(ExperimentalFoundationApi::class)
@@ -172,7 +181,7 @@ private fun EngagementsGrid() {
     ) {
         EngagementPillar(
             icon = AppSymbol.Device,
-            title = "100% Local",
+            title = "Local par defaut",
             subtitle = "Inférence CPU",
             modifier = Modifier.weight(1f),
         )
@@ -185,7 +194,7 @@ private fun EngagementsGrid() {
         EngagementPillar(
             icon = AppSymbol.CloudDisconnected,
             title = "Hors-Ligne",
-            subtitle = "Lecture sans connexion",
+            subtitle = "Services en ligne optionnels",
             modifier = Modifier.weight(1f),
         )
     }
@@ -279,11 +288,17 @@ private fun ArchitectureAccordion() {
             )
             if (expanded) {
                 Column(Modifier.padding(start = 20.dp, end = 20.dp, bottom = 12.dp)) {
+                    LicenseRow("InkTone (code source)", "MIT", Color(0xFF1565C0))
                     LicenseRow("Readium (parseur EPUB)", "BSD-3-Clause", Color(0xFF00695C))
+                    LicenseRow("Pdfium (rendu PDF)", "BSD-3-Clause", Color(0xFF00695C))
                     LicenseRow("Kokoro (synthèse vocale)", "Apache-2.0", Color(0xFF2E7D32))
+                    // Attribution obligatoire : le modele d'alignement force est sous
+                    // CC-BY-4.0, qui impose de crediter l'auteur dans l'application
+                    // distribuee, pas seulement dans le depot (THIRD_PARTY_NOTICES.md).
+                    LicenseRow("NeMo FastConformer CTC, NVIDIA (alignement mot a mot)", "CC-BY-4.0", Color(0xFF6A1B9A))
                     LicenseRow("ONNX Runtime (inférence)", "MIT", Color(0xFF1565C0))
                     LicenseRow("Jetpack Compose, Room, Hilt, Media3, WorkManager", "Apache-2.0", Color(0xFF2E7D32))
-                    LicenseRow("Police OpenDyslexic", "SIL Open Font License 1.1", Color(0xFFE65100))
+                    LicenseRow("Polices Literata, Work Sans, OpenDyslexic", "SIL Open Font License 1.1", Color(0xFFE65100))
                 }
             }
         }
