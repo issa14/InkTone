@@ -57,6 +57,7 @@ import com.inktone.feature.reader.ReaderIntent
 import com.inktone.feature.reader.ReaderScreen
 import com.inktone.feature.reader.ReaderViewModel
 import com.inktone.feature.search.SearchScreen
+import com.inktone.feature.settings.AboutViewModel
 import com.inktone.feature.settings.PronunciationRulesScreen
 import com.inktone.feature.settings.SettingsScreen
 import com.inktone.feature.settings.ThemeGalleryScreen
@@ -406,8 +407,13 @@ fun InkToneNavHost(navController: NavHostController = rememberNavController(), s
             )
         }
         composable<AboutRoute> {
+            val aboutViewModel: AboutViewModel = hiltViewModel()
+            val ttsEngineLabel by aboutViewModel.ttsEngineLabel.collectAsState()
             BackScaffold(title = "A propos", onBack = navController::popBackStack) {
-                AboutScreen(versionName = BuildConfig.VERSION_NAME)
+                AboutScreen(
+                    versionName = BuildConfig.VERSION_NAME,
+                    ttsEngineLabel = ttsEngineLabel,
+                )
             }
         }
         composable<ThemeGalleryRoute> {
