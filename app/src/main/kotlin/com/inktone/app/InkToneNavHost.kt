@@ -34,7 +34,6 @@ import androidx.compose.ui.platform.LocalContext
 import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.navigation.NavDestination
 import androidx.navigation.NavDestination.Companion.hasRoute
-import androidx.navigation.NavGraph.Companion.findStartDestination
 import androidx.navigation.NavHostController
 import androidx.navigation.compose.NavHost
 import androidx.navigation.compose.composable
@@ -103,15 +102,21 @@ fun InkToneNavHost(navController: NavHostController = rememberNavController(), s
 
     /**
      * Navigue vers une destination principale du drawer : `launchSingleTop`
-     * + `popUpTo(startDestination)` gardent un back stack plat entre pairs
+     * + `popUpTo<LibraryRoute>` gardent un back stack plat entre pairs
      * (aller de Récents à Statistiques n'empile pas Récents), et le retour
      * système revient toujours à la Bibliothèque plutôt que de dérouler
      * l'historique de navigation latérale.
+     *
+     * L'ancre est `LibraryRoute` explicitement, pas
+     * `graph.findStartDestination()` : au premier lancement la destination
+     * de départ du graphe est `OnboardingRoute`, qui n'est plus dans le
+     * back stack une fois l'onboarding terminé — `popUpTo` ne trouverait
+     * rien à dépiler et la pile grossirait à chaque navigation latérale.
      */
     fun navigateToDrawerDestination(route: Any) {
         scope.launch { drawerState.close() }
         navController.navigate(route) {
-            popUpTo(navController.graph.findStartDestination().id) { saveState = true }
+            popUpTo<LibraryRoute> { saveState = true }
             launchSingleTop = true
             restoreState = true
         }
