@@ -44,7 +44,7 @@ import com.inktone.core.designsystem.AppSymbol
 @Composable
 fun RecentsScreen(
     onNavigateToReader: (String) -> Unit,
-    onBack: () -> Unit,
+    onMenuClick: () -> Unit,
     viewModel: RecentsViewModel = hiltViewModel(),
 ) {
     val state by viewModel.state.collectAsState()
@@ -62,8 +62,8 @@ fun RecentsScreen(
             TopAppBar(
                 title = { Text("Récents") },
                 navigationIcon = {
-                    IconButton(onClick = onBack) {
-                        AppIcon(AppSymbol.Back, contentDescription = "Retour")
+                    IconButton(onClick = onMenuClick) {
+                        AppIcon(AppSymbol.Menu, contentDescription = "Ouvrir le menu")
                     }
                 },
                 colors = TopAppBarDefaults.topAppBarColors(

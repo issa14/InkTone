@@ -7,13 +7,17 @@ import androidx.compose.animation.SharedTransitionLayout
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.padding
 import androidx.compose.material3.AlertDialog
+import androidx.compose.material3.DrawerValue
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
+import androidx.compose.material3.ModalDrawerSheet
+import androidx.compose.material3.ModalNavigationDrawer
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.material3.TopAppBar
+import androidx.compose.material3.rememberDrawerState
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.runtime.LaunchedEffect
@@ -21,21 +25,27 @@ import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.ui.platform.LocalContext
 import androidx.hilt.navigation.compose.hiltViewModel
+import androidx.navigation.NavDestination
+import androidx.navigation.NavDestination.Companion.hasRoute
 import androidx.navigation.NavHostController
 import androidx.navigation.compose.NavHost
 import androidx.navigation.compose.composable
+import androidx.navigation.compose.currentBackStackEntryAsState
 import androidx.navigation.compose.rememberNavController
 import androidx.navigation.toRoute
 import com.inktone.core.designsystem.LocalAnimatedVisibilityScope
 import com.inktone.core.designsystem.LocalSharedTransitionScope
 import com.inktone.core.ui.AboutScreen
 import com.inktone.feature.importer.ImportViewModel
+import com.inktone.feature.library.DrawerDestination
+import com.inktone.feature.library.LibraryDrawerContent
 import com.inktone.feature.library.LibraryDetailCategory
 import com.inktone.feature.library.LibraryDetailScreen
 import com.inktone.feature.library.LibraryItemsScreen
@@ -55,6 +65,7 @@ import com.inktone.feature.statistics.BookStatisticsScreen
 import com.inktone.feature.statistics.StatisticsScreen
 import com.inktone.feature.sync.SyncConfigurationScreen
 import com.inktone.feature.sync.SyncConflictBottomSheet
+import kotlinx.coroutines.launch
 
 /**
  * Tâche 9bis.2 — `NavHost` réel, remplace `AppScreen` (état à 3 cas,
@@ -79,6 +90,74 @@ import com.inktone.feature.sync.SyncConflictBottomSheet
 @OptIn(ExperimentalSharedTransitionApi::class)
 @Composable
 fun InkToneNavHost(navController: NavHostController = rememberNavController(), startDestination: Any = LibraryRoute) {
+    // Lot 18 — un seul drawer, hoisté ici plutôt que local à
+    // `LibraryScreen` : les 6 destinations principales le partagent et
+    // l'ouvrent par leur hamburger, au lieu d'y accéder uniquement depuis
+    // Bibliothèque avec une flèche de retour partout ailleurs.
+    val drawerState = rememberDrawerState(DrawerValue.Closed)
+    val scope = rememberCoroutineScope()
+    val backStackEntry by navController.currentBackStackEntryAsState()
+    val currentDestination = backStackEntry?.destination
+    val drawerDestination = currentDestination?.toDrawerDestination()
+
+    /**
+     * Navigue vers une destination principale du drawer : `launchSingleTop`
+     * + `popUpTo<LibraryRoute>` gardent un back stack plat entre pairs
+     * (aller de Récents à Statistiques n'empile pas Récents), et le retour
+     * système revient toujours à la Bibliothèque plutôt que de dérouler
+     * l'historique de navigation latérale.
+     *
+     * L'ancre est `LibraryRoute` explicitement, pas
+     * `graph.findStartDestination()` : au premier lancement la destination
+     * de départ du graphe est `OnboardingRoute`, qui n'est plus dans le
+     * back stack une fois l'onboarding terminé — `popUpTo` ne trouverait
+     * rien à dépiler et la pile grossirait à chaque navigation latérale.
+     */
+    fun navigateToDrawerDestination(route: Any) {
+        scope.launch { drawerState.close() }
+        navController.navigate(route) {
+            popUpTo<LibraryRoute> { saveState = true }
+            launchSingleTop = true
+            restoreState = true
+        }
+    }
+
+    ModalNavigationDrawer(
+        drawerState = drawerState,
+        // Le geste de balayage n'ouvre le drawer que sur les 6 destinations
+        // principales : sur le Reader ou un écran de détail, il resterait en
+        // conflit avec les gestes de l'écran (sélection de texte, retour).
+        gesturesEnabled = drawerDestination != null || drawerState.isOpen,
+        drawerContent = {
+            ModalDrawerSheet {
+                LibraryDrawerContent(
+                    selected = drawerDestination ?: DrawerDestination.LIBRARY,
+                    onSelectLibrary = { navigateToDrawerDestination(LibraryRoute) },
+                    onOpenRecents = { navigateToDrawerDestination(RecentsRoute) },
+                    onOpenBookmarks = { navigateToDrawerDestination(BookmarksRoute) },
+                    onOpenOpds = { navigateToDrawerDestination(OpdsRoute) },
+                    onOpenSync = { navigateToDrawerDestination(SyncRoute) },
+                    onOpenStats = { navigateToDrawerDestination(StatisticsRoute) },
+                    // Pied de drawer — poussées classiques à flèche de
+                    // retour, hors du jeu des destinations pairs (décision
+                    // actée, plan du Lot 18) : pas de `popUpTo`.
+                    onOpenSettings = {
+                        scope.launch { drawerState.close() }
+                        navController.navigate(SettingsRoute)
+                    },
+                    onOpenThemes = {
+                        scope.launch { drawerState.close() }
+                        navController.navigate(ThemeGalleryRoute)
+                    },
+                    onOpenAbout = {
+                        scope.launch { drawerState.close() }
+                        navController.navigate(AboutRoute)
+                    },
+                )
+            }
+        },
+    ) {
+    val openDrawer: () -> Unit = { scope.launch { drawerState.open() } }
     SharedTransitionLayout {
         CompositionLocalProvider(LocalSharedTransitionScope provides this@SharedTransitionLayout) {
         NavHost(navController = navController, startDestination = startDestination) {
@@ -106,14 +185,11 @@ fun InkToneNavHost(navController: NavHostController = rememberNavController(), s
             }
             LibraryScreen(
                 onNavigateToReader = { publicationId -> navController.navigate(ReaderRoute(publicationId)) },
-                onOpenRecents = { navController.navigate(RecentsRoute) },
-                onOpenBookmarks = { navController.navigate(BookmarksRoute) },
-                onOpenStats = { navController.navigate(StatisticsRoute) },
-                onOpenSettings = { navController.navigate(SettingsRoute) },
-                onOpenAbout = { navController.navigate(AboutRoute) },
-                onOpenThemes = { navController.navigate(ThemeGalleryRoute) },
-                onOpenSync = { navController.navigate(SyncRoute) },
-                onOpenOpds = { navController.navigate(OpdsRoute) },
+                // `LibraryEffect.NavigateToStats` (carte de statistiques de
+                // la Bibliothèque) vise la même destination que l'item de
+                // drawer : même navigation plate, pas une poussée.
+                onOpenStats = { navigateToDrawerDestination(StatisticsRoute) },
+                onMenuClick = openDrawer,
                 onNavigateToSeriesDetail = { series -> navController.navigate(LibraryDetailRoute("series", series)) },
                 onNavigateToTagDetail = { tag -> navController.navigate(LibraryDetailRoute("tag", tag)) },
                 onImportClick = { importLauncher.launch(arrayOf("application/epub+zip", "text/plain", "application/pdf")) },
@@ -128,7 +204,7 @@ fun InkToneNavHost(navController: NavHostController = rememberNavController(), s
         composable<RecentsRoute> {
             RecentsScreen(
                 onNavigateToReader = { publicationId -> navController.navigate(ReaderRoute(publicationId)) },
-                onBack = navController::popBackStack,
+                onMenuClick = openDrawer,
             )
         }
         composable<ReaderRoute> { entry ->
@@ -240,6 +316,7 @@ fun InkToneNavHost(navController: NavHostController = rememberNavController(), s
         composable<OpdsRoute> {
             CatalogDashboardScreen(
                 onBack = navController::popBackStack,
+                onMenuClick = openDrawer,
                 onOpenPublication = { publicationId -> navController.navigate(ReaderRoute(publicationId)) },
             )
         }
@@ -258,6 +335,7 @@ fun InkToneNavHost(navController: NavHostController = rememberNavController(), s
 
             SyncConfigurationScreen(
                 onBack = navController::popBackStack,
+                onMenuClick = openDrawer,
                 onOpenLocalBackup = { navController.navigate(SettingsRoute) },
                 isGoogleAuthenticating = isAuthenticating,
                 isGoogleConfigured = syncAuthViewModel.isGoogleConfigured,
@@ -280,13 +358,12 @@ fun InkToneNavHost(navController: NavHostController = rememberNavController(), s
             }
         }
         composable<StatisticsRoute> {
-            BackScaffold(title = "Statistiques", onBack = navController::popBackStack) {
-                StatisticsScreen(
-                    onNavigateToBookDetail = { bookId ->
-                        navController.navigate(BookStatisticsRoute(bookId))
-                    },
-                )
-            }
+            StatisticsScreen(
+                onNavigateToBookDetail = { bookId ->
+                    navController.navigate(BookStatisticsRoute(bookId))
+                },
+                onMenuClick = openDrawer,
+            )
         }
         composable<BookStatisticsRoute> { entry ->
             val route = entry.toRoute<BookStatisticsRoute>()
@@ -297,7 +374,7 @@ fun InkToneNavHost(navController: NavHostController = rememberNavController(), s
         }
         composable<BookmarksRoute> {
             LibraryItemsScreen(
-                onBack = navController::popBackStack,
+                onMenuClick = openDrawer,
                 onNavigateToReader = { publicationId, resourceHref, chapterIndex, charOffset ->
                     navController.navigate(
                         ReaderRoute(
@@ -347,6 +424,25 @@ fun InkToneNavHost(navController: NavHostController = rememberNavController(), s
     }
         } // CompositionLocalProvider (SharedTransitionScope)
     } // SharedTransitionLayout
+    } // ModalNavigationDrawer
+}
+
+/**
+ * Lot 18 — associe la destination de navigation courante à l'item de
+ * drawer à surligner. Une navigation profonde (`BookStatisticsRoute`
+ * poussée depuis Statistiques) garde l'item de sa destination parente ;
+ * un écran hors drawer (Reader, Réglages, pied de drawer) renvoie `null`
+ * — aucun item surligné, et le geste de balayage désactivé.
+ */
+private fun NavDestination.toDrawerDestination(): DrawerDestination? = when {
+    hasRoute<LibraryRoute>() -> DrawerDestination.LIBRARY
+    hasRoute<RecentsRoute>() -> DrawerDestination.RECENTS
+    hasRoute<BookmarksRoute>() -> DrawerDestination.BOOKMARKS
+    hasRoute<OpdsRoute>() -> DrawerDestination.OPDS
+    hasRoute<SyncRoute>() -> DrawerDestination.SYNC
+    hasRoute<StatisticsRoute>() -> DrawerDestination.STATISTICS
+    hasRoute<BookStatisticsRoute>() -> DrawerDestination.STATISTICS
+    else -> null
 }
 
 @OptIn(ExperimentalMaterial3Api::class)

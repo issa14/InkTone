@@ -2,6 +2,7 @@ package com.inktone.feature.library
 
 import androidx.activity.ComponentActivity
 import androidx.compose.material3.MaterialTheme
+import androidx.compose.runtime.mutableStateOf
 import androidx.compose.ui.test.assertCountEquals
 import androidx.compose.ui.test.assertIsNotSelected
 import androidx.compose.ui.test.assertIsSelected
@@ -170,5 +171,60 @@ class LibraryDrawerContentTest {
         composeTestRule.onNodeWithText("Récents").assertIsNotSelected()
         composeTestRule.onNodeWithText("Marque-pages et Notes").assertIsNotSelected()
         composeTestRule.onNodeWithText("Statistiques de lecture").assertIsNotSelected()
+    }
+
+    // Lot 18 — le surlignage suit la destination active passée en
+    // paramètre, plus un `selected = true` figé sur Bibliothèque.
+    @Test
+    fun le_surlignage_suit_la_destination_active() {
+        composeTestRule.setContent {
+            MaterialTheme {
+                LibraryDrawerContent(
+                    onOpenBookmarks = {},
+                    onOpenStats = {},
+                    selected = DrawerDestination.STATISTICS,
+                )
+            }
+        }
+
+        composeTestRule.onNodeWithText("Statistiques de lecture").assertIsSelected()
+        composeTestRule.onNodeWithText("Bibliothèque").assertIsNotSelected()
+        composeTestRule.onNodeWithText("Récents").assertIsNotSelected()
+        composeTestRule.onNodeWithText("Marque-pages et Notes").assertIsNotSelected()
+        composeTestRule.onNodeWithText("Synchronisation").assertIsNotSelected()
+        composeTestRule.onNodeWithText("Catalogues OPDS").assertIsNotSelected()
+    }
+
+    @Test
+    fun un_seul_item_est_surligne_quelle_que_soit_la_destination() {
+        val labelParDestination = mapOf(
+            DrawerDestination.RECENTS to "Récents",
+            DrawerDestination.LIBRARY to "Bibliothèque",
+            DrawerDestination.BOOKMARKS to "Marque-pages et Notes",
+            DrawerDestination.OPDS to "Catalogues OPDS",
+            DrawerDestination.SYNC to "Synchronisation",
+            DrawerDestination.STATISTICS to "Statistiques de lecture",
+        )
+        // `setContent` ne peut être appelé qu'une fois par test : la
+        // destination est pilotée par un état, comme le fera le NavHost.
+        val selected = mutableStateOf(DrawerDestination.LIBRARY)
+        composeTestRule.setContent {
+            MaterialTheme {
+                LibraryDrawerContent(
+                    onOpenBookmarks = {},
+                    onOpenStats = {},
+                    selected = selected.value,
+                )
+            }
+        }
+
+        for (destination in DrawerDestination.entries) {
+            selected.value = destination
+            composeTestRule.waitForIdle()
+            composeTestRule.onNodeWithText(labelParDestination.getValue(destination)).assertIsSelected()
+            labelParDestination.filterKeys { it != destination }.values.forEach { label ->
+                composeTestRule.onNodeWithText(label).assertIsNotSelected()
+            }
+        }
     }
 }
