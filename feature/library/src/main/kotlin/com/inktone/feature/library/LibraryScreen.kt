@@ -262,7 +262,7 @@ fun LibraryScreen(
 }
 
 @Composable
-internal fun LibraryDrawerContent(
+fun LibraryDrawerContent(
     onOpenBookmarks: () -> Unit,
     onOpenStats: () -> Unit,
     onOpenRecents: () -> Unit = {},
@@ -272,6 +272,7 @@ internal fun LibraryDrawerContent(
     onOpenThemes: () -> Unit = {},
     onOpenSync: () -> Unit = {},
     onOpenOpds: () -> Unit = {},
+    selected: DrawerDestination = DrawerDestination.LIBRARY,
 ) {
     Column(Modifier.fillMaxHeight()) {
         // C.1 — Header avec dégradé brand (legacy §1.2)
@@ -308,22 +309,23 @@ internal fun LibraryDrawerContent(
         NavigationDrawerItem(
             label = { Text("Récents") },
             icon = { AppIcon(AppSymbol.Recents,  contentDescription = null) },
-            selected = false,
+            selected = selected == DrawerDestination.RECENTS,
             onClick = onOpenRecents,
         )
-        // Bibliotheque — destination a part entiere, toujours active par
-        // defaut : LibraryDrawerContent n'est monte que depuis l'ecran
-        // Bibliotheque lui-meme, il n'y a pas d'autre etat possible.
+        // Bibliotheque — destination a part entiere. Lot 18 : le drawer
+        // etant hoiste dans InkToneNavHost et partage par les 6
+        // destinations principales, l'item actif est desormais derive de
+        // la destination reelle ([selected]), plus un `true` fige.
         NavigationDrawerItem(
             label = { Text("Bibliothèque") },
             icon = { AppIcon(AppSymbol.Reading,  contentDescription = null) },
-            selected = true,
+            selected = selected == DrawerDestination.LIBRARY,
             onClick = onSelectLibrary,
         )
         NavigationDrawerItem(
             label = { Text("Marque-pages et Notes") },
             icon = { AppIcon(AppSymbol.Bookmark,  contentDescription = null) },
-            selected = false,
+            selected = selected == DrawerDestination.BOOKMARKS,
             onClick = onOpenBookmarks,
         )
         // Lot 13, tâche 13.6 — « Catalogues OPDS » réactivée en b4
@@ -334,7 +336,7 @@ internal fun LibraryDrawerContent(
         NavigationDrawerItem(
             label = { Text("Catalogues OPDS") },
             icon = { AppIcon(AppSymbol.Article,  contentDescription = null) },
-            selected = false,
+            selected = selected == DrawerDestination.OPDS,
             onClick = onOpenOpds,
         )
         // Lot 11, tâche 11.6 — "Synchronisation" réactivée en b5
@@ -345,13 +347,13 @@ internal fun LibraryDrawerContent(
         NavigationDrawerItem(
             label = { Text("Synchronisation") },
             icon = { AppIcon(AppSymbol.Sync,  contentDescription = null) },
-            selected = false,
+            selected = selected == DrawerDestination.SYNC,
             onClick = onOpenSync,
         )
         NavigationDrawerItem(
             label = { Text("Statistiques de lecture") },
             icon = { AppIcon(AppSymbol.Stats,  contentDescription = null) },
-            selected = false,
+            selected = selected == DrawerDestination.STATISTICS,
             onClick = onOpenStats,
         )
 
