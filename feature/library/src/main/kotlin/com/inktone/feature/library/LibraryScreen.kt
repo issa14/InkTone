@@ -71,6 +71,7 @@ import com.inktone.core.designsystem.AppSymbol
 import com.inktone.domain.model.FilterMode
 import com.inktone.domain.model.Publication
 import com.inktone.domain.service.ImportProgress
+import com.inktone.domain.service.SyncOperationResult
 import kotlinx.coroutines.launch
 
 /**
@@ -141,6 +142,16 @@ fun LibraryScreen(
                 }
                 is LibraryEffect.CoversReset -> scope.launch {
                     snackbarHostState.showSnackbar("Couvertures réinitialisées")
+                }
+                is LibraryEffect.RandomBookUnavailable -> scope.launch {
+                    snackbarHostState.showSnackbar("Aucun livre à ouvrir")
+                }
+                is LibraryEffect.SyncCompleted -> scope.launch {
+                    val message = when (effect.result) {
+                        is SyncOperationResult.Success -> "Synchronisation terminée"
+                        is SyncOperationResult.Failed -> "Échec de la synchronisation"
+                    }
+                    snackbarHostState.showSnackbar(message)
                 }
             }
         }
@@ -400,6 +411,16 @@ internal fun LibraryTopBar(
     var showActionsSheet by remember { mutableStateOf(false) }
     var showNavPopup by remember { mutableStateOf(false) }
     var showResetCoversConfirm by remember { mutableStateOf(false) }
+    // Lot 19 — la reconstruction garde le bottom sheet OUVERT pour que la
+    // progression X/Y soit réellement visible ; il se referme à la fin.
+    var regenerationRequested by remember { mutableStateOf(false) }
+
+    LaunchedEffect(isRegeneratingCovers) {
+        if (!isRegeneratingCovers && regenerationRequested) {
+            showActionsSheet = false
+            regenerationRequested = false
+        }
+    }
 
     if (isSearchActive) {
         // État recherche : SearchBar pleine largeur qui remplace la TopBar
@@ -527,7 +548,10 @@ internal fun LibraryTopBar(
                     ActionSheetProgress("Reconstruire les couvertures", coverRegeneration)
                 } else {
                     ActionSheetItem("Reconstruire les couvertures", AppIcons.Refresh) {
-                        showActionsSheet = false
+                        // Le sheet reste ouvert : la progression X/Y est
+                        // visible dans l'item, refermé à la fin par
+                        // LaunchedEffect(isRegeneratingCovers).
+                        regenerationRequested = true
                         onRegenerateCovers()
                     }
                 }

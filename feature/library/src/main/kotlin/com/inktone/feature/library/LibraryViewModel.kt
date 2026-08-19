@@ -145,6 +145,8 @@ class LibraryViewModel @Inject constructor(
                 val random = _state.value.displayedPublications.randomOrNull()
                 if (random != null) {
                     viewModelScope.launch { _effects.send(LibraryEffect.NavigateToReader(random.id)) }
+                } else {
+                    viewModelScope.launch { _effects.send(LibraryEffect.RandomBookUnavailable) }
                 }
             }
             LibraryIntent.SyncNow -> viewModelScope.launch {
@@ -154,7 +156,8 @@ class LibraryViewModel @Inject constructor(
                 if (syncAccountRepository.get() == null) {
                     _effects.send(LibraryEffect.NavigateToSync)
                 } else {
-                    synchronizeNow()
+                    val result = synchronizeNow()
+                    _effects.send(LibraryEffect.SyncCompleted(result))
                 }
             }
             LibraryIntent.RegenerateCovers -> viewModelScope.launch {

@@ -5,6 +5,7 @@ import com.inktone.domain.model.Publication
 import com.inktone.domain.model.PublicationFormat
 import com.inktone.domain.service.ImportProgress
 import com.inktone.domain.service.ImportResultEntry
+import com.inktone.domain.service.SyncOperationResult
 import com.inktone.domain.usecase.CoverRegenerationResult
 
 /**
@@ -138,4 +139,8 @@ sealed interface LibraryEffect {
     data object NavigateToSync : LibraryEffect
     data class CoversRegenerated(val result: CoverRegenerationResult) : LibraryEffect
     data object CoversReset : LibraryEffect
+    // Retours des actions du menu 3-points — mêmes règles que les
+    // couvertures : un retour utilisateur, jamais un no-op muet.
+    data object RandomBookUnavailable : LibraryEffect
+    data class SyncCompleted(val result: SyncOperationResult) : LibraryEffect
 }
