@@ -22,6 +22,16 @@ interface PublicationRepository {
     suspend fun setPinned(id: String, isPinned: Boolean)
     suspend fun setLastOpened(id: String, lastOpened: Long)
 
+    /**
+     * Pose la couverture d'une publication (Lot 19). `null` = couverture
+     * par défaut (dégradé procédural de `BookCover`), toute valeur non
+     * nulle = chemin local de l'image extraite.
+     */
+    suspend fun setCoverUri(id: String, coverUri: String?)
+
+    /** Remet TOUTES les couvertures à la valeur par défaut (`null`). */
+    suspend fun resetAllCoversToDefault()
+
     // ───── Audit fix : COUNT pour le dashboard (pas .first().size) ─────
     suspend fun countFiltered(mode: FilterMode): Int
 }

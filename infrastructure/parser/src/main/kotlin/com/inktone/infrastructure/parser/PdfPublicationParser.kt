@@ -9,6 +9,7 @@ import com.inktone.domain.model.DocumentModel
 import com.inktone.domain.model.PublicationFormat
 import com.inktone.domain.model.Sentence
 import com.inktone.domain.model.StyledText
+import com.inktone.domain.service.CoverExtractionResult
 import com.inktone.domain.service.FileStorageService
 import com.inktone.domain.service.ParseResult
 import com.inktone.domain.service.PublicationMetadata
@@ -128,6 +129,32 @@ class PdfPublicationParser @Inject constructor(
         val signature = "%PDF-".toByteArray(Charsets.US_ASCII)
         if (bytes.size < signature.size) return false
         return bytes.copyOfRange(0, signature.size).contentEquals(signature)
+    }
+
+    /**
+     * Lot 19 — ré-extrait la couverture (page 0) sans re-parser le texte.
+     * Un fichier illisible, sans signature PDF ou protégé retourne
+     * [CoverExtractionResult.Failure] (jamais une exception qui remonte,
+     * jamais un écrasement de la couverture existante par l'appelant).
+     */
+    override suspend fun extractCover(fileUri: String): CoverExtractionResult = withContext(pdfiumDispatcher) {
+        val bytes = fileStorageService.openInputStream(fileUri)
+            ?.use { stream -> runCatching { stream.readBytes() }.getOrNull() }
+            ?: return@withContext CoverExtractionResult.Failure
+
+        if (!hasPdfMagicBytes(bytes)) return@withContext CoverExtractionResult.Failure
+
+        val document = try {
+            pdfiumCore.newDocument(bytes)
+        } catch (e: Exception) {
+            return@withContext CoverExtractionResult.Failure
+        }
+
+        try {
+            CoverExtractionResult.Success(extractAndSaveCover(document, fileUri))
+        } finally {
+            document.close()
+        }
     }
 
     /**

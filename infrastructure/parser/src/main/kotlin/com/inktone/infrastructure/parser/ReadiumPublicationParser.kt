@@ -8,6 +8,7 @@ import com.inktone.domain.model.ChapterContent
 import com.inktone.domain.model.DocumentModel
 import com.inktone.domain.model.PublicationFormat
 import com.inktone.domain.model.TableOfContentsEntry
+import com.inktone.domain.service.CoverExtractionResult
 import com.inktone.domain.service.ParseResult
 import com.inktone.domain.service.PublicationMetadata
 import com.inktone.domain.service.PublicationParser
@@ -84,6 +85,28 @@ class ReadiumPublicationParser @Inject constructor(
     }
 
     override suspend fun parse(fileUri: String): ParseResult = parseLazy(fileUri)
+
+    /**
+     * Lot 19 — ré-extrait la couverture sans re-parser le contenu. Ouvre
+     * l'EPUB (une seconde ouverture ZIP dédiée, hors import — K2 ne
+     * s'applique qu'à l'import, jamais à une opération ponctuelle de
+     * reconstruction) et réutilise [extractAndSaveCover]. Un échec
+     * d'ouverture retourne [CoverExtractionResult.Failure] — l'appelant ne
+     * doit pas écraser la couverture existante.
+     */
+    override suspend fun extractCover(fileUri: String): CoverExtractionResult = withContext(Dispatchers.IO) {
+        val url = if (fileUri.contains("://")) {
+            Uri.parse(fileUri).toAbsoluteUrl()
+                ?: return@withContext CoverExtractionResult.Failure
+        } else {
+            File(fileUri).toUrl()
+        }
+
+        val asset = assetRetriever.retrieve(url).getOrElse { return@withContext CoverExtractionResult.Failure }
+        val publication = publicationOpener.open(asset, allowUserInteraction = false)
+            .getOrElse { return@withContext CoverExtractionResult.Failure }
+        CoverExtractionResult.Success(extractAndSaveCover(publication, fileUri))
+    }
 
     /**
      * Ouvre un EPUB et extrait UNIQUEMENT les métadonnées, la TOC et les

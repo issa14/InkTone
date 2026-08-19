@@ -71,6 +71,14 @@ class FakePublicationRepository : PublicationRepository {
         state.value = state.value.map { if (it.id == id) it.copy(lastOpened = lastOpened) else it }
     }
 
+    override suspend fun setCoverUri(id: String, coverUri: String?) {
+        state.value = state.value.map { if (it.id == id) it.copy(coverUri = coverUri) else it }
+    }
+
+    override suspend fun resetAllCoversToDefault() {
+        state.value = state.value.map { it.copy(coverUri = null) }
+    }
+
     // ───── Audit fix : COUNT pour le dashboard ─────
     override suspend fun countFiltered(mode: FilterMode): Int =
         state.value.count { pub ->

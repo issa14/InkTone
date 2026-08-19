@@ -23,6 +23,8 @@ import androidx.compose.foundation.lazy.grid.LazyVerticalGrid
 import androidx.compose.foundation.lazy.grid.items as gridItems
 import androidx.compose.foundation.lazy.items as listItems
 import androidx.compose.material3.ElevatedCard
+import androidx.compose.material3.AlertDialog
+import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.Icon
@@ -33,11 +35,14 @@ import androidx.compose.material3.ModalBottomSheet
 import androidx.compose.material3.NavigationDrawerItem
 import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.Scaffold
+import androidx.compose.material3.SnackbarHost
+import androidx.compose.material3.SnackbarHostState
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextField
 import androidx.compose.material3.TopAppBar
 import androidx.compose.material3.TopAppBarDefaults
 import androidx.compose.material3.Button
+import androidx.compose.material3.TextButton
 import androidx.compose.material3.rememberModalBottomSheetState
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.DisposableEffect
@@ -46,6 +51,7 @@ import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -65,6 +71,8 @@ import com.inktone.core.designsystem.AppSymbol
 import com.inktone.domain.model.FilterMode
 import com.inktone.domain.model.Publication
 import com.inktone.domain.service.ImportProgress
+import com.inktone.domain.service.SyncOperationResult
+import kotlinx.coroutines.launch
 
 /**
  * Tache 9bis.4 — reconstruction complete : drawer (filtres/series/tags),
@@ -100,8 +108,13 @@ fun LibraryScreen(
     onMenuClick: () -> Unit = {},
     onNavigateToSeriesDetail: (String) -> Unit = {},
     onNavigateToTagDetail: (String) -> Unit = {},
+    // Lot 19 — « Synchroniser avec le cloud » non configuré bascule vers
+    // l'écran de configuration de la sync (UX §Bottom sheet 3-points).
+    onOpenSync: () -> Unit = {},
 ) {
     val state by viewModel.state.collectAsState()
+    val snackbarHostState = remember { SnackbarHostState() }
+    val scope = rememberCoroutineScope()
 
     // Phase 4 — rafraîchissement au retour du Reader (ON_RESUME)
     val lifecycleOwner = LocalLifecycleOwner.current
@@ -120,11 +133,32 @@ fun LibraryScreen(
             when (effect) {
                 is LibraryEffect.NavigateToReader -> onNavigateToReader(effect.publicationId)
                 is LibraryEffect.NavigateToStats -> onOpenStats()
+                is LibraryEffect.NavigateToSync -> onOpenSync()
+                is LibraryEffect.CoversRegenerated -> {
+                    val succeeded = effect.result.processed - effect.result.failed
+                    scope.launch {
+                        snackbarHostState.showSnackbar("Couvertures reconstruites ($succeeded/${effect.result.processed})")
+                    }
+                }
+                is LibraryEffect.CoversReset -> scope.launch {
+                    snackbarHostState.showSnackbar("Couvertures réinitialisées")
+                }
+                is LibraryEffect.RandomBookUnavailable -> scope.launch {
+                    snackbarHostState.showSnackbar("Aucun livre à ouvrir")
+                }
+                is LibraryEffect.SyncCompleted -> scope.launch {
+                    val message = when (effect.result) {
+                        is SyncOperationResult.Success -> "Synchronisation terminée"
+                        is SyncOperationResult.Failed -> "Échec de la synchronisation"
+                    }
+                    snackbarHostState.showSnackbar(message)
+                }
             }
         }
     }
 
     Scaffold(
+        snackbarHost = { SnackbarHost(snackbarHostState) },
         floatingActionButton = {
             Row(verticalAlignment = Alignment.Bottom) {
                 floatingAudioButton()
@@ -143,7 +177,6 @@ fun LibraryScreen(
                 selectedFormats = state.selectedFormats,
                 onToggleFormat = { viewModel.onIntent(LibraryIntent.ToggleFileFormat(it)) },
                 onClearFormats = { viewModel.onIntent(LibraryIntent.ClearFileFormats) },
-                onRefresh = { viewModel.onIntent(LibraryIntent.Refresh) },
                 onImportClick = onImportClick,
                 activeFilter = state.activeFilter,
                 filterValue = state.filterValue,
@@ -155,6 +188,13 @@ fun LibraryScreen(
                 tagCounts = state.tagCounts,
                 onNavigateToSeriesDetail = onNavigateToSeriesDetail,
                 onNavigateToTagDetail = onNavigateToTagDetail,
+                // Lot 19 — actions du menu 3-points
+                onOpenRandomBook = { viewModel.onIntent(LibraryIntent.OpenRandomBook) },
+                onSyncNow = { viewModel.onIntent(LibraryIntent.SyncNow) },
+                onResetCovers = { viewModel.onIntent(LibraryIntent.ResetCovers) },
+                onRegenerateCovers = { viewModel.onIntent(LibraryIntent.RegenerateCovers) },
+                isRegeneratingCovers = state.isRegeneratingCovers,
+                coverRegeneration = state.coverRegeneration,
             )
         },
     ) { innerPadding ->
@@ -346,7 +386,6 @@ internal fun LibraryTopBar(
     selectedFormats: Set<com.inktone.domain.model.PublicationFormat>,
     onToggleFormat: (com.inktone.domain.model.PublicationFormat) -> Unit,
     onClearFormats: () -> Unit,
-    onRefresh: () -> Unit,
     onImportClick: () -> Unit,
     // C.4 — filtre actif pour le titre cliquable
     activeFilter: FilterMode = FilterMode.ALL,
@@ -359,11 +398,29 @@ internal fun LibraryTopBar(
     tagCounts: Map<String, Int> = emptyMap(),
     onNavigateToSeriesDetail: (String) -> Unit = {},
     onNavigateToTagDetail: (String) -> Unit = {},
+    // Lot 19 — actions du menu 3-points
+    onOpenRandomBook: () -> Unit = {},
+    onSyncNow: () -> Unit = {},
+    onResetCovers: () -> Unit = {},
+    onRegenerateCovers: () -> Unit = {},
+    isRegeneratingCovers: Boolean = false,
+    coverRegeneration: CoverRegenerationProgress? = null,
 ) {
     var isSearchActive by remember { mutableStateOf(false) }
     var showFilterDialog by remember { mutableStateOf(false) }
     var showActionsSheet by remember { mutableStateOf(false) }
     var showNavPopup by remember { mutableStateOf(false) }
+    var showResetCoversConfirm by remember { mutableStateOf(false) }
+    // Lot 19 — la reconstruction garde le bottom sheet OUVERT pour que la
+    // progression X/Y soit réellement visible ; il se referme à la fin.
+    var regenerationRequested by remember { mutableStateOf(false) }
+
+    LaunchedEffect(isRegeneratingCovers) {
+        if (!isRegeneratingCovers && regenerationRequested) {
+            showActionsSheet = false
+            regenerationRequested = false
+        }
+    }
 
     if (isSearchActive) {
         // État recherche : SearchBar pleine largeur qui remplace la TopBar
@@ -483,9 +540,41 @@ internal fun LibraryTopBar(
                     modifier = Modifier.padding(horizontal = 24.dp, vertical = 8.dp),
                     color = MaterialTheme.colorScheme.primary)
                 ActionSheetItem("Importer", AppIcons.Data) { showActionsSheet = false; onImportClick() }
-                ActionSheetItem("Actualiser", AppIcons.Refresh) { showActionsSheet = false; onRefresh() }
+                ActionSheetItem("Couverture par défaut", AppIcons.CoverOnly) {
+                    showActionsSheet = false
+                    showResetCoversConfirm = true
+                }
+                if (isRegeneratingCovers) {
+                    ActionSheetProgress("Reconstruire les couvertures", coverRegeneration)
+                } else {
+                    ActionSheetItem("Reconstruire les couvertures", AppIcons.Refresh) {
+                        // Le sheet reste ouvert : la progression X/Y est
+                        // visible dans l'item, refermé à la fin par
+                        // LaunchedEffect(isRegeneratingCovers).
+                        regenerationRequested = true
+                        onRegenerateCovers()
+                    }
+                }
+                ActionSheetItem("Ouvrir un livre au hasard", AppIcons.Reading) { showActionsSheet = false; onOpenRandomBook() }
+                ActionSheetItem("Synchroniser avec le cloud", AppIcons.Sync) { showActionsSheet = false; onSyncNow() }
             }
         }
+    }
+
+    if (showResetCoversConfirm) {
+        AlertDialog(
+            onDismissRequest = { showResetCoversConfirm = false },
+            title = { Text("Réinitialiser les couvertures ?") },
+            text = { Text("Toutes les couvertures reviendront à leur apparence par défaut. Vous pourrez les reconstruire à tout moment.") },
+            confirmButton = {
+                TextButton(onClick = { showResetCoversConfirm = false; onResetCovers() }) {
+                    Text("Réinitialiser", color = MaterialTheme.colorScheme.error)
+                }
+            },
+            dismissButton = {
+                TextButton(onClick = { showResetCoversConfirm = false }) { Text("Annuler") }
+            },
+        )
     }
 }
 
@@ -498,6 +587,22 @@ private fun ActionSheetItem(label: String, icon: androidx.compose.ui.graphics.ve
         Icon(icon, contentDescription = null, modifier = Modifier.size(22.dp))
         Spacer(Modifier.width(16.dp))
         Text(label, style = MaterialTheme.typography.bodyLarge)
+    }
+}
+
+/** Lot 19 — item non cliquable affichant la progression live X/Y pendant la reconstruction. */
+@Composable
+private fun ActionSheetProgress(label: String, progress: CoverRegenerationProgress?) {
+    Row(
+        modifier = Modifier.fillMaxWidth().padding(horizontal = 24.dp, vertical = 14.dp),
+        verticalAlignment = Alignment.CenterVertically,
+    ) {
+        CircularProgressIndicator(modifier = Modifier.size(22.dp), strokeWidth = 2.dp)
+        Spacer(Modifier.width(16.dp))
+        Text(
+            if (progress != null) "$label (${progress.processed}/${progress.total})" else label,
+            style = MaterialTheme.typography.bodyLarge,
+        )
     }
 }
 

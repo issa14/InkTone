@@ -5,6 +5,8 @@ import com.inktone.domain.model.Publication
 import com.inktone.domain.model.PublicationFormat
 import com.inktone.domain.service.ImportProgress
 import com.inktone.domain.service.ImportResultEntry
+import com.inktone.domain.service.SyncOperationResult
+import com.inktone.domain.usecase.CoverRegenerationResult
 
 /**
  * Tache 9bis.4 — tri et recherche titre/auteur en derive du `publications`
@@ -36,6 +38,10 @@ data class LibraryUiState(
     val importResults: List<ImportResultEntry> = emptyList(),
     val showImportDetails: Boolean = false,
     val importSessionId: String? = null,
+    // Lot 19 — progression live de la reconstruction des couvertures
+    // (menu 3-points « Reconstruire les couvertures »).
+    val isRegeneratingCovers: Boolean = false,
+    val coverRegeneration: CoverRegenerationProgress? = null,
 ) {
     /** Tags distincts de la bibliotheque COMPLETE, pas seulement du filtre actif — le drawer doit pouvoir en changer. */
     val availableTags: List<String> get() = publications.flatMap { it.subjects }.distinct().sorted()
@@ -95,6 +101,9 @@ enum class LibrarySortOrder { RECENTLY_ADDED, TITLE, AUTHOR, RECENTLY_OPENED }
 /** Lot 2a.1 — 2 dispositions, pas 3 : GRID (couverture + titre) retiree, decision finale UX (grille couvertures seules). */
 enum class LibraryLayoutMode { LIST, GRID_COVERS }
 
+/** Lot 19 — progression X/Y de la reconstruction des couvertures (menu legacy « progression live »). */
+data class CoverRegenerationProgress(val processed: Int, val total: Int)
+
 sealed interface LibraryIntent {
     data class OpenPublication(val publicationId: String) : LibraryIntent
     data class ToggleFavorite(val publicationId: String, val isFavorite: Boolean) : LibraryIntent
@@ -110,6 +119,11 @@ sealed interface LibraryIntent {
     data object DismissError : LibraryIntent
     data object DismissImportResults : LibraryIntent
     data object OpenImportDetails : LibraryIntent
+    // Lot 19 — actions du menu 3-points
+    data object OpenRandomBook : LibraryIntent
+    data object SyncNow : LibraryIntent
+    data object RegenerateCovers : LibraryIntent
+    data object ResetCovers : LibraryIntent
 }
 
 /**
@@ -120,4 +134,13 @@ sealed interface LibraryIntent {
 sealed interface LibraryEffect {
     data class NavigateToReader(val publicationId: String) : LibraryEffect
     data object NavigateToStats : LibraryEffect
+    // Lot 19 — « Synchroniser avec le cloud » non configuré : bascule
+    // vers l'écran de configuration, jamais un bouton désactivé.
+    data object NavigateToSync : LibraryEffect
+    data class CoversRegenerated(val result: CoverRegenerationResult) : LibraryEffect
+    data object CoversReset : LibraryEffect
+    // Retours des actions du menu 3-points — mêmes règles que les
+    // couvertures : un retour utilisateur, jamais un no-op muet.
+    data object RandomBookUnavailable : LibraryEffect
+    data class SyncCompleted(val result: SyncOperationResult) : LibraryEffect
 }
