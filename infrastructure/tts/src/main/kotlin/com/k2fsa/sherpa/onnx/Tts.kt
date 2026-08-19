@@ -1,4 +1,8 @@
 // Copyright (c)  2023  Xiaomi Corporation
+//
+// Liaisons Kotlin issues de sherpa-onnx (https://github.com/k2-fsa/sherpa-onnx),
+// sous licence Apache-2.0. Ce fichier reste sous sa licence amont : la licence
+// MIT d'InkTone ne s'y applique pas (voir THIRD_PARTY_NOTICES.md).
 package com.k2fsa.sherpa.onnx
 
 import android.content.res.AssetManager
