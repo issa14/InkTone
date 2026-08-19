@@ -193,6 +193,9 @@ fun InkToneNavHost(navController: NavHostController = rememberNavController(), s
                 onNavigateToSeriesDetail = { series -> navController.navigate(LibraryDetailRoute("series", series)) },
                 onNavigateToTagDetail = { tag -> navController.navigate(LibraryDetailRoute("tag", tag)) },
                 onImportClick = { importLauncher.launch(arrayOf("application/epub+zip", "text/plain", "application/pdf")) },
+                // Lot 19 — « Synchroniser avec le cloud » non configuré
+                // bascule vers l'écran de configuration de la sync.
+                onOpenSync = { navigateToDrawerDestination(SyncRoute) },
             )
             // Lot 11, tâche 11.10 — présenté à la prochaine ouverture de
             // l'app (Bibliothèque = première destination réelle après
@@ -329,6 +332,8 @@ fun InkToneNavHost(navController: NavHostController = rememberNavController(), s
             val syncAuthViewModel: SyncAuthViewModel = hiltViewModel()
             val isAuthenticating by syncAuthViewModel.isAuthenticating.collectAsState()
             val authError by syncAuthViewModel.authError.collectAsState()
+            val isWebDavConnecting by syncAuthViewModel.isWebDavConnecting.collectAsState()
+            val webDavError by syncAuthViewModel.webDavError.collectAsState()
             val authLauncher = rememberLauncherForActivityResult(
                 ActivityResultContracts.StartActivityForResult(),
             ) { result -> syncAuthViewModel.onAuthorizationResult(result.data) }
@@ -341,6 +346,9 @@ fun InkToneNavHost(navController: NavHostController = rememberNavController(), s
                 isGoogleConfigured = syncAuthViewModel.isGoogleConfigured,
                 onConnectGoogle = { authLauncher.launch(syncAuthViewModel.buildAuthorizationIntent()) },
                 onDisconnectGoogle = syncAuthViewModel::disconnect,
+                isWebDavConnecting = isWebDavConnecting,
+                onConnectWebDav = syncAuthViewModel::connectWebDav,
+                onDisconnectWebDav = syncAuthViewModel::disconnectWebDav,
             )
 
             authError?.let { message ->
@@ -349,6 +357,14 @@ fun InkToneNavHost(navController: NavHostController = rememberNavController(), s
                     title = { Text("Échec de la connexion") },
                     text = { Text(message) },
                     confirmButton = { TextButton(onClick = syncAuthViewModel::dismissError) { Text("OK") } },
+                )
+            }
+            webDavError?.let { message ->
+                AlertDialog(
+                    onDismissRequest = syncAuthViewModel::dismissWebDavError,
+                    title = { Text("Échec de la connexion WebDAV") },
+                    text = { Text(message) },
+                    confirmButton = { TextButton(onClick = syncAuthViewModel::dismissWebDavError) { Text("OK") } },
                 )
             }
         }

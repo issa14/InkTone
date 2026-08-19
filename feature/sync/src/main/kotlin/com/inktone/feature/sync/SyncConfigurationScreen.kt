@@ -34,6 +34,7 @@ import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedButton
+import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Switch
 import androidx.compose.material3.Text
@@ -41,6 +42,7 @@ import androidx.compose.material3.TextButton
 import androidx.compose.material3.TopAppBar
 import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.TopAppBarDefaults
+import androidx.compose.ui.text.input.PasswordVisualTransformation
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
@@ -60,6 +62,7 @@ import com.inktone.core.designsystem.AppIcons
 import com.inktone.domain.model.DeviceFleetEntry
 import com.inktone.domain.model.SyncActivityEvent
 import com.inktone.domain.model.SyncActivityEventType
+import com.inktone.domain.model.SyncProviderId
 import com.inktone.domain.model.SyncUiState
 
 /**
@@ -86,6 +89,10 @@ fun SyncConfigurationScreen(
     isGoogleConfigured: Boolean = true,
     onConnectGoogle: () -> Unit = {},
     onDisconnectGoogle: () -> Unit = {},
+    // Lot 19 — carte WebDAV fonctionnelle
+    isWebDavConnecting: Boolean = false,
+    onConnectWebDav: (url: String, username: String, password: String) -> Unit = { _, _, _ -> },
+    onDisconnectWebDav: () -> Unit = {},
 ) {
     val state by viewModel.state.collectAsState()
     var manualShowConfig by remember { mutableStateOf(false) }
@@ -154,6 +161,9 @@ fun SyncConfigurationScreen(
                     onConnectGoogle = onConnectGoogle,
                     onDisconnectGoogle = { manualShowConfig = false; onDisconnectGoogle() },
                     onOpenLocalBackup = onOpenLocalBackup,
+                    isWebDavConnecting = isWebDavConnecting,
+                    onConnectWebDav = onConnectWebDav,
+                    onDisconnectWebDav = onDisconnectWebDav,
                 )
             }
         }
@@ -181,7 +191,15 @@ private fun SyncConfigurationContent(
     onConnectGoogle: () -> Unit,
     onDisconnectGoogle: () -> Unit,
     onOpenLocalBackup: () -> Unit,
+    isWebDavConnecting: Boolean,
+    onConnectWebDav: (url: String, username: String, password: String) -> Unit,
+    onDisconnectWebDav: () -> Unit,
 ) {
+    val account = (state.syncUiState as? SyncUiState.Configured)?.account
+        ?: (state.syncUiState as? SyncUiState.Syncing)?.account
+    val isWebDavActive = account?.provider == SyncProviderId.WEBDAV
+    val isGoogleActive = account?.provider == SyncProviderId.GOOGLE_DRIVE
+
     Column(
         modifier = Modifier.padding(horizontal = 16.dp, vertical = 12.dp),
         verticalArrangement = Arrangement.spacedBy(16.dp),
@@ -190,10 +208,18 @@ private fun SyncConfigurationContent(
             syncUiState = state.syncUiState,
             isAuthenticating = isGoogleAuthenticating,
             isConfigured = isGoogleConfigured,
+            isOtherProviderActive = isWebDavActive,
             onConnect = onConnectGoogle,
             onDisconnect = onDisconnectGoogle,
         )
-        WebDavCard()
+        WebDavCard(
+            isActive = isWebDavActive,
+            isOtherProviderActive = isGoogleActive,
+            isConnecting = isWebDavConnecting,
+            host = account?.takeIf { isWebDavActive }?.accountLabel,
+            onConnect = onConnectWebDav,
+            onDisconnect = onDisconnectWebDav,
+        )
         LocalBackupCard(onOpenLocalBackup)
     }
 }
@@ -203,6 +229,7 @@ private fun GoogleDriveCard(
     syncUiState: SyncUiState,
     isAuthenticating: Boolean,
     isConfigured: Boolean,
+    isOtherProviderActive: Boolean,
     onConnect: () -> Unit,
     onDisconnect: () -> Unit,
 ) {
@@ -215,14 +242,16 @@ private fun GoogleDriveCard(
     var showDisconnectConfirm by remember { mutableStateOf(false) }
 
     Card(
-        colors = if (isActive) {
-            CardDefaults.cardColors(
+        colors = when {
+            isOtherProviderActive -> CardDefaults.cardColors(
+                containerColor = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.4f),
+            )
+            isActive -> CardDefaults.cardColors(
                 containerColor = MaterialTheme.colorScheme.primaryContainer.copy(alpha = 0.3f),
             )
-        } else {
-            CardDefaults.cardColors()
+            else -> CardDefaults.cardColors()
         },
-        border = if (isActive) BorderStroke(1.dp, MaterialTheme.colorScheme.primary) else null,
+        border = if (isActive && !isOtherProviderActive) BorderStroke(1.dp, MaterialTheme.colorScheme.primary) else null,
     ) {
         Column(Modifier.padding(16.dp)) {
             Row(verticalAlignment = Alignment.CenterVertically) {
@@ -265,7 +294,18 @@ private fun GoogleDriveCard(
                 }
             } else {
                 Spacer(Modifier.height(12.dp))
-                if (!isConfigured) {
+                if (isOtherProviderActive) {
+                    // Lot 19 — exclusivité mutuelle WebDAV/Google Drive
+                    // (décision actée) : la carte est grisée, pas un
+                    // contrôle décoratif — le message explique pourquoi.
+                    Text(
+                        "Désactivez WebDAV pour connecter Google Drive.",
+                        style = MaterialTheme.typography.bodySmall,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    )
+                    Spacer(Modifier.height(8.dp))
+                }
+                if (!isConfigured && !isOtherProviderActive) {
                     // Absence de configuration OAuth rendue explicite plutôt
                     // que silencieuse (tâche 11.4) : clientId/redirectScheme
                     // sont un prérequis hors périmètre de Claude Code, pris
@@ -277,7 +317,11 @@ private fun GoogleDriveCard(
                     )
                     Spacer(Modifier.height(8.dp))
                 }
-                Button(onClick = onConnect, enabled = !isAuthenticating && isConfigured, modifier = Modifier.fillMaxWidth()) {
+                Button(
+                    onClick = onConnect,
+                    enabled = !isAuthenticating && isConfigured && !isOtherProviderActive,
+                    modifier = Modifier.fillMaxWidth(),
+                ) {
                     if (isAuthenticating) {
                         CircularProgressIndicator(modifier = Modifier.size(18.dp), strokeWidth = 2.dp)
                         Spacer(Modifier.width(4.dp))
@@ -310,26 +354,120 @@ private fun GoogleDriveCard(
 }
 
 @Composable
-private fun WebDavCard() {
-    // Grisage permanent, pas conditionnel à l'autre fournisseur actif
-    // (contrairement à la cible) : aucune implémentation n'existe encore
-    // (WebDAV arrive après ce lot). Un bouton désactivé qui explique
-    // pourquoi n'est pas un contrôle décoratif — à consigner.
-    Card(colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.4f))) {
+private fun WebDavCard(
+    isActive: Boolean,
+    isOtherProviderActive: Boolean,
+    isConnecting: Boolean,
+    host: String?,
+    onConnect: (url: String, username: String, password: String) -> Unit,
+    onDisconnect: () -> Unit,
+) {
+    var url by remember { mutableStateOf("") }
+    var username by remember { mutableStateOf("") }
+    var password by remember { mutableStateOf("") }
+    var showDisconnectConfirm by remember { mutableStateOf(false) }
+
+    Card(
+        colors = when {
+            isOtherProviderActive -> CardDefaults.cardColors(
+                containerColor = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.4f),
+            )
+            isActive -> CardDefaults.cardColors(
+                containerColor = MaterialTheme.colorScheme.primaryContainer.copy(alpha = 0.3f),
+            )
+            else -> CardDefaults.cardColors()
+        },
+        border = if (isActive && !isOtherProviderActive) BorderStroke(1.dp, MaterialTheme.colorScheme.primary) else null,
+    ) {
         Column(Modifier.padding(16.dp)) {
-            Text(
-                "WebDAV",
-                style = MaterialTheme.typography.titleMedium,
-                fontWeight = FontWeight.Bold,
-                color = MaterialTheme.colorScheme.onSurfaceVariant,
-            )
-            Spacer(Modifier.height(4.dp))
-            Text(
-                "Bientôt disponible",
-                style = MaterialTheme.typography.bodyMedium,
-                color = MaterialTheme.colorScheme.onSurfaceVariant,
-            )
+            Row(verticalAlignment = Alignment.CenterVertically) {
+                Text("WebDAV", style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.Bold)
+                Spacer(Modifier.weight(1f))
+                StatusBadge(isActive)
+            }
+
+            if (isActive) {
+                // Le mot de passe persisté n'est jamais ré-affiché (secret,
+                // même discipline que le jeton OAuth) : l'état actif montre
+                // l'hôte lié + « Connecté », pas les champs d'édition.
+                Spacer(Modifier.height(8.dp))
+                Text("Connecté", style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.primary)
+                host?.let {
+                    Text(it, style = MaterialTheme.typography.bodyMedium, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                }
+                Spacer(Modifier.height(12.dp))
+                OutlinedButton(onClick = { showDisconnectConfirm = true }, modifier = Modifier.fillMaxWidth()) {
+                    Text("Déconnecter")
+                }
+            } else {
+                Spacer(Modifier.height(12.dp))
+                if (isOtherProviderActive) {
+                    Text(
+                        "Désactivez Google Drive pour connecter WebDAV.",
+                        style = MaterialTheme.typography.bodySmall,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    )
+                    Spacer(Modifier.height(8.dp))
+                }
+                OutlinedTextField(
+                    value = url,
+                    onValueChange = { url = it },
+                    label = { Text("URL") },
+                    placeholder = { Text("https://exemple.com/webdav/") },
+                    singleLine = true,
+                    enabled = !isOtherProviderActive,
+                    modifier = Modifier.fillMaxWidth(),
+                )
+                Spacer(Modifier.height(8.dp))
+                OutlinedTextField(
+                    value = username,
+                    onValueChange = { username = it },
+                    label = { Text("Identifiant") },
+                    singleLine = true,
+                    enabled = !isOtherProviderActive,
+                    modifier = Modifier.fillMaxWidth(),
+                )
+                Spacer(Modifier.height(8.dp))
+                OutlinedTextField(
+                    value = password,
+                    onValueChange = { password = it },
+                    label = { Text("Mot de passe") },
+                    singleLine = true,
+                    visualTransformation = PasswordVisualTransformation(),
+                    enabled = !isOtherProviderActive,
+                    modifier = Modifier.fillMaxWidth(),
+                )
+                Spacer(Modifier.height(12.dp))
+                Button(
+                    onClick = { onConnect(url.trim(), username, password) },
+                    enabled = !isConnecting && !isOtherProviderActive && url.isNotBlank() && username.isNotBlank() && password.isNotBlank(),
+                    modifier = Modifier.fillMaxWidth(),
+                ) {
+                    if (isConnecting) {
+                        CircularProgressIndicator(modifier = Modifier.size(18.dp), strokeWidth = 2.dp)
+                        Spacer(Modifier.width(4.dp))
+                    }
+                    Text("Tester")
+                }
+            }
         }
+    }
+
+    if (showDisconnectConfirm) {
+        AlertDialog(
+            onDismissRequest = { showDisconnectConfirm = false },
+            title = { Text("Déconnecter WebDAV ?") },
+            text = { Text("La synchronisation s'arrêtera. Vous pourrez vous reconnecter à tout moment.") },
+            confirmButton = {
+                TextButton(
+                    onClick = {
+                        showDisconnectConfirm = false
+                        onDisconnect()
+                    },
+                ) { Text("Déconnecter", color = MaterialTheme.colorScheme.error) }
+            },
+            dismissButton = { TextButton(onClick = { showDisconnectConfirm = false }) { Text("Annuler") } },
+        )
     }
 }
 

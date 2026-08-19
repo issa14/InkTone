@@ -1,7 +1,11 @@
 package com.inktone.infrastructure.sync.di
 
 import com.inktone.domain.service.SyncProvider
-import com.inktone.infrastructure.sync.drive.GoogleDriveSyncProvider
+import com.inktone.domain.service.WebDavSyncService
+import com.inktone.infrastructure.sync.SyncProviderRouter
+import com.inktone.infrastructure.sync.webdav.WebDavCredentialsStore
+import com.inktone.infrastructure.sync.webdav.WebDavCredentialsStoreContract
+import com.inktone.infrastructure.sync.webdav.WebDavSyncManager
 import dagger.Binds
 import dagger.Module
 import dagger.Provides
@@ -14,8 +18,18 @@ import javax.inject.Singleton
 @Module
 @InstallIn(SingletonComponent::class)
 abstract class SyncNetworkModule {
-    /** Seule implémentation à ce jour (tâche 11.5) — WebDAV (hors périmètre de ce lot) exigera une sélection par [com.inktone.domain.model.SyncProviderId] plutôt qu'un binding direct. */
-    @Binds @Singleton abstract fun bindSyncProvider(impl: GoogleDriveSyncProvider): SyncProvider
+    /**
+     * Lot 19 — sélection par [com.inktone.domain.model.SyncProviderId]
+     * plutôt qu'un binding direct sur Google Drive : WebDAV est désormais
+     * implémenté, l'aiguillage lit le compte persisté.
+     */
+    @Binds @Singleton abstract fun bindSyncProvider(impl: SyncProviderRouter): SyncProvider
+
+    /** Connexion WebDAV (test/connect/déconnecter), consommée par `data` (`WebDavSyncLinker`). */
+    @Binds @Singleton abstract fun bindWebDavSyncService(impl: WebDavSyncManager): WebDavSyncService
+
+    /** Stockage chiffré des identifiants WebDAV — interface extraite pour les tests JVM sans Keystore. */
+    @Binds @Singleton abstract fun bindWebDavCredentialsStore(impl: WebDavCredentialsStore): WebDavCredentialsStoreContract
 
     companion object {
         @Provides
