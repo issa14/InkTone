@@ -1,7 +1,7 @@
 # Mentions de tiers
 
 Le code source écrit pour InkTone est distribué sous licence MIT (voir
-[`LICENSE`](LICENSE)). Ce fichier recense ce qui n'est **pas** couvert par
+[`LICENSE`](LICENSE) et [ADR-026](docs/adr/ADR-026-licence-mit-ouverture-du-code.md)). Ce fichier recense ce qui n'est **pas** couvert par
 cette licence : le code tiers présent dans le dépôt, les bibliothèques
 liées à la compilation, et les modèles téléchargés à l'exécution.
 
