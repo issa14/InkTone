@@ -146,7 +146,14 @@ class WebDavSyncProvider @Inject constructor(
 
     private fun baseUrl(url: String): String = url.trimEnd('/')
 
-    private fun fileUrl(baseUrl: String, fileName: String): String = "$baseUrl/$fileName"
+    // Percent-encode le segment de chemin (esprit K6 : normaliser les
+    // noms de ressources avant de construire une URL). Noms internes
+    // sûrs aujourd'hui, mais un hôte futur ne devrait pas casser l'URL.
+    private fun fileUrl(baseUrl: String, fileName: String): String =
+        "$baseUrl/${encodePathSegment(fileName)}"
+
+    private fun encodePathSegment(segment: String): String =
+        java.net.URLEncoder.encode(segment, "UTF-8").replace("+", "%20")
 
     /**
      * Parse la réponse multistatus WebDAV en [SyncRemoteFile]. Les href
@@ -154,7 +161,7 @@ class WebDavSyncProvider @Inject constructor(
      * href terminant par `/` et égal à la racine n'est pas un fichier.
      */
     private fun parseMultistatus(xml: String): List<SyncRemoteFile> = runCatching {
-        val factory = DocumentBuilderFactory.newInstance().apply { isNamespaceAware = true }
+        val factory = hardenedDocumentBuilderFactory()
         val document = factory.newDocumentBuilder().parse(xml.byteInputStream())
         val responses = document.getElementsByTagNameNS("DAV:", "response")
         (0 until responses.length).mapNotNull { index ->
@@ -172,6 +179,22 @@ class WebDavSyncProvider @Inject constructor(
             )
         }
     }.getOrElse { emptyList() }
+
+    /**
+     * Fabrique un parseur XML durci contre XXE : la réponse provient d'un
+     * serveur arbitraire saisi par l'utilisateur. Le parseur Android
+     * n'expanse pas les entités externes par défaut, mais désactiver
+     * explicitement DOCTYPE et les entités lève toute ambiguïté.
+     */
+    private fun hardenedDocumentBuilderFactory(): DocumentBuilderFactory =
+        DocumentBuilderFactory.newInstance().apply {
+            isNamespaceAware = true
+            runCatching { setFeature("http://apache.org/xml/features/disallow-doctype-decl", true) }
+            runCatching { setFeature("http://xml.org/sax/features/external-general-entities", false) }
+            runCatching { setFeature("http://xml.org/sax/features/external-parameter-entities", false) }
+            isXIncludeAware = false
+            isExpandEntityReferences = false
+        }
 
     private fun parseHttpDate(value: String): Long =
         runCatching { Instant.from(DateTimeFormatter.RFC_1123_DATE_TIME.parse(value)).toEpochMilli() }.getOrElse { 0L }
