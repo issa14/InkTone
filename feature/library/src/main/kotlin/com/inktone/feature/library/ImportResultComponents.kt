@@ -44,9 +44,9 @@ fun ImportResultSummary(
 ) {
     val successCount = results.count { it.resultType == "success" }
     val duplicateCount = results.count { it.resultType == "duplicate" }
-    val alertCount = results.count {
-        it.resultType == "corrupted" || it.resultType == "drm_protected" || it.resultType == "unsupported_format"
-    }
+    val corruptedCount = results.count { it.resultType == "corrupted" }
+    val drmCount = results.count { it.resultType == "drm_protected" }
+    val unsupportedCount = results.count { it.resultType == "unsupported_format" }
 
     Card(
         modifier = modifier.fillMaxWidth().padding(horizontal = 8.dp, vertical = 4.dp),
@@ -60,7 +60,9 @@ fun ImportResultSummary(
                 val parts = mutableListOf<String>()
                 if (successCount > 0) parts += "$successCount importé${if (successCount > 1) "s" else ""}"
                 if (duplicateCount > 0) parts += "$duplicateCount doublon${if (duplicateCount > 1) "s" else ""} ignoré${if (duplicateCount > 1) "s" else ""}"
-                if (alertCount > 0) parts += "$alertCount échec${if (alertCount > 1) "s" else ""}"
+                if (corruptedCount > 0) parts += "$corruptedCount fichier${if (corruptedCount > 1) "s" else ""} corrompu${if (corruptedCount > 1) "s" else ""}"
+                if (drmCount > 0) parts += "$drmCount fichier${if (drmCount > 1) "s" else ""} protégé${if (drmCount > 1) "s" else ""} par DRM"
+                if (unsupportedCount > 0) parts += "$unsupportedCount format${if (unsupportedCount > 1) "s" else ""} non pris en charge"
 
                 Text(
                     text = parts.joinToString(" · "),

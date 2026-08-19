@@ -444,6 +444,11 @@ class ReaderViewModel @Inject constructor(
                 is ParseResult.Success -> {
                     currentPublicationId = publicationId
 
+                    // Lot 17, tâche 1 — écrit lastOpened à l'ouverture : la
+                    // carte « Reprendre la lecture » (LibraryUiState) dérive de
+                    // ce champ, jamais écrit jusqu'ici (code mort).
+                    publicationRepository.setLastOpened(publicationId, System.currentTimeMillis())
+
                     // ───── Lot Sessions : démarre le tracking ─────
                     val tracker = ReadingSessionTracker(publicationId)
                     sessionTracker = tracker

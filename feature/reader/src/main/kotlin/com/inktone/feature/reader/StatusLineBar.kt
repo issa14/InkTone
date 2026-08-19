@@ -19,6 +19,7 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.LocalLifecycleOwner
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.Lifecycle
@@ -48,6 +49,7 @@ fun StatusLineBar(
     bookProgression: Float,
     modifier: Modifier = Modifier,
     showPageCounter: Boolean = true,
+    contentColor: Color = MaterialTheme.colorScheme.onSurface,
 ) {
     val timeText by rememberAlignedClockText()
 
@@ -60,12 +62,13 @@ fun StatusLineBar(
         horizontalArrangement = Arrangement.SpaceBetween,
         verticalAlignment = Alignment.CenterVertically,
     ) {
-        Text(timeText, style = MaterialTheme.typography.labelSmall)
+        Text(timeText, style = MaterialTheme.typography.labelSmall, color = contentColor)
         Text(
             chapterCounterText(chapterNumber, pageInChapter, pageCountInChapter, showPageCounter),
             style = MaterialTheme.typography.labelSmall,
+            color = contentColor,
         )
-        Text(formatProgressionFr(bookProgression), style = MaterialTheme.typography.labelSmall)
+        Text(formatProgressionFr(bookProgression), style = MaterialTheme.typography.labelSmall, color = contentColor)
     }
 }
 

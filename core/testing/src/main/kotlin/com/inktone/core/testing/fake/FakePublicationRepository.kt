@@ -67,6 +67,10 @@ class FakePublicationRepository : PublicationRepository {
         state.value = state.value.map { if (it.id == id) it.copy(isPinned = isPinned) else it }
     }
 
+    override suspend fun setLastOpened(id: String, lastOpened: Long) {
+        state.value = state.value.map { if (it.id == id) it.copy(lastOpened = lastOpened) else it }
+    }
+
     // ───── Audit fix : COUNT pour le dashboard ─────
     override suspend fun countFiltered(mode: FilterMode): Int =
         state.value.count { pub ->
