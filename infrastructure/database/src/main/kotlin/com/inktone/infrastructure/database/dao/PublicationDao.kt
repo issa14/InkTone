@@ -75,6 +75,9 @@ interface PublicationDao {
     @Query("UPDATE publications SET isPinned = :isPinned WHERE id = :id")
     suspend fun setPinned(id: String, isPinned: Boolean)
 
+    @Query("UPDATE publications SET lastOpened = :lastOpened WHERE id = :id")
+    suspend fun setLastOpened(id: String, lastOpened: Long)
+
     // ───── Audit fix : COUNT pour le dashboard (pas .first().size) ─────
 
     @Query(

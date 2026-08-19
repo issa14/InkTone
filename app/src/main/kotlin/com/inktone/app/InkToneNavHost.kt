@@ -35,7 +35,6 @@ import androidx.navigation.toRoute
 import com.inktone.core.designsystem.LocalAnimatedVisibilityScope
 import com.inktone.core.designsystem.LocalSharedTransitionScope
 import com.inktone.core.ui.AboutScreen
-import com.inktone.feature.importer.ImportPickerButton
 import com.inktone.feature.importer.ImportViewModel
 import com.inktone.feature.library.LibraryDetailCategory
 import com.inktone.feature.library.LibraryDetailScreen
@@ -117,12 +116,7 @@ fun InkToneNavHost(navController: NavHostController = rememberNavController(), s
                 onOpenOpds = { navController.navigate(OpdsRoute) },
                 onNavigateToSeriesDetail = { series -> navController.navigate(LibraryDetailRoute("series", series)) },
                 onNavigateToTagDetail = { tag -> navController.navigate(LibraryDetailRoute("tag", tag)) },
-                onImportClick = { importLauncher.launch(arrayOf("application/epub+zip", "text/plain")) },
-                // Tache 1.0 (Partie 1) : seul l'import reste dans le FAB.
-                // Search/Stats/Settings sont atteignables uniquement depuis
-                // le drawer (Partie 2) — c'est tout l'interet d'avoir un
-                // drawer plutot que des icones eparpillees.
-                floatingActionButton = { ImportPickerButton() },
+                onImportClick = { importLauncher.launch(arrayOf("application/epub+zip", "text/plain", "application/pdf")) },
             )
             // Lot 11, tâche 11.10 — présenté à la prochaine ouverture de
             // l'app (Bibliothèque = première destination réelle après

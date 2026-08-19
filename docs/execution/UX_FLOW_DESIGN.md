@@ -79,6 +79,8 @@ Premier lancement → Onboarding → Bibliothèque (centre de navigation)
 
 Onboarding câblé au premier lancement (`OnboardingRoute`, `startDestination` de `InkToneNavHost` arbitré sur `UserPreferences.hasSeenOnboarding`, migration 19→20). `CrashConsent`/`VoiceDownload` retirés (pure présentation) : le consentement crash vit dans la carte Confidentialité des Réglages (formulation honnête ajoutée ce lot, gap trouvé à l'audit — voir `LOT_ONBOARDING_PERIMETRE.md`), le téléchargement de voix dans la carte Lecture des Réglages (`SettingsIntent.StartVoiceDownload`, nouveau point de besoin réel, aucun autre point d'accès n'existait avant ce lot).
 
+**Dérive documentaire constatée (Lot 17)** : les illustrations Canvas décrites ci-dessus (`OnboardingIllustrations.kt`) ont été supprimées du dépôt après retour utilisateur sur appareil réel. Le code actuel (`OnboardingScreen.kt`) affiche l'icône de l'application (cacatoès + livre, `app_icon_monochrome`, tintée à la couleur d'accent) sur la carte 1, et une liste verticale aérée (icône ronde 48dp à gauche, titre + description à droite) sur la carte 2 — les deux blocs côte à côte comprimaient le texte en un mur illisible. La carte 3 et les textes restent ceux validés au lot 10. Ce document décrivait l'état antérieur ; le code fait foi.
+
 ---
 
 ## Écran : Bibliothèque — état vide
@@ -243,7 +245,7 @@ Cinq actions, dans l'ordre :
 - Catalogues OPDS (b4) → non conçu dans cette session ; réintégré en v1.x et planifié séparément (`ADR-023`, `docs/execution/LOT_13_CATALOGUES_OPDS.md`).
 - Synchronisation (b5) → ✅ écran conçu (§ Écran Synchronisation — Configuration + Opérationnel).
 - Statistiques de lecture (b6) → ✅ écran conçu (§ Écran Statistiques de lecture, 4 sections).
-- Pied de page (b7) : **Paramètres** → ✅ pointe vers l'écran **Réglages** entièrement conçu (6 cartes). **Thèmes** → ✅ pointe vers la **Galerie de thèmes** entièrement conçue (Studio de création inclus). **À propos** → ✅ écran conçu (§ Écran À propos).
+- Pied de page (b7) : **Paramètres** → ✅ pointe vers l'écran **Réglages** entièrement conçu (7 cartes). **Thèmes** → ✅ pointe vers la **Galerie de thèmes** entièrement conçue (Studio de création inclus). **À propos** → ✅ écran conçu (§ Écran À propos).
 
 **Tous les items du drawer sont désormais conçus, à l'exception d'OPDS — hors périmètre de cette session de conception UX, planifié à part (`ADR-023`, `docs/execution/LOT_13_CATALOGUES_OPDS.md`).**
 
@@ -340,6 +342,10 @@ Trois éléments sur une seule ligne, discrets mais lisibles :
 
 **Aucun élément de chrome ajouté par InkTone** au-dessus du texte pour annoncer le chapitre (la ligne de statut suffit). **Distinction importante, confirmée** : si le livre lui-même contient un vrai titre de chapitre écrit par l'auteur dans le fichier EPUB, ce texte continue de s'afficher naturellement dans le flux de lecture avec son style de titre — cohérent avec l'extension `ParagraphStyle.HEADING` décidée en Partie 1 (Fondations). Seul l'ajout artificiel d'une bannière par l'application est exclu, pas le contenu réel du livre.
 
+### Transition animée entre chapitres (ajout « Polissage lecteur », 14/08/2026)
+
+Le package `feature/reader/.../transition/` (`ChapterTransitionConnection`, `ChapterTransitionDirection`, `ChapterTransitionIndicator`, `ChapterTransitionMath`, `ChapterTransitionState`) implémente une transition entre chapitres par résistance spatiale (overscroll) : tirer au-delà du bord du chapitre (haut/bas en SCROLL, gauche/droite en PAGED) déclenche la navigation vers le chapitre précédent/suivant, avec un indicateur de chargement. Non documenté ici au moment de sa livraison — consigné a posteriori (Lot 17).
+
 ---
 
 ## Écran : Lecture — HUD (barre du haut + panneau unifié)
@@ -375,7 +381,7 @@ Apparaît uniquement après sélection d'un passage. Un seul bloc, positionné a
 
 **Ordre de conception :** un par un, en commençant par Sommaire (le plus simple), comme convenu.
 
-### Vue d'ensemble des 7 icônes (clarifiée avant tout mockup)
+### Vue d'ensemble des 10 icônes (clarifiée avant tout mockup)
 
 | Icône | Comportement |
 |---|---|
@@ -386,6 +392,8 @@ Apparaît uniquement après sélection d'un passage. Un seul bloc, positionné a
 | **TT** | Petit bottomsheet, ligne 1 taille du texte, ligne 2 interligne |
 | **Minuteur** | **Deux fonctions distinctes sous une seule icône :** (1) minuteur de sommeil TTS — 3 durées fixes (15/30/45 min) + bouton durée personnalisée ; (2) rappel de repos oculaire, **indépendant du TTS**, activé par défaut, déclenché après **1h fixe par défaut** — utilisateur peut désactiver le rappel ou ajuster l'intervalle si activé. Popup : « Cela fait 1h que vous lisez, pensez à reposer vos yeux » + compte à rebours de 60s ignorable |
 | **Haut-parleur** | Choix de la voix (parmi celles du moteur déjà sélectionné dans les Réglages généraux), volume, vitesse |
+| **Mode** | Bascule le mode de lecture (continu / paginé) — ajouté après le mockup initial, voir « Panneau unifié, 3 rangées » |
+| **Recherche** | Ouvre la recherche plein texte dans le livre — ajoutée après le mockup initial, voir « Panneau unifié, 3 rangées » |
 | **Luminosité** | Fine barre, ajuste la luminosité **uniquement pour l'écran de lecture**, pas le système — **signalé par Issa comme un défi technique potentiel**, noté tel quel, pas résolu à ce stade |
 
 ### Sommaire — Table des matières
@@ -409,7 +417,7 @@ Le bouton « Marquer cette page » reste visible quel que soit l'onglet actif �
 
 Pas un panneau : un tap fait défiler **Clair → Sombre → Sépia → Clair...**. Confirmé : **aucun retour visuel supplémentaire** (pas de toast/texte de confirmation) — le changement d'apparence de l'écran suffit à lui-même.
 
-Couleurs : Sépia reprend `#F4ECD8` (déjà choisi Tâche 4.7, pas réinventé). Sombre utilise un gris très foncé chaud (`#1c1b19`) plutôt qu'un noir pur — plus confortable pour une lecture longue, à valider si un noir pur est préféré.
+Couleurs : Sépia reprend `#F4ECD8` (déjà choisi Tâche 4.7, pas réinventé). Sombre (`Obsidienne`) utilise un noir pur (`#000000`) — décision actée au Lot 17 (noir pur préféré, cohérent avec `Noir Absolu AMOLED`), contrairement au gris très foncé chaud (`#1c1b19`) envisagé ici au départ.
 
 ### TT — taille du texte et interligne
 
@@ -544,15 +552,15 @@ Ajoutée après coup à l'écran Réglages (initialement conçu avec 5 cartes). 
 
 Mockup validé sans correction.
 
-**Écran Réglages : 6 cartes au total désormais.**
+**Écran Réglages : 7 cartes au total désormais.**
 
 ### État réel — Lot 6, Palier A (livré, non déclaré terminé — voir `docs/execution/LOT_6_REGLAGES.md`)
 
-Les 6 cartes existent dans `SettingsScreen.kt`, branchées sur `SettingsViewModel`
+Les 7 cartes existent dans `SettingsScreen.kt`, branchées sur `SettingsViewModel`
 et testées (`SettingsViewModelTest`, `DatabaseMigrationTest`). Écarts assumés
 par rapport à cette section, à vérifier sur appareil avant clôture :
 
-- **Langue et Confidentialité** : pas de place dans les 6 cartes cibles —
+- **Langue et Confidentialité** : pas de place dans les 7 cartes cibles —
   rattachées comme sous-sections de la carte **Appareil** plutôt que
   supprimées (le consentement Crashlytics doit rester accessible).
 - **Désapplication des présets** : approche « retour aux valeurs par défaut »
@@ -655,7 +663,7 @@ Distinct du panneau par livre (§ Marque-pages — panneau latéral) : cet écra
 - Extrait de texte du passage.
 - Commentaire/annotation de l'utilisateur, si présent (note) — en italique, sous l'extrait.
 - Titre de l'ouvrage + chapitre + date, en pied de carte (format `Titre · Chapitre X · 25 déc. 2025`, pas de pourcentage — jugé surchargé).
-- Icône étoile en haut à droite si l'entrée est épinglée en favori — les favoris remontent en haut de liste indépendamment du tri choisi.
+- Icône d'épingle en haut à droite si l'entrée est épinglée — les entrées épinglées remontent en haut de liste indépendamment du tri choisi. **Décision actée (Lot 17)** : le code utilise l'épingle (`AppSymbol.Pin`), pas l'étoile décrite initialement — comportement identique (remontée en tête), seule l'icône diffère ; une étoile nécessiterait de nouveaux assets d'icône, hors périmètre de ce lot.
 
 **Interactions :**
 - **Clic sur une carte** → ouvre le lecteur directement au passage correspondant, avec un flash/surlignage temporaire sur la phrase ciblée.
@@ -835,13 +843,13 @@ Mockup validé sans correction après les deux corrections apportées (Kokoro, c
 
 ## Panneau unifié du Lecteur : entièrement conçu
 
-Les 7 icônes (Sommaire, Marque-pages, Play, Thème, TT, Minuteur, Haut-parleur) et Luminosité sont maintenant toutes spécifiées et maquettées.
+Les 10 icônes (Sommaire, Marque-pages, Play, Thème, TT, Minuteur, Haut-parleur, Mode, Recherche, Luminosité) sont maintenant toutes spécifiées et maquettées.
 
 ---
 
 ## Point d'étape — ce qui reste sur l'ensemble du flux
 
-**Fait — flux de niveau 1 entièrement conçu :** Onboarding (3 cartes) · Bibliothèque (barre du haut, état vide, état peuplé mosaïque/liste, menu déroulant + écran de détail Séries/Tags, popup de filtrage, bottom sheet 3-points, drawer, avertissement de suppression en cascade des marque-pages/notes) · Import (progression, retours) · Lecture (vue silencieuse, HUD, popup de sélection, 7 sous-écrans du panneau unifié + luminosité, couche TTS complète — barre de contrôle et FAB replié, panneau Marque-pages par livre entièrement conçu avec ses trois onglets Notes/Surlignages/Marque-pages) · Récents (états peuplé et vide) · Réglages (écran entièrement conçu, 6 cartes) · Marque-pages et notes — vue globale (drawer b3) · Statistiques de lecture (écran entièrement conçu, 4 sections) · Synchronisation (écran entièrement conçu — Configuration + Opérationnel) · Galerie de thèmes entièrement conçue (Studio de création inclus) · **À propos (écran entièrement conçu, avec correction factuelle Piper→Kokoro).**
+**Fait — flux de niveau 1 entièrement conçu :** Onboarding (3 cartes) · Bibliothèque (barre du haut, état vide, état peuplé mosaïque/liste, menu déroulant + écran de détail Séries/Tags, popup de filtrage, bottom sheet 3-points, drawer, avertissement de suppression en cascade des marque-pages/notes) · Import (progression, retours) · Lecture (vue silencieuse, HUD, popup de sélection, 10 icônes du panneau unifié (luminosité incluse), couche TTS complète — barre de contrôle et FAB replié, panneau Marque-pages par livre entièrement conçu avec ses trois onglets Notes/Surlignages/Marque-pages) · Récents (états peuplé et vide) · Réglages (écran entièrement conçu, 7 cartes) · Marque-pages et notes — vue globale (drawer b3) · Statistiques de lecture (écran entièrement conçu, 4 sections) · Synchronisation (écran entièrement conçu — Configuration + Opérationnel) · Galerie de thèmes entièrement conçue (Studio de création inclus) · **À propos (écran entièrement conçu, avec correction factuelle Piper→Kokoro).**
 
 **Seul point hors scope de cette session :**
 - Catalogues OPDS (b4) — non conçu ici ; réintégré en v1.x et planifié séparément (`ADR-023`, `docs/execution/LOT_13_CATALOGUES_OPDS.md`)
