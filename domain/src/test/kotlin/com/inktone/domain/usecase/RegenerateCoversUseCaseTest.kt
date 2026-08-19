@@ -4,6 +4,7 @@ import com.inktone.core.testing.fake.FakePublicationParser
 import com.inktone.core.testing.fake.FakePublicationRepository
 import com.inktone.domain.model.Publication
 import com.inktone.domain.model.PublicationFormat
+import com.inktone.domain.service.CoverExtractionResult
 import kotlinx.coroutines.test.runTest
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertNull
@@ -50,18 +51,33 @@ class RegenerateCoversUseCaseTest {
     }
 
     @Test
-    fun `un fichier illisible est isole comme echec sans interrompre les suivants`() = runTest {
+    fun `un echec d'ouverture est compte et preserve la couverture existante`() = runTest {
         val repository = FakePublicationRepository()
         repository.insert(publication("pub-1"))
         repository.insert(publication("pub-2"))
         val parser = FakePublicationParser()
         parser.setExtractCoverHandler { fileUri ->
-            if (fileUri.endsWith("pub-1")) error("fichier illisible") else "couverture-pub-2.jpg"
+            if (fileUri.endsWith("pub-1")) CoverExtractionResult.Failure else CoverExtractionResult.Success("couverture-pub-2.jpg")
         }
 
         val result = RegenerateCoversUseCase(repository, parser)()
 
         assertEquals(CoverRegenerationResult(processed = 2, failed = 1), result)
+        // pub-1 a échoué : sa couverture d'origine est préservée, pas écrasée.
+        assertEquals("couverture-originale-pub-1.jpg", repository.getById("pub-1")?.coverUri)
         assertEquals("couverture-pub-2.jpg", repository.getById("pub-2")?.coverUri)
+    }
+
+    @Test
+    fun `un parser qui leve malgre le contrat est isole en echec sans ecrasement`() = runTest {
+        val repository = FakePublicationRepository()
+        repository.insert(publication("pub-1"))
+        val parser = FakePublicationParser()
+        parser.setExtractCoverHandler { error("levée inattendue") }
+
+        val result = RegenerateCoversUseCase(repository, parser)()
+
+        assertEquals(CoverRegenerationResult(processed = 1, failed = 1), result)
+        assertEquals("couverture-originale-pub-1.jpg", repository.getById("pub-1")?.coverUri)
     }
 }

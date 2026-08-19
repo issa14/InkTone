@@ -2,6 +2,7 @@ package com.inktone.core.testing.fake
 
 import com.inktone.domain.model.DocumentModel
 import com.inktone.domain.model.PublicationFormat
+import com.inktone.domain.service.CoverExtractionResult
 import com.inktone.domain.service.ParseResult
 import com.inktone.domain.service.PublicationMetadata
 import com.inktone.domain.service.PublicationParser
@@ -27,18 +28,18 @@ class FakePublicationParser(
 ) : PublicationParser {
     override val supportedFormats = listOf(PublicationFormat.EPUB)
 
-    private var coverUri: String? = null
-    private var extractCoverHandler: ((String) -> String?)? = null
+    private var coverResult: CoverExtractionResult = CoverExtractionResult.Success(null)
+    private var extractCoverHandler: ((String) -> CoverExtractionResult)? = null
 
     fun setNextResult(result: ParseResult) {
         this.result = result
     }
 
     fun setCoverResult(coverUri: String?) {
-        this.coverUri = coverUri
+        this.coverResult = CoverExtractionResult.Success(coverUri)
     }
 
-    fun setExtractCoverHandler(handler: (String) -> String?) {
+    fun setExtractCoverHandler(handler: (String) -> CoverExtractionResult) {
         this.extractCoverHandler = handler
     }
 
@@ -47,6 +48,6 @@ class FakePublicationParser(
         return result
     }
 
-    override suspend fun extractCover(fileUri: String): String? =
-        extractCoverHandler?.invoke(fileUri) ?: coverUri
+    override suspend fun extractCover(fileUri: String): CoverExtractionResult =
+        extractCoverHandler?.invoke(fileUri) ?: coverResult
 }

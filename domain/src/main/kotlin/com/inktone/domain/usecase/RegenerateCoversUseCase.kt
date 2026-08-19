@@ -1,6 +1,7 @@
 package com.inktone.domain.usecase
 
 import com.inktone.domain.repository.PublicationRepository
+import com.inktone.domain.service.CoverExtractionResult
 import com.inktone.domain.service.PublicationParser
 import kotlinx.coroutines.flow.first
 
@@ -18,10 +19,13 @@ data class CoverRegenerationResult(
 /**
  * Reconstruit les couvertures de toute la bibliothèque (Lot 19) : pour
  * chaque publication, ré-extrait la couverture depuis le fichier source
- * ([PublicationParser.extractCover]) et la réécrit en base. Un format
- * sans couverture (TXT) ou un EPUB sans image de couverture produit
- * `null` → couverture par défaut (dégradé procédural), ce qui n'est pas
- * compté comme un échec.
+ * ([PublicationParser.extractCover]) et la réécrit en base.
+ *
+ * - [CoverExtractionResult.Success] → `coverUri` réécrit (chemin extrait,
+ *   ou `null` = couverture par défaut pour un format sans couverture).
+ * - [CoverExtractionResult.Failure] → la couverture existante est
+ *   **préservée** (aucune écriture), l'échec est compté — jamais un
+ *   fichier illisible ne dégrade une couverture déjà extraite.
  *
  * Progression live via [onProgress] (compteur `processed/total`), cohérent
  * avec le menu legacy (« progression live X/Y ») — l'appelant (ViewModel)
@@ -37,10 +41,15 @@ class RegenerateCoversUseCase(
         var failed = 0
 
         publications.forEachIndexed { index, publication ->
-            val extracted = runCatching { publicationParser.extractCover(publication.fileUri) }
-            if (extracted.isSuccess) {
-                publicationRepository.setCoverUri(publication.id, extracted.getOrNull())
+            val extraction = runCatching { publicationParser.extractCover(publication.fileUri) }
+            if (extraction.isSuccess) {
+                when (val result = extraction.getOrThrow()) {
+                    is CoverExtractionResult.Success -> publicationRepository.setCoverUri(publication.id, result.coverUri)
+                    is CoverExtractionResult.Failure -> failed++
+                }
             } else {
+                // Un parser qui lève malgré le contrat — isolé, jamais
+                // fatal, et surtout jamais une écriture de `null`.
                 failed++
             }
             onProgress(index + 1, total)

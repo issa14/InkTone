@@ -14,12 +14,30 @@ interface PublicationParser {
     /**
      * Ré-extrait la seule couverture depuis le fichier source, sans
      * re-parser le contenu (Lot 19 — « Reconstruire les couvertures »).
-     * Retourne le chemin local du fichier extrait, ou `null` si le format
-     * n'a pas de couverture extractible (TXT) ou si aucune couverture
-     * n'est présente. Jamais un échec silencieux : un fichier illisible
-     * retourne `null` (repli sur la couverture procédurale par défaut).
+     *
+     * Trois issues distinctes, jamais réduites à un `null` ambigu :
+     * - [CoverExtractionResult.Success] avec `coverUri = null` : le format
+     *   n'a pas de couverture (TXT) ou l'EPUB n'en contient aucune — c'est
+     *   un résultat valide, qui pose la couverture procédurale par défaut.
+     * - [CoverExtractionResult.Success] avec un chemin : couverture extraite.
+     * - [CoverExtractionResult.Failure] : échec d'ouverture du fichier
+     *   (permission SAF perdue, stockage démonté, fichier déplacé) — le
+     *   Use Case ne doit **jamais** écraser la couverture existante.
+     *
+     * Défaut = [CoverExtractionResult.Failure] : un parseur qui oublie
+     * d'override ne peut pas effacer silencieusement les couvertures.
      */
-    suspend fun extractCover(fileUri: String): String? = null
+    suspend fun extractCover(fileUri: String): CoverExtractionResult = CoverExtractionResult.Failure
+}
+
+/**
+ * Résultat d'une extraction de couverture (Lot 19) — distingue « pas de
+ * couverture » de « échec d'ouverture », que la couverture existante ne
+ * doit pas être écrasée par un dégradé procédural par erreur.
+ */
+sealed interface CoverExtractionResult {
+    data class Success(val coverUri: String?) : CoverExtractionResult
+    data object Failure : CoverExtractionResult
 }
 
 /**

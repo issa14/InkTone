@@ -1,5 +1,6 @@
 package com.inktone.infrastructure.parser
 
+import com.inktone.domain.service.CoverExtractionResult
 import com.inktone.domain.service.FileStorageService
 import com.inktone.domain.service.ParseResult
 import com.inktone.domain.service.PublicationParser
@@ -42,7 +43,7 @@ class CompositePublicationParser @Inject constructor(
         return delegate.parse(fileUri)
     }
 
-    override suspend fun extractCover(fileUri: String): String? {
+    override suspend fun extractCover(fileUri: String): CoverExtractionResult {
         val fileName = fileStorageService.getFileName(fileUri) ?: fileUri
         val delegate = when {
             fileName.endsWith(".txt", ignoreCase = true) -> txtParser
