@@ -32,6 +32,7 @@ import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.material3.TopAppBar
 import androidx.compose.material3.rememberModalBottomSheetState
+import androidx.compose.material3.TopAppBarDefaults
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
@@ -63,6 +64,7 @@ import com.inktone.domain.model.OpdsCatalog
 fun CatalogDashboardScreen(
     viewModel: OpdsViewModel = hiltViewModel(),
     onBack: () -> Unit = {},
+    onMenuClick: () -> Unit = {},
     onOpenPublication: (String) -> Unit = {},
 ) {
     val state by viewModel.state.collectAsState()
@@ -105,8 +107,19 @@ fun CatalogDashboardScreen(
                     )
                 },
                 navigationIcon = {
-                    IconButton(onClick = { viewModel.onIntent(OpdsIntent.GoBack) }) {
-                        AppIcon(AppSymbol.Back, contentDescription = "Retour")
+                    // Lot 18 — le tableau de bord est une destination
+                    // principale du drawer (hamburger) ; un flux ouvert
+                    // dans un catalogue reste une profondeur, avec sa
+                    // flèche de retour d'origine (règle d'or `OPDS.md`
+                    // §1.2 : remonter d'un niveau de flux, pas fermer).
+                    if (state is OpdsUiState.Dashboard) {
+                        IconButton(onClick = onMenuClick) {
+                            AppIcon(AppSymbol.Menu, contentDescription = "Ouvrir le menu")
+                        }
+                    } else {
+                        IconButton(onClick = { viewModel.onIntent(OpdsIntent.GoBack) }) {
+                            AppIcon(AppSymbol.Back, contentDescription = "Retour")
+                        }
                     }
                 },
                 actions = {
@@ -117,6 +130,12 @@ fun CatalogDashboardScreen(
                         }
                     }
                 },
+                colors = TopAppBarDefaults.topAppBarColors(
+                    containerColor = MaterialTheme.colorScheme.primary,
+                    titleContentColor = MaterialTheme.colorScheme.onPrimary,
+                    actionIconContentColor = MaterialTheme.colorScheme.onPrimary,
+                    navigationIconContentColor = MaterialTheme.colorScheme.onPrimary,
+                ),
             )
         },
         floatingActionButton = {

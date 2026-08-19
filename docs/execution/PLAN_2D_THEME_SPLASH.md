@@ -24,6 +24,8 @@ l'icône de splash laissée en attente au lot 1. Réf. : `main` @ `ca3c503`.
 
 **D2 — Barres système couleur du fond**, pas une barre violette. `statusBarColor` = `windowBackground` ; `windowLightStatusBar` = **true** en clair (icônes sombres) / **false** en sombre. (Le doc ne demande pas de barre teintée.)
 
+> **D2 rouverte — Lot 18 (2026-08-19).** Décision d'Issa sur appareil : la barre de statut doit reprendre la **couleur active de l'écran**, pas le fond. Constat à l'origine : depuis que les 6 destinations du drawer portent une top bar en `primary` (voir `UX_FLOW_DESIGN.md`, section Drawer), la barre système crème `#FFFBF5` posée juste au-dessus d'un bandeau `Accent700` crée une couture franche qui « casse l'ambiance ». **Non traité au Lot 18, volontairement** : la bonne mise en œuvre est l'edge-to-edge de D4, pas un `statusBarColor` teinté. Un `statusBarColor` statique serait une impasse — déprécié et ignoré dès `targetSdk 35` (on est à 34, `compileSdk` déjà à 35), figé face à la couleur dynamique Material You, et faux sur le Reader, qui peint son propre thème de lecture plein écran. Cible retenue : traiter ce besoin **dans le lot SDK 36**, où les insets sont refaits de toute façon (voir D4 et §6).
+
 **D3 — Splash via `androidx.core:core-splashscreen 1.0.1`.** Icône = `@mipmap/ic_launcher_foreground` (réutilisée) ; fond splash = `windowBackground` (day/night) ; `postSplashScreenTheme = @style/Theme.InkTone`.
 
 **D4 — Edge-to-edge HORS périmètre.** Le thème est *prêt* pour l'edge-to-edge, mais `enableEdgeToEdge()` + gestion des insets est un chantier à part, rattaché au **lot SDK 36** (où Android 15+ l'impose). Ne pas l'introduire ici (risque de régressions de layout).
@@ -128,7 +130,7 @@ override fun onCreate(savedInstanceState: Bundle?) {
 
 ## 6. Écarts / hors périmètre
 
-- **Edge-to-edge** différé au lot SDK 36 (D4).
+- **Edge-to-edge** différé au lot SDK 36 (D4). **Porte désormais un objectif fonctionnel explicite, pas seulement une mise en conformité SDK** (D2 rouverte au Lot 18) : une fois `enableEdgeToEdge()` en place et la barre de statut transparente, la `TopAppBar` dessine dessous et la couleur active s'étend d'elle-même — accent de marque sur les 6 destinations du drawer, couleur du thème de lecture sur le Reader, sans cas particulier par écran. Points de vigilance relevés au passage : `ImmersiveReaderChrome` masque les barres système sans jamais appeler `WindowCompat.setDecorFitsSystemWindows(window, false)` (constat du Lot 17, un vrai edge-to-edge est peu fiable sans cet appel), et plusieurs écrans gèrent aujourd'hui leurs insets à la main — `StatisticsScreen` via `WindowInsets.navigationBars` en `contentPadding`, le Reader via le padding corrigé au Lot 17 — donc tous à repasser pour éviter les doubles marges. Prévoir aussi l'apparence des icônes système (`windowLightStatusBar` ne suffit plus si le fond devient l'accent).
 - **Centrage de l'icône dans le masque circulaire du splash** : `ic_launcher_foreground` est centré safe-zone launcher, mais le gabarit splash (cercle ~240dp, icône ~2/3) est plus serré — à **juger sur device** (§7) ; si trop grand, fournir un `@drawable/ic_splash` dédié avec plus de marge. C'est la reprise du point laissé ouvert au lot 1.
 - **Icône de notification** : toujours dans le lot Media3, hors 2d.
 

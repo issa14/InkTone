@@ -39,6 +39,8 @@ import androidx.compose.material3.Switch
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.material3.TopAppBar
+import androidx.compose.material3.ButtonDefaults
+import androidx.compose.material3.TopAppBarDefaults
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
@@ -73,6 +75,11 @@ import com.inktone.domain.model.SyncUiState
 @Composable
 fun SyncConfigurationScreen(
     viewModel: SyncViewModel = hiltViewModel(),
+    // Lot 18 — la flèche de retour cède la place au hamburger du drawer
+    // partagé ; [onBack] reste utilisé par le bouton « Enregistrer », qui
+    // quitte l'écran une fois la configuration validée (comportement
+    // inchangé, ce n'est pas l'icône de navigation).
+    onMenuClick: () -> Unit = {},
     onBack: () -> Unit = {},
     onOpenLocalBackup: () -> Unit = {},
     isGoogleAuthenticating: Boolean = false,
@@ -91,20 +98,34 @@ fun SyncConfigurationScreen(
             TopAppBar(
                 title = { Text(if (showOperational) "Synchronisation" else "Configuration Sync") },
                 navigationIcon = {
-                    IconButton(onClick = onBack) {
-                        AppIcon(AppSymbol.Back, contentDescription = "Retour")
+                    IconButton(onClick = onMenuClick) {
+                        AppIcon(AppSymbol.Menu, contentDescription = "Ouvrir le menu")
                     }
                 },
                 actions = {
+                    // Lot 18 — la barre est peinte en `primary` : sans
+                    // couleur explicite, un TextButton rendrait son
+                    // libellé en `primary` sur `primary`, donc invisible.
+                    val barButtonColors = ButtonDefaults.textButtonColors(
+                        contentColor = MaterialTheme.colorScheme.onPrimary,
+                        disabledContentColor = MaterialTheme.colorScheme.onPrimary.copy(alpha = 0.38f),
+                    )
                     if (showOperational) {
-                        TextButton(onClick = { manualShowConfig = true }) { Text("Gérer") }
+                        TextButton(onClick = { manualShowConfig = true }, colors = barButtonColors) { Text("Gérer") }
                     } else {
                         TextButton(
                             onClick = { manualShowConfig = false; onBack() },
                             enabled = isConfigured,
+                            colors = barButtonColors,
                         ) { Text("Enregistrer") }
                     }
                 },
+                colors = TopAppBarDefaults.topAppBarColors(
+                    containerColor = MaterialTheme.colorScheme.primary,
+                    titleContentColor = MaterialTheme.colorScheme.onPrimary,
+                    actionIconContentColor = MaterialTheme.colorScheme.onPrimary,
+                    navigationIconContentColor = MaterialTheme.colorScheme.onPrimary,
+                ),
             )
         },
     ) { innerPadding ->
