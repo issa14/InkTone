@@ -24,6 +24,11 @@ data class SettingsUiState(
     // (Tâche 10.3), retiré de l'onboarding : accessible ici, dans la
     // carte Lecture, à côté du sélecteur de voix.
     val voiceDownloadProgress: VoiceDownloadProgress? = null,
+    // Audit v1.0.0 (B1) — lecture d'extrait : vrai pendant la synthèse +
+    // lecture de la phrase d'exemple ; `previewError` porte un échec
+    // éventuel (jamais un échec silencieux).
+    val isPreviewing: Boolean = false,
+    val previewError: String? = null,
 )
 
 /**
@@ -84,7 +89,10 @@ sealed interface SettingsIntent {
     // Lot 6 — présets rapides (toggle réversible, désapplication vers les valeurs par défaut)
     data class SetDarkModePreset(val enabled: Boolean) : SettingsIntent
     data class SetAccessibilityPreset(val enabled: Boolean) : SettingsIntent
-    // Lot 6 — écouter un extrait
+    // Lot 6 — écouter un extrait. Audit v1.0.0 (AUDIT_CONSOLIDATION_V1.md,
+    // B1) : RÉ-IMPLÉMENTÉ — le bouton avait été retiré parce que l'intent
+    // était un no-op ; il est désormais câblé sur une vraie synthèse +
+    // lecture d'une phrase d'exemple (SettingsViewModel.togglePreview).
     object PlayPreview : SettingsIntent
     // Lot 10 — téléchargement de la voix neuronale par défaut, point de
     // besoin réel après le retrait de l'étape d'onboarding (Tâche 10.3).

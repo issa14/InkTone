@@ -37,6 +37,7 @@ import androidx.compose.ui.unit.dp
 import com.inktone.core.designsystem.InkToneShapes
 import com.inktone.domain.model.TtsEngineId
 import com.inktone.domain.model.VoiceProfile
+import com.inktone.domain.model.voiceLabel
 
 /**
  * 3d.1 — Panneau de contrôle vocal accessible depuis le Reader. Navigation
@@ -217,16 +218,17 @@ private fun VoiceProfilePickerDialog(
 }
 
 /**
- * 3d.1 — format cible `ff_siwis · Kokoro · Français` (UX_FLOW_DESIGN.md
- * §Haut-parleur), jamais un nom inventé : la voix et la langue viennent
- * directement du `VoiceProfile`, seul le libellé de moteur est un mapping
- * statique (aucun nom lisible n'existe ailleurs dans le domaine).
+ * 3d.1 — format cible `voix · moteur · langue` (UX_FLOW_DESIGN.md
+ * §Haut-parleur), jamais un nom inventé : la voix passe par le libellé
+ * lisible du catalogue domaine (`voiceLabel`), le moteur est un mapping
+ * statique.
  */
 internal fun voiceDisplayName(profile: VoiceProfile): String =
-    "${profile.voice} · ${engineDisplayName(profile.engine)} · ${languageDisplayName(profile.language)}"
+    "${voiceLabel(profile.voice)} · ${engineDisplayName(profile.engine)} · ${languageDisplayName(profile.language)}"
 
 private fun engineDisplayName(engine: TtsEngineId): String = when (engine) {
-    TtsEngineId.SHERPA_ONNX -> "Kokoro"
+    // Lot 20 — Sherpa = modèle upmc-medium (remplace Kokoro).
+    TtsEngineId.SHERPA_ONNX -> "UPMC"
     TtsEngineId.ANDROID_NATIVE -> "Voix système"
     TtsEngineId.PIPER -> "Piper"
     TtsEngineId.EDGE_TTS -> "Edge"

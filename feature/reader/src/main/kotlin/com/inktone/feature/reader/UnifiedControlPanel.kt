@@ -70,6 +70,10 @@ fun UnifiedControlPanel(
     // Modifier.weight(1f) evitent le decalage deja corrige au lot 3b,
     // voir commentaire plus bas), jamais un bouton visible sans effet.
     showTtsControls: Boolean = true,
+    // Audit v1.0.0 (AUDIT_CONSOLIDATION_V1.md, M6) : PDF et TXT n'ont
+    // aucune table des matières (parsers -> tableOfContents vide) ; avant
+    // le fix, le bouton Sommaire ouvrait une feuille vide sans message.
+    showToc: Boolean = true,
     // Contraste garanti avec la page de lecture par défaut (voir
     // ThemeColors.barSurface/barContent) — les défauts au thème chrome ne
     // servent qu'aux previews/tests qui n'ont pas de ReadingTheme.
@@ -104,7 +108,9 @@ fun UnifiedControlPanel(
                 verticalAlignment = Alignment.CenterVertically,
             ) {
                 Box(Modifier.weight(1f), contentAlignment = Alignment.Center) {
-                    SecondaryAction(icon = AppIcons.Toc, label = "Sommaire", tint = iconTint, onClick = onTocClick)
+                    if (showToc) {
+                        SecondaryAction(icon = AppIcons.Toc, label = "Sommaire", tint = iconTint, onClick = onTocClick)
+                    }
                 }
                 Box(Modifier.weight(1f), contentAlignment = Alignment.Center) {
                     SecondaryAction(icon = AppIcons.Bookmark, label = "Marque-pages", tint = iconTint, onClick = onBookmarksClick)

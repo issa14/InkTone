@@ -19,6 +19,7 @@ import com.inktone.domain.usecase.RegenerateCoversUseCase
 import com.inktone.domain.usecase.SynchronizeNowUseCase
 import com.inktone.domain.usecase.ToggleFavoriteUseCase
 import com.inktone.domain.usecase.TogglePinUseCase
+import kotlinx.coroutines.CoroutineDispatcher
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.launch
@@ -57,6 +58,9 @@ class LibraryViewModelTest {
         syncAccountRepository: FakeSyncAccountRepository = FakeSyncAccountRepository(),
         syncNowService: FakeSyncNowService = FakeSyncNowService(),
         publicationParser: FakePublicationParser = FakePublicationParser(),
+        // Audit v1.0.0 (P5) : même StandardTestDispatcher que setMain,
+        // sinon advanceUntilIdle ne voit pas le calcul de progression.
+        defaultDispatcher: CoroutineDispatcher = dispatcher,
     ): LibraryViewModel = LibraryViewModel(
         publicationRepository,
         FakeReadingStateRepository(),
@@ -70,6 +74,7 @@ class LibraryViewModelTest {
         SynchronizeNowUseCase(syncNowService),
         syncAccountRepository,
         RegenerateCoversUseCase(publicationRepository, publicationParser),
+        defaultDispatcher,
     )
 
     @Test

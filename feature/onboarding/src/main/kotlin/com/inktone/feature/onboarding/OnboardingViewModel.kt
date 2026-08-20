@@ -15,9 +15,10 @@ import javax.inject.Inject
  * (consentement crash, téléchargement de voix), retirées de
  * l'onboarding (Tâche 10.3). Leur point de besoin réel vit désormais
  * ailleurs : consentement dans la carte Confidentialité des Réglages
- * (déjà câblé depuis le lot 6), téléchargement de voix dans la carte
- * Lecture des Réglages (`SettingsIntent.StartVoiceDownload`, ajouté ce
- * lot pour ne pas laisser l'utilisateur sans moyen d'obtenir une voix).
+ * (déjà câblé depuis le lot 6), voix neuronale retirée de la v1.0.0
+ * (audit de consolidation, AUDIT_CONSOLIDATION_V1.md B2 — modèles non
+ * distribuables dans cette version ; la voix du système est la voix de
+ * la v1.0.0).
  */
 @HiltViewModel
 class OnboardingViewModel @Inject constructor(

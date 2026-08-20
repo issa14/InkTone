@@ -32,11 +32,19 @@ class VoiceModelDownloader @Inject constructor(@ApplicationContext private val c
     /**
      * URL et hash SHA-256 attendus fournis par l'appelant — ce
      * téléchargeur ne connaît aucune URL/empreinte en dur, pour rester
-     * réutilisable pour n'importe quelle voix (Palier 1 n'en a pas
-     * besoin, Palier 2 en aura plusieurs à terme, §8.4).
+     * réutilisable pour n'importe quelle voix.
+     *
+     * @param subDir Lot 20 — sous-répertoire cible dans `filesDir`
+     *   (« voices » pour la voix, « models » pour le modèle CTC
+     *   d'alignement), chaque modèle restant dans son arborescence.
      */
-    fun downloadVoiceModel(url: String, expectedSha256: String, fileName: String): Flow<DownloadProgress> = flow {
-        val targetFile = File(context.filesDir, "voices/$fileName")
+    fun downloadVoiceModel(
+        url: String,
+        expectedSha256: String,
+        fileName: String,
+        subDir: String = "voices",
+    ): Flow<DownloadProgress> = flow {
+        val targetFile = File(context.filesDir, "$subDir/$fileName")
         if (targetFile.exists() && verifyHash(targetFile, expectedSha256)) {
             emit(DownloadProgress.Complete(targetFile))
             return@flow

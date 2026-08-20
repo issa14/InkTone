@@ -23,7 +23,7 @@ class ReaderTtsPanelTest {
     @get:Rule
     val composeTestRule = createComposeRule()
 
-    private val activeProfile = VoiceProfile(id = "vp-1", engine = TtsEngineId.SHERPA_ONNX, voice = "ff_siwis", language = "fr-FR", speed = 1.6f)
+    private val activeProfile = VoiceProfile(id = "vp-1", engine = TtsEngineId.SHERPA_ONNX, voice = "jessica", language = "fr-FR", speed = 1.6f)
 
     @Test
     fun aucun_bouton_arreter_dans_le_panneau_voix() {
@@ -91,7 +91,7 @@ class ReaderTtsPanelTest {
             )
         }
 
-        // Format cible UX_FLOW_DESIGN.md §Haut-parleur : "ff_siwis · Kokoro · Français"
-        composeTestRule.onNodeWithText("ff_siwis · Kokoro · Français").assertIsDisplayed()
+        // Format cible UX_FLOW_DESIGN.md §Haut-parleur : "Jessica (FR) · UPMC · Français"
+        composeTestRule.onNodeWithText("Jessica (FR) · UPMC · Français").assertIsDisplayed()
     }
 }

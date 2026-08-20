@@ -35,6 +35,10 @@ securityCrypto = "1.1.0-alpha06"
 pdfiumAndroid = "1.0.20"
 jsoup = "1.18.1"
 androidxCoreSplashscreen = "1.0.1"
+# Lot 20 — extraction tar+bzip2 des modèles sherpa-onnx (voix
+# upmc-medium, modèle CTC) : rend le téléchargement réellement
+# exploitable (avant : archive jamais extraite, moteur inutilisable).
+commonsCompress = "1.27.1"
 
 [libraries]
 onnxruntime-android = { group = "com.microsoft.onnxruntime", name = "onnxruntime-android", version.ref = "onnxruntimeAndroid" }
@@ -83,6 +87,7 @@ appauth = { group = "net.openid", name = "appauth", version.ref = "appauth" }
 androidx-security-crypto = { group = "androidx.security", name = "security-crypto", version.ref = "securityCrypto" }
 jsoup = { module = "org.jsoup:jsoup", version.ref = "jsoup" }
 androidx-core-splashscreen = { group = "androidx.core", name = "core-splashscreen", version.ref = "androidxCoreSplashscreen" }
+commons-compress = { group = "org.apache.commons", name = "commons-compress", version.ref = "commonsCompress" }
 
 [plugins]
 android-application = { id = "com.android.application", version.ref = "agp" }

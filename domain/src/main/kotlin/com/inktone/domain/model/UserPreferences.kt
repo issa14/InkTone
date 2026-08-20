@@ -10,6 +10,11 @@ data class UserPreferences(
     // fermé. Défaut : Papier Clair (voir ReadingTheme.DEFAULT).
     val theme: String = ReadingTheme.DEFAULT.id,
     val fontSize: Int = 18,
+    // Lot 20 — moteur par défaut restauré à Sherpa-ONNX (voix neuronale
+    // upmc-medium, désormais réellement installable : extraction +
+    // modèle CTC câblés). Le repli automatique sur la voix du système
+    // (FallbackTtsEngine) garantit que le premier usage fonctionne même
+    // sans modèle installé.
     val defaultTtsEngine: TtsEngineId = TtsEngineId.SHERPA_ONNX,
     val crashReportingEnabled: Boolean = false,
     val language: String = "fr",

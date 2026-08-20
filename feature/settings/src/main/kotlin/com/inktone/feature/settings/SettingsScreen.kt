@@ -128,6 +128,8 @@ fun SettingsScreen(
                 pronunciationRules = state.pronunciationRules,
                 cacheSizeBytes = state.cacheSizeBytes,
                 voiceDownloadProgress = state.voiceDownloadProgress,
+                isPreviewing = state.isPreviewing,
+                previewError = state.previewError,
                 onIntent = viewModel::onIntent,
                 onOpenAbout = onOpenAbout,
                 modelsFolderInfo = modelsFolderInfo,
@@ -152,6 +154,8 @@ internal fun SettingsContent(
     pronunciationRules: List<PronunciationRule> = emptyList(),
     cacheSizeBytes: Long = 0L,
     voiceDownloadProgress: com.inktone.domain.service.VoiceDownloadProgress? = null,
+    isPreviewing: Boolean = false,
+    previewError: String? = null,
     onIntent: (SettingsIntent) -> Unit,
     onOpenAbout: () -> Unit = {},
     modelsFolderInfo: ModelsFolderInfo = ModelsFolderInfo(path = "Emplacement inconnu"),
@@ -225,10 +229,11 @@ internal fun SettingsContent(
                 value = activeVoiceName,
                 onClick = { showVoicePicker = true },
             )
-            // Lot 10 — point de besoin réel du téléchargement de voix
-            // neuronale (Tâche 10.3), retiré de l'onboarding : le Palier 1
-            // (moteur natif Android) reste utilisable sans, ce bouton
-            // n'est donc jamais bloquant.
+            // Lot 20 — voix neuronale RESTAURÉE : le téléchargement est
+            // désormais réellement exploitable (extraction tar.bz2 +
+            // modèle CTC câblés, AUDIT_CONSOLIDATION_V1.md B2 corrigé).
+            // La voix du système reste le repli tant que le modèle n'est
+            // pas installé (FallbackTtsEngine) — jamais bloquant.
             VoiceDownloadRow(
                 progress = voiceDownloadProgress,
                 onStart = { onIntent(SettingsIntent.StartVoiceDownload) },
@@ -264,18 +269,31 @@ internal fun SettingsContent(
                 displayFormatter = { "%.1f×".format(it) },
                 onValueChange = { onIntent(SettingsIntent.SetVoicePitch(it)) },
             )
-            // Lot 6 — Écouter un extrait.
-            // Signalé : PlayPreview est enregistré mais non branché au TTS depuis SettingsViewModel.
-            // Branchement nécessite une UseCase dédiée (PlayTtsPreviewUseCase) hors scope Palier A.
+            // Lot 6 — Écouter un extrait. Audit v1.0.0 (AUDIT_CONSOLIDATION_V1.md,
+            // B1) : RÉ-IMPLÉMENTÉ — le bouton avait été retiré (l'intent était
+            // un no-op) puis recâblé sur une vraie synthèse + lecture
+            // (SettingsViewModel.togglePreview). Spec UX (l.507) : bouton
+            // plein largeur en bas de carte, icône + libellé.
             OutlinedButton(
                 onClick = { onIntent(SettingsIntent.PlayPreview) },
                 modifier = Modifier
                     .fillMaxWidth()
                     .padding(horizontal = 20.dp, vertical = 8.dp),
             ) {
-                Icon(AppIcons.Play, contentDescription = null)
+                Icon(
+                    if (isPreviewing) AppIcons.Pause else AppIcons.Play,
+                    contentDescription = null,
+                )
                 Spacer(Modifier.width(8.dp))
-                Text("Écouter un extrait")
+                Text(if (isPreviewing) "Arrêter l'extrait" else "Écouter un extrait")
+            }
+            if (previewError != null) {
+                Text(
+                    text = previewError,
+                    style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.error,
+                    modifier = Modifier.padding(horizontal = 20.dp),
+                )
             }
         }
 
@@ -751,9 +769,11 @@ private fun PresetRow(
 }
 
 /**
- * Lot 10 — téléchargement de la voix neuronale par défaut (Tâche 10.3).
- * Jamais bloquant : le Palier 1 (moteur natif Android) reste utilisable
- * sans, texte assumé explicitement plutôt que sous-entendu.
+ * Lot 10 / Lot 20 — téléchargement de la voix neuronale (voix upmc-medium
+ * + modèle CTC d'alignement). RESTAURÉ au Lot 20 : le téléchargement est
+ * désormais réellement exploitable (extraction tar.bz2 + modèle CTC
+ * câblés — AUDIT_CONSOLIDATION_V1.md B2 corrigé), l'état « installée »
+ * n'est affiché que si les modèles sont réellement prêts.
  *
  * Retour Issa (vérification device) : confirmation avant de lancer (nom
  * du moteur/voix + taille annoncés, pas de démarrage automatique au
@@ -775,22 +795,28 @@ private fun VoiceDownloadRow(
                     "Téléchargement : ${formatMegabytes(progress.bytesDownloaded)} / ${formatMegabytes(progress.totalBytes)}"
                 is com.inktone.domain.service.VoiceDownloadProgress.Failed -> "Échec : ${progress.message}"
                 com.inktone.domain.service.VoiceDownloadProgress.Complete -> "Voix neuronale installée"
-                null -> "Améliore la qualité de la narration. La lecture visuelle reste disponible sans cela."
+                null -> "Voix neuronale locale (Jessica & Pierre). La lecture reste disponible sans cela."
             },
             style = MaterialTheme.typography.bodySmall,
             color = MaterialTheme.colorScheme.onSurfaceVariant,
         )
         Spacer(Modifier.height(8.dp))
-        if (progress is com.inktone.domain.service.VoiceDownloadProgress.InProgress) {
-            OutlinedButton(onClick = onCancel) {
-                Text("Annuler le téléchargement")
-            }
-        } else {
-            OutlinedButton(onClick = { showConfirmDialog = true }) {
-                Icon(AppIcons.Download, contentDescription = null)
-                Spacer(Modifier.width(8.dp))
-                Text("Télécharger une voix neuronale")
-            }
+        // Lot 20 — une fois installée, plus de bouton : re-télécharger une
+        // voix déjà prête n'a pas de sens (le flux émettrait Complete
+        // immédiatement de toute façon).
+        when (progress) {
+            is com.inktone.domain.service.VoiceDownloadProgress.InProgress ->
+                OutlinedButton(onClick = onCancel) {
+                    Text("Annuler le téléchargement")
+                }
+            com.inktone.domain.service.VoiceDownloadProgress.Complete -> Unit
+            // null (jamais lancé) ou Failed (réessayer) : bouton de téléchargement.
+            null, is com.inktone.domain.service.VoiceDownloadProgress.Failed ->
+                OutlinedButton(onClick = { showConfirmDialog = true }) {
+                    Icon(AppIcons.Download, contentDescription = null)
+                    Spacer(Modifier.width(8.dp))
+                    Text("Télécharger une voix neuronale")
+                }
         }
     }
 
@@ -799,7 +825,11 @@ private fun VoiceDownloadRow(
             onDismissRequest = { showConfirmDialog = false },
             title = { Text("Télécharger la voix neuronale ?") },
             text = {
-                Text("Moteur Sherpa-ONNX (voix Kokoro) · environ 126 Mo. Téléchargé une seule fois, réutilisable hors ligne ensuite.")
+                Text(
+                    "Moteur Sherpa-ONNX (voix UPMC upmc-medium — Jessica & Pierre) : " +
+                        "environ 183 Mo au total (voix 80 Mo + alignement mot à mot 102 Mo). " +
+                        "Téléchargé une seule fois, réutilisable hors ligne ensuite.",
+                )
             },
             confirmButton = {
                 TextButton(onClick = { showConfirmDialog = false; onStart() }) { Text("Télécharger") }
@@ -1149,7 +1179,8 @@ private fun ConfirmDialog(
 
 /** Lot 14 — libellé lisible du moteur TTS (jamais `enum.name` brut, K12 : pas d'emoji). */
 private fun ttsEngineLabel(engine: TtsEngineId): String = when (engine) {
-    TtsEngineId.SHERPA_ONNX -> "Sherpa-ONNX (Kokoro)"
+    // Lot 20 — upmc-medium remplace Kokoro.
+    TtsEngineId.SHERPA_ONNX -> "Sherpa-ONNX (UPMC)"
     TtsEngineId.ANDROID_NATIVE -> "Voix système"
     TtsEngineId.EDGE_TTS -> "Edge (cloud)"
     TtsEngineId.PIPER -> "Piper (indisponible)"

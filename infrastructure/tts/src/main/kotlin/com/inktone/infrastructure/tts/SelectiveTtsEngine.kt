@@ -77,6 +77,11 @@ class SelectiveTtsEngine @Inject constructor(
     override fun observePlaybackEvents(): Flow<PlaybackEvent> =
         if (edgeActive) edgeEngine.observePlaybackEvents() else offlineEngine.observePlaybackEvents()
 
+    /** Lot 20 — préchauffe la chaîne offline (Sherpa-ONNX charge ses modèles). */
+    override fun warmUp() {
+        offlineEngine.warmUp()
+    }
+
     private companion object {
         const val TAG = "SelectiveTtsEngine"
     }

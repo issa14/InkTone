@@ -10,6 +10,7 @@ import com.inktone.domain.service.TtsCapabilities
 import com.inktone.domain.service.TtsEngine
 import com.inktone.infrastructure.tts.di.Palier1
 import com.inktone.infrastructure.tts.di.Palier2
+import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.flow.Flow
 import javax.inject.Inject
 import javax.inject.Singleton
@@ -49,6 +50,15 @@ class FallbackTtsEngine @Inject constructor(
         if (fallenBack) return fallback.synthesize(sentence, voiceProfile)
         return try {
             primary.synthesize(sentence, voiceProfile)
+        } catch (e: CancellationException) {
+            // Audit v1.0.0 / Lot 20 (vérification device) : un timeout de
+            // l'ordonnanceur (withTimeout sur la synthèse) annule la
+            // coroutine — ce n'est PAS un échec du moteur. Avant ce fix,
+            // l'exception de timeout était avalée ici et le moteur restait
+            // définitivement sur le repli natif après UN seul dépassement
+            // (init froid lent). Re-lancer : l'annulation reste une
+            // annulation.
+            throw e
         } catch (e: Exception) {
             Log.w(TAG, "Palier 2 (Sherpa-ONNX) a echoue, repli vers le Palier 1 (Android natif): ${e.message}", e)
             fallenBack = true
@@ -58,6 +68,12 @@ class FallbackTtsEngine @Inject constructor(
 
     override fun observePlaybackEvents(): Flow<PlaybackEvent> =
         if (fallenBack) fallback.observePlaybackEvents() else primary.observePlaybackEvents()
+
+    /** Lot 20 — préchauffe le Palier 2 (Sherpa charge ses modèles), no-op sinon. */
+    override fun warmUp() {
+        primary.warmUp()
+        fallback.warmUp()
+    }
 
     private companion object {
         const val TAG = "FallbackTtsEngine"

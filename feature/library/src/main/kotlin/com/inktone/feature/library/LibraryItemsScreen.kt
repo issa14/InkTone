@@ -18,6 +18,7 @@ import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
+import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.DropdownMenu
 import androidx.compose.material3.DropdownMenuItem
 import androidx.compose.material3.ExperimentalMaterial3Api
@@ -132,7 +133,12 @@ fun LibraryItemsScreen(
             )
 
             when {
-                state.isLoading -> Unit
+                // Audit v1.0.0 (AUDIT_CONSOLIDATION_V1.md, M5) : l'écran
+                // s'ouvrait BLANC pendant le chargement (isLoading -> Unit) ;
+                // la première émission Room peut prendre un instant.
+                state.isLoading -> Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
+                    CircularProgressIndicator()
+                }
                 state.items.isEmpty() -> LibraryItemsEmptyState(
                     isFiltered = state.searchQuery.isNotBlank() || state.filter != LibraryItemFilter.ALL,
                 )
