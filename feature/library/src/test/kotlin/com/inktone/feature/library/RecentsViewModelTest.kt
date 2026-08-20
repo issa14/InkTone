@@ -51,6 +51,8 @@ class RecentsViewModelTest {
             publicationRepository, readingStateRepository,
             ToggleFavoriteUseCase(publicationRepository), TogglePinUseCase(publicationRepository),
             DeletePublicationUseCase(publicationRepository),
+            // Audit v1.0.0 (P5) : même StandardTestDispatcher que setMain.
+            dispatcher,
         )
 
     @Test

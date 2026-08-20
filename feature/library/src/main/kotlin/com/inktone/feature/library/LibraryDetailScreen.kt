@@ -11,6 +11,7 @@ import androidx.compose.foundation.lazy.items
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
+import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Text
@@ -24,6 +25,7 @@ import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
+import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
@@ -137,20 +139,38 @@ fun LibraryDetailScreen(
         },
     ) { innerPadding ->
         Box(Modifier.fillMaxSize().padding(innerPadding)) {
-            LazyColumn(contentPadding = PaddingValues(8.dp)) {
-                items(state.displayedPublications, key = { it.id }) { publication ->
-                    PublicationListRow(
-                        publication = publication,
-                        onClick = { viewModel.onIntent(LibraryDetailIntent.OpenPublication(publication.id)) },
-                        onToggleFavorite = {
-                            viewModel.onIntent(LibraryDetailIntent.ToggleFavorite(publication.id, !publication.isFavorite))
-                        },
-                        progressPercent = state.progressMap[publication.id] ?: 0,
-                        onTogglePin = {
-                            viewModel.onIntent(LibraryDetailIntent.TogglePin(publication.id, !publication.isPinned))
-                        },
-                        onDelete = { viewModel.onIntent(LibraryDetailIntent.DeletePublication(publication.id)) },
+            // Audit v1.0.0 (AUDIT_CONSOLIDATION_V1.md, M3) : avant le fix,
+            // une série/tag sans livre ou pendant le chargement affichait
+            // un écran blanc sans message ni spinner.
+            when {
+                state.isLoading -> Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
+                    CircularProgressIndicator()
+                }
+                state.displayedPublications.isEmpty() -> Box(
+                    Modifier.fillMaxSize(),
+                    contentAlignment = Alignment.Center,
+                ) {
+                    Text(
+                        "Aucun livre dans cette sélection",
+                        style = MaterialTheme.typography.bodyLarge,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
                     )
+                }
+                else -> LazyColumn(contentPadding = PaddingValues(8.dp)) {
+                    items(state.displayedPublications, key = { it.id }) { publication ->
+                        PublicationListRow(
+                            publication = publication,
+                            onClick = { viewModel.onIntent(LibraryDetailIntent.OpenPublication(publication.id)) },
+                            onToggleFavorite = {
+                                viewModel.onIntent(LibraryDetailIntent.ToggleFavorite(publication.id, !publication.isFavorite))
+                            },
+                            progressPercent = state.progressMap[publication.id] ?: 0,
+                            onTogglePin = {
+                                viewModel.onIntent(LibraryDetailIntent.TogglePin(publication.id, !publication.isPinned))
+                            },
+                            onDelete = { viewModel.onIntent(LibraryDetailIntent.DeletePublication(publication.id)) },
+                        )
+                    }
                 }
             }
         }

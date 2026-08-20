@@ -8,13 +8,16 @@ import com.inktone.domain.repository.ReadingStateRepository
 import com.inktone.domain.usecase.DeletePublicationUseCase
 import com.inktone.domain.usecase.ToggleFavoriteUseCase
 import com.inktone.domain.usecase.TogglePinUseCase
+import com.inktone.feature.library.di.IoDispatcher
 import dagger.hilt.android.lifecycle.HiltViewModel
+import kotlinx.coroutines.CoroutineDispatcher
 import kotlinx.coroutines.channels.Channel
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.receiveAsFlow
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.withContext
 import javax.inject.Inject
 
 /**
@@ -32,6 +35,9 @@ class RecentsViewModel @Inject constructor(
     private val toggleFavorite: ToggleFavoriteUseCase,
     private val togglePin: TogglePinUseCase,
     private val deletePublication: DeletePublicationUseCase,
+    // Audit v1.0.0 (P5) — calcul de progression hors Main (injectable
+    // pour les tests, voir di/IoDispatcher.kt).
+    @IoDispatcher private val defaultDispatcher: CoroutineDispatcher,
 ) : ViewModel() {
 
     private val _state = MutableStateFlow(RecentsUiState())
@@ -43,7 +49,11 @@ class RecentsViewModel @Inject constructor(
     init {
         viewModelScope.launch {
             publicationRepository.observeFiltered(FilterMode.ALL).collect { publications ->
-                val progressMap = computeProgressMap(publications, readingStateRepository.getAll())
+                // Audit v1.0.0 (AUDIT_CONSOLIDATION_V1.md, P5) — même fix
+                // que LibraryViewModel : boucle O(n) hors Main.
+                val progressMap = withContext(defaultDispatcher) {
+                    computeProgressMap(publications, readingStateRepository.getAll())
+                }
                 _state.value = _state.value.copy(
                     publications = publications,
                     progressMap = progressMap,

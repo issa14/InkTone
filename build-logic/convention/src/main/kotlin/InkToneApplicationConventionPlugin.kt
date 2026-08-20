@@ -6,6 +6,7 @@ import org.gradle.kotlin.dsl.configure
 import org.gradle.kotlin.dsl.dependencies
 import org.jetbrains.kotlin.gradle.dsl.JvmTarget
 import org.jetbrains.kotlin.gradle.dsl.KotlinAndroidProjectExtension
+import java.util.Properties
 
 /**
  * Module `app` uniquement : point d'entrée (Application, navigation, DI,
@@ -27,12 +28,62 @@ class InkToneApplicationConventionPlugin : Plugin<Project> {
                 namespace = "com.inktone.app"
                 compileSdk = 35
 
+                // Audit de consolidation v1.0.0 (AUDIT_CONSOLIDATION_V1.md) :
+                // versionName aligne sur la release. versionCode reste 1 :
+                // aucun artifact 0.1.0 n'a ete distribue, un premier
+                // versionCode 1 est donc valide pour le Play Store.
                 defaultConfig {
                     applicationId = "com.inktone.app"
                     minSdk = 26
                     targetSdk = 34
                     versionCode = 1
-                    versionName = "0.1.0"
+                    versionName = "1.0.0"
+                }
+
+                // ── Signature release (audit v1.0.0) ────────────────────────────
+                // Aucune config de signature n'existait : `assembleRelease`
+                // produisait un APK/AAB non signable. Lecture conditionnelle de
+                // `keystore.properties` (gitignore, absent par defaut pour
+                // quiconque clone le depot) — meme pattern que
+                // `firebaseConfigured` plus haut : sans le fichier, la release
+                // reste NON signee mais `./gradlew build` reste vert en CI.
+                // Ne jamais committer les secrets ; ne jamais afficher leurs
+                // valeurs (CLAUDE.md).
+                val keystoreProperties = Properties().apply {
+                    val file = rootProject.file("keystore.properties")
+                    if (file.exists()) file.inputStream().use { load(it) }
+                }
+                val releaseSigningConfigured =
+                    keystoreProperties.getProperty("storeFile") != null &&
+                    keystoreProperties.getProperty("storePassword") != null &&
+                    keystoreProperties.getProperty("keyAlias") != null &&
+                    keystoreProperties.getProperty("keyPassword") != null
+
+                if (releaseSigningConfigured) {
+                    signingConfigs {
+                        create("release") {
+                            storeFile = rootProject.file(keystoreProperties.getProperty("storeFile"))
+                            storePassword = keystoreProperties.getProperty("storePassword")
+                            keyAlias = keystoreProperties.getProperty("keyAlias")
+                            keyPassword = keystoreProperties.getProperty("keyPassword")
+                        }
+                    }
+                }
+
+                buildTypes {
+                    getByName("release") {
+                        // Audit v1.0.0 : R8/minify VOLONTAIREMENT PAS active dans
+                        // cette passe (AAB 196 Mo vs budget Blueprint §11.2 <= 60 Mo,
+                        // mais activation risquee sans validation device des regles
+                        // proguard Readium/onnxruntime — differe declare dans
+                        // AUDIT_CONSOLIDATION_V1.md). Explicitement false pour
+                        // qu'aucune activation accidentelle ne se glisse.
+                        isMinifyEnabled = false
+                        isShrinkResources = false
+                        if (releaseSigningConfigured) {
+                            signingConfig = signingConfigs.getByName("release")
+                        }
+                    }
                 }
 
                 // buildConfig : expose BuildConfig.DEBUG a MainActivity, pour

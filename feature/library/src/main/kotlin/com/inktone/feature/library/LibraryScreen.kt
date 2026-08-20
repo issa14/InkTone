@@ -232,6 +232,7 @@ fun LibraryScreen(
                 state.displayedPublications.isEmpty() -> EmptyState(
                     hasActiveImport = state.importProgress.total > 0 || state.importProgress.hasQueuedChunks,
                     onImportClick = onImportClick,
+                    searchQuery = state.searchQuery,
                 )
                 else -> {
                     LibraryContent(
@@ -860,25 +861,38 @@ private fun ImportProgressBanner(progress: ImportProgress) {
  * du lot 2a.6, `AppIcons.Reading` n'est plus un repli.
  */
 @Composable
-private fun EmptyState(hasActiveImport: Boolean, onImportClick: () -> Unit) {
+private fun EmptyState(hasActiveImport: Boolean, onImportClick: () -> Unit, searchQuery: String = "") {
     Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
         Column(horizontalAlignment = Alignment.CenterHorizontally) {
+            // Audit v1.0.0 (AUDIT_CONSOLIDATION_V1.md, M1) : une recherche
+            // sans résultat n'est PAS une bibliothèque vide — avant le fix,
+            // l'écran affichait « Votre bibliothèque est vide / Importez
+            // votre premier livre » alors que la bibliothèque était pleine,
+            // avec un CTA d'import trompeur.
+            val isSearchNoResult = searchQuery.isNotBlank() && !hasActiveImport
             EmptyLibraryShelfIllustration(modifier = Modifier.size(width = 160.dp, height = 100.dp))
             Spacer(Modifier.height(8.dp))
             Text(
-                if (hasActiveImport) "Import en cours…" else "Votre bibliothèque est vide",
+                when {
+                    hasActiveImport -> "Import en cours…"
+                    isSearchNoResult -> "Aucun résultat"
+                    else -> "Votre bibliothèque est vide"
+                },
                 style = MaterialTheme.typography.titleMedium,
                 modifier = Modifier.padding(top = 16.dp),
             )
             Text(
-                if (hasActiveImport) "Vos livres apparaîtront ici une fois l'import terminé."
-                else "Importez votre premier livre pour commencer à lire et écouter avec InkTone.",
+                when {
+                    hasActiveImport -> "Vos livres apparaîtront ici une fois l'import terminé."
+                    isSearchNoResult -> "Aucun livre ne correspond à « $searchQuery »."
+                    else -> "Importez votre premier livre pour commencer à lire et écouter avec InkTone."
+                },
                 style = MaterialTheme.typography.bodyMedium,
                 color = MaterialTheme.colorScheme.onSurfaceVariant,
                 textAlign = TextAlign.Center,
                 modifier = Modifier.padding(horizontal = 32.dp, vertical = 8.dp),
             )
-            if (!hasActiveImport) {
+            if (!hasActiveImport && !isSearchNoResult) {
                 Button(onClick = onImportClick, modifier = Modifier.padding(top = 16.dp)) {
                     Text("Importer votre premier livre")
                 }
