@@ -16,7 +16,9 @@ import com.inktone.domain.usecase.RegenerateCoversUseCase
 import com.inktone.domain.usecase.SynchronizeNowUseCase
 import com.inktone.domain.usecase.ToggleFavoriteUseCase
 import com.inktone.domain.usecase.TogglePinUseCase
+import com.inktone.feature.library.di.IoDispatcher
 import dagger.hilt.android.lifecycle.HiltViewModel
+import kotlinx.coroutines.CoroutineDispatcher
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.channels.Channel
 import kotlinx.coroutines.flow.MutableStateFlow
@@ -26,6 +28,7 @@ import kotlinx.coroutines.flow.catch
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.flow.receiveAsFlow
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.withContext
 import javax.inject.Inject
 
 @HiltViewModel
@@ -43,6 +46,9 @@ class LibraryViewModel @Inject constructor(
     private val synchronizeNow: SynchronizeNowUseCase,
     private val syncAccountRepository: SyncAccountRepository,
     private val regenerateCovers: RegenerateCoversUseCase,
+    // Audit v1.0.0 (P5) — calcul de progression hors Main (injectable
+    // pour les tests, voir di/IoDispatcher.kt).
+    @IoDispatcher private val defaultDispatcher: CoroutineDispatcher,
 ) : ViewModel() {
 
     private val _state = MutableStateFlow(LibraryUiState())
@@ -215,7 +221,15 @@ class LibraryViewModel @Inject constructor(
                     )
                 }
                 .collect { publications ->
-                    val progressMap = computeProgressMap(publications, readingStateRepository.getAll())
+                    // Audit v1.0.0 (AUDIT_CONSOLIDATION_V1.md, P5) : la
+                    // 2e requête (getAll des ReadingState) et la boucle O(n)
+                    // de computeProgressMap s'exécutaient sur Main à CHAQUE
+                    // émission du Flow Room (500 émissions pendant un import
+                    // groupé). Déplacé sur Default ; seuls les mises à jour
+                    // d'état repassent sur Main.
+                    val progressMap = withContext(defaultDispatcher) {
+                        computeProgressMap(publications, readingStateRepository.getAll())
+                    }
                     _state.value = _state.value.copy(
                         publications = publications,
                         progressMap = progressMap,

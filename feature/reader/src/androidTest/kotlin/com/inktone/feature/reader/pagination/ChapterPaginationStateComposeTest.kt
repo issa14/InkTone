@@ -10,7 +10,6 @@ import androidx.compose.ui.test.junit4.createComposeRule
 import androidx.compose.ui.unit.dp
 import com.inktone.domain.model.Chapter
 import com.inktone.domain.model.ChapterContent
-import com.inktone.domain.model.Paragraph
 import com.inktone.domain.model.BookBlock
 import com.inktone.domain.model.StyledText
 import com.inktone.domain.model.Sentence

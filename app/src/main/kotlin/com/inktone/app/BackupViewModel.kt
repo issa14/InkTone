@@ -9,10 +9,12 @@ import com.inktone.feature.settings.DataOperationResult
 import com.inktone.feature.settings.ModelsFolderInfo
 import dagger.hilt.android.lifecycle.HiltViewModel
 import dagger.hilt.android.qualifiers.ApplicationContext
+import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.withContext
 import java.io.File
 import javax.inject.Inject
 
@@ -50,7 +52,13 @@ class BackupViewModel @Inject constructor(
 
     fun exportTo(destinationUri: String, password: String) {
         viewModelScope.launch {
-            val success = backupManager.exportTo(destinationUri, BuildConfig.VERSION_NAME, password)
+            // Audit v1.0.0 (AUDIT_CONSOLIDATION_V1.md, P3) : BackupManager
+            // fait PBKDF2 120 000 itérations + AES-GCM + sérialisation JSON —
+            // tout sur le thread appelant. Avant le fix, viewModelScope
+            // (Main) gelait l'UI ; export/import passent désormais par IO.
+            val success = withContext(Dispatchers.IO) {
+                backupManager.exportTo(destinationUri, BuildConfig.VERSION_NAME, password)
+            }
             _lastResult.value = if (success) {
                 DataOperationResult.ExportSuccess
             } else {
@@ -62,7 +70,11 @@ class BackupViewModel @Inject constructor(
     /** @param password ignoré si le fichier importé est un export antérieur en clair (compatibilité ascendante). */
     fun importFrom(sourceUri: String, password: String?) {
         viewModelScope.launch {
-            _lastResult.value = when (val result = backupManager.importFrom(sourceUri, password)) {
+            // Audit v1.0.0 (AUDIT_CONSOLIDATION_V1.md, P3) — idem exportTo :
+            // travail cryptographique/IO hors Main.
+            _lastResult.value = when (val result = withContext(Dispatchers.IO) {
+                backupManager.importFrom(sourceUri, password)
+            }) {
                 is ImportBackupResult.Success ->
                     DataOperationResult.ImportSuccess(result.restored, result.skippedOrphans)
                 is ImportBackupResult.Failed -> DataOperationResult.ImportFailed(result.message)

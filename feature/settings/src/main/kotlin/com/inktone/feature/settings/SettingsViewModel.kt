@@ -7,20 +7,26 @@ import com.inktone.domain.model.AppTheme
 import com.inktone.domain.model.FontFamily
 import com.inktone.domain.model.PronunciationRule
 import com.inktone.domain.model.ReadingTheme
+import com.inktone.domain.model.Sentence
 import com.inktone.domain.model.TtsEngineId
 import com.inktone.domain.model.UserPreferences
 import com.inktone.domain.model.VoiceProfile
 import com.inktone.domain.repository.PreferencesRepository
 import com.inktone.domain.repository.PronunciationRuleRepository
 import com.inktone.domain.repository.VoiceProfileRepository
+import com.inktone.domain.service.AudioPlayer
+import com.inktone.domain.service.PlayerState
+import com.inktone.domain.service.TtsEngine
 import com.inktone.domain.service.VoiceModelDownloadService
 import com.inktone.domain.usecase.ApplyAccessibilityPresetUseCase
 import com.inktone.domain.usecase.GetVoiceProfilesUseCase
 import com.inktone.feature.settings.di.IoDispatcher
 import dagger.hilt.android.lifecycle.HiltViewModel
 import dagger.hilt.android.qualifiers.ApplicationContext
+import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.CoroutineDispatcher
 import kotlinx.coroutines.Job
+import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
@@ -57,10 +63,18 @@ class SettingsViewModel @Inject constructor(
     private val voiceModelDownloadService: VoiceModelDownloadService,
     @ApplicationContext private val appContext: Context,
     @IoDispatcher private val ioDispatcher: CoroutineDispatcher,
+    // Audit v1.0.0 (B1) — « Écouter un extrait » ré-implémenté : les deux
+    // contrats domaine (TtsEngine routeur + AudioPlayer gapless), câblés
+    // par infrastructure/tts et infrastructure/media dans le graphe Hilt
+    // de l'app. feature/settings ne voit que les contrats, jamais les
+    // implémentations (Blueprint §12.4).
+    private val ttsEngine: TtsEngine,
+    private val audioPlayer: AudioPlayer,
 ) : ViewModel() {
 
     private val _state = MutableStateFlow(SettingsUiState())
     private var voiceDownloadJob: Job? = null
+    private var previewJob: Job? = null
     val state: StateFlow<SettingsUiState> = _state.asStateFlow()
 
     init {
@@ -82,6 +96,33 @@ class SettingsViewModel @Inject constructor(
         }
         // Lot 6, Palier B — taille réelle du cache à l'ouverture de l'écran
         viewModelScope.launch { refreshCacheSize() }
+        // Lot 20 — l'état de téléchargement de la voix est en mémoire
+        // (perdu à la navigation) ; au retour sur l'écran, l'installation
+        // réelle sur disque fait foi : « installée » si les modèles sont
+        // prêts, sans quoi le bouton de téléchargement reste proposé.
+        if (voiceModelDownloadService.isDefaultVoiceInstalled()) {
+            _state.value = _state.value.copy(
+                voiceDownloadProgress = com.inktone.domain.service.VoiceDownloadProgress.Complete,
+            )
+        }
+        // Audit v1.0.0 (B1) — fin naturelle de l'extrait (file vidée) ou
+        // arrêt explicite : isPreviewing repasse à false. Aucune minuterie
+        // au hasard : l'état du lecteur EST la source de vérité.
+        viewModelScope.launch {
+            audioPlayer.state.collect { playerState ->
+                if (playerState == PlayerState.Idle || playerState == PlayerState.Stopped) {
+                    if (_state.value.isPreviewing) {
+                        _state.value = _state.value.copy(isPreviewing = false)
+                    }
+                }
+            }
+        }
+    }
+
+    override fun onCleared() {
+        previewJob?.cancel()
+        audioPlayer.stop()
+        super.onCleared()
     }
 
     fun onIntent(intent: SettingsIntent) {
@@ -123,6 +164,9 @@ class SettingsViewModel @Inject constructor(
                     preferencesRepository.update(current.copy(eyeRestReminderEnabled = intent.enabled))
                 is SettingsIntent.SetEyeRestReminderIntervalMinutes ->
                     preferencesRepository.update(current.copy(eyeRestReminderIntervalMinutes = intent.minutes))
+                // Audit v1.0.0 (B1) — « Écouter un extrait » ré-implémenté :
+                // bascule lecture/arrêt d'une phrase d'exemple.
+                is SettingsIntent.PlayPreview -> togglePreview()
                 // Lot 6 — vitesse et pitch : même cible VoiceProfile que setTtsSpeed() dans ReaderViewModel
                 is SettingsIntent.SetVoiceSpeed -> updateActiveVoiceProfile(current) { it.copy(speed = intent.speed) }
                 is SettingsIntent.SetVoicePitch -> updateActiveVoiceProfile(current) { it.copy(pitch = intent.pitch) }
@@ -131,9 +175,11 @@ class SettingsViewModel @Inject constructor(
                 is SettingsIntent.SetAccessibilityPreset -> applyAccessibilityPresetToggle(intent.enabled, current)
                 // Compat — remplacé par SetAccessibilityPreset mais conservé pour les tests existants
                 is SettingsIntent.ApplyAccessibilityPreset -> applyAccessibilityPreset()
-                // Lot 6 — écouter un extrait : signalé non branché (voir commentaire)
-                // PlayPreview nécessite une UseCase dédiée hors scope SettingsViewModel.
-                is SettingsIntent.PlayPreview -> { /* Signalé : non branché au TTS — UseCase dédiée à créer */ }
+                // Lot 6 — écouter un extrait : RETIRÉ à l'audit v1.0.0
+                // (AUDIT_CONSOLIDATION_V1.md, B1) — l'intent PlayPreview
+                // n'était branché sur aucun moteur (no-op) ; le bouton a été
+                // retiré de l'UI et l'intent supprimé. À réintroduire avec
+                // une vraie PlayTtsPreviewUseCase, pas avant.
                 // Lot 10 — point de besoin réel du téléchargement de voix,
                 // retiré de l'onboarding (Tâche 10.3). Même mécanisme que
                 // l'ancien OnboardingViewModel.startVoiceDownload.
@@ -171,6 +217,80 @@ class SettingsViewModel @Inject constructor(
         voiceDownloadJob?.cancel()
         voiceDownloadJob = null
         _state.value = _state.value.copy(voiceDownloadProgress = null)
+    }
+
+    /**
+     * Audit v1.0.0 (B1) — « Écouter un extrait » ré-implémenté : bascule
+     * lecture/arrêt d'une phrase d'exemple avec le profil vocal actif.
+     * Même chemin que le Reader (TtsEngine → AudioSegment PCM → AudioPlayer
+     * gapless), sans l'ordonnanceur : une seule phrase, enqueue + play.
+     * L'échec de synthèse n'est jamais silencieux : le repli interne
+     * (FallbackTtsEngine) couvre Sherpa, un échec résiduel remonte dans
+     * `previewError` affiché sous le bouton.
+     */
+    private fun togglePreview() {
+        if (_state.value.isPreviewing) {
+            previewJob?.cancel()
+            previewJob = null
+            audioPlayer.stop()
+            _state.value = _state.value.copy(isPreviewing = false, previewError = null)
+            return
+        }
+        previewJob?.cancel()
+        previewJob = viewModelScope.launch {
+            _state.value = _state.value.copy(isPreviewing = true, previewError = null)
+            try {
+                val prefs = preferencesRepository.get()
+                val profile = resolveActiveVoiceProfile(prefs)
+                val sample = Sentence(
+                    index = 0,
+                    text = PREVIEW_TEXT,
+                    startOffset = 0,
+                    endOffset = PREVIEW_TEXT.length,
+                )
+                // La synthèse peut être longue (moteur local) : jamais sur Main.
+                val segment = withContext(ioDispatcher) { ttsEngine.synthesize(sample, profile) }
+                audioPlayer.sampleRate = segment.sampleRate
+                audioPlayer.enqueue(segment)
+                audioPlayer.play()
+                // Fin naturelle : le segment complet est déjà synthétisé, sa
+                // durée est donc connue. GaplessPlaybackCore ne passe PAS à
+                // Idle quand sa file se vide (il attend des segments suivants,
+                // `pollTimeoutMs`) — sans ce délai borné, le bouton resterait
+                // sur « Arrêter l'extrait » après la fin de l'audio.
+                delay(segment.durationMs + PREVIEW_END_MARGIN_MS)
+                if (_state.value.isPreviewing) {
+                    audioPlayer.stop()
+                    _state.value = _state.value.copy(isPreviewing = false)
+                }
+            } catch (e: CancellationException) {
+                throw e
+            } catch (e: Exception) {
+                _state.value = _state.value.copy(
+                    isPreviewing = false,
+                    previewError = e.message ?: "Impossible de lire l'extrait.",
+                )
+            }
+        }
+    }
+
+    /** Profil vocal actif, même repli que le Reader : profil sauvegardé, sinon le premier disponible. */
+    private fun resolveActiveVoiceProfile(prefs: UserPreferences): VoiceProfile =
+        _state.value.voiceProfiles.find { it.id == prefs.activeVoiceProfileId }
+            ?: _state.value.voiceProfiles.firstOrNull()
+            ?: VoiceProfile(
+                id = "default",
+                engine = prefs.defaultTtsEngine,
+                voice = "default",
+                language = prefs.language,
+            )
+
+    private companion object {
+        /** Phrase d'exemple — courte, française, avec ponctuation de fin. */
+        const val PREVIEW_TEXT = "Bonjour. Voici un aperçu de la voix choisie."
+
+        /** Marge après la fin du segment avant l'arrêt propre du lecteur. */
+        const val PREVIEW_END_MARGIN_MS = 300L
     }
 
     /** Lot 6, Palier B — taille réelle occupée par `Context.cacheDir`, pas une estimation. */
@@ -254,7 +374,8 @@ class SettingsViewModel @Inject constructor(
 
     /** Voix par défaut de chaque moteur — aligné sur les moteurs réels (Palier 1/2/Edge). */
     private fun defaultVoiceFor(engine: TtsEngineId): String = when (engine) {
-        TtsEngineId.SHERPA_ONNX -> "ff_siwis"
+        // Lot 20 — Sherpa = upmc-medium, voix par défaut jessica (sid 0, comme le legacy).
+        TtsEngineId.SHERPA_ONNX -> "jessica"
         TtsEngineId.ANDROID_NATIVE -> "fr-fr-default"
         TtsEngineId.EDGE_TTS -> "fr-FR-VivienneNeural"
         TtsEngineId.PIPER -> "default"

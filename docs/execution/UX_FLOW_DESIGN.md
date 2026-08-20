@@ -506,6 +506,13 @@ Titre de carte en majuscules discrètes en en-tête. Contenu, dans l'ordre de la
 - **Vitesse d'élocution** (0,5x–2,0x), **Gain audio** (1,0x–4,0x), **Intonation/Pitch** (0,5x–1,5x) : trois curseurs, chacun avec libellé + valeur courante affichée au-dessus de la piste, et bornes min/max affichées sous la piste.
 - **Écouter un extrait** : bouton plein largeur en bas de carte, icône + libellé.
 
+> **Note de consolidation (audit v1.0.0, `AUDIT_CONSOLIDATION_V1.md` B1)** :
+> ce bouton a été **ré-implémenté** en v1.0.0. Il existait dans le code
+> mais `SettingsIntent.PlayPreview` n'était branché sur aucun moteur TTS
+> (no-op) — retiré un temps, il est recâblé sur une vraie synthèse +
+> lecture d'une phrase d'exemple (`SettingsViewModel.togglePreview`,
+> mêmes contrats `TtsEngine`/`AudioPlayer` que le Reader).
+
 Mockup validé sans correction.
 
 **Confirmations actées pour la suite de l'écran (cartes non encore maquettées) :**

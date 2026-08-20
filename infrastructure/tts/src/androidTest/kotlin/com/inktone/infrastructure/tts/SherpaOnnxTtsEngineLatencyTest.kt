@@ -16,7 +16,7 @@ import org.junit.runner.RunWith
 import java.io.File
 
 /**
- * Mesure la latence réelle de `synthesize()` (Kokoro + resampling + CTC,
+ * Mesure la latence réelle de `synthesize()` (upmc-medium + resampling + CTC,
  * Tâche 5.1/5.2 assemblées) sur un device physique — chronométrée avec un
  * nombre d'itérations borné (1 run initial + 5 répétitions), pas
  * `androidx.benchmark.measureRepeated` : ce dernier répète l'opération un
@@ -43,13 +43,13 @@ class SherpaOnnxTtsEngineLatencyTest {
     fun mesure_latence_synthese_plus_alignement(): Unit = runBlocking {
         val modelPaths = SherpaOnnxModelPaths(context)
         val ctcModelPaths = CtcModelPaths(context)
-        if (!modelPaths.isReady) stage("kokoro-int8-multi-lang-v1_0", modelPaths.modelFile.parentFile!!)
+        if (!modelPaths.isReady) stage("vits-piper-fr_FR-upmc-medium", modelPaths.modelFile.parentFile!!)
         if (!ctcModelPaths.isReady) stage("nemo-ctc-fr-multilang-int8", ctcModelPaths.modelFile.parentFile!!)
-        assumeTrue("Modele Kokoro absent", modelPaths.isReady)
+        assumeTrue("Modele vocal upmc absent", modelPaths.isReady)
         assumeTrue("Modele CTC absent", ctcModelPaths.isReady)
 
         val engine = SherpaOnnxTtsEngine(modelPaths, CtcForcedAligner(ctcModelPaths), PronunciationRuleApplier(FakePronunciationRuleRepository()))
-        val voiceProfile = VoiceProfile(id = "vp-sherpa-fr", engine = TtsEngineId.SHERPA_ONNX, voice = "ff_siwis", language = "fr-FR")
+        val voiceProfile = VoiceProfile(id = "vp-sherpa-fr", engine = TtsEngineId.SHERPA_ONNX, voice = "jessica", language = "fr-FR")
         val text = "Bonjour le monde. Ceci est un test pour vérifier l'alignement."
         val sentence = Sentence(index = 0, text = text, startOffset = 0, endOffset = text.length)
 
@@ -72,7 +72,7 @@ class SherpaOnnxTtsEngineLatencyTest {
             Log.i(TAG, "[WORD] start=${w.startMs} end=${w.endMs} charOffset=${w.charOffset} word=${w.word}")
         }
 
-        // Decomposition : synthese Kokoro seule vs alignement CTC seul
+        // Decomposition : synthese upmc seule vs alignement CTC seul
         // (deja mesure isolement a ~540ms dans le prototype scratchpad -
         // ici on verifie sur le pipeline production reel lequel des deux
         // domine le total mesure ci-dessus).
@@ -93,7 +93,7 @@ class SherpaOnnxTtsEngineLatencyTest {
 
         Log.i(
             TAG,
-            "[LATENCY_BREAKDOWN] kokoro_synth_ms=${"%.2f".format(synthMs)} " +
+            "[LATENCY_BREAKDOWN] upmc_synth_ms=${"%.2f".format(synthMs)} " +
                 "ctc_align_cold_ms=${"%.2f".format(alignColdMs)} ctc_align_warm_ms=${"%.2f".format(alignWarmMs)}",
         )
     }

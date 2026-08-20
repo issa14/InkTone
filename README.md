@@ -42,11 +42,11 @@ que l'on lise des yeux ou que l'on écoute.
 
   | Moteur | Hors ligne | Timing mot | Notes |
   |---|---|---|---|
-  | **Sherpa-ONNX / Kokoro** (référence) | oui | oui, par alignement forcé CTC | ~290 Mo de modèles, qualité premium |
-  | **Android natif** (`TextToSpeech`) | oui | oui, via `onRangeStart` | aucun téléchargement, palier de repli |
+  | **Sherpa-ONNX / VITS Piper upmc-medium** (référence) | oui | oui, par alignement forcé CTC | ~80 Mo de voix (2 locuteurs : Jessica & Pierre) + ~102 Mo de modèle d'alignement, téléchargés à la demande |
+  | **Voix du système** (`android.speech.tts`) | oui | oui, via `onRangeStart` | aucun téléchargement, repli automatique tant que les modèles neuronaux ne sont pas installés |
   | **Edge-TTS** (optionnel, opt-in) | non | oui, métadonnées du service | voix cloud, désactivé par défaut |
 
-- **Le surlignage mot à mot n'est jamais simulé.** Il n'est actif que si
+- **Le surlignage mot à mot n'est jamais simulé.** Il n'actif que si
   `TtsCapabilities.wordTimestamps` est vrai pour le moteur en cours
   ([TtsCapabilities.kt](domain/src/main/kotlin/com/inktone/domain/service/TtsCapabilities.kt)).
   Aucune interpolation de caractères ne vient combler un moteur qui ne
@@ -54,8 +54,17 @@ que l'on lise des yeux ou que l'on écoute.
 - Sherpa-ONNX n'exposant pas de timestamps natifs — vérifié
   empiriquement, voir [ADR-021](docs/adr/ADR-021-tts-word-timing-tiered-architecture.md) —
   InkTone exécute un **second passage d'alignement forcé sur l'appareil**
-  (modèle CTC léger, décodage de Viterbi contraint par le texte connu)
-  pour produire de vraies frontières temporelles.
+  (modèle NeMo FastConformer CTC int8, décodage de Viterbi contraint par
+  le texte connu) pour produire de vraies frontières temporelles.
+- **Voix neuronale** : le moteur de référence est le modèle VITS Piper
+  `fr_FR-upmc-medium` (~80 Mo, deux voix françaises : **Jessica** et
+  **Pierre**, vérifiées dans les métadonnées du modèle) — RTF ~0,8 mesuré
+  sur le Snapdragon 680 (l'ancien moteur Kokoro était à ~4,7×, non
+  viable). La voix et le modèle d'alignement (~102 Mo) sont téléchargés à
+  la demande, vérifiés par empreinte SHA-256 puis **extraits** ; l'état
+  « installée » n'est affiché que lorsque les modèles sont réellement
+  prêts. La voix du système reste le repli automatique tant que ce n'est
+  pas le cas.
 - Lecture continue sans blanc entre phrases (pipeline gapless,
   [ADR-025](docs/adr/ADR-025-playback-gapless.md)), session média
   Media3 : contrôles depuis l'écran verrouillé, casque, Android Auto.
@@ -134,7 +143,7 @@ Le dépôt compte 27 modules Gradle, découpés par responsabilité :
 - **`core:*`** — `designsystem` (couleurs, typo, `AppIcons`, contraste),
   `ui`, `common`, `testing`
 - **`domain`** — entités, value objects, contrats de repository,
-  38 use cases ; zéro dépendance de framework
+  33 use cases ; zéro dépendance de framework
 - **`data`** — implémentations de repository, mappers
 - **`infrastructure:*`** — `database`, `storage` (SAF), `parser`
   (EPUB/PDF), `tts`, `media`, `worker`, `crashreporting`, `sync`, `opds`
@@ -170,7 +179,9 @@ bash scripts/check-no-manage-external-storage.sh    # SAF exclusivement
 
 Les modèles de voix neuronaux ne sont pas embarqués dans l'APK : ils sont
 téléchargés à la demande depuis l'application
-([ADR-018](docs/adr/ADR-018-voice-model-distribution.md)).
+([ADR-018](docs/adr/ADR-018-voice-model-distribution.md)) — voix
+upmc-medium (~80 Mo) + modèle d'alignement CTC (~102 Mo), vérifiés par
+empreinte SHA-256 et extraits avant utilisation.
 
 ---
 
@@ -202,7 +213,7 @@ instrumentés.
 | Besoin | Emplacement |
 |---|---|
 | Architecture cible, tous les chapitres | [`docs/blueprint/`](docs/blueprint/) |
-| Décisions d'architecture et alternatives écartées (25 ADR) | [`docs/adr/`](docs/adr/) |
+| Décisions d'architecture et alternatives écartées (26 ADR) | [`docs/adr/`](docs/adr/) |
 | Plans d'exécution détaillés et avancement réel | [`docs/execution/`](docs/execution/) |
 | Conventions de contribution | [`CONTRIBUTING.md`](CONTRIBUTING.md) |
 | Contexte permanent pour Claude Code | [`CLAUDE.md`](CLAUDE.md) |

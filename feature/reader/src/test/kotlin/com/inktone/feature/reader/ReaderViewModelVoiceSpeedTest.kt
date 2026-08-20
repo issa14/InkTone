@@ -182,7 +182,7 @@ class ReaderViewModelVoiceSpeedTest {
         val preferencesRepository = FakePreferencesRepository()
         preferencesRepository.update(UserPreferences(eyeRestReminderEnabled = false))
         val voiceProfileRepository = FakeVoiceProfileRepository()
-        val otherProfile = VoiceProfile(id = "vp-other", engine = TtsEngineId.SHERPA_ONNX, voice = "ff_siwis", language = "fr-FR")
+        val otherProfile = VoiceProfile(id = "vp-other", engine = TtsEngineId.SHERPA_ONNX, voice = "jessica", language = "fr-FR")
         voiceProfileRepository.save(otherProfile)
         val publicationRepository = FakePublicationRepository()
         val publicationId = "pub-speed-3"

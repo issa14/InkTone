@@ -57,9 +57,9 @@ class TtsCapabilityConsistencyTest {
     @Test
     fun palier2_sherpa_onnx_respecte_sa_capacite_wordTimestamps() {
         val modelPaths = SherpaOnnxModelPaths(context)
-        val stagedKokoro = File(context.getExternalFilesDir(null), "kokoro-int8-multi-lang-v1_0")
-        if (!modelPaths.isReady && stagedKokoro.exists()) {
-            stagedKokoro.copyRecursively(modelPaths.modelFile.parentFile!!, overwrite = true)
+        val stagedVoice = File(context.getExternalFilesDir(null), "vits-piper-fr_FR-upmc-medium")
+        if (!modelPaths.isReady && stagedVoice.exists()) {
+            stagedVoice.copyRecursively(modelPaths.modelFile.parentFile!!, overwrite = true)
         }
         val ctcModelPaths = CtcModelPaths(context)
         val stagedCtc = File(context.getExternalFilesDir(null), "nemo-ctc-fr-multilang-int8")
@@ -75,7 +75,7 @@ class TtsCapabilityConsistencyTest {
             ctcModelPaths.isReady,
         )
         val engine = SherpaOnnxTtsEngine(modelPaths, CtcForcedAligner(ctcModelPaths), PronunciationRuleApplier(FakePronunciationRuleRepository()))
-        val voiceProfile = VoiceProfile(id = "vp-sherpa-fr", engine = TtsEngineId.SHERPA_ONNX, voice = "ff_siwis", language = "fr-FR")
+        val voiceProfile = VoiceProfile(id = "vp-sherpa-fr", engine = TtsEngineId.SHERPA_ONNX, voice = "jessica", language = "fr-FR")
         assertTrue(
             "Palier 2 declare wordTimestamps=true - Tache 5.2 (alignement CTC) branchee pour de vrai",
             engine.capabilities.wordTimestamps,
@@ -98,9 +98,9 @@ class TtsCapabilityConsistencyTest {
     @Test
     fun fallback_engine_respecte_sa_capacite_wordTimestamps_quel_que_soit_le_palier_actif() {
         val modelPaths = SherpaOnnxModelPaths(context)
-        val stagedKokoro = File(context.getExternalFilesDir(null), "kokoro-int8-multi-lang-v1_0")
-        if (!modelPaths.isReady && stagedKokoro.exists()) {
-            stagedKokoro.copyRecursively(modelPaths.modelFile.parentFile!!, overwrite = true)
+        val stagedVoice = File(context.getExternalFilesDir(null), "vits-piper-fr_FR-upmc-medium")
+        if (!modelPaths.isReady && stagedVoice.exists()) {
+            stagedVoice.copyRecursively(modelPaths.modelFile.parentFile!!, overwrite = true)
         }
         val ctcModelPaths = CtcModelPaths(context)
         val stagedCtc = File(context.getExternalFilesDir(null), "nemo-ctc-fr-multilang-int8")
@@ -110,7 +110,7 @@ class TtsCapabilityConsistencyTest {
         val primary = SherpaOnnxTtsEngine(modelPaths, CtcForcedAligner(ctcModelPaths), PronunciationRuleApplier(FakePronunciationRuleRepository()))
         val fallback = AndroidNativeTtsEngine(context, PronunciationRuleApplier(FakePronunciationRuleRepository()))
         val engine = FallbackTtsEngine(primary, fallback)
-        val voiceProfile = VoiceProfile(id = "vp-fallback-fr", engine = TtsEngineId.SHERPA_ONNX, voice = "ff_siwis", language = "fr-FR")
+        val voiceProfile = VoiceProfile(id = "vp-fallback-fr", engine = TtsEngineId.SHERPA_ONNX, voice = "jessica", language = "fr-FR")
         assertCapabilityMatchesBehavior(engine, voiceProfile)
     }
 

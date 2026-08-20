@@ -19,6 +19,16 @@ interface TtsEngine {
 
     /** Événements de progression pendant la lecture d'un segment (§8.9). */
     fun observePlaybackEvents(): Flow<PlaybackEvent>
+
+    /**
+     * Lot 20 — préchauffage optionnel (chargement des modèles) hors du
+     * premier appel à [synthesize]. No-op par défaut : seuls les moteurs
+     * qui chargent des modèles lourds à la première synthèse (ex.
+     * Sherpa-ONNX) le surchargent. À déclencher avant le premier usage
+     * (ouverture du Reader, fin de téléchargement) pour ne pas payer
+     * l'init froide au premier tap (budget §11.2).
+     */
+    fun warmUp() {}
 }
 
 /**

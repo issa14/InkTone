@@ -72,6 +72,12 @@ dependencies {
     // le commentaire packaging.jniLibs.pickFirsts ci-dessus.
     implementation(libs.onnxruntime.android)
 
+    // Lot 20 — extraction tar+bzip2 des modèles téléchargés (voix
+    // upmc-medium, modèle CTC) : sans elle, l'archive téléchargée n'était
+    // jamais extraite et le moteur restait inutilisable
+    // (AUDIT_CONSOLIDATION_V1.md, B2).
+    implementation(libs.commons.compress)
+
     // Lot 14, Tache 1.2 (spike Edge TTS) — OkHttp pour le client WebSocket
     // Bing. Choix delibere : ni Retrofit ni Ktor, meme sobriete que
     // infrastructure/sync et infrastructure/opds qui construisent deja

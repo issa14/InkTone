@@ -36,7 +36,7 @@ class SelectiveTtsEngineTest {
 
     private val sentence = Sentence(index = 0, text = "Bonjour", startOffset = 0, endOffset = 7)
     private val edgeProfile = VoiceProfile(id = "vp", engine = TtsEngineId.EDGE_TTS, voice = "fr-FR-VivienneNeural", language = "fr-FR")
-    private val sherpaProfile = VoiceProfile(id = "vp", engine = TtsEngineId.SHERPA_ONNX, voice = "ff_siwis", language = "fr-FR")
+    private val sherpaProfile = VoiceProfile(id = "vp", engine = TtsEngineId.SHERPA_ONNX, voice = "jessica", language = "fr-FR")
 
     private fun capabilities(id: TtsEngineId) = TtsCapabilities(
         offline = id != TtsEngineId.EDGE_TTS,

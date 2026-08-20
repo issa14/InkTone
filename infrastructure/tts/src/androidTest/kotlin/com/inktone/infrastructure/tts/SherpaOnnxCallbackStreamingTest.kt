@@ -44,8 +44,8 @@ class SherpaOnnxCallbackStreamingTest {
     @Test
     fun trajectoire_des_appels_du_callback(): Unit = runBlocking {
         val modelPaths = SherpaOnnxModelPaths(context)
-        if (!modelPaths.isReady) stage("kokoro-int8-multi-lang-v1_0", modelPaths.modelFile.parentFile!!)
-        assumeTrue("Modele Kokoro absent", modelPaths.isReady)
+        if (!modelPaths.isReady) stage("vits-piper-fr_FR-upmc-medium", modelPaths.modelFile.parentFile!!)
+        assumeTrue("Modele vocal upmc absent", modelPaths.isReady)
 
         val engine = SherpaOnnxTtsEngine(modelPaths, ctcForcedAligner = CtcForcedAligner(CtcModelPaths(context)), pronunciationRuleApplier = PronunciationRuleApplier(FakePronunciationRuleRepository()))
         val text = "Bonjour le monde. Ceci est un test pour vérifier l'alignement."

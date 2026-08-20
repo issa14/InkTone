@@ -291,7 +291,7 @@ private fun ArchitectureAccordion() {
                     LicenseRow("InkTone (code source)", "MIT", Color(0xFF1565C0))
                     LicenseRow("Readium (parseur EPUB)", "BSD-3-Clause", Color(0xFF00695C))
                     LicenseRow("Pdfium (rendu PDF)", "BSD-3-Clause", Color(0xFF00695C))
-                    LicenseRow("Kokoro (synthèse vocale)", "Apache-2.0", Color(0xFF2E7D32))
+                    LicenseRow("Voix UPMC upmc-medium, Piper VITS (Jessica & Pierre)", "CC-BY-SA-4.0", Color(0xFF2E7D32))
                     // Attribution obligatoire : le modele d'alignement force est sous
                     // CC-BY-4.0, qui impose de crediter l'auteur dans l'application
                     // distribuee, pas seulement dans le depot (THIRD_PARTY_NOTICES.md).

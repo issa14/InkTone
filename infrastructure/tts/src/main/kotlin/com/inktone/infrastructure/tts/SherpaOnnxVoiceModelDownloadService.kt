@@ -1,75 +1,172 @@
 package com.inktone.infrastructure.tts
 
+import android.content.Context
 import com.inktone.domain.service.VoiceDownloadProgress
 import com.inktone.domain.service.VoiceModelDownloadService
+import dagger.hilt.android.qualifiers.ApplicationContext
+import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.flow.Flow
-import kotlinx.coroutines.flow.map
+import kotlinx.coroutines.flow.FlowCollector
+import kotlinx.coroutines.flow.flow
+import kotlinx.coroutines.withContext
+import java.io.File
 import javax.inject.Inject
 import javax.inject.Singleton
 
 /**
  * Implementation reelle de [VoiceModelDownloadService] (Tache 8.7) —
- * delegue a [VoiceModelDownloader] (Tache 5.6, deja fait et teste).
+ * Lot 20 : installe **la voix et le modèle CTC** en une seule opération,
+ * puis rend la chaîne réellement utilisable.
  *
- * **Decision d'hebergement (Tache 9.0.1)** : option 1 retenue (URL
- * publique deja stable), pas de CDN propre. Verifie le 2026-07-29,
- * PAS suppose : `k2-fsa/sherpa-onnx` publie le paquet
- * `kokoro-int8-multi-lang-v1_0` (celui deja vendore et valide en Phase 5)
- * comme asset de la release GitHub taguee `tts-models`, url stable
- * (`releases/download/<tag>/<asset>`, ne change pas meme si l'asset est
- * remplace) :
- * `https://github.com/k2-fsa/sherpa-onnx/releases/download/tts-models/kokoro-int8-multi-lang-v1_0.tar.bz2`.
- * SHA-256 lu directement depuis le champ `digest` de l'API GitHub
- * Releases pour cet asset (`gh api .../releases/tags/tts-models`),
- * jamais calcule a la main sur un fichier telecharge sans verification
- * independante. Taille annoncee par GitHub : 131 839 838 octets
- * (~125,7 Mio).
+ * Avant le Lot 20, cette classe téléchargeait l'archive `.tar.bz2` de la
+ * voix sans jamais l'extraire (`SherpaOnnxModelPaths.isReady` toujours
+ * faux) et n'affichait pas moins « Voix neuronale installée » —
+ * AUDIT_CONSOLIDATION_V1.md B2. Désormais :
  *
- * Option CDN propre explicitement rejetee : cout d'infrastructure
- * recurrent pour une app gratuite a donation volontaire (philosophie
- * actee Phase 5), sans benefice pour une release qui n'a change ni de
- * contenu ni d'URL depuis sa publication initiale par k2-fsa.
+ * 1. **Voix** `vits-piper-fr_FR-upmc-medium` (fp32, ~80 Mo, 2 locuteurs
+ *    jessica/pierre) — téléchargée, SHA-256 vérifié, **extraite** vers
+ *    `SherpaOnnxModelPaths.dir`.
+ * 2. **Modèle CTC** d'alignement forcé (`nemo-fast-conformer-ctc-...-20k`
+ *    int8, ~102 Mo — même modèle que le prototype, doc l.703) —
+ *    téléchargé, vérifié, extrait vers `CtcModelPaths.dir` (surlignage
+ *    mot à mot réel).
  *
- * **Limite non resolue par cette tache, a ne pas confondre avec un
- * hebergement non tranche** : l'asset telecharge est une ARCHIVE
- * `.tar.bz2` contenant plusieurs fichiers (`model.int8.onnx`,
- * `voices.bin`, `tokens.txt`, `espeak-ng-data/`, lexiques, `.fst`) —
- * pas le seul `model.int8.onnx` attendu tel quel par
- * [SherpaOnnxModelPaths]. [VoiceModelDownloader] (Tache 5.6) telecharge
- * et verifie l'empreinte d'un fichier unique, il n'extrait aucune
- * archive. Cette classe telecharge donc l'archive verifiee dans le
- * repertoire de voix (a cote de l'arborescence attendue), mais
- * l'extraction tar+bzip2 vers les fichiers individuels reste TODO
- * (necessite une dependance de decompression, ex. Apache Commons
- * Compress, absente du projet) — a traiter dans une tache dediee, pas
- * suppose fonctionner silencieusement ici.
+ * Progression **globale** (somme des octets des deux archives) ; chaque
+ * modèle déjà prêt est sauté (reprise après interruption). L'état
+ * « installée » n'est vrai que si les deux `isReady` le sont — jamais
+ * avant.
+ *
+ * URL/hash lus depuis l'API GitHub Releases (digest), jamais calculés à
+ * la main sur un fichier téléchargé sans vérification indépendante.
  */
 @Singleton
 class SherpaOnnxVoiceModelDownloadService @Inject constructor(
+    @ApplicationContext private val context: Context,
     private val modelPaths: SherpaOnnxModelPaths,
+    private val ctcModelPaths: CtcModelPaths,
     private val voiceModelDownloader: VoiceModelDownloader,
+    // Lot 20 — préchauffage après installation : le premier usage TTS ne
+    // paie pas le chargement froid des deux modèles ONNX (budget §11.2).
+    private val ttsEngine: SherpaOnnxTtsEngine,
 ) : VoiceModelDownloadService {
 
-    override fun downloadDefaultVoiceModel(): Flow<VoiceDownloadProgress> =
-        voiceModelDownloader.downloadVoiceModel(
-            url = KOKORO_MODEL_ARCHIVE_URL,
-            expectedSha256 = KOKORO_MODEL_ARCHIVE_SHA256,
-            fileName = KOKORO_MODEL_ARCHIVE_FILE_NAME,
-        ).map { progress ->
-            when (progress) {
-                is DownloadProgress.InProgress -> VoiceDownloadProgress.InProgress(progress.bytesDownloaded, progress.totalBytes)
-                is DownloadProgress.Complete -> VoiceDownloadProgress.Complete
-                is DownloadProgress.Failed -> VoiceDownloadProgress.Failed(progress.message)
-                is DownloadProgress.VerificationFailed ->
-                    VoiceDownloadProgress.Failed("Empreinte invalide (attendu ${progress.expectedHash}, obtenu ${progress.actualHash})")
-            }
+    override fun downloadDefaultVoiceModel(): Flow<VoiceDownloadProgress> = flow {
+        val voiceRemaining = if (modelPaths.isReady) 0L else VOICE_ARCHIVE_SIZE
+        val ctcRemaining = if (ctcModelPaths.isReady) 0L else CTC_ARCHIVE_SIZE
+        val total = voiceRemaining + ctcRemaining
+        if (total == 0L) {
+            emit(VoiceDownloadProgress.Complete)
+            return@flow
+        }
+        var done = 0L
+
+        if (voiceRemaining > 0L) {
+            val ok = downloadAndExtract(
+                url = VOICE_ARCHIVE_URL,
+                sha256 = VOICE_ARCHIVE_SHA256,
+                fileName = VOICE_ARCHIVE_FILE_NAME,
+                subDir = "voices",
+                archiveSize = VOICE_ARCHIVE_SIZE,
+                targetDir = modelPaths.dir,
+                total = total,
+                done = done,
+            ) { newDone -> done = newDone }
+            if (!ok) return@flow
         }
 
+        if (ctcRemaining > 0L) {
+            val ok = downloadAndExtract(
+                url = CTC_ARCHIVE_URL,
+                sha256 = CTC_ARCHIVE_SHA256,
+                fileName = CTC_ARCHIVE_FILE_NAME,
+                subDir = "models",
+                archiveSize = CTC_ARCHIVE_SIZE,
+                targetDir = ctcModelPaths.dir,
+                total = total,
+                done = done,
+            ) { newDone -> done = newDone }
+            if (!ok) return@flow
+        }
+
+        // Lot 20 — préchauffage : charge les deux modèles ONNX (TTS +
+        // aligneur) hors du premier usage, pour tenir le budget §11.2.
+        withContext(Dispatchers.IO) { ttsEngine.warmUp() }
+
+        emit(VoiceDownloadProgress.Complete)
+    }
+
+    override fun isDefaultVoiceInstalled(): Boolean =
+        modelPaths.isReady && ctcModelPaths.isReady
+
+    /**
+     * Télécharge, vérifie puis extrait une archive dans [targetDir].
+     * Émet la progression (octets globaux) au fil du téléchargement.
+     * @return faux (et une erreur `Failed` émise) en cas d'échec —
+     *   jamais d'échec silencieux ni d'archive partielle conservée.
+     */
+    private suspend fun FlowCollector<VoiceDownloadProgress>.downloadAndExtract(
+        url: String,
+        sha256: String,
+        fileName: String,
+        subDir: String,
+        archiveSize: Long,
+        targetDir: File,
+        total: Long,
+        done: Long,
+        onDoneUpdate: (Long) -> Unit,
+    ): Boolean {
+        var step = false
+        voiceModelDownloader.downloadVoiceModel(url, sha256, fileName, subDir).collect { progress ->
+            when (progress) {
+                is DownloadProgress.InProgress ->
+                    emit(VoiceDownloadProgress.InProgress(done + progress.bytesDownloaded, total))
+                is DownloadProgress.Complete -> {
+                    // L'archive vérifiée est déjà sur disque (chemin fourni
+                    // par le téléchargeur) — extraction + suppression.
+                    val extracted = try {
+                        withContext(Dispatchers.IO) {
+                            TarBz2Extractor.extract(progress.modelFile, targetDir, stripRoot = true)
+                            progress.modelFile.delete()
+                            true
+                        }
+                    } catch (e: Exception) {
+                        emit(VoiceDownloadProgress.Failed("Extraction du modèle impossible : ${e.message}"))
+                        false
+                    }
+                    if (!extracted) {
+                        step = true
+                        return@collect
+                    }
+                    val newDone = done + archiveSize
+                    onDoneUpdate(newDone)
+                    emit(VoiceDownloadProgress.InProgress(newDone, total))
+                }
+                is DownloadProgress.Failed -> {
+                    emit(VoiceDownloadProgress.Failed(progress.message))
+                    step = true
+                }
+                is DownloadProgress.VerificationFailed -> {
+                    emit(VoiceDownloadProgress.Failed("Empreinte invalide (attendu ${progress.expectedHash})"))
+                    step = true
+                }
+            }
+        }
+        return !step
+    }
+
     private companion object {
-        const val KOKORO_MODEL_ARCHIVE_URL =
-            "https://github.com/k2-fsa/sherpa-onnx/releases/download/tts-models/kokoro-int8-multi-lang-v1_0.tar.bz2"
-        const val KOKORO_MODEL_ARCHIVE_SHA256 =
-            "75654a84864be26f345f020f4070c2c019e96dd1b7f9bf6e2ffd59efac6aa5a3"
-        const val KOKORO_MODEL_ARCHIVE_FILE_NAME = "kokoro-int8-multi-lang-v1_0.tar.bz2"
+        const val VOICE_ARCHIVE_URL =
+            "https://github.com/k2-fsa/sherpa-onnx/releases/download/tts-models/vits-piper-fr_FR-upmc-medium.tar.bz2"
+        const val VOICE_ARCHIVE_SHA256 =
+            "e9830a331a16f6cc5ef3116a287065e015d3495c3f56b974889a266da7f89a7f"
+        const val VOICE_ARCHIVE_FILE_NAME = "vits-piper-fr_FR-upmc-medium.tar.bz2"
+        const val VOICE_ARCHIVE_SIZE = 80_422_639L
+
+        const val CTC_ARCHIVE_URL =
+            "https://github.com/k2-fsa/sherpa-onnx/releases/download/asr-models/sherpa-onnx-nemo-fast-conformer-ctc-be-de-en-es-fr-hr-it-pl-ru-uk-20k-int8.tar.bz2"
+        const val CTC_ARCHIVE_SHA256 =
+            "2116eebbfc923ee3332a244e8c933ccc1b7e6783070f7bf842d0b5fc64f6ae33"
+        const val CTC_ARCHIVE_FILE_NAME = "sherpa-onnx-nemo-fast-conformer-ctc-be-de-en-es-fr-hr-it-pl-ru-uk-20k-int8.tar.bz2"
+        const val CTC_ARCHIVE_SIZE = 102_261_698L
     }
 }

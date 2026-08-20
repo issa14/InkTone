@@ -71,9 +71,9 @@ class TtsSynthesisBenchmarkTest {
     @Test
     fun latence_synthese_palier2_sherpa_onnx_dans_l_ordre_de_grandeur_documente(): Unit = runBlocking {
         val modelPaths = SherpaOnnxModelPaths(context)
-        val stagedKokoro = File(context.getExternalFilesDir(null), "kokoro-int8-multi-lang-v1_0")
-        if (!modelPaths.isReady && stagedKokoro.exists()) {
-            stagedKokoro.copyRecursively(modelPaths.modelFile.parentFile!!, overwrite = true)
+        val stagedVoice = File(context.getExternalFilesDir(null), "vits-piper-fr_FR-upmc-medium")
+        if (!modelPaths.isReady && stagedVoice.exists()) {
+            stagedVoice.copyRecursively(modelPaths.modelFile.parentFile!!, overwrite = true)
         }
         val ctcModelPaths = CtcModelPaths(context)
         val stagedCtc = File(context.getExternalFilesDir(null), "nemo-ctc-fr-multilang-int8")
@@ -89,7 +89,7 @@ class TtsSynthesisBenchmarkTest {
             ctcModelPaths.isReady,
         )
         val engine = SherpaOnnxTtsEngine(modelPaths, CtcForcedAligner(ctcModelPaths), PronunciationRuleApplier(FakePronunciationRuleRepository()))
-        val voiceProfile = VoiceProfile(id = "vp-sherpa-fr", engine = TtsEngineId.SHERPA_ONNX, voice = "ff_siwis", language = "fr-FR")
+        val voiceProfile = VoiceProfile(id = "vp-sherpa-fr", engine = TtsEngineId.SHERPA_ONNX, voice = "jessica", language = "fr-FR")
 
         val warm = engine.synthesize(sentence, voiceProfile) // echauffement (charge le modele), ecarte du chiffre retenu
         val audioDurationMs = warm.durationMs.coerceAtLeast(1L)

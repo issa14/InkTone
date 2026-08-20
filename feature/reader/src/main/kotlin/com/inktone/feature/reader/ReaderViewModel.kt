@@ -246,6 +246,13 @@ class ReaderViewModel @Inject constructor(
             is ReaderIntent.Pause -> pausePlayback()
             is ReaderIntent.DismissError -> _state.value = _state.value.copy(errorMessage = null)
             is ReaderIntent.DismissVoiceDownloadPrompt -> _state.value = _state.value.copy(showVoiceDownloadPrompt = false)
+            is ReaderIntent.RetryOpen -> {
+                val id = currentPublicationId
+                if (id != null) {
+                    _state.value = _state.value.copy(errorMessage = null)
+                    openPublication(id, targetLocator = null, flashOnArrival = false)
+                }
+            }
             is ReaderIntent.ToggleReadingMode -> {
                 // Lot 12, tâche 12.10 — un PDF est nativement paginé,
                 // la bascule SCROLL/PAGED n'a pas de sens pour ce format
@@ -428,6 +435,13 @@ class ReaderViewModel @Inject constructor(
      * ne sont pas encore reflétés dans `ReaderUiState` — Tâche 4.8.
      */
     private fun openPublication(publicationId: String, targetLocator: Locator? = null, flashOnArrival: Boolean = false) {
+        // Lot 20 — préchauffe le moteur TTS (chargement des modèles ONNX
+        // hors du premier tap de lecture) : dans un process neuf, l'init
+        // froide (~10-20 s sur V2206) dépassait le timeout de synthèse de
+        // l'ordonnanceur et le moteur retombait définitivement sur la voix
+        // système (bug trouvé par la vérification device, corrigé ici et
+        // dans FallbackTtsEngine qui ne re-avale plus les annulations).
+        viewModelScope.launch(Dispatchers.Default) { ttsEngine.warmUp() }
         // Lot 12, tache 12.9 — une publication PDF ouverte precedemment
         // garde son FixedPageDocument vivant jusqu'ici (decision actee 14
         // du plan) ; en ouvrir une nouvelle doit d'abord fermer l'ancien,
@@ -955,10 +969,12 @@ class ReaderViewModel @Inject constructor(
     }
 
     /**
-     * Lot 10 (préservé) — proposition proactive de la voix neuronale au
-     * premier usage réel du TTS. Déclenchée quand l'ordonnanceur passe en
-     * lecture : la première synthèse a eu lieu, donc `ttsEngine.id` reflète
-     * le moteur réellement actif, repli compris (voir FallbackTtsEngine).
+     * Lot 10 (restauré au Lot 20) — proposition proactive de la voix
+     * neuronale au premier usage réel du TTS. Déclenchée quand
+     * l'ordonnanceur passe en lecture : la première synthèse a eu lieu,
+     * donc `ttsEngine.id` reflète le moteur réellement actif, repli
+     * compris (voir FallbackTtsEngine). Si le moteur actif est la voix
+     * du système, le modèle neuronal n'est pas installé → proposition.
      */
     private fun checkVoiceDownloadPrompt() {
         if (ttsEngine.id != TtsEngineId.ANDROID_NATIVE) return

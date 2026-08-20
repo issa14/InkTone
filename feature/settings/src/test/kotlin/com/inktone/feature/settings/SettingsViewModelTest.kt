@@ -3,6 +3,7 @@ package com.inktone.feature.settings
 import androidx.test.core.app.ApplicationProvider
 import com.inktone.core.testing.fake.FakePreferencesRepository
 import com.inktone.core.testing.fake.FakePronunciationRuleRepository
+import com.inktone.core.testing.fake.FakeTtsEngine
 import com.inktone.core.testing.fake.FakeVoiceModelDownloadService
 import com.inktone.core.testing.fake.FakeVoiceProfileRepository
 import com.inktone.domain.model.AppTheme
@@ -11,11 +12,18 @@ import com.inktone.domain.model.PronunciationRule
 import com.inktone.domain.model.ReadingTheme
 import com.inktone.domain.model.TtsEngineId
 import com.inktone.domain.model.VoiceProfile
+import com.inktone.domain.service.AudioPlayer
+import com.inktone.domain.service.AudioSegment
+import com.inktone.domain.service.PlaybackPosition
+import com.inktone.domain.service.PlayerState
+import com.inktone.domain.service.TtsEngine
 import com.inktone.domain.service.VoiceModelDownloadService
 import com.inktone.domain.usecase.ApplyAccessibilityPresetUseCase
 import com.inktone.domain.usecase.GetVoiceProfilesUseCase
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.ExperimentalCoroutinesApi
+import kotlinx.coroutines.flow.MutableStateFlow
+import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.test.StandardTestDispatcher
 import kotlinx.coroutines.test.resetMain
 import kotlinx.coroutines.test.runTest
@@ -23,6 +31,7 @@ import kotlinx.coroutines.test.setMain
 import org.junit.After
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertNotEquals
+import org.junit.Assert.assertNull
 import org.junit.Assert.assertTrue
 import org.junit.Before
 import org.junit.Test
@@ -59,6 +68,8 @@ class SettingsViewModelTest {
         voiceProfileRepository: FakeVoiceProfileRepository = FakeVoiceProfileRepository(),
         pronunciationRuleRepository: FakePronunciationRuleRepository = FakePronunciationRuleRepository(),
         voiceModelDownloadService: VoiceModelDownloadService = FakeVoiceModelDownloadService(),
+        ttsEngine: TtsEngine = FakeTtsEngine(),
+        audioPlayer: AudioPlayer = FakeAudioPlayer(),
     ) = SettingsViewModel(
         preferencesRepository,
         ApplyAccessibilityPresetUseCase(preferencesRepository),
@@ -73,6 +84,8 @@ class SettingsViewModelTest {
         // coroutine reprend en temps réel — course avec l'assertion (trouvé
         // par un échec intermittent, pas en théorie).
         dispatcher,
+        ttsEngine,
+        audioPlayer,
     )
 
     @Test
@@ -360,6 +373,7 @@ class SettingsViewModelTest {
                 com.inktone.domain.service.VoiceDownloadProgress.InProgress(50, 100),
                 com.inktone.domain.service.VoiceDownloadProgress.Complete,
             ),
+            installed = false,
         )
         val vm = viewModel(voiceModelDownloadService = downloadService)
         dispatcher.scheduler.advanceUntilIdle()
@@ -383,6 +397,7 @@ class SettingsViewModelTest {
                 emit(com.inktone.domain.service.VoiceDownloadProgress.InProgress(50, 100))
                 kotlinx.coroutines.awaitCancellation()
             }
+            override fun isDefaultVoiceInstalled(): Boolean = false
         }
         val vm = viewModel(voiceModelDownloadService = neverEndingDownload)
         dispatcher.scheduler.advanceUntilIdle()
@@ -398,5 +413,93 @@ class SettingsViewModelTest {
         dispatcher.scheduler.advanceUntilIdle()
 
         assertEquals(null, vm.state.value.voiceDownloadProgress)
+    }
+
+    // ───── Audit v1.0.0 (B1) — « Écouter un extrait » ré-implémenté ─────
+
+    @Test
+    fun `PlayPreview synthetise joue puis s arrete naturellement a la fin du segment`() = runTest {
+        val audioPlayer = FakeAudioPlayer()
+        val vm = viewModel(audioPlayer = audioPlayer)
+        dispatcher.scheduler.advanceUntilIdle()
+
+        vm.onIntent(SettingsIntent.PlayPreview)
+        // runCurrent : la synthèse et le play ont eu lieu, le délai de fin
+        // n'est pas encore écoulé → l'extrait « joue ».
+        dispatcher.scheduler.runCurrent()
+        assertEquals(1, audioPlayer.enqueued.size)
+        assertEquals(1, audioPlayer.playCount)
+        assertEquals(true, vm.state.value.isPreviewing)
+
+        // advanceUntilIdle : la durée du segment (0 ms chez le fake) + marge
+        // est écoulée → arrêt propre, retour à l'état initial.
+        dispatcher.scheduler.advanceUntilIdle()
+        assertEquals(1, audioPlayer.stopCount)
+        assertEquals(false, vm.state.value.isPreviewing)
+        assertEquals(null, vm.state.value.previewError)
+    }
+
+    @Test
+    fun `PlayPreview une seconde fois arrete la lecture`() = runTest {
+        val audioPlayer = FakeAudioPlayer()
+        val vm = viewModel(audioPlayer = audioPlayer)
+        dispatcher.scheduler.advanceUntilIdle()
+
+        vm.onIntent(SettingsIntent.PlayPreview)
+        dispatcher.scheduler.runCurrent()
+        assertEquals(true, vm.state.value.isPreviewing)
+
+        vm.onIntent(SettingsIntent.PlayPreview)
+        dispatcher.scheduler.advanceUntilIdle()
+
+        assertEquals(1, audioPlayer.stopCount)
+        assertEquals(false, vm.state.value.isPreviewing)
+    }
+
+    @Test
+    fun `PlayPreview en echec de synthese affiche une erreur au lieu d echouer en silence`() = runTest {
+        val failingEngine = object : TtsEngine {
+            override val id = TtsEngineId.ANDROID_NATIVE
+            override val capabilities = com.inktone.domain.service.TtsCapabilities(
+                offline = true, wordTimestamps = false, sentenceTimestamps = false,
+                languages = listOf("fr"), streamingSynthesis = false,
+                speedControl = true, pitchControl = true, modelSizeMb = 0, license = "test",
+            )
+            override suspend fun synthesize(
+                sentence: com.inktone.domain.model.Sentence,
+                voiceProfile: VoiceProfile,
+            ): AudioSegment = throw IllegalStateException("moteur indisponible")
+            override fun observePlaybackEvents(): kotlinx.coroutines.flow.Flow<com.inktone.domain.service.PlaybackEvent> =
+                kotlinx.coroutines.flow.emptyFlow()
+        }
+        val vm = viewModel(ttsEngine = failingEngine)
+        dispatcher.scheduler.advanceUntilIdle()
+
+        vm.onIntent(SettingsIntent.PlayPreview)
+        dispatcher.scheduler.advanceUntilIdle()
+
+        assertEquals(false, vm.state.value.isPreviewing)
+        assertEquals("moteur indisponible", vm.state.value.previewError)
+    }
+
+    /** Faux lecteur gapless — enregistre les appels, aucun matériel audio. */
+    private class FakeAudioPlayer : AudioPlayer {
+        val enqueued = mutableListOf<AudioSegment>()
+        var playCount = 0
+        var stopCount = 0
+        private val _state = MutableStateFlow<PlayerState>(PlayerState.Idle)
+        private val _playbackPosition = MutableStateFlow(PlaybackPosition(0, 16000, null, false))
+        override val state: StateFlow<PlayerState> = _state
+        override val playbackPosition: StateFlow<PlaybackPosition> = _playbackPosition
+        override var sampleRate: Int = 16000
+        override val pendingCount: Int get() = enqueued.size
+
+        override fun enqueue(segment: AudioSegment) { enqueued.add(segment) }
+        override fun play() { playCount++; _state.value = PlayerState.Playing }
+        override fun pause() { _state.value = PlayerState.Paused }
+        override fun resume() { _state.value = PlayerState.Playing }
+        override fun stop() { stopCount++; _state.value = PlayerState.Stopped }
+        override fun release() {}
+        override fun setVolume(volume: Float) {}
     }
 }

@@ -613,12 +613,17 @@ class DatabaseMigrationTest {
             assertEquals(5000, cursor.getInt(2))
             assertEquals(0, cursor.getInt(3))
 
-            // s2 : durationMs = 3000, migré vers visualDurationMs, mode AUDIO
+            // s2 : durationMs = 3000, migré vers ttsDurationMs (mode AUDIO)
+            // — Audit v1.0.0 (AUDIT_CONSOLIDATION_V1.md, R4) : ce test
+            // attendait l'ANCIEN comportement (AUDIO → visualDurationMs),
+            // contredit par la migration corrigée (AUDIO → ttsDurationMs,
+            // complétée par MIGRATION_17_18). Mis en cohérence avec le
+            // code : c'est ce que MIGRATION_16_17 exécute réellement.
             assertEquals(true, cursor.moveToNext())
             assertEquals("s2", cursor.getString(0))
             assertEquals(3000, cursor.getInt(1))
-            assertEquals(3000, cursor.getInt(2))
-            assertEquals(0, cursor.getInt(3))
+            assertEquals(0, cursor.getInt(2))
+            assertEquals(3000, cursor.getInt(3))
         }
 
         // La table est encore utilisable : insertion avec les nouveaux champs
@@ -632,6 +637,89 @@ class DatabaseMigrationTest {
             assertEquals(4000, cursor.getInt(1))
         }
         v17.close()
+    }
+
+    /**
+     * Audit v1.0.0 (AUDIT_CONSOLIDATION_V1.md, R4) : cette migration
+     * n'avait PAS de test dédié — seule transition de 16→18 non couverte
+     * par un MigrationTestHelper (violation K4, Blueprint §14.5). Elle
+     * corrige les sessions AUDIO que 16→17 avait migrées vers
+     * `visualDurationMs` par erreur (le UPDATE de 16→17 ignorait la
+     * colonne `mode`) et ajoute l'index d'agrégation temporelle.
+     */
+    @Test
+    fun migration_17_vers_18_cree_l_index_startedAt_et_corrige_les_sessions_audio() {
+        val v17 = helper.createDatabase(TEST_DB_NAME, 17)
+        v17.execSQL(
+            """
+            INSERT INTO publications (id, title, authors, format, fileUri, fileHash, fileSize, chapterCount, subjects, isFavorite, isPinned, isDrmProtected, importDate)
+            VALUES ('pub-stats', 'Stats Book', '', 'EPUB', '/stats.epub', 'hash-stats', 1024, 1, '', 0, 0, 0, 0)
+            """.trimIndent(),
+        )
+        // Session AUDIO migrée par erreur vers visualDurationMs par 16→17
+        // (le cas que 17→18 doit corriger) : visualDurationMs peuplé,
+        // ttsDurationMs à 0, mode AUDIO.
+        v17.execSQL(
+            """
+            INSERT INTO reading_sessions (id, publicationId, startedAt, endedAt, mode, sentencesRead, durationMs, wordsRead, visualDurationMs, ttsDurationMs)
+            VALUES ('s-audio-errone', 'pub-stats', 2000000, 2003000, 'AUDIO', 10, 3000, 100, 3000, 0)
+            """.trimIndent(),
+        )
+        // Session VISUAL normale : doit rester inchangée.
+        v17.execSQL(
+            """
+            INSERT INTO reading_sessions (id, publicationId, startedAt, endedAt, mode, sentencesRead, durationMs, wordsRead, visualDurationMs, ttsDurationMs)
+            VALUES ('s-visual', 'pub-stats', 1000000, 1005000, 'VISUAL', 0, 5000, 0, 5000, 0)
+            """.trimIndent(),
+        )
+        // Session AUDIO déjà correcte (ttsDurationMs peuplé) : ne doit
+        // PAS être touchée (garde WHERE ttsDurationMs = 0).
+        v17.execSQL(
+            """
+            INSERT INTO reading_sessions (id, publicationId, startedAt, endedAt, mode, sentencesRead, durationMs, wordsRead, visualDurationMs, ttsDurationMs)
+            VALUES ('s-audio-ok', 'pub-stats', 3000000, 3004000, 'AUDIO', 5, 2000, 50, 0, 2000)
+            """.trimIndent(),
+        )
+        v17.close()
+
+        val v18 = helper.runMigrationsAndValidate(
+            TEST_DB_NAME, 18, true,
+            MIGRATION_1_2, MIGRATION_2_3, MIGRATION_3_4, MIGRATION_4_5, MIGRATION_5_6, MIGRATION_6_7,
+            MIGRATION_7_8, MIGRATION_8_9, MIGRATION_9_10, MIGRATION_10_11, MIGRATION_11_12, MIGRATION_12_13,
+            MIGRATION_13_14, MIGRATION_14_15, MIGRATION_15_16, MIGRATION_16_17, MIGRATION_17_18,
+        )
+
+        // L'index d'agrégation temporelle existe réellement.
+        v18.query(
+            "SELECT name FROM sqlite_master WHERE type = 'index' AND name = 'index_reading_sessions_startedAt'",
+        ).use { cursor ->
+            assertEquals(true, cursor.moveToFirst())
+            assertEquals("index_reading_sessions_startedAt", cursor.getString(0))
+        }
+
+        // s-audio-errone : corrigée — les durées basculent vers ttsDurationMs.
+        v18.query(
+            "SELECT id, visualDurationMs, ttsDurationMs FROM reading_sessions ORDER BY id",
+        ).use { cursor ->
+            assertEquals(3, cursor.count)
+
+            assertEquals(true, cursor.moveToFirst())
+            assertEquals("s-audio-errone", cursor.getString(0))
+            assertEquals(0, cursor.getInt(1))
+            assertEquals(3000, cursor.getInt(2))
+
+            assertEquals(true, cursor.moveToNext())
+            assertEquals("s-audio-ok", cursor.getString(0))
+            assertEquals(0, cursor.getInt(1))
+            assertEquals(2000, cursor.getInt(2))
+
+            // s-visual : intacte.
+            assertEquals(true, cursor.moveToNext())
+            assertEquals("s-visual", cursor.getString(0))
+            assertEquals(5000, cursor.getInt(1))
+            assertEquals(0, cursor.getInt(2))
+        }
+        v18.close()
     }
 
     /**

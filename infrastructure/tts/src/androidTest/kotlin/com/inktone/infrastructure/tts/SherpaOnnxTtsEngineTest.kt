@@ -19,12 +19,12 @@ import java.io.File
 /**
  * Valide bout en bout (Tâche 5.1.2/5.2-prod) : sur un device réel,
  * `SherpaOnnxTtsEngine.synthesize()` renvoie un `AudioSegment` réel (audio
- * non vide, sampleRate cohérent avec Kokoro — 24000 Hz) **avec de vrais
+ * non vide, sampleRate coherent avec upmc-medium — 22 050 Hz) **avec de vrais
  * `WordTimestamp`** produits par l'alignement forcé CTC branché pour de
  * vrai (Tâche 5.2, déjà prouvée séparément —
  * `docs/execution/PROTOTYPE_ALIGNEMENT_CTC.md`).
  *
- * Les deux modèles (Kokoro `~164 Mo` + CTC int8 `~126 Mo`) ne sont PAS
+ * Les deux modèles (voix upmc `~80 Mo` + CTC int8 `~102 Mo`) ne sont PAS
  * committés — même principe que
  * `docs/execution/VALIDATION_EPUB_REEL_LES_MISERABLES.md` (Tâche 4.11)
  * pour l'EPUB réel. Ce test se saute (`assumeTrue`) tant qu'ils ne sont
@@ -39,7 +39,7 @@ class SherpaOnnxTtsEngineTest {
     private fun voiceProfile() = VoiceProfile(
         id = "vp-sherpa-fr",
         engine = TtsEngineId.SHERPA_ONNX,
-        voice = "ff_siwis",
+        voice = "jessica",
         language = "fr-FR",
     )
 
@@ -62,7 +62,7 @@ class SherpaOnnxTtsEngineTest {
         val modelPaths = SherpaOnnxModelPaths(context)
         val ctcModelPaths = CtcModelPaths(context)
         if (!modelPaths.isReady) {
-            stageModelFromExternalStorageIfPresent("kokoro-int8-multi-lang-v1_0", modelPaths.modelFile.parentFile!!)
+            stageModelFromExternalStorageIfPresent("vits-piper-fr_FR-upmc-medium", modelPaths.modelFile.parentFile!!)
         }
         if (!ctcModelPaths.isReady) {
             stageModelFromExternalStorageIfPresent("nemo-ctc-fr-multilang-int8", ctcModelPaths.modelFile.parentFile!!)
@@ -84,7 +84,7 @@ class SherpaOnnxTtsEngineTest {
 
         assertTrue("audioData ne doit pas etre vide", segment.audioData.isNotEmpty())
         assertTrue("durationMs doit etre positif", segment.durationMs > 0)
-        assertEquals("sampleRate attendu pour Kokoro (confirme en pratique, Tache 5.1.0)", 24000, segment.sampleRate)
+        assertEquals("sampleRate attendu pour upmc-medium (22 050 Hz, MODEL_CARD)", 22050, segment.sampleRate)
         assertTrue(
             "Tache 5.2 (alignement CTC) branchee - des WordTimestamp reels sont attendus, jamais simules",
             segment.wordTimestamps.isNotEmpty(),

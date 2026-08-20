@@ -33,7 +33,7 @@ class AboutViewModel @Inject constructor(
     private companion object {
         /** Aligné sur `ttsEngineLabel` de `SettingsScreen` (Lot 14) — jamais `enum.name` brut. */
         fun engineLabel(engine: TtsEngineId): String = when (engine) {
-            TtsEngineId.SHERPA_ONNX -> "Sherpa-ONNX (Kokoro)"
+            TtsEngineId.SHERPA_ONNX -> "Sherpa-ONNX (UPMC)"
             TtsEngineId.ANDROID_NATIVE -> "Voix système"
             TtsEngineId.EDGE_TTS -> "Edge (cloud)"
             TtsEngineId.PIPER -> "Piper (indisponible)"

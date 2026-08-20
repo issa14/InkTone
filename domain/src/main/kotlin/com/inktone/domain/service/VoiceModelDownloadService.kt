@@ -12,6 +12,15 @@ import kotlinx.coroutines.flow.Flow
  */
 interface VoiceModelDownloadService {
     fun downloadDefaultVoiceModel(): Flow<VoiceDownloadProgress>
+
+    /**
+     * Lot 20 — vrai si la voix neuronale est **réellement installée et
+     * exploitable** (modèles TTS + alignement CTC présents et prêts).
+     * Source de vérité pour l'UI au retour sur l'écran : l'état de
+     * téléchargement est en mémoire (perdu à la navigation), l'installation
+     * sur disque, non.
+     */
+    fun isDefaultVoiceInstalled(): Boolean
 }
 
 sealed interface VoiceDownloadProgress {

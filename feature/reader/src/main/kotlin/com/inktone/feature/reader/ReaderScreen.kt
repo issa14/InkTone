@@ -42,6 +42,7 @@ import androidx.compose.material3.Button
 import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
+import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.runtime.DisposableEffect
@@ -340,12 +341,17 @@ fun ReaderScreen(
             ) { handleReadingAreaTap() },
     ) {
         // A.3 — État d'erreur : affiché quand le parsing ou l'ouverture
-        // échoue, avec boutons Réessayer et Retour.
+        // échoue. Audit v1.0.0 (AUDIT_CONSOLIDATION_V1.md, B3) : deux
+        // boutons RÉELS — « Réessayer » relance l'ouverture de la
+        // publication, « Retour à la bibliothèque » navigue réellement
+        // (avant l'audit, un seul bouton mal libellé effaçait l'erreur
+        // sans rien faire, laissant un écran vide).
         val errorMessage = state.errorMessage
         if (errorMessage != null) {
             ErrorState(
                 message = errorMessage,
-                onRetry = { viewModel.onIntent(ReaderIntent.DismissError) },
+                onRetry = { viewModel.onIntent(ReaderIntent.RetryOpen) },
+                onBack = onBack,
             )
             return@Box
         }
@@ -997,6 +1003,8 @@ fun ReaderScreen(
                             onTtsClick = { keepHudVisible(); showTtsPanel = true },
                             onReadingModeClick = { keepHudVisible(); viewModel.onIntent(ReaderIntent.ToggleReadingMode) },
                             showTtsControls = !isPdf,
+                            // Audit v1.0.0 (M6) : pas de sommaire pour PDF/TXT.
+                            showToc = state.publicationFormat == PublicationFormat.EPUB,
                             surfaceColor = ThemeColors.barSurface(state.resolvedTheme),
                             accentColor = ThemeColors.accent(state.resolvedTheme),
                             onBrightnessClick = {
@@ -1196,17 +1204,17 @@ fun ReaderScreen(
             }
         }
 
-        // Lot 10 — retour Issa (vérification device) : proposition
-        // proactive de la voix neuronale au premier usage réel du TTS.
-        // "Télécharger" ouvre les Réglages (carte Lecture) où le
-        // téléchargement réel se confirme et se suit — pas de logique de
-        // téléchargement dupliquée ici.
+        // Lot 10 (restauré au Lot 20) — proposition proactive de la voix
+        // neuronale au premier usage réel du TTS. « Télécharger » ouvre
+        // les Réglages (carte Lecture) où le téléchargement réel
+        // (voix upmc + modèle CTC, ~183 Mo) se confirme et se suit —
+        // pas de logique de téléchargement dupliquée ici.
         if (state.showVoiceDownloadPrompt) {
             androidx.compose.material3.AlertDialog(
                 onDismissRequest = { viewModel.onIntent(ReaderIntent.DismissVoiceDownloadPrompt) },
                 title = { Text("Voix neuronale disponible") },
                 text = {
-                    Text("Une voix plus naturelle peut être téléchargée (environ 126 Mo, une seule fois). La lecture visuelle et la voix actuelle restent disponibles sans cela.")
+                    Text("Une voix française plus naturelle (Jessica & Pierre) peut être téléchargée (environ 183 Mo, une seule fois). La lecture visuelle et la voix actuelle restent disponibles sans cela.")
                 },
                 confirmButton = {
                     androidx.compose.material3.TextButton(onClick = {
@@ -1272,7 +1280,7 @@ internal fun resolveSelectionPopupBounds(
 }
 
 @Composable
-private fun ErrorState(message: String, onRetry: () -> Unit) {
+private fun ErrorState(message: String, onRetry: () -> Unit, onBack: () -> Unit) {
     Column(
         modifier = Modifier.fillMaxSize().padding(32.dp),
         verticalArrangement = Arrangement.Center,
@@ -1285,6 +1293,12 @@ private fun ErrorState(message: String, onRetry: () -> Unit) {
         Button(
             onClick = onRetry,
             modifier = Modifier.padding(top = 16.dp),
+        ) {
+            Text("Réessayer")
+        }
+        TextButton(
+            onClick = onBack,
+            modifier = Modifier.padding(top = 4.dp),
         ) {
             Text("Retour à la bibliothèque")
         }

@@ -24,5 +24,8 @@ class CtcModelPaths @Inject constructor(@ApplicationContext context: Context) {
     val modelFile: File get() = File(modelDir, "model.int8.onnx")
     val tokensFile: File get() = File(modelDir, "tokens.txt")
 
+    /** Répertoire cible de l'extraction — exposé pour le service de téléchargement. */
+    internal val dir: File get() = modelDir
+
     val isReady: Boolean get() = modelFile.exists() && tokensFile.exists()
 }
