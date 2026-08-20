@@ -22,6 +22,7 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.draw.shadow
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.layout.ContentScale
@@ -36,29 +37,32 @@ import androidx.compose.ui.unit.sp
 import coil.compose.SubcomposeAsyncImage
 import coil.request.ImageRequest
 import com.inktone.core.designsystem.AppIcon
-import com.inktone.core.designsystem.AppIcons
 import com.inktone.core.designsystem.AppSymbol
 import com.inktone.domain.model.Publication
 import java.io.File
 
 /**
  * Carte de couverture de bibliothèque — image réelle (Coil) ou dégradé
- * de repli par hash du titre, badge de progression, favori.
+ * de repli par hash du titre, badge de progression, menu d'actions.
  *
  * Pattern legacy porté et amélioré :
  * - Couverture via Coil (`AsyncImage` + `crossfade`) depuis `coverUri`
  * - Repli : dégradé déterministe basé sur `title.hashCode()`
  * - Badge de progression : cercle semi-transparent, pourcentage ≥1%
  *   (jamais 0% si progression > 0)
- * - Favori : étoile en haut à droite
- * - Accessibilité : `contentDescription` sur le badge
+ * - Menu 3-points : icône `MoreVert` blanche, simple shadow (plus de
+ *   fond circulaire — retour UX, trop lourd visuellement)
+ * - Favori : badge cœur plein affiché UNIQUEMENT quand le livre est
+ *   favori (coin supérieur droit) ; la bascule vit dans le menu
+ *   3-points (« Ajouter aux favoris » / « Retirer des favoris »)
+ * - Accessibilité : `contentDescription` sur le badge et le menu
  *
  * @param progressPercent  0..100, calculé par l'appelant à partir de
  *   [ReadingState]. Si 0, le badge est masqué.
  * @param showTitle  affiche le titre sous la couverture (désactivé
  *   en mode GRID_COVERS_ONLY)
- * @param showOverlays  favori + menu 3-points superposés à la
- *   couverture — désactivé pour la miniature du mode Liste
+ * @param showOverlays  menu 3-points superposé à la couverture —
+ *   désactivé pour la miniature du mode Liste
  *   ([PublicationListRow] porte ses propres contrôles, lot 2b.4).
  */
 @OptIn(ExperimentalSharedTransitionApi::class)
@@ -132,25 +136,6 @@ fun BookCover(
             CoverPlaceholder(title = publication.title, showTitle = !showTitle)
         }
 
-        // Bouton favori — coin supérieur droit
-        if (showOverlays) {
-            IconButton(
-                onClick = onToggleFavorite,
-                modifier = Modifier.align(Alignment.TopEnd),
-            ) {
-                AppIcon(AppSymbol.Favorite, selected = publication.isFavorite,
-                    contentDescription = if (publication.isFavorite)
-                        "Retirer des favoris"
-                    else
-                        "Ajouter aux favoris",
-                    tint = if (publication.isFavorite)
-                        MaterialTheme.colorScheme.primary
-                    else
-                        Color.White.copy(alpha = 0.85f),
-                )
-            }
-        }
-
         // Badge de progression — coin inférieur droit
         if (progressPercent > 0) {
             Box(
@@ -174,7 +159,9 @@ fun BookCover(
         }
 
         // Menu 3-points — coin inférieur gauche, ouvre le popup d'actions
-        // (lot 2b.3 : remplace les points décoratifs sans logique)
+        // (lot 2b.3 : remplace les points décoratifs sans logique).
+        // Retour UX : plus de fond circulaire — icône blanche seule,
+        // une shadow légère assure le contraste sur couverture claire.
         if (showOverlays) {
             IconButton(
                 onClick = { showActionsSheet = true },
@@ -182,11 +169,38 @@ fun BookCover(
                     .align(Alignment.BottomStart)
                     .padding(4.dp)
                     .size(32.dp)
-                    .clip(CircleShape)
-                    .background(Color.Black.copy(alpha = 0.55f)),
+                    .shadow(
+                        elevation = 6.dp,
+                        shape = CircleShape,
+                        clip = false,
+                        spotColor = Color.Black.copy(alpha = 0.7f),
+                    ),
             ) {
                 AppIcon(AppSymbol.MoreActions,  contentDescription = "Actions sur « ${publication.title} »", tint = Color.White)
             }
+        }
+
+        // Badge favori — coin supérieur droit, visible et plein UNIQUEMENT
+        // quand le livre est favori. Indicateur non interactif (la bascule
+        // vit dans le menu 3-points) : cœur violet de marque « Deadly
+        // Depths » (colorScheme.primary), sans fond.
+        if (showOverlays && publication.isFavorite) {
+            AppIcon(
+                symbol = AppSymbol.Favorite,
+                contentDescription = "Favori",
+                selected = true,
+                tint = MaterialTheme.colorScheme.primary,
+                modifier = Modifier
+                    .align(Alignment.TopEnd)
+                    .padding(6.dp)
+                    .size(20.dp)
+                    .shadow(
+                        elevation = 6.dp,
+                        shape = CircleShape,
+                        clip = false,
+                        spotColor = Color.Black.copy(alpha = 0.7f),
+                    ),
+            )
         }
 
         // Titre (optionnel — masqué en GRID_COVERS_ONLY)
@@ -208,6 +222,7 @@ fun BookCover(
         BookActionsSheet(
             publication = publication,
             onDismiss = { showActionsSheet = false },
+            onToggleFavorite = onToggleFavorite,
             onTogglePin = onTogglePin,
             onShowDetails = { showDetailsSheet = true },
             onRequestDelete = { showDeleteConfirm = true },

@@ -35,15 +35,16 @@ import kotlin.math.pow
 
 /**
  * Popup d'actions par livre (UX §Bibliothèque état peuplé) — remplace
- * les points décoratifs (lot 2b.3). 3 actions, pas 4 : « Télécharger la
- * couverture » retirée de la cible (décision actée, voir
- * UX_FLOW_DESIGN.md).
+ * les points décoratifs (lot 2b.3). 4 actions : favori, épingler,
+ * détails, retirer. « Télécharger la couverture » retirée de la cible
+ * (décision actée, voir UX_FLOW_DESIGN.md).
  */
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun BookActionsSheet(
     publication: Publication,
     onDismiss: () -> Unit,
+    onToggleFavorite: () -> Unit,
     onTogglePin: () -> Unit,
     onShowDetails: () -> Unit,
     onRequestDelete: () -> Unit,
@@ -57,6 +58,14 @@ fun BookActionsSheet(
                 modifier = Modifier.padding(horizontal = 24.dp, vertical = 8.dp),
                 color = MaterialTheme.colorScheme.primary,
                 maxLines = 1,
+            )
+            // Retour UX : le favori (cœur) a été retiré de la couverture et
+            // déplacé ici — une action de plus dans le menu, jamais un
+            // contrôle superposé encombrant.
+            BookActionItem(
+                label = if (publication.isFavorite) "Retirer des favoris" else "Ajouter aux favoris",
+                icon = if (publication.isFavorite) AppIcons.Favorite else AppIcons.FavoriteBorder,
+                onClick = { onDismiss(); onToggleFavorite() },
             )
             BookActionItem(
                 label = if (publication.isPinned) "Détacher" else "Épingler",
