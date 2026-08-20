@@ -22,10 +22,10 @@ class BookCoverActionsTest {
     @get:Rule
     val composeTestRule = createAndroidComposeRule<ComponentActivity>()
 
-    private fun publication(isPinned: Boolean = false) = Publication(
+    private fun publication(isPinned: Boolean = false, isFavorite: Boolean = false) = Publication(
         id = "pub-1", title = "Les Misérables", authors = listOf("Victor Hugo"),
         format = PublicationFormat.EPUB, fileUri = "content://fake/1", fileHash = "hash-1",
-        fileSize = 100L, chapterCount = 3, importDate = 0L, isPinned = isPinned,
+        fileSize = 100L, chapterCount = 3, importDate = 0L, isPinned = isPinned, isFavorite = isFavorite,
     )
 
     @Test
@@ -51,6 +51,45 @@ class BookCoverActionsTest {
         composeTestRule.onNodeWithText("Épingler").performClick()
 
         assertEquals(true, pinned)
+    }
+
+    @Test
+    fun le_menu_3_points_ajoute_aux_favoris() {
+        var favorited = false
+        composeTestRule.setContent {
+            MaterialTheme {
+                BookCover(
+                    publication = publication(),
+                    onClick = {},
+                    onToggleFavorite = { favorited = true },
+                )
+            }
+        }
+
+        composeTestRule.onNodeWithContentDescription("Actions sur « Les Misérables »").performClick()
+        composeTestRule.onNodeWithText("Ajouter aux favoris").performClick()
+
+        assertEquals(true, favorited)
+    }
+
+    @Test
+    fun le_badge_favori_est_absent_quand_non_favori() {
+        composeTestRule.setContent {
+            MaterialTheme {
+                BookCover(publication = publication(), onClick = {}, onToggleFavorite = {})
+            }
+        }
+        composeTestRule.onNodeWithContentDescription("Favori").assertDoesNotExist()
+    }
+
+    @Test
+    fun le_badge_favori_est_visible_quand_favori() {
+        composeTestRule.setContent {
+            MaterialTheme {
+                BookCover(publication = publication(isFavorite = true), onClick = {}, onToggleFavorite = {})
+            }
+        }
+        composeTestRule.onNodeWithContentDescription("Favori").assertExists()
     }
 
     @Test

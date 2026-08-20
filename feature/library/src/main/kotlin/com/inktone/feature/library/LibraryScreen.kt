@@ -777,6 +777,7 @@ internal fun PublicationListRow(
         BookActionsSheet(
             publication = publication,
             onDismiss = { showActionsSheet = false },
+            onToggleFavorite = onToggleFavorite,
             onTogglePin = onTogglePin,
             onShowDetails = { showDetailsSheet = true },
             onRequestDelete = { showDeleteConfirm = true },
