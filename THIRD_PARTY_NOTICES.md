@@ -43,7 +43,7 @@ distribution de l'application** :
 
 | Modèle | Rôle | Licence |
 |---|---|---|
-| Kokoro-82M (hexgrad) | synthèse vocale neuronale | Apache-2.0 |
+| Voix `fr_FR-upmc-medium` (Piper VITS, entraînée sur le corpus UPMC) | synthèse vocale neuronale française — locuteurs Jessica & Pierre | **CC-BY-SA-4.0** (jeu de données UPMC) — voir [MODEL_CARD](https://huggingface.co/rhasspy/piper-voices/blob/main/fr/fr_FR/upmc/medium/MODEL_CARD) |
 | NeMo FastConformer CTC multilingue (NVIDIA) | alignement forcé pour le timing mot | **CC-BY-4.0 — attribution obligatoire** |
 
 L'obligation d'attribution CC-BY-4.0 du modèle d'alignement doit être

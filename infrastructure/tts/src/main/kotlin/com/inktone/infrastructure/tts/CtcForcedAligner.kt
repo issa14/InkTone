@@ -39,7 +39,22 @@ class CtcForcedAligner @Inject constructor(
 
     private val session: OrtSession by lazy {
         val env = OrtEnvironment.getEnvironment()
-        env.createSession(modelPaths.modelFile.absolutePath, OrtSession.SessionOptions())
+        val options = OrtSession.SessionOptions()
+        // Lot 20 — l'alignement CTC est le goulot de latence de la synthèse
+        // neuronale (mesuré sur V2206 : ~1,6 s par phrase à chaud, ~4,6 s à
+        // froid pour ~3,7 s d'audio). setIntraOpNumThreads(4) est appliqué
+        // (même réglage que le moteur TTS) mais **sans effet mesuré** sur ce
+        // modèle/device : le FastConformer est majoritairement séquentiel.
+        // Le coût résiduel est consigné dans LOT_20_RESTAURATION_SHERPA_UPMC.md.
+        options.setIntraOpNumThreads(ALIGNER_NUM_THREADS)
+        env.createSession(modelPaths.modelFile.absolutePath, options)
+    }
+
+    /** Lot 20 — initialise la session d'alignement (chargement du modèle
+     * ONNX) hors du premier appel : le préchauffage fait disparaître le
+     * chargement froid du premier surlignage. */
+    internal fun warmUp() {
+        session
     }
 
     /**
@@ -124,5 +139,7 @@ class CtcForcedAligner @Inject constructor(
         const val FBANK_DIM = 80
         const val SUBSAMPLING_FACTOR = 8
         const val FRAME_SHIFT_S = 0.010 * SUBSAMPLING_FACTOR
+        // Lot 20 — mêmes threads que le moteur TTS (optimal mesuré sur V2206).
+        const val ALIGNER_NUM_THREADS = 4
     }
 }

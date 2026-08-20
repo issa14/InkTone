@@ -1,5 +1,6 @@
 package com.inktone.infrastructure.tts
 
+import android.util.Log
 import com.inktone.domain.model.Sentence
 import com.inktone.domain.model.TtsEngineId
 import com.inktone.domain.model.VoiceProfile
@@ -11,8 +12,8 @@ import com.inktone.domain.service.TtsEngine
 import com.inktone.domain.service.remapToOriginal
 import com.k2fsa.sherpa.onnx.OfflineTts
 import com.k2fsa.sherpa.onnx.OfflineTtsConfig
-import com.k2fsa.sherpa.onnx.OfflineTtsKokoroModelConfig
 import com.k2fsa.sherpa.onnx.OfflineTtsModelConfig
+import com.k2fsa.sherpa.onnx.OfflineTtsVitsModelConfig
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.channels.awaitClose
 import kotlinx.coroutines.flow.Flow
@@ -23,47 +24,33 @@ import javax.inject.Singleton
 import kotlin.math.roundToInt
 
 /**
- * Palier 2 (ADR-021) — qualité vocale neuronale (Kokoro, voix `ff_siwis`
- * française, Apache-2.0), avec de vrais timestamps mot (alignement forcé
- * CTC, Tâche 5.2, branché ici pour de vrai après avoir été prouvé
- * séparément sur device réel — `docs/execution/PROTOTYPE_ALIGNEMENT_CTC.md`
- * §1-9). `wordTimestamps = true` est honnête : chaque appel réussi à
- * [synthesize] passe systématiquement par [CtcForcedAligner.align] —
- * jamais un sous-ensemble silencieux de phrases avec timestamps et
- * d'autres sans (§8.9 : "un moteur ne fait jamais semblant").
+ * Palier 2 (ADR-021) — qualité vocale neuronale **VITS Piper
+ * `fr_FR-upmc-medium`** (Lot 20 — remplace Kokoro), avec de vrais
+ * timestamps mot (alignement forcé CTC, Tâche 5.2 — voir
+ * `docs/execution/PROTOTYPE_ALIGNEMENT_CTC.md`).
  *
- * Remplace la voix VITS `fr_FR-siwis-medium` retenue en Tâche 5.1.1. Sa
- * prémisse (« aucun modèle Kokoro français n'existe dans le catalogue
- * Sherpa-ONNX, le modèle multi-lang ne couvre que zh/en ») était
- * factuellement fausse — vérifié en pratique le 2026-07-28 : l'app
- * d'exemple officielle `SherpaOnnxTts`, chargée avec
- * `kokoro-int8-multi-lang-v1_0` sur un device Snapdragon 680 réel,
- * confirme une voix française (`ff_siwis`, speaker id 30, lu dans les
- * métadonnées ONNX `speaker2id` du modèle, pas deviné) produisant un
- * français correct (`docs/execution/PROTOTYPE_SYNTHESE_KOKORO_ONNX.md`).
- * `sid = 30` ci-dessous est donc spécifique à ce modèle exact — pas une
- * constante Kokoro générale, à revérifier si le modèle vendoré change.
+ * Le modèle porte **2 locuteurs** (vérifié dans `fr_FR-upmc-medium.onnx.json`,
+ * pas supposé) : `jessica` (sid 0) et `pierre` (sid 1). Le sid est résolu
+ * depuis `VoiceProfile.voice` — jamais une constante en dur.
  *
- * **Alerte performance réelle, mesurée sur device (Snapdragon 680, V2206)**,
- * **diagnostiquée avant conclusion architecturale** (`numThreads`, execution
- * provider — y compris NNAPI recompilé et réellement activé, pas juste
- * indisponible —, int8 réel, G2P vs inférence :
- * `docs/execution/PHASE_5_TTS_ENGINE.md`, section dédiée) : `synthesize()`
- * prend **~25 secondes** pour une phrase de ~4,8 s d'audio (RTF ~4,7× en
- * CPU, contre ~6-7× avant réglage de `numThreads`). **NNAPI recompilé
- * depuis les sources (`ANDROID_PLATFORM=android-27`) et réellement activé
- * (confirmé « Use nnapi » en log, pas un repli) mesure PLUS LENT que CPU**
- * (RTF ~5,4×) — pas seulement indisponible, réellement sans bénéfice sur
- * ce modèle/device. Le modèle est authentiquement quantifié int8
- * (vérifié) ; le G2P ne représente qu'environ 200 ms sur les ~25 s —
- * l'inférence neuronale Kokoro domine à ~99 %. Budget §11.2 (tap →
- * premier audio ≤ 1 500 ms) **toujours dépassé d'un facteur ~17×** après
- * ce diagnostic complet (5 vérifications, pas 4) — signal architectural
- * réel, pas une négligence de configuration. Ne pas considérer ce moteur
- * comme viable en production
- * tant que cet écart n'est pas résolu ou explicitement ré-arbitré
- * (Blueprint §11.2 : un dépassement de budget bloque la release ou
- * déclenche un ADR de révision — pas une ignorance silencieuse).
+ * **Latence (Lot 20)** : le legacy a mesuré ce modèle (fp32) sur un
+ * Snapdragon 680 réel à **RTF ~0,8** (`legacy/monolith/docs/prototype-report.md`),
+ * contre RTF ~4,7 pour Kokoro — le moteur redevient utilisable en temps
+ * quasi réel. La mesure int8/fp32 de cette implémentation est consignée
+ * par `SherpaOnnxTtsEngineLatencyTest` sur device (budget §11.2
+ * « tap → premier audio ≤ 1 500 ms », avec préchauffage si nécessaire).
+ *
+ * **Prosaïdie** : `lengthScale = 1.08` (voix upmc jugée trop rapide par
+ * certains utilisateurs, corrigée — valeur du legacy), `noiseScale =
+ * 0.667`, `noiseScaleW = 0.8` (défauts Piper VITS).
+ *
+ * **Honnêteté `wordTimestamps = true`** : chaque appel réussi à
+ * [synthesize] passe par [CtcForcedAligner.align] — jamais un
+ * sous-ensemble silencieux (§8.9 : « un moteur ne fait jamais
+ * semblant »). Si le modèle CTC n'est pas installé (état transitoire ou
+ * échec de son téléchargement), la synthèse reste audible mais renvoie
+ * des timestamps **vides** (pas de surlignage, jamais d'interpolation) —
+ * dégradation loggée, jamais un crash.
  */
 @Singleton
 class SherpaOnnxTtsEngine @Inject constructor(
@@ -76,57 +63,46 @@ class SherpaOnnxTtsEngine @Inject constructor(
 
     override val capabilities = TtsCapabilities(
         offline = true,
-        wordTimestamps = true, // Tache 5.2 branchee - voir KDoc
+        wordTimestamps = true, // CTC branché (voir KDoc — timestamps vides si modèle absent)
         sentenceTimestamps = true,
         languages = listOf("fr"),
         streamingSynthesis = false,
         speedControl = true,
-        pitchControl = false, // OfflineTtsKokoroModelConfig n'expose que lengthScale (duree/vitesse), pas de parametre de hauteur - verifie contre l'API (kotlin-api/Tts.kt)
-        modelSizeMb = 290, // Kokoro (164 Mo, voir Tache 5.1.0) + modele CTC int8 + tokens.txt (~126 Mo, Tache 5.2 §7.1)
-        license = "Apache-2.0 (Kokoro-82M, hexgrad) + CC-BY-4.0 (NeMo FastConformer CTC multilingue, NVIDIA)",
+        pitchControl = false, // VITS n'expose que lengthScale (durée/vitesse), pas de hauteur
+        modelSizeMb = 80, // archive fp32 vits-piper-fr_FR-upmc-medium (80,4 Mo) — Lot 20
+        license = "Apache-2.0 (sherpa-onnx) + CC-BY-SA-4.0 (voix UPMC upmc-medium) + CC-BY-4.0 (NeMo CTC)",
     )
 
     // internal (pas private) uniquement pour permettre la mesure de latence
-    // decomposee synthese/alignement en test (SherpaOnnxTtsEngineLatencyTest) -
+    // decomposée synthese/alignement en test (SherpaOnnxTtsEngineLatencyTest) -
     // jamais accede hors module.
     internal val tts: OfflineTts by lazy {
-        check(modelPaths.isReady) { "Modele vocal Sherpa-ONNX absent (${modelPaths.modelFile.parent}) - telechargement non encore cable (Tache 5.6)" }
+        check(modelPaths.isReady) { "Modele vocal Sherpa-ONNX absent (${modelPaths.modelFile.parent}) - telechargement non encore effectue" }
         OfflineTts(
             assetManager = null,
             config = OfflineTtsConfig(
                 model = OfflineTtsModelConfig(
-                    kokoro = OfflineTtsKokoroModelConfig(
+                    vits = OfflineTtsVitsModelConfig(
                         model = modelPaths.modelFile.absolutePath,
-                        voices = modelPaths.voicesFile.absolutePath,
                         tokens = modelPaths.tokensFile.absolutePath,
                         dataDir = modelPaths.espeakDataDir.absolutePath,
-                        lexicon = "${modelPaths.lexiconUsEnFile.absolutePath},${modelPaths.lexiconZhFile.absolutePath}",
-                        // lang laisse vide : le C++ retombe sur meta_data.voice
-                        // (derive du speaker_names[sid] choisi), verifie en
-                        // pratique (Tache 5.1.0, app d'exemple) - pas devine.
+                        lexicon = "", // phonémiseur espeak-ng (pas de lexicon dans l'archive upmc)
+                        dictDir = "",
+                        // Prosaïdie héritée du legacy (voix upmc « trop rapide » corrigée).
+                        noiseScale = PROSODY_NOISE_SCALE,
+                        noiseScaleW = PROSODY_NOISE_SCALE_W,
+                        lengthScale = PROSODY_LENGTH_SCALE,
                     ),
-                    // 4 coeurs performants mesures sur ce device (Snapdragon
-                    // 680 / V2206 - cpu4-7 a 2.4GHz, cpu0-3 a 1.9GHz, verifie
-                    // via /sys/devices/system/cpu/cpuN/cpufreq/cpuinfo_max_freq).
-                    // Diagnostic complet (PHASE_5_TTS_ENGINE.md, section
-                    // dediee) : 2->4 fait passer le RTF Kokoro de ~6-7x a
-                    // ~4.7x (~20-25%) - garde car reellement meilleur, mais
-                    // n'explique pas la majorite de l'ecart.
+                    // 4 cœurs performants mesurés sur ce device (Snapdragon
+                    // 680 / V2206) — même réglage que Phase 5, conservé.
                     numThreads = 4,
-                    // "cpu" : verifie explicitement comme le meilleur choix
-                    // reel, pas suppose. XNNPACK absent du .so vendore.
-                    // NNAPI teste pour de vrai (PHASE_5_TTS_ENGINE.md,
-                    // section diagnostic) : libsherpa-onnx-jni.so recompile
-                    // depuis les sources avec ANDROID_PLATFORM=android-27
-                    // (le prebuilt officiel cible l'API 21, qui desactive
-                    // NNAPI a la compilation) - NNAPI s'active reellement
-                    // ("Use nnapi" confirme en log, pas de repli), mais
-                    // mesure PLUS LENT que cpu+4 threads (RTF ~5.4x contre
-                    // ~4.7x). "cpu" reste donc le meilleur choix mesure, pas
-                    // un defaut par defaut.
                     provider = "cpu",
+                    debug = false,
                 ),
-                ruleFsts = "${modelPaths.phoneZhFst.absolutePath},${modelPaths.dateZhFst.absolutePath},${modelPaths.numberZhFst.absolutePath}",
+                ruleFsts = "", // pas de règle .fst pour ce modèle
+                ruleFars = "",
+                maxNumSentences = 1,
+                silenceScale = 1.0f,
             ),
         )
     }
@@ -137,26 +113,30 @@ class SherpaOnnxTtsEngine @Inject constructor(
             // que AndroidNativeTtsEngine — reste reversible sans reimport.
             val appliedText = pronunciationRuleApplier.apply(sentence.text)
 
-            // sid=30 : voix francaise "ff_siwis" de kokoro-int8-multi-lang-v1_0,
-            // lue dans les metadonnees ONNX speaker2id du modele (pas devinee) -
-            // voir KDoc de la classe.
             val generated = tts.generate(
                 text = appliedText.substitutedText,
-                sid = FF_SIWIS_SPEAKER_ID,
+                sid = sidFor(voiceProfile.voice),
                 speed = voiceProfile.speed,
             )
 
-            // Alignement force CTC sur l'audio REELLEMENT produit (pas un
-            // fichier de test) - resampling 24kHz (Kokoro) -> 16kHz (modele
-            // CTC) fait a l'interieur de CtcForcedAligner.align(), a partir
-            // du sampleRate reel rapporte par Kokoro, jamais suppose. Les
-            // WordTimestamp sont ensuite remappes sur sentence.text (texte
-            // affiche), jamais sur le texte substitue envoye au moteur.
-            val wordTimestamps = ctcForcedAligner.align(
-                audioSamples = generated.samples,
-                sampleRate = generated.sampleRate,
-                referenceText = appliedText.substitutedText,
-            ).map { it.remapToOriginal(appliedText) }
+            // Alignement force CTC sur l'audio REELLEMENT produit — le
+            // resampling (22050 Hz upmc -> 16 kHz CTC) est fait a
+            // l'interieur de CtcForcedAligner.align() a partir du sampleRate
+            // reel rapporte par le moteur, jamais suppose. Les WordTimestamp
+            // sont ensuite remappes sur sentence.text (texte affiche), jamais
+            // sur le texte substitue envoye au moteur.
+            val wordTimestamps = if (ctcForcedAligner.isReady) {
+                ctcForcedAligner.align(
+                    audioSamples = generated.samples,
+                    sampleRate = generated.sampleRate,
+                    referenceText = appliedText.substitutedText,
+                ).map { it.remapToOriginal(appliedText) }
+            } else {
+                // Degradation honnete et loggee : voix audible, pas de
+                // surlignage — jamais d'interpolation (voir KDoc).
+                Log.w(TAG, "Modele CTC absent : surlignage mot a mot desactive pour cette phrase")
+                emptyList()
+            }
 
             AudioSegment(
                 audioData = floatSamplesToPcm16(generated.samples),
@@ -166,11 +146,40 @@ class SherpaOnnxTtsEngine @Inject constructor(
             )
         }
 
-    private companion object {
-        const val FF_SIWIS_SPEAKER_ID = 30
+    /** Résout le sid depuis la voix du profil — défaut `jessica` (sid 0). */
+    private fun sidFor(voice: String): Int = when (voice) {
+        "pierre" -> SPEAKER_PIERRE_SID
+        else -> SPEAKER_JESSICA_SID
+    }
+
+    /**
+     * Lot 20 — préchauffe le moteur (chargement du modèle ONNX TTS + session
+     * d'alignement CTC) hors du premier appel : le premier usage après
+     * téléchargement — ou à l'ouverture du Reader dans un process neuf —
+     * ne paie pas le chargement froid (~10-20 s mesuré sur V2206), qui
+     * dépassait le timeout de synthèse de l'ordonnanceur (budget §11.2
+     * « tap → premier audio ≤ 1 500 ms »). Sans effet si le modèle n'est
+     * pas prêt (repli voix système assumé, FallbackTtsEngine).
+     */
+    override fun warmUp() {
+        if (!modelPaths.isReady) return
+        tts
+        ctcForcedAligner.warmUp()
     }
 
     override fun observePlaybackEvents(): Flow<PlaybackEvent> = callbackFlow { awaitClose { } }
+
+    private companion object {
+        const val TAG = "SherpaOnnxTtsEngine"
+        // Locuteurs du modèle vits-piper-fr_FR-upmc-medium (verifie dans les
+        // metadonnees ONNX, pas devine) : jessica sid 0, pierre sid 1.
+        const val SPEAKER_JESSICA_SID = 0
+        const val SPEAKER_PIERRE_SID = 1
+        // Prosaïdie Piper VITS (defauts) + correction du debit upmc (legacy).
+        const val PROSODY_NOISE_SCALE = 0.667f
+        const val PROSODY_NOISE_SCALE_W = 0.8f
+        const val PROSODY_LENGTH_SCALE = 1.08f
+    }
 }
 
 /**

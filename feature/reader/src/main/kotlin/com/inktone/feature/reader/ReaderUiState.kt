@@ -109,9 +109,9 @@ data class ReaderUiState(
     // ChapterPaginationState). Consommée une seule fois par
     // ReaderViewModel.onChapterLayoutCompleted, jamais rejouée ensuite.
     val pendingHighlightTarget: PendingHighlightTarget? = null,
-    // Lot 10 — retour Issa (vérification device) : proposition proactive
-    // de la voix neuronale au premier usage réel du TTS (voir
-    // ReaderViewModel.playCurrentSentence) — posée une seule fois,
+    // Lot 10 (restauré au Lot 20) — proposition proactive de la voix
+    // neuronale au premier usage réel du TTS (voir
+    // ReaderViewModel.checkVoiceDownloadPrompt) : posée une seule fois,
     // jamais reproposée (UserPreferences.hasPromptedVoiceDownload).
     val showVoiceDownloadPrompt: Boolean = false,
     // Lot 12, Palier 2 (tache 12.9) — format de la publication ouverte,
@@ -308,8 +308,17 @@ sealed interface ReaderIntent {
     /** A.3 — Efface le message d'erreur affiché dans le Reader. */
     data object DismissError : ReaderIntent
 
-    /** Lot 10 — ferme la proposition de téléchargement de voix (choix "Plus tard" ou "Télécharger"). */
+    /** Lot 10 (restauré au Lot 20) — ferme la proposition de téléchargement de voix. */
     data object DismissVoiceDownloadPrompt : ReaderIntent
+
+    /**
+     * A.3 — Audit v1.0.0 (AUDIT_CONSOLIDATION_V1.md, B3) : ré-essaie
+     * d'ouvrir la publication courante après un échec d'ouverture/parsing
+     * (efface l'erreur puis relance [ReaderIntent.OpenPublication]).
+     * Avant l'audit, le seul bouton d'erreur se contentait d'effacer le
+     * message, laissant un écran vide sans CTA.
+     */
+    data object RetryOpen : ReaderIntent
 
     /**
      * Panneau TTS (Tâche B.3) — recule/avance d'une phrase dans le
