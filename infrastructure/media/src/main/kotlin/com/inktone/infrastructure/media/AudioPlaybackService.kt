@@ -11,6 +11,7 @@ import android.media.session.MediaSession
 import android.media.session.PlaybackState
 import android.os.IBinder
 import com.inktone.domain.service.PlaybackSession
+import com.inktone.domain.service.PlaybackSessionState
 import dagger.hilt.android.AndroidEntryPoint
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
@@ -41,6 +42,9 @@ class AudioPlaybackService : Service() {
     @Inject
     lateinit var playbackSession: PlaybackSession
 
+    @Inject
+    lateinit var audioFocusController: AudioFocusController
+
     private var mediaSession: MediaSession? = null
     private var isForeground: Boolean = false
     private val scope = CoroutineScope(SupervisorJob() + Dispatchers.Main.immediate)
@@ -51,24 +55,43 @@ class AudioPlaybackService : Service() {
         mediaSession = MediaSession(this, "InkToneTts").apply {
             setCallback(object : MediaSession.Callback() {
                 override fun onPlay() {
-                    if (!playbackSession.isPlaying.value) playbackSession.togglePlayPause()
+                    onUserCommand()
+                    // `sessionState` est un flux dérivé : ne jamais enchaîner
+                    // deux lectures de `.value` autour d'une mutation (la
+                    // seconde serait périmée). Une lecture, une décision.
+                    if (playbackSession.sessionState.value == PlaybackSessionState.PAUSED) {
+                        playbackSession.resume()
+                    } else {
+                        playbackSession.togglePlayPause()
+                    }
                 }
 
                 override fun onPause() {
-                    if (playbackSession.isPlaying.value) playbackSession.togglePlayPause()
+                    onUserCommand()
+                    playbackSession.pause()
                 }
 
-                override fun onSkipToNext() = playbackSession.skip(1)
+                override fun onSkipToNext() {
+                    onUserCommand()
+                    playbackSession.skip(1)
+                }
 
-                override fun onSkipToPrevious() = playbackSession.skip(-1)
+                override fun onSkipToPrevious() {
+                    onUserCommand()
+                    playbackSession.skip(-1)
+                }
 
                 override fun onStop() {
+                    onUserCommand()
                     playbackSession.stop()
                     stopSelf()
                 }
             })
             setFlags(MediaSession.FLAG_HANDLES_MEDIA_BUTTONS or MediaSession.FLAG_HANDLES_TRANSPORT_CONTROLS)
         }
+        // Le focus audio suit la vie du service : demandé quand la narration
+        // commence, relâché quand elle s'arrête (P1-c).
+        audioFocusController.acquire(scope)
         observeSession()
     }
 
@@ -77,10 +100,20 @@ class AudioPlaybackService : Service() {
         // commandes externes (bluetooth, écran verrouillé) passent par le
         // `MediaSession.Callback` ci-dessus.
         when (intent?.action) {
-            ACTION_PLAY_PAUSE -> playbackSession.togglePlayPause()
-            ACTION_SKIP_NEXT -> playbackSession.skip(1)
-            ACTION_SKIP_PREVIOUS -> playbackSession.skip(-1)
+            ACTION_PLAY_PAUSE -> {
+                onUserCommand()
+                playbackSession.togglePlayPause()
+            }
+            ACTION_SKIP_NEXT -> {
+                onUserCommand()
+                playbackSession.skip(1)
+            }
+            ACTION_SKIP_PREVIOUS -> {
+                onUserCommand()
+                playbackSession.skip(-1)
+            }
             ACTION_STOP -> {
+                onUserCommand()
                 playbackSession.stop()
                 stopSelf()
                 return START_NOT_STICKY
@@ -93,11 +126,20 @@ class AudioPlaybackService : Service() {
     override fun onBind(intent: Intent?): IBinder? = null
 
     override fun onDestroy() {
+        audioFocusController.release()
         scope.cancel()
         mediaSession?.release()
         mediaSession = null
         super.onDestroy()
     }
+
+    /**
+     * Toute commande explicite (notification, écran verrouillé, casque
+     * Bluetooth) désarme la reprise automatique du focus : à partir de là,
+     * l'état de lecture appartient à l'utilisateur (voir
+     * [AudioInterruptionPolicy]).
+     */
+    private fun onUserCommand() = audioFocusController.onUserCommand()
 
     // ── Observation de la session ──────────────────────────────────────
 

@@ -172,7 +172,7 @@ class PlaybackOrchestrator @Inject constructor(
     }
 
     /** Suspend la lecture sans vider la file ni perdre la position. */
-    fun pause() {
+    override fun pause() {
         stateLock.lock()
         try {
             if (_state.value != PlaybackStatus.Playing) return
@@ -184,7 +184,7 @@ class PlaybackOrchestrator @Inject constructor(
     }
 
     /** Reprend la lecture après [pause]. */
-    fun resume() {
+    override fun resume() {
         stateLock.lock()
         try {
             if (_state.value != PlaybackStatus.Paused) return

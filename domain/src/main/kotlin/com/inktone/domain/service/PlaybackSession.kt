@@ -46,6 +46,20 @@ interface PlaybackSession {
     /** Bascule lecture ↔ pause ; reprend depuis la phrase courante après un arrêt. */
     fun togglePlayPause()
 
+    /**
+     * Pause réelle, sans perdre la position ni vider la file (état `PAUSED`).
+     *
+     * Contrairement à [togglePlayPause], l'appel est **idempotent et
+     * directionnel** : sans effet si la lecture n'est pas engagée. C'est ce
+     * qu'exige une interruption externe (perte de focus audio, casque
+     * débranché), où basculer aveuglément relancerait la narration au lieu de
+     * l'interrompre.
+     */
+    fun pause()
+
+    /** Reprend après [pause]. Sans effet si la session n'est pas en pause. */
+    fun resume()
+
     /** Recule (`delta < 0`) ou avance (`delta > 0`) d'une phrase. */
     fun skip(delta: Int)
 
