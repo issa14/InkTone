@@ -64,7 +64,7 @@ class ReaderViewModelLineHeightTest {
 
         val viewModel = ReaderViewModel(
             ttsEngine = FakeTtsEngine(),
-            playbackOrchestrator = PlaybackOrchestrator(FakeTtsEngine(), FakeAudioPlayer(), UpdateReadingStateUseCase(readingStateRepository)),
+            playbackOrchestrator = PlaybackOrchestrator(FakeTtsEngine(), FakeAudioPlayer(), UpdateReadingStateUseCase(readingStateRepository), FakeChapterParser()),
             publicationParser = FakePublicationParser(),
             updateReadingState = UpdateReadingStateUseCase(readingStateRepository),
             getReadingState = GetReadingStateUseCase(readingStateRepository),

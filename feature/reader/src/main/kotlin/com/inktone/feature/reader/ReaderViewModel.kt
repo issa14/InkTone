@@ -156,10 +156,16 @@ class ReaderViewModel @Inject constructor(
             }
         }
 
-        // P1 — fin naturelle de chapitre : enchaîne le suivant. Émis par
-        // l'ordonnanceur après la dernière phrase jouée, et par lui seul.
+        // P2-b — l'écran SUIT le chapitre narré, il ne le pilote plus.
+        // L'auto-avance vit désormais dans l'ordonnanceur (seul capable de
+        // continuer quand cet écran est détruit) ; ici on se contente de
+        // recaler l'affichage sur le chapitre qu'il a décidé de jouer.
         viewModelScope.launch {
-            playbackOrchestrator.chapterCompleted.collect { onChapterPlaybackCompleted() }
+            playbackOrchestrator.currentChapterIndex.collect { chapterIndex ->
+                if (!_state.value.isPlaying) return@collect
+                if (chapterIndex == _state.value.currentChapterIndex) return@collect
+                syncDisplayToNarratedChapter(chapterIndex)
+            }
         }
 
         // Lot 16 (Tâche 2.2) — le surlignage mot suit la position réelle de
@@ -457,6 +463,11 @@ class ReaderViewModel @Inject constructor(
         // système (bug trouvé par la vérification device, corrigé ici et
         // dans FallbackTtsEngine qui ne re-avale plus les annulations).
         viewModelScope.launch(Dispatchers.Default) { ttsEngine.warmUp() }
+        // P2-b — cet écran reprend la propriété des ressources de lecture : si
+        // une fermeture précédente avait laissé une libération en attente
+        // (narration poursuivie sans écran), elle fermerait le résolveur EPUB
+        // sous nos pieds à la première pause.
+        playbackOrchestrator.releaseOnSessionEnd(null)
         // Lot 12, tache 12.9 — une publication PDF ouverte precedemment
         // garde son FixedPageDocument vivant jusqu'ici (decision actee 14
         // du plan) ; en ouvrir une nouvelle doit d'abord fermer l'ancien,
@@ -955,6 +966,15 @@ class ReaderViewModel @Inject constructor(
         _state.value = _state.value.copy(isPlaying = true, isAudioActive = false)
         val startFrom = _state.value.currentSentenceIndex
 
+        // P2-b — donne à l'ordonnanceur de quoi enchaîner seul les chapitres
+        // suivants, y compris si cet écran est détruit entre-temps. Reposé à
+        // chaque lancement : la liste des chapitres peut avoir changé (contenu
+        // Rich chargé paresseusement), et l'href reste stable, lui.
+        playbackOrchestrator.setNarrationProgram(
+            publicationId = publicationId,
+            chapterHrefs = _state.value.chapters.map { it.href },
+        )
+
         viewModelScope.launch {
             val prefs = preferencesRepository.get()
             val voiceProfile = resolveVoiceProfile(prefs)
@@ -1015,10 +1035,26 @@ class ReaderViewModel @Inject constructor(
      * lecture était engagée) : auto-avance au chapitre suivant et reprend,
      * ou s'arrête en fin de livre.
      */
-    private fun onChapterPlaybackCompleted() {
-        if (!_state.value.hasNextChapter) return
-        navigateToChapter(_state.value.currentChapterIndex + 1)
-        playCurrentSentence()
+    /**
+     * P2-b — recale l'affichage sur le chapitre que l'ordonnanceur a enchaîné
+     * de lui-même (auto-avance).
+     *
+     * Distinct de [navigateToChapter] sur trois points, et c'est toute la
+     * différence : ne coupe pas la lecture (elle est déjà en cours sur le
+     * chapitre cible), ne relance pas `playCurrentSentence` (ce serait rejouer
+     * depuis le début ce que l'ordonnanceur joue déjà), et ne persiste pas la
+     * position — pendant la narration, l'ordonnanceur en est le seul écrivain
+     * (K3, chemins TTS et manuel jamais simultanés).
+     */
+    private fun syncDisplayToNarratedChapter(targetIndex: Int) {
+        if (targetIndex !in _state.value.chapters.indices) return
+        _state.value = _state.value.copy(
+            currentChapterIndex = targetIndex,
+            currentSentenceIndex = 0,
+            highlightedWordRange = null,
+        )
+        loadChapterContentIfNeeded(targetIndex)
+        preloadAdjacentChapters(targetIndex)
     }
 
     /**
@@ -1203,7 +1239,8 @@ class ReaderViewModel @Inject constructor(
         // ───── Fin Lot Sessions ─────
 
         super.onCleared()
-        if (!playbackOrchestrator.isSessionEngaged()) playbackOrchestrator.stop()
+        val sessionEngaged = playbackOrchestrator.isSessionEngaged()
+        if (!sessionEngaged) playbackOrchestrator.stop()
         sleepTimerJob?.cancel()
         scrollPersistJob?.cancel()
         eyeRestReminderJob?.cancel()
@@ -1215,8 +1252,29 @@ class ReaderViewModel @Inject constructor(
         fixedPageDocument = null
         // Plan v4 — libère le cache LRU du ChapterParser + ferme le resolver EPUB
         preloadScope?.coroutineContext[Job]?.cancel()
-        currentPublicationId?.let { chapterParser.invalidate(it) }
-        epubResourceResolver.close()
+        // P2-b — sauf si la narration continue sans cet écran : l'ordonnanceur
+        // parse lui-même le chapitre suivant à l'auto-avance, ce qui exige que
+        // le cache ET le résolveur de ressources EPUB restent ouverts. Les
+        // libérer ici couperait la narration au premier changement de chapitre,
+        // avec une erreur de ressource introuvable au lieu d'un arrêt propre.
+        // Ils sont alors libérés à la fermeture réelle de la session
+        // (`PlaybackServiceLauncher`, quand `sessionState` retombe à IDLE).
+        if (sessionEngaged) {
+            // Capture volontairement restreinte au parseur, au résolveur et à
+            // l'identifiant : aucune référence à ce ViewModel, qui doit rester
+            // collectable pendant que la narration se poursuit sans lui.
+            val parser = chapterParser
+            val resolver = epubResourceResolver
+            val publicationId = currentPublicationId
+            playbackOrchestrator.releaseOnSessionEnd {
+                publicationId?.let { parser.invalidate(it) }
+                resolver.close()
+            }
+        } else {
+            currentPublicationId?.let { chapterParser.invalidate(it) }
+            epubResourceResolver.close()
+            playbackOrchestrator.clearNarrationProgram()
+        }
     }
 
     // ═══════════════════════════════════════════════

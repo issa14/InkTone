@@ -94,7 +94,7 @@ class ReaderViewModelFreeSelectionTest {
 
         return ReaderViewModel(
             ttsEngine = FakeTtsEngine(),
-            playbackOrchestrator = PlaybackOrchestrator(FakeTtsEngine(), FakeAudioPlayer(), UpdateReadingStateUseCase(readingStateRepository)),
+            playbackOrchestrator = PlaybackOrchestrator(FakeTtsEngine(), FakeAudioPlayer(), UpdateReadingStateUseCase(readingStateRepository), FakeChapterParser()),
             publicationParser = parser,
             updateReadingState = UpdateReadingStateUseCase(readingStateRepository),
             getReadingState = GetReadingStateUseCase(readingStateRepository),

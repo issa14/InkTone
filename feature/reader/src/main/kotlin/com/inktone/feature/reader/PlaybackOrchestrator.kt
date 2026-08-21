@@ -5,6 +5,7 @@ import com.inktone.domain.model.Sentence
 import com.inktone.domain.model.VoiceProfile
 import com.inktone.domain.service.AudioPlayer
 import com.inktone.domain.service.AudioSegment
+import com.inktone.domain.service.ChapterParser
 import com.inktone.domain.service.PlaybackMetadata
 import com.inktone.domain.service.PlaybackSession
 import com.inktone.domain.service.PlaybackSessionState
@@ -26,6 +27,7 @@ import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.SharedFlow
 import kotlinx.coroutines.flow.asSharedFlow
 import kotlinx.coroutines.flow.asStateFlow
+import kotlinx.coroutines.flow.collectLatest
 import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.launch
@@ -62,7 +64,30 @@ class PlaybackOrchestrator @Inject constructor(
     private val ttsEngine: TtsEngine,
     private val audioPlayer: AudioPlayer,
     private val updateReadingState: UpdateReadingStateUseCase,
+    private val chapterParser: ChapterParser,
 ) : PlaybackSession {
+
+    /**
+     * Programme de narration (P2-b) : la suite ordonnée des chapitres du livre
+     * narré, **par href** et non par contenu.
+     *
+     * C'est ce qui permet à l'auto-avance de chapitre de survivre à la
+     * destruction de l'écran Lecteur : l'ordonnanceur n'a plus besoin qu'on lui
+     * apporte les phrases du chapitre suivant, il les obtient lui-même de
+     * [ChapterParser] (qui cache déjà le résultat). Auparavant, la chaîne
+     * complète passait par le ViewModel — quitter le Lecteur arrêtait donc la
+     * narration à la fin du chapitre en cours.
+     *
+     * On ne retient volontairement pas les phrases ici : un livre entier de
+     * phrases en mémoire, pour un seul chapitre utile à la fois, dupliquerait
+     * l'état déjà porté par l'écran et deviendrait périmé au moindre
+     * rechargement.
+     */
+    data class NarrationProgram(
+        val publicationId: String,
+        /** Hrefs des chapitres, **dans l'ordre du spine** : la position dans la liste EST l'index de chapitre. */
+        val chapterHrefs: List<String>,
+    )
 
     /** État de lecture exposé à la couche présentation. */
     sealed interface PlaybackStatus {
@@ -81,6 +106,17 @@ class PlaybackOrchestrator @Inject constructor(
     /** Index de la phrase en cours de lecture (surlignage, progression). */
     private val _currentSentenceIndex = MutableStateFlow(0)
     override val currentSentenceIndex: StateFlow<Int> = _currentSentenceIndex.asStateFlow()
+
+    /**
+     * Index du chapitre en cours de narration (P2-b).
+     *
+     * Émis par l'ordonnanceur, **suivi** par l'écran Lecteur — et non l'inverse.
+     * C'est le renversement qu'impose une session qui survit à l'écran : quand
+     * l'auto-avance change de chapitre alors que le Lecteur est détruit, ce flux
+     * porte la vérité, et l'écran s'y recale s'il revient.
+     */
+    private val _currentChapterIndex = MutableStateFlow(0)
+    val currentChapterIndex: StateFlow<Int> = _currentChapterIndex.asStateFlow()
 
     /** Timestamps mot-à-mot de la phrase courante — consommés par le surlignage. */
     private val _currentWordTimestamps = MutableStateFlow<List<WordTimestamp>>(emptyList())
@@ -147,9 +183,26 @@ class PlaybackOrchestrator @Inject constructor(
      */
     private var session: SessionContext? = null
 
+    /**
+     * Programme de narration courant (P2-b). `null` tant que le Lecteur n'en a
+     * pas posé : l'auto-avance est alors inactive et la narration s'arrête en
+     * fin de chapitre, comportement d'avant ce palier.
+     */
+    private var program: NarrationProgram? = null
+
     private val playGeneration = AtomicLong(0)
     private var playbackJob: Job? = null
     private var wordTrackingJob: Job? = null
+
+    /**
+     * Libération différée des ressources de lecture (P2-b), posée par le
+     * Lecteur quand il se ferme alors qu'une narration continue sans lui.
+     *
+     * Ne capture que des objets de session (résolveur EPUB, parseur,
+     * identifiant de publication) — jamais le ViewModel, qui doit rester
+     * collectable.
+     */
+    private var pendingSessionRelease: (() -> Unit)? = null
 
     init {
         // Miroir de la validité de la position du lecteur, sans verrou ni
@@ -160,6 +213,39 @@ class PlaybackOrchestrator @Inject constructor(
                 _positionValid.value = position.valid
             }
         }
+
+        // P2-b — fin RÉELLE de la narration : libère les ressources que le
+        // Lecteur nous a laissées. `collectLatest` fait tout le travail
+        // délicat : l'`Idle` transitoire d'une auto-avance de chapitre annule
+        // le délai dès que l'état repasse à `Buffering`, si bien qu'un seul
+        // point couvre tous les chemins de fin (arrêt depuis la notification,
+        // fin du livre, chapitre illisible) sans distinguer l'arrêt volontaire
+        // du `stop()` interne que `play()` déclenche à chaque relance.
+        scope.launch {
+            state.collectLatest { status ->
+                if (status is PlaybackStatus.Idle || status is PlaybackStatus.Error) {
+                    delay(SESSION_RELEASE_DEBOUNCE_MS)
+                    runPendingSessionRelease()
+                }
+            }
+        }
+    }
+
+    /**
+     * Enregistre la libération à exécuter quand la narration s'arrêtera pour de
+     * bon. Remplace toute libération déjà en attente (une seule session à la
+     * fois) ; `null` l'annule — cas d'un Lecteur rouvert sur le même livre, qui
+     * reprend la propriété de ses ressources.
+     */
+    fun releaseOnSessionEnd(release: (() -> Unit)?) {
+        pendingSessionRelease = release
+    }
+
+    private fun runPendingSessionRelease() {
+        val release = pendingSessionRelease ?: return
+        pendingSessionRelease = null
+        program = null
+        release()
     }
 
     /** Sérialise pause/resume/stop (appelés depuis UI, MediaSession, etc.). */
@@ -182,6 +268,7 @@ class PlaybackOrchestrator @Inject constructor(
         stop()
         val generation = playGeneration.incrementAndGet()
         _currentSentenceIndex.value = startFrom
+        _currentChapterIndex.value = chapterIndex
         _state.value = PlaybackStatus.Buffering
         playbackJob = scope.launch {
             run(generation, sentences, voiceProfile, startFrom, publicationId, chapterIndex, resourceHref)
@@ -245,6 +332,27 @@ class PlaybackOrchestrator @Inject constructor(
     fun isSessionEngaged(): Boolean = when (_state.value) {
         PlaybackStatus.Playing, PlaybackStatus.Buffering, PlaybackStatus.Paused -> true
         PlaybackStatus.Idle, is PlaybackStatus.Error -> false
+    }
+
+    /**
+     * Pose le programme de narration (P2-b) : la suite ordonnée des hrefs de
+     * chapitres du livre ouvert. Appelé par le Lecteur à l'ouverture ; c'est ce
+     * qui autorise l'auto-avance à survivre à la destruction de l'écran.
+     *
+     * Sans appel, [program] reste `null` et la narration s'arrête en fin de
+     * chapitre — jamais de comportement à moitié câblé.
+     */
+    fun setNarrationProgram(publicationId: String, chapterHrefs: List<String>) {
+        program = NarrationProgram(publicationId, chapterHrefs)
+    }
+
+    /**
+     * Retire le programme : l'auto-avance redevient inactive. Appelé quand le
+     * Lecteur se ferme **sans** session engagée — sinon le programme doit
+     * survivre, c'est tout l'objet du palier.
+     */
+    fun clearNarrationProgram() {
+        program = null
     }
 
     /**
@@ -417,7 +525,62 @@ class PlaybackOrchestrator @Inject constructor(
             // Après l'`Idle` : l'écran doit d'abord enregistrer la fin de la
             // lecture courante, puis seulement enchaîner le chapitre suivant.
             _chapterCompleted.tryEmit(Unit)
+            advanceToNextChapter(generation, chapterIndex)
         }
+    }
+
+    /**
+     * Enchaîne le chapitre suivant du [program] (P2-b), phrases obtenues de
+     * [ChapterParser] plutôt que de l'écran — c'est ce qui rend l'auto-avance
+     * indépendante de la vie du Lecteur.
+     *
+     * Repasse en `Buffering` **avant** de parser : le parsing peut prendre
+     * plusieurs centaines de millisecondes, et laisser l'état à `Idle` pendant
+     * ce temps ferait retirer la notification puis la reposer (le service
+     * foreground suit `sessionState`) — un clignotement visible, et un
+     * arrêt/redémarrage de service pour rien.
+     *
+     * Toute impasse (fin du livre, href introuvable, chapitre sans phrase)
+     * laisse simplement la narration terminée : jamais de saut silencieux vers
+     * un chapitre plus loin, qui ferait perdre du texte à l'auditeur.
+     */
+    private suspend fun advanceToNextChapter(generation: Long, completedChapterIndex: Int) {
+        val prog = program ?: return
+        val ctx = session ?: return
+        val nextIndex = completedChapterIndex + 1
+        val nextHref = prog.chapterHrefs.getOrNull(nextIndex) ?: return // fin du livre
+        if (!isCurrent(generation)) return
+
+        _state.value = PlaybackStatus.Buffering
+        val chapter = try {
+            chapterParser.parseChapter(prog.publicationId, nextHref)
+        } catch (e: CancellationException) {
+            throw e
+        } catch (e: Exception) {
+            // Même politique que le Lecteur (K6/K7) : un href introuvable ou un
+            // chapitre malformé n'interrompt pas l'app, il termine la narration.
+            _state.value = PlaybackStatus.Idle
+            return
+        }
+        // Une pause ou un arrêt survenu pendant le parsing a péremé la
+        // génération : ne pas relancer une narration que l'utilisateur vient
+        // d'interrompre.
+        if (!isCurrent(generation)) return
+        if (chapter.sentences.isEmpty()) {
+            _state.value = PlaybackStatus.Idle
+            return
+        }
+        // `chapter.index` recalculé par le parseur peut diverger de la position
+        // réelle dans le spine (livres à couverture prépendue — même bug que
+        // `loadChapterContentIfNeeded`). La position dans le programme fait foi.
+        play(
+            sentences = chapter.sentences,
+            voiceProfile = ctx.voiceProfile,
+            startFrom = 0,
+            publicationId = prog.publicationId,
+            chapterIndex = nextIndex,
+            resourceHref = nextHref,
+        )
     }
 
     /**
@@ -552,5 +715,12 @@ class PlaybackOrchestrator @Inject constructor(
         const val SILENCE_COMMA_MS = 150L
         const val SILENCE_SENTENCE_MS = 650L
         const val SILENCE_PARAGRAPH_MS = 1000L
+
+        /**
+         * Délai avant de libérer les ressources de lecture sur un état terminal
+         * (P2-b). Doit couvrir largement l'`Idle` transitoire d'une auto-avance
+         * — le parsing du chapitre suivant repasse en `Buffering` bien avant.
+         */
+        const val SESSION_RELEASE_DEBOUNCE_MS = 1_500L
     }
 }

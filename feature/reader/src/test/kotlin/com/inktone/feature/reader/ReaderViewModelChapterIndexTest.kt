@@ -116,7 +116,7 @@ class ReaderViewModelChapterIndexTest {
 
         return ReaderViewModel(
             ttsEngine = FakeTtsEngine(),
-            playbackOrchestrator = PlaybackOrchestrator(FakeTtsEngine(), FakeAudioPlayer(), UpdateReadingStateUseCase(FakeReadingStateRepository())),
+            playbackOrchestrator = PlaybackOrchestrator(FakeTtsEngine(), FakeAudioPlayer(), UpdateReadingStateUseCase(FakeReadingStateRepository()), FakeChapterParser()),
             publicationParser = parser,
             updateReadingState = UpdateReadingStateUseCase(FakeReadingStateRepository()),
             getReadingState = GetReadingStateUseCase(FakeReadingStateRepository()),
