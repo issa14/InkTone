@@ -60,6 +60,7 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.geometry.Rect
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
+import com.inktone.core.designsystem.rememberAppHaptics
 import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.layout.LayoutCoordinates
 import androidx.compose.ui.layout.onGloballyPositioned
@@ -313,6 +314,7 @@ fun ReaderScreen(
     ) {
     // 3d.3 — applique la luminosité choisie à la fenêtre du lecteur
     // seulement, restaurée à la sortie (voir ReaderBrightnessEffect).
+    val haptics = rememberAppHaptics()
     ReaderBrightnessEffect(value = state.readerBrightness)
     // P4 — retiré avec l'écran de lecture (DisposableEffect) : le maintien ne
     // doit jamais survivre au Lecteur.
@@ -1236,7 +1238,12 @@ fun ReaderScreen(
                     isCurrentPageBookmarked = state.isCurrentPageBookmarked,
                     onBookmarkClick = { bookmark -> viewModel.onIntent(ReaderIntent.NavigateToLocator(bookmark.locator)) },
                     onAnnotationClick = { annotation -> viewModel.onIntent(ReaderIntent.NavigateToLocator(annotation.startLocator)) },
-                    onToggleBookmark = { viewModel.onIntent(ReaderIntent.ToggleBookmarkAtCurrentPosition) },
+                    onToggleBookmark = {
+                        // P5 — confirmation tactile d'une action qui aboutit,
+                        // distincte du simple cran de page (`tick`).
+                        haptics.confirm()
+                        viewModel.onIntent(ReaderIntent.ToggleBookmarkAtCurrentPosition)
+                    },
                     onClose = { viewModel.onIntent(ReaderIntent.ToggleBookmarkList) },
                 )
             }

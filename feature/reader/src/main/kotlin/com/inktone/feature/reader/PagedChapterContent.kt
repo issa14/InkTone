@@ -56,6 +56,7 @@ import androidx.compose.ui.text.TextRange
 import androidx.compose.ui.text.TextStyle
 import androidx.compose.ui.text.buildAnnotatedString
 import androidx.compose.ui.text.input.TextFieldValue
+import com.inktone.core.designsystem.rememberAppHaptics
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 
@@ -151,6 +152,10 @@ fun PagedChapterContent(
     // plus de page fantôme.
     val pagerState = rememberPagerState(pageCount = { pageCount })
 
+    // P5 — échelle haptique de l'app (core:designsystem), jamais une
+    // vibration fabriquée sur place.
+    val haptics = rememberAppHaptics()
+
     // 3c.1bis — bug réel trouvé sur appareil pendant la vérification du
     // lot 3c : le compteur de PAGE suit déjà le swipe manuel
     // (onPageChanged ci-dessous, corrigé au lot 3b), mais le POURCENTAGE
@@ -222,6 +227,12 @@ fun PagedChapterContent(
         onPageChanged(pagerState.currentPage)
 
         if (!isProgrammaticPageChange && chapter != null) {
+            // P5 — le cran haptique de la page tournée est posé ICI, dans la
+            // branche du swipe MANUEL, et pas sur `onPageChanged` ci-dessus :
+            // ce dernier suit aussi les changements de page pilotés par la
+            // narration, qui feraient vibrer l'appareil en continu pendant
+            // une écoute — précisément quand l'utilisateur ne le touche pas.
+            haptics.tick()
             val sentenceRange = pagination.sentenceRangeOf(chapter.index, pagerState.currentPage)
             if (!sentenceRange.isEmpty()) {
                 lastManuallyEmittedSentenceIndex = sentenceRange.first
