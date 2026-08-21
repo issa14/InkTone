@@ -593,6 +593,55 @@ couvre donc pas cette catégorie ; ajouter `compileDebugAndroidTestKotlin` à la
 vérification mériterait d'être tranché (non fait ici : cela touche les
 conventions de build et allonge chaque build).
 
+### 6.12 — Espacement des paragraphes : deuxième tentative, deux impasses mesurées
+
+Le réglage avait été refusé en §6.6 faute de levier neutre en offsets. Une
+tentative complète a été menée puis **entièrement annulée** (`git checkout`,
+rien de commité). Elle n'a pas produit de code, mais elle a produit ce qui
+manquait au refus : des preuves, sur appareil.
+
+Rappel de la contrainte : les blocs sont séparés par UN `'\n'` dont l'espace
+d'offsets doit rester aligné au caractère près avec `JsoupChapterParser` —
+c'est de lui que dépendent le surlignage TTS et la sélection. Insérer une ligne
+vide est donc exclu. Deux leviers neutres en offsets ont été essayés :
+
+1. **`SpanStyle(fontSize = …)` sur le séparateur** — aucun effet visible en mode
+   paginé. Le style de base porte un `lineHeight` FIXE (le réglage
+   d'interligne), qui plafonne les métriques naturelles de la ligne : le
+   séparateur avait beau être plus grand, la ligne gardait sa hauteur.
+2. **`ParagraphStyle(lineHeight = …)` sur le séparateur** — échappe bien au
+   plafond, mais **la page paginée s'affiche vide** (aucune erreur, aucun
+   crash, compteur de pages absent : la mesure ne produit plus aucune page).
+
+Le mode DÉFILEMENT, lui, fonctionnait sans difficulté (chaque bloc est un item,
+un simple `padding` suffit) et l'effet était net à l'écran.
+
+**Décision : ne pas livrer.** Un réglage qui agirait en défilement et resterait
+inerte en paginé est exactement le défaut relevé deux fois par Issa sur les
+marges puis l'interligne. Le livrer en connaissance de cause serait pire que de
+ne pas le livrer.
+
+**Ce qu'il faudrait pour le débloquer** : comprendre pourquoi un `ParagraphStyle`
+dans l'`AnnotatedString` mesuré vide la pagination — piste la plus probable, le
+découpage par offset (`buildPageAnnotatedString` / `subSequence`) face aux
+frontières de paragraphe. C'est une tâche de pagination à part entière, pas un
+ajout de réglage.
+
+### 6.13 — Observation non attribuée : page vide en mode paginé
+
+Constaté en fin de session sur « La fille de papier », chapitre 17 : basculer en
+mode PAGINÉ affiche une **page blanche**, sans erreur ni crash, le compteur de
+pages disparaissant de la ligne de statut (`pageCount == 0`). Le mode DÉFILEMENT
+affiche le même chapitre normalement.
+
+**Non attribué** : le même chapitre s'était affiché correctement en paginé
+quelques minutes plus tôt dans la même session, et le symptôme persiste après
+annulation complète de la tentative §6.12. La comparaison avec `main` n'a pas pu
+être faite (installer `main` par-dessus une base en schéma v27 provoquerait un
+échec d'ouverture Room — rétrogradation). À reproduire et attribuer avant toute
+conclusion : ce n'est PAS établi comme une régression de ce plan, ni comme un
+défaut préexistant.
+
 ### 6.8 — État du plan
 
 | Lot | État |
