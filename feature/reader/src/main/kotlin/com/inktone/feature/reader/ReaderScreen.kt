@@ -762,7 +762,13 @@ fun ReaderScreen(
                                     .graphicsLayer { translationY = visualPull.value }
                                     .nestedScroll(chapterTransitionConnection),
                                 userScrollEnabled = freeSelectedRange == null,
-                                contentPadding = PaddingValues(16.dp),
+                                // P4 — même marge qu'en mode paginé : un
+                                // réglage de lecture ne doit pas dépendre du
+                                // mode choisi. Cette valeur était en dur, si
+                                // bien que le cran de marge n'avait aucun
+                                // effet en défilement (défaut trouvé à la
+                                // vérification device).
+                                contentPadding = PaddingValues(readerMargin),
                             ) {
                                 items(
                                     items = blocks,
