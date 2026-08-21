@@ -553,6 +553,45 @@ l'écran — le HUD auto-masqué rend l'automatisation peu fiable).
 entrées de la table des matières s'affichent « Prologue ». À investiguer côté
 parseur de TOC, pas dans ce plan.
 
+### 6.11 — Retours de vérification device sur le minuteur (Issa)
+
+Deux retours, tous deux traités. Commit `5dcc6bfd` — **note de discipline :
+les deux tiennent dans ce seul commit alors qu'ils auraient dû être séparés
+(un `git add -A` trop large), et son message ne décrit que le premier. La
+branche étant déjà poussée, l'historique n'a pas été réécrit.**
+
+1. **Roue de durée personnalisée figée (bug).** Symptôme rapporté : « le
+   bouton Valider ne s'active jamais, même quand on ajuste un temps ». La
+   cause était plus large que le bouton — la valeur sélectionnée ne suivait
+   pas la roue. La lecture de position exigeait « défilement terminé ET
+   `firstVisibleItemScrollOffset` exactement nul », condition pratiquement
+   jamais vraie après un geste (le `contentPadding` décale l'origine, et un
+   glissement relâché sans lancer ne repasse pas forcément par un offset nul).
+   `onSelect` ne se rappelait donc plus : l'état restait figé à sa valeur
+   initiale, et il suffisait qu'elle vaille zéro pour que le bouton soit
+   définitivement inerte. L'affichage mentait aussi — constaté sur device :
+   roue centrée sur 32, état interne à 30. La position centrée est désormais
+   déduite de `layoutInfo` (item dont le centre est le plus proche du centre du
+   viewport), vraie à tout instant. Régression couverte par
+   `faire_defiler_la_roue_change_la_duree_confirmee` (5 tests verts sur device).
+2. **Décompte à la seconde (demande).** L'affichage tronquait en minutes
+   entières : un minuteur de 30 min montrait « 29 min » pendant une minute
+   pleine puis sautait à 28. L'ordonnanceur décomptait déjà à la seconde, il ne
+   manquait que de l'afficher. `formatSleepTimerRemaining` arrondit par excès
+   (jamais « 0 s » s'il reste du temps) et masque les secondes au-delà d'une
+   heure. `SleepTimerState` retient désormais la durée ARMÉE (`totalMs`) : sans
+   elle la puce choisie se désélectionnait après une seconde, défaut
+   préexistant qu'un affichage à la minute masquait. Tests :
+   `SleepTimerFormatTest` (6 cas). Vérifié sur device : « Actif — 29 min 56 s
+   restantes », puce « 30 min » toujours sélectionnée.
+
+**Trou de garde-fou découvert au passage** : `./gradlew build` **ne compile pas
+les sources `androidTest`**. Le palier P4 avait cassé `ReaderSettingsPanelTest`
+sans que le build passe au rouge. La règle « build vert avant commit » ne
+couvre donc pas cette catégorie ; ajouter `compileDebugAndroidTestKotlin` à la
+vérification mériterait d'être tranché (non fait ici : cela touche les
+conventions de build et allonge chaque build).
+
 ### 6.8 — État du plan
 
 | Lot | État |
