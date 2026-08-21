@@ -1,6 +1,6 @@
 package com.inktone.core.designsystem
 
-import androidx.compose.animation.core.AnimationSpec
+import androidx.compose.animation.core.FiniteAnimationSpec
 import androidx.compose.animation.core.FastOutSlowInEasing
 import androidx.compose.animation.core.LinearOutSlowInEasing
 import androidx.compose.animation.core.Spring
@@ -49,7 +49,7 @@ object Motion {
     fun <T> tween(
         durationMs: Int = DURATION_STANDARD_MS,
         easing: androidx.compose.animation.core.Easing = StandardEasing,
-    ): AnimationSpec<T> = tween(durationMillis = reducedMotionDuration(durationMs), easing = easing)
+    ): FiniteAnimationSpec<T> = tween(durationMillis = reducedMotionDuration(durationMs), easing = easing)
 
     /**
      * Ressort de l'app pour les mouvements pilotés au doigt (tirage de
@@ -63,7 +63,7 @@ object Motion {
     fun <T> gestureSpring(
         dampingRatio: Float = Spring.DampingRatioMediumBouncy,
         stiffness: Float = Spring.StiffnessMediumLow,
-    ): AnimationSpec<T> =
+    ): FiniteAnimationSpec<T> =
         if (reducedMotionDuration(DURATION_STANDARD_MS) == 0) {
             tween(durationMillis = 0)
         } else {

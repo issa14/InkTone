@@ -15,6 +15,7 @@ import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
+import com.inktone.core.designsystem.Motion
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.ui.Alignment
@@ -81,12 +82,15 @@ internal fun MiniPlayerContent(
     val sessionState = state.sessionState
     val isPlaying = state.isPlaying
     val isVisible = state.isVisible
-    val duration = reducedMotionDuration(220)
+    // P5 — durée du système de design plutôt qu'une valeur locale ; le
+    // mouvement réduit reste appliqué, désormais par construction.
+    val spec = Motion.tween<Float>()
+    val slideSpec = Motion.tween<androidx.compose.ui.unit.IntOffset>()
 
     AnimatedVisibility(
         visible = isVisible,
-        enter = slideInVertically(tween(duration)) { it } + fadeIn(tween(duration)),
-        exit = slideOutVertically(tween(duration)) { it } + fadeOut(tween(duration)),
+        enter = slideInVertically(slideSpec) { it } + fadeIn(spec),
+        exit = slideOutVertically(slideSpec) { it } + fadeOut(spec),
         modifier = modifier,
     ) {
         Surface(

@@ -60,6 +60,7 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.geometry.Rect
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
+import com.inktone.core.designsystem.Motion
 import com.inktone.core.designsystem.rememberAppHaptics
 import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.layout.LayoutCoordinates
@@ -981,15 +982,20 @@ fun ReaderScreen(
                         // aucune position n'est jamais interpolée, un pur fondu.
                         // AnimatedVisibility n'a pas d'overload BoxScope (seulement
                         // Column/RowScope) : inapplicable ici.
-                        val fadeDuration = if (state.reduceMotion) 0 else 200
+                        // P5 — deux signaux distincts et complémentaires :
+                        // `state.reduceMotion` est la préférence APPLICATIVE,
+                        // `Motion.tween` applique en plus le réglage SYSTÈME
+                        // d'échelle d'animation. Remplacer l'un par l'autre
+                        // ferait perdre un des deux.
+                        val fadeSpec = if (state.reduceMotion) tween<Float>(0) else Motion.tween<Float>()
                         val barAlpha by animateFloatAsState(
                             targetValue = if (isPillCollapsed) 0f else 1f,
-                            animationSpec = tween(fadeDuration),
+                            animationSpec = fadeSpec,
                             label = "TtsPillBarAlpha",
                         )
                         val fabAlpha by animateFloatAsState(
                             targetValue = if (isPillCollapsed) 1f else 0f,
-                            animationSpec = tween(fadeDuration),
+                            animationSpec = fadeSpec,
                             label = "TtsPillBarCollapsedAlpha",
                         )
                         Box(modifier = Modifier.fillMaxWidth()) {
