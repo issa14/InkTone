@@ -325,11 +325,39 @@ persistant, qui déplacera la propriété de la session hors du `ReaderViewModel
   et l'onboarding ; l'appui ramène au livre réellement narré
   (`PlaybackMetadata.publicationId`). Tests : `MiniPlayerUiStateTest` (JVM),
   `MiniPlayerContentTest` (Compose, 4 cas). Commit `94325623`.
-- **(b) à faire** — déplacer la **propriété de la session** hors du
-  `ReaderViewModel` : l'auto-avance de chapitre (collecteur `chapterCompleted`)
-  et le tracker de statistiques y vivent encore, donc meurent avec l'écran.
-  C'est ce palier, et lui seul, qui referme les écarts 1 et 2 de P1 — le
-  mini-lecteur rend la session *visible*, il ne la *possède* pas.
+- **(b) fait** — la propriété de la session quitte le `ReaderViewModel`. Deux
+  commits, un par écart refermé :
+  - **Auto-avance (écart 1)** — `PlaybackOrchestrator` porte un
+    `NarrationProgram` (les hrefs des chapitres, jamais leurs phrases) et
+    obtient lui-même le chapitre suivant de `ChapterParser`. L'écran **suit**
+    désormais `currentChapterIndex` au lieu de le piloter
+    (`syncDisplayToNarratedChapter` : ne coupe pas la lecture, ne la relance
+    pas, ne persiste pas la position — l'ordonnanceur en reste seul écrivain
+    pendant le TTS, K3). Passage en `Buffering` avant le parsing, pour ne pas
+    faire clignoter la notification. Corrige au passage une libération qui
+    aurait vidé le palier de son sens : `onCleared()` fermait le résolveur EPUB
+    et invalidait le cache du parseur, donc l'auto-avance aurait échoué au
+    premier chapitre suivant ; ces libérations sont différées à la fin réelle
+    de session (`releaseOnSessionEnd`) et annulées si un Lecteur rouvre le
+    livre. Tests : `PlaybackOrchestratorChapterAdvanceTest` (4 cas). Commit
+    `24016a0a`.
+  - **Statistiques (écart 2)** — `NarrationSessionContinuation` (@Singleton)
+    prend le relais du `ReadingSessionTracker`, qui n'est jamais partagé mais
+    **transmis** : l'écran le cède en mourant, un écran rouvert sur le même
+    livre le reprend (`takeOver`), deux trackers concurrents produiraient des
+    fragments chevauchants. Mode forcé à AUDIO (sans écran, aucune lecture
+    visuelle à imputer) ; `lastFragmentSavedMs` transmis dans les deux sens.
+    Tests : `NarrationSessionContinuationTest` (4 cas, horloge injectée).
+    Commit `8f397215`.
+- **Écarts 3 et 4 de P1 : état inchangé.** Le saut ±30 s reste refusé (pas
+  d'index temps→phrase, K12). L'action « minuteur de sommeil » dans la
+  notification reste à faire : le minuteur vit toujours dans le
+  `ReaderViewModel` (`sleepTimerJob`) et meurt donc avec l'écran — désormais
+  le seul élément de session encore attaché à l'écran.
+- **Vérification device restant à faire pour (b)** : quitter le Lecteur en
+  pleine narration, laisser passer une fin de chapitre, vérifier que la voix
+  enchaîne le chapitre suivant ; puis que le temps écoulé apparaît bien en
+  écoute dans les statistiques du livre.
 - **Défaut de test corrigé au passage** :
   `PlaybackOrchestratorTest.togglePlayPause_bascule_entre_pause_et_reprise`
   affirmait `isPlaying` (un `stateIn`) immédiatement après avoir attendu
