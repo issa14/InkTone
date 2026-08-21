@@ -712,14 +712,30 @@ Commit `0e108721`.
 | P2 — mini-lecteur et propriété de session | Livré (paliers a et b) |
 | P3 — build honnête | Partiel : build type, `profileinstaller` et générateur posés ; branchement bloqué par l'environnement (§6.9) |
 | P4 — confort visuel | Livré, sauf espacement de paragraphe (refusé, motivé) |
-| P5 — micro-polish | Haptique, tokens de mouvement et couverture de notification livrés ; migration des `tween` en dur **volontairement reportée** (voir ci-dessous) |
+| P5 — micro-polish | Livré. Migration des animations faite hors périmètre du diagnostic ; 4 sites de transition de chapitre laissés intacts à dessein (voir ci-dessous) |
 
 **Clôture de cette session** (décision d'Issa) : les points en cours sont bouclés
 et le diagnostic de la page blanche / du clignotement repart proprement dans une
-session dédiée. La **migration des `tween` en dur vers les tokens `Motion` est
-délibérément reportée** : elle toucherait exactement les animations mises en
-cause par le clignotement signalé, et brouillerait le diagnostic à venir. Les
-tokens restent posés et inutilisés, ce qui ne coûte rien.
+session dédiée.
+
+La migration des `tween` en dur vers les tokens `Motion` est **partiellement
+faite** (commit `30a61ab0`), selon un partage net :
+
+- **Migrés** — `BookmarkPanel` (écrit en dur à 200 ms, ne respectait AUCUN
+  réglage de mouvement réduit : c'est le gain réel), `MiniPlayerBar`, et le
+  fondu du HUD de `ReaderScreen` (qui conserve la préférence APPLICATIVE
+  `state.reduceMotion` et gagne en plus le réglage SYSTÈME — deux signaux
+  distincts, remplacer l'un par l'autre en aurait perdu un).
+- **Non migrés, délibérément** — les ressorts de transition de chapitre
+  (`ReaderScreen`, `PagedChapterContent`), l'indicateur de transition et l'onde
+  du `TtsPillBar`. Les trois premiers sont exactement les animations mises en
+  cause par le clignotement signalé (bascule SCROLL → PAGINÉ après un long
+  défilement) : les toucher avant le diagnostic le brouillerait.
+  `BookCoverShimmer` respecte déjà le mouvement réduit.
+
+`Motion.tween`/`gestureSpring` renvoient désormais `FiniteAnimationSpec`, seul
+type accepté par `fadeIn`/`slideIn` — le type précédent rendait les tokens
+inutilisables là où ils servent le plus.
 
 Le plus gros reste de valeur mesurable est toujours **P3** : le Baseline Profile
 est le seul élément du plan dont le gain (démarrage à froid) se chiffre. Le
