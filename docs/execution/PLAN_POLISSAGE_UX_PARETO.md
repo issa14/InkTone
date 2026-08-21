@@ -642,6 +642,38 @@ annulation complète de la tentative §6.12. La comparaison avec `main` n'a pas 
 conclusion : ce n'est PAS établi comme une régression de ce plan, ni comme un
 défaut préexistant.
 
+### 6.14 — Un défaut de pagination trouvé en enquêtant (§6.13)
+
+L'enquête sur la page blanche n'a pas abouti à son attribution, mais elle a
+mis au jour un défaut réel, **préexistant à ce plan**, établi par test.
+
+La ligne de statut masque le compteur de pages quand `isMeasurementComplete`
+est faux, et l'ancrage de position du mode paginé ne se recale QUE sur une
+mesure complète. Or la complétude se comparait au nombre TOTAL de phrases du
+chapitre, alors que `ChapterTextMeasurer` ne mesure que les blocs de TEXTE :
+**une seule phrase rattachée à un bloc image (une légende) suffisait à rendre
+la mesure éternellement incomplète**, quelle que soit la durée d'attente.
+
+`measurableOffsetCount` calcule désormais le nombre d'offsets qu'une mesure
+complète PEUT produire, en reproduisant exactement la règle du mesureur. Un
+test compare les deux sur un même chapitre plutôt que d'affirmer un nombre en
+dur : une divergence future ramènerait le défaut.
+
+La complétude ne devient pas trop optimiste pour autant — pendant une mesure de
+préfixe (3a.3), moins d'offsets sont produits que le total attendu, donc l'état
+reste incomplet : la régression « N/N présenté comme final » de
+`NOTE_REGRESSION_CLIGNOTEMENT_PAGE_HUD.md` reste couverte.
+
+**Écart déclaré** : ce correctif traite un mécanisme prouvé, mais il n'est PAS
+démontré qu'il explique à lui seul la page blanche de §6.13. Celle-ci reste à
+reproduire et à attribuer.
+
+Écarté au passage, par test : le `TextStyle` de mesure enrichi par P4
+(`TextAlign.Unspecified` / `Hyphens.None` / `LineBreak.Unspecified` hors
+justification) produit bien des lignes — il n'était pas en cause.
+
+Commit `0e108721`.
+
 ### 6.8 — État du plan
 
 | Lot | État |
