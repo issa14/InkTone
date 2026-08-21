@@ -414,9 +414,18 @@ commit (K4), **vérifié sur device** : 29 tests de migration, 0 échec. Tests
 JVM : `ReaderComfortTest` (4 cas), `PaginationJustificationKeyTest` (2 cas).
 Commits `1bcc5d70`, `3f8f9b64`.
 
-**Vérification device restant à faire** : les trois réglages depuis le panneau
-TT, en mode paginé ET en défilement ; vérifier qu'un changement de marge
-repagine sans perdre la position de lecture.
+**Vérifié sur device** (V2206, Android 14) : les trois réglages sont exposés au
+panneau TT et prennent effet — justification et césure visibles (mots coupés en
+fin de ligne), marges larges effectives.
+
+**Défaut trouvé par cette vérification, corrigé** : le cran de marge n'avait
+aucun effet en mode SCROLL, dont le `contentPadding` était resté écrit en dur —
+seul le mode paginé avait été câblé. La lecture du code ne l'avait pas relevé ;
+l'écran, immédiatement.
+
+**Restant à vérifier par Issa** : qu'un changement de marge repagine sans perdre
+la position de lecture sur un chapitre long, et le maintien de l'écran allumé
+sur une session réelle.
 
 ### 6.7 — P5, micro-polish premium
 
