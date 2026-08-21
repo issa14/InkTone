@@ -104,11 +104,18 @@ hilt = { id = "com.google.dagger.hilt.android", version.ref = "hilt" }
 ksp = { id = "com.google.devtools.ksp", version = "2.0.20-1.0.25" }
 room = { id = "androidx.room", version.ref = "room" }
 kotlin-serialization = { id = "org.jetbrains.kotlin.plugin.serialization", version.ref = "kotlin" }
-# P3 (plan polissage Pareto) — génération du Baseline Profile. Le plugin
-# `baselineprofile` s'applique au module générateur ; le plugin
-# `baselineprofile.producer` s'applique à :app pour consommer le profil.
+# P3 (plan polissage Pareto) — génération du Baseline Profile. UN SEUL plugin,
+# à appliquer aux DEUX modules (il détecte lui-même s'il est côté producteur,
+# module `com.android.test`, ou côté consommateur, module d'application). Une
+# entrée `baselineprofile.gradle.producer` figurait ici, pointant un id de
+# plugin qui n'existe pas — jamais appliquée, donc jamais tombée en erreur.
+#
+# DÉCLARÉ MAIS PAS ENCORE APPLIQUÉ : l'appliquer crée côté `:app` les variantes
+# `nonMinifiedBenchmark`/`nonMinifiedRelease`, dont la tâche
+# `expandL8ArtProfileWildcards` (désucrage de la bibliothèque de base) échoue
+# sur les profils fournis par les dépendances. Détail et alternatives dans
+# PLAN_POLISSAGE_UX_PARETO.md §6.9.
 androidx-baselineprofile = { id = "androidx.baselineprofile", version.ref = "baselineProfile" }
-androidx-baselineprofile-producer = { id = "androidx.baselineprofile.gradle.producer", version.ref = "baselineProfile" }
 kover = { id = "org.jetbrains.kotlinx.kover", version.ref = "kover" }
 google-services = { id = "com.google.gms.google-services", version.ref = "googleServices" }
 firebase-crashlytics = { id = "com.google.firebase.crashlytics", version.ref = "firebaseCrashlyticsPlugin" }
