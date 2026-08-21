@@ -14,6 +14,7 @@ import com.inktone.domain.model.ChapterContent
 import com.inktone.domain.model.Sentence
 import com.inktone.domain.model.StyledText
 import org.junit.Assert.assertEquals
+import org.junit.Assert.assertFalse
 import org.junit.Assert.assertTrue
 import org.junit.Before
 import org.junit.Test
@@ -82,6 +83,162 @@ class ChapterTextMeasurerTest {
         // consécutifs (correctif : le texte de deux paragraphes ne doit
         // jamais fusionner sans espace dans le rendu/la mesure).
         assertEquals("Titre.\nPremière phrase. Deuxième phrase.", result.annotatedString.text)
+    }
+
+    /**
+     * Diagnostic d'une page blanche observée en mode paginé (§6.13 du plan) :
+     * le compteur de pages disparaissait, signe d'une mesure qui ne produit
+     * AUCUNE ligne.
+     *
+     * Suspect n°1 : le `TextStyle` de mesure, enrichi par le palier P4
+     * (justification/césure). Même hors justification il porte désormais
+     * `Hyphens.None`, `LineBreak.Unspecified` et `TextAlign.Unspecified` là où
+     * il ne portait rien — si l'une de ces valeurs faisait échouer la mesure,
+     * tout le mode paginé tomberait.
+     */
+    @Test
+    fun `le style de mesure du palier P4 produit bien des lignes hors justification`() {
+        val chapter = Chapter(
+            index = 0,
+            href = "chap1.xhtml",
+            title = null,
+            content = ChapterContent.Rich(
+                blocks = listOf(
+                    BookBlock.ParagraphBlock(
+                        richText = StyledText.plain(
+                            "Un paragraphe assez long pour occuper plusieurs lignes une fois mesuré " +
+                                "dans une largeur volontairement etroite, afin que la mesure ait " +
+                                "reellement du travail a faire.",
+                        ),
+                        globalOffsetRange = 0..160,
+                    ),
+                ),
+            ),
+            sentences = listOf(sentence(0, "Un paragraphe.", 0, blockIndex = 0)),
+        )
+
+        val styleP4NonJustifie = TextStyle(
+            fontSize = 18.sp,
+            lineHeight = 25.sp,
+            textAlign = androidx.compose.ui.text.style.TextAlign.Unspecified,
+            hyphens = androidx.compose.ui.text.style.Hyphens.None,
+            lineBreak = androidx.compose.ui.text.style.LineBreak.Unspecified,
+        )
+        val styleP4Justifie = TextStyle(
+            fontSize = 18.sp,
+            lineHeight = 25.sp,
+            textAlign = androidx.compose.ui.text.style.TextAlign.Justify,
+            hyphens = androidx.compose.ui.text.style.Hyphens.Auto,
+            lineBreak = androidx.compose.ui.text.style.LineBreak.Paragraph,
+        )
+
+        val nonJustifie = measurer.measure(chapter, styleP4NonJustifie, maxWidthPx = 400)
+        val justifie = measurer.measure(chapter, styleP4Justifie, maxWidthPx = 400)
+
+        assertTrue("le style non justifié doit produire des lignes", nonJustifie.lines.isNotEmpty())
+        assertTrue("le style justifié doit produire des lignes", justifie.lines.isNotEmpty())
+    }
+
+    /**
+     * Diagnostic de la page blanche en mode paginé (§6.13 du plan).
+     *
+     * Le compteur de pages disparaît quand `isMeasurementComplete` est faux —
+     * autrement dit quand la mesure produit MOINS d'offsets de phrase que le
+     * chapitre n'a de phrases. Or `measureRich` ne mesure que les blocs de
+     * TEXTE (paragraphes et titres) : toute phrase rattachée à un autre type de
+     * bloc n'obtient jamais son offset.
+     *
+     * Un chapitre mêlant texte et image suffit donc à rendre la mesure
+     * éternellement « incomplète », quelle que soit la durée d'attente. Ce test
+     * établit le mécanisme ; il ne préjuge pas du correctif (compter les
+     * phrases mesurables plutôt que toutes, ou rattacher les phrases aux seuls
+     * blocs de texte à l'analyse).
+     */
+    @Test
+    fun `une phrase rattachee a un bloc non textuel laisse la mesure incomplete`() {
+        val chapter = Chapter(
+            index = 0,
+            href = "chap1.xhtml",
+            title = null,
+            content = ChapterContent.Rich(
+                blocks = listOf(
+                    BookBlock.ParagraphBlock(
+                        richText = StyledText.plain("Un paragraphe."),
+                        globalOffsetRange = 0..13,
+                    ),
+                    BookBlock.ImageBlock(href = "img/photo.jpg"),
+                ),
+            ),
+            sentences = listOf(
+                sentence(0, "Un paragraphe.", 0, blockIndex = 0),
+                // Phrase rattachée au bloc image : jamais mesurée.
+                sentence(1, "Légende.", 15, blockIndex = 1),
+            ),
+        )
+
+        val result = measurer.measure(chapter, TextStyle(fontSize = 18.sp), maxWidthPx = 2000)
+
+        assertEquals(
+            "seules les phrases des blocs de texte obtiennent un offset",
+            1,
+            result.sentenceStartOffsets.size,
+        )
+        // Avant correctif, la complétude se comparait à `chapter.sentences.size`
+        // (2) : elle ne pouvait JAMAIS être atteinte, le compteur de pages
+        // restait masqué et l'ancrage du mode paginé ne se recalait jamais.
+        assertFalse(
+            "l'ancien calcul, comparé au total des phrases, restait éternellement incomplet",
+            isMeasurementComplete(result.sentenceStartOffsets.size, chapter.sentences.size),
+        )
+        // Après correctif : la complétude se compare au nombre d'offsets qu'une
+        // mesure complète PEUT produire.
+        assertTrue(
+            "la mesure couvre tout ce qu'elle peut couvrir : elle est complète",
+            isMeasurementComplete(result.sentenceStartOffsets.size, measurableOffsetCount(chapter)),
+        )
+    }
+
+    /**
+     * Garde-fou du correctif : `measurableOffsetCount` doit reproduire
+     * EXACTEMENT la règle de `ChapterTextMeasurer`. Toute divergence entre les
+     * deux ramènerait la mesure éternellement incomplète — ce test les compare
+     * donc sur un même chapitre, plutôt que d'affirmer un nombre en dur.
+     */
+    @Test
+    fun `le compte d offsets attendus correspond a ce que la mesure produit`() {
+        val chapter = Chapter(
+            index = 0,
+            href = "chap1.xhtml",
+            title = null,
+            content = ChapterContent.Rich(
+                blocks = listOf(
+                    BookBlock.HeadingBlock(level = 1, richText = StyledText.plain("Titre."), globalOffsetRange = 0..5),
+                    BookBlock.ImageBlock(href = "img/a.jpg"),
+                    BookBlock.ParagraphBlock(
+                        richText = StyledText.plain("Phrase une. Phrase deux."),
+                        globalOffsetRange = 7..30,
+                    ),
+                    BookBlock.ParagraphBlock(
+                        richText = StyledText.plain("Bloc sans phrase déclarée."),
+                        globalOffsetRange = 32..57,
+                    ),
+                ),
+            ),
+            sentences = listOf(
+                sentence(0, "Titre.", 0, blockIndex = 0),
+                sentence(1, "Légende.", 6, blockIndex = 1),
+                sentence(2, "Phrase une.", 7, blockIndex = 2),
+                sentence(3, "Phrase deux.", 19, blockIndex = 2),
+            ),
+        )
+
+        val result = measurer.measure(chapter, TextStyle(fontSize = 18.sp), maxWidthPx = 2000)
+
+        assertEquals(
+            "le compte attendu doit coller à la mesure réelle",
+            result.sentenceStartOffsets.size,
+            measurableOffsetCount(chapter),
+        )
     }
 
     @Test

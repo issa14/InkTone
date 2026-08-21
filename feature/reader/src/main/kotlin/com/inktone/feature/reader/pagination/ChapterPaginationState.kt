@@ -17,6 +17,8 @@ import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.text.rememberTextMeasurer
 import androidx.compose.ui.unit.sp
 import com.inktone.domain.model.Chapter
+import com.inktone.domain.model.ChapterContent
+import com.inktone.domain.model.BookBlock
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
 
@@ -96,7 +98,7 @@ class ChapterPaginationState internal constructor(
     fun isMeasurementComplete(chapter: Chapter?): Boolean =
         isMeasurementComplete(
             measuredSentences = measurement?.sentenceStartOffsets?.size ?: 0,
-            totalSentences = chapter?.sentences?.size ?: 0,
+            totalSentences = measurableOffsetCount(chapter),
         )
 }
 
@@ -108,6 +110,32 @@ class ChapterPaginationState internal constructor(
  */
 internal fun isMeasurementComplete(measuredSentences: Int, totalSentences: Int): Boolean =
     measuredSentences >= totalSentences
+
+/**
+ * Nombre d'offsets qu'une mesure COMPLÈTE du chapitre peut produire.
+ *
+ * Bug réel : la complétude se comparait au nombre total de phrases du chapitre,
+ * alors que `ChapterTextMeasurer` ne mesure que les blocs de TEXTE. Une seule
+ * phrase rattachée à un bloc image (légende) suffisait donc à rendre la mesure
+ * éternellement « incomplète » — le compteur de pages disparaissait de la ligne
+ * de statut et l'ancrage de position du mode paginé, qui n'agit que sur une
+ * mesure complète, ne se recalait jamais.
+ *
+ * Reproduit ici EXACTEMENT la règle du mesureur (voir
+ * `ChapterTextMeasurer.buildBatchAnnotatedString`) : un offset par phrase pour
+ * un bloc de texte qui en possède, sinon un seul offset pour le bloc. Toute
+ * divergence entre les deux ramènerait le défaut, d'où le test qui les compare
+ * sur un même chapitre.
+ */
+internal fun measurableOffsetCount(chapter: Chapter?): Int {
+    val blocks = (chapter?.content as? ChapterContent.Rich)?.blocks ?: return chapter?.sentences?.size ?: 0
+    val sentences = chapter.sentences
+    return blocks.withIndex()
+        .filter { it.value is BookBlock.ParagraphBlock || it.value is BookBlock.HeadingBlock }
+        .sumOf { (originalIndex, _) ->
+            sentences.count { it.blockIndex == originalIndex }.coerceAtLeast(1)
+        }
+}
 
 /**
  * Construit la clé d'invalidation à partir des valeurs **réellement
