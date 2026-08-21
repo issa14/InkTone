@@ -500,9 +500,20 @@ HRF risquerait de livrer un profil faux, ce qui est pire qu'aucun profil.
 émulateur AOSP (Android 13/14) plutôt que sur ce ROM constructeur ; valider une
 version de `androidx.benchmark` intermédiaire ; revoir le désucrage.
 
-Incident d'environnement à noter : les variantes `nonMinified` dupliquent les
-binaires natifs (onnxruntime, ~800 Mo par variante) et ont saturé le disque en
-cours de session. Nettoyage nécessaire après toute tentative.
+**Deux incidents d'environnement, à connaître avant toute nouvelle tentative :**
+
+1. **Les données de l'app sur l'appareil sont effacées.**
+   `generateBaselineProfile` installe un APK `nonMinifiedRelease` signé
+   différemment de l'APK de debug : Android impose alors une désinstallation,
+   qui emporte la base Room. Bibliothèque, positions de lecture, signets,
+   annotations et statistiques sont perdus (`allowBackup=false`, aucune
+   restauration possible). Les fichiers EPUB eux-mêmes restent sur le stockage
+   de l'appareil — seul l'index d'InkTone disparaît. **Ne lancer la génération
+   que sur un appareil de test, jamais sur celui qui porte une bibliothèque
+   réelle.**
+2. **Le disque sature.** Les variantes `nonMinified` dupliquent les binaires
+   natifs (onnxruntime, ~800 Mo par variante). Nettoyer `app/build` et
+   `benchmark/build` après toute tentative.
 
 Commit `c9dbceb6`.
 
