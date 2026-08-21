@@ -232,3 +232,35 @@ le commit ou l'état du code qui la prouve (CLAUDE.md §« le code fait foi »).
   ouverture EPUB → première page → démarrage TTS), puis le macrobenchmark de
   démarrage à froid avant/après, chiffres consignés dans §5. La génération
   s'exécute **sur device** (hors portée d'une session sans appareil).
+
+### 6.2 — P1, correctif du tracker de session (fait)
+
+- **`onAppBackground()`** ne pause plus le tracker quand `isPlaying` est vrai
+  (`ReaderViewModel.kt`) : le temps d'écoute écran éteint reste imputé au mode
+  AUDIO au lieu d'être figé. Garde-fou de non-régression :
+  `ReaderViewModelBackgroundTrackerTest.kt` (deux cas : sans écoute → pausé,
+  pendant l'écoute → actif). Commit `37fbefd1`.
+
+### 6.3 — P1, session média (à faire — décision d'architecture actée)
+
+Le reste de P1 (MediaSession + notification + focus audio + `onCleared`) est un
+chantier **cohésif** qui exige de hisser la session TTS hors de `ReaderViewModel`
+vers un singleton app-scoped, consommé par `infrastructure/media` via un contrat
+domaine. Décision clé identifiée à l'audit :
+
+- **Sémantique pause ≠ stop.** Le lecteur pause par `stop()` (Idle) ; la
+  notification doit pauser par `pause()` (réel, réservé à cet usage — cf.
+  `TtsPillBar.kt`). Le collecteur d'état du `ReaderViewModel` doit alors traiter
+  `Paused` en `isPlaying=false` (branche aujourd'hui morte), et `Playing` en
+  `isPlaying=true`, pour rester la source de vérité unique (K3).
+- **Pas d'auto-avance parasite.** `skip()`/`togglePlayPause()` du singleton
+  font `stop()`+`play()` de façon synchrone : StateFlow conflate l'Idle
+  transitoire, le collecteur voit Buffering/Playing — pas d'`onChapterPlaybackCompleted`
+  intempestif. À couvrir par un test de non-régression.
+- **Ordre des paliers** : (a) contrat domaine `PlaybackSession` + extension de
+  `PlaybackOrchestrator` (rétention du contexte, `skip`, `togglePlayPause`,
+  métadonnées) testés en JVM ; (b) réécriture d'`AudioPlaybackService` en vrai
+  service foreground + notification `MediaStyle` + `POST_NOTIFICATIONS` demandée
+  au premier démarrage de lecture ; (c) `AudioFocusRequest` + `BecomingNoisy`
+  (test instrumenté) ; (d) `onCleared()` ne coupe plus quand la session détient
+  la lecture.
