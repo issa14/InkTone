@@ -2,6 +2,7 @@ package com.inktone.feature.reader
 
 import com.inktone.domain.model.ReadingState
 import com.inktone.domain.model.Sentence
+import com.inktone.domain.model.SleepTimerState
 import com.inktone.domain.model.VoiceProfile
 import com.inktone.domain.service.AudioPlayer
 import com.inktone.domain.service.AudioSegment
@@ -38,10 +39,16 @@ import javax.inject.Inject
 import javax.inject.Singleton
 
 /**
- * Ordonnanceur de lecture gapless (Lot 15, ADR-025) — **borné**, sans preWarm,
- * sans seuils d'erreur adaptatifs, sans sleep timer, sans audio focus. Il ne
- * connaît que les contrats domaine [TtsEngine] et [AudioPlayer] — jamais
- * `AudioTrack`, jamais un moteur concret.
+ * Ordonnanceur de lecture gapless (Lot 15, ADR-025) — **borné**, sans preWarm
+ * ni seuils d'erreur adaptatifs. Il ne connaît que les contrats domaine
+ * [TtsEngine] et [AudioPlayer] — jamais `AudioTrack`, jamais un moteur concret.
+ *
+ * Depuis P1/P2 (plan polissage Pareto) il porte aussi la **session** :
+ * métadonnées, programme de narration, auto-avance de chapitre et minuteur de
+ * sommeil. Ces éléments vivaient dans le `ReaderViewModel` et mouraient donc
+ * avec l'écran de lecture, alors qu'ils décrivent une écoute qui lui survit.
+ * Le focus audio reste hors d'ici : c'est de l'I/O Android, porté par
+ * `AudioFocusController` (infrastructure).
  *
  * Architecture producteur/consommateur :
  * - **Producteur** : synthétise les phrases dans l'ordre, avec un [Channel]
@@ -332,6 +339,47 @@ class PlaybackOrchestrator @Inject constructor(
     fun isSessionEngaged(): Boolean = when (_state.value) {
         PlaybackStatus.Playing, PlaybackStatus.Buffering, PlaybackStatus.Paused -> true
         PlaybackStatus.Idle, is PlaybackStatus.Error -> false
+    }
+
+    // ── Minuteur de sommeil (P2-b, écart 4 de P1) ──────────────────────
+
+    private val _sleepTimer = MutableStateFlow<SleepTimerState?>(null)
+    override val sleepTimer: StateFlow<SleepTimerState?> = _sleepTimer.asStateFlow()
+
+    private var sleepTimerJob: Job? = null
+
+    /**
+     * Arme le minuteur de sommeil, ou l'annule si [minutes] est `null`.
+     *
+     * Vit ici plutôt que dans le Lecteur (où il était jusqu'à ce palier) parce
+     * que s'endormir en écoutant est exactement le cas où l'écran de lecture
+     * n'existe plus : un minuteur attaché à l'écran laissait la narration
+     * tourner toute la nuit dès qu'on quittait le Lecteur.
+     *
+     * Décompte à la seconde plutôt qu'un unique `delay` : la notification doit
+     * pouvoir afficher le temps restant, ce qu'une simple attente ne permet
+     * pas. À l'expiration, `stop()` — jamais une simple mise à faux d'un
+     * drapeau, qui laisserait la phrase en cours finir de jouer.
+     */
+    override fun setSleepTimer(minutes: Int?) {
+        sleepTimerJob?.cancel()
+        sleepTimerJob = null
+        if (minutes == null || minutes <= 0) {
+            _sleepTimer.value = null
+            return
+        }
+        val totalMs = minutes * 60_000L
+        _sleepTimer.value = SleepTimerState(remainingMs = totalMs)
+        sleepTimerJob = scope.launch {
+            var remaining = totalMs
+            while (remaining > 0) {
+                delay(SLEEP_TIMER_TICK_MS)
+                remaining -= SLEEP_TIMER_TICK_MS
+                _sleepTimer.value = SleepTimerState(remainingMs = remaining.coerceAtLeast(0))
+            }
+            _sleepTimer.value = null
+            stop()
+        }
     }
 
     /**
@@ -722,5 +770,8 @@ class PlaybackOrchestrator @Inject constructor(
          * — le parsing du chapitre suivant repasse en `Buffering` bien avant.
          */
         const val SESSION_RELEASE_DEBOUNCE_MS = 1_500L
+
+        /** Pas de décompte du minuteur de sommeil (affichage à la seconde). */
+        const val SLEEP_TIMER_TICK_MS = 1_000L
     }
 }

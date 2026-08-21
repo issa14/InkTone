@@ -1,5 +1,6 @@
 package com.inktone.domain.service
 
+import com.inktone.domain.model.SleepTimerState
 import kotlinx.coroutines.flow.StateFlow
 
 /**
@@ -73,4 +74,20 @@ interface PlaybackSession {
 
     /** Arrête la lecture et libère la synthèse (reprise impossible sans [togglePlayPause]). */
     fun stop()
+
+    /**
+     * Minuteur de sommeil en cours, `null` si aucun (P2-b).
+     *
+     * Porté par la session et non par l'écran Lecteur : s'endormir en écoutant
+     * est précisément le cas où l'écran est éteint et l'écran de lecture
+     * détruit. Un minuteur qui mourrait avec lui laisserait la narration
+     * tourner toute la nuit.
+     */
+    val sleepTimer: StateFlow<SleepTimerState?>
+
+    /**
+     * Arme le minuteur pour [minutes], ou l'annule si `null`. Un seul minuteur
+     * actif à la fois : réarmer remplace, jamais deux qui coexistent.
+     */
+    fun setSleepTimer(minutes: Int?)
 }

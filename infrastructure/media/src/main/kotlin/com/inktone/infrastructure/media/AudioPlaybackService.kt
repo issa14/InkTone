@@ -17,6 +17,8 @@ import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.cancel
+import kotlinx.coroutines.flow.map
+import kotlinx.coroutines.flow.distinctUntilChanged
 import kotlinx.coroutines.launch
 import javax.inject.Inject
 
@@ -112,6 +114,10 @@ class AudioPlaybackService : Service() {
                 onUserCommand()
                 playbackSession.skip(-1)
             }
+            ACTION_CANCEL_SLEEP_TIMER -> {
+                onUserCommand()
+                playbackSession.setSleepTimer(null)
+            }
             ACTION_STOP -> {
                 onUserCommand()
                 playbackSession.stop()
@@ -149,6 +155,16 @@ class AudioPlaybackService : Service() {
                 mediaSession?.setPlaybackState(buildPlaybackState(playing))
                 refreshNotification()
             }
+        }
+        // P2-b — le décompte du minuteur de sommeil s'affiche dans la
+        // notification. Rafraîchi à la minute et non à la seconde : une
+        // notification réécrite chaque seconde coûte du réveil de process pour
+        // une information que personne ne lit à cette précision.
+        scope.launch {
+            playbackSession.sleepTimer
+                .map { it?.remainingMs?.let { ms -> ms / 60_000L } }
+                .distinctUntilChanged()
+                .collect { refreshNotification() }
         }
         scope.launch {
             playbackSession.metadata.collect { meta ->
@@ -191,6 +207,17 @@ class AudioPlaybackService : Service() {
         }
     }
 
+    /**
+     * Temps restant du minuteur de sommeil, ou `null` si aucun n'est armé.
+     * Arrondi à la minute SUPÉRIEURE : afficher « 0 min » pendant les
+     * dernières secondes laisserait croire que le minuteur est déjà passé.
+     */
+    private fun sleepTimerLabel(): String? {
+        val remainingMs = playbackSession.sleepTimer.value?.remainingMs ?: return null
+        val minutes = ((remainingMs + 59_999L) / 60_000L).toInt()
+        return "Arrêt dans $minutes min"
+    }
+
     private fun buildNotification(): Notification {
         val contentIntent = PendingIntent.getActivity(
             this,
@@ -204,7 +231,7 @@ class AudioPlaybackService : Service() {
         return Notification.Builder(this, CHANNEL_ID)
             .setSmallIcon(android.R.drawable.ic_media_play)
             .setContentTitle(metadata.title ?: getString(android.R.string.unknownName))
-            .setContentText(metadata.author)
+            .setContentText(sleepTimerLabel() ?: metadata.author)
             .setContentIntent(contentIntent)
             .setVisibility(Notification.VISIBILITY_PUBLIC)
             .setOnlyAlertOnce(true)
@@ -241,6 +268,21 @@ class AudioPlaybackService : Service() {
                 ).build(),
             )
             .setDeleteIntent(serviceIntent(ACTION_STOP))
+            .also { builder ->
+                // Action présente UNIQUEMENT quand un minuteur est armé :
+                // proposer « annuler » sans minuteur serait un bouton mort, et
+                // en ARMER un depuis la notification demanderait de choisir une
+                // durée — ce qui appartient au panneau, pas à une action.
+                if (playbackSession.sleepTimer.value != null) {
+                    builder.addAction(
+                        Notification.Action.Builder(
+                            android.R.drawable.ic_menu_close_clear_cancel,
+                            "Annuler le minuteur",
+                            serviceIntent(ACTION_CANCEL_SLEEP_TIMER),
+                        ).build(),
+                    )
+                }
+            }
             .setStyle(
                 Notification.MediaStyle()
                     .setMediaSession(mediaSession?.sessionToken)
@@ -276,6 +318,7 @@ class AudioPlaybackService : Service() {
         const val NOTIFICATION_ID = 1001
         const val ACTION_PLAY_PAUSE = "com.inktone.media.action.PLAY_PAUSE"
         const val ACTION_SKIP_NEXT = "com.inktone.media.action.SKIP_NEXT"
+        const val ACTION_CANCEL_SLEEP_TIMER = "com.inktone.media.action.CANCEL_SLEEP_TIMER"
         const val ACTION_SKIP_PREVIOUS = "com.inktone.media.action.SKIP_PREVIOUS"
         const val ACTION_STOP = "com.inktone.media.action.STOP"
     }

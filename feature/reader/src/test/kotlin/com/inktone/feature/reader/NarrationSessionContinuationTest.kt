@@ -2,6 +2,7 @@ package com.inktone.feature.reader
 
 import com.inktone.core.testing.fake.FakeReadingSessionRepository
 import com.inktone.domain.model.ReadingMode
+import com.inktone.domain.model.SleepTimerState
 import com.inktone.domain.service.PlaybackMetadata
 import com.inktone.domain.service.PlaybackSession
 import com.inktone.domain.service.PlaybackSessionState
@@ -37,6 +38,8 @@ class NarrationSessionContinuationTest {
         override fun resume() = Unit
         override fun skip(delta: Int) = Unit
         override fun stop() = Unit
+        override val sleepTimer = MutableStateFlow<SleepTimerState?>(null)
+        override fun setSleepTimer(minutes: Int?) = Unit
     }
 
     /** Horloge manuelle : le test décide du temps écoulé. */

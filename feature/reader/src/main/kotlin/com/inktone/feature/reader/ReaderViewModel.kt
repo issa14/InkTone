@@ -162,6 +162,14 @@ class ReaderViewModel @Inject constructor(
             }
         }
 
+        // P2-b — le minuteur de sommeil est porté par la session ; l'écran ne
+        // fait que l'afficher (SleepTimerPanel, ligne de statut).
+        viewModelScope.launch {
+            playbackOrchestrator.sleepTimer.collect { timer ->
+                _state.value = _state.value.copy(sleepTimer = timer)
+            }
+        }
+
         // P2-b — l'écran SUIT le chapitre narré, il ne le pilote plus.
         // L'auto-avance vit désormais dans l'ordonnanceur (seul capable de
         // continuer quand cet écran est détruit) ; ici on se contente de
@@ -219,7 +227,6 @@ class ReaderViewModel @Inject constructor(
     /** Plan v4 — scope dédié aux préchargements, annulé indépendamment du chargement courant. */
     private var preloadScope: CoroutineScope? = null
     private val annotationSelectionHandler = AnnotationSelectionHandler()
-    private var sleepTimerJob: Job? = null
 
     // ───── Lot Sessions ─────
     private var sessionTracker: ReadingSessionTracker? = null
@@ -229,7 +236,7 @@ class ReaderViewModel @Inject constructor(
 
     // 3d.5 — rappel de repos oculaire : eyeRestReminderJob porte le délai
     // jusqu'à l'échéance (relancé à chaque reprise, jamais deux en
-    // parallèle comme sleepTimerJob) ; eyeRestCountdownJob porte le
+    // parallèle) ; eyeRestCountdownJob porte le
     // compte à rebours de 60s du popup une fois affiché ;
     // wasPlayingBeforeEyeRest mémorise s'il faut reprendre le TTS.
     private var eyeRestReminderJob: Job? = null
@@ -244,7 +251,7 @@ class ReaderViewModel @Inject constructor(
     // Lot 4, tâche 4.7 — flash différé : pendingHighlightTimeoutJob est la
     // sortie de secours (mise en page qui n'aboutit jamais) ; flashClearJob
     // efface le flash affiché après un court délai. Un seul de chaque à la
-    // fois, même discipline que sleepTimerJob.
+    // fois, même discipline que les autres jobs de cet écran.
     private var pendingHighlightTimeoutJob: Job? = null
     private var flashClearJob: Job? = null
 
@@ -402,22 +409,12 @@ class ReaderViewModel @Inject constructor(
      * cours, jamais deux qui coexistent.
      */
     private fun setSleepTimer(minutes: Int?) {
-        sleepTimerJob?.cancel()
-        if (minutes == null) {
-            _state.value = _state.value.copy(sleepTimer = null)
-            return
-        }
-        val remainingMs = minutes * 60_000L
-        _state.value = _state.value.copy(sleepTimer = SleepTimerState(remainingMs = remainingMs))
-        sleepTimerJob = viewModelScope.launch {
-            delay(remainingMs)
-            // Même bug que Pause avant correction (voir pausePlayback) :
-            // ne mettre isPlaying à false sans couper playbackJob/audio
-            // laissait la phrase en cours continuer à jouer après
-            // l'extinction du minuteur.
-            pausePlayback()
-            _state.value = _state.value.copy(sleepTimer = null)
-        }
+        // P2-b — le minuteur appartient à la session, plus à cet écran :
+        // s'endormir en écoutant est précisément le cas où le Lecteur est
+        // détruit, et un minuteur qui mourrait avec lui laisserait la
+        // narration tourner toute la nuit. Cet écran ne fait plus que
+        // transmettre l'intention et refléter l'état (collecteur ci-dessus).
+        playbackOrchestrator.setSleepTimer(minutes)
     }
 
     /**
@@ -1287,7 +1284,6 @@ class ReaderViewModel @Inject constructor(
         super.onCleared()
         val sessionEngaged = playbackOrchestrator.isSessionEngaged()
         if (!sessionEngaged) playbackOrchestrator.stop()
-        sleepTimerJob?.cancel()
         scrollPersistJob?.cancel()
         eyeRestReminderJob?.cancel()
         eyeRestCountdownJob?.cancel()
