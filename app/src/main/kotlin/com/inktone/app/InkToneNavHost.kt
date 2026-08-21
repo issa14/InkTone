@@ -5,6 +5,8 @@ import com.inktone.core.designsystem.AppSymbol
 import androidx.compose.animation.ExperimentalSharedTransitionApi
 import androidx.compose.animation.SharedTransitionLayout
 import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.padding
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.DrawerValue
@@ -52,6 +54,7 @@ import com.inktone.feature.library.LibraryItemsScreen
 import com.inktone.feature.library.LibraryScreen
 import com.inktone.feature.library.RecentsScreen
 import com.inktone.feature.onboarding.OnboardingScreen
+import com.inktone.feature.player.MiniPlayerBar
 import com.inktone.feature.opds.CatalogDashboardScreen
 import com.inktone.feature.reader.ReaderIntent
 import com.inktone.feature.reader.ReaderScreen
@@ -161,7 +164,15 @@ fun InkToneNavHost(navController: NavHostController = rememberNavController(), s
     val openDrawer: () -> Unit = { scope.launch { drawerState.open() } }
     SharedTransitionLayout {
         CompositionLocalProvider(LocalSharedTransitionScope provides this@SharedTransitionLayout) {
-        NavHost(navController = navController, startDestination = startDestination) {
+        // P2 — le mini-lecteur occupe une bande sous le contenu plutôt que de
+        // le recouvrir : une barre flottante masquerait les actions ancrées en
+        // bas des écrans (import, filtres de bibliothèque).
+        Column(modifier = Modifier.fillMaxSize()) {
+        NavHost(
+            navController = navController,
+            startDestination = startDestination,
+            modifier = Modifier.weight(1f),
+        ) {
         composable<OnboardingRoute> {
             OnboardingScreen(
                 onDone = {
@@ -444,6 +455,16 @@ fun InkToneNavHost(navController: NavHostController = rememberNavController(), s
             )
         }
     }
+        // Masqué sur le Lecteur (qui a ses propres commandes TTS) et sur
+        // l'onboarding (aucune narration possible avant le premier import).
+        if (currentDestination?.hidesMiniPlayer() != true) {
+            MiniPlayerBar(
+                onOpenReader = { publicationId ->
+                    navController.navigate(ReaderRoute(publicationId)) { launchSingleTop = true }
+                },
+            )
+        }
+        } // Column (contenu + mini-lecteur)
         } // CompositionLocalProvider (SharedTransitionScope)
     } // SharedTransitionLayout
     } // ModalNavigationDrawer
@@ -456,6 +477,14 @@ fun InkToneNavHost(navController: NavHostController = rememberNavController(), s
  * un écran hors drawer (Reader, Réglages, pied de drawer) renvoie `null`
  * — aucun item surligné, et le geste de balayage désactivé.
  */
+/**
+ * P2 — écrans où le mini-lecteur ne doit pas apparaître : le Lecteur, qui a
+ * ses propres commandes TTS (une seconde barre ferait doublon et volerait de
+ * la hauteur de page), et l'onboarding, où aucune narration ne peut exister.
+ */
+private fun NavDestination.hidesMiniPlayer(): Boolean =
+    hasRoute<ReaderRoute>() || hasRoute<OnboardingRoute>()
+
 private fun NavDestination.toDrawerDestination(): DrawerDestination? = when {
     hasRoute<LibraryRoute>() -> DrawerDestination.LIBRARY
     hasRoute<RecentsRoute>() -> DrawerDestination.RECENTS

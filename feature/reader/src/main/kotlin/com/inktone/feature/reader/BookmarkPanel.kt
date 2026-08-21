@@ -43,6 +43,7 @@ import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import com.inktone.core.designsystem.AppIcon
 import com.inktone.core.designsystem.AppIcons
+import com.inktone.core.designsystem.Motion
 import com.inktone.core.designsystem.AppSymbol
 import com.inktone.domain.model.Annotation
 import com.inktone.domain.model.AnnotationColor
@@ -88,8 +89,11 @@ fun BookmarkPanel(
         // ModalBottomSheet le ferait pour son propre scrim.
         AnimatedVisibility(
             visible = true,
-            enter = fadeIn(tween(200)),
-            exit = fadeOut(tween(200)),
+            // P5 — durée du système de design. Ces animations étaient écrites
+            // en dur (200 ms) et ne respectaient AUCUN réglage de mouvement
+            // réduit ; `Motion.tween` l'applique par construction.
+            enter = fadeIn(Motion.tween()),
+            exit = fadeOut(Motion.tween()),
         ) {
             Box(
                 modifier = Modifier
@@ -101,8 +105,8 @@ fun BookmarkPanel(
 
         AnimatedVisibility(
             visible = true,
-            enter = slideInHorizontally(tween(200)) { -it },
-            exit = slideOutHorizontally(tween(200)) { -it },
+            enter = slideInHorizontally(Motion.tween()) { -it },
+            exit = slideOutHorizontally(Motion.tween()) { -it },
         ) {
             Surface(
                 modifier = Modifier

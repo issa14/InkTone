@@ -410,3 +410,21 @@ val MIGRATION_25_26 = object : Migration(25, 26) {
         )
     }
 }
+
+/**
+ * P4 (plan polissage Pareto) — réglages de confort de lecture visuelle : marges
+ * latérales, espacement de paragraphe, justification, écran maintenu allumé.
+ *
+ * Toutes les colonnes ont un défaut neutre reproduisant le rendu d'avant la
+ * migration (marge et espacement au cran médian, pas de justification, écran
+ * non forcé) : une bibliothèque existante s'ouvre exactement comme avant, sans
+ * que l'utilisateur constate un changement qu'il n'a pas demandé.
+ */
+val MIGRATION_26_27 = object : Migration(26, 27) {
+    override fun migrate(db: SupportSQLiteDatabase) {
+        db.execSQL("ALTER TABLE user_preferences ADD COLUMN readerMarginStep INTEGER NOT NULL DEFAULT 1")
+        db.execSQL("ALTER TABLE user_preferences ADD COLUMN paragraphSpacingStep INTEGER NOT NULL DEFAULT 1")
+        db.execSQL("ALTER TABLE user_preferences ADD COLUMN textJustified INTEGER NOT NULL DEFAULT 0")
+        db.execSQL("ALTER TABLE user_preferences ADD COLUMN keepScreenOn INTEGER NOT NULL DEFAULT 0")
+    }
+}

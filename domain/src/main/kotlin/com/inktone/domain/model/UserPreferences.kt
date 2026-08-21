@@ -84,10 +84,37 @@ data class UserPreferences(
     // UI, et sans effet côté planification si l'auto-sync est éteinte.
     val syncAutoEnabled: Boolean = false,
     val syncWifiOnly: Boolean = false,
+    // P4 (plan polissage Pareto) — confort de lecture visuelle. Le panneau
+    // n'exposait que la taille et l'interligne ; ces quatre réglages sont le
+    // minimum qu'offre tout lecteur sérieux.
+    //
+    // Les marges et l'espacement de paragraphe sont des CRANS (0..2) et non
+    // des valeurs en dp : l'utilisateur choisit un confort, pas une mesure,
+    // et une valeur libre exposerait des combinaisons illisibles (marge de
+    // 60 dp sur un écran de 5 pouces). La conversion en dp appartient à la
+    // couche de rendu, seule à connaître la densité de l'écran.
+    val readerMarginStep: Int = MARGIN_STEP_DEFAULT,
+    val paragraphSpacingStep: Int = PARAGRAPH_SPACING_STEP_DEFAULT,
+    /**
+     * Texte justifié. Emporte la césure avec lui, sans réglage séparé :
+     * justifier sans césurer creuse des « rivières » blanches dans un texte
+     * français (mots longs, peu de coupures naturelles). Les proposer
+     * séparément laisserait choisir la seule combinaison qui dégrade la
+     * lecture.
+     */
+    val textJustified: Boolean = false,
+    /** Empêche l'écran de s'éteindre pendant la lecture visuelle. */
+    val keepScreenOn: Boolean = false,
 ) {
     init {
         require(fontSize > 0) { "fontSize doit être strictement positif" }
         require(lineHeightMultiplier > 0f) { "lineHeightMultiplier doit être strictement positif" }
+        require(readerMarginStep in MARGIN_STEP_RANGE) {
+            "readerMarginStep doit être dans $MARGIN_STEP_RANGE"
+        }
+        require(paragraphSpacingStep in PARAGRAPH_SPACING_STEP_RANGE) {
+            "paragraphSpacingStep doit être dans $PARAGRAPH_SPACING_STEP_RANGE"
+        }
         require(readerBrightness == null || readerBrightness in 0.01f..1.0f) {
             "readerBrightness doit être compris entre 0.01 et 1.0, ou null"
         }
@@ -95,6 +122,16 @@ data class UserPreferences(
         require((syncProvider == null) == (syncAccountLabel == null && syncLinkedAt == null)) {
             "syncProvider, syncAccountLabel et syncLinkedAt doivent être renseignés ensemble ou tous absents"
         }
+    }
+
+    companion object {
+        /** Crans de marge latérale : 0 étroite, 1 normale, 2 large. */
+        val MARGIN_STEP_RANGE = 0..2
+        const val MARGIN_STEP_DEFAULT = 1
+
+        /** Crans d'espacement entre paragraphes : 0 serré, 1 normal, 2 aéré. */
+        val PARAGRAPH_SPACING_STEP_RANGE = 0..2
+        const val PARAGRAPH_SPACING_STEP_DEFAULT = 1
     }
 }
 

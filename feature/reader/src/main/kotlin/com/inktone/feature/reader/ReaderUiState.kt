@@ -10,6 +10,7 @@ import com.inktone.domain.model.ReadingOverrides
 import com.inktone.domain.model.ReadingTheme
 import com.inktone.domain.model.SleepTimerState
 import com.inktone.domain.model.TableOfContentsEntry
+import com.inktone.domain.model.UserPreferences
 import com.inktone.domain.model.VoiceProfile
 import com.inktone.domain.service.EpubResourceResolver
 import com.inktone.domain.valueobject.Locator
@@ -84,6 +85,18 @@ data class ReaderUiState(
     // en continu comme isReadingRulerEnabled : pas de surcharge par
     // publication, voir doc du lot 3d.
     val lineHeightMultiplier: Float = 1.4f,
+    // P4 (plan polissage Pareto) — confort de lecture visuelle, même patron
+    // d'observation continue que lineHeightMultiplier (réglage global, pas de
+    // surcharge par publication).
+    //
+    // `readerMarginStep` alimente une seule valeur en dp côté ReaderScreen,
+    // consommée à la fois par la MESURE de pagination et par le rendu : deux
+    // sources distinctes feraient déborder le texte hors de la page mesurée.
+    val readerMarginStep: Int = UserPreferences.MARGIN_STEP_DEFAULT,
+    /** Justification + césure (les deux ensemble, voir UserPreferences.textJustified). */
+    val isTextJustified: Boolean = false,
+    /** Empêche l'extinction de l'écran pendant la lecture visuelle. */
+    val keepScreenOn: Boolean = false,
     // 3d.3 — réglage global (UserPreferences.readerBrightness), même
     // patron d'observation continue que lineHeightMultiplier. null =
     // valeur système, appliqué à la fenêtre par ReaderBrightnessEffect.
@@ -365,6 +378,15 @@ sealed interface ReaderIntent {
 
     /** 3d.2 — réglage global d'interligne, voir `ReaderUiState.lineHeightMultiplier`. */
     data class SetLineHeight(val multiplier: Float) : ReaderIntent
+
+    /** P4 — cran de marge latérale (voir `UserPreferences.MARGIN_STEP_RANGE`). */
+    data class SetReaderMarginStep(val step: Int) : ReaderIntent
+
+    /** P4 — justification du texte, césure comprise. */
+    data class SetTextJustified(val justified: Boolean) : ReaderIntent
+
+    /** P4 — maintien de l'écran allumé pendant la lecture visuelle. */
+    data class SetKeepScreenOn(val enabled: Boolean) : ReaderIntent
 
     /** 3d.3 — luminosité de la fenêtre du lecteur. `null` = valeur système. */
     data class SetReaderBrightness(val value: Float?) : ReaderIntent

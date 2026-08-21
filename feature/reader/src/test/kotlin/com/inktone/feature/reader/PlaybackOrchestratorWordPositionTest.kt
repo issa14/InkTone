@@ -1,5 +1,6 @@
 package com.inktone.feature.reader
 
+import com.inktone.core.testing.fake.FakeChapterParser
 import com.inktone.core.testing.fake.FakeReadingStateRepository
 import com.inktone.domain.model.Sentence
 import com.inktone.domain.model.TtsEngineId
@@ -65,6 +66,7 @@ class PlaybackOrchestratorWordPositionTest {
             ttsEngine = FakeWordTtsEngine(wordTimestamps),
             audioPlayer = player,
             updateReadingState = UpdateReadingStateUseCase(FakeReadingStateRepository()),
+            chapterParser = FakeChapterParser(),
         )
 
         orchestrator.play(listOf(sentence()), profile, 0, "pub1", 0, "ch.xhtml")
@@ -97,6 +99,7 @@ class PlaybackOrchestratorWordPositionTest {
             ttsEngine = FakeWordTtsEngine(listOf(WordTimestamp(word = "x", startMs = 0, endMs = 100, charOffset = 0))),
             audioPlayer = player,
             updateReadingState = UpdateReadingStateUseCase(FakeReadingStateRepository()),
+            chapterParser = FakeChapterParser(),
         )
 
         orchestrator.play(listOf(sentence()), profile, 0, "pub1", 0, "ch.xhtml")
@@ -118,6 +121,7 @@ class PlaybackOrchestratorWordPositionTest {
             ttsEngine = FakeWordTtsEngine(wordTimestamps),
             audioPlayer = player,
             updateReadingState = UpdateReadingStateUseCase(FakeReadingStateRepository()),
+            chapterParser = FakeChapterParser(),
         )
 
         orchestrator.play(listOf(sentence()), profile, 0, "pub1", 0, "ch.xhtml")

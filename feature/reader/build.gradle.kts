@@ -58,6 +58,10 @@ dependencies {
     implementation("androidx.compose.foundation:foundation")
     // Tache 9bis.3.1 : WindowInsetsControllerCompat (mode immersif)
     implementation(libs.androidx.core.ktx)
+    // P1 : demande de POST_NOTIFICATIONS au premier demarrage d'une
+    // narration (rememberLauncherForActivityResult) - meme dependance et
+    // meme version que feature/import (ImportPickerButton).
+    implementation("androidx.activity:activity-compose:1.9.1")
     coreLibraryDesugaring(libs.desugar.jdk.libs)
 
     // data (RepositoryModule/UseCaseModule), infrastructure/database

@@ -60,6 +60,8 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.geometry.Rect
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
+import com.inktone.core.designsystem.Motion
+import com.inktone.core.designsystem.rememberAppHaptics
 import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.layout.LayoutCoordinates
 import androidx.compose.ui.layout.onGloballyPositioned
@@ -77,6 +79,9 @@ import androidx.compose.ui.text.SpanStyle
 import androidx.compose.ui.text.TextLayoutResult
 import androidx.compose.ui.text.TextRange
 import androidx.compose.ui.text.TextStyle
+import androidx.compose.ui.text.style.TextAlign
+import androidx.compose.ui.text.style.LineBreak
+import androidx.compose.ui.text.style.Hyphens
 import androidx.compose.ui.text.buildAnnotatedString
 import androidx.compose.ui.text.input.TextFieldValue
 import androidx.compose.ui.unit.Dp
@@ -178,6 +183,16 @@ fun ReaderScreen(
     onOpenSettings: () -> Unit = {},
 ) {
     val state by viewModel.state.collectAsState()
+
+    // P1 — la notification média est la voie de contrôle en arrière-plan et
+    // sur écran verrouillé. Sur Android 13+, elle n'apparaît qu'avec
+    // POST_NOTIFICATIONS : demandée ici, au moment précis où l'utilisateur
+    // lance une narration, jamais au lancement de l'application.
+    val requestNotificationPermission = rememberTtsNotificationPermissionRequest()
+    val togglePlayback = {
+        if (!state.isPlaying) requestNotificationPermission()
+        viewModel.onIntent(if (state.isPlaying) ReaderIntent.Pause else ReaderIntent.PlayCurrentSentence)
+    }
 
     // ───── Lot Sessions : pause/reprise sur changement de visibilité ─────
     val lifecycleOwner = LocalLifecycleOwner.current
@@ -300,7 +315,11 @@ fun ReaderScreen(
     ) {
     // 3d.3 — applique la luminosité choisie à la fenêtre du lecteur
     // seulement, restaurée à la sortie (voir ReaderBrightnessEffect).
+    val haptics = rememberAppHaptics()
     ReaderBrightnessEffect(value = state.readerBrightness)
+    // P4 — retiré avec l'écran de lecture (DisposableEffect) : le maintien ne
+    // doit jamais survivre au Lecteur.
+    KeepScreenOnEffect(enabled = state.keepScreenOn)
 
     // C.5 — SharedTransition depuis la couverture de la bibliothèque
     val sharedTransitionScope = runCatching {
@@ -515,11 +534,16 @@ fun ReaderScreen(
         // masquage/réapparition du HUD, dont les étapes intermédiaires
         // faisaient clignoter la page affichée, ne se produit plus.
         var readingAreaSize by remember { mutableStateOf(IntSize.Zero) }
-        val paginationPaddingPx = with(density) { 16.dp.roundToPx() }
+        // P4 — marge latérale réglable. UNE seule valeur, consommée à la fois
+        // par la mesure de pagination et par le rendu (PagedChapterContent) :
+        // deux sources distinctes feraient mesurer une page plus large que
+        // celle réellement dessinée, donc déborder le texte.
+        val readerMargin = readerMarginFor(state.readerMarginStep)
+        val paginationPaddingPx = with(density) { readerMargin.roundToPx() }
         // 3d.2 — interligne en sp, combiné à fontSize (multiplicateur
         // global, voir UserPreferences.lineHeightMultiplier) : seul point de
-        // calcul, consommé à la fois par la mesure de pagination et par le
-        // rendu en mode SCROLL (ParagraphText) ci-dessous.
+        // calcul, consommé par la mesure de pagination (mode paginé) ET par le
+        // style de rendu du mode défilement plus bas.
         val lineHeightSp = (state.effectiveSettings.fontSize * state.lineHeightMultiplier).roundToInt()
         // Lot 9 — police effective (préférence explicite si définie, sinon
         // celle du thème actif) : entre dans la clé d'invalidation de la
@@ -542,6 +566,10 @@ fun ReaderScreen(
             viewportHeightPx = readingAreaSize.height,
             paddingPx = paginationPaddingPx,
             fontFamily = effectiveFontFamily,
+            // P4 — la césure change les points de coupure de ligne, donc la
+            // pagination : elle doit faire partie du style de MESURE, jamais
+            // seulement du rendu.
+            justified = state.isTextJustified,
         )
 
         // Lot 4, tâche 4.7 — signale la fin de mise en page du chapitre
@@ -627,8 +655,23 @@ fun ReaderScreen(
                     val blocks = (chapter?.content as? ChapterContent.Rich)?.blocks.orEmpty()
                     val textStyle = TextStyle(
                         fontSize = state.effectiveSettings.fontSize.sp,
+                        // Bug réel signalé à la vérification device : le
+                        // réglage d'interligne n'avait AUCUN effet en mode
+                        // défilement. `lineHeightSp` n'alimentait que la mesure
+                        // de pagination (mode paginé) ; le style de rendu du
+                        // défilement ne le posait nulle part, et le commentaire
+                        // de sa déclaration affirmait pourtant le contraire —
+                        // resté vrai à l'époque de `ParagraphText`, faux depuis
+                        // la migration vers LazyColumn/BookBlockItem.
+                        lineHeight = lineHeightSp.sp,
                         color = ThemeColors.text(state.resolvedTheme),
                         fontFamily = effectiveFontFamily,
+                        // P4 — mêmes règles qu'en mode paginé (où elles
+                        // viennent de `pagination.baseTextStyle`) : un réglage
+                        // de lecture ne doit jamais dépendre du mode choisi.
+                        textAlign = if (state.isTextJustified) TextAlign.Justify else TextAlign.Unspecified,
+                        hyphens = if (state.isTextJustified) Hyphens.Auto else Hyphens.None,
+                        lineBreak = if (state.isTextJustified) LineBreak.Paragraph else LineBreak.Unspecified,
                     )
 
                     // Parité avec le mode PAGED (absoluteHighlightedRange dans
@@ -729,7 +772,13 @@ fun ReaderScreen(
                                     .graphicsLayer { translationY = visualPull.value }
                                     .nestedScroll(chapterTransitionConnection),
                                 userScrollEnabled = freeSelectedRange == null,
-                                contentPadding = PaddingValues(16.dp),
+                                // P4 — même marge qu'en mode paginé : un
+                                // réglage de lecture ne doit pas dépendre du
+                                // mode choisi. Cette valeur était en dur, si
+                                // bien que le cran de marge n'avait aucun
+                                // effet en défilement (défaut trouvé à la
+                                // vérification device).
+                                contentPadding = PaddingValues(readerMargin),
                             ) {
                                 items(
                                     items = blocks,
@@ -800,6 +849,7 @@ fun ReaderScreen(
                         chapterCount = state.chapters.size,
                         textColor = ThemeColors.text(state.resolvedTheme),
                         isReadingRulerEnabled = state.isReadingRulerEnabled,
+                        contentPadding = readerMargin,
                         onClick = { handleReadingAreaTap() },
                         onNextChapter = { viewModel.onIntent(ReaderIntent.NextChapter) },
                         onPreviousChapter = { viewModel.onIntent(ReaderIntent.PreviousChapter) },
@@ -932,15 +982,20 @@ fun ReaderScreen(
                         // aucune position n'est jamais interpolée, un pur fondu.
                         // AnimatedVisibility n'a pas d'overload BoxScope (seulement
                         // Column/RowScope) : inapplicable ici.
-                        val fadeDuration = if (state.reduceMotion) 0 else 200
+                        // P5 — deux signaux distincts et complémentaires :
+                        // `state.reduceMotion` est la préférence APPLICATIVE,
+                        // `Motion.tween` applique en plus le réglage SYSTÈME
+                        // d'échelle d'animation. Remplacer l'un par l'autre
+                        // ferait perdre un des deux.
+                        val fadeSpec = if (state.reduceMotion) tween<Float>(0) else Motion.tween<Float>()
                         val barAlpha by animateFloatAsState(
                             targetValue = if (isPillCollapsed) 0f else 1f,
-                            animationSpec = tween(fadeDuration),
+                            animationSpec = fadeSpec,
                             label = "TtsPillBarAlpha",
                         )
                         val fabAlpha by animateFloatAsState(
                             targetValue = if (isPillCollapsed) 1f else 0f,
-                            animationSpec = tween(fadeDuration),
+                            animationSpec = fadeSpec,
                             label = "TtsPillBarCollapsedAlpha",
                         )
                         Box(modifier = Modifier.fillMaxWidth()) {
@@ -956,7 +1011,7 @@ fun ReaderScreen(
                                     onPreviousSentence = { keepHudVisible(); viewModel.onIntent(ReaderIntent.SkipToPreviousSentence) },
                                     onPlayPause = {
                                         keepHudVisible()
-                                        viewModel.onIntent(if (state.isPlaying) ReaderIntent.Pause else ReaderIntent.PlayCurrentSentence)
+                                        togglePlayback()
                                     },
                                     onNextSentence = { keepHudVisible(); viewModel.onIntent(ReaderIntent.SkipToNextSentence) },
                                     onNextChapter = { keepHudVisible(); viewModel.onIntent(ReaderIntent.NextChapter) },
@@ -987,7 +1042,7 @@ fun ReaderScreen(
                             bookProgression = state.bookProgression,
                             onPlayPause = {
                                 keepHudVisible()
-                                viewModel.onIntent(if (state.isPlaying) ReaderIntent.Pause else ReaderIntent.PlayCurrentSentence)
+                                togglePlayback()
                             },
                             onSleepTimerClick = { keepHudVisible(); showSleepTimerPanel = true },
                             onSearchClick = { keepHudVisible(); onSearchClick() },
@@ -1103,6 +1158,12 @@ fun ReaderScreen(
                     viewModel.onIntent(ReaderIntent.SetOverrides(overrides))
                 },
                 onLineHeightChange = { multiplier -> viewModel.onIntent(ReaderIntent.SetLineHeight(multiplier)) },
+                currentMarginStep = state.readerMarginStep,
+                isTextJustified = state.isTextJustified,
+                keepScreenOn = state.keepScreenOn,
+                onMarginStepChange = { step -> viewModel.onIntent(ReaderIntent.SetReaderMarginStep(step)) },
+                onTextJustifiedChange = { justified -> viewModel.onIntent(ReaderIntent.SetTextJustified(justified)) },
+                onKeepScreenOnChange = { enabled -> viewModel.onIntent(ReaderIntent.SetKeepScreenOn(enabled)) },
                 onDismiss = { showSettingsPanel = false },
             )
         }
@@ -1117,7 +1178,7 @@ fun ReaderScreen(
                 activeVoiceProfile = state.activeVoiceProfile,
                 availableVoiceProfiles = state.availableVoiceProfiles,
                 onPlayPause = {
-                    viewModel.onIntent(if (state.isPlaying) ReaderIntent.Pause else ReaderIntent.PlayCurrentSentence)
+                    togglePlayback()
                 },
                 onPreviousSentence = { viewModel.onIntent(ReaderIntent.SkipToPreviousSentence) },
                 onNextSentence = { viewModel.onIntent(ReaderIntent.SkipToNextSentence) },
@@ -1131,7 +1192,8 @@ fun ReaderScreen(
         // 3d.4/3d.5 — Panneau Minuteur (remplace le cycle sur l'icône Veille) + repos oculaire
         if (showSleepTimerPanel) {
             SleepTimerPanel(
-                remainingMinutes = state.sleepTimer?.let { (it.remainingMs / 60_000L).toInt() },
+                remainingMs = state.sleepTimer?.remainingMs,
+                armedMinutes = state.sleepTimer?.let { (it.totalMs / 60_000L).toInt() },
                 onSetSleepTimer = { minutes -> viewModel.onIntent(ReaderIntent.SetSleepTimer(minutes)) },
                 eyeRestReminderEnabled = state.eyeRestReminderEnabled,
                 eyeRestReminderIntervalMinutes = state.eyeRestReminderIntervalMinutes,
@@ -1198,7 +1260,12 @@ fun ReaderScreen(
                     isCurrentPageBookmarked = state.isCurrentPageBookmarked,
                     onBookmarkClick = { bookmark -> viewModel.onIntent(ReaderIntent.NavigateToLocator(bookmark.locator)) },
                     onAnnotationClick = { annotation -> viewModel.onIntent(ReaderIntent.NavigateToLocator(annotation.startLocator)) },
-                    onToggleBookmark = { viewModel.onIntent(ReaderIntent.ToggleBookmarkAtCurrentPosition) },
+                    onToggleBookmark = {
+                        // P5 — confirmation tactile d'une action qui aboutit,
+                        // distincte du simple cran de page (`tick`).
+                        haptics.confirm()
+                        viewModel.onIntent(ReaderIntent.ToggleBookmarkAtCurrentPosition)
+                    },
                     onClose = { viewModel.onIntent(ReaderIntent.ToggleBookmarkList) },
                 )
             }

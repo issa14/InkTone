@@ -7,11 +7,13 @@ android {
 }
 
 dependencies {
-    // MediaController (Tache 5.5) parle a AudioPlaybackService (infrastructure/media)
-    // via SessionToken/ComponentName par nom de classe (string), jamais par
-    // dependance de compilation directe sur ce module - respecte le sens des
-    // dependances (Blueprint §12.4 : feature ne depend jamais d'infrastructure).
-    implementation(libs.androidx.media3.session)
+    // P2 : le mini-lecteur consomme le contrat domaine PlaybackSession
+    // (expose par Hilt), plus aucun MediaController media3 - l'ancien
+    // PlayerViewModel parlait par SessionToken/ComponentName a un service
+    // qui ne jouait rien (code mort, constat §1 du plan de polissage).
     implementation(libs.androidx.hilt.navigation.compose)
     implementation(libs.androidx.lifecycle.viewmodel.compose)
+    implementation(libs.androidx.lifecycle.runtime.compose)
+
+    androidTestImplementation(libs.androidx.test.ext.junit)
 }

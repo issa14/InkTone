@@ -1032,6 +1032,47 @@ class DatabaseMigrationTest {
         v26.close()
     }
 
+    @Test
+    fun migration_26_vers_27_ajoute_les_reglages_de_confort_sans_toucher_aux_preferences_existantes() {
+        val v26 = helper.createDatabase(TEST_DB_NAME, 26)
+        // Préférences déjà personnalisées par l'utilisateur : la migration ne
+        // doit en modifier aucune, et les nouveaux réglages doivent arriver
+        // sur un défaut qui reproduit le rendu d'avant.
+        v26.execSQL(
+            """
+            INSERT INTO user_preferences (id, theme, fontSize, defaultTtsEngine, crashReportingEnabled, language, fontFamily, reduceMotion, dynamicColorEnabled, readingRulerEnabled, dailyGoalMinutes, activeVoiceProfileId, readingMode, audioGain, useSystemFontScale, appTheme, libraryLayoutMode, lineHeightMultiplier, readerBrightness, eyeRestReminderEnabled, eyeRestReminderIntervalMinutes, hasSeenOnboarding, hasPromptedVoiceDownload, syncLastAutoSyncFailed, syncAutoEnabled, syncWifiOnly)
+            VALUES (0, 'obsidienne', 22, 'SHERPA_ONNX', 0, 'fr', 'SERIF', 0, 1, 0, 20, NULL, 'PAGED', 1.0, 0, 'SYSTEM', 'GRID_COVERS', 1.6, NULL, 1, 60, 1, 1, 0, 0, 0)
+            """.trimIndent(),
+        )
+        v26.close()
+
+        val v27 = helper.runMigrationsAndValidate(
+            TEST_DB_NAME, 27, true,
+            MIGRATION_1_2, MIGRATION_2_3, MIGRATION_3_4, MIGRATION_4_5, MIGRATION_5_6, MIGRATION_6_7,
+            MIGRATION_7_8, MIGRATION_8_9, MIGRATION_9_10, MIGRATION_10_11, MIGRATION_11_12, MIGRATION_12_13,
+            MIGRATION_13_14, MIGRATION_14_15, MIGRATION_15_16, MIGRATION_16_17, MIGRATION_17_18, MIGRATION_18_19,
+            MIGRATION_19_20, MIGRATION_20_21, MIGRATION_21_22, MIGRATION_22_23, MIGRATION_23_24, MIGRATION_24_25,
+            MIGRATION_25_26, MIGRATION_26_27,
+        )
+
+        v27.query(
+            "SELECT theme, fontSize, lineHeightMultiplier, readerMarginStep, paragraphSpacingStep, textJustified, keepScreenOn FROM user_preferences WHERE id = 0",
+        ).use { cursor ->
+            assertEquals(true, cursor.moveToFirst())
+            // Aucune perte : les réglages existants traversent la migration.
+            assertEquals("obsidienne", cursor.getString(0))
+            assertEquals(22, cursor.getInt(1))
+            assertEquals(1.6f, cursor.getFloat(2), 0.001f)
+            // Défauts neutres : le rendu reste identique tant que l'utilisateur
+            // n'a rien changé.
+            assertEquals(1, cursor.getInt(3))
+            assertEquals(1, cursor.getInt(4))
+            assertEquals(0, cursor.getInt(5))
+            assertEquals(0, cursor.getInt(6))
+        }
+        v27.close()
+    }
+
     companion object {
         private const val TEST_DB_NAME = "migration-test"
     }

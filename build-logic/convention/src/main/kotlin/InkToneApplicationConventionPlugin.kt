@@ -84,6 +84,21 @@ class InkToneApplicationConventionPlugin : Plugin<Project> {
                             signingConfig = signingConfigs.getByName("release")
                         }
                     }
+                    // P3 (plan polissage Pareto) — build type non debuggable
+                    // pour des mesures macrobenchmark fiables. Le module
+                    // `benchmark` (com.android.test) ciblait jusqu'ici le type
+                    // `debug` (debogable) en masquant le refus de
+                    // androidx.benchmark par suppressErrors=DEBUGGABLE : les
+                    // chiffres de demarrage etaient donc non representatifs.
+                    // matchingFallbacks vers release : les modules bibliotheque
+                    // n'exposent que debug/release.
+                    create("benchmark") {
+                        isDebuggable = false
+                        matchingFallbacks += listOf("release")
+                        if (releaseSigningConfigured) {
+                            signingConfig = signingConfigs.getByName("release")
+                        }
+                    }
                 }
 
                 // buildConfig : expose BuildConfig.DEBUG a MainActivity, pour

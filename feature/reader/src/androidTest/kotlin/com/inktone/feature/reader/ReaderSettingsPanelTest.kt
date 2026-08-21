@@ -33,7 +33,13 @@ class ReaderSettingsPanelTest {
                 previewBackgroundColor = Color.White,
                 onFontSizeChange = {},
                 onLineHeightChange = {},
-                onDismiss = {},
+                currentMarginStep = 1,
+            isTextJustified = false,
+            keepScreenOn = false,
+            onMarginStepChange = {},
+            onTextJustifiedChange = {},
+            onKeepScreenOnChange = {},
+            onDismiss = {},
             )
         }
 
@@ -53,7 +59,13 @@ class ReaderSettingsPanelTest {
                 previewBackgroundColor = Color.White,
                 onFontSizeChange = {},
                 onLineHeightChange = {},
-                onDismiss = {},
+                currentMarginStep = 1,
+            isTextJustified = false,
+            keepScreenOn = false,
+            onMarginStepChange = {},
+            onTextJustifiedChange = {},
+            onKeepScreenOnChange = {},
+            onDismiss = {},
             )
         }
 
@@ -71,7 +83,13 @@ class ReaderSettingsPanelTest {
                 previewBackgroundColor = Color.White,
                 onFontSizeChange = {},
                 onLineHeightChange = {},
-                onDismiss = {},
+                currentMarginStep = 1,
+            isTextJustified = false,
+            keepScreenOn = false,
+            onMarginStepChange = {},
+            onTextJustifiedChange = {},
+            onKeepScreenOnChange = {},
+            onDismiss = {},
             )
         }
 

@@ -1,57 +1,368 @@
 package com.inktone.infrastructure.media
 
-import android.net.Uri
-import androidx.media3.common.MediaItem
-import androidx.media3.exoplayer.ExoPlayer
-import androidx.media3.session.MediaSession
-import androidx.media3.session.MediaSessionService
-import com.inktone.domain.service.AudioSegment
+import android.app.Notification
+import android.app.NotificationChannel
+import android.app.NotificationManager
+import android.app.PendingIntent
+import android.app.Service
+import android.content.Intent
+import coil.request.ImageRequest
+import coil.imageLoader
+import android.graphics.drawable.BitmapDrawable
+import android.graphics.Bitmap
+import android.media.MediaMetadata
+import android.media.session.MediaSession
+import android.media.session.PlaybackState
+import android.os.IBinder
+import com.inktone.domain.service.PlaybackSession
+import com.inktone.domain.service.PlaybackSessionState
 import dagger.hilt.android.AndroidEntryPoint
+import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.SupervisorJob
+import kotlinx.coroutines.cancel
+import kotlinx.coroutines.flow.map
+import kotlinx.coroutines.flow.distinctUntilChanged
+import kotlinx.coroutines.launch
+import javax.inject.Inject
 
 /**
- * Remplace la lecture ad hoc de la marche à blanc (`AudioSegmentPlayer`,
- * Tâche 3.8 — `AudioTrack` jetable) par un vrai service de lecture,
- * survivant à la mise en arrière-plan. `AudioSegmentPlayer` reste utilisé
- * tel quel uniquement si un jour un besoin de preview très court (aperçu
- * d'une voix dans les réglages) justifie un chemin plus léger — pas pour
- * la lecture de publication.
+ * Service foreground de la session média TTS (P1, plan polissage Pareto).
  *
- * Chaque `AudioSegment` (PCM16 brut) est écrit dans un fichier WAV
- * temporaire avant d'être remis à `ExoPlayer` (voir
- * `AudioSegmentWavFile.writeToTempWavFile`, décision documentée là).
+ * Remplace l'ancien service fantôme (Media3 `MediaSessionService` + `ExoPlayer`
+ * auquel **rien ne se connectait jamais** — la lecture réelle passe par
+ * `GaplessAudioPlayer`, ADR-025) par une vraie façade : il pilote le contrat
+ * domaine [PlaybackSession] (implémenté par `PlaybackOrchestrator`) et expose
+ * ses commandes via une `MediaSession` système + une notification `MediaStyle`.
+ *
+ * Cycle de vie : démarré (en foreground) quand la lecture TTS commence, arrêté
+ * quand elle s'arrête — la notification reste affichée pendant une pause réelle
+ * (`Paused`), et disparaît au `stop()` (arrêt complet, libération de la
+ * synthèse). La notification est la voie de contrôle en arrière-plan/écran
+ * verrouillé ; l'écran Lecteur reste maître de la lecture (source de vérité
+ * unique, K3).
  */
 @AndroidEntryPoint
-class AudioPlaybackService : MediaSessionService() {
+class AudioPlaybackService : Service() {
 
-    private lateinit var player: ExoPlayer
+    @Inject
+    lateinit var playbackSession: PlaybackSession
+
+    @Inject
+    lateinit var audioFocusController: AudioFocusController
+
     private var mediaSession: MediaSession? = null
+    private var isForeground: Boolean = false
+    private val scope = CoroutineScope(SupervisorJob() + Dispatchers.Main.immediate)
 
     override fun onCreate() {
         super.onCreate()
-        player = ExoPlayer.Builder(this).build()
-        mediaSession = MediaSession.Builder(this, player).build()
+        createNotificationChannel()
+        mediaSession = MediaSession(this, "InkToneTts").apply {
+            setCallback(object : MediaSession.Callback() {
+                override fun onPlay() {
+                    onUserCommand()
+                    // `sessionState` est un flux dérivé : ne jamais enchaîner
+                    // deux lectures de `.value` autour d'une mutation (la
+                    // seconde serait périmée). Une lecture, une décision.
+                    if (playbackSession.sessionState.value == PlaybackSessionState.PAUSED) {
+                        playbackSession.resume()
+                    } else {
+                        playbackSession.togglePlayPause()
+                    }
+                }
+
+                override fun onPause() {
+                    onUserCommand()
+                    playbackSession.pause()
+                }
+
+                override fun onSkipToNext() {
+                    onUserCommand()
+                    playbackSession.skip(1)
+                }
+
+                override fun onSkipToPrevious() {
+                    onUserCommand()
+                    playbackSession.skip(-1)
+                }
+
+                override fun onStop() {
+                    onUserCommand()
+                    playbackSession.stop()
+                    stopSelf()
+                }
+            })
+            setFlags(MediaSession.FLAG_HANDLES_MEDIA_BUTTONS or MediaSession.FLAG_HANDLES_TRANSPORT_CONTROLS)
+        }
+        // Le focus audio suit la vie du service : demandé quand la narration
+        // commence, relâché quand elle s'arrête (P1-c).
+        audioFocusController.acquire(scope)
+        observeSession()
     }
 
-    override fun onGetSession(controllerInfo: MediaSession.ControllerInfo): MediaSession? = mediaSession
-
-    /**
-     * Joue un segment audio synthétisé : écrit dans un fichier WAV
-     * temporaire (répertoire cache, nettoyé par le système), remplace
-     * l'élément courant du lecteur.
-     */
-    fun playSegment(segment: AudioSegment) {
-        val wavFile = segment.writeToTempWavFile(cacheDir)
-        player.setMediaItem(MediaItem.fromUri(Uri.fromFile(wavFile)))
-        player.prepare()
-        player.play()
+    override fun onStartCommand(intent: Intent?, flags: Int, startId: Int): Int {
+        // Les actions de la notification arrivent ici en PendingIntent ; les
+        // commandes externes (bluetooth, écran verrouillé) passent par le
+        // `MediaSession.Callback` ci-dessus.
+        when (intent?.action) {
+            ACTION_PLAY_PAUSE -> {
+                onUserCommand()
+                playbackSession.togglePlayPause()
+            }
+            ACTION_SKIP_NEXT -> {
+                onUserCommand()
+                playbackSession.skip(1)
+            }
+            ACTION_SKIP_PREVIOUS -> {
+                onUserCommand()
+                playbackSession.skip(-1)
+            }
+            ACTION_CANCEL_SLEEP_TIMER -> {
+                onUserCommand()
+                playbackSession.setSleepTimer(null)
+            }
+            ACTION_STOP -> {
+                onUserCommand()
+                playbackSession.stop()
+                stopSelf()
+                return START_NOT_STICKY
+            }
+        }
+        startForegroundSafe()
+        return START_NOT_STICKY
     }
+
+    override fun onBind(intent: Intent?): IBinder? = null
 
     override fun onDestroy() {
-        mediaSession?.run {
-            player.release()
-            release()
-            mediaSession = null
-        }
+        audioFocusController.release()
+        scope.cancel()
+        mediaSession?.release()
+        mediaSession = null
         super.onDestroy()
+    }
+
+    /**
+     * Toute commande explicite (notification, écran verrouillé, casque
+     * Bluetooth) désarme la reprise automatique du focus : à partir de là,
+     * l'état de lecture appartient à l'utilisateur (voir
+     * [AudioInterruptionPolicy]).
+     */
+    private fun onUserCommand() = audioFocusController.onUserCommand()
+
+    // ── Observation de la session ──────────────────────────────────────
+
+    private fun observeSession() {
+        scope.launch {
+            playbackSession.isPlaying.collect { playing ->
+                mediaSession?.setPlaybackState(buildPlaybackState(playing))
+                refreshNotification()
+            }
+        }
+        // P2-b — le décompte du minuteur de sommeil s'affiche dans la
+        // notification. Rafraîchi à la minute et non à la seconde : une
+        // notification réécrite chaque seconde coûte du réveil de process pour
+        // une information que personne ne lit à cette précision.
+        scope.launch {
+            playbackSession.sleepTimer
+                .map { it?.remainingMs?.let { ms -> ms / 60_000L } }
+                .distinctUntilChanged()
+                .collect { refreshNotification() }
+        }
+        scope.launch {
+            playbackSession.metadata.collect { meta ->
+                // La couverture est chargée AVANT de publier les métadonnées :
+                // poser d'abord un jeu sans image, puis un second avec, fait
+                // clignoter l'écran verrouillé de certains lanceurs.
+                coverBitmap = loadCover(meta.coverUri)
+                mediaSession?.setMetadata(
+                    MediaMetadata.Builder()
+                        .putString(MediaMetadata.METADATA_KEY_TITLE, meta.title)
+                        .putString(MediaMetadata.METADATA_KEY_ARTIST, meta.author)
+                        .putBitmap(MediaMetadata.METADATA_KEY_ALBUM_ART, coverBitmap)
+                        .build(),
+                )
+                refreshNotification()
+            }
+        }
+    }
+
+    private fun buildPlaybackState(playing: Boolean): PlaybackState {
+        val state = if (playing) PlaybackState.STATE_PLAYING else PlaybackState.STATE_PAUSED
+        return PlaybackState.Builder()
+            .setActions(
+                PlaybackState.ACTION_PLAY or
+                    PlaybackState.ACTION_PAUSE or
+                    PlaybackState.ACTION_SKIP_TO_NEXT or
+                    PlaybackState.ACTION_SKIP_TO_PREVIOUS or
+                    PlaybackState.ACTION_STOP,
+            )
+            .setState(state, PlaybackState.PLAYBACK_POSITION_UNKNOWN, 1.0f)
+            .build()
+    }
+
+    // ── Notification ────────────────────────────────────────────────────
+
+    private fun startForegroundSafe() {
+        if (isForeground) return
+        startForeground(NOTIFICATION_ID, buildNotification())
+        isForeground = true
+    }
+
+    private fun refreshNotification() {
+        if (isForeground) {
+            getSystemService(NotificationManager::class.java).notify(NOTIFICATION_ID, buildNotification())
+        }
+    }
+
+    /**
+     * Temps restant du minuteur de sommeil, ou `null` si aucun n'est armé.
+     * Arrondi à la minute SUPÉRIEURE : afficher « 0 min » pendant les
+     * dernières secondes laisserait croire que le minuteur est déjà passé.
+     */
+    private fun sleepTimerLabel(): String? {
+        val remainingMs = playbackSession.sleepTimer.value?.remainingMs ?: return null
+        val minutes = ((remainingMs + 59_999L) / 60_000L).toInt()
+        return "Arrêt dans $minutes min"
+    }
+
+    /** Couverture courante, `null` tant qu'aucune n'a pu être chargée. */
+    private var coverBitmap: Bitmap? = null
+
+    /**
+     * Charge la couverture via Coil — le chargeur d'images de l'app, donc son
+     * cache : la couverture affichée dans la bibliothèque n'est pas
+     * décompressée une seconde fois pour la notification.
+     *
+     * Un échec (URI périmée, permission SAF révoquée, fichier supprimé) rend
+     * `null` : la notification s'affiche alors sans image plutôt que de faire
+     * échouer la lecture. Une couverture est un agrément, jamais une condition
+     * pour écouter un livre.
+     */
+    private suspend fun loadCover(coverUri: String?): Bitmap? {
+        if (coverUri.isNullOrBlank()) return null
+        return runCatching {
+            val request = ImageRequest.Builder(this)
+                .data(coverUri)
+                .allowHardware(false) // un bitmap matériel n'est pas sérialisable vers la MediaSession
+                .size(COVER_SIZE_PX)
+                .build()
+            (this.imageLoader.execute(request).drawable as? BitmapDrawable)?.bitmap
+        }.getOrNull()
+    }
+
+    private fun buildNotification(): Notification {
+        val contentIntent = PendingIntent.getActivity(
+            this,
+            0,
+            packageManager.getLaunchIntentForPackage(packageName),
+            PendingIntent.FLAG_IMMUTABLE or PendingIntent.FLAG_UPDATE_CURRENT,
+        )
+        val metadata = playbackSession.metadata.value
+        val playing = playbackSession.isPlaying.value
+
+        return Notification.Builder(this, CHANNEL_ID)
+            .setSmallIcon(android.R.drawable.ic_media_play)
+            .setContentTitle(metadata.title ?: getString(android.R.string.unknownName))
+            .setContentText(sleepTimerLabel() ?: metadata.author)
+            .setLargeIcon(coverBitmap)
+            .setContentIntent(contentIntent)
+            .setVisibility(Notification.VISIBILITY_PUBLIC)
+            .setOnlyAlertOnce(true)
+            .addAction(
+                Notification.Action.Builder(
+                    android.R.drawable.ic_media_previous,
+                    "Précédent",
+                    serviceIntent(ACTION_SKIP_PREVIOUS),
+                ).build(),
+            )
+            .addAction(
+                Notification.Action.Builder(
+                    if (playing) android.R.drawable.ic_media_pause else android.R.drawable.ic_media_play,
+                    if (playing) "Pause" else "Lecture",
+                    serviceIntent(ACTION_PLAY_PAUSE),
+                ).build(),
+            )
+            .addAction(
+                Notification.Action.Builder(
+                    android.R.drawable.ic_media_next,
+                    "Suivant",
+                    serviceIntent(ACTION_SKIP_NEXT),
+                ).build(),
+            )
+            // `ACTION_STOP` était géré par `onStartCommand` sans qu'aucune
+            // commande ne puisse l'atteindre : arrêter la narration exigeait de
+            // rouvrir le Lecteur. Quatrième action (vue déployée), et même
+            // intention sur le balayage de la notification.
+            .addAction(
+                Notification.Action.Builder(
+                    android.R.drawable.ic_menu_close_clear_cancel,
+                    "Arrêter",
+                    serviceIntent(ACTION_STOP),
+                ).build(),
+            )
+            .setDeleteIntent(serviceIntent(ACTION_STOP))
+            .also { builder ->
+                // Action présente UNIQUEMENT quand un minuteur est armé :
+                // proposer « annuler » sans minuteur serait un bouton mort, et
+                // en ARMER un depuis la notification demanderait de choisir une
+                // durée — ce qui appartient au panneau, pas à une action.
+                if (playbackSession.sleepTimer.value != null) {
+                    builder.addAction(
+                        Notification.Action.Builder(
+                            android.R.drawable.ic_menu_close_clear_cancel,
+                            "Annuler le minuteur",
+                            serviceIntent(ACTION_CANCEL_SLEEP_TIMER),
+                        ).build(),
+                    )
+                }
+            }
+            .setStyle(
+                Notification.MediaStyle()
+                    .setMediaSession(mediaSession?.sessionToken)
+                    // Vue compacte : les trois commandes du geste courant
+                    // (phrase précédente, lecture/pause, phrase suivante).
+                    .setShowActionsInCompactView(0, 1, 2),
+            )
+            .build()
+    }
+
+    private fun serviceIntent(action: String): PendingIntent =
+        PendingIntent.getService(
+            this,
+            action.hashCode(),
+            Intent(this, AudioPlaybackService::class.java).setAction(action),
+            PendingIntent.FLAG_IMMUTABLE or PendingIntent.FLAG_UPDATE_CURRENT,
+        )
+
+    private fun createNotificationChannel() {
+        val channel = NotificationChannel(
+            CHANNEL_ID,
+            "Lecture TTS",
+            NotificationManager.IMPORTANCE_LOW,
+        ).apply {
+            description = "Contrôle de la narration en cours (lecture, pause, phrase ±)."
+            setShowBadge(false)
+        }
+        getSystemService(NotificationManager::class.java).createNotificationChannel(channel)
+    }
+
+    private companion object {
+        const val CHANNEL_ID = "inktone.tts.playback"
+        const val NOTIFICATION_ID = 1001
+        const val ACTION_PLAY_PAUSE = "com.inktone.media.action.PLAY_PAUSE"
+        const val ACTION_SKIP_NEXT = "com.inktone.media.action.SKIP_NEXT"
+        const val ACTION_CANCEL_SLEEP_TIMER = "com.inktone.media.action.CANCEL_SLEEP_TIMER"
+
+        /**
+         * Côté de la couverture décodée. Volontairement modeste : la vignette
+         * d'une notification ne dépasse pas quelques centaines de pixels, et
+         * décoder une couverture pleine résolution pour l'y afficher gaspille
+         * de la mémoire sur la cible matérielle du projet (Snapdragon 680).
+         */
+        const val COVER_SIZE_PX = 512
+        const val ACTION_SKIP_PREVIOUS = "com.inktone.media.action.SKIP_PREVIOUS"
+        const val ACTION_STOP = "com.inktone.media.action.STOP"
     }
 }
