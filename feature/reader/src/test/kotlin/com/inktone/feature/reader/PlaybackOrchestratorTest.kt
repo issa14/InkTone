@@ -182,6 +182,90 @@ class PlaybackOrchestratorTest {
         orchestrator.stop()
     }
 
+    // ── Session (P1, contrat PlaybackSession) ──────────────
+
+    @Test
+    fun skip_pendant_lecture_reprend_sur_la_nouvelle_phrase() = runBlocking {
+        val tts = FakeTtsEngine(segmentDurationMs = 300)
+        val player = FakeAudioPlayer()
+        val orchestrator = PlaybackOrchestrator(tts, player, UpdateReadingStateUseCase(FakeReadingStateRepository()))
+        val sentences = listOf(sentence(0, "Un.", 0), sentence(1, "Deux.", 4), sentence(2, "Trois.", 10))
+
+        orchestrator.play(sentences, profile, 0, "pub1", 0, "ch.xhtml")
+        awaitUntil { orchestrator.state.value == PlaybackOrchestrator.PlaybackStatus.Playing }
+
+        orchestrator.skip(1)
+
+        awaitUntil { orchestrator.isPlaying.value }
+        assertEquals(1, orchestrator.currentSentenceIndex.value)
+        orchestrator.stop()
+    }
+
+    @Test
+    fun skip_a_larret_deplace_lindex_sans_reprendre() = runBlocking {
+        val orchestrator = PlaybackOrchestrator(FakeTtsEngine(), FakeAudioPlayer(), UpdateReadingStateUseCase(FakeReadingStateRepository()))
+        val sentences = listOf(sentence(0, "Un.", 0), sentence(1, "Deux.", 4), sentence(2, "Trois.", 10))
+        orchestrator.play(sentences, profile, 0, "pub1", 0, "ch.xhtml")
+        awaitUntil { orchestrator.state.value == PlaybackOrchestrator.PlaybackStatus.Playing }
+        orchestrator.stop()
+        assertEquals(PlaybackOrchestrator.PlaybackStatus.Idle, orchestrator.state.value)
+
+        orchestrator.skip(1)
+
+        assertEquals(1, orchestrator.currentSentenceIndex.value)
+        assertEquals(PlaybackOrchestrator.PlaybackStatus.Idle, orchestrator.state.value)
+        // isPlaying est un flux dérivé (stateIn sur Dispatchers.IO) : sa
+        // propagation est asynchrone, on attend plutôt que d'asserter aussitôt.
+        awaitUntil { !orchestrator.isPlaying.value }
+    }
+
+    @Test
+    fun togglePlayPause_bascule_entre_pause_et_reprise() = runBlocking {
+        val orchestrator = PlaybackOrchestrator(FakeTtsEngine(segmentDurationMs = 300), FakeAudioPlayer(), UpdateReadingStateUseCase(FakeReadingStateRepository()))
+        val sentences = listOf(sentence(0, "Un.", 0), sentence(1, "Deux.", 4))
+        orchestrator.play(sentences, profile, 0, "pub1", 0, "ch.xhtml")
+        awaitUntil { orchestrator.state.value == PlaybackOrchestrator.PlaybackStatus.Playing }
+
+        orchestrator.togglePlayPause()
+        awaitUntil { orchestrator.state.value == PlaybackOrchestrator.PlaybackStatus.Paused }
+        assertEquals(false, orchestrator.isPlaying.value)
+
+        orchestrator.togglePlayPause()
+        awaitUntil { orchestrator.state.value == PlaybackOrchestrator.PlaybackStatus.Playing }
+        assertEquals(true, orchestrator.isPlaying.value)
+
+        orchestrator.stop()
+    }
+
+    @Test
+    fun togglePlayPause_apres_arret_relance_depuis_la_session_retenue() = runBlocking {
+        val orchestrator = PlaybackOrchestrator(FakeTtsEngine(segmentDurationMs = 300), FakeAudioPlayer(), UpdateReadingStateUseCase(FakeReadingStateRepository()))
+        val sentences = listOf(sentence(0, "Un.", 0), sentence(1, "Deux.", 4))
+        orchestrator.play(sentences, profile, 0, "pub1", 0, "ch.xhtml")
+        awaitUntil { orchestrator.state.value == PlaybackOrchestrator.PlaybackStatus.Playing }
+        orchestrator.stop()
+        assertEquals(PlaybackOrchestrator.PlaybackStatus.Idle, orchestrator.state.value)
+
+        orchestrator.togglePlayPause()
+
+        awaitUntil { orchestrator.isPlaying.value }
+        orchestrator.stop()
+    }
+
+    @Test
+    fun metadata_et_isPlaying_refletent_letat() = runBlocking {
+        val orchestrator = PlaybackOrchestrator(FakeTtsEngine(), FakeAudioPlayer(), UpdateReadingStateUseCase(FakeReadingStateRepository()))
+        orchestrator.setMetadata("Titre de test", "Auteur de test")
+        assertEquals("Titre de test", orchestrator.metadata.value.title)
+        assertEquals("Auteur de test", orchestrator.metadata.value.author)
+        assertEquals(false, orchestrator.isPlaying.value)
+
+        orchestrator.play(listOf(sentence(0, "Un.", 0)), profile, 0, "pub1", 0, "ch.xhtml")
+        awaitUntil { orchestrator.isPlaying.value }
+        orchestrator.stop()
+        awaitUntil { !orchestrator.isPlaying.value }
+    }
+
     // ── Fakes ──────────────────────────────────────────────
 
     private class FakeTtsEngine(

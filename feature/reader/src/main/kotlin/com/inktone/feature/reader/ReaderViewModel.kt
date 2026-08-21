@@ -133,11 +133,18 @@ class ReaderViewModel @Inject constructor(
                     PlaybackOrchestrator.PlaybackStatus.Buffering ->
                         _state.value = _state.value.copy(isAudioActive = false)
                     PlaybackOrchestrator.PlaybackStatus.Playing -> {
-                        _state.value = _state.value.copy(isAudioActive = true)
+                        // P1 — isPlaying = true ici (et pas seulement dans
+                        // playCurrentSentence) : une reprise déclenchée par la
+                        // notification (PlaybackSession.resume) doit se
+                        // refléter dans l'état du Lecteur.
+                        _state.value = _state.value.copy(isAudioActive = true, isPlaying = true)
                         checkVoiceDownloadPrompt()
                     }
                     PlaybackOrchestrator.PlaybackStatus.Paused ->
-                        _state.value = _state.value.copy(isAudioActive = false)
+                        // P1 — vraie pause (PlaybackSession.pause) : le Lecteur
+                        // doit refléter isPlaying = false sans auto-avancer
+                        // (seul Idle déclenche la fin de chapitre).
+                        _state.value = _state.value.copy(isAudioActive = false, isPlaying = false)
                     is PlaybackOrchestrator.PlaybackStatus.Error ->
                         _state.value = _state.value.copy(
                             isPlaying = false, isAudioActive = false, highlightedWordRange = null,
@@ -506,6 +513,10 @@ class ReaderViewModel @Inject constructor(
                             this@ReaderViewModel.epubResourceResolver
                         } else null,
                     )
+                    // P1 — alimente les métadonnées de la notification média
+                    // (titre/auteur), source unique : jamais rechargées depuis
+                    // un repository dans le service.
+                    playbackOrchestrator.setMetadata(publication.title, publication.authors.joinToString(", ").ifBlank { null })
                     // Plan v3, Palier 3.6 — initialiser le parsing lazy EPUB
                     if (publication.format == PublicationFormat.EPUB) {
                         chapterParser.registerPublication(publicationId, publication.fileUri)

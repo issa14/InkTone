@@ -5,6 +5,8 @@ import com.inktone.domain.model.Sentence
 import com.inktone.domain.model.VoiceProfile
 import com.inktone.domain.service.AudioPlayer
 import com.inktone.domain.service.AudioSegment
+import com.inktone.domain.service.PlaybackMetadata
+import com.inktone.domain.service.PlaybackSession
 import com.inktone.domain.service.TtsEngine
 import com.inktone.domain.service.WordTimestamp
 import com.inktone.domain.usecase.UpdateReadingStateUseCase
@@ -17,8 +19,11 @@ import kotlinx.coroutines.TimeoutCancellationException
 import kotlinx.coroutines.channels.Channel
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.MutableStateFlow
+import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
+import kotlinx.coroutines.flow.map
+import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withTimeout
 import java.util.concurrent.atomic.AtomicLong
@@ -53,7 +58,7 @@ class PlaybackOrchestrator @Inject constructor(
     private val ttsEngine: TtsEngine,
     private val audioPlayer: AudioPlayer,
     private val updateReadingState: UpdateReadingStateUseCase,
-) {
+) : PlaybackSession {
 
     /** État de lecture exposé à la couche présentation. */
     sealed interface PlaybackStatus {
@@ -71,7 +76,7 @@ class PlaybackOrchestrator @Inject constructor(
 
     /** Index de la phrase en cours de lecture (surlignage, progression). */
     private val _currentSentenceIndex = MutableStateFlow(0)
-    val currentSentenceIndex: StateFlow<Int> = _currentSentenceIndex.asStateFlow()
+    override val currentSentenceIndex: StateFlow<Int> = _currentSentenceIndex.asStateFlow()
 
     /** Timestamps mot-à-mot de la phrase courante — consommés par le surlignage. */
     private val _currentWordTimestamps = MutableStateFlow<List<WordTimestamp>>(emptyList())
@@ -94,6 +99,26 @@ class PlaybackOrchestrator @Inject constructor(
      */
     private val _positionValid = MutableStateFlow(false)
     val positionValid: StateFlow<Boolean> = _positionValid.asStateFlow()
+
+    /** Métadonnées du livre narré (titre/auteur) — posées par le Lecteur, lues par la notification. */
+    private val _metadata = MutableStateFlow(PlaybackMetadata())
+    override val metadata: StateFlow<PlaybackMetadata> = _metadata.asStateFlow()
+
+    /**
+     * Vrai quand l'audio est engagé (buffering ou lecture réelle). Dérivé de
+     * [state] — jamais un second drapeau maintenu à la main (source classique
+     * de désynchronisation entre l'écran et la notification).
+     */
+    override val isPlaying: StateFlow<Boolean> = _state
+        .map { it == PlaybackStatus.Playing || it == PlaybackStatus.Buffering }
+        .stateIn(scope, SharingStarted.Eagerly, false)
+
+    /**
+     * Contexte de la dernière session démarrée (phrases, voix, publication),
+     * retenu pour que la notification puisse reprendre/sauter une phrase sans
+     * repasser par le Lecteur. `null` tant qu'aucune lecture n'a été lancée.
+     */
+    private var session: SessionContext? = null
 
     private val playGeneration = AtomicLong(0)
     private var playbackJob: Job? = null
@@ -126,6 +151,7 @@ class PlaybackOrchestrator @Inject constructor(
         resourceHref: String,
     ) {
         if (sentences.isEmpty()) return
+        session = SessionContext(sentences, voiceProfile, publicationId, chapterIndex, resourceHref)
         stop()
         val generation = playGeneration.incrementAndGet()
         _currentSentenceIndex.value = startFrom
@@ -160,7 +186,7 @@ class PlaybackOrchestrator @Inject constructor(
     }
 
     /** Arrête la lecture, vide la file du lecteur et invalide la génération courante. */
-    fun stop() {
+    override fun stop() {
         stateLock.lock()
         try {
             playGeneration.incrementAndGet()
@@ -175,6 +201,59 @@ class PlaybackOrchestrator @Inject constructor(
         } finally {
             stateLock.unlock()
         }
+    }
+
+    /**
+     * Pose les métadonnées (titre/auteur) du livre narré. Appelé par le
+     * Lecteur à l'ouverture, consommé par la notification média.
+     */
+    fun setMetadata(title: String?, author: String?) {
+        _metadata.value = PlaybackMetadata(title = title, author = author)
+    }
+
+    /**
+     * Bascule lecture ↔ pause (contrat [PlaybackSession], P1). La pause est
+     * une **vraie pause** (`pause()`, état `Paused`) — distincte de l'arrêt
+     * `stop()` que l'écran Lecteur emploie pour « mettre en pause ». Reprend
+     * (ou relance) depuis la phrase courante après un arrêt.
+     */
+    override fun togglePlayPause() {
+        when (_state.value) {
+            PlaybackStatus.Playing -> pause()
+            PlaybackStatus.Paused -> resume()
+            // Buffering : rien d'audible encore, « pause » = annuler la
+            // synthèse en cours (retour Idle, sans reprise possible).
+            // Limite connue (à traiter au palier notification, P1-B) : le
+            // collecteur du Lecteur interprète « Idle alors que isPlaying »
+            // comme une fin de chapitre naturelle — un signal dédié
+            // `chapterCompleted` (plutôt que l'heuristique Idle) lèvera cette
+            // ambiguïté sans risque d'auto-avance parasite.
+            PlaybackStatus.Buffering -> stop()
+            PlaybackStatus.Idle -> restart()
+            is PlaybackStatus.Error -> restart()
+        }
+    }
+
+    /**
+     * Recule/avance d'une phrase (contrat [PlaybackSession], P1). Reprend
+     * immédiatement si la lecture était engagée ; sinon se contente de
+     * déplacer l'index (la position sera persistée au prochain [play]).
+     */
+    override fun skip(delta: Int) {
+        val ctx = session ?: return
+        val wasPlaying = _state.value == PlaybackStatus.Playing || _state.value == PlaybackStatus.Buffering
+        val newIndex = (_currentSentenceIndex.value + delta).coerceIn(0, ctx.sentences.lastIndex)
+        if (wasPlaying) {
+            play(ctx.sentences, ctx.voiceProfile, newIndex, ctx.publicationId, ctx.chapterIndex, ctx.resourceHref)
+        } else {
+            _currentSentenceIndex.value = newIndex
+        }
+    }
+
+    /** Relance la lecture depuis la session retenue, à la phrase courante. */
+    private fun restart() {
+        val ctx = session ?: return
+        play(ctx.sentences, ctx.voiceProfile, _currentSentenceIndex.value, ctx.publicationId, ctx.chapterIndex, ctx.resourceHref)
     }
 
     private suspend fun run(
@@ -398,6 +477,15 @@ class PlaybackOrchestrator @Inject constructor(
             else -> SILENCE_SENTENCE_MS
         }
     }
+
+    /** Contexte d'une session de lecture retenu pour la reprise/skip sans le Lecteur. */
+    private data class SessionContext(
+        val sentences: List<Sentence>,
+        val voiceProfile: VoiceProfile,
+        val publicationId: String,
+        val chapterIndex: Int,
+        val resourceHref: String,
+    )
 
     private companion object {
         const val LOOKAHEAD = 3
