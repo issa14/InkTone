@@ -44,4 +44,6 @@ data class PaginationStyleKey(
     val viewportWidthPx: Int,
     val viewportHeightPx: Int,
     val paddingPx: Int,
+    /** P4 — la césure (solidaire de la justification) change les coupures de ligne. */
+    val justified: Boolean = false,
 )

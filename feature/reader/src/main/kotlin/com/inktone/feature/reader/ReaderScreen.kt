@@ -77,6 +77,9 @@ import androidx.compose.ui.text.SpanStyle
 import androidx.compose.ui.text.TextLayoutResult
 import androidx.compose.ui.text.TextRange
 import androidx.compose.ui.text.TextStyle
+import androidx.compose.ui.text.style.TextAlign
+import androidx.compose.ui.text.style.LineBreak
+import androidx.compose.ui.text.style.Hyphens
 import androidx.compose.ui.text.buildAnnotatedString
 import androidx.compose.ui.text.input.TextFieldValue
 import androidx.compose.ui.unit.Dp
@@ -311,6 +314,9 @@ fun ReaderScreen(
     // 3d.3 — applique la luminosité choisie à la fenêtre du lecteur
     // seulement, restaurée à la sortie (voir ReaderBrightnessEffect).
     ReaderBrightnessEffect(value = state.readerBrightness)
+    // P4 — retiré avec l'écran de lecture (DisposableEffect) : le maintien ne
+    // doit jamais survivre au Lecteur.
+    KeepScreenOnEffect(enabled = state.keepScreenOn)
 
     // C.5 — SharedTransition depuis la couverture de la bibliothèque
     val sharedTransitionScope = runCatching {
@@ -525,7 +531,12 @@ fun ReaderScreen(
         // masquage/réapparition du HUD, dont les étapes intermédiaires
         // faisaient clignoter la page affichée, ne se produit plus.
         var readingAreaSize by remember { mutableStateOf(IntSize.Zero) }
-        val paginationPaddingPx = with(density) { 16.dp.roundToPx() }
+        // P4 — marge latérale réglable. UNE seule valeur, consommée à la fois
+        // par la mesure de pagination et par le rendu (PagedChapterContent) :
+        // deux sources distinctes feraient mesurer une page plus large que
+        // celle réellement dessinée, donc déborder le texte.
+        val readerMargin = readerMarginFor(state.readerMarginStep)
+        val paginationPaddingPx = with(density) { readerMargin.roundToPx() }
         // 3d.2 — interligne en sp, combiné à fontSize (multiplicateur
         // global, voir UserPreferences.lineHeightMultiplier) : seul point de
         // calcul, consommé à la fois par la mesure de pagination et par le
@@ -552,6 +563,10 @@ fun ReaderScreen(
             viewportHeightPx = readingAreaSize.height,
             paddingPx = paginationPaddingPx,
             fontFamily = effectiveFontFamily,
+            // P4 — la césure change les points de coupure de ligne, donc la
+            // pagination : elle doit faire partie du style de MESURE, jamais
+            // seulement du rendu.
+            justified = state.isTextJustified,
         )
 
         // Lot 4, tâche 4.7 — signale la fin de mise en page du chapitre
@@ -639,6 +654,12 @@ fun ReaderScreen(
                         fontSize = state.effectiveSettings.fontSize.sp,
                         color = ThemeColors.text(state.resolvedTheme),
                         fontFamily = effectiveFontFamily,
+                        // P4 — mêmes règles qu'en mode paginé (où elles
+                        // viennent de `pagination.baseTextStyle`) : un réglage
+                        // de lecture ne doit jamais dépendre du mode choisi.
+                        textAlign = if (state.isTextJustified) TextAlign.Justify else TextAlign.Unspecified,
+                        hyphens = if (state.isTextJustified) Hyphens.Auto else Hyphens.None,
+                        lineBreak = if (state.isTextJustified) LineBreak.Paragraph else LineBreak.Unspecified,
                     )
 
                     // Parité avec le mode PAGED (absoluteHighlightedRange dans
@@ -810,6 +831,7 @@ fun ReaderScreen(
                         chapterCount = state.chapters.size,
                         textColor = ThemeColors.text(state.resolvedTheme),
                         isReadingRulerEnabled = state.isReadingRulerEnabled,
+                        contentPadding = readerMargin,
                         onClick = { handleReadingAreaTap() },
                         onNextChapter = { viewModel.onIntent(ReaderIntent.NextChapter) },
                         onPreviousChapter = { viewModel.onIntent(ReaderIntent.PreviousChapter) },
@@ -1113,6 +1135,12 @@ fun ReaderScreen(
                     viewModel.onIntent(ReaderIntent.SetOverrides(overrides))
                 },
                 onLineHeightChange = { multiplier -> viewModel.onIntent(ReaderIntent.SetLineHeight(multiplier)) },
+                currentMarginStep = state.readerMarginStep,
+                isTextJustified = state.isTextJustified,
+                keepScreenOn = state.keepScreenOn,
+                onMarginStepChange = { step -> viewModel.onIntent(ReaderIntent.SetReaderMarginStep(step)) },
+                onTextJustifiedChange = { justified -> viewModel.onIntent(ReaderIntent.SetTextJustified(justified)) },
+                onKeepScreenOnChange = { enabled -> viewModel.onIntent(ReaderIntent.SetKeepScreenOn(enabled)) },
                 onDismiss = { showSettingsPanel = false },
             )
         }

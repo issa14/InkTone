@@ -21,6 +21,16 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.selection.toggleable
+import androidx.compose.material3.SegmentedButton
+import androidx.compose.material3.SegmentedButtonDefaults
+import androidx.compose.material3.SingleChoiceSegmentedButtonRow
+import androidx.compose.material3.Switch
+import androidx.compose.ui.Alignment
+import androidx.compose.ui.semantics.Role
+import androidx.compose.ui.text.style.TextAlign
+import com.inktone.domain.model.UserPreferences
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import kotlin.math.roundToInt
@@ -43,11 +53,19 @@ import kotlin.math.roundToInt
 fun ReaderSettingsPanel(
     currentFontSize: Int,
     currentLineHeightMultiplier: Float,
+    // P4 — confort de lecture visuelle : le panneau n'exposait que la taille
+    // et l'interligne.
+    currentMarginStep: Int,
+    isTextJustified: Boolean,
+    keepScreenOn: Boolean,
     previewText: String,
     previewTextColor: Color,
     previewBackgroundColor: Color,
     onFontSizeChange: (Int) -> Unit,
     onLineHeightChange: (Float) -> Unit,
+    onMarginStepChange: (Int) -> Unit,
+    onTextJustifiedChange: (Boolean) -> Unit,
+    onKeepScreenOnChange: (Boolean) -> Unit,
     onDismiss: () -> Unit,
 ) {
     val sheetState = rememberModalBottomSheetState(skipPartiallyExpanded = true)
@@ -78,6 +96,10 @@ fun ReaderSettingsPanel(
                 color = previewTextColor,
                 fontSize = fontSizeDraft.sp,
                 lineHeight = (fontSizeDraft * lineHeightDraft).sp,
+                // L'aperçu montre AUSSI la justification : un aperçu qui
+                // ignorerait un réglage du même panneau mentirait sur son
+                // effet, ce qui est pire que pas d'aperçu du tout.
+                textAlign = if (isTextJustified) TextAlign.Justify else TextAlign.Unspecified,
                 maxLines = 5,
             )
 
@@ -105,7 +127,83 @@ fun ReaderSettingsPanel(
                 steps = 0,
             )
 
+            Spacer(Modifier.height(20.dp))
+
+            // ── Marges — P4 : trois crans, pas un curseur continu ──
+            Text(
+                "Marges (${readerMarginLabel(currentMarginStep).lowercase()})",
+                style = MaterialTheme.typography.labelLarge,
+            )
+            Spacer(Modifier.height(8.dp))
+            SingleChoiceSegmentedButtonRow(modifier = Modifier.fillMaxWidth()) {
+                UserPreferences.MARGIN_STEP_RANGE.forEachIndexed { index, step ->
+                    SegmentedButton(
+                        selected = currentMarginStep == step,
+                        onClick = { onMarginStepChange(step) },
+                        shape = SegmentedButtonDefaults.itemShape(
+                            index = index,
+                            count = UserPreferences.MARGIN_STEP_RANGE.count(),
+                        ),
+                    ) {
+                        Text(readerMarginLabel(step))
+                    }
+                }
+            }
+
+            Spacer(Modifier.height(20.dp))
+
+            // ── Justification — la césure vient avec, jamais séparément ──
+            SettingSwitchRow(
+                label = "Texte justifié",
+                supporting = "Aligne les deux bords, avec césure",
+                checked = isTextJustified,
+                onCheckedChange = onTextJustifiedChange,
+            )
+
+            Spacer(Modifier.height(8.dp))
+
+            SettingSwitchRow(
+                label = "Garder l'écran allumé",
+                supporting = "Pendant la lecture visuelle uniquement",
+                checked = keepScreenOn,
+                onCheckedChange = onKeepScreenOnChange,
+            )
+
             Spacer(Modifier.height(32.dp))
         }
+    }
+}
+
+/** Ligne libellé + interrupteur, toute la ligne étant cliquable (cible tactile). */
+@Composable
+private fun SettingSwitchRow(
+    label: String,
+    supporting: String,
+    checked: Boolean,
+    onCheckedChange: (Boolean) -> Unit,
+) {
+    Row(
+        modifier = Modifier
+            .fillMaxWidth()
+            .toggleable(
+                value = checked,
+                onValueChange = onCheckedChange,
+                role = Role.Switch,
+            )
+            .padding(vertical = 8.dp),
+        verticalAlignment = Alignment.CenterVertically,
+    ) {
+        Column(modifier = Modifier.weight(1f)) {
+            Text(label, style = MaterialTheme.typography.bodyLarge)
+            Text(
+                supporting,
+                style = MaterialTheme.typography.bodySmall,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+            )
+        }
+        // `onCheckedChange = null` : la ligne entière porte déjà la
+        // sémantique d'accessibilité (toggleable ci-dessus) — un second
+        // gestionnaire ici annoncerait deux fois le même contrôle.
+        Switch(checked = checked, onCheckedChange = null)
     }
 }

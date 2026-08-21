@@ -107,6 +107,14 @@ fun PagedChapterContent(
     chapterCount: Int = currentChapterIndex + 1,
     textColor: Color,
     isReadingRulerEnabled: Boolean,
+    /**
+     * P4 — marge de page. Doit être la MÊME valeur que le `paddingPx` remis à
+     * `rememberChapterPaginationState` : mesurer une page plus large que celle
+     * dessinée ferait déborder la dernière ligne hors de l'écran. Défaut égal
+     * à l'ancienne valeur en dur, pour que tout appelant non migré rende comme
+     * avant.
+     */
+    contentPadding: Dp = 16.dp,
     onClick: () -> Unit,
     onNextChapter: () -> Unit,
     onPreviousChapter: () -> Unit = {},
@@ -377,7 +385,7 @@ fun PagedChapterContent(
                 .nestedScroll(chapterTransitionConnection),
             beyondViewportPageCount = 1,
         ) { pageIndex ->
-            Box(modifier = Modifier.fillMaxSize().padding(16.dp)) {
+            Box(modifier = Modifier.fillMaxSize().padding(contentPadding)) {
                 if (chapter != null && currentMeasurement != null && pageIndex < pageCount) {
                 val pageOffsetRange = pagination.pageOffsetRange(chapter.index, pageIndex)
                 if (!pageOffsetRange.isEmpty()) {

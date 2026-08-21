@@ -10,6 +10,9 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberUpdatedState
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.text.TextStyle
+import androidx.compose.ui.text.style.Hyphens
+import androidx.compose.ui.text.style.LineBreak
+import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.text.rememberTextMeasurer
 import androidx.compose.ui.unit.sp
@@ -125,6 +128,7 @@ fun paginationStyleKeyFrom(
     viewportWidthPx: Int,
     viewportHeightPx: Int,
     paddingPx: Int,
+    justified: Boolean = false,
 ): PaginationStyleKey {
     val lineHeightSp = if (baseTextStyle.lineHeight.isSp) baseTextStyle.lineHeight.value.toInt() else fontSizeSp
     val fontFamilyKey = baseTextStyle.fontFamily?.toString() ?: "default"
@@ -135,6 +139,7 @@ fun paginationStyleKeyFrom(
         viewportWidthPx = viewportWidthPx,
         viewportHeightPx = viewportHeightPx,
         paddingPx = paddingPx,
+        justified = justified,
     )
 }
 
@@ -163,6 +168,13 @@ fun rememberChapterPaginationState(
     // (3a.1, jamais ici), une police change la largeur du texte et donc
     // la pagination. `null` = police système par défaut.
     fontFamily: FontFamily? = null,
+    // P4 — justification + césure. Fait partie du style de MESURE pour la même
+    // raison que fontFamily : la césure déplace les points de coupure de ligne,
+    // donc change la pagination. La justification seule ne la changerait pas
+    // (elle ne fait qu'étirer les blancs), mais les deux vont ensemble par
+    // construction (voir UserPreferences.textJustified) et le même TextStyle
+    // sert au rendu — les séparer ferait diverger mesure et affichage.
+    justified: Boolean = false,
 ): ChapterPaginationState {
     val textMeasurer = rememberTextMeasurer()
     val chapterTextMeasurer = remember(textMeasurer) { ChapterTextMeasurer(textMeasurer) }
@@ -176,21 +188,29 @@ fun rememberChapterPaginationState(
     // l'interligne redéclenche automatiquement la pagination. Lot 9 :
     // fontFamily rejoint ce même style pour la même raison — changer
     // d'ambiance dont la police diffère doit recalculer la pagination.
-    val baseTextStyle = remember(fontSizeSp, lineHeightSp, fontFamily) {
-        TextStyle(fontSize = fontSizeSp.sp, lineHeight = lineHeightSp.sp, fontFamily = fontFamily)
+    val baseTextStyle = remember(fontSizeSp, lineHeightSp, fontFamily, justified) {
+        TextStyle(
+            fontSize = fontSizeSp.sp,
+            lineHeight = lineHeightSp.sp,
+            fontFamily = fontFamily,
+            textAlign = if (justified) TextAlign.Justify else TextAlign.Unspecified,
+            hyphens = if (justified) Hyphens.Auto else Hyphens.None,
+            lineBreak = if (justified) LineBreak.Paragraph else LineBreak.Unspecified,
+        )
     }
     val state = remember(engine, baseTextStyle) { ChapterPaginationState(engine, baseTextStyle) }
 
     val contentWidthPx = viewportWidthPx - paddingPx * 2
     val contentHeightPx = (viewportHeightPx - paddingPx * 2).coerceAtLeast(0)
 
-    val styleKey = remember(baseTextStyle, fontSizeSp, viewportWidthPx, contentHeightPx, paddingPx) {
+    val styleKey = remember(baseTextStyle, fontSizeSp, viewportWidthPx, contentHeightPx, paddingPx, justified) {
         paginationStyleKeyFrom(
             baseTextStyle = baseTextStyle,
             fontSizeSp = fontSizeSp,
             viewportWidthPx = viewportWidthPx,
             viewportHeightPx = contentHeightPx,
             paddingPx = paddingPx,
+            justified = justified,
         )
     }
 

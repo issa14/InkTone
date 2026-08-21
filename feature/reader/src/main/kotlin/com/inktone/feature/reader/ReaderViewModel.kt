@@ -112,6 +112,9 @@ class ReaderViewModel @Inject constructor(
                 _state.value = _state.value.copy(
                     isReadingRulerEnabled = preferences.readingRulerEnabled,
                     lineHeightMultiplier = preferences.lineHeightMultiplier,
+                    readerMarginStep = preferences.readerMarginStep,
+                    isTextJustified = preferences.textJustified,
+                    keepScreenOn = preferences.keepScreenOn,
                     readerBrightness = preferences.readerBrightness,
                     eyeRestReminderEnabled = preferences.eyeRestReminderEnabled,
                     eyeRestReminderIntervalMinutes = preferences.eyeRestReminderIntervalMinutes,
@@ -314,6 +317,9 @@ class ReaderViewModel @Inject constructor(
             is ReaderIntent.SetTtsSpeed -> setTtsSpeed(intent.speed)
             is ReaderIntent.SetActiveVoiceProfile -> setActiveVoiceProfile(intent.profileId)
             is ReaderIntent.SetLineHeight -> setLineHeight(intent.multiplier)
+            is ReaderIntent.SetReaderMarginStep -> setReaderMarginStep(intent.step)
+            is ReaderIntent.SetTextJustified -> setTextJustified(intent.justified)
+            is ReaderIntent.SetKeepScreenOn -> setKeepScreenOn(intent.enabled)
             is ReaderIntent.SetReaderBrightness -> setReaderBrightness(intent.value)
             is ReaderIntent.SetEyeRestReminderEnabled -> setEyeRestReminderEnabled(intent.enabled)
             is ReaderIntent.SetEyeRestReminderInterval -> setEyeRestReminderInterval(intent.minutes)
@@ -531,6 +537,9 @@ class ReaderViewModel @Inject constructor(
                         activeVoiceProfile = activeVoiceProfile,
                         availableVoiceProfiles = availableVoiceProfiles,
                         lineHeightMultiplier = prefs.lineHeightMultiplier,
+                        readerMarginStep = prefs.readerMarginStep,
+                        isTextJustified = prefs.textJustified,
+                        keepScreenOn = prefs.keepScreenOn,
                         // Lot 12, tache 12.9 — jamais reporte avant ce lot.
                         publicationFormat = publication.format,
                         pageOffsetY = restored?.locator?.pageOffsetY ?: 0f,
@@ -1133,6 +1142,35 @@ class ReaderViewModel @Inject constructor(
         viewModelScope.launch {
             val current = preferencesRepository.get()
             preferencesRepository.update(current.copy(lineHeightMultiplier = multiplier))
+        }
+    }
+
+    /**
+     * P4 — cran de marge latérale. Borné ici plutôt que laissé au `require()`
+     * du domaine : un cran hors bornes venant de l'UI est un défaut de
+     * l'appelant, pas une donnée utilisateur à faire planter l'app.
+     */
+    private fun setReaderMarginStep(step: Int) {
+        val bounded = step.coerceIn(UserPreferences.MARGIN_STEP_RANGE)
+        viewModelScope.launch {
+            val current = preferencesRepository.get()
+            preferencesRepository.update(current.copy(readerMarginStep = bounded))
+        }
+    }
+
+    /** P4 — justification du texte (césure comprise, jamais l'une sans l'autre). */
+    private fun setTextJustified(justified: Boolean) {
+        viewModelScope.launch {
+            val current = preferencesRepository.get()
+            preferencesRepository.update(current.copy(textJustified = justified))
+        }
+    }
+
+    /** P4 — maintien de l'écran allumé, appliqué à la fenêtre par ReaderScreen. */
+    private fun setKeepScreenOn(enabled: Boolean) {
+        viewModelScope.launch {
+            val current = preferencesRepository.get()
+            preferencesRepository.update(current.copy(keepScreenOn = enabled))
         }
     }
 
