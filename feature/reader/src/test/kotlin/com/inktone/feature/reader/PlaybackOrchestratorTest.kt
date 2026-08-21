@@ -10,15 +10,20 @@ import com.inktone.domain.service.PlaybackEvent
 import com.inktone.domain.service.TtsCapabilities
 import com.inktone.domain.service.TtsEngine
 import com.inktone.domain.usecase.UpdateReadingStateUseCase
+import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.delay
+import kotlinx.coroutines.launch
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.emptyFlow
+import kotlinx.coroutines.flow.onSubscription
 import kotlinx.coroutines.runBlocking
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
 import org.junit.Assert.assertTrue
 import org.junit.Test
 import java.util.concurrent.CopyOnWriteArrayList
+import java.util.concurrent.atomic.AtomicBoolean
 import java.util.concurrent.atomic.AtomicInteger
 
 /**
@@ -268,6 +273,64 @@ class PlaybackOrchestratorTest {
     }
 
     // ── Fakes ──────────────────────────────────────────────
+
+    /**
+     * P1 — la fin de chapitre a un signal propre. Auparavant le Lecteur la
+     * déduisait de « `Idle` alors que la lecture était engagée », ce qui
+     * confondait une vraie fin avec une pause demandée pendant la synthèse
+     * (`Buffering` → `stop()`) : depuis la notification, mettre en pause au
+     * mauvais moment faisait sauter un chapitre.
+     */
+    @Test
+    fun chapterCompletedNestEmisQuALaFinNaturelleDuChapitre() = runBlocking {
+        val tts = FakeTtsEngine(segmentDurationMs = 50)
+        val player = FakeAudioPlayer()
+        val orchestrator = PlaybackOrchestrator(tts, player, UpdateReadingStateUseCase(FakeReadingStateRepository()))
+        val completions = AtomicInteger(0)
+        val subscribed = AtomicBoolean(false)
+        val collector = CoroutineScope(Dispatchers.Default).launch {
+            orchestrator.chapterCompleted
+                .onSubscription { subscribed.set(true) }
+                .collect { completions.incrementAndGet() }
+        }
+        // `chapterCompleted` n'a pas de replay : une émission avant l'abonnement
+        // serait perdue et rendrait le test faussement vert (ou faussement rouge).
+        awaitUntil { subscribed.get() }
+
+        orchestrator.play(listOf(sentence(0, "Fin.", 0)), profile, 0, "pub1", 0, "ch.xhtml")
+        awaitUntil { orchestrator.state.value == PlaybackOrchestrator.PlaybackStatus.Idle }
+        awaitUntil { completions.get() == 1 }
+
+        collector.cancel()
+    }
+
+    @Test
+    fun unePauseDemandeePendantLaSyntheseNemetPasDeFinDeChapitre() = runBlocking {
+        // Synthèse lente : l'état reste `Buffering`, où `togglePlayPause`
+        // annule la synthèse (retour `Idle`) faute d'audio à suspendre.
+        val tts = FakeTtsEngine(segmentDurationMs = 50, synthesisDelayMs = 2_000)
+        val player = FakeAudioPlayer()
+        val orchestrator = PlaybackOrchestrator(tts, player, UpdateReadingStateUseCase(FakeReadingStateRepository()))
+        val completions = AtomicInteger(0)
+        val subscribed = AtomicBoolean(false)
+        val collector = CoroutineScope(Dispatchers.Default).launch {
+            orchestrator.chapterCompleted
+                .onSubscription { subscribed.set(true) }
+                .collect { completions.incrementAndGet() }
+        }
+        // `chapterCompleted` n'a pas de replay : une émission avant l'abonnement
+        // serait perdue et rendrait le test faussement vert (ou faussement rouge).
+        awaitUntil { subscribed.get() }
+
+        orchestrator.play(listOf(sentence(0, "Une.", 0), sentence(1, "Deux.", 5)), profile, 0, "pub1", 0, "ch.xhtml")
+        awaitUntil { orchestrator.state.value == PlaybackOrchestrator.PlaybackStatus.Buffering }
+        orchestrator.togglePlayPause()
+        awaitUntil { orchestrator.state.value == PlaybackOrchestrator.PlaybackStatus.Idle }
+
+        Thread.sleep(200)
+        assertEquals("aucune fin de chapitre : l'utilisateur a mis en pause", 0, completions.get())
+        collector.cancel()
+    }
 
     /**
      * P1-d — `ReaderViewModel.onCleared()` ne coupe la narration que si aucune

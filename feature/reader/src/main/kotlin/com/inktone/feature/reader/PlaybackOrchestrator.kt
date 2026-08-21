@@ -19,9 +19,12 @@ import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.TimeoutCancellationException
 import kotlinx.coroutines.channels.Channel
 import kotlinx.coroutines.delay
+import kotlinx.coroutines.flow.MutableSharedFlow
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.StateFlow
+import kotlinx.coroutines.flow.SharedFlow
+import kotlinx.coroutines.flow.asSharedFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.flow.stateIn
@@ -100,6 +103,20 @@ class PlaybackOrchestrator @Inject constructor(
      */
     private val _positionValid = MutableStateFlow(false)
     val positionValid: StateFlow<Boolean> = _positionValid.asStateFlow()
+
+    /**
+     * Fin **naturelle** du chapitre : la dernière phrase a été jouée jusqu'au
+     * bout (P1-c/d).
+     *
+     * Signal dédié, et non plus l'heuristique « `Idle` alors que la lecture
+     * était engagée » : cette dernière confondait la fin d'un chapitre avec
+     * tout arrêt survenant en cours de lecture — notamment une pause demandée
+     * pendant la synthèse (`Buffering`), qui passe par `stop()`. Depuis la
+     * notification média, mettre en pause au mauvais instant faisait ainsi
+     * sauter un chapitre. Ici, l'émission n'a qu'une seule cause possible.
+     */
+    private val _chapterCompleted = MutableSharedFlow<Unit>(extraBufferCapacity = 1)
+    val chapterCompleted: SharedFlow<Unit> = _chapterCompleted.asSharedFlow()
 
     /** Métadonnées du livre narré (titre/auteur) — posées par le Lecteur, lues par la notification. */
     private val _metadata = MutableStateFlow(PlaybackMetadata())
@@ -250,11 +267,9 @@ class PlaybackOrchestrator @Inject constructor(
             PlaybackStatus.Paused -> resume()
             // Buffering : rien d'audible encore, « pause » = annuler la
             // synthèse en cours (retour Idle, sans reprise possible).
-            // Limite connue (à traiter au palier notification, P1-B) : le
-            // collecteur du Lecteur interprète « Idle alors que isPlaying »
-            // comme une fin de chapitre naturelle — un signal dédié
-            // `chapterCompleted` (plutôt que l'heuristique Idle) lèvera cette
-            // ambiguïté sans risque d'auto-avance parasite.
+            // Cet `Idle` ne déclenche plus d'auto-avance : la fin de chapitre
+            // a désormais son signal propre ([chapterCompleted]), émis par le
+            // seul chemin qui la constate réellement.
             PlaybackStatus.Buffering -> stop()
             PlaybackStatus.Idle -> restart()
             is PlaybackStatus.Error -> restart()
@@ -399,6 +414,9 @@ class PlaybackOrchestrator @Inject constructor(
                 if (waitMs > 0) pace(generation, waitMs)
             }
             _state.value = PlaybackStatus.Idle
+            // Après l'`Idle` : l'écran doit d'abord enregistrer la fin de la
+            // lecture courante, puis seulement enchaîner le chapitre suivant.
+            _chapterCompleted.tryEmit(Unit)
         }
     }
 

@@ -123,13 +123,15 @@ class ReaderViewModel @Inject constructor(
         viewModelScope.launch {
             playbackOrchestrator.state.collect { status ->
                 when (status) {
-                    PlaybackOrchestrator.PlaybackStatus.Idle -> {
-                        val wasPlaying = _state.value.isPlaying
+                    PlaybackOrchestrator.PlaybackStatus.Idle ->
+                        // P1 — plus d'auto-avance déduite ici : `Idle` signifie
+                        // seulement « plus rien ne joue », qu'il s'agisse d'une
+                        // fin de chapitre, d'un arrêt volontaire ou d'une pause
+                        // demandée pendant la synthèse. La fin de chapitre a son
+                        // signal propre (`chapterCompleted`, collecté plus bas).
                         _state.value = _state.value.copy(
                             isPlaying = false, isAudioActive = false, highlightedWordRange = null,
                         )
-                        if (wasPlaying) onChapterPlaybackCompleted()
-                    }
                     PlaybackOrchestrator.PlaybackStatus.Buffering ->
                         _state.value = _state.value.copy(isAudioActive = false)
                     PlaybackOrchestrator.PlaybackStatus.Playing -> {
@@ -152,6 +154,12 @@ class ReaderViewModel @Inject constructor(
                         )
                 }
             }
+        }
+
+        // P1 — fin naturelle de chapitre : enchaîne le suivant. Émis par
+        // l'ordonnanceur après la dernière phrase jouée, et par lui seul.
+        viewModelScope.launch {
+            playbackOrchestrator.chapterCompleted.collect { onChapterPlaybackCompleted() }
         }
 
         // Lot 16 (Tâche 2.2) — le surlignage mot suit la position réelle de
