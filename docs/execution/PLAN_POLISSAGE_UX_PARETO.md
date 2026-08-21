@@ -241,26 +241,33 @@ le commit ou l'état du code qui la prouve (CLAUDE.md §« le code fait foi »).
   `ReaderViewModelBackgroundTrackerTest.kt` (deux cas : sans écoute → pausé,
   pendant l'écoute → actif). Commit `37fbefd1`.
 
-### 6.3 — P1, session média (à faire — décision d'architecture actée)
+### 6.3 — P1, session média
 
-Le reste de P1 (MediaSession + notification + focus audio + `onCleared`) est un
-chantier **cohésif** qui exige de hisser la session TTS hors de `ReaderViewModel`
-vers un singleton app-scoped, consommé par `infrastructure/media` via un contrat
-domaine. Décision clé identifiée à l'audit :
+Paliers **a** (contrat + ordonnanceur) livré, **b/c/d** restants :
+
+- **(a) fait** — contrat domaine `PlaybackSession` (`domain/service/PlaybackSession.kt`)
+  + `PlaybackOrchestrator` l'implémente : rétention du contexte de session,
+  `skip(delta)`, `togglePlayPause()` (pause **réelle** `pause()`/`resume()`, pas
+  `stop()`), `metadata`/`setMetadata`, `isPlaying` dérivé de `state` (flux
+  `stateIn`, jamais un second drapeau). Liaison Hilt `PlaybackSessionModule`
+  (`feature/reader/di`). Collecteur du `ReaderViewModel` synchronisé : `Paused`
+  → `isPlaying=false`, `Playing` → `isPlaying=true`. Tests JVM
+  (`PlaybackOrchestratorTest`) : skip pendant lecture / à l'arrêt, toggle pause↔
+  reprise, relance après arrêt, métadonnées. Commit `ebc8d83e`.
+- **(b/c/d) à faire** — réécriture d'`AudioPlaybackService` en vrai service
+  foreground pilotant `PlaybackSession` + notification `MediaStyle` +
+  `POST_NOTIFICATIONS` ; `AudioFocusRequest` + `BecomingNoisy` (test instrumenté) ;
+  `onCleared()` qui ne coupe plus quand la session détient la lecture.
+
+### 6.4 — P1, décision d'architecture actée (rappel)
 
 - **Sémantique pause ≠ stop.** Le lecteur pause par `stop()` (Idle) ; la
-  notification doit pauser par `pause()` (réel, réservé à cet usage — cf.
-  `TtsPillBar.kt`). Le collecteur d'état du `ReaderViewModel` doit alors traiter
-  `Paused` en `isPlaying=false` (branche aujourd'hui morte), et `Playing` en
-  `isPlaying=true`, pour rester la source de vérité unique (K3).
-- **Pas d'auto-avance parasite.** `skip()`/`togglePlayPause()` du singleton
-  font `stop()`+`play()` de façon synchrone : StateFlow conflate l'Idle
-  transitoire, le collecteur voit Buffering/Playing — pas d'`onChapterPlaybackCompleted`
-  intempestif. À couvrir par un test de non-régression.
-- **Ordre des paliers** : (a) contrat domaine `PlaybackSession` + extension de
-  `PlaybackOrchestrator` (rétention du contexte, `skip`, `togglePlayPause`,
-  métadonnées) testés en JVM ; (b) réécriture d'`AudioPlaybackService` en vrai
-  service foreground + notification `MediaStyle` + `POST_NOTIFICATIONS` demandée
-  au premier démarrage de lecture ; (c) `AudioFocusRequest` + `BecomingNoisy`
+  notification pausera par `pause()` (réel). Le collecteur traite `Paused` en
+  `isPlaying=false` (désormais branché).
+- **Limite connue (à lever en b)** : `togglePlayPause` sur `Buffering` passe par
+  `stop()` → le collecteur interprète « Idle alors que isPlaying » comme une fin
+  de chapitre — un signal dédié `chapterCompleted` (plutôt que l'heuristique
+  Idle) lèvera l'ambiguïté sans auto-avance parasite. Documenté dans le code
+  (`PlaybackOrchestrator.togglePlayPause`).
   (test instrumenté) ; (d) `onCleared()` ne coupe plus quand la session détient
   la lecture.
