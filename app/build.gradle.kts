@@ -90,6 +90,11 @@ android {
 dependencies {
     coreLibraryDesugaring(libs.desugar.jdk.libs)
 
+    // P2 : mini-lecteur persistant, affiche sous le contenu de tous les
+    // ecrans hors Lecteur (InkToneNavHost). Le module etait jusqu'ici
+    // inclus dans settings.gradle.kts sans qu'aucun module n'en depende.
+    implementation(project(":feature:player"))
+
     // Tache 3.7 : MainActivity minimale pour rendre le test de bout en
     // bout manuel possible (heberge ReaderScreen) - pas de navigation
     // complete, hors de portee de la marche a blanc (Phase 4).

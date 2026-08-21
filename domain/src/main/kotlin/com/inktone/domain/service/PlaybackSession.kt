@@ -2,8 +2,16 @@ package com.inktone.domain.service
 
 import kotlinx.coroutines.flow.StateFlow
 
-/** Métadonnées du livre en cours de narration, affichées dans la notification média. */
+/**
+ * Métadonnées du livre en cours de narration, affichées dans la notification
+ * média et dans le mini-lecteur (P2).
+ *
+ * [publicationId] est l'adresse de retour : elle permet au mini-lecteur de
+ * ramener au Lecteur, sur le livre effectivement narré, depuis n'importe quel
+ * écran. Nul tant qu'aucune narration n'a démarré.
+ */
 data class PlaybackMetadata(
+    val publicationId: String? = null,
     val title: String? = null,
     val author: String? = null,
 )

@@ -232,13 +232,17 @@ class PlaybackOrchestratorTest {
         orchestrator.play(sentences, profile, 0, "pub1", 0, "ch.xhtml")
         awaitUntil { orchestrator.state.value == PlaybackOrchestrator.PlaybackStatus.Playing }
 
+        // `isPlaying` est un `stateIn` : il suit `state` par une coroutine, il
+        // ne bascule donc pas dans le même tick. L'attendre au lieu de
+        // l'affirmer aussitôt — sinon le test passe ou échoue selon
+        // l'ordonnancement (observé rouge sur une exécution complète).
         orchestrator.togglePlayPause()
         awaitUntil { orchestrator.state.value == PlaybackOrchestrator.PlaybackStatus.Paused }
-        assertEquals(false, orchestrator.isPlaying.value)
+        awaitUntil { !orchestrator.isPlaying.value }
 
         orchestrator.togglePlayPause()
         awaitUntil { orchestrator.state.value == PlaybackOrchestrator.PlaybackStatus.Playing }
-        assertEquals(true, orchestrator.isPlaying.value)
+        awaitUntil { orchestrator.isPlaying.value }
 
         orchestrator.stop()
     }
@@ -261,9 +265,12 @@ class PlaybackOrchestratorTest {
     @Test
     fun metadata_et_isPlaying_refletent_letat() = runBlocking {
         val orchestrator = PlaybackOrchestrator(FakeTtsEngine(), FakeAudioPlayer(), UpdateReadingStateUseCase(FakeReadingStateRepository()))
-        orchestrator.setMetadata("Titre de test", "Auteur de test")
+        orchestrator.setMetadata("pub-1", "Titre de test", "Auteur de test")
         assertEquals("Titre de test", orchestrator.metadata.value.title)
         assertEquals("Auteur de test", orchestrator.metadata.value.author)
+        // P2 — adresse de retour du mini-lecteur : sans elle, la barre
+        // ramènerait au dernier livre ouvert, pas à celui qui est narré.
+        assertEquals("pub-1", orchestrator.metadata.value.publicationId)
         assertEquals(false, orchestrator.isPlaying.value)
 
         orchestrator.play(listOf(sentence(0, "Un.", 0)), profile, 0, "pub1", 0, "ch.xhtml")

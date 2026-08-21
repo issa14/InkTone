@@ -524,7 +524,11 @@ class ReaderViewModel @Inject constructor(
                     // P1 — alimente les métadonnées de la notification média
                     // (titre/auteur), source unique : jamais rechargées depuis
                     // un repository dans le service.
-                    playbackOrchestrator.setMetadata(publication.title, publication.authors.joinToString(", ").ifBlank { null })
+                    playbackOrchestrator.setMetadata(
+                        publicationId = publication.id,
+                        title = publication.title,
+                        author = publication.authors.joinToString(", ").ifBlank { null },
+                    )
                     // Plan v3, Palier 3.6 — initialiser le parsing lazy EPUB
                     if (publication.format == PublicationFormat.EPUB) {
                         chapterParser.registerPublication(publicationId, publication.fileUri)
