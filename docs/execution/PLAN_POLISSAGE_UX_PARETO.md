@@ -374,3 +374,84 @@ persistant, qui déplacera la propriété de la session hors du `ReaderViewModel
   de chapitre — un signal dédié `chapterCompleted` (plutôt que l'heuristique
   Idle) lèvera l'ambiguïté sans auto-avance parasite. Documenté dans le code
   (`PlaybackOrchestrator.togglePlayPause`).
+
+### 6.6 — P4, confort de lecture visuelle
+
+Le panneau n'exposait que deux leviers (taille, interligne). Trois des quatre
+réglages prévus sont livrés ; un quatrième était déjà fait, un cinquième est
+refusé en l'état.
+
+- **Marges latérales (fait)** — trois crans (`readerMarginFor`), le cran par
+  défaut valant exactement l'ancienne valeur en dur (16 dp) : aucune
+  bibliothèque existante ne change d'apparence. Une SEULE valeur alimente la
+  mesure de pagination et le rendu de `PagedChapterContent`, dont le padding
+  était écrit en dur — deux sources auraient mesuré une page plus large que
+  celle dessinée, donc fait déborder le texte.
+- **Justification + césure (fait)** — posée sur `pagination.baseTextStyle`,
+  d'où le mode paginé tire déjà son style de rendu : mesure et affichage ne
+  peuvent pas diverger. Le mode SCROLL applique les mêmes règles. La césure
+  déplaçant les coupures de ligne, `PaginationStyleKey` gagne `justified` —
+  sans quoi la pagination resterait calculée sur l'ancien style sans signal,
+  exactement le piège déjà documenté pour `lineHeight`/`fontFamily`.
+- **Garder l'écran allumé (fait)** — `KeepScreenOnEffect`, en
+  `DisposableEffect` : le maintien meurt avec l'écran de lecture, jamais un
+  `addFlags` sans retrait qui viderait la batterie sur un autre écran.
+- **Famille de police — déjà faite avant ce plan.** Vérifié dans le code :
+  `UserPreferences.fontFamily` → `EffectiveReadingSettings` → `TextStyle` →
+  clé de pagination, de bout en bout. Retirée du périmètre plutôt que
+  réimplémentée.
+- **Espacement des paragraphes — REFUSÉ en l'état (écart déclaré).** La
+  colonne `paragraphSpacingStep` est persistée mais n'est pas exposée. Les
+  paragraphes sont séparés par un `"\n"` dont l'espace d'offsets doit rester
+  aligné au caractère près avec `JsoupChapterParser` : c'est l'invariant dont
+  dépend le surlignage TTS. L'espacer demande des `ParagraphStyle` par bloc
+  dans `buildBatchAnnotatedString`, pas un séparateur supplémentaire. Exposer
+  un curseur sans ce travail aurait donné soit un réglage sans effet, soit un
+  surlignage désaligné.
+
+Migration `MIGRATION_26_27` avec son test `MigrationTestHelper` dans le même
+commit (K4), **vérifié sur device** : 29 tests de migration, 0 échec. Tests
+JVM : `ReaderComfortTest` (4 cas), `PaginationJustificationKeyTest` (2 cas).
+Commits `1bcc5d70`, `3f8f9b64`.
+
+**Vérification device restant à faire** : les trois réglages depuis le panneau
+TT, en mode paginé ET en défilement ; vérifier qu'un changement de marge
+repagine sans perdre la position de lecture.
+
+### 6.7 — P5, micro-polish premium
+
+- **Échelle haptique (fait)** — `AppHaptics` (core:designsystem) : `tick`,
+  `confirm`, `reject`, `longPress`. Passe par les constantes plateforme et non
+  par `LocalHapticFeedback` : sur Compose 1.7, `HapticFeedbackType` n'offre que
+  `LongPress` et `TextHandleMove`, sans distinction confirmation/refus et bien
+  trop appuyés pour un changement de page. Premiers usages : cran de page
+  tournée (dans la branche du swipe MANUEL — `onPageChanged` suit aussi la
+  narration et ferait vibrer en continu pendant une écoute), confirmation au
+  signet.
+- **Tokens de mouvement (posés)** — `Motion` : trois durées, deux courbes,
+  dont les fabriques passent par `reducedMotionDuration` **par construction**.
+  `gestureSpring` renvoie une durée nulle plutôt qu'un ressort rapide quand le
+  mouvement est réduit.
+- **Restant** — substituer ces tokens aux `tween` en dur existants. Non fait
+  dans le même commit volontairement : plusieurs de ces animations portent des
+  correctifs de clignotement documentés
+  (`NOTE_REGRESSION_CLIGNOTEMENT_PAGE_HUD.md`), leur migration demande une
+  vérification device dédiée.
+- **Restant** — partage de la bitmap de couverture entre le lecteur et la
+  notification média (cache Coil), pour éviter une seconde décompression.
+
+Commit `f42103bb`.
+
+### 6.8 — État du plan
+
+| Lot | État |
+|---|---|
+| P1 — session média | Livré ; écarts 3 (±30 s, refusé) et 4 (minuteur en notification) ouverts |
+| P2 — mini-lecteur et propriété de session | Livré (paliers a et b) |
+| P3 — build honnête | Partiel : build type et `profileinstaller` posés ; générateur de Baseline Profile restant |
+| P4 — confort visuel | Livré, sauf espacement de paragraphe (refusé, motivé) |
+| P5 — micro-polish | Fondations posées ; migration des animations et couverture partagée restantes |
+
+Le plus gros reste de valeur mesurable est **P3** : le Baseline Profile est le
+seul élément du plan dont le gain (démarrage à froid) se chiffre, et il n'est
+toujours pas mesuré.
