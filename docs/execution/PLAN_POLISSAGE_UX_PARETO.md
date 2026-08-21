@@ -313,6 +313,29 @@ persistant, qui déplacera la propriété de la session hors du `ReaderViewModel
    écran verrouillé ne se prouvent pas en JVM ; la clôture du palier revient à
    Issa (checklist ci-dessous).
 
+### 6.5 — P2, mini-lecteur persistant
+
+- **(a) fait** — `feature:player` (code mort : aucun module n'en dépendait,
+  aucune route ne référençait `PlayerScreen`) est **remplacé** par le
+  mini-lecteur. `MiniPlayerViewModel` consomme directement `PlaybackSession`
+  via Hilt : plus de `MediaController`, plus de `ComponentName` reconstruit
+  depuis un nom de classe en chaîne. `MiniPlayerContent` est sans état donc
+  testable. `InkToneNavHost` l'affiche en bande sous le contenu (jamais en
+  flottant, qui masquerait les actions ancrées en bas), masqué sur le Lecteur
+  et l'onboarding ; l'appui ramène au livre réellement narré
+  (`PlaybackMetadata.publicationId`). Tests : `MiniPlayerUiStateTest` (JVM),
+  `MiniPlayerContentTest` (Compose, 4 cas). Commit `94325623`.
+- **(b) à faire** — déplacer la **propriété de la session** hors du
+  `ReaderViewModel` : l'auto-avance de chapitre (collecteur `chapterCompleted`)
+  et le tracker de statistiques y vivent encore, donc meurent avec l'écran.
+  C'est ce palier, et lui seul, qui referme les écarts 1 et 2 de P1 — le
+  mini-lecteur rend la session *visible*, il ne la *possède* pas.
+- **Défaut de test corrigé au passage** :
+  `PlaybackOrchestratorTest.togglePlayPause_bascule_entre_pause_et_reprise`
+  affirmait `isPlaying` (un `stateIn`) immédiatement après avoir attendu
+  `state` — vert ou rouge selon l'ordonnancement. Observé rouge sur une
+  exécution complète, corrigé en attendant la valeur dérivée.
+
 ### 6.4 — P1, décision d'architecture actée (rappel)
 
 - **Sémantique pause ≠ stop.** Le lecteur pause par `stop()` (Idle) ; la
