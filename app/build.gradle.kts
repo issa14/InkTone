@@ -96,6 +96,10 @@ dependencies {
     implementation("androidx.activity:activity-compose:1.9.1")
     implementation(libs.androidx.hilt.navigation.compose)
     implementation(libs.androidx.core.splashscreen)
+    // P3 (plan polissage Pareto) — installe au demarrage le Baseline
+    // Profile (profil de reference) compile a la livraison, pour reduire
+    // le temps de demarrage a froid sur Snapdragon 680 (Blueprint §11.2).
+    implementation(libs.androidx.profileinstaller)
 
     // Tache 9bis.0.1/9bis.2 : Compose Navigation 2.8+ a routes typees
     // (@Serializable), remplace l'etat AppScreen a 3 cas (Phase 7).

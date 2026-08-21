@@ -13,13 +13,21 @@ android {
         minSdk = 26
         targetSdk = 34
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
-        // :app n'a pour l'instant qu'un build type debug (donc
-        // debuggable=true), sur lequel androidx.benchmark refuse de
-        // mesurer par defaut (resultats non fiables en debuggable).
-        // Supprime volontairement pour cette premiere mise en place de
-        // l'outillage (Tache 4.9) - un vrai build type "benchmark" non
-        // debuggable est le sujet d'une tache separee, pas de celle-ci.
-        testInstrumentationRunnerArguments["androidx.benchmark.suppressErrors"] = "DEBUGGABLE"
+        // P3 (plan polissage Pareto) — le suppressErrors=DEBUGGABLE qui
+        // masquait la mesure sur un build debogable est retire : :app
+        // expose desormais un build type `benchmark` non debuggable (voir
+        // InkToneApplicationConventionPlugin), cible reelle des mesures.
+    }
+
+    // Build type `benchmark` non debuggable, aligne sur le build type du
+    // meme nom de :app (targetProjectPath) : c'est lui qui produit les
+    // chiffres de demarrage representatifs, sans suppressErrors.
+    buildTypes {
+        create("benchmark") {
+            isDebuggable = false
+            signingConfig = signingConfigs.getByName("debug")
+            matchingFallbacks += listOf("release")
+        }
     }
 
     compileOptions {
