@@ -517,15 +517,51 @@ version de `androidx.benchmark` intermédiaire ; revoir le désucrage.
 
 Commit `c9dbceb6`.
 
+### 6.10 — P1 écart 4 et P5 : minuteur de session et couverture
+
+- **Minuteur de sommeil déplacé dans la session (écart 4 de P1, fait)** —
+  dernier élément de session encore attaché à l'écran. Son intérêt est
+  justement de s'appliquer quand personne ne regarde l'écran, et depuis P1-d
+  quitter le Lecteur ne coupe plus la narration : attaché à l'écran, il
+  laissait la voix tourner toute la nuit dès qu'on fermait le Lecteur.
+  `PlaybackSession` gagne `sleepTimer`/`setSleepTimer` ; décompte à la seconde
+  (la notification doit afficher le temps restant) ; `stop()` à expiration, pas
+  une simple mise à faux d'un drapeau. La notification affiche « Arrêt dans
+  N min » et une action « Annuler le minuteur » présente **uniquement** quand
+  un minuteur est armé. Tests : `PlaybackOrchestratorSleepTimerTest` (5 cas).
+  Commit `ef7d9e8b`.
+- **Couverture dans la notification (P5, fait)** — la notification et l'écran
+  verrouillé n'affichaient AUCUNE couverture (ni `setLargeIcon`, ni
+  `METADATA_KEY_ALBUM_ART`) : une narration en cours se présentait comme un
+  bloc de texte nu. Chargée via Coil (cache partagé avec la bibliothèque, pas
+  de seconde décompression), à 512 px, `allowHardware(false)`, et avant la
+  publication des métadonnées pour ne pas faire clignoter l'écran verrouillé.
+  Un échec de chargement laisse la notification sans image : une couverture est
+  un agrément, jamais une condition pour écouter. Commit `efa14920`.
+
+**Vérifié sur device** (V2206 / Android 14, après réimport) : la demande de
+`POST_NOTIFICATIONS` apparaît bien au premier démarrage d'une narration et la
+lecture démarre malgré tout ; la notification média affiche la couverture, le
+titre, l'auteur et ses contrôles ; l'**auto-avance de chapitre fonctionne**
+(chapitres 6 → 8 → 11 enchaînés pendant la narration).
+
+**Restant à vérifier par Issa** : l'affichage du décompte du minuteur et son
+action d'annulation dans la notification (couverts en JVM, non capturés à
+l'écran — le HUD auto-masqué rend l'automatisation peu fiable).
+
+**Défaut hors périmètre, signalé** : dans « La fille de papier », toutes les
+entrées de la table des matières s'affichent « Prologue ». À investiguer côté
+parseur de TOC, pas dans ce plan.
+
 ### 6.8 — État du plan
 
 | Lot | État |
 |---|---|
-| P1 — session média | Livré ; écarts 3 (±30 s, refusé) et 4 (minuteur en notification) ouverts |
+| P1 — session média | Livré ; seul l'écart 3 reste (±30 s, refusé et motivé) |
 | P2 — mini-lecteur et propriété de session | Livré (paliers a et b) |
 | P3 — build honnête | Partiel : build type, `profileinstaller` et générateur posés ; branchement bloqué par l'environnement (§6.9) |
 | P4 — confort visuel | Livré, sauf espacement de paragraphe (refusé, motivé) |
-| P5 — micro-polish | Fondations posées ; migration des animations et couverture partagée restantes |
+| P5 — micro-polish | Haptique, tokens de mouvement et couverture de notification livrés ; migration des `tween` en dur restante |
 
 Le plus gros reste de valeur mesurable est toujours **P3** : le Baseline Profile
 est le seul élément du plan dont le gain (démarrage à froid) se chiffre. Le
