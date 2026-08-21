@@ -642,6 +642,36 @@ annulation complète de la tentative §6.12. La comparaison avec `main` n'a pas 
 conclusion : ce n'est PAS établi comme une régression de ce plan, ni comme un
 défaut préexistant.
 
+#### Reproduction précisée par Issa (à prendre comme point de départ)
+
+- La page blanche **ne survient qu'en mode PAGINÉ**, et **après trois balayages
+  de page ou plus** — jamais dès l'ouverture. Cela oriente vers l'avance de
+  page et la mesure progressive, plutôt que vers l'ouverture du chapitre.
+- **Symptôme probablement lié** : après un **long défilement en mode SCROLL**,
+  basculer en PAGINÉ fait **clignoter le texte frénétiquement**. Même famille
+  que la régression documentée dans
+  `NOTE_REGRESSION_CLIGNOTEMENT_PAGE_HUD.md` (recalage sur mesure partielle,
+  `pageIndexAt` / ancrage de position).
+- Hypothèse d'Issa, à retenir comme piste sérieuse : le **découpage en lots**
+  de la mesure (`MAX_BATCH_CHARS`, `buildBatches`) et l'accumulation
+  `cumulativeTop` / `globalOffset` entre lots.
+
+#### Avertissement pour la session de diagnostic
+
+Le correctif §6.14 **change le moment où `isMeasurementComplete` devient vrai**,
+et c'est précisément ce booléen qui autorise l'ancrage de position du mode
+paginé. Il peut donc modifier le comportement des deux symptômes ci-dessus,
+dans un sens comme dans l'autre. Toute mesure faite lors du diagnostic doit
+préciser si elle a été prise **avant ou après** le commit `0e108721` — sans quoi
+les observations ne seront pas comparables.
+
+Protocole suggéré pour la prochaine session, pour éviter les impasses de
+celle-ci : reproduire d'abord sur un chapitre connu, avec un compteur de
+balayages, en instrumentant `pageCount` / `isMeasurementComplete` /
+`measurement.lines.size` par des logs plutôt que par des captures d'écran —
+l'automatisation d'écran s'est révélée peu fiable (HUD auto-masqué en 4 s,
+feuilles modales qui interceptent les gestes).
+
 ### 6.14 — Un défaut de pagination trouvé en enquêtant (§6.13)
 
 L'enquête sur la page blanche n'a pas abouti à son attribution, mais elle a
@@ -682,7 +712,14 @@ Commit `0e108721`.
 | P2 — mini-lecteur et propriété de session | Livré (paliers a et b) |
 | P3 — build honnête | Partiel : build type, `profileinstaller` et générateur posés ; branchement bloqué par l'environnement (§6.9) |
 | P4 — confort visuel | Livré, sauf espacement de paragraphe (refusé, motivé) |
-| P5 — micro-polish | Haptique, tokens de mouvement et couverture de notification livrés ; migration des `tween` en dur restante |
+| P5 — micro-polish | Haptique, tokens de mouvement et couverture de notification livrés ; migration des `tween` en dur **volontairement reportée** (voir ci-dessous) |
+
+**Clôture de cette session** (décision d'Issa) : les points en cours sont bouclés
+et le diagnostic de la page blanche / du clignotement repart proprement dans une
+session dédiée. La **migration des `tween` en dur vers les tokens `Motion` est
+délibérément reportée** : elle toucherait exactement les animations mises en
+cause par le clignotement signalé, et brouillerait le diagnostic à venir. Les
+tokens restent posés et inutilisés, ce qui ne coûte rien.
 
 Le plus gros reste de valeur mesurable est toujours **P3** : le Baseline Profile
 est le seul élément du plan dont le gain (démarrage à froid) se chiffre. Le
