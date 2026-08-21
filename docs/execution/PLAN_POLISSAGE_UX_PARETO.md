@@ -423,6 +423,25 @@ aucun effet en mode SCROLL, dont le `contentPadding` était resté écrit en dur
 seul le mode paginé avait été câblé. La lecture du code ne l'avait pas relevé ;
 l'écran, immédiatement.
 
+**Second défaut, signalé par Issa, corrigé** : le réglage d'**interligne**
+n'avait lui non plus aucun effet en mode SCROLL — antérieur à ce plan.
+`lineHeightSp` n'alimentait que la mesure de pagination ; le `TextStyle` du
+rendu en défilement ne le posait nulle part, alors que le commentaire de sa
+déclaration affirmait le contraire (vrai à l'époque de `ParagraphText`, faux
+depuis la migration vers `LazyColumn`). Commentaire corrigé avec le code.
+Corrige au passage `BookBlockStyleMapper.headingStyle`, qui multipliait la
+taille de police d'un titre sans toucher à son interligne — sans conséquence
+tant que le style de base n'en portait pas d'absolu, mais source de lignes qui
+se chevauchent dès que le réglage utilisateur en pose un. Commit `128fd5b3`.
+
+**Leçon de ces deux défauts** : les réglages de lecture existants n'étaient
+câblés QUE sur le mode paginé. Tout nouveau réglage de rendu doit être vérifié
+dans les deux modes — la lecture du code ne l'a relevé ni une fois ni l'autre.
+
+**Rendu plus visible par ce câblage** : à interligne élevé, les paragraphes se
+touchent, faute d'espacement propre entre eux. C'est exactement l'écart
+`paragraphSpacingStep` déclaré ci-dessus, dont l'utilité devient tangible.
+
 **Restant à vérifier par Issa** : qu'un changement de marge repagine sans perdre
 la position de lecture sur un chapitre long, et le maintien de l'écran allumé
 sur une session réelle.
