@@ -470,16 +470,53 @@ sur une session réelle.
 
 Commit `f42103bb`.
 
+### 6.9 — P3, générateur de Baseline Profile : écrit, non branché
+
+Le parcours de génération (`BaselineProfileGenerator`, module `benchmark`)
+**fonctionne** : exécuté sur V2206 / Android 14, il a produit un profil de
+52 608 lignes couvrant démarrage → bibliothèque → ouverture d'un livre →
+pagination. Ce sont l'extraction puis le branchement qui butent. Trois
+obstacles distincts, tous constatés sur appareil, aucun contourné :
+
+1. **Assertion trop stricte de la bibliothèque (1.3.0 et 1.3.4)** —
+   `androidx.benchmark` exige que la sortie de `pm dump-profiles` soit vide ou
+   exactement `Profile saved to '…'`. FunTouch OS 14 la préfixe de deux lignes
+   (`Waiting for app processes to flush profiles...`), et l'extraction échoue
+   alors que le profil est correctement écrit dans `/data/misc/profman/`.
+2. **Crash en 1.4.1** — la version lève l'assertion précédente mais fait
+   planter le processus d'instrumentation sur ce même appareil.
+3. **Désucrage vs profils des dépendances** — appliquer le plugin à `:app` crée
+   les variantes `nonMinifiedBenchmark`/`nonMinifiedRelease`, dont
+   `expandL8ArtProfileWildcards` échoue à parser le profil fourni par Coil
+   (`isCoreLibraryDesugaringEnabled` est actif). Le build passe alors au rouge.
+
+**Décision** : le plugin reste déclaré au catalogue mais appliqué nulle part —
+`./gradlew build` reste vert. Le générateur est conservé tel quel : il est
+correct, et sera exécuté dès qu'un des obstacles sera levé. **Aucun profil
+n'est commité** : convertir à la main la sortie brute de profman vers le format
+HRF risquerait de livrer un profil faux, ce qui est pire qu'aucun profil.
+
+**Pistes pour clore P3**, par coût croissant : exécuter la génération sur un
+émulateur AOSP (Android 13/14) plutôt que sur ce ROM constructeur ; valider une
+version de `androidx.benchmark` intermédiaire ; revoir le désucrage.
+
+Incident d'environnement à noter : les variantes `nonMinified` dupliquent les
+binaires natifs (onnxruntime, ~800 Mo par variante) et ont saturé le disque en
+cours de session. Nettoyage nécessaire après toute tentative.
+
+Commit `c9dbceb6`.
+
 ### 6.8 — État du plan
 
 | Lot | État |
 |---|---|
 | P1 — session média | Livré ; écarts 3 (±30 s, refusé) et 4 (minuteur en notification) ouverts |
 | P2 — mini-lecteur et propriété de session | Livré (paliers a et b) |
-| P3 — build honnête | Partiel : build type et `profileinstaller` posés ; générateur de Baseline Profile restant |
+| P3 — build honnête | Partiel : build type, `profileinstaller` et générateur posés ; branchement bloqué par l'environnement (§6.9) |
 | P4 — confort visuel | Livré, sauf espacement de paragraphe (refusé, motivé) |
 | P5 — micro-polish | Fondations posées ; migration des animations et couverture partagée restantes |
 
-Le plus gros reste de valeur mesurable est **P3** : le Baseline Profile est le
-seul élément du plan dont le gain (démarrage à froid) se chiffre, et il n'est
-toujours pas mesuré.
+Le plus gros reste de valeur mesurable est toujours **P3** : le Baseline Profile
+est le seul élément du plan dont le gain (démarrage à froid) se chiffre. Le
+travail applicatif est fait ; ce qui manque est un environnement d'exécution
+capable d'en extraire le profil (§6.9), pas du code.
