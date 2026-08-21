@@ -264,9 +264,54 @@ Paliers **a** (contrat + ordonnanceur) et **b** (service + notification) livrés
   (Android 13+) n'est pas encore câblée (concerne l'UI/Activity), et les
   dépendances `media3` d'`infrastructure/media` deviennent inutilisées (nettoyage
   avec P2, suppression de `feature/player`).
-- **(c/d) à faire** — `AudioFocusRequest` + `BecomingNoisy` (test instrumenté) ;
-  `onCleared()` qui ne coupe plus quand la session détient la lecture ; signal
-  dédié `chapterCompleted` (voir 6.4).
+- **(c) fait** — focus audio et débranchement de casque. `AudioInterruptionPolicy`
+  (pur JVM, modèle `GaplessPlaybackCore`/`GaplessAudioPlayer`) porte les règles :
+  jamais d'atténuation d'une voix (`CAN_DUCK` traité comme perte transitoire),
+  reprise automatique **seulement** après une perte transitoire, jamais après un
+  casque débranché ni une perte définitive, pause différée quand l'interruption
+  tombe pendant la synthèse. `AudioFocusController` est la couche I/O
+  `AudioManager` (`AudioFocusRequest` GAIN, `USAGE_MEDIA`/`CONTENT_TYPE_SPEECH`,
+  `setWillPauseWhenDucked`, receiver `BECOMING_NOISY`), possédée par le service —
+  seul demandeur de focus de l'app (K3). `PlaybackSession` gagne `pause()`/
+  `resume()` explicites (une interruption externe ne peut pas passer par
+  `togglePlayPause`, qui relancerait la narration). Tests JVM :
+  `AudioInterruptionPolicyTest` (10 cas). Commit `c4b401aa`.
+- **(d) fait** — `ReaderViewModel.onCleared()` ne coupe plus la narration quand
+  une session est engagée (`PlaybackOrchestrator.isSessionEngaged()`, lu sur
+  l'état interne et non sur le `stateIn` dérivé, périmé d'un tick). Quitter le
+  Lecteur laisse la voix continuer, pilotée par la notification. Commit `43d3caa8`.
+- **Signal `chapterCompleted` fait** — l'auto-avance ne se déduit plus de « `Idle`
+  alors que la lecture était engagée » (qui faisait sauter un chapitre quand la
+  notification demandait une pause pendant la synthèse). `PlaybackOrchestrator`
+  émet un `SharedFlow` depuis le seul chemin qui constate la fin réelle. La limite
+  connue de §6.4 est donc levée. Commit `69e32573`.
+- **`POST_NOTIFICATIONS` fait** — écart de (b) refermé :
+  `rememberTtsNotificationPermissionRequest` demande la permission en contexte,
+  au premier démarrage d'une narration ; un refus ne coûte que le contrôle depuis
+  le volet, jamais la lecture. Les trois points lecture/pause de `ReaderScreen`
+  passent par un unique `togglePlayback`. Commit `20bda23e`.
+- **Action « Arrêter » faite** — `ACTION_STOP` était géré mais inatteignable :
+  quatrième action de la vue déployée + `deleteIntent` (balayer la notification
+  arrête réellement). Commit `39a83eec`.
+
+**Écarts déclarés à l'issue de P1** (tous relèvent de P2, mini-lecteur
+persistant, qui déplacera la propriété de la session hors du `ReaderViewModel`) :
+
+1. **L'auto-avance de chapitre s'arrête** quand l'écran Lecteur est détruit :
+   le collecteur `chapterCompleted` vit dans le ViewModel. La narration continue
+   donc jusqu'à la fin du chapitre en cours, puis s'arrête.
+2. **Le tracker de statistiques cesse de compter** dans le même cas — le
+   correctif §6.2 ne couvre que l'app en arrière-plan, pas l'écran détruit.
+3. **Pas de `−30 s`/`+30 s`** dans la notification : la narration est adressée
+   par phrase, pas par temps. Les actions « phrase précédente/suivante » en sont
+   l'équivalent exact ; un saut temporel exigerait un index temps→phrase qui
+   n'existe pas. Non simulé, conformément à K12 (jamais de compensation aval).
+4. **Pas d'action « minuteur de sommeil »** dans la notification : le minuteur
+   vit dans le `ReaderViewModel` (`sleepTimerJob`), pas dans la session. Son
+   déplacement appartient à P2.
+5. **Vérification device non faite** — focus audio, casque débranché et survie
+   écran verrouillé ne se prouvent pas en JVM ; la clôture du palier revient à
+   Issa (checklist ci-dessous).
 
 ### 6.4 — P1, décision d'architecture actée (rappel)
 
