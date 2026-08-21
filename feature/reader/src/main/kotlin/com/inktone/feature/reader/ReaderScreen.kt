@@ -541,8 +541,8 @@ fun ReaderScreen(
         val paginationPaddingPx = with(density) { readerMargin.roundToPx() }
         // 3d.2 — interligne en sp, combiné à fontSize (multiplicateur
         // global, voir UserPreferences.lineHeightMultiplier) : seul point de
-        // calcul, consommé à la fois par la mesure de pagination et par le
-        // rendu en mode SCROLL (ParagraphText) ci-dessous.
+        // calcul, consommé par la mesure de pagination (mode paginé) ET par le
+        // style de rendu du mode défilement plus bas.
         val lineHeightSp = (state.effectiveSettings.fontSize * state.lineHeightMultiplier).roundToInt()
         // Lot 9 — police effective (préférence explicite si définie, sinon
         // celle du thème actif) : entre dans la clé d'invalidation de la
@@ -654,6 +654,15 @@ fun ReaderScreen(
                     val blocks = (chapter?.content as? ChapterContent.Rich)?.blocks.orEmpty()
                     val textStyle = TextStyle(
                         fontSize = state.effectiveSettings.fontSize.sp,
+                        // Bug réel signalé à la vérification device : le
+                        // réglage d'interligne n'avait AUCUN effet en mode
+                        // défilement. `lineHeightSp` n'alimentait que la mesure
+                        // de pagination (mode paginé) ; le style de rendu du
+                        // défilement ne le posait nulle part, et le commentaire
+                        // de sa déclaration affirmait pourtant le contraire —
+                        // resté vrai à l'époque de `ParagraphText`, faux depuis
+                        // la migration vers LazyColumn/BookBlockItem.
+                        lineHeight = lineHeightSp.sp,
                         color = ThemeColors.text(state.resolvedTheme),
                         fontFamily = effectiveFontFamily,
                         // P4 — mêmes règles qu'en mode paginé (où elles
