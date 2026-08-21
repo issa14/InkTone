@@ -243,31 +243,38 @@ le commit ou l'état du code qui la prouve (CLAUDE.md §« le code fait foi »).
 
 ### 6.3 — P1, session média
 
-Paliers **a** (contrat + ordonnanceur) livré, **b/c/d** restants :
+Paliers **a** (contrat + ordonnanceur) et **b** (service + notification) livrés ;
+**c/d** restants :
 
 - **(a) fait** — contrat domaine `PlaybackSession` (`domain/service/PlaybackSession.kt`)
   + `PlaybackOrchestrator` l'implémente : rétention du contexte de session,
   `skip(delta)`, `togglePlayPause()` (pause **réelle** `pause()`/`resume()`, pas
-  `stop()`), `metadata`/`setMetadata`, `isPlaying` dérivé de `state` (flux
-  `stateIn`, jamais un second drapeau). Liaison Hilt `PlaybackSessionModule`
-  (`feature/reader/di`). Collecteur du `ReaderViewModel` synchronisé : `Paused`
-  → `isPlaying=false`, `Playing` → `isPlaying=true`. Tests JVM
-  (`PlaybackOrchestratorTest`) : skip pendant lecture / à l'arrêt, toggle pause↔
-  reprise, relance après arrêt, métadonnées. Commit `ebc8d83e`.
-- **(b/c/d) à faire** — réécriture d'`AudioPlaybackService` en vrai service
-  foreground pilotant `PlaybackSession` + notification `MediaStyle` +
-  `POST_NOTIFICATIONS` ; `AudioFocusRequest` + `BecomingNoisy` (test instrumenté) ;
-  `onCleared()` qui ne coupe plus quand la session détient la lecture.
+  `stop()`), `metadata`/`setMetadata`, `isPlaying` et `sessionState` dérivés de
+  `state` (flux `stateIn`, jamais un second drapeau). Liaison Hilt
+  `PlaybackSessionModule` (`feature/reader/di`). Collecteur du `ReaderViewModel`
+  synchronisé : `Paused` → `isPlaying=false`, `Playing` → `isPlaying=true`.
+  Tests JVM (`PlaybackOrchestratorTest`). Commit `ebc8d83e`.
+- **(b) fait** — `AudioPlaybackService` réécrit en vrai service foreground
+  (`android.app.Service` + `MediaSession` système + notification `MediaStyle`),
+  pilotant `PlaybackSession` — plus de `MediaSessionService`/`ExoPlayer` fantôme.
+  `PlaybackServiceLauncher` (`@Singleton`) observe `sessionState` et démarre/
+  arrête le service (découplé du `ReaderViewModel`, activé depuis
+  `InkToneApplication`). Manifest : `POST_NOTIFICATIONS` + déclaration de service
+  nettoyée. Écart déclaré : la demande de `POST_NOTIFICATIONS` à l'exécution
+  (Android 13+) n'est pas encore câblée (concerne l'UI/Activity), et les
+  dépendances `media3` d'`infrastructure/media` deviennent inutilisées (nettoyage
+  avec P2, suppression de `feature/player`).
+- **(c/d) à faire** — `AudioFocusRequest` + `BecomingNoisy` (test instrumenté) ;
+  `onCleared()` qui ne coupe plus quand la session détient la lecture ; signal
+  dédié `chapterCompleted` (voir 6.4).
 
 ### 6.4 — P1, décision d'architecture actée (rappel)
 
 - **Sémantique pause ≠ stop.** Le lecteur pause par `stop()` (Idle) ; la
   notification pausera par `pause()` (réel). Le collecteur traite `Paused` en
   `isPlaying=false` (désormais branché).
-- **Limite connue (à lever en b)** : `togglePlayPause` sur `Buffering` passe par
+- **Limite connue (à lever en c)** : `togglePlayPause` sur `Buffering` passe par
   `stop()` → le collecteur interprète « Idle alors que isPlaying » comme une fin
   de chapitre — un signal dédié `chapterCompleted` (plutôt que l'heuristique
   Idle) lèvera l'ambiguïté sans auto-avance parasite. Documenté dans le code
   (`PlaybackOrchestrator.togglePlayPause`).
-  (test instrumenté) ; (d) `onCleared()` ne coupe plus quand la session détient
-  la lecture.
