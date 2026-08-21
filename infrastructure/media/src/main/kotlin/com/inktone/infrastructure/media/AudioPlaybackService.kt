@@ -229,9 +229,23 @@ class AudioPlaybackService : Service() {
                     serviceIntent(ACTION_SKIP_NEXT),
                 ).build(),
             )
+            // `ACTION_STOP` était géré par `onStartCommand` sans qu'aucune
+            // commande ne puisse l'atteindre : arrêter la narration exigeait de
+            // rouvrir le Lecteur. Quatrième action (vue déployée), et même
+            // intention sur le balayage de la notification.
+            .addAction(
+                Notification.Action.Builder(
+                    android.R.drawable.ic_menu_close_clear_cancel,
+                    "Arrêter",
+                    serviceIntent(ACTION_STOP),
+                ).build(),
+            )
+            .setDeleteIntent(serviceIntent(ACTION_STOP))
             .setStyle(
                 Notification.MediaStyle()
                     .setMediaSession(mediaSession?.sessionToken)
+                    // Vue compacte : les trois commandes du geste courant
+                    // (phrase précédente, lecture/pause, phrase suivante).
                     .setShowActionsInCompactView(0, 1, 2),
             )
             .build()
