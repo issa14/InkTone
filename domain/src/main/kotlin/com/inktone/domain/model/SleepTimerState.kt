@@ -9,8 +9,18 @@ package com.inktone.domain.model
  * play/stop (Tache 3.8). Le minuteur declenche donc pour l'instant un
  * `ReaderIntent.Pause` net a expiration, pas un fondu.
  */
-data class SleepTimerState(val remainingMs: Long, val fadeOutEnabled: Boolean = true) {
+data class SleepTimerState(
+    val remainingMs: Long,
+    /**
+     * Durée initialement armée. Retenue à part du restant : sans elle, l'écran
+     * ne peut pas savoir QUELLE durée a été choisie une fois le décompte
+     * entamé — la puce « 30 min » se désélectionnerait au bout d'une seconde.
+     */
+    val totalMs: Long = remainingMs,
+    val fadeOutEnabled: Boolean = true,
+) {
     init {
         require(remainingMs >= 0) { "remainingMs doit être positif ou nul" }
+        require(totalMs >= remainingMs) { "totalMs ne peut pas être inférieur au temps restant" }
     }
 }

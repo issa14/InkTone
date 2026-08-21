@@ -120,7 +120,7 @@ class ReaderViewModelPdfTest {
 
         return ReaderViewModel(
             ttsEngine = FakeTtsEngine(),
-            playbackOrchestrator = PlaybackOrchestrator(FakeTtsEngine(), FakeAudioPlayer(), UpdateReadingStateUseCase(readingStateRepository)),
+            playbackOrchestrator = PlaybackOrchestrator(FakeTtsEngine(), FakeAudioPlayer(), UpdateReadingStateUseCase(readingStateRepository), FakeChapterParser()),
             publicationParser = parser,
             updateReadingState = UpdateReadingStateUseCase(readingStateRepository),
             getReadingState = GetReadingStateUseCase(readingStateRepository),
@@ -147,6 +147,10 @@ class ReaderViewModelPdfTest {
             ),
             chapterParser = FakeChapterParser(),
             epubResourceResolver = FakeEpubResourceResolver(),
+            narrationSessionContinuation = NarrationSessionContinuation(
+                PlaybackOrchestrator(FakeTtsEngine(), FakeAudioPlayer(), UpdateReadingStateUseCase(FakeReadingStateRepository()), FakeChapterParser()),
+                FakeReadingSessionRepository(),
+            ),
         )
     }
 

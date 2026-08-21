@@ -93,6 +93,9 @@ class ReaderViewModel @Inject constructor(
     // Plan v3, Palier 3.6 — parsing lazy EPUB + résolveur d'images
     private val chapterParser: ChapterParser,
     private val epubResourceResolver: EpubResourceResolver,
+    // P2-b — relais du suivi statistique quand cet écran meurt pendant une
+    // narration : le tracker lui est cédé, jamais partagé.
+    private val narrationSessionContinuation: NarrationSessionContinuation,
 ) : ViewModel() {
 
     private val _state = MutableStateFlow(ReaderUiState())
@@ -109,6 +112,9 @@ class ReaderViewModel @Inject constructor(
                 _state.value = _state.value.copy(
                     isReadingRulerEnabled = preferences.readingRulerEnabled,
                     lineHeightMultiplier = preferences.lineHeightMultiplier,
+                    readerMarginStep = preferences.readerMarginStep,
+                    isTextJustified = preferences.textJustified,
+                    keepScreenOn = preferences.keepScreenOn,
                     readerBrightness = preferences.readerBrightness,
                     eyeRestReminderEnabled = preferences.eyeRestReminderEnabled,
                     eyeRestReminderIntervalMinutes = preferences.eyeRestReminderIntervalMinutes,
@@ -123,27 +129,56 @@ class ReaderViewModel @Inject constructor(
         viewModelScope.launch {
             playbackOrchestrator.state.collect { status ->
                 when (status) {
-                    PlaybackOrchestrator.PlaybackStatus.Idle -> {
-                        val wasPlaying = _state.value.isPlaying
+                    PlaybackOrchestrator.PlaybackStatus.Idle ->
+                        // P1 — plus d'auto-avance déduite ici : `Idle` signifie
+                        // seulement « plus rien ne joue », qu'il s'agisse d'une
+                        // fin de chapitre, d'un arrêt volontaire ou d'une pause
+                        // demandée pendant la synthèse. La fin de chapitre a son
+                        // signal propre (`chapterCompleted`, collecté plus bas).
                         _state.value = _state.value.copy(
                             isPlaying = false, isAudioActive = false, highlightedWordRange = null,
                         )
-                        if (wasPlaying) onChapterPlaybackCompleted()
-                    }
                     PlaybackOrchestrator.PlaybackStatus.Buffering ->
                         _state.value = _state.value.copy(isAudioActive = false)
                     PlaybackOrchestrator.PlaybackStatus.Playing -> {
-                        _state.value = _state.value.copy(isAudioActive = true)
+                        // P1 — isPlaying = true ici (et pas seulement dans
+                        // playCurrentSentence) : une reprise déclenchée par la
+                        // notification (PlaybackSession.resume) doit se
+                        // refléter dans l'état du Lecteur.
+                        _state.value = _state.value.copy(isAudioActive = true, isPlaying = true)
                         checkVoiceDownloadPrompt()
                     }
                     PlaybackOrchestrator.PlaybackStatus.Paused ->
-                        _state.value = _state.value.copy(isAudioActive = false)
+                        // P1 — vraie pause (PlaybackSession.pause) : le Lecteur
+                        // doit refléter isPlaying = false sans auto-avancer
+                        // (seul Idle déclenche la fin de chapitre).
+                        _state.value = _state.value.copy(isAudioActive = false, isPlaying = false)
                     is PlaybackOrchestrator.PlaybackStatus.Error ->
                         _state.value = _state.value.copy(
                             isPlaying = false, isAudioActive = false, highlightedWordRange = null,
                             errorMessage = status.message,
                         )
                 }
+            }
+        }
+
+        // P2-b — le minuteur de sommeil est porté par la session ; l'écran ne
+        // fait que l'afficher (SleepTimerPanel, ligne de statut).
+        viewModelScope.launch {
+            playbackOrchestrator.sleepTimer.collect { timer ->
+                _state.value = _state.value.copy(sleepTimer = timer)
+            }
+        }
+
+        // P2-b — l'écran SUIT le chapitre narré, il ne le pilote plus.
+        // L'auto-avance vit désormais dans l'ordonnanceur (seul capable de
+        // continuer quand cet écran est détruit) ; ici on se contente de
+        // recaler l'affichage sur le chapitre qu'il a décidé de jouer.
+        viewModelScope.launch {
+            playbackOrchestrator.currentChapterIndex.collect { chapterIndex ->
+                if (!_state.value.isPlaying) return@collect
+                if (chapterIndex == _state.value.currentChapterIndex) return@collect
+                syncDisplayToNarratedChapter(chapterIndex)
             }
         }
 
@@ -192,7 +227,6 @@ class ReaderViewModel @Inject constructor(
     /** Plan v4 — scope dédié aux préchargements, annulé indépendamment du chargement courant. */
     private var preloadScope: CoroutineScope? = null
     private val annotationSelectionHandler = AnnotationSelectionHandler()
-    private var sleepTimerJob: Job? = null
 
     // ───── Lot Sessions ─────
     private var sessionTracker: ReadingSessionTracker? = null
@@ -202,7 +236,7 @@ class ReaderViewModel @Inject constructor(
 
     // 3d.5 — rappel de repos oculaire : eyeRestReminderJob porte le délai
     // jusqu'à l'échéance (relancé à chaque reprise, jamais deux en
-    // parallèle comme sleepTimerJob) ; eyeRestCountdownJob porte le
+    // parallèle) ; eyeRestCountdownJob porte le
     // compte à rebours de 60s du popup une fois affiché ;
     // wasPlayingBeforeEyeRest mémorise s'il faut reprendre le TTS.
     private var eyeRestReminderJob: Job? = null
@@ -217,7 +251,7 @@ class ReaderViewModel @Inject constructor(
     // Lot 4, tâche 4.7 — flash différé : pendingHighlightTimeoutJob est la
     // sortie de secours (mise en page qui n'aboutit jamais) ; flashClearJob
     // efface le flash affiché après un court délai. Un seul de chaque à la
-    // fois, même discipline que sleepTimerJob.
+    // fois, même discipline que les autres jobs de cet écran.
     private var pendingHighlightTimeoutJob: Job? = null
     private var flashClearJob: Job? = null
 
@@ -290,6 +324,9 @@ class ReaderViewModel @Inject constructor(
             is ReaderIntent.SetTtsSpeed -> setTtsSpeed(intent.speed)
             is ReaderIntent.SetActiveVoiceProfile -> setActiveVoiceProfile(intent.profileId)
             is ReaderIntent.SetLineHeight -> setLineHeight(intent.multiplier)
+            is ReaderIntent.SetReaderMarginStep -> setReaderMarginStep(intent.step)
+            is ReaderIntent.SetTextJustified -> setTextJustified(intent.justified)
+            is ReaderIntent.SetKeepScreenOn -> setKeepScreenOn(intent.enabled)
             is ReaderIntent.SetReaderBrightness -> setReaderBrightness(intent.value)
             is ReaderIntent.SetEyeRestReminderEnabled -> setEyeRestReminderEnabled(intent.enabled)
             is ReaderIntent.SetEyeRestReminderInterval -> setEyeRestReminderInterval(intent.minutes)
@@ -372,22 +409,12 @@ class ReaderViewModel @Inject constructor(
      * cours, jamais deux qui coexistent.
      */
     private fun setSleepTimer(minutes: Int?) {
-        sleepTimerJob?.cancel()
-        if (minutes == null) {
-            _state.value = _state.value.copy(sleepTimer = null)
-            return
-        }
-        val remainingMs = minutes * 60_000L
-        _state.value = _state.value.copy(sleepTimer = SleepTimerState(remainingMs = remainingMs))
-        sleepTimerJob = viewModelScope.launch {
-            delay(remainingMs)
-            // Même bug que Pause avant correction (voir pausePlayback) :
-            // ne mettre isPlaying à false sans couper playbackJob/audio
-            // laissait la phrase en cours continuer à jouer après
-            // l'extinction du minuteur.
-            pausePlayback()
-            _state.value = _state.value.copy(sleepTimer = null)
-        }
+        // P2-b — le minuteur appartient à la session, plus à cet écran :
+        // s'endormir en écoutant est précisément le cas où le Lecteur est
+        // détruit, et un minuteur qui mourrait avec lui laisserait la
+        // narration tourner toute la nuit. Cet écran ne fait plus que
+        // transmettre l'intention et refléter l'état (collecteur ci-dessus).
+        playbackOrchestrator.setSleepTimer(minutes)
     }
 
     /**
@@ -442,6 +469,11 @@ class ReaderViewModel @Inject constructor(
         // système (bug trouvé par la vérification device, corrigé ici et
         // dans FallbackTtsEngine qui ne re-avale plus les annulations).
         viewModelScope.launch(Dispatchers.Default) { ttsEngine.warmUp() }
+        // P2-b — cet écran reprend la propriété des ressources de lecture : si
+        // une fermeture précédente avait laissé une libération en attente
+        // (narration poursuivie sans écran), elle fermerait le résolveur EPUB
+        // sous nos pieds à la première pause.
+        playbackOrchestrator.releaseOnSessionEnd(null)
         // Lot 12, tache 12.9 — une publication PDF ouverte precedemment
         // garde son FixedPageDocument vivant jusqu'ici (decision actee 14
         // du plan) ; en ouvrir une nouvelle doit d'abord fermer l'ancien,
@@ -464,9 +496,14 @@ class ReaderViewModel @Inject constructor(
                     publicationRepository.setLastOpened(publicationId, System.currentTimeMillis())
 
                     // ───── Lot Sessions : démarre le tracking ─────
-                    val tracker = ReadingSessionTracker(publicationId)
+                    // P2-b — si une narration sans écran suivait déjà ce livre,
+                    // on REPREND son tracker au lieu d'en ouvrir un second :
+                    // deux trackers concurrents produiraient des fragments qui
+                    // se chevauchent, donc du temps compté deux fois.
+                    val handover = narrationSessionContinuation.takeOver(publicationId)
+                    val tracker = handover?.tracker ?: ReadingSessionTracker(publicationId)
                     sessionTracker = tracker
-                    lastFragmentSavedMs = tracker.startTimestamp
+                    lastFragmentSavedMs = handover?.lastFragmentSavedMs ?: tracker.startTimestamp
                     tracker.resume(DomainReadingMode.VISUAL)
                     startCheckpointTimer()
                     // ───── Fin Lot Sessions ─────
@@ -497,6 +534,9 @@ class ReaderViewModel @Inject constructor(
                         activeVoiceProfile = activeVoiceProfile,
                         availableVoiceProfiles = availableVoiceProfiles,
                         lineHeightMultiplier = prefs.lineHeightMultiplier,
+                        readerMarginStep = prefs.readerMarginStep,
+                        isTextJustified = prefs.textJustified,
+                        keepScreenOn = prefs.keepScreenOn,
                         // Lot 12, tache 12.9 — jamais reporte avant ce lot.
                         publicationFormat = publication.format,
                         pageOffsetY = restored?.locator?.pageOffsetY ?: 0f,
@@ -505,6 +545,15 @@ class ReaderViewModel @Inject constructor(
                         epubResourceResolver = if (publication.format == PublicationFormat.EPUB) {
                             this@ReaderViewModel.epubResourceResolver
                         } else null,
+                    )
+                    // P1 — alimente les métadonnées de la notification média
+                    // (titre/auteur), source unique : jamais rechargées depuis
+                    // un repository dans le service.
+                    playbackOrchestrator.setMetadata(
+                        publicationId = publication.id,
+                        title = publication.title,
+                        author = publication.authors.joinToString(", ").ifBlank { null },
+                        coverUri = publication.coverUri,
                     )
                     // Plan v3, Palier 3.6 — initialiser le parsing lazy EPUB
                     if (publication.format == PublicationFormat.EPUB) {
@@ -932,6 +981,15 @@ class ReaderViewModel @Inject constructor(
         _state.value = _state.value.copy(isPlaying = true, isAudioActive = false)
         val startFrom = _state.value.currentSentenceIndex
 
+        // P2-b — donne à l'ordonnanceur de quoi enchaîner seul les chapitres
+        // suivants, y compris si cet écran est détruit entre-temps. Reposé à
+        // chaque lancement : la liste des chapitres peut avoir changé (contenu
+        // Rich chargé paresseusement), et l'href reste stable, lui.
+        playbackOrchestrator.setNarrationProgram(
+            publicationId = publicationId,
+            chapterHrefs = _state.value.chapters.map { it.href },
+        )
+
         viewModelScope.launch {
             val prefs = preferencesRepository.get()
             val voiceProfile = resolveVoiceProfile(prefs)
@@ -992,10 +1050,26 @@ class ReaderViewModel @Inject constructor(
      * lecture était engagée) : auto-avance au chapitre suivant et reprend,
      * ou s'arrête en fin de livre.
      */
-    private fun onChapterPlaybackCompleted() {
-        if (!_state.value.hasNextChapter) return
-        navigateToChapter(_state.value.currentChapterIndex + 1)
-        playCurrentSentence()
+    /**
+     * P2-b — recale l'affichage sur le chapitre que l'ordonnanceur a enchaîné
+     * de lui-même (auto-avance).
+     *
+     * Distinct de [navigateToChapter] sur trois points, et c'est toute la
+     * différence : ne coupe pas la lecture (elle est déjà en cours sur le
+     * chapitre cible), ne relance pas `playCurrentSentence` (ce serait rejouer
+     * depuis le début ce que l'ordonnanceur joue déjà), et ne persiste pas la
+     * position — pendant la narration, l'ordonnanceur en est le seul écrivain
+     * (K3, chemins TTS et manuel jamais simultanés).
+     */
+    private fun syncDisplayToNarratedChapter(targetIndex: Int) {
+        if (targetIndex !in _state.value.chapters.indices) return
+        _state.value = _state.value.copy(
+            currentChapterIndex = targetIndex,
+            currentSentenceIndex = 0,
+            highlightedWordRange = null,
+        )
+        loadChapterContentIfNeeded(targetIndex)
+        preloadAdjacentChapters(targetIndex)
     }
 
     /**
@@ -1066,6 +1140,35 @@ class ReaderViewModel @Inject constructor(
         viewModelScope.launch {
             val current = preferencesRepository.get()
             preferencesRepository.update(current.copy(lineHeightMultiplier = multiplier))
+        }
+    }
+
+    /**
+     * P4 — cran de marge latérale. Borné ici plutôt que laissé au `require()`
+     * du domaine : un cran hors bornes venant de l'UI est un défaut de
+     * l'appelant, pas une donnée utilisateur à faire planter l'app.
+     */
+    private fun setReaderMarginStep(step: Int) {
+        val bounded = step.coerceIn(UserPreferences.MARGIN_STEP_RANGE)
+        viewModelScope.launch {
+            val current = preferencesRepository.get()
+            preferencesRepository.update(current.copy(readerMarginStep = bounded))
+        }
+    }
+
+    /** P4 — justification du texte (césure comprise, jamais l'une sans l'autre). */
+    private fun setTextJustified(justified: Boolean) {
+        viewModelScope.launch {
+            val current = preferencesRepository.get()
+            preferencesRepository.update(current.copy(textJustified = justified))
+        }
+    }
+
+    /** P4 — maintien de l'écran allumé, appliqué à la fenêtre par ReaderScreen. */
+    private fun setKeepScreenOn(enabled: Boolean) {
+        viewModelScope.launch {
+            val current = preferencesRepository.get()
+            preferencesRepository.update(current.copy(keepScreenOn = enabled))
         }
     }
 
@@ -1160,8 +1263,18 @@ class ReaderViewModel @Inject constructor(
 
     /**
      * A.2 — Nettoyage des ressources audio et du minuteur de sommeil
-     * quand le ViewModel est détruit. Évite qu'un segment audio continue
-     * de jouer après la destruction de l'écran.
+     * quand le ViewModel est détruit.
+     *
+     * P1-d — la narration en cours **survit** désormais à la destruction de
+     * l'écran : quitter le Lecteur pour la bibliothèque ne coupe plus la voix,
+     * puisque la session appartient au service foreground et à sa notification
+     * (`AudioPlaybackService`), pas à cet écran. L'ordonnanceur est un
+     * `@Singleton` : il garde son contexte de session (phrases, voix,
+     * publication) et continue de persister la position lue.
+     *
+     * L'arrêt reste inconditionnel quand rien n'est engagé — sinon un segment
+     * résiduel continuerait de jouer sans notification pour le contrôler, ce
+     * que corrigeait la Tâche A.2 à l'origine.
      */
     override fun onCleared() {
         // ───── Lot Sessions : sauvegarde finale + arrêt timer ─────
@@ -1170,8 +1283,8 @@ class ReaderViewModel @Inject constructor(
         // ───── Fin Lot Sessions ─────
 
         super.onCleared()
-        playbackOrchestrator.stop()
-        sleepTimerJob?.cancel()
+        val sessionEngaged = playbackOrchestrator.isSessionEngaged()
+        if (!sessionEngaged) playbackOrchestrator.stop()
         scrollPersistJob?.cancel()
         eyeRestReminderJob?.cancel()
         eyeRestCountdownJob?.cancel()
@@ -1182,8 +1295,36 @@ class ReaderViewModel @Inject constructor(
         fixedPageDocument = null
         // Plan v4 — libère le cache LRU du ChapterParser + ferme le resolver EPUB
         preloadScope?.coroutineContext[Job]?.cancel()
-        currentPublicationId?.let { chapterParser.invalidate(it) }
-        epubResourceResolver.close()
+        // P2-b — sauf si la narration continue sans cet écran : l'ordonnanceur
+        // parse lui-même le chapitre suivant à l'auto-avance, ce qui exige que
+        // le cache ET le résolveur de ressources EPUB restent ouverts. Les
+        // libérer ici couperait la narration au premier changement de chapitre,
+        // avec une erreur de ressource introuvable au lieu d'un arrêt propre.
+        // Ils sont alors libérés à la fermeture réelle de la session
+        // (`PlaybackServiceLauncher`, quand `sessionState` retombe à IDLE).
+        if (sessionEngaged) {
+            // P2-b — cède le tracker au relais : l'écoute qui continue sans cet
+            // écran doit rester comptabilisée. `saveCurrentFragment()` vient de
+            // flusher, `lastFragmentSavedMs` borne donc correctement le premier
+            // fragment que le relais posera.
+            sessionTracker?.let {
+                narrationSessionContinuation.continueTracking(it, lastFragmentSavedMs)
+            }
+            // Capture volontairement restreinte au parseur, au résolveur et à
+            // l'identifiant : aucune référence à ce ViewModel, qui doit rester
+            // collectable pendant que la narration se poursuit sans lui.
+            val parser = chapterParser
+            val resolver = epubResourceResolver
+            val publicationId = currentPublicationId
+            playbackOrchestrator.releaseOnSessionEnd {
+                publicationId?.let { parser.invalidate(it) }
+                resolver.close()
+            }
+        } else {
+            currentPublicationId?.let { chapterParser.invalidate(it) }
+            epubResourceResolver.close()
+            playbackOrchestrator.clearNarrationProgram()
+        }
     }
 
     // ═══════════════════════════════════════════════
@@ -1197,7 +1338,13 @@ class ReaderViewModel @Inject constructor(
      */
     fun onAppBackground() {
         saveCurrentFragment()
-        sessionTracker?.pause()
+        // P1 (plan polissage Pareto) — ne pauser le tracker que si aucune
+        // écoute TTS n'est active : le temps écoulé écran éteint pendant la
+        // narration doit rester imputé à l'AUDIO, pas figé. Sinon l'écoute
+        // en arrière-plan n'est jamais comptabilisée dans les statistiques.
+        if (!_state.value.isPlaying) {
+            sessionTracker?.pause()
+        }
     }
 
     /**
@@ -1222,6 +1369,15 @@ class ReaderViewModel @Inject constructor(
     internal fun cancelCheckpointTimerForTest() {
         checkpointJob?.cancel()
     }
+
+    /**
+     * Exposé pour les tests de [onAppBackground]/[onAppForeground] : le
+     * tracker de session est privé, mais son état `paused` détermine si le
+     * temps d'écoute en arrière-plan est comptabilisé ou figé. `true` par
+     * défaut quand aucune publication n'est ouverte (rien à suivre).
+     */
+    @VisibleForTesting
+    internal fun isSessionTrackerPausedForTest(): Boolean = sessionTracker?.isPaused ?: true
 
     /** Timer de checkpoint : sauve un fragment toutes les 5 minutes. */
     private fun startCheckpointTimer() {

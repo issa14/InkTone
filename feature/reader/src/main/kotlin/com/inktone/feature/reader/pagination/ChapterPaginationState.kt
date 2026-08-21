@@ -10,10 +10,15 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberUpdatedState
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.text.TextStyle
+import androidx.compose.ui.text.style.Hyphens
+import androidx.compose.ui.text.style.LineBreak
+import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.text.rememberTextMeasurer
 import androidx.compose.ui.unit.sp
 import com.inktone.domain.model.Chapter
+import com.inktone.domain.model.ChapterContent
+import com.inktone.domain.model.BookBlock
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
 
@@ -93,7 +98,7 @@ class ChapterPaginationState internal constructor(
     fun isMeasurementComplete(chapter: Chapter?): Boolean =
         isMeasurementComplete(
             measuredSentences = measurement?.sentenceStartOffsets?.size ?: 0,
-            totalSentences = chapter?.sentences?.size ?: 0,
+            totalSentences = measurableOffsetCount(chapter),
         )
 }
 
@@ -105,6 +110,32 @@ class ChapterPaginationState internal constructor(
  */
 internal fun isMeasurementComplete(measuredSentences: Int, totalSentences: Int): Boolean =
     measuredSentences >= totalSentences
+
+/**
+ * Nombre d'offsets qu'une mesure COMPLÈTE du chapitre peut produire.
+ *
+ * Bug réel : la complétude se comparait au nombre total de phrases du chapitre,
+ * alors que `ChapterTextMeasurer` ne mesure que les blocs de TEXTE. Une seule
+ * phrase rattachée à un bloc image (légende) suffisait donc à rendre la mesure
+ * éternellement « incomplète » — le compteur de pages disparaissait de la ligne
+ * de statut et l'ancrage de position du mode paginé, qui n'agit que sur une
+ * mesure complète, ne se recalait jamais.
+ *
+ * Reproduit ici EXACTEMENT la règle du mesureur (voir
+ * `ChapterTextMeasurer.buildBatchAnnotatedString`) : un offset par phrase pour
+ * un bloc de texte qui en possède, sinon un seul offset pour le bloc. Toute
+ * divergence entre les deux ramènerait le défaut, d'où le test qui les compare
+ * sur un même chapitre.
+ */
+internal fun measurableOffsetCount(chapter: Chapter?): Int {
+    val blocks = (chapter?.content as? ChapterContent.Rich)?.blocks ?: return chapter?.sentences?.size ?: 0
+    val sentences = chapter.sentences
+    return blocks.withIndex()
+        .filter { it.value is BookBlock.ParagraphBlock || it.value is BookBlock.HeadingBlock }
+        .sumOf { (originalIndex, _) ->
+            sentences.count { it.blockIndex == originalIndex }.coerceAtLeast(1)
+        }
+}
 
 /**
  * Construit la clé d'invalidation à partir des valeurs **réellement
@@ -125,6 +156,7 @@ fun paginationStyleKeyFrom(
     viewportWidthPx: Int,
     viewportHeightPx: Int,
     paddingPx: Int,
+    justified: Boolean = false,
 ): PaginationStyleKey {
     val lineHeightSp = if (baseTextStyle.lineHeight.isSp) baseTextStyle.lineHeight.value.toInt() else fontSizeSp
     val fontFamilyKey = baseTextStyle.fontFamily?.toString() ?: "default"
@@ -135,6 +167,7 @@ fun paginationStyleKeyFrom(
         viewportWidthPx = viewportWidthPx,
         viewportHeightPx = viewportHeightPx,
         paddingPx = paddingPx,
+        justified = justified,
     )
 }
 
@@ -163,6 +196,13 @@ fun rememberChapterPaginationState(
     // (3a.1, jamais ici), une police change la largeur du texte et donc
     // la pagination. `null` = police système par défaut.
     fontFamily: FontFamily? = null,
+    // P4 — justification + césure. Fait partie du style de MESURE pour la même
+    // raison que fontFamily : la césure déplace les points de coupure de ligne,
+    // donc change la pagination. La justification seule ne la changerait pas
+    // (elle ne fait qu'étirer les blancs), mais les deux vont ensemble par
+    // construction (voir UserPreferences.textJustified) et le même TextStyle
+    // sert au rendu — les séparer ferait diverger mesure et affichage.
+    justified: Boolean = false,
 ): ChapterPaginationState {
     val textMeasurer = rememberTextMeasurer()
     val chapterTextMeasurer = remember(textMeasurer) { ChapterTextMeasurer(textMeasurer) }
@@ -176,21 +216,29 @@ fun rememberChapterPaginationState(
     // l'interligne redéclenche automatiquement la pagination. Lot 9 :
     // fontFamily rejoint ce même style pour la même raison — changer
     // d'ambiance dont la police diffère doit recalculer la pagination.
-    val baseTextStyle = remember(fontSizeSp, lineHeightSp, fontFamily) {
-        TextStyle(fontSize = fontSizeSp.sp, lineHeight = lineHeightSp.sp, fontFamily = fontFamily)
+    val baseTextStyle = remember(fontSizeSp, lineHeightSp, fontFamily, justified) {
+        TextStyle(
+            fontSize = fontSizeSp.sp,
+            lineHeight = lineHeightSp.sp,
+            fontFamily = fontFamily,
+            textAlign = if (justified) TextAlign.Justify else TextAlign.Unspecified,
+            hyphens = if (justified) Hyphens.Auto else Hyphens.None,
+            lineBreak = if (justified) LineBreak.Paragraph else LineBreak.Unspecified,
+        )
     }
     val state = remember(engine, baseTextStyle) { ChapterPaginationState(engine, baseTextStyle) }
 
     val contentWidthPx = viewportWidthPx - paddingPx * 2
     val contentHeightPx = (viewportHeightPx - paddingPx * 2).coerceAtLeast(0)
 
-    val styleKey = remember(baseTextStyle, fontSizeSp, viewportWidthPx, contentHeightPx, paddingPx) {
+    val styleKey = remember(baseTextStyle, fontSizeSp, viewportWidthPx, contentHeightPx, paddingPx, justified) {
         paginationStyleKeyFrom(
             baseTextStyle = baseTextStyle,
             fontSizeSp = fontSizeSp,
             viewportWidthPx = viewportWidthPx,
             viewportHeightPx = contentHeightPx,
             paddingPx = paddingPx,
+            justified = justified,
         )
     }
 

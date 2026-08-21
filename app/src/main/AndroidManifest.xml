@@ -6,6 +6,13 @@
     <uses-permission android:name="android.permission.FOREGROUND_SERVICE" />
     <uses-permission android:name="android.permission.FOREGROUND_SERVICE_MEDIA_PLAYBACK" />
 
+    <!-- P1 (plan polissage Pareto) : notification media du TTS. Demandee a
+         l'execution au premier demarrage d'une narration (pas au lancement de
+         l'app) — voir rememberTtsNotificationPermissionRequest, appelee par
+         ReaderScreen.togglePlayback. Un refus n'empeche pas la lecture, il
+         prive seulement du controle depuis le volet de notifications. -->
+    <uses-permission android:name="android.permission.POST_NOTIFICATIONS" />
+
     <!-- Tache 9.2.2 : trouvee manquante par l'audit de securite -
          VoiceModelDownloader (Tache 5.6/8.7/9.0.1) telecharge le modele
          vocal via java.net.URL.openConnection() ; sans cette permission,
@@ -49,20 +56,17 @@
             </intent-filter>
         </activity>
 
-        <!-- tools:ignore="Instantiatable" : faux positif connu de Lint avec
-             Hilt (@AndroidEntryPoint genere une superclasse synthetique
-             Hilt_AudioPlaybackService que Lint ne resout pas toujours a
-             travers les modules Gradle) - confirme faux sur device reel,
-             l'app s'installe et demarre avec ce service enregistre. -->
+        <!-- P1 (plan polissage Pareto) : service foreground de la session
+             media TTS, pilote le contrat domaine PlaybackSession (plus de
+             MediaSessionService Media3 / ExoPlayer fantome). Demarre en
+             foreground depuis ReaderViewModel au lancement de la lecture.
+             tools:ignore="Instantiatable" : faux positif connu de Lint avec
+             Hilt (@AndroidEntryPoint genere une superclasse synthetique). -->
         <service
             android:name="com.inktone.infrastructure.media.AudioPlaybackService"
             android:foregroundServiceType="mediaPlayback"
             android:exported="false"
-            tools:ignore="Instantiatable">
-            <intent-filter>
-                <action android:name="androidx.media3.session.MediaSessionService" />
-            </intent-filter>
-        </service>
+            tools:ignore="Instantiatable" />
 
         <!-- Tache 6.2 : desactive l'initialisation par defaut de WorkManager
              (androidx-startup) — InkToneApplication (Configuration.Provider)

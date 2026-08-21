@@ -90,12 +90,21 @@ android {
 dependencies {
     coreLibraryDesugaring(libs.desugar.jdk.libs)
 
+    // P2 : mini-lecteur persistant, affiche sous le contenu de tous les
+    // ecrans hors Lecteur (InkToneNavHost). Le module etait jusqu'ici
+    // inclus dans settings.gradle.kts sans qu'aucun module n'en depende.
+    implementation(project(":feature:player"))
+
     // Tache 3.7 : MainActivity minimale pour rendre le test de bout en
     // bout manuel possible (heberge ReaderScreen) - pas de navigation
     // complete, hors de portee de la marche a blanc (Phase 4).
     implementation("androidx.activity:activity-compose:1.9.1")
     implementation(libs.androidx.hilt.navigation.compose)
     implementation(libs.androidx.core.splashscreen)
+    // P3 (plan polissage Pareto) — installe au demarrage le Baseline
+    // Profile (profil de reference) compile a la livraison, pour reduire
+    // le temps de demarrage a froid sur Snapdragon 680 (Blueprint §11.2).
+    implementation(libs.androidx.profileinstaller)
 
     // Tache 9bis.0.1/9bis.2 : Compose Navigation 2.8+ a routes typees
     // (@Serializable), remplace l'etat AppScreen a 3 cas (Phase 7).

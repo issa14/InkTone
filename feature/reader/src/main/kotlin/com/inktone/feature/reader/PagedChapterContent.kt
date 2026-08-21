@@ -56,6 +56,7 @@ import androidx.compose.ui.text.TextRange
 import androidx.compose.ui.text.TextStyle
 import androidx.compose.ui.text.buildAnnotatedString
 import androidx.compose.ui.text.input.TextFieldValue
+import com.inktone.core.designsystem.rememberAppHaptics
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 
@@ -107,6 +108,14 @@ fun PagedChapterContent(
     chapterCount: Int = currentChapterIndex + 1,
     textColor: Color,
     isReadingRulerEnabled: Boolean,
+    /**
+     * P4 — marge de page. Doit être la MÊME valeur que le `paddingPx` remis à
+     * `rememberChapterPaginationState` : mesurer une page plus large que celle
+     * dessinée ferait déborder la dernière ligne hors de l'écran. Défaut égal
+     * à l'ancienne valeur en dur, pour que tout appelant non migré rende comme
+     * avant.
+     */
+    contentPadding: Dp = 16.dp,
     onClick: () -> Unit,
     onNextChapter: () -> Unit,
     onPreviousChapter: () -> Unit = {},
@@ -142,6 +151,10 @@ fun PagedChapterContent(
     // transition à résistance spatiale (ChapterTransitionConnection) :
     // plus de page fantôme.
     val pagerState = rememberPagerState(pageCount = { pageCount })
+
+    // P5 — échelle haptique de l'app (core:designsystem), jamais une
+    // vibration fabriquée sur place.
+    val haptics = rememberAppHaptics()
 
     // 3c.1bis — bug réel trouvé sur appareil pendant la vérification du
     // lot 3c : le compteur de PAGE suit déjà le swipe manuel
@@ -214,6 +227,12 @@ fun PagedChapterContent(
         onPageChanged(pagerState.currentPage)
 
         if (!isProgrammaticPageChange && chapter != null) {
+            // P5 — le cran haptique de la page tournée est posé ICI, dans la
+            // branche du swipe MANUEL, et pas sur `onPageChanged` ci-dessus :
+            // ce dernier suit aussi les changements de page pilotés par la
+            // narration, qui feraient vibrer l'appareil en continu pendant
+            // une écoute — précisément quand l'utilisateur ne le touche pas.
+            haptics.tick()
             val sentenceRange = pagination.sentenceRangeOf(chapter.index, pagerState.currentPage)
             if (!sentenceRange.isEmpty()) {
                 lastManuallyEmittedSentenceIndex = sentenceRange.first
@@ -377,7 +396,7 @@ fun PagedChapterContent(
                 .nestedScroll(chapterTransitionConnection),
             beyondViewportPageCount = 1,
         ) { pageIndex ->
-            Box(modifier = Modifier.fillMaxSize().padding(16.dp)) {
+            Box(modifier = Modifier.fillMaxSize().padding(contentPadding)) {
                 if (chapter != null && currentMeasurement != null && pageIndex < pageCount) {
                 val pageOffsetRange = pagination.pageOffsetRange(chapter.index, pageIndex)
                 if (!pageOffsetRange.isEmpty()) {

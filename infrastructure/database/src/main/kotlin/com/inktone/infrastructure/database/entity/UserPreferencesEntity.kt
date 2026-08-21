@@ -39,4 +39,9 @@ data class UserPreferencesEntity(
     val syncLastAutoSyncFailed: Boolean = false, // Lot 11 — pilote la bannière persistante du Dashboard
     val syncAutoEnabled: Boolean = false, // Lot 11, tâche 11.8
     val syncWifiOnly: Boolean = false, // Lot 11, tâche 11.8
+    // P4 (plan polissage Pareto) — confort de lecture visuelle (MIGRATION_26_27)
+    val readerMarginStep: Int = 1,
+    val paragraphSpacingStep: Int = 1,
+    val textJustified: Boolean = false,
+    val keepScreenOn: Boolean = false,
 )

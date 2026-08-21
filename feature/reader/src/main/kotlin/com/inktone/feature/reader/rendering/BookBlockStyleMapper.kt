@@ -75,8 +75,13 @@ object BookBlockStyleMapper {
             2 -> 1.25f
             else -> 1.1f // h3–h6 : légèrement plus grand que le corps
         }
+        // L'interligne suit la taille : depuis que le style de base porte un
+        // `lineHeight` ABSOLU (en sp, réglage utilisateur), grossir la seule
+        // police ferait se chevaucher les lignes d'un titre long, qui garderait
+        // l'interligne du corps de texte.
         return base.copy(
             fontSize = base.fontSize * fontSizeMultiplier,
+            lineHeight = if (base.lineHeight.isSp) base.lineHeight * fontSizeMultiplier else base.lineHeight,
             fontWeight = FontWeight.Bold,
         )
     }
