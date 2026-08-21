@@ -136,6 +136,10 @@ class ReaderViewModelChapterIndexTest {
             // le chapitre demandé (voir KDoc de cette classe de test).
             chapterParser = FakeChapterParser(),
             epubResourceResolver = FakeEpubResourceResolver(),
+            narrationSessionContinuation = NarrationSessionContinuation(
+                PlaybackOrchestrator(FakeTtsEngine(), FakeAudioPlayer(), UpdateReadingStateUseCase(FakeReadingStateRepository()), FakeChapterParser()),
+                FakeReadingSessionRepository(),
+            ),
         )
     }
 

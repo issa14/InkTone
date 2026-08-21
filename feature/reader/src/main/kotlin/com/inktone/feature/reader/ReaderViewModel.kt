@@ -93,6 +93,9 @@ class ReaderViewModel @Inject constructor(
     // Plan v3, Palier 3.6 — parsing lazy EPUB + résolveur d'images
     private val chapterParser: ChapterParser,
     private val epubResourceResolver: EpubResourceResolver,
+    // P2-b — relais du suivi statistique quand cet écran meurt pendant une
+    // narration : le tracker lui est cédé, jamais partagé.
+    private val narrationSessionContinuation: NarrationSessionContinuation,
 ) : ViewModel() {
 
     private val _state = MutableStateFlow(ReaderUiState())
@@ -490,9 +493,14 @@ class ReaderViewModel @Inject constructor(
                     publicationRepository.setLastOpened(publicationId, System.currentTimeMillis())
 
                     // ───── Lot Sessions : démarre le tracking ─────
-                    val tracker = ReadingSessionTracker(publicationId)
+                    // P2-b — si une narration sans écran suivait déjà ce livre,
+                    // on REPREND son tracker au lieu d'en ouvrir un second :
+                    // deux trackers concurrents produiraient des fragments qui
+                    // se chevauchent, donc du temps compté deux fois.
+                    val handover = narrationSessionContinuation.takeOver(publicationId)
+                    val tracker = handover?.tracker ?: ReadingSessionTracker(publicationId)
                     sessionTracker = tracker
-                    lastFragmentSavedMs = tracker.startTimestamp
+                    lastFragmentSavedMs = handover?.lastFragmentSavedMs ?: tracker.startTimestamp
                     tracker.resume(DomainReadingMode.VISUAL)
                     startCheckpointTimer()
                     // ───── Fin Lot Sessions ─────
@@ -1260,6 +1268,13 @@ class ReaderViewModel @Inject constructor(
         // Ils sont alors libérés à la fermeture réelle de la session
         // (`PlaybackServiceLauncher`, quand `sessionState` retombe à IDLE).
         if (sessionEngaged) {
+            // P2-b — cède le tracker au relais : l'écoute qui continue sans cet
+            // écran doit rester comptabilisée. `saveCurrentFragment()` vient de
+            // flusher, `lastFragmentSavedMs` borne donc correctement le premier
+            // fragment que le relais posera.
+            sessionTracker?.let {
+                narrationSessionContinuation.continueTracking(it, lastFragmentSavedMs)
+            }
             // Capture volontairement restreinte au parseur, au résolveur et à
             // l'identifiant : aucune référence à ce ViewModel, qui doit rester
             // collectable pendant que la narration se poursuit sans lui.

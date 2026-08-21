@@ -147,6 +147,10 @@ class ReaderViewModelPdfTest {
             ),
             chapterParser = FakeChapterParser(),
             epubResourceResolver = FakeEpubResourceResolver(),
+            narrationSessionContinuation = NarrationSessionContinuation(
+                PlaybackOrchestrator(FakeTtsEngine(), FakeAudioPlayer(), UpdateReadingStateUseCase(FakeReadingStateRepository()), FakeChapterParser()),
+                FakeReadingSessionRepository(),
+            ),
         )
     }
 

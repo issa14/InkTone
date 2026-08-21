@@ -119,6 +119,10 @@ class ReaderViewModelBookmarkToggleTest {
             fixedPageRenderer = com.inktone.core.testing.fake.FakeFixedPageRenderer(),
             chapterParser = FakeChapterParser(),
             epubResourceResolver = FakeEpubResourceResolver(),
+            narrationSessionContinuation = NarrationSessionContinuation(
+                PlaybackOrchestrator(FakeTtsEngine(), FakeAudioPlayer(), UpdateReadingStateUseCase(FakeReadingStateRepository()), FakeChapterParser()),
+                FakeReadingSessionRepository(),
+            ),
         )
     }
 
@@ -287,6 +291,10 @@ class ReaderViewModelBookmarkToggleTest {
             fixedPageRenderer = com.inktone.core.testing.fake.FakeFixedPageRenderer(),
             chapterParser = FakeChapterParser(),
             epubResourceResolver = FakeEpubResourceResolver(),
+            narrationSessionContinuation = NarrationSessionContinuation(
+                PlaybackOrchestrator(FakeTtsEngine(), FakeAudioPlayer(), UpdateReadingStateUseCase(FakeReadingStateRepository()), FakeChapterParser()),
+                FakeReadingSessionRepository(),
+            ),
         )
         viewModel.onIntent(ReaderIntent.OpenPublication("pub-1"))
         dispatcher.scheduler.runCurrent()
