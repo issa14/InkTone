@@ -1197,7 +1197,13 @@ class ReaderViewModel @Inject constructor(
      */
     fun onAppBackground() {
         saveCurrentFragment()
-        sessionTracker?.pause()
+        // P1 (plan polissage Pareto) — ne pauser le tracker que si aucune
+        // écoute TTS n'est active : le temps écoulé écran éteint pendant la
+        // narration doit rester imputé à l'AUDIO, pas figé. Sinon l'écoute
+        // en arrière-plan n'est jamais comptabilisée dans les statistiques.
+        if (!_state.value.isPlaying) {
+            sessionTracker?.pause()
+        }
     }
 
     /**
@@ -1222,6 +1228,15 @@ class ReaderViewModel @Inject constructor(
     internal fun cancelCheckpointTimerForTest() {
         checkpointJob?.cancel()
     }
+
+    /**
+     * Exposé pour les tests de [onAppBackground]/[onAppForeground] : le
+     * tracker de session est privé, mais son état `paused` détermine si le
+     * temps d'écoute en arrière-plan est comptabilisé ou figé. `true` par
+     * défaut quand aucune publication n'est ouverte (rien à suivre).
+     */
+    @VisibleForTesting
+    internal fun isSessionTrackerPausedForTest(): Boolean = sessionTracker?.isPaused ?: true
 
     /** Timer de checkpoint : sauve un fragment toutes les 5 minutes. */
     private fun startCheckpointTimer() {
