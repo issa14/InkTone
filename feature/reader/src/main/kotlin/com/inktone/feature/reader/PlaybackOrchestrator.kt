@@ -369,13 +369,16 @@ class PlaybackOrchestrator @Inject constructor(
             return
         }
         val totalMs = minutes * 60_000L
-        _sleepTimer.value = SleepTimerState(remainingMs = totalMs)
+        _sleepTimer.value = SleepTimerState(remainingMs = totalMs, totalMs = totalMs)
         sleepTimerJob = scope.launch {
             var remaining = totalMs
             while (remaining > 0) {
                 delay(SLEEP_TIMER_TICK_MS)
                 remaining -= SLEEP_TIMER_TICK_MS
-                _sleepTimer.value = SleepTimerState(remainingMs = remaining.coerceAtLeast(0))
+                _sleepTimer.value = SleepTimerState(
+                    remainingMs = remaining.coerceAtLeast(0),
+                    totalMs = totalMs,
+                )
             }
             _sleepTimer.value = null
             stop()

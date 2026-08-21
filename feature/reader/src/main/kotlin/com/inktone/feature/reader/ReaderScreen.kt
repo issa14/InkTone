@@ -1186,7 +1186,8 @@ fun ReaderScreen(
         // 3d.4/3d.5 — Panneau Minuteur (remplace le cycle sur l'icône Veille) + repos oculaire
         if (showSleepTimerPanel) {
             SleepTimerPanel(
-                remainingMinutes = state.sleepTimer?.let { (it.remainingMs / 60_000L).toInt() },
+                remainingMs = state.sleepTimer?.remainingMs,
+                armedMinutes = state.sleepTimer?.let { (it.totalMs / 60_000L).toInt() },
                 onSetSleepTimer = { minutes -> viewModel.onIntent(ReaderIntent.SetSleepTimer(minutes)) },
                 eyeRestReminderEnabled = state.eyeRestReminderEnabled,
                 eyeRestReminderIntervalMinutes = state.eyeRestReminderIntervalMinutes,
