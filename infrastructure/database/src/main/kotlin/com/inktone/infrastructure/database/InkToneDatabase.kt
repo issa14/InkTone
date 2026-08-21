@@ -42,7 +42,7 @@ import com.inktone.infrastructure.database.entity.VoiceProfileEntity
         CatalogEntity::class,
     ],
     views = [LibraryItemView::class],
-    version = 26, // Lot 13, tâche 13.1 : table opds_catalogs (MIGRATION_25_26)
+    version = 27, // P4 (polissage Pareto) : réglages de confort de lecture (MIGRATION_26_27)
     exportSchema = true, // condition du harnais de migration — Tâche 2.4
 )
 @TypeConverters(StringListConverter::class)

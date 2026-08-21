@@ -29,6 +29,10 @@ fun UserPreferences.toEntity(): UserPreferencesEntity = UserPreferencesEntity(
     syncLastAutoSyncFailed = syncLastAutoSyncFailed,
     syncAutoEnabled = syncAutoEnabled,
     syncWifiOnly = syncWifiOnly,
+    readerMarginStep = readerMarginStep,
+    paragraphSpacingStep = paragraphSpacingStep,
+    textJustified = textJustified,
+    keepScreenOn = keepScreenOn,
 )
 
 fun UserPreferencesEntity.toDomain(): UserPreferences = UserPreferences(
@@ -58,4 +62,8 @@ fun UserPreferencesEntity.toDomain(): UserPreferences = UserPreferences(
     syncLastAutoSyncFailed = syncLastAutoSyncFailed,
     syncAutoEnabled = syncAutoEnabled,
     syncWifiOnly = syncWifiOnly,
+    readerMarginStep = readerMarginStep,
+    paragraphSpacingStep = paragraphSpacingStep,
+    textJustified = textJustified,
+    keepScreenOn = keepScreenOn,
 )
