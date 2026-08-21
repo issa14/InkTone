@@ -1171,8 +1171,18 @@ class ReaderViewModel @Inject constructor(
 
     /**
      * A.2 — Nettoyage des ressources audio et du minuteur de sommeil
-     * quand le ViewModel est détruit. Évite qu'un segment audio continue
-     * de jouer après la destruction de l'écran.
+     * quand le ViewModel est détruit.
+     *
+     * P1-d — la narration en cours **survit** désormais à la destruction de
+     * l'écran : quitter le Lecteur pour la bibliothèque ne coupe plus la voix,
+     * puisque la session appartient au service foreground et à sa notification
+     * (`AudioPlaybackService`), pas à cet écran. L'ordonnanceur est un
+     * `@Singleton` : il garde son contexte de session (phrases, voix,
+     * publication) et continue de persister la position lue.
+     *
+     * L'arrêt reste inconditionnel quand rien n'est engagé — sinon un segment
+     * résiduel continuerait de jouer sans notification pour le contrôler, ce
+     * que corrigeait la Tâche A.2 à l'origine.
      */
     override fun onCleared() {
         // ───── Lot Sessions : sauvegarde finale + arrêt timer ─────
@@ -1181,7 +1191,7 @@ class ReaderViewModel @Inject constructor(
         // ───── Fin Lot Sessions ─────
 
         super.onCleared()
-        playbackOrchestrator.stop()
+        if (!playbackOrchestrator.isSessionEngaged()) playbackOrchestrator.stop()
         sleepTimerJob?.cancel()
         scrollPersistJob?.cancel()
         eyeRestReminderJob?.cancel()

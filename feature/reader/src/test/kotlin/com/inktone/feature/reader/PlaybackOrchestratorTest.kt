@@ -15,6 +15,7 @@ import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.emptyFlow
 import kotlinx.coroutines.runBlocking
 import org.junit.Assert.assertEquals
+import org.junit.Assert.assertFalse
 import org.junit.Assert.assertTrue
 import org.junit.Test
 import java.util.concurrent.CopyOnWriteArrayList
@@ -267,6 +268,31 @@ class PlaybackOrchestratorTest {
     }
 
     // ── Fakes ──────────────────────────────────────────────
+
+    /**
+     * P1-d — `ReaderViewModel.onCleared()` ne coupe la narration que si aucune
+     * session n'est engagée : quitter le Lecteur pendant une lecture (ou une
+     * pause réelle, notification affichée) ne doit plus faire taire la voix.
+     * Ce test verrouille le prédicat dont dépend cette décision.
+     */
+    @Test
+    fun isSessionEngagedDistingueLectureEtPauseDunArret() = runBlocking {
+        val tts = FakeTtsEngine(segmentDurationMs = 400)
+        val player = FakeAudioPlayer()
+        val orchestrator = PlaybackOrchestrator(tts, player, UpdateReadingStateUseCase(FakeReadingStateRepository()))
+
+        assertFalse("aucune lecture lancée : rien à préserver", orchestrator.isSessionEngaged())
+
+        orchestrator.play(listOf(sentence(0, "Bonjour.", 0)), profile, 0, "pub1", 0, "ch.xhtml")
+        awaitUntil { orchestrator.state.value == PlaybackOrchestrator.PlaybackStatus.Playing }
+        assertTrue("lecture en cours", orchestrator.isSessionEngaged())
+
+        orchestrator.pause()
+        assertTrue("pause réelle : la notification reste, la session est engagée", orchestrator.isSessionEngaged())
+
+        orchestrator.stop()
+        assertFalse("arrêt : plus rien à préserver", orchestrator.isSessionEngaged())
+    }
 
     private class FakeTtsEngine(
         private val segmentDurationMs: Long = 200,

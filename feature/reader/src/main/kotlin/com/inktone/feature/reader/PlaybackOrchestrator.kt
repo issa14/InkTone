@@ -214,6 +214,23 @@ class PlaybackOrchestrator @Inject constructor(
     }
 
     /**
+     * Vrai quand une session de lecture est engagée — en cours, en synthèse,
+     * ou en pause réelle (P1-d).
+     *
+     * Lit l'état interne [_state] et non le flux dérivé [sessionState] : ce
+     * dernier est un `stateIn` alimenté par une coroutine, donc périmé d'un
+     * tick après une mutation. Pour une décision immédiate (« faut-il couper
+     * la voix en détruisant l'écran ? »), seule la source directe convient.
+     *
+     * Une pause compte comme engagée : la notification est toujours affichée
+     * et propose la reprise, la couper serait un arrêt déguisé.
+     */
+    fun isSessionEngaged(): Boolean = when (_state.value) {
+        PlaybackStatus.Playing, PlaybackStatus.Buffering, PlaybackStatus.Paused -> true
+        PlaybackStatus.Idle, is PlaybackStatus.Error -> false
+    }
+
+    /**
      * Pose les métadonnées (titre/auteur) du livre narré. Appelé par le
      * Lecteur à l'ouverture, consommé par la notification média.
      */
