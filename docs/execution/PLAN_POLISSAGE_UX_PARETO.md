@@ -465,8 +465,9 @@ sur une session réelle.
   correctifs de clignotement documentés
   (`NOTE_REGRESSION_CLIGNOTEMENT_PAGE_HUD.md`), leur migration demande une
   vérification device dédiée.
-- **Restant** — partage de la bitmap de couverture entre le lecteur et la
-  notification média (cache Coil), pour éviter une seconde décompression.
+- **Couverture partagée — faite depuis** (§6.10, commit `efa14920`) : la
+  notification charge la couverture via Coil, donc depuis le même cache que la
+  bibliothèque, sans seconde décompression.
 
 Commit `f42103bb`.
 
