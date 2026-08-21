@@ -6,9 +6,11 @@
     <uses-permission android:name="android.permission.FOREGROUND_SERVICE" />
     <uses-permission android:name="android.permission.FOREGROUND_SERVICE_MEDIA_PLAYBACK" />
 
-    <!-- P1 (plan polissage Pareto) : notification media du TTS. Demande a
-         l'execution au premier demarrage d'une lecture (pas au lancement de
-         l'app) — voir ReaderViewModel.startPlaybackService. -->
+    <!-- P1 (plan polissage Pareto) : notification media du TTS. Demandee a
+         l'execution au premier demarrage d'une narration (pas au lancement de
+         l'app) — voir rememberTtsNotificationPermissionRequest, appelee par
+         ReaderScreen.togglePlayback. Un refus n'empeche pas la lecture, il
+         prive seulement du controle depuis le volet de notifications. -->
     <uses-permission android:name="android.permission.POST_NOTIFICATIONS" />
 
     <!-- Tache 9.2.2 : trouvee manquante par l'audit de securite -

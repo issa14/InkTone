@@ -179,6 +179,16 @@ fun ReaderScreen(
 ) {
     val state by viewModel.state.collectAsState()
 
+    // P1 — la notification média est la voie de contrôle en arrière-plan et
+    // sur écran verrouillé. Sur Android 13+, elle n'apparaît qu'avec
+    // POST_NOTIFICATIONS : demandée ici, au moment précis où l'utilisateur
+    // lance une narration, jamais au lancement de l'application.
+    val requestNotificationPermission = rememberTtsNotificationPermissionRequest()
+    val togglePlayback = {
+        if (!state.isPlaying) requestNotificationPermission()
+        viewModel.onIntent(if (state.isPlaying) ReaderIntent.Pause else ReaderIntent.PlayCurrentSentence)
+    }
+
     // ───── Lot Sessions : pause/reprise sur changement de visibilité ─────
     val lifecycleOwner = LocalLifecycleOwner.current
     DisposableEffect(lifecycleOwner) {
@@ -956,7 +966,7 @@ fun ReaderScreen(
                                     onPreviousSentence = { keepHudVisible(); viewModel.onIntent(ReaderIntent.SkipToPreviousSentence) },
                                     onPlayPause = {
                                         keepHudVisible()
-                                        viewModel.onIntent(if (state.isPlaying) ReaderIntent.Pause else ReaderIntent.PlayCurrentSentence)
+                                        togglePlayback()
                                     },
                                     onNextSentence = { keepHudVisible(); viewModel.onIntent(ReaderIntent.SkipToNextSentence) },
                                     onNextChapter = { keepHudVisible(); viewModel.onIntent(ReaderIntent.NextChapter) },
@@ -987,7 +997,7 @@ fun ReaderScreen(
                             bookProgression = state.bookProgression,
                             onPlayPause = {
                                 keepHudVisible()
-                                viewModel.onIntent(if (state.isPlaying) ReaderIntent.Pause else ReaderIntent.PlayCurrentSentence)
+                                togglePlayback()
                             },
                             onSleepTimerClick = { keepHudVisible(); showSleepTimerPanel = true },
                             onSearchClick = { keepHudVisible(); onSearchClick() },
@@ -1117,7 +1127,7 @@ fun ReaderScreen(
                 activeVoiceProfile = state.activeVoiceProfile,
                 availableVoiceProfiles = state.availableVoiceProfiles,
                 onPlayPause = {
-                    viewModel.onIntent(if (state.isPlaying) ReaderIntent.Pause else ReaderIntent.PlayCurrentSentence)
+                    togglePlayback()
                 },
                 onPreviousSentence = { viewModel.onIntent(ReaderIntent.SkipToPreviousSentence) },
                 onNextSentence = { viewModel.onIntent(ReaderIntent.SkipToNextSentence) },
