@@ -1,57 +1,226 @@
 package com.inktone.infrastructure.media
 
-import android.net.Uri
-import androidx.media3.common.MediaItem
-import androidx.media3.exoplayer.ExoPlayer
-import androidx.media3.session.MediaSession
-import androidx.media3.session.MediaSessionService
-import com.inktone.domain.service.AudioSegment
+import android.app.Notification
+import android.app.NotificationChannel
+import android.app.NotificationManager
+import android.app.PendingIntent
+import android.app.Service
+import android.content.Intent
+import android.media.MediaMetadata
+import android.media.session.MediaSession
+import android.media.session.PlaybackState
+import android.os.IBinder
+import com.inktone.domain.service.PlaybackSession
 import dagger.hilt.android.AndroidEntryPoint
+import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.SupervisorJob
+import kotlinx.coroutines.cancel
+import kotlinx.coroutines.launch
+import javax.inject.Inject
 
 /**
- * Remplace la lecture ad hoc de la marche à blanc (`AudioSegmentPlayer`,
- * Tâche 3.8 — `AudioTrack` jetable) par un vrai service de lecture,
- * survivant à la mise en arrière-plan. `AudioSegmentPlayer` reste utilisé
- * tel quel uniquement si un jour un besoin de preview très court (aperçu
- * d'une voix dans les réglages) justifie un chemin plus léger — pas pour
- * la lecture de publication.
+ * Service foreground de la session média TTS (P1, plan polissage Pareto).
  *
- * Chaque `AudioSegment` (PCM16 brut) est écrit dans un fichier WAV
- * temporaire avant d'être remis à `ExoPlayer` (voir
- * `AudioSegmentWavFile.writeToTempWavFile`, décision documentée là).
+ * Remplace l'ancien service fantôme (Media3 `MediaSessionService` + `ExoPlayer`
+ * auquel **rien ne se connectait jamais** — la lecture réelle passe par
+ * `GaplessAudioPlayer`, ADR-025) par une vraie façade : il pilote le contrat
+ * domaine [PlaybackSession] (implémenté par `PlaybackOrchestrator`) et expose
+ * ses commandes via une `MediaSession` système + une notification `MediaStyle`.
+ *
+ * Cycle de vie : démarré (en foreground) quand la lecture TTS commence, arrêté
+ * quand elle s'arrête — la notification reste affichée pendant une pause réelle
+ * (`Paused`), et disparaît au `stop()` (arrêt complet, libération de la
+ * synthèse). La notification est la voie de contrôle en arrière-plan/écran
+ * verrouillé ; l'écran Lecteur reste maître de la lecture (source de vérité
+ * unique, K3).
  */
 @AndroidEntryPoint
-class AudioPlaybackService : MediaSessionService() {
+class AudioPlaybackService : Service() {
 
-    private lateinit var player: ExoPlayer
+    @Inject
+    lateinit var playbackSession: PlaybackSession
+
     private var mediaSession: MediaSession? = null
+    private var isForeground: Boolean = false
+    private val scope = CoroutineScope(SupervisorJob() + Dispatchers.Main.immediate)
 
     override fun onCreate() {
         super.onCreate()
-        player = ExoPlayer.Builder(this).build()
-        mediaSession = MediaSession.Builder(this, player).build()
+        createNotificationChannel()
+        mediaSession = MediaSession(this, "InkToneTts").apply {
+            setCallback(object : MediaSession.Callback() {
+                override fun onPlay() {
+                    if (!playbackSession.isPlaying.value) playbackSession.togglePlayPause()
+                }
+
+                override fun onPause() {
+                    if (playbackSession.isPlaying.value) playbackSession.togglePlayPause()
+                }
+
+                override fun onSkipToNext() = playbackSession.skip(1)
+
+                override fun onSkipToPrevious() = playbackSession.skip(-1)
+
+                override fun onStop() {
+                    playbackSession.stop()
+                    stopSelf()
+                }
+            })
+            setFlags(MediaSession.FLAG_HANDLES_MEDIA_BUTTONS or MediaSession.FLAG_HANDLES_TRANSPORT_CONTROLS)
+        }
+        observeSession()
     }
 
-    override fun onGetSession(controllerInfo: MediaSession.ControllerInfo): MediaSession? = mediaSession
-
-    /**
-     * Joue un segment audio synthétisé : écrit dans un fichier WAV
-     * temporaire (répertoire cache, nettoyé par le système), remplace
-     * l'élément courant du lecteur.
-     */
-    fun playSegment(segment: AudioSegment) {
-        val wavFile = segment.writeToTempWavFile(cacheDir)
-        player.setMediaItem(MediaItem.fromUri(Uri.fromFile(wavFile)))
-        player.prepare()
-        player.play()
+    override fun onStartCommand(intent: Intent?, flags: Int, startId: Int): Int {
+        // Les actions de la notification arrivent ici en PendingIntent ; les
+        // commandes externes (bluetooth, écran verrouillé) passent par le
+        // `MediaSession.Callback` ci-dessus.
+        when (intent?.action) {
+            ACTION_PLAY_PAUSE -> playbackSession.togglePlayPause()
+            ACTION_SKIP_NEXT -> playbackSession.skip(1)
+            ACTION_SKIP_PREVIOUS -> playbackSession.skip(-1)
+            ACTION_STOP -> {
+                playbackSession.stop()
+                stopSelf()
+                return START_NOT_STICKY
+            }
+        }
+        startForegroundSafe()
+        return START_NOT_STICKY
     }
+
+    override fun onBind(intent: Intent?): IBinder? = null
 
     override fun onDestroy() {
-        mediaSession?.run {
-            player.release()
-            release()
-            mediaSession = null
-        }
+        scope.cancel()
+        mediaSession?.release()
+        mediaSession = null
         super.onDestroy()
+    }
+
+    // ── Observation de la session ──────────────────────────────────────
+
+    private fun observeSession() {
+        scope.launch {
+            playbackSession.isPlaying.collect { playing ->
+                mediaSession?.setPlaybackState(buildPlaybackState(playing))
+                refreshNotification()
+            }
+        }
+        scope.launch {
+            playbackSession.metadata.collect { meta ->
+                mediaSession?.setMetadata(
+                    MediaMetadata.Builder()
+                        .putString(MediaMetadata.METADATA_KEY_TITLE, meta.title)
+                        .putString(MediaMetadata.METADATA_KEY_ARTIST, meta.author)
+                        .build(),
+                )
+                refreshNotification()
+            }
+        }
+    }
+
+    private fun buildPlaybackState(playing: Boolean): PlaybackState {
+        val state = if (playing) PlaybackState.STATE_PLAYING else PlaybackState.STATE_PAUSED
+        return PlaybackState.Builder()
+            .setActions(
+                PlaybackState.ACTION_PLAY or
+                    PlaybackState.ACTION_PAUSE or
+                    PlaybackState.ACTION_SKIP_TO_NEXT or
+                    PlaybackState.ACTION_SKIP_TO_PREVIOUS or
+                    PlaybackState.ACTION_STOP,
+            )
+            .setState(state, PlaybackState.PLAYBACK_POSITION_UNKNOWN, 1.0f)
+            .build()
+    }
+
+    // ── Notification ────────────────────────────────────────────────────
+
+    private fun startForegroundSafe() {
+        if (isForeground) return
+        startForeground(NOTIFICATION_ID, buildNotification())
+        isForeground = true
+    }
+
+    private fun refreshNotification() {
+        if (isForeground) {
+            getSystemService(NotificationManager::class.java).notify(NOTIFICATION_ID, buildNotification())
+        }
+    }
+
+    private fun buildNotification(): Notification {
+        val contentIntent = PendingIntent.getActivity(
+            this,
+            0,
+            packageManager.getLaunchIntentForPackage(packageName),
+            PendingIntent.FLAG_IMMUTABLE or PendingIntent.FLAG_UPDATE_CURRENT,
+        )
+        val metadata = playbackSession.metadata.value
+        val playing = playbackSession.isPlaying.value
+
+        return Notification.Builder(this, CHANNEL_ID)
+            .setSmallIcon(android.R.drawable.ic_media_play)
+            .setContentTitle(metadata.title ?: getString(android.R.string.unknownName))
+            .setContentText(metadata.author)
+            .setContentIntent(contentIntent)
+            .setVisibility(Notification.VISIBILITY_PUBLIC)
+            .setOnlyAlertOnce(true)
+            .addAction(
+                Notification.Action.Builder(
+                    android.R.drawable.ic_media_previous,
+                    "Précédent",
+                    serviceIntent(ACTION_SKIP_PREVIOUS),
+                ).build(),
+            )
+            .addAction(
+                Notification.Action.Builder(
+                    if (playing) android.R.drawable.ic_media_pause else android.R.drawable.ic_media_play,
+                    if (playing) "Pause" else "Lecture",
+                    serviceIntent(ACTION_PLAY_PAUSE),
+                ).build(),
+            )
+            .addAction(
+                Notification.Action.Builder(
+                    android.R.drawable.ic_media_next,
+                    "Suivant",
+                    serviceIntent(ACTION_SKIP_NEXT),
+                ).build(),
+            )
+            .setStyle(
+                Notification.MediaStyle()
+                    .setMediaSession(mediaSession?.sessionToken)
+                    .setShowActionsInCompactView(0, 1, 2),
+            )
+            .build()
+    }
+
+    private fun serviceIntent(action: String): PendingIntent =
+        PendingIntent.getService(
+            this,
+            action.hashCode(),
+            Intent(this, AudioPlaybackService::class.java).setAction(action),
+            PendingIntent.FLAG_IMMUTABLE or PendingIntent.FLAG_UPDATE_CURRENT,
+        )
+
+    private fun createNotificationChannel() {
+        val channel = NotificationChannel(
+            CHANNEL_ID,
+            "Lecture TTS",
+            NotificationManager.IMPORTANCE_LOW,
+        ).apply {
+            description = "Contrôle de la narration en cours (lecture, pause, phrase ±)."
+            setShowBadge(false)
+        }
+        getSystemService(NotificationManager::class.java).createNotificationChannel(channel)
+    }
+
+    private companion object {
+        const val CHANNEL_ID = "inktone.tts.playback"
+        const val NOTIFICATION_ID = 1001
+        const val ACTION_PLAY_PAUSE = "com.inktone.media.action.PLAY_PAUSE"
+        const val ACTION_SKIP_NEXT = "com.inktone.media.action.SKIP_NEXT"
+        const val ACTION_SKIP_PREVIOUS = "com.inktone.media.action.SKIP_PREVIOUS"
+        const val ACTION_STOP = "com.inktone.media.action.STOP"
     }
 }

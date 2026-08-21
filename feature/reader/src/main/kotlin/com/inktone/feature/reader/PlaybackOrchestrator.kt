@@ -7,6 +7,7 @@ import com.inktone.domain.service.AudioPlayer
 import com.inktone.domain.service.AudioSegment
 import com.inktone.domain.service.PlaybackMetadata
 import com.inktone.domain.service.PlaybackSession
+import com.inktone.domain.service.PlaybackSessionState
 import com.inktone.domain.service.TtsEngine
 import com.inktone.domain.service.WordTimestamp
 import com.inktone.domain.usecase.UpdateReadingStateUseCase
@@ -112,6 +113,15 @@ class PlaybackOrchestrator @Inject constructor(
     override val isPlaying: StateFlow<Boolean> = _state
         .map { it == PlaybackStatus.Playing || it == PlaybackStatus.Buffering }
         .stateIn(scope, SharingStarted.Eagerly, false)
+
+    /**
+     * État de vie complet de la session (contrat [PlaybackSession]) — miroir
+     * domaine du [PlaybackStatus] interne, pour que la notification puisse
+     * distinguer une pause réelle (`PAUSED`) d'un arrêt (`IDLE`).
+     */
+    override val sessionState: StateFlow<PlaybackSessionState> = _state
+        .map { it.toSessionState() }
+        .stateIn(scope, SharingStarted.Eagerly, PlaybackSessionState.IDLE)
 
     /**
      * Contexte de la dernière session démarrée (phrases, voix, publication),
@@ -476,6 +486,15 @@ class PlaybackOrchestrator @Inject constructor(
             '\n' -> SILENCE_PARAGRAPH_MS
             else -> SILENCE_SENTENCE_MS
         }
+    }
+
+    /** Mappe le statut interne vers l'état domaine du contrat [PlaybackSession]. */
+    private fun PlaybackStatus.toSessionState(): PlaybackSessionState = when (this) {
+        PlaybackStatus.Idle -> PlaybackSessionState.IDLE
+        PlaybackStatus.Buffering -> PlaybackSessionState.BUFFERING
+        PlaybackStatus.Playing -> PlaybackSessionState.PLAYING
+        PlaybackStatus.Paused -> PlaybackSessionState.PAUSED
+        is PlaybackStatus.Error -> PlaybackSessionState.ERROR
     }
 
     /** Contexte d'une session de lecture retenu pour la reprise/skip sans le Lecteur. */

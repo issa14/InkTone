@@ -4,6 +4,7 @@ import android.app.Application
 import androidx.hilt.work.HiltWorkerFactory
 import androidx.work.Configuration
 import com.inktone.infrastructure.crashreporting.CrashReportingConsentObserver
+import com.inktone.infrastructure.media.PlaybackServiceLauncher
 import com.inktone.infrastructure.worker.SyncScheduleObserver
 import dagger.hilt.android.HiltAndroidApp
 import kotlinx.coroutines.CoroutineScope
@@ -37,6 +38,10 @@ class InkToneApplication : Application(), Configuration.Provider {
     // SyncScheduler (WorkManager) en continu.
     @Inject lateinit var syncScheduleObserver: SyncScheduleObserver
 
+    // P1 (plan polissage Pareto) — démarre/arrête le service foreground de la
+    // notification média selon l'état de la session TTS (PlaybackSession).
+    @Inject lateinit var playbackServiceLauncher: PlaybackServiceLauncher
+
     override val workManagerConfiguration: Configuration
         get() = Configuration.Builder().setWorkerFactory(workerFactory).build()
 
@@ -53,5 +58,6 @@ class InkToneApplication : Application(), Configuration.Provider {
         // google-services.json) et n'a alors aucun effet réel.
         crashReportingConsentObserver.start(CoroutineScope(SupervisorJob() + Dispatchers.Default))
         syncScheduleObserver.start(CoroutineScope(SupervisorJob() + Dispatchers.Default))
+        playbackServiceLauncher.start(CoroutineScope(SupervisorJob() + Dispatchers.Default))
     }
 }

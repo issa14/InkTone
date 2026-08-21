@@ -8,6 +8,9 @@ data class PlaybackMetadata(
     val author: String? = null,
 )
 
+/** État de vie d'une session de lecture TTS (miroir domaine du `PlaybackStatus` interne). */
+enum class PlaybackSessionState { IDLE, BUFFERING, PLAYING, PAUSED, ERROR }
+
 /**
  * Façade de session de lecture TTS (P1, plan polissage Pareto).
  *
@@ -27,6 +30,9 @@ data class PlaybackMetadata(
  * état `Idle`) que l'écran Lecteur utilise pour « mettre en pause ».
  */
 interface PlaybackSession {
+
+    /** État de vie complet (distincte une pause réelle d'un arrêt, pour la notification). */
+    val sessionState: StateFlow<PlaybackSessionState>
 
     /** Vrai quand l'audio est engagé (buffering ou lecture réelle). */
     val isPlaying: StateFlow<Boolean>
