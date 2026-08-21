@@ -6,6 +6,10 @@ import android.app.NotificationManager
 import android.app.PendingIntent
 import android.app.Service
 import android.content.Intent
+import coil.request.ImageRequest
+import coil.imageLoader
+import android.graphics.drawable.BitmapDrawable
+import android.graphics.Bitmap
 import android.media.MediaMetadata
 import android.media.session.MediaSession
 import android.media.session.PlaybackState
@@ -168,10 +172,15 @@ class AudioPlaybackService : Service() {
         }
         scope.launch {
             playbackSession.metadata.collect { meta ->
+                // La couverture est chargée AVANT de publier les métadonnées :
+                // poser d'abord un jeu sans image, puis un second avec, fait
+                // clignoter l'écran verrouillé de certains lanceurs.
+                coverBitmap = loadCover(meta.coverUri)
                 mediaSession?.setMetadata(
                     MediaMetadata.Builder()
                         .putString(MediaMetadata.METADATA_KEY_TITLE, meta.title)
                         .putString(MediaMetadata.METADATA_KEY_ARTIST, meta.author)
+                        .putBitmap(MediaMetadata.METADATA_KEY_ALBUM_ART, coverBitmap)
                         .build(),
                 )
                 refreshNotification()
@@ -218,6 +227,31 @@ class AudioPlaybackService : Service() {
         return "Arrêt dans $minutes min"
     }
 
+    /** Couverture courante, `null` tant qu'aucune n'a pu être chargée. */
+    private var coverBitmap: Bitmap? = null
+
+    /**
+     * Charge la couverture via Coil — le chargeur d'images de l'app, donc son
+     * cache : la couverture affichée dans la bibliothèque n'est pas
+     * décompressée une seconde fois pour la notification.
+     *
+     * Un échec (URI périmée, permission SAF révoquée, fichier supprimé) rend
+     * `null` : la notification s'affiche alors sans image plutôt que de faire
+     * échouer la lecture. Une couverture est un agrément, jamais une condition
+     * pour écouter un livre.
+     */
+    private suspend fun loadCover(coverUri: String?): Bitmap? {
+        if (coverUri.isNullOrBlank()) return null
+        return runCatching {
+            val request = ImageRequest.Builder(this)
+                .data(coverUri)
+                .allowHardware(false) // un bitmap matériel n'est pas sérialisable vers la MediaSession
+                .size(COVER_SIZE_PX)
+                .build()
+            (this.imageLoader.execute(request).drawable as? BitmapDrawable)?.bitmap
+        }.getOrNull()
+    }
+
     private fun buildNotification(): Notification {
         val contentIntent = PendingIntent.getActivity(
             this,
@@ -232,6 +266,7 @@ class AudioPlaybackService : Service() {
             .setSmallIcon(android.R.drawable.ic_media_play)
             .setContentTitle(metadata.title ?: getString(android.R.string.unknownName))
             .setContentText(sleepTimerLabel() ?: metadata.author)
+            .setLargeIcon(coverBitmap)
             .setContentIntent(contentIntent)
             .setVisibility(Notification.VISIBILITY_PUBLIC)
             .setOnlyAlertOnce(true)
@@ -319,6 +354,14 @@ class AudioPlaybackService : Service() {
         const val ACTION_PLAY_PAUSE = "com.inktone.media.action.PLAY_PAUSE"
         const val ACTION_SKIP_NEXT = "com.inktone.media.action.SKIP_NEXT"
         const val ACTION_CANCEL_SLEEP_TIMER = "com.inktone.media.action.CANCEL_SLEEP_TIMER"
+
+        /**
+         * Côté de la couverture décodée. Volontairement modeste : la vignette
+         * d'une notification ne dépasse pas quelques centaines de pixels, et
+         * décoder une couverture pleine résolution pour l'y afficher gaspille
+         * de la mémoire sur la cible matérielle du projet (Snapdragon 680).
+         */
+        const val COVER_SIZE_PX = 512
         const val ACTION_SKIP_PREVIOUS = "com.inktone.media.action.SKIP_PREVIOUS"
         const val ACTION_STOP = "com.inktone.media.action.STOP"
     }

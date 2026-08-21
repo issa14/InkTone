@@ -553,6 +553,7 @@ class ReaderViewModel @Inject constructor(
                         publicationId = publication.id,
                         title = publication.title,
                         author = publication.authors.joinToString(", ").ifBlank { null },
+                        coverUri = publication.coverUri,
                     )
                     // Plan v3, Palier 3.6 — initialiser le parsing lazy EPUB
                     if (publication.format == PublicationFormat.EPUB) {

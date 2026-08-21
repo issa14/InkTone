@@ -407,8 +407,13 @@ class PlaybackOrchestrator @Inject constructor(
      * Pose les métadonnées (titre/auteur) du livre narré. Appelé par le
      * Lecteur à l'ouverture, consommé par la notification média.
      */
-    fun setMetadata(publicationId: String?, title: String?, author: String?) {
-        _metadata.value = PlaybackMetadata(publicationId = publicationId, title = title, author = author)
+    fun setMetadata(publicationId: String?, title: String?, author: String?, coverUri: String? = null) {
+        _metadata.value = PlaybackMetadata(
+            publicationId = publicationId,
+            title = title,
+            author = author,
+            coverUri = coverUri,
+        )
     }
 
     /**

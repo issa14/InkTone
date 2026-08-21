@@ -15,6 +15,12 @@ data class PlaybackMetadata(
     val publicationId: String? = null,
     val title: String? = null,
     val author: String? = null,
+    /**
+     * Couverture du livre narré, pour la notification et l'écran verrouillé.
+     * Chaîne d'URI et non bitmap : le domaine ne connaît pas `Bitmap`, et
+     * charger l'image est le métier de la couche qui l'affiche.
+     */
+    val coverUri: String? = null,
 )
 
 /** État de vie d'une session de lecture TTS (miroir domaine du `PlaybackStatus` interne). */
