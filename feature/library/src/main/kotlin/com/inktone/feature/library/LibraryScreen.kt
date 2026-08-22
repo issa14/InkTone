@@ -73,8 +73,9 @@ import androidx.hilt.navigation.compose.hiltViewModel
 import com.inktone.core.designsystem.AppIcon
 import com.inktone.core.designsystem.AppIcons
 import com.inktone.core.designsystem.AppSymbol
+import com.inktone.core.designsystem.InkToneBrandMark
+import com.inktone.core.designsystem.NarrativeAccentFamily
 import com.inktone.core.designsystem.InkToneShapes
-import com.inktone.core.designsystem.StatusBarColorEffect
 import com.inktone.domain.model.FilterMode
 import com.inktone.domain.model.Publication
 import com.inktone.domain.service.ImportProgress
@@ -164,10 +165,6 @@ fun LibraryScreen(
         }
     }
 
-    // Etend la couleur de la barre du haut a la barre de statut Android :
-    // sans cela, le bandeau systeme garde le creme fige de `themes.xml`
-    // au-dessus d'une TopAppBar `primary` (voir StatusBarColorEffect).
-    StatusBarColorEffect(MaterialTheme.colorScheme.primary)
     Scaffold(
         snackbarHost = { SnackbarHost(snackbarHostState) },
         floatingActionButton = {
@@ -285,29 +282,48 @@ fun LibraryDrawerContent(
     selected: DrawerDestination = DrawerDestination.LIBRARY,
 ) {
     Column(Modifier.fillMaxHeight()) {
-        // C.1 — Header avec dégradé brand (legacy §1.2)
-        Box(
+        // En-tête de marque, sur `surface` — la même couleur que le corps du
+        // menu, donc sans couture.
+        //
+        // Remplace un bloc de 140 dp en dégradé `primaryContainer` →
+        // `primary`. Ce dégradé descendait du CLAIR vers le SOMBRE : son
+        // point le plus sombre tombait donc contre le corps du menu, quasi
+        // blanc, plaçant le contraste maximal exactement sur la couture.
+        // Depuis que la barre de statut suit la barre du haut, la colonne
+        // empilait quatre bandes avec deux inversions (système sombre →
+        // lavande clair → violet sombre → blanc cassé).
+        //
+        // « InkTone » est en Literata (`NarrativeAccentFamily`) et non dans
+        // la scale Work Sans : c'est la police d'accent narratif de la
+        // marque, déjà employée pour ce même mot par l'Onboarding
+        // (« Bienvenue sur InkTone »). Elle est posée ICI, au point d'appel,
+        // jamais dans `InkToneTypography` — `TypographyBrandTest` l'interdit
+        // dans la scale.
+        Row(
             modifier = Modifier
                 .fillMaxWidth()
-                .height(140.dp)
-                .background(
-                    Brush.verticalGradient(
-                        colors = listOf(
-                            MaterialTheme.colorScheme.primaryContainer,
-                            MaterialTheme.colorScheme.primary,
-                        )
-                    )
-                )
-                .padding(start = 24.dp, bottom = 24.dp),
-            contentAlignment = Alignment.BottomStart,
+                .padding(start = 24.dp, end = 24.dp, top = 28.dp, bottom = 20.dp),
+            verticalAlignment = Alignment.CenterVertically,
         ) {
-            Text(
-                "InkTone",
-                style = MaterialTheme.typography.headlineMedium,
-                color = MaterialTheme.colorScheme.onPrimary,
-                fontWeight = FontWeight.Bold,
-            )
+            InkToneBrandMark(modifier = Modifier.size(44.dp))
+            Column(modifier = Modifier.padding(start = 14.dp)) {
+                Text(
+                    "InkTone",
+                    style = MaterialTheme.typography.headlineSmall,
+                    fontFamily = NarrativeAccentFamily,
+                    fontWeight = FontWeight.SemiBold,
+                    color = MaterialTheme.colorScheme.onSurface,
+                )
+                Text(
+                    "Votre compagnon de voyage",
+                    style = MaterialTheme.typography.labelSmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                )
+            }
         }
+        // Symétrique du séparateur qui coiffe déjà le pied de drawer : sans
+        // elle, la liste de navigation est bornée en bas et pas en haut.
+        HorizontalDivider()
         Column(Modifier.weight(1f).padding(16.dp)) {
         // Récents — Lot 8, en première position des destinations (cible
         // UX). Destination à part entière qui navigue vers un écran

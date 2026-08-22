@@ -33,6 +33,7 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.graphics.lerp
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.ui.platform.LocalContext
@@ -166,17 +167,36 @@ fun InkToneNavHost(navController: NavHostController = rememberNavController(), s
         },
     ) {
     val openDrawer: () -> Unit = { scope.launch { drawerState.open() } }
-    // Ligne de base de la barre de statut, posée ICI et non dans
-    // `InkToneTheme` : ce composable relit `currentBackStackEntryAsState()`,
-    // il recompose donc à CHAQUE navigation, quand le thème, lui, ne
-    // recompose pas. Posée dans le thème, la couleur du dernier écran visité
-    // fuyait vers les écrans qui n'en déclarent pas (Réglages, À propos,
-    // Recherche...), qui gardaient par exemple le fond du Lecteur.
+    // Couleur de la barre de statut — décidée ICI, en un seul point, à partir
+    // de la destination ET de l'état du drawer.
     //
-    // Les écrans à barre du haut colorée la surchargent avec la leur : les
-    // `SideEffect` sont appliqués dans l'ordre de composition, donc celui de
-    // l'écran (enfant) passe après celui-ci et gagne.
-    StatusBarColorEffect(MaterialTheme.colorScheme.surface)
+    // Elle a d'abord vécu dans chaque écran, au plus près de la barre du haut
+    // qui la définit. Ce placement ne survit pas au drawer : à son ouverture
+    // seul CE composable recompose (il relit `drawerState`), l'écran non ; et
+    // à sa fermeture, l'inverse — personne ne restaure. Deux écrivains pour
+    // une même valeur, aucun des deux ne voyant l'événement de l'autre.
+    // Centraliser est la seule façon d'en faire une fonction de l'état plutôt
+    // qu'une course. Le prix — une table à tenir en phase avec la couleur
+    // réelle des barres du haut — est payé par `usesPrimaryTopBar()`, même
+    // idiome que `hidesMiniPlayer()`/`toDrawerDestination()` juste à côté.
+    //
+    // Drawer ouvert : la couleur est assombrie du scrim. En edge-to-edge, le
+    // scrim du drawer couvrirait aussi la barre de statut ; on ne dessine pas
+    // encore derrière elle (voir StatusBarColorEffect, dette targetSdk 35),
+    // donc on reproduit son effet à la main plutôt que de laisser une bande
+    // pleine lumière au-dessus d'un écran voilé.
+    val baseStatusBarColor = if (currentDestination?.usesPrimaryTopBar() == true) {
+        MaterialTheme.colorScheme.primary
+    } else {
+        MaterialTheme.colorScheme.surface
+    }
+    StatusBarColorEffect(
+        if (drawerState.isOpen) {
+            lerp(baseStatusBarColor, MaterialTheme.colorScheme.scrim, DRAWER_SCRIM_ALPHA)
+        } else {
+            baseStatusBarColor
+        },
+    )
     SharedTransitionLayout {
         CompositionLocalProvider(LocalSharedTransitionScope provides this@SharedTransitionLayout) {
         // P2 — le mini-lecteur occupe une bande sous le contenu plutôt que de
@@ -540,6 +560,27 @@ fun InkToneNavHost(navController: NavHostController = rememberNavController(), s
  * ses propres commandes TTS (une seconde barre ferait doublon et volerait de
  * la hauteur de page), et l'onboarding, où aucune narration ne peut exister.
  */
+/**
+ * Destinations dont la `TopAppBar` est peinte en `colorScheme.primary`, et
+ * dont la barre de statut doit donc prendre la même couleur.
+ *
+ * À tenir en phase avec le `containerColor` réel de ces écrans — c'est le
+ * prix de la centralisation (voir le commentaire de `InkToneNavHost`). Les
+ * autres destinations gardent `surface`, la couleur de leur `BackScaffold`
+ * ou de leur propre barre. `ReaderRoute` en fait partie et n'a rien à y
+ * gagner : il masque les barres système et peint lui-même son fond de
+ * fenêtre (`WindowBackgroundColorEffect`).
+ */
+private fun NavDestination.usesPrimaryTopBar(): Boolean =
+    hasRoute<LibraryRoute>() ||
+        hasRoute<RecentsRoute>() ||
+        hasRoute<BookmarksRoute>() ||
+        hasRoute<LibraryDetailRoute>() ||
+        hasRoute<StatisticsRoute>() ||
+        hasRoute<BookStatisticsRoute>() ||
+        hasRoute<SyncRoute>() ||
+        hasRoute<OpdsRoute>()
+
 private fun NavDestination.hidesMiniPlayer(): Boolean =
     hasRoute<ReaderRoute>() || hasRoute<OnboardingRoute>()
 
@@ -581,3 +622,9 @@ private fun BackScaffold(title: String, onBack: () -> Unit, content: @Composable
  * (shared element) plutôt qu'une animation soignée en soi.
  */
 private const val READER_CLOSE_FADE_MS = 120
+
+/**
+ * Opacité du scrim appliqué à la barre de statut quand le drawer est ouvert
+ * — celle du scrim de `ModalNavigationDrawer` (Material 3).
+ */
+private const val DRAWER_SCRIM_ALPHA = 0.32f

@@ -70,7 +70,6 @@ import com.inktone.core.designsystem.AppIcon
 import com.inktone.core.designsystem.AppIcons
 import com.inktone.core.designsystem.AppSymbol
 import com.inktone.core.designsystem.InkToneSpacing
-import com.inktone.core.designsystem.StatusBarColorEffect
 import com.inktone.domain.model.DailyReadingStats
 import com.inktone.domain.service.ExportFormat
 import com.inktone.domain.usecase.StatsPeriod
@@ -123,10 +122,6 @@ fun StatisticsScreen(
     // générique d'`InkToneNavHost` en tenait lieu). Destination principale
     // du drawer, il porte désormais la sienne, hamburger compris, comme
     // les 5 autres.
-    // Etend la couleur de la barre du haut a la barre de statut Android :
-    // sans cela, le bandeau systeme garde le creme fige de `themes.xml`
-    // au-dessus d'une TopAppBar `primary` (voir StatusBarColorEffect).
-    StatusBarColorEffect(MaterialTheme.colorScheme.primary)
     Scaffold(
         topBar = {
             TopAppBar(

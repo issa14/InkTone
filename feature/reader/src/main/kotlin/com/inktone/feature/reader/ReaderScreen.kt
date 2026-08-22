@@ -98,6 +98,7 @@ import com.inktone.core.designsystem.AppIcons
 import com.inktone.core.designsystem.AppSymbol
 import com.inktone.core.designsystem.reducedMotionDuration
 import com.inktone.core.designsystem.WindowBackgroundColorEffect
+import com.inktone.core.designsystem.StatusBarColorEffect
 import com.inktone.domain.model.Annotation
 import com.inktone.domain.model.AnnotationColor
 import com.inktone.domain.model.ChapterContent
@@ -330,6 +331,13 @@ fun ReaderScreen(
     // quand elle est visible (les deux se confondent), celle de la page
     // sinon — `barSurface` est un lerp à 10 % vers la couleur du texte,
     // nettement visible en bande claire sur un fond noir sans HUD.
+    // Le Lecteur est la seule exception à la couleur centralisée par
+    // `InkToneNavHost` : la sienne dépend du thème de LECTURE, que le NavHost
+    // ne connaît pas. Aucun conflit d'écriture possible — le drawer n'est
+    // jamais ouvrable depuis cet écran, donc rien ne recompose le NavHost
+    // pendant que celui-ci est affiché. Sert les barres qui reparaissent
+    // transitoirement au balayage (mode immersif).
+    StatusBarColorEffect(ThemeColors.barSurface(state.resolvedTheme))
     WindowBackgroundColorEffect(
         if (isHudVisible) {
             ThemeColors.barSurface(state.resolvedTheme)
