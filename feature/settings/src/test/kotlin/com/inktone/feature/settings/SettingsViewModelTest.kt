@@ -190,7 +190,7 @@ class SettingsViewModelTest {
         assertEquals(18, prefs.fontSize)
         assertEquals(ReadingTheme.DEFAULT.id, prefs.theme)
         assertEquals(false, prefs.reduceMotion)
-        assertEquals("GRID_COVERS", prefs.libraryLayoutMode)
+        assertEquals("GRID_DETAILED", prefs.libraryLayoutMode)
     }
 
     @Test

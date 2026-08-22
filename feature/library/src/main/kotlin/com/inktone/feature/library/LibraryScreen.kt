@@ -627,11 +627,13 @@ private fun ActionSheetProgress(label: String, progress: CoverRegenerationProgre
 
 internal fun LibraryLayoutMode.icon() = when (this) {
     LibraryLayoutMode.GRID_COVERS -> AppIcons.CoverOnly
+    LibraryLayoutMode.GRID_DETAILED -> AppIcons.ViewGrid
     LibraryLayoutMode.LIST -> AppIcons.ViewList
 }
 
 internal fun LibraryLayoutMode.label() = when (this) {
     LibraryLayoutMode.GRID_COVERS -> "Couvertures seules"
+    LibraryLayoutMode.GRID_DETAILED -> "Grille détaillée"
     LibraryLayoutMode.LIST -> "Liste"
 }
 
@@ -671,6 +673,25 @@ private fun LibraryContent(
             }
         }
 
+        LibraryLayoutMode.GRID_DETAILED -> {
+            LazyVerticalGrid(
+                columns = GridCells.Adaptive(minSize = 120.dp),
+                contentPadding = PaddingValues(8.dp),
+            ) {
+                gridItems(state.displayedPublications, key = { it.id }) { publication ->
+                    BookGridCell(
+                        publication = publication,
+                        onClick = { onOpen(publication.id) },
+                        onToggleFavorite = { onToggleFavorite(publication.id, !publication.isFavorite) },
+                        progressPercent = state.progressMap[publication.id] ?: 0,
+                        onTogglePin = { onTogglePin(publication.id, !publication.isPinned) },
+                        onDelete = { onDelete(publication.id) },
+                        modifier = Modifier.padding(8.dp),
+                    )
+                }
+            }
+        }
+
         LibraryLayoutMode.LIST -> {
             LazyColumn(contentPadding = PaddingValues(8.dp)) {
                 listItems(state.displayedPublications, key = { it.id }) { publication ->
@@ -687,6 +708,87 @@ private fun LibraryContent(
         }
     }
 }
+
+/**
+ * Cellule du mode « Grille détaillée » — couverture, puis titre et auteur
+ * SOUS elle.
+ *
+ * Le texte est délibérément placé sous la jaquette et non en surimpression
+ * (`BookCover(showTitle = true)`, chemin resté inutilisé) : superposer du
+ * blanc sur une illustration arbitraire est illisible dès qu'elle est
+ * claire, et recouvrir l'illustration va contre la raison même d'afficher
+ * une couverture.
+ *
+ * La hauteur du bloc texte est **fixe** ([CAPTION_HEIGHT]) et non dictée par
+ * le contenu : dans une `LazyVerticalGrid`, une rangée prend la hauteur de
+ * sa cellule la plus haute — un titre sur deux lignes à côté d'un titre sur
+ * une seule décalerait donc toute la rangée, et le pas vertical de la grille
+ * changerait d'une rangée à l'autre.
+ *
+ * Deux zones cliquables distinctes (couverture, légende) plutôt qu'un
+ * `clickable` sur la Column : [BookCover] pose déjà le sien sur la
+ * couverture, l'imbriquer donnerait deux ondulations superposées pour un
+ * seul tap.
+ */
+@Composable
+private fun BookGridCell(
+    publication: Publication,
+    onClick: () -> Unit,
+    onToggleFavorite: () -> Unit,
+    progressPercent: Int,
+    onTogglePin: () -> Unit,
+    onDelete: () -> Unit,
+    modifier: Modifier = Modifier,
+) {
+    Column(modifier = modifier) {
+        BookCover(
+            publication = publication,
+            onClick = onClick,
+            onToggleFavorite = onToggleFavorite,
+            showTitle = false,
+            progressPercent = progressPercent,
+            onTogglePin = onTogglePin,
+            onDelete = onDelete,
+        )
+        Column(
+            modifier = Modifier
+                .fillMaxWidth()
+                .height(CAPTION_HEIGHT)
+                .clickable(onClick = onClick)
+                .padding(top = 6.dp),
+        ) {
+            // Même nettoyage des artefacts EPUB (tiret, espaces en tête) que
+            // la carte « Reprendre la lecture » — ces titres viennent des
+            // mêmes métadonnées.
+            Text(
+                text = publication.title.trimStart('-', '\u2013', '\u2014', ' '),
+                style = MaterialTheme.typography.bodySmall.copy(fontWeight = FontWeight.SemiBold),
+                maxLines = 2,
+                overflow = TextOverflow.Ellipsis,
+                color = MaterialTheme.colorScheme.onSurface,
+            )
+            if (publication.authors.isNotEmpty()) {
+                Text(
+                    text = publication.authors
+                        .map { it.trimStart('-', '\u2013', '\u2014', ' ') }
+                        .filter { it.isNotBlank() }
+                        .joinToString(),
+                    style = MaterialTheme.typography.labelSmall,
+                    maxLines = 1,
+                    overflow = TextOverflow.Ellipsis,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                )
+            }
+        }
+    }
+}
+
+/**
+ * Hauteur fixe du bloc titre + auteur d'une cellule de « Grille détaillée » :
+ * deux lignes de `bodySmall` et une de `labelSmall`, plus l'espace au-dessus.
+ * Voir [BookGridCell] pour la raison du choix d'une hauteur fixe.
+ */
+private val CAPTION_HEIGHT = 58.dp
 
 /**
  * Rangée compacte pour le mode Liste — couverture miniature à gauche,
