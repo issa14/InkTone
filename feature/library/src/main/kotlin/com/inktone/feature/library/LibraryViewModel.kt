@@ -104,7 +104,7 @@ class LibraryViewModel @Inject constructor(
     fun onIntent(intent: LibraryIntent) {
         when (intent) {
             is LibraryIntent.OpenPublication -> viewModelScope.launch {
-                _effects.send(LibraryEffect.NavigateToReader(intent.publicationId))
+                _effects.send(LibraryEffect.NavigateToReader(intent.publicationId, intent.autoStartTts))
             }
             is LibraryIntent.ToggleFavorite -> viewModelScope.launch {
                 toggleFavorite(intent.publicationId, intent.isFavorite)

@@ -7,6 +7,7 @@ import com.inktone.domain.model.Sentence
 import com.inktone.domain.model.TtsEngineId
 import com.inktone.domain.model.VoiceProfile
 import com.inktone.domain.service.ChapterParser
+import com.inktone.domain.usecase.GetReadingStateUseCase
 import com.inktone.domain.usecase.UpdateReadingStateUseCase
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Job
@@ -107,6 +108,7 @@ class PlaybackOrchestratorChapterAdvanceTest {
         ttsEngine = ShortTtsEngine(),
         audioPlayer = FakeAudioPlayer(),
         updateReadingState = UpdateReadingStateUseCase(FakeReadingStateRepository()),
+            getReadingState = GetReadingStateUseCase(FakeReadingStateRepository()),
         chapterParser = parser,
     )
 

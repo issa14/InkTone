@@ -270,7 +270,7 @@ class ReaderViewModel @Inject constructor(
                 } else {
                     null
                 }
-                openPublication(intent.publicationId, targetLocator, intent.flashOnArrival)
+                openPublication(intent.publicationId, targetLocator, intent.flashOnArrival, intent.autoStartTts)
             }
             is ReaderIntent.NextChapter -> navigateToChapter(_state.value.currentChapterIndex + 1)
             is ReaderIntent.PreviousChapter -> navigateToChapter(_state.value.currentChapterIndex - 1)
@@ -461,7 +461,7 @@ class ReaderViewModel @Inject constructor(
      * Les cas d'erreur de parsing (Corrompu, DRM, format non supporté)
      * ne sont pas encore reflétés dans `ReaderUiState` — Tâche 4.8.
      */
-    private fun openPublication(publicationId: String, targetLocator: Locator? = null, flashOnArrival: Boolean = false) {
+    private fun openPublication(publicationId: String, targetLocator: Locator? = null, flashOnArrival: Boolean = false, autoStartTts: Boolean = false) {
         // Lot 20 — préchauffe le moteur TTS (chargement des modèles ONNX
         // hors du premier tap de lecture) : dans un process neuf, l'init
         // froide (~10-20 s sur V2206) dépassait le timeout de synthèse de
@@ -576,12 +576,29 @@ class ReaderViewModel @Inject constructor(
                     // N+2, jamais N lui-même. Le lecteur s'ouvrait donc sur une
                     // zone de lecture vide (coquille ChapterContent.Rich sans
                     // blocks) jusqu'à ce que l'utilisateur navigue et revienne.
-                    loadChapterContentIfNeeded(_state.value.currentChapterIndex)
+                    val chapterLoadJob = loadChapterContentIfNeeded(_state.value.currentChapterIndex)
                     preloadAdjacentChapters(_state.value.currentChapterIndex)
                     observeAnnotations(publicationId)
                     observeBookmarks(publicationId)
                     if (prefs.eyeRestReminderEnabled) scheduleEyeRestReminder(prefs.eyeRestReminderIntervalMinutes)
-                    if (targetLocator != null) navigateToLocator(targetLocator, flashOnArrival)
+                    // Restauration de position : si aucun locator externe n'est fourni
+                    // (ouverture depuis la bibliothèque), on utilise le locator sauvegardé
+                    // pour revenir à la position exacte. Bug réel corrigé ici : sans
+                    // attendre `chapterLoadJob`, `chapters[i].sentences` était encore
+                    // vide au moment de naviguer — navigateToLocator retombait sur la
+                    // phrase 0 (indexOfFirst introuvable → coerceAtLeast(0)) ET
+                    // persistait cette fausse position 0, écrasant la vraie position
+                    // sauvegardée à chaque réouverture. Les autres appels ci-dessus
+                    // (préchargement, observateurs, minuteur) restent lancés en
+                    // parallèle, seule cette section attend le chapitre courant.
+                    val effectiveLocator = targetLocator ?: restored?.locator
+                    viewModelScope.launch {
+                        chapterLoadJob?.join()
+                        if (effectiveLocator != null) navigateToLocator(effectiveLocator, flashOnArrival)
+                        if (autoStartTts && publication.format != PublicationFormat.PDF) {
+                            playCurrentSentence()
+                        }
+                    }
 
                     // Lot 12, tache 12.9 — ouvre le document de rendu fixe
                     // pour toute la session de lecture (decision actee 14),
@@ -854,14 +871,20 @@ class ReaderViewModel @Inject constructor(
      * Plan v3, Palier 3.6 — charge le contenu d'un chapitre Rich vide
      * via [ChapterParser.parseChapter]. Les chapitres Legacy (PDF/TXT)
      * ou déjà chargés sont ignorés.
+     *
+     * Retourne le [Job] du parsing lancé, ou `null` si rien à charger
+     * (déjà en cache) — permet à l'appelant d'attendre la fin du
+     * chargement uniquement quand c'est nécessaire (restauration de
+     * position à l'ouverture), sans bloquer les autres appelants qui
+     * l'utilisent en tir-et-oublie (changement de chapitre manuel).
      */
-    private fun loadChapterContentIfNeeded(chapterIndex: Int) {
-        val chapter = _state.value.chapters.getOrNull(chapterIndex) ?: return
-        val rich = chapter.content as? ChapterContent.Rich ?: return
-        if (rich.blocks.isNotEmpty()) return // déjà chargé
+    private fun loadChapterContentIfNeeded(chapterIndex: Int): Job? {
+        val chapter = _state.value.chapters.getOrNull(chapterIndex) ?: return null
+        val rich = chapter.content as? ChapterContent.Rich ?: return null
+        if (rich.blocks.isNotEmpty()) return null // déjà chargé
 
-        val publicationId = currentPublicationId ?: return
-        viewModelScope.launch {
+        val publicationId = currentPublicationId ?: return null
+        return viewModelScope.launch {
             // Un href introuvable (K6 : encodage divergent entre le spine
             // et la ressource, ou EPUB malformé) ne doit jamais crasher le
             // lecteur — juste laisser ce chapitre vide et le signaler.
@@ -945,11 +968,18 @@ class ReaderViewModel @Inject constructor(
                 val sentence = chapter.sentences.getOrNull(sentenceIndex) ?: return@launch
                 sentence.startLocator(chapterIndex = chapterIndex, resourceHref = chapter.href)
             }
+            // Bug réel trouvé au diagnostic : reconstruire un ReadingState
+            // « nu » ici écrasait silencieusement overrides/voiceProfileId
+            // déjà enregistrés à chaque scroll ou phrase TTS — préserver
+            // l'existant, comme setOverrides le fait déjà pour son propre champ.
+            val existing = getReadingState(publicationId)
             updateReadingState(
                 ReadingState(
                     publicationId = publicationId,
                     locator = locator,
                     lastReadAt = System.currentTimeMillis(),
+                    voiceProfileId = existing?.voiceProfileId,
+                    overrides = existing?.overrides,
                 ),
             )
         }
@@ -1281,6 +1311,23 @@ class ReaderViewModel @Inject constructor(
         saveCurrentFragment()
         checkpointJob?.cancel()
         // ───── Fin Lot Sessions ─────
+
+        // Bug réel trouvé au diagnostic : `scrollPersistJob?.cancel()` /
+        // `pageOffsetPersistJob?.cancel()` plus bas annulaient un débounce de
+        // position encore en attente (SCROLL_PERSIST_DEBOUNCE_MS) SANS écrire
+        // la position qu'il portait — fermer le livre juste après un
+        // défilement ou un geste PDF perdait ce dernier déplacement, la
+        // reprise retombant sur la position précédente. Même remède que
+        // `saveCurrentFragment` ci-dessus : flush immédiat AVANT
+        // `super.onCleared()`, tant que `viewModelScope` est encore actif.
+        if (scrollPersistJob?.isActive == true) {
+            scrollPersistJob?.cancel()
+            persistPosition(chapterIndex = _state.value.currentChapterIndex, sentenceIndex = _state.value.currentSentenceIndex)
+        }
+        if (pageOffsetPersistJob?.isActive == true) {
+            pageOffsetPersistJob?.cancel()
+            persistPosition(chapterIndex = _state.value.currentChapterIndex, sentenceIndex = 0)
+        }
 
         super.onCleared()
         val sessionEngaged = playbackOrchestrator.isSessionEngaged()

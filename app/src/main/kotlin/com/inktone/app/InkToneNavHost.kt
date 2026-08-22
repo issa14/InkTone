@@ -196,7 +196,9 @@ fun InkToneNavHost(navController: NavHostController = rememberNavController(), s
                 }
             }
             LibraryScreen(
-                onNavigateToReader = { publicationId -> navController.navigate(ReaderRoute(publicationId)) },
+                onNavigateToReader = { publicationId, autoStartTts ->
+                    navController.navigate(ReaderRoute(publicationId, autoStartTts = autoStartTts))
+                },
                 // `LibraryEffect.NavigateToStats` (carte de statistiques de
                 // la Bibliothèque) vise la même destination que l'item de
                 // drawer : même navigation plate, pas une poussée.
@@ -234,6 +236,7 @@ fun InkToneNavHost(navController: NavHostController = rememberNavController(), s
                         targetChapterIndex = route.targetChapterIndex,
                         targetCharOffset = route.targetCharOffset,
                         flashOnArrival = route.flashOnArrival,
+                        autoStartTts = route.autoStartTts,
                     ),
                 )
             }

@@ -12,6 +12,7 @@ import com.inktone.domain.service.PlaybackSession
 import com.inktone.domain.service.PlaybackSessionState
 import com.inktone.domain.service.TtsEngine
 import com.inktone.domain.service.WordTimestamp
+import com.inktone.domain.usecase.GetReadingStateUseCase
 import com.inktone.domain.usecase.UpdateReadingStateUseCase
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.CoroutineScope
@@ -71,6 +72,7 @@ class PlaybackOrchestrator @Inject constructor(
     private val ttsEngine: TtsEngine,
     private val audioPlayer: AudioPlayer,
     private val updateReadingState: UpdateReadingStateUseCase,
+    private val getReadingState: GetReadingStateUseCase,
     private val chapterParser: ChapterParser,
 ) : PlaybackSession {
 
@@ -656,11 +658,19 @@ class PlaybackOrchestrator @Inject constructor(
         _currentSentenceIndex.value = index
         _currentWordTimestamps.value = wordTimestamps
         if (publicationId.isNotEmpty() && sentence != null) {
+            // Bug réel trouvé au diagnostic (même famille que ReaderViewModel
+            // .persistPosition) : construire un ReadingState « nu » ici
+            // écrasait silencieusement overrides/voiceProfileId déjà
+            // enregistrés à CHAQUE transition de phrase narrée — préserver
+            // l'existant, comme le chemin manuel le fait déjà.
+            val existing = getReadingState(publicationId)
             updateReadingState(
                 ReadingState(
                     publicationId = publicationId,
                     locator = sentence.startLocator(chapterIndex = chapterIndex, resourceHref = resourceHref),
                     lastReadAt = System.currentTimeMillis(),
+                    voiceProfileId = existing?.voiceProfileId,
+                    overrides = existing?.overrides,
                 ),
             )
         }

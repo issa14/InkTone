@@ -10,6 +10,7 @@ import com.inktone.domain.service.AudioSegment
 import com.inktone.domain.service.PlaybackEvent
 import com.inktone.domain.service.TtsCapabilities
 import com.inktone.domain.service.TtsEngine
+import com.inktone.domain.usecase.GetReadingStateUseCase
 import com.inktone.domain.usecase.UpdateReadingStateUseCase
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
@@ -63,7 +64,7 @@ class PlaybackOrchestratorTest {
     fun enchaineSegmentsEtSilencesDansLordre() = runBlocking {
         val tts = FakeTtsEngine(segmentDurationMs = 200)
         val player = FakeAudioPlayer()
-        val orchestrator = PlaybackOrchestrator(tts, player, UpdateReadingStateUseCase(FakeReadingStateRepository()), FakeChapterParser())
+        val orchestrator = PlaybackOrchestrator(tts, player, UpdateReadingStateUseCase(FakeReadingStateRepository()), GetReadingStateUseCase(FakeReadingStateRepository()), FakeChapterParser())
         val sentences = listOf(
             sentence(0, "Bonjour.", 0),
             sentence(1, "Salut,", 8),
@@ -89,7 +90,7 @@ class PlaybackOrchestratorTest {
     fun pauseRepriseConserveIndex() = runBlocking {
         val tts = FakeTtsEngine(segmentDurationMs = 500)
         val player = FakeAudioPlayer()
-        val orchestrator = PlaybackOrchestrator(tts, player, UpdateReadingStateUseCase(FakeReadingStateRepository()), FakeChapterParser())
+        val orchestrator = PlaybackOrchestrator(tts, player, UpdateReadingStateUseCase(FakeReadingStateRepository()), GetReadingStateUseCase(FakeReadingStateRepository()), FakeChapterParser())
         val sentences = listOf(sentence(0, "Un.", 0), sentence(1, "Deux.", 4), sentence(2, "Trois.", 10))
 
         orchestrator.play(sentences, profile, 0, "pub1", 0, "ch.xhtml")
@@ -111,7 +112,7 @@ class PlaybackOrchestratorTest {
     @Test
     fun stopAnnuleLeProducteur() = runBlocking {
         val tts = FakeTtsEngine(segmentDurationMs = 200, synthesisDelayMs = 30)
-        val orchestrator = PlaybackOrchestrator(tts, FakeAudioPlayer(), UpdateReadingStateUseCase(FakeReadingStateRepository()), FakeChapterParser())
+        val orchestrator = PlaybackOrchestrator(tts, FakeAudioPlayer(), UpdateReadingStateUseCase(FakeReadingStateRepository()), GetReadingStateUseCase(FakeReadingStateRepository()), FakeChapterParser())
         val sentences = (0 until 200).map { sentence(it, "Phrase $it.", it * 8) }
 
         orchestrator.play(sentences, profile, 0, "pub1", 0, "ch.xhtml")
@@ -131,7 +132,7 @@ class PlaybackOrchestratorTest {
     fun erreurSynthese_injecteUnSilenceCourt_puisPoursuit() = runBlocking {
         val tts = FakeTtsEngine(segmentDurationMs = 200, failSynthesisCount = 1)
         val player = FakeAudioPlayer()
-        val orchestrator = PlaybackOrchestrator(tts, player, UpdateReadingStateUseCase(FakeReadingStateRepository()), FakeChapterParser())
+        val orchestrator = PlaybackOrchestrator(tts, player, UpdateReadingStateUseCase(FakeReadingStateRepository()), GetReadingStateUseCase(FakeReadingStateRepository()), FakeChapterParser())
         val sentences = listOf(sentence(0, "Première.", 0), sentence(1, "Deuxième.", 10))
 
         orchestrator.play(sentences, profile, 0, "pub1", 0, "ch.xhtml")
@@ -151,7 +152,7 @@ class PlaybackOrchestratorTest {
         val tts = FakeTtsEngine(segmentDurationMs = 100)
         val player = FakeAudioPlayer()
         val repo = FakeReadingStateRepository()
-        val orchestrator = PlaybackOrchestrator(tts, player, UpdateReadingStateUseCase(repo), FakeChapterParser())
+        val orchestrator = PlaybackOrchestrator(tts, player, UpdateReadingStateUseCase(repo), GetReadingStateUseCase(repo), FakeChapterParser())
         val sentences = listOf(sentence(0, "Un.", 0), sentence(1, "Deux.", 4))
 
         orchestrator.play(sentences, profile, 0, "pub1", 3, "ch3.xhtml")
@@ -173,7 +174,7 @@ class PlaybackOrchestratorTest {
         // de ~500 ms) — le surlignage mot-à-mot prenait du retard sur Edge.
         val tts = FakeTtsEngine(segmentDurationMs = 350, synthesisDelayMs = 300)
         val player = FakeAudioPlayer()
-        val orchestrator = PlaybackOrchestrator(tts, player, UpdateReadingStateUseCase(FakeReadingStateRepository()), FakeChapterParser())
+        val orchestrator = PlaybackOrchestrator(tts, player, UpdateReadingStateUseCase(FakeReadingStateRepository()), GetReadingStateUseCase(FakeReadingStateRepository()), FakeChapterParser())
         val sentences = listOf(sentence(0, "Un,", 0), sentence(1, "Deux,", 4))
 
         orchestrator.play(sentences, profile, 0, "pub1", 0, "ch.xhtml")
@@ -195,7 +196,7 @@ class PlaybackOrchestratorTest {
     fun skip_pendant_lecture_reprend_sur_la_nouvelle_phrase() = runBlocking {
         val tts = FakeTtsEngine(segmentDurationMs = 300)
         val player = FakeAudioPlayer()
-        val orchestrator = PlaybackOrchestrator(tts, player, UpdateReadingStateUseCase(FakeReadingStateRepository()), FakeChapterParser())
+        val orchestrator = PlaybackOrchestrator(tts, player, UpdateReadingStateUseCase(FakeReadingStateRepository()), GetReadingStateUseCase(FakeReadingStateRepository()), FakeChapterParser())
         val sentences = listOf(sentence(0, "Un.", 0), sentence(1, "Deux.", 4), sentence(2, "Trois.", 10))
 
         orchestrator.play(sentences, profile, 0, "pub1", 0, "ch.xhtml")
@@ -210,7 +211,7 @@ class PlaybackOrchestratorTest {
 
     @Test
     fun skip_a_larret_deplace_lindex_sans_reprendre() = runBlocking {
-        val orchestrator = PlaybackOrchestrator(FakeTtsEngine(), FakeAudioPlayer(), UpdateReadingStateUseCase(FakeReadingStateRepository()), FakeChapterParser())
+        val orchestrator = PlaybackOrchestrator(FakeTtsEngine(), FakeAudioPlayer(), UpdateReadingStateUseCase(FakeReadingStateRepository()), GetReadingStateUseCase(FakeReadingStateRepository()), FakeChapterParser())
         val sentences = listOf(sentence(0, "Un.", 0), sentence(1, "Deux.", 4), sentence(2, "Trois.", 10))
         orchestrator.play(sentences, profile, 0, "pub1", 0, "ch.xhtml")
         awaitUntil { orchestrator.state.value == PlaybackOrchestrator.PlaybackStatus.Playing }
@@ -228,7 +229,7 @@ class PlaybackOrchestratorTest {
 
     @Test
     fun togglePlayPause_bascule_entre_pause_et_reprise() = runBlocking {
-        val orchestrator = PlaybackOrchestrator(FakeTtsEngine(segmentDurationMs = 300), FakeAudioPlayer(), UpdateReadingStateUseCase(FakeReadingStateRepository()), FakeChapterParser())
+        val orchestrator = PlaybackOrchestrator(FakeTtsEngine(segmentDurationMs = 300), FakeAudioPlayer(), UpdateReadingStateUseCase(FakeReadingStateRepository()), GetReadingStateUseCase(FakeReadingStateRepository()), FakeChapterParser())
         val sentences = listOf(sentence(0, "Un.", 0), sentence(1, "Deux.", 4))
         orchestrator.play(sentences, profile, 0, "pub1", 0, "ch.xhtml")
         awaitUntil { orchestrator.state.value == PlaybackOrchestrator.PlaybackStatus.Playing }
@@ -250,7 +251,7 @@ class PlaybackOrchestratorTest {
 
     @Test
     fun togglePlayPause_apres_arret_relance_depuis_la_session_retenue() = runBlocking {
-        val orchestrator = PlaybackOrchestrator(FakeTtsEngine(segmentDurationMs = 300), FakeAudioPlayer(), UpdateReadingStateUseCase(FakeReadingStateRepository()), FakeChapterParser())
+        val orchestrator = PlaybackOrchestrator(FakeTtsEngine(segmentDurationMs = 300), FakeAudioPlayer(), UpdateReadingStateUseCase(FakeReadingStateRepository()), GetReadingStateUseCase(FakeReadingStateRepository()), FakeChapterParser())
         val sentences = listOf(sentence(0, "Un.", 0), sentence(1, "Deux.", 4))
         orchestrator.play(sentences, profile, 0, "pub1", 0, "ch.xhtml")
         awaitUntil { orchestrator.state.value == PlaybackOrchestrator.PlaybackStatus.Playing }
@@ -265,7 +266,7 @@ class PlaybackOrchestratorTest {
 
     @Test
     fun metadata_et_isPlaying_refletent_letat() = runBlocking {
-        val orchestrator = PlaybackOrchestrator(FakeTtsEngine(), FakeAudioPlayer(), UpdateReadingStateUseCase(FakeReadingStateRepository()), FakeChapterParser())
+        val orchestrator = PlaybackOrchestrator(FakeTtsEngine(), FakeAudioPlayer(), UpdateReadingStateUseCase(FakeReadingStateRepository()), GetReadingStateUseCase(FakeReadingStateRepository()), FakeChapterParser())
         orchestrator.setMetadata("pub-1", "Titre de test", "Auteur de test")
         assertEquals("Titre de test", orchestrator.metadata.value.title)
         assertEquals("Auteur de test", orchestrator.metadata.value.author)
@@ -293,7 +294,7 @@ class PlaybackOrchestratorTest {
     fun chapterCompletedNestEmisQuALaFinNaturelleDuChapitre() = runBlocking {
         val tts = FakeTtsEngine(segmentDurationMs = 50)
         val player = FakeAudioPlayer()
-        val orchestrator = PlaybackOrchestrator(tts, player, UpdateReadingStateUseCase(FakeReadingStateRepository()), FakeChapterParser())
+        val orchestrator = PlaybackOrchestrator(tts, player, UpdateReadingStateUseCase(FakeReadingStateRepository()), GetReadingStateUseCase(FakeReadingStateRepository()), FakeChapterParser())
         val completions = AtomicInteger(0)
         val subscribed = AtomicBoolean(false)
         val collector = CoroutineScope(Dispatchers.Default).launch {
@@ -318,7 +319,7 @@ class PlaybackOrchestratorTest {
         // annule la synthèse (retour `Idle`) faute d'audio à suspendre.
         val tts = FakeTtsEngine(segmentDurationMs = 50, synthesisDelayMs = 2_000)
         val player = FakeAudioPlayer()
-        val orchestrator = PlaybackOrchestrator(tts, player, UpdateReadingStateUseCase(FakeReadingStateRepository()), FakeChapterParser())
+        val orchestrator = PlaybackOrchestrator(tts, player, UpdateReadingStateUseCase(FakeReadingStateRepository()), GetReadingStateUseCase(FakeReadingStateRepository()), FakeChapterParser())
         val completions = AtomicInteger(0)
         val subscribed = AtomicBoolean(false)
         val collector = CoroutineScope(Dispatchers.Default).launch {
@@ -350,7 +351,7 @@ class PlaybackOrchestratorTest {
     fun isSessionEngagedDistingueLectureEtPauseDunArret() = runBlocking {
         val tts = FakeTtsEngine(segmentDurationMs = 400)
         val player = FakeAudioPlayer()
-        val orchestrator = PlaybackOrchestrator(tts, player, UpdateReadingStateUseCase(FakeReadingStateRepository()), FakeChapterParser())
+        val orchestrator = PlaybackOrchestrator(tts, player, UpdateReadingStateUseCase(FakeReadingStateRepository()), GetReadingStateUseCase(FakeReadingStateRepository()), FakeChapterParser())
 
         assertFalse("aucune lecture lancée : rien à préserver", orchestrator.isSessionEngaged())
 

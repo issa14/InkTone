@@ -18,7 +18,6 @@ import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.grid.GridCells
-import androidx.compose.foundation.lazy.grid.GridItemSpan
 import androidx.compose.foundation.lazy.grid.LazyVerticalGrid
 import androidx.compose.foundation.lazy.grid.items as gridItems
 import androidx.compose.foundation.lazy.items as listItems
@@ -103,7 +102,7 @@ import kotlinx.coroutines.launch
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun LibraryScreen(
-    onNavigateToReader: (String) -> Unit,
+    onNavigateToReader: (publicationId: String, autoStartTts: Boolean) -> Unit,
     viewModel: LibraryViewModel = hiltViewModel(),
     floatingActionButton: @Composable () -> Unit = {},
     floatingAudioButton: @Composable () -> Unit = {},
@@ -138,7 +137,7 @@ fun LibraryScreen(
     LaunchedEffect(Unit) {
         viewModel.effects.collect { effect ->
             when (effect) {
-                is LibraryEffect.NavigateToReader -> onNavigateToReader(effect.publicationId)
+                is LibraryEffect.NavigateToReader -> onNavigateToReader(effect.publicationId, effect.autoStartTts)
                 is LibraryEffect.NavigateToStats -> onOpenStats()
                 is LibraryEffect.NavigateToSync -> onOpenSync()
                 is LibraryEffect.CoversRegenerated -> {
@@ -242,6 +241,17 @@ fun LibraryScreen(
                     searchQuery = state.searchQuery,
                 )
                 else -> {
+                    // Carte « Reprendre la lecture » fixe au-dessus de la liste :
+                    // reste visible en permanence, seule la bibliothèque défile
+                    // dessous (au lieu d'un premier item qui disparaissait au scroll).
+                    state.resumeReadingPublication?.let { resume ->
+                        ResumeReadingCard(
+                            publication = resume,
+                            progressPercent = state.progressMap[resume.id] ?: 0,
+                            onClick = { viewModel.onIntent(LibraryIntent.OpenPublication(resume.id)) },
+                            onPlayTts = { viewModel.onIntent(LibraryIntent.OpenPublication(resume.id, autoStartTts = true)) },
+                        )
+                    }
                     LibraryContent(
                         state = state,
                         onOpen = { id -> viewModel.onIntent(LibraryIntent.OpenPublication(id)) },
@@ -639,23 +649,12 @@ private fun LibraryContent(
     onTogglePin: (String, Boolean) -> Unit,
     onDelete: (String) -> Unit,
 ) {
-    val resume = state.resumeReadingPublication
-
     when (state.layoutMode) {
         LibraryLayoutMode.GRID_COVERS -> {
             LazyVerticalGrid(
                 columns = GridCells.Adaptive(minSize = 120.dp),
                 contentPadding = PaddingValues(8.dp),
             ) {
-                if (resume != null) {
-                    gridItems(listOf(resume), key = { "resume-${it.id}" }, span = { GridItemSpan(maxLineSpan) }) { publication ->
-                        ResumeReadingCard(
-                            publication = publication,
-                            progressPercent = state.progressMap[publication.id] ?: 0,
-                            onClick = { onOpen(publication.id) },
-                        )
-                    }
-                }
                 gridItems(state.displayedPublications, key = { it.id }) { publication ->
                     BookCover(
                         publication = publication,
@@ -673,15 +672,6 @@ private fun LibraryContent(
 
         LibraryLayoutMode.LIST -> {
             LazyColumn(contentPadding = PaddingValues(8.dp)) {
-                if (resume != null) {
-                    item {
-                        ResumeReadingCard(
-                            publication = resume,
-                            progressPercent = state.progressMap[resume.id] ?: 0,
-                            onClick = { onOpen(resume.id) },
-                        )
-                    }
-                }
                 listItems(state.displayedPublications, key = { it.id }) { publication ->
                     PublicationListRow(
                         publication = publication,
@@ -818,6 +808,7 @@ private fun ResumeReadingCard(
     publication: Publication,
     progressPercent: Int,
     onClick: () -> Unit,
+    onPlayTts: () -> Unit,
 ) {
     ElevatedCard(
         onClick = onClick,
@@ -878,18 +869,23 @@ private fun ResumeReadingCard(
                     )
                 }
 
-                // Titre
+                // Titre — nettoyage des artefacts EPUB (tiret, espaces en tête)
+                val cleanTitle = publication.title.trimStart('-', '–', '—', ' ')
                 Text(
-                    text = publication.title,
+                    text = cleanTitle,
                     style = MaterialTheme.typography.titleMedium.copy(fontWeight = FontWeight.Bold),
                     maxLines = 1,
                     overflow = TextOverflow.Ellipsis
                 )
 
-                // Auteur
+                // Auteur — même nettoyage
                 if (publication.authors.isNotEmpty()) {
+                    val cleanAuthors = publication.authors
+                        .map { it.trimStart('-', '–', '—', ' ') }
+                        .filter { it.isNotBlank() }
+                        .joinToString()
                     Text(
-                        text = publication.authors.joinToString(),
+                        text = cleanAuthors,
                         style = MaterialTheme.typography.bodySmall,
                         color = MaterialTheme.colorScheme.onSurfaceVariant,
                         maxLines = 1,
@@ -921,17 +917,18 @@ private fun ResumeReadingCard(
 
             Spacer(Modifier.width(8.dp))
 
-            // Bouton Play
+            // Bouton Play — ouvre le livre ET démarre le TTS
             Box(
                 modifier = Modifier
                     .size(36.dp)
                     .clip(CircleShape)
-                    .background(MaterialTheme.colorScheme.primaryContainer),
+                    .background(MaterialTheme.colorScheme.primaryContainer)
+                    .clickable(onClick = onPlayTts),
                 contentAlignment = Alignment.Center
             ) {
                 AppIcon(
                     symbol = AppSymbol.Play,
-                    contentDescription = null,
+                    contentDescription = "Reprendre la lecture TTS",
                     tint = MaterialTheme.colorScheme.onPrimaryContainer,
                     modifier = Modifier.size(20.dp)
                 )
