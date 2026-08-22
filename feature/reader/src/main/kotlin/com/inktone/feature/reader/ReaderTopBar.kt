@@ -2,6 +2,10 @@ package com.inktone.feature.reader
 
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.ExperimentalLayoutApi
+import androidx.compose.foundation.layout.WindowInsets
+import androidx.compose.foundation.layout.statusBarsIgnoringVisibility
+import androidx.compose.foundation.layout.windowInsetsPadding
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
@@ -29,6 +33,7 @@ import com.inktone.core.designsystem.AppSymbol
  * (`ReaderScreen` les gate tous les deux sur `isHudVisible`). Ne pas
  * confondre avec `StatusLineBar` (3b.4), persistante celle-là.
  */
+@OptIn(ExperimentalLayoutApi::class)
 @Composable
 fun ReaderTopBar(
     title: String?,
@@ -48,7 +53,23 @@ fun ReaderTopBar(
         shape = RoundedCornerShape(bottomStart = 20.dp, bottomEnd = 20.dp),
     ) {
         Row(
-            modifier = Modifier.fillMaxWidth().padding(horizontal = 4.dp, vertical = 8.dp),
+            modifier = Modifier
+                .fillMaxWidth()
+                // Edge-to-edge : l'inset est posé sur le CONTENU, jamais sur la
+                // `Surface` ci-dessus. Sur la Surface, il aurait décalé la barre
+                // entière vers le bas et laissé voir le texte de la page
+                // au-dessus d'elle ; ici, le fond monte jusqu'au bord haut de
+                // l'écran et seuls le titre et la flèche descendent sous la
+                // découpe de caméra. Même motif que `StatusLineBar` en bas.
+                //
+                // `statusBarsPadding()` ne conviendrait pas : le mode immersif
+                // MASQUE la barre, son inset tombe donc à zéro et le titre
+                // remonterait sous la caméra, pour être recouvert par l'horloge
+                // dès qu'un balayage rappelle les barres transitoires. La
+                // variante `IgnoringVisibility` réserve la place que la barre
+                // OCCUPERAIT, masquée ou non.
+                .windowInsetsPadding(WindowInsets.statusBarsIgnoringVisibility)
+                .padding(horizontal = 4.dp, vertical = 8.dp),
             verticalAlignment = Alignment.CenterVertically,
         ) {
             IconButton(onClick = onBack) {
