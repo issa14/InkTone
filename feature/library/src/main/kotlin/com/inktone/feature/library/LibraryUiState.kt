@@ -42,7 +42,21 @@ data class LibraryUiState(
     // (menu 3-points « Reconstruire les couvertures »).
     val isRegeneratingCovers: Boolean = false,
     val coverRegeneration: CoverRegenerationProgress? = null,
+    /**
+     * Publication actuellement narrée par la session TTS, et si elle joue —
+     * alimentent le bouton Lecture/Pause de la carte « Reprendre la lecture ».
+     * Dérivés de `PlaybackSession` (source de vérité unique, K3), jamais un
+     * drapeau maintenu à la main ici : une pause venue de la notification ou
+     * du Lecteur doit s'y refléter sans une ligne de synchronisation.
+     */
+    val narratingPublicationId: String? = null,
+    val isNarrationPlaying: Boolean = false,
 ) {
+
+    /** Vrai si la carte « Reprendre la lecture » porte le livre en cours de narration. */
+    val isResumeNarrationPlaying: Boolean
+        get() = isNarrationPlaying && narratingPublicationId != null &&
+            narratingPublicationId == resumeReadingPublication?.id
     /** Tags distincts de la bibliotheque COMPLETE, pas seulement du filtre actif — le drawer doit pouvoir en changer. */
     val availableTags: List<String> get() = publications.flatMap { it.subjects }.distinct().sorted()
     val availableSeries: List<String> get() = publications.mapNotNull { it.seriesName }.distinct().sorted()
@@ -106,6 +120,12 @@ data class CoverRegenerationProgress(val processed: Int, val total: Int)
 
 sealed interface LibraryIntent {
     data class OpenPublication(val publicationId: String, val autoStartTts: Boolean = false) : LibraryIntent
+
+    /**
+     * Bouton Lecture/Pause de la carte « Reprendre la lecture » — bascule la
+     * narration SANS ouvrir le Lecteur (l'ouverture reste le tap sur la carte).
+     */
+    data class ToggleResumeNarration(val publicationId: String) : LibraryIntent
     data class ToggleFavorite(val publicationId: String, val isFavorite: Boolean) : LibraryIntent
     data class TogglePin(val publicationId: String, val isPinned: Boolean) : LibraryIntent
     data class DeletePublication(val publicationId: String) : LibraryIntent

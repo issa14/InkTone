@@ -9,6 +9,8 @@ import com.inktone.domain.repository.PublicationRepository
 import com.inktone.domain.repository.ReadingStateRepository
 import com.inktone.domain.repository.SyncAccountRepository
 import com.inktone.domain.service.ImportProgressObserver
+import com.inktone.domain.service.PlaybackSession
+import com.inktone.domain.service.PlaybackSessionState
 import com.inktone.domain.service.ImportResultsStore
 import com.inktone.domain.service.ImportSessionStore
 import com.inktone.domain.usecase.DeletePublicationUseCase
@@ -46,6 +48,10 @@ class LibraryViewModel @Inject constructor(
     private val synchronizeNow: SynchronizeNowUseCase,
     private val syncAccountRepository: SyncAccountRepository,
     private val regenerateCovers: RegenerateCoversUseCase,
+    // Bouton Lecture/Pause de la carte « Reprendre la lecture » : la
+    // narration se pilote par le contrat domaine, jamais en ouvrant le
+    // Lecteur (celui-ci n'est plus qu'un consommateur de la même session).
+    private val playbackSession: PlaybackSession,
     // Audit v1.0.0 (P5) — calcul de progression hors Main (injectable
     // pour les tests, voir di/IoDispatcher.kt).
     @IoDispatcher private val defaultDispatcher: CoroutineDispatcher,
@@ -61,6 +67,23 @@ class LibraryViewModel @Inject constructor(
 
     init {
         observePublications(FilterMode.ALL)
+        // Bouton Lecture/Pause de la carte « Reprendre la lecture » : l'état
+        // affiché DÉRIVE de la session (K3), il n'est jamais posé à la main.
+        // Une pause déclenchée depuis la notification, l'écran verrouillé ou
+        // le Lecteur se reflète donc ici sans synchronisation explicite.
+        viewModelScope.launch {
+            playbackSession.metadata.collect { metadata ->
+                _state.value = _state.value.copy(narratingPublicationId = metadata.publicationId)
+            }
+        }
+        viewModelScope.launch {
+            playbackSession.sessionState.collect { sessionState ->
+                _state.value = _state.value.copy(
+                    isNarrationPlaying = sessionState == PlaybackSessionState.PLAYING ||
+                        sessionState == PlaybackSessionState.BUFFERING,
+                )
+            }
+        }
         // Job independant de observeJob (Tache 6.8) - un changement de
         // filtre ne doit jamais interrompre l'observation de la
         // progression d'import, les deux sont sans rapport.
@@ -106,6 +129,7 @@ class LibraryViewModel @Inject constructor(
             is LibraryIntent.OpenPublication -> viewModelScope.launch {
                 _effects.send(LibraryEffect.NavigateToReader(intent.publicationId, intent.autoStartTts))
             }
+            is LibraryIntent.ToggleResumeNarration -> toggleResumeNarration(intent.publicationId)
             is LibraryIntent.ToggleFavorite -> viewModelScope.launch {
                 toggleFavorite(intent.publicationId, intent.isFavorite)
             }
@@ -201,6 +225,30 @@ class LibraryViewModel @Inject constructor(
         viewModelScope.launch {
             val results = importResultsStore.getResults(sessionId)
             _state.value = _state.value.copy(importResults = results)
+        }
+    }
+
+    /**
+     * Bouton Lecture/Pause de la carte « Reprendre la lecture » — narration
+     * seule, jamais d'ouverture du Lecteur (réservée au tap sur la carte).
+     *
+     * Trois cas distincts, et un seul écrit la session :
+     * - **ce livre est déjà la session courante** (en lecture ou en pause) :
+     *   simple bascule, la position et la file de synthèse sont conservées ;
+     * - **une AUTRE publication est narrée** : démarrage à froid sur celle-ci,
+     *   qui remplace la session (`play` appelle `stop` en interne) — sans quoi
+     *   le bouton reprendrait silencieusement la lecture d'un autre livre ;
+     * - **aucune session** (cas nominal au lancement de l'app) : démarrage à
+     *   froid depuis la position de reprise enregistrée.
+     */
+    private fun toggleResumeNarration(publicationId: String) {
+        val isSameBook = _state.value.narratingPublicationId == publicationId
+        val hasSession = playbackSession.sessionState.value != PlaybackSessionState.IDLE &&
+            playbackSession.sessionState.value != PlaybackSessionState.ERROR
+        if (isSameBook && hasSession) {
+            playbackSession.togglePlayPause()
+        } else {
+            playbackSession.startNarration(publicationId)
         }
     }
 

@@ -26,6 +26,7 @@ import org.junit.Before
 import org.junit.Test
 import com.inktone.core.testing.fake.FakeChapterParser
 import com.inktone.core.testing.fake.FakeEpubResourceResolver
+import com.inktone.core.testing.fake.FakeVoiceProfileRepository
 
 /**
  * Tache 9bis.3.6/9bis.5, seconde reserve levee : `isReadingRulerEnabled`
@@ -55,7 +56,7 @@ class ReaderViewModelReadingRulerTest {
 
         val viewModel = ReaderViewModel(
             ttsEngine = FakeTtsEngine(),
-            playbackOrchestrator = PlaybackOrchestrator(FakeTtsEngine(), FakeAudioPlayer(), UpdateReadingStateUseCase(readingStateRepository), GetReadingStateUseCase(readingStateRepository), FakeChapterParser()),
+            playbackOrchestrator = PlaybackOrchestrator(FakeTtsEngine(), FakeAudioPlayer(), UpdateReadingStateUseCase(readingStateRepository), GetReadingStateUseCase(readingStateRepository), FakeChapterParser(), FakePublicationRepository(), FakePublicationParser(), FakePreferencesRepository(), FakeVoiceProfileRepository()),
             publicationParser = FakePublicationParser(),
             updateReadingState = UpdateReadingStateUseCase(readingStateRepository),
             getReadingState = GetReadingStateUseCase(readingStateRepository),
@@ -74,7 +75,7 @@ class ReaderViewModelReadingRulerTest {
             chapterParser = FakeChapterParser(),
             epubResourceResolver = FakeEpubResourceResolver(),
             narrationSessionContinuation = NarrationSessionContinuation(
-                PlaybackOrchestrator(FakeTtsEngine(), FakeAudioPlayer(), UpdateReadingStateUseCase(FakeReadingStateRepository()), GetReadingStateUseCase(FakeReadingStateRepository()), FakeChapterParser()),
+                PlaybackOrchestrator(FakeTtsEngine(), FakeAudioPlayer(), UpdateReadingStateUseCase(FakeReadingStateRepository()), GetReadingStateUseCase(FakeReadingStateRepository()), FakeChapterParser(), FakePublicationRepository(), FakePublicationParser(), FakePreferencesRepository(), FakeVoiceProfileRepository()),
                 FakeReadingSessionRepository(),
             ),
         )

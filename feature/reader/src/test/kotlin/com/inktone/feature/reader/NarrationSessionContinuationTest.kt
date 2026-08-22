@@ -34,6 +34,7 @@ class NarrationSessionContinuationTest {
         override val currentSentenceIndex = MutableStateFlow(0)
         override val metadata = MutableStateFlow(PlaybackMetadata())
         override fun togglePlayPause() = Unit
+        override fun startNarration(publicationId: String) = Unit
         override fun pause() = Unit
         override fun resume() = Unit
         override fun skip(delta: Int) = Unit

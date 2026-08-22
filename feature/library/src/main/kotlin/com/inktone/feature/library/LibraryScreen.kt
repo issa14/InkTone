@@ -249,7 +249,8 @@ fun LibraryScreen(
                             publication = resume,
                             progressPercent = state.progressMap[resume.id] ?: 0,
                             onClick = { viewModel.onIntent(LibraryIntent.OpenPublication(resume.id)) },
-                            onPlayTts = { viewModel.onIntent(LibraryIntent.OpenPublication(resume.id, autoStartTts = true)) },
+                            isNarrating = state.isResumeNarrationPlaying,
+                            onTogglePlayback = { viewModel.onIntent(LibraryIntent.ToggleResumeNarration(resume.id)) },
                         )
                     }
                     LibraryContent(
@@ -808,7 +809,8 @@ private fun ResumeReadingCard(
     publication: Publication,
     progressPercent: Int,
     onClick: () -> Unit,
-    onPlayTts: () -> Unit,
+    isNarrating: Boolean,
+    onTogglePlayback: () -> Unit,
 ) {
     ElevatedCard(
         onClick = onClick,
@@ -923,18 +925,24 @@ private fun ResumeReadingCard(
 
             Spacer(Modifier.width(8.dp))
 
-            // Bouton Play — ouvre le livre ET démarre le TTS
+            // Bouton Lecture/Pause — pilote la NARRATION seule, sans ouvrir
+            // le Lecteur : écouter n'oblige plus à quitter la Bibliothèque.
+            // L'ouverture du livre reste le tap sur la carte elle-même.
             Box(
                 modifier = Modifier
                     .size(36.dp)
                     .clip(CircleShape)
                     .background(MaterialTheme.colorScheme.primaryContainer)
-                    .clickable(onClick = onPlayTts),
+                    .clickable(onClick = onTogglePlayback),
                 contentAlignment = Alignment.Center
             ) {
                 AppIcon(
-                    symbol = AppSymbol.Play,
-                    contentDescription = "Reprendre la lecture TTS",
+                    symbol = if (isNarrating) AppSymbol.Pause else AppSymbol.Play,
+                    contentDescription = if (isNarrating) {
+                        "Mettre la narration en pause"
+                    } else {
+                        "Écouter la narration"
+                    },
                     tint = MaterialTheme.colorScheme.onPrimaryContainer,
                     modifier = Modifier.size(20.dp)
                 )

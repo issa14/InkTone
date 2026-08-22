@@ -1,7 +1,9 @@
 package com.inktone.feature.reader
 
+import com.inktone.domain.model.PublicationFormat
 import com.inktone.domain.model.ReadingState
 import com.inktone.domain.model.Sentence
+import com.inktone.domain.model.TtsEngineId
 import com.inktone.domain.model.SleepTimerState
 import com.inktone.domain.model.VoiceProfile
 import com.inktone.domain.service.AudioPlayer
@@ -10,8 +12,13 @@ import com.inktone.domain.service.ChapterParser
 import com.inktone.domain.service.PlaybackMetadata
 import com.inktone.domain.service.PlaybackSession
 import com.inktone.domain.service.PlaybackSessionState
+import com.inktone.domain.service.ParseResult
+import com.inktone.domain.service.PublicationParser
 import com.inktone.domain.service.TtsEngine
 import com.inktone.domain.service.WordTimestamp
+import com.inktone.domain.repository.PreferencesRepository
+import com.inktone.domain.repository.PublicationRepository
+import com.inktone.domain.repository.VoiceProfileRepository
 import com.inktone.domain.usecase.GetReadingStateUseCase
 import com.inktone.domain.usecase.UpdateReadingStateUseCase
 import kotlinx.coroutines.CancellationException
@@ -74,6 +81,14 @@ class PlaybackOrchestrator @Inject constructor(
     private val updateReadingState: UpdateReadingStateUseCase,
     private val getReadingState: GetReadingStateUseCase,
     private val chapterParser: ChapterParser,
+    // Démarrage à froid depuis la Bibliothèque ([startNarration]) : lancer une
+    // narration sans écran Lecteur exige de résoudre soi-même la publication,
+    // son spine, sa position de reprise et sa voix — le Lecteur ne peut plus
+    // les apporter, puisqu'il n'est pas ouvert.
+    private val publicationRepository: PublicationRepository,
+    private val publicationParser: PublicationParser,
+    private val preferencesRepository: PreferencesRepository,
+    private val voiceProfileRepository: VoiceProfileRepository,
 ) : PlaybackSession {
 
     /**
@@ -419,6 +434,97 @@ class PlaybackOrchestrator @Inject constructor(
             author = author,
             coverUri = coverUri,
         )
+    }
+
+    /**
+     * Démarrage à froid d'une narration (contrat [PlaybackSession]) — depuis
+     * la carte « Reprendre la lecture » de la Bibliothèque, sans ouvrir le
+     * Lecteur.
+     *
+     * Refait ici, sans écran, ce que `ReaderViewModel.openPublication` +
+     * `playCurrentSentence` font avec lui : résoudre la publication, son
+     * spine, sa position de reprise, sa voix, puis lancer la lecture. Le
+     * service foreground et sa notification suivent tout seuls (
+     * `PlaybackServiceLauncher` observe [sessionState]) — rien à déclencher
+     * ici.
+     *
+     * Deux points de vigilance, tous deux des bugs déjà payés ailleurs :
+     * - l'index de chapitre qui fait foi est la **position dans le spine**
+     *   (`chapters`), jamais `Chapter.index` recalculé par le parseur, qui
+     *   diverge sur les livres à couverture prépendue (même correction que
+     *   `loadChapterContentIfNeeded` et [advanceToNextChapter]) ;
+     * - la phrase de départ vient du `charOffset` du `Locator` restauré, pas
+     *   d'un départ implicite à zéro (K3).
+     */
+    override fun startNarration(publicationId: String) {
+        scope.launch {
+            val publication = publicationRepository.getById(publicationId) ?: return@launch
+            // TTS hors périmètre PDF (décision actée 16, Lot 12) — même garde
+            // que `ReaderViewModel.playCurrentSentence`, ici parce que cet
+            // appel vient d'un écran qui ne connaît pas le format.
+            if (publication.format == PublicationFormat.PDF) return@launch
+
+            // Préchauffe comme le fait le Lecteur à l'ouverture : dans un
+            // process neuf, l'init froide des modèles ONNX dépasse le timeout
+            // de synthèse et le moteur retomberait sur la voix système.
+            ttsEngine.warmUp()
+
+            val chapters = when (val result = publicationParser.parse(publication.fileUri)) {
+                is ParseResult.Success -> result.documentModel.chapters
+                // K6/K7 : un livre corrompu, protégé ou illisible ne fait pas
+                // planter l'app — la narration ne démarre simplement pas. Le
+                // message d'erreur détaillé reste l'affaire du Lecteur, qui
+                // sait l'afficher ; ici il n'y a pas d'écran pour le porter.
+                else -> return@launch
+            }
+            if (chapters.isEmpty()) return@launch
+            chapterParser.registerPublication(publicationId, publication.fileUri)
+
+            val restored = getReadingState(publicationId)
+            val chapterIndex = (restored?.locator?.chapterIndex ?: 0).coerceIn(chapters.indices)
+            val chapter = chapters[chapterIndex]
+
+            // EPUB : contenu paresseux, `sentences` est vide tant que le
+            // chapitre n'a pas été parsé. TXT : déjà porté par le parse
+            // complet ci-dessus (même distinction que
+            // `loadChapterContentIfNeeded`, qui ignore les chapitres Legacy).
+            val sentences = chapter.sentences.ifEmpty {
+                try {
+                    chapterParser.parseChapter(publicationId, chapter.href).sentences
+                } catch (e: CancellationException) {
+                    throw e
+                } catch (e: Exception) {
+                    return@launch
+                }
+            }
+            if (sentences.isEmpty()) return@launch
+
+            val charOffset = restored?.locator?.charOffset ?: 0
+            val startFrom = sentences
+                .indexOfFirst { charOffset in it.startOffset..it.endOffset }
+                .coerceAtLeast(0)
+
+            val prefs = preferencesRepository.get()
+            val voiceProfile = prefs.activeVoiceProfileId
+                ?.let { voiceProfileRepository.getById(it) }
+                ?: DEFAULT_NARRATION_VOICE_PROFILE
+
+            setMetadata(
+                publicationId = publication.id,
+                title = publication.title,
+                author = publication.authors.joinToString(", ").ifBlank { null },
+                coverUri = publication.coverUri,
+            )
+            setNarrationProgram(publicationId, chapters.map { it.href })
+            play(
+                sentences = sentences,
+                voiceProfile = voiceProfile,
+                startFrom = startFrom,
+                publicationId = publicationId,
+                chapterIndex = chapterIndex,
+                resourceHref = chapter.href,
+            )
+        }
     }
 
     /**
@@ -793,3 +899,13 @@ class PlaybackOrchestrator @Inject constructor(
         const val SLEEP_TIMER_TICK_MS = 1_000L
     }
 }
+
+/**
+ * Repli de voix pour un démarrage à froid ([PlaybackOrchestrator.startNarration])
+ * quand `UserPreferences.activeVoiceProfileId` est nul — même profil que le
+ * repli du Lecteur (`ReaderViewModel.resolveVoiceProfile`).
+ */
+private val DEFAULT_NARRATION_VOICE_PROFILE = VoiceProfile(
+    id = "vp-native-fr", engine = TtsEngineId.ANDROID_NATIVE,
+    voice = "fr-fr-default", language = "fr-FR",
+)
