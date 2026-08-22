@@ -158,9 +158,9 @@ class ChapterTextMeasurer(private val textMeasurer: TextMeasurer) {
         // 3. Mesurer chaque lot et accumuler
         val allLines = mutableListOf<LineGeometry>()
         val allSentenceOffsets = mutableListOf<Int>()
+        val batchAnnotatedStrings = mutableListOf<AnnotatedString>()
         var cumulativeTop = 0f
         var globalOffset = 0
-        var firstBatchAnnotated: AnnotatedString? = null
 
         batches.forEachIndexed { batchIndex, batch ->
             val (annotatedString, localOffsets) = buildBatchAnnotatedString(
@@ -177,13 +177,27 @@ class ChapterTextMeasurer(private val textMeasurer: TextMeasurer) {
                 // dépassant MAX_BATCH_CHARS.
                 leadingSeparator = batchIndex > 0,
             )
-            if (firstBatchAnnotated == null) firstBatchAnnotated = annotatedString
+            batchAnnotatedStrings.add(annotatedString)
             val measurement = measureBuilt(annotatedString, localOffsets, baseStyle, maxWidthPx)
 
-            // Ajuster les tops/bottoms des lignes
+            // Ajuster les lignes dans l'espace global : `top`/`bottom` sont
+            // décalés de la hauteur cumulée des lots précédents, ET
+            // `startOffset`/`endOffset` du nombre de caractères déjà
+            // consommés (`globalOffset`) — SANS ce second décalage, les
+            // offsets de lignes du lot 2+ retombaient à 0 (espace LOCAL du
+            // lot) alors que `annotatedString` et les offsets de phrases
+            // sont, eux, en espace GLOBAL : `computePageLineRanges` pouvait
+            // alors produire des `pageOffsetRange` vides (start > end) sur
+            // toute page chevauchant une frontière de lot — la page blanche
+            // observée sur appareil. Les deux décalages vont de pair.
             for (line in measurement.lines) {
                 allLines.add(
-                    line.copy(top = line.top + cumulativeTop, bottom = line.bottom + cumulativeTop),
+                    line.copy(
+                        top = line.top + cumulativeTop,
+                        bottom = line.bottom + cumulativeTop,
+                        startOffset = line.startOffset + globalOffset,
+                        endOffset = line.endOffset + globalOffset,
+                    ),
                 )
             }
 
@@ -196,12 +210,28 @@ class ChapterTextMeasurer(private val textMeasurer: TextMeasurer) {
             globalOffset += annotatedString.text.length
         }
 
-        // AnnotatedString "virtuel" : seul le premier lot est stocké
-        // (le contrat de ChapterMeasurement exige un AnnotatedString,
-        // mais le rendu paginé tranche par offset — le premier lot suffit
-        // comme référence pour les offsets). Déjà construit dans la boucle
-        // ci-dessus — jamais reconstruit une seconde fois.
-        return ChapterMeasurement(firstBatchAnnotated ?: AnnotatedString(""), allLines, allSentenceOffsets)
+        // Bug réel trouvé sur appareil (page blanche après ~3 swipes en
+        // mode paginé) : l'ancien code ne stockait que le PREMIER lot
+        // (`firstBatchAnnotated`) en croyant qu'il « suffisait comme
+        // référence pour les offsets ». Faux : `buildPageAnnotatedString`
+        // (PagedChapterContent) tranche le TEXTE de la page à partir de cet
+        // `AnnotatedString` — au-delà des MAX_BATCH_CHARS premiers
+        // caractères, la tranche tombait hors du texte stocké et rendait
+        // une page vide. Le rendu doit disposer du texte INTÉGRAL : on
+        // concatène donc tous les lots. Chaque lot porte déjà son
+        // séparateur "\n" de tête (`leadingSeparator`), et `globalOffset`
+        // en tient compte — la concaténation directe préserve exactement
+        // l'espace d'offsets global de `allLines`/`allSentenceOffsets`.
+        // La mesure, elle, reste bien par lots (protection texture GPU) :
+        // concaténer des AnnotatedString ne déclenche aucune mesure.
+        val fullAnnotatedString = when (batchAnnotatedStrings.size) {
+            0 -> AnnotatedString("")
+            1 -> batchAnnotatedStrings[0]
+            else -> buildAnnotatedString {
+                batchAnnotatedStrings.forEach { append(it) }
+            }
+        }
+        return ChapterMeasurement(fullAnnotatedString, allLines, allSentenceOffsets)
     }
 
     /**

@@ -419,15 +419,25 @@ fun ReaderScreen(
             }
         }
 
+        // Index O(1) `blockIndex` → index de la première phrase de ce bloc,
+        // construit UNE FOIS par chapitre. L'ancien
+        // `sentences.firstOrNull { it.blockIndex == firstVisibleBlock }`
+        // rescanait TOUTES les phrases du chapitre à chaque frame de
+        // défilement (O(N) par frame) — coût réel sur les chapitres longs,
+        // contribuant à la gigue du mode SCROLL.
+        val firstSentenceIndexByBlock = remember(state.currentChapter) {
+            buildMap {
+                state.currentChapter?.sentences?.forEach { sentence ->
+                    if (sentence.blockIndex >= 0) putIfAbsent(sentence.blockIndex, sentence.index)
+                }
+            }
+        }
         val topmostVisibleSentenceIndex by remember(state.currentChapter) {
             derivedStateOf {
                 if (isProgrammaticScroll) return@derivedStateOf null
                 val firstVisibleBlock = scrollState.layoutInfo.visibleItemsInfo
                     .firstOrNull()?.index ?: return@derivedStateOf null
-                // Trouver la première phrase appartenant à ce bloc
-                state.currentChapter?.sentences
-                    ?.firstOrNull { it.blockIndex == firstVisibleBlock }
-                    ?.index
+                firstSentenceIndexByBlock[firstVisibleBlock]
             }
         }
 
