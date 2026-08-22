@@ -22,7 +22,7 @@ import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.ModalBottomSheet
 import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.RadioButton
-import androidx.compose.material3.Slider
+import com.inktone.core.designsystem.InkToneSlider
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.material3.rememberModalBottomSheetState
@@ -148,12 +148,15 @@ fun ReaderTtsPanel(
             // AndroidNativeTtsEngine) ; ce curseur ne fait plus que
             // refléter/écrire cette valeur, il n'y avait pas de chantier
             // domaine à faire ici.
-            Text("Vitesse (${"%.1f".format(speed)}×)", style = MaterialTheme.typography.labelLarge)
-            Slider(
+            InkToneSlider(
+                label = "Vitesse",
                 value = speed,
+                range = 0.5f..3.0f,
                 onValueChange = onSpeedChange,
-                valueRange = 0.5f..3.0f,
+                minIcon = AppSymbol.SlowMotionVideo,
+                maxIcon = AppSymbol.FastForward,
                 steps = 9,
+                displayFormatter = { "%.1f×".format(it) },
             )
 
             Spacer(Modifier.height(12.dp))

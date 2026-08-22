@@ -10,7 +10,7 @@ import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.ModalBottomSheet
-import androidx.compose.material3.Slider
+import com.inktone.core.designsystem.InkToneSlider
 import androidx.compose.material3.Text
 import androidx.compose.material3.rememberModalBottomSheetState
 import androidx.compose.runtime.Composable
@@ -106,25 +106,27 @@ fun ReaderSettingsPanel(
             Spacer(Modifier.height(24.dp))
 
             // ── Taille du texte — curseur continu (3d.2 : plus de paliers) ──
-            Text("Taille du texte (${fontSizeDraft.roundToInt()}sp)", style = MaterialTheme.typography.labelLarge)
-            Slider(
+            // `onValueChangeFinished` conservé : appliquer chaque valeur
+            // intermédiaire repaginerait le chapitre à chaque pixel du geste.
+            InkToneSlider(
+                label = "Taille du texte",
                 value = fontSizeDraft,
+                range = 12f..32f,
                 onValueChange = { fontSizeDraft = it },
                 onValueChangeFinished = { onFontSizeChange(fontSizeDraft.roundToInt()) },
-                valueRange = 12f..32f,
-                steps = 0,
+                displayFormatter = { "${it.roundToInt()} sp" },
             )
 
             Spacer(Modifier.height(20.dp))
 
             // ── Interligne — 3d.2 : seul vrai ajout de modèle du lot ──
-            Text("Interligne (${"%.1f".format(lineHeightDraft)}×)", style = MaterialTheme.typography.labelLarge)
-            Slider(
+            InkToneSlider(
+                label = "Interligne",
                 value = lineHeightDraft,
+                range = 1.0f..2.0f,
                 onValueChange = { lineHeightDraft = it },
                 onValueChangeFinished = { onLineHeightChange(lineHeightDraft) },
-                valueRange = 1.0f..2.0f,
-                steps = 0,
+                displayFormatter = { "%.1f×".format(it) },
             )
 
             Spacer(Modifier.height(20.dp))

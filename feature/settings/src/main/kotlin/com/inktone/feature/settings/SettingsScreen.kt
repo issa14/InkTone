@@ -1,6 +1,7 @@
 package com.inktone.feature.settings
 import com.inktone.core.designsystem.AppIcon
 import com.inktone.core.designsystem.AppSymbol
+import com.inktone.core.designsystem.InkToneSlider
 
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
@@ -241,7 +242,8 @@ internal fun SettingsContent(
                 onCancel = { onIntent(SettingsIntent.CancelVoiceDownload) },
             )
             // Lot 6 — vitesse : même cible VoiceProfile.speed que le panneau Voix du lecteur (Tâche 3d).
-            SliderSetting(
+            InkToneSlider(
+                modifier = Modifier.padding(horizontal = 20.dp, vertical = 12.dp),
                 label = "Vitesse d'élocution",
                 value = activeSpeed,
                 range = 0.5f..2.0f,
@@ -250,7 +252,8 @@ internal fun SettingsContent(
                 displayFormatter = { "%.1f×".format(it) },
                 onValueChange = { onIntent(SettingsIntent.SetVoiceSpeed(it)) },
             )
-            SliderSetting(
+            InkToneSlider(
+                modifier = Modifier.padding(horizontal = 20.dp, vertical = 12.dp),
                 label = "Gain audio",
                 value = preferences.audioGain,
                 range = 1.0f..4.0f,
@@ -261,7 +264,8 @@ internal fun SettingsContent(
             )
             // Lot 6 — Intonation : VoiceProfile.pitch.
             // Signalé : non vérifié que pitch atteint le moteur Sherpa-ONNX — à confirmer sur device (A4).
-            SliderSetting(
+            InkToneSlider(
+                modifier = Modifier.padding(horizontal = 20.dp, vertical = 12.dp),
                 label = "Intonation (pitch)",
                 value = activePitch,
                 range = 0.5f..1.5f,
@@ -872,83 +876,6 @@ private fun ToggleSetting(label: String, checked: Boolean, onCheckedChange: (Boo
 }
 
 /**
- * Tâche 9.1.1 — contentDescription explicite : un Slider seul n'annonce ni
- * son label ni sa valeur à TalkBack.
- * Refonte — la valeur quitte les parenthèses du titre pour rejoindre
- * l'extrémité droite de la ligne (`Arrangement.SpaceBetween`) ; le slider
- * lui-même est encadré d'icônes de repère (mini/maxi, `onSurfaceVariant`),
- * piste allégée à 4dp et partie inactive discrète (`surfaceVariant`).
- */
-@OptIn(ExperimentalMaterial3Api::class)
-@Composable
-private fun SliderSetting(
-    label: String,
-    value: Float,
-    range: ClosedFloatingPointRange<Float>,
-    minIcon: AppSymbol,
-    maxIcon: AppSymbol,
-    displayFormatter: (Float) -> String = { it.toInt().toString() },
-    onValueChange: (Float) -> Unit,
-) {
-    Column(modifier = Modifier.fillMaxWidth().padding(horizontal = 20.dp, vertical = 12.dp)) {
-        Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
-            Text(label)
-            Text(
-                text = displayFormatter(value),
-                style = MaterialTheme.typography.bodyMedium,
-                color = MaterialTheme.colorScheme.primary,
-            )
-        }
-        Row(
-            verticalAlignment = Alignment.CenterVertically,
-            modifier = Modifier.fillMaxWidth().padding(vertical = 8.dp),
-        ) {
-            AppIcon(
-                minIcon,
-                contentDescription = null,
-                tint = MaterialTheme.colorScheme.onSurfaceVariant,
-            )
-            Slider(
-                value = value,
-                onValueChange = onValueChange,
-                valueRange = range,
-                colors = SliderDefaults.colors(inactiveTrackColor = MaterialTheme.colorScheme.surfaceVariant),
-                track = { sliderState ->
-                    SliderDefaults.Track(
-                        sliderState = sliderState,
-                        modifier = Modifier.height(4.dp),
-                        colors = SliderDefaults.colors(inactiveTrackColor = MaterialTheme.colorScheme.surfaceVariant),
-                    )
-                },
-                // Le curseur M3 par défaut (1.3+) est une barre pilule 4×44dp —
-                // remplacé par un petit cercle plein, plus discret sur une piste
-                // fine. Le cercle visuel (20dp) reste centré dans une cible
-                // tactile de 48dp, la zone de toucher ne rétrécit pas avec lui.
-                thumb = {
-                    Box(modifier = Modifier.size(48.dp), contentAlignment = Alignment.Center) {
-                        Box(
-                            modifier = Modifier
-                                .size(20.dp)
-                                .background(MaterialTheme.colorScheme.primary, CircleShape),
-                        )
-                    }
-                },
-                modifier = Modifier
-                    .weight(1f)
-                    .heightIn(min = 48.dp)
-                    .padding(horizontal = 12.dp)
-                    .semantics { contentDescription = "$label, valeur ${displayFormatter(value)}" },
-            )
-            AppIcon(
-                maxIcon,
-                contentDescription = null,
-                tint = MaterialTheme.colorScheme.onSurfaceVariant,
-            )
-        }
-    }
-}
-
-/**
  * Lot 6 — Stepper −/+ par pas, désactivé visuellement quand enabled=false.
  * Refonte — de vrais `IconButton` (48x48dp, `AppSymbol.Remove`/`Add`)
  * remplacent les boutons texte "−"/"+" ; la valeur est encadrée par les deux.
@@ -1241,15 +1168,12 @@ private fun GoalPickerDialog(
         title = { Text("Objectif quotidien de lecture") },
         text = {
             Column {
-                Text("${value.toInt()} minutes par jour")
-                Spacer(Modifier.height(8.dp))
-                Slider(
+                InkToneSlider(
+                    label = "Minutes par jour",
                     value = value,
+                    range = 10f..120f,
                     onValueChange = { value = it },
-                    valueRange = 10f..120f,
-                    modifier = Modifier.semantics {
-                        contentDescription = "Objectif, valeur ${value.toInt()} minutes"
-                    },
+                    displayFormatter = { "${it.toInt()} min" },
                 )
                 Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
                     Text("10 min", style = MaterialTheme.typography.labelSmall)

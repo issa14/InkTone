@@ -14,7 +14,7 @@ import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
-import androidx.compose.material3.Slider
+import com.inktone.core.designsystem.InkToneLevelBar
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
@@ -93,15 +93,20 @@ fun ReaderBrightnessBar(value: Float?, onValueChange: (Float?) -> Unit) {
                     .padding(4.dp),
                 tint = MaterialTheme.colorScheme.onSurfaceVariant,
             )
-            Spacer(Modifier.width(4.dp))
-            Slider(
+            Spacer(Modifier.width(8.dp))
+            // Rail sans pouce plutôt qu'un curseur : ce réglage se manipule au
+            // pouce, en pleine page et souvent dans le noir — une cible pleine
+            // largeur se trouve sans regarder, et le chiffre exact n'apprend
+            // rien au lecteur, seul le résultat à l'écran compte.
+            InkToneLevelBar(
                 value = value ?: MIN_BRIGHTNESS,
-                onValueChange = { onValueChange(it) },
-                valueRange = MIN_BRIGHTNESS..1.0f,
-                steps = 0,
+                // Le plancher est conservé : à zéro l'écran serait noir, et
+                // l'utilisateur n'aurait plus de quoi viser pour remonter.
+                onValueChange = { onValueChange(it.coerceAtLeast(MIN_BRIGHTNESS)) },
+                contentDescription = "Luminosité",
                 modifier = Modifier.weight(1f),
             )
-            Spacer(Modifier.width(4.dp))
+            Spacer(Modifier.width(8.dp))
             AppIcon(
                 AppSymbol.Brightness,
                 contentDescription = "Luminosité maximale",
