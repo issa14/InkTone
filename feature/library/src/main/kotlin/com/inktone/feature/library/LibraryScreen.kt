@@ -504,7 +504,12 @@ internal fun LibraryTopBar(
                             // valeur), pas "Tous" — ce dernier reste le libellé
                             // du filtre lui-même dans le flyout (2a.3).
                             filterValue ?: if (activeFilter == FilterMode.ALL) "Bibliothèque" else activeFilter.label(),
-                            style = MaterialTheme.typography.titleMedium,
+                            // `titleLarge` comme les autres destinations : elles
+                            // laissent `TopAppBar` appliquer son style par
+                            // défaut, cet écran forçait `titleMedium` et son
+                            // titre paraissait d'un quart plus petit (16 sp
+                            // contre 20) alors qu'il est de même rang.
+                            style = MaterialTheme.typography.titleLarge,
                             color = MaterialTheme.colorScheme.onPrimary,
                         )
                         // Unique indice que le titre ouvre un menu : il doit se
