@@ -33,10 +33,6 @@ import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.lazy.itemsIndexed
 import androidx.compose.foundation.lazy.rememberLazyListState
-import androidx.compose.foundation.layout.WindowInsets
-import androidx.compose.foundation.layout.navigationBarsIgnoringVisibility
-import androidx.compose.foundation.layout.statusBarsIgnoringVisibility
-import androidx.compose.foundation.layout.windowInsetsPadding
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.text.BasicTextField
@@ -607,16 +603,7 @@ fun ReaderScreen(
                 onBack = onBack,
                 modifier = Modifier
                     .align(Alignment.TopCenter)
-                    .zIndex(1f)
-                    // Edge-to-edge : le HUD ne doit pas se glisser sous les
-                    // barres système. `statusBarsPadding()` ne conviendrait
-                    // pas ici — le mode immersif MASQUE la barre, son inset
-                    // tombe donc à zéro et le titre reviendrait se coller au
-                    // bord, pour être recouvert par l'horloge dès que le
-                    // balayage rappelle les barres transitoires. La variante
-                    // `IgnoringVisibility` réserve la place que la barre
-                    // OCCUPERAIT, masquée ou non.
-                    .windowInsetsPadding(WindowInsets.statusBarsIgnoringVisibility),
+                    .zIndex(1f),
                 surfaceColor = ThemeColors.barSurface(state.resolvedTheme),
                 contentColor = ThemeColors.barContent(state.resolvedTheme),
             )
@@ -1037,10 +1024,7 @@ fun ReaderScreen(
         Box(
             modifier = Modifier
                 .align(Alignment.BottomCenter)
-                .fillMaxWidth()
-                // Même raison qu'en haut : la ligne de statut et les commandes
-                // passeraient sous la barre de navigation système.
-                .windowInsetsPadding(WindowInsets.navigationBarsIgnoringVisibility),
+                .fillMaxWidth(),
         ) {
             Column(modifier = Modifier.fillMaxWidth()) {
                 if (isHudVisible) {
