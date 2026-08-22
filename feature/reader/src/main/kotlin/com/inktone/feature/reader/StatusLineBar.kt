@@ -1,5 +1,6 @@
 package com.inktone.feature.reader
 
+import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.displayCutoutPadding
@@ -50,12 +51,14 @@ fun StatusLineBar(
     modifier: Modifier = Modifier,
     showPageCounter: Boolean = true,
     contentColor: Color = MaterialTheme.colorScheme.onSurface,
+    backgroundColor: Color = Color.Transparent,
 ) {
     val timeText by rememberAlignedClockText()
 
     Row(
         modifier = modifier
             .fillMaxWidth()
+            .background(backgroundColor)
             .navigationBarsPadding()
             .displayCutoutPadding()
             .padding(horizontal = 16.dp, vertical = 6.dp),
