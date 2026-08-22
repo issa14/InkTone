@@ -1,11 +1,21 @@
 <?xml version="1.0" encoding="utf-8"?>
+<!--
+  Material Symbols Rounded (wght 400, GRAD 0, opsz 24) — Apache License 2.0.
+  Régénéré depuis google/material-design-icons, glyphe « speed ».
+
+  Le viewport reste la grille 960 d'origine et le décalage du viewBox SVG
+  (`0 -960 960 960`) est repris par un `translateY`, plutôt que de recalculer
+  les coordonnées : c'est précisément une conversion maison qui avait déformé
+  le jeu précédent.
+-->
 <vector xmlns:android="http://schemas.android.com/apk/res/android"
     android:width="24dp"
     android:height="24dp"
-    android:viewportWidth="24"
-    android:viewportHeight="24"
-    >
-    <path
-        android:fillColor="#FF000000"
-        android:pathData="M12,16.088 Q12.95,16.075,13.4,15.4 L17.625,9.075 Q17.85,8.725,17.562,8.438 L10.6,12.6 Q9.925,13.05,9.888,13.975 Q10.488,14.575,11.438,14.562 Z M12,4 Q12.9,4,13.775,4.15 Q14.175,4.3,14.625,4.713 Q14.425,5.088,13.725,5.213 Q13.1,4.988,12.463,4.875 Q9.138,4.875,6.8,7.213 Q6.8,8.263,7.088,9.287 L20.888,9.287 Q21.463,8.338,21.725,7.312 Q21.725,6.663,21.613,6.038 Q21.463,5.613,21.562,5.213 Q21.888,4.963,22.275,5.062 Q22.65,5.938,22.85,6.85 Q22.875,8.275,22.525,9.575 Q22.25,10.025,21.775,10.275 L5.1,10.275 Q4.575,10.275,4.1,10.025 Q3.45,8.9,3.1,7.638 Q3.1,5.562,3.888,3.75 Q6.3,5.575,8.125,4.788 Z M12.175,11.825 Z" />
+    android:viewportWidth="960"
+    android:viewportHeight="960">
+    <group android:translateY="960">
+        <path
+            android:fillColor="#FF000000"
+            android:pathData="M418-340q24 24 62 23.5t56-27.5l169-253q9-14-2.5-25.5T677-625L424-456q-27 18-28.5 55t22.5 61Zm62-460q36 0 71 6t68 19q16 6 34 22.5t10 31.5q-8 15-36 20t-45-1q-25-9-50.5-13.5T480-720q-133 0-226.5 93.5T160-400q0 42 11.5 83t32.5 77h552q23-38 33.5-79t10.5-85q0-26-4.5-51T782-504q-6-17-2-33t18-27q13-10 28.5-6t21.5 18q15 35 23 71.5t9 74.5q1 57-13 109t-41 99q-11 18-30 28t-40 10H204q-21 0-40-10t-30-28q-26-45-40-95.5T80-400q0-83 31.5-155.5t86-127Q252-737 325-768.5T480-800Zm7 313Z" />
+    </group>
 </vector>

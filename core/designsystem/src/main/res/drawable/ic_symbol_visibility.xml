@@ -1,6 +1,21 @@
 <?xml version="1.0" encoding="utf-8"?>
+<!--
+  Material Symbols Rounded (wght 400, GRAD 0, opsz 24) — Apache License 2.0.
+  Régénéré depuis google/material-design-icons, glyphe « visibility ».
+
+  Le viewport reste la grille 960 d'origine et le décalage du viewBox SVG
+  (`0 -960 960 960`) est repris par un `translateY`, plutôt que de recalculer
+  les coordonnées : c'est précisément une conversion maison qui avait déformé
+  le jeu précédent.
+-->
 <vector xmlns:android="http://schemas.android.com/apk/res/android"
-    android:width="24dp" android:height="24dp"
-    android:viewportWidth="24" android:viewportHeight="24">
-    <path android:fillColor="#FF000000" android:pathData="M15.188,14.688 Q16.5,13.375,16.5,11.5 Q13.875,7,12,7 Q7.5,9.625,7.5,11.5 Q10.125,16,12,16 Z M10.088,13.413 Q9.3,12.625,9.3,11.5 Q10.875,8.8,12,8.8 Q14.7,10.375,14.7,11.5 Q13.125,14.2,12,14.2 Z M5.888,17.2 Q3.125,15.4,1.525,12.45 Q1.4,12.225,1.338,11.988 Q1.338,11.738,1.4,11.5 Q3,8.55,5.763,6.75 Q9.113,6.75,11.875,8.55 Q12,8.775,12.062,9.013 Q12.062,9.263,12,9.5 Q10.4,12.45,7.638,14.25 Q4.288,14.25,1.525,12.45 Z M12,11.5 Z M17.188,15.513 Q19.55,14.025,20.8,11.5 Q19.55,8.975,17.188,7.488 Q14.363,7.488,12,8.975 Q13.25,11.5,15.613,12.988 Q18.438,12.988,20.8,11.5 Z" />
+    android:width="24dp"
+    android:height="24dp"
+    android:viewportWidth="960"
+    android:viewportHeight="960">
+    <group android:translateY="960">
+        <path
+            android:fillColor="#FF000000"
+            android:pathData="M480-320q75 0 127.5-52.5T660-500q0-75-52.5-127.5T480-680q-75 0-127.5 52.5T300-500q0 75 52.5 127.5T480-320Zm0-72q-45 0-76.5-31.5T372-500q0-45 31.5-76.5T480-608q45 0 76.5 31.5T588-500q0 45-31.5 76.5T480-392Zm0 192q-134 0-244.5-72T61-462q-5-9-7.5-18.5T51-500q0-10 2.5-19.5T61-538q64-118 174.5-190T480-800q134 0 244.5 72T899-538q5 9 7.5 18.5T909-500q0 10-2.5 19.5T899-462q-64 118-174.5 190T480-200Zm0-300Zm0 220q113 0 207.5-59.5T832-500q-50-101-144.5-160.5T480-720q-113 0-207.5 59.5T128-500q50 101 144.5 160.5T480-280Z" />
+    </group>
 </vector>

@@ -1,11 +1,21 @@
 <?xml version="1.0" encoding="utf-8"?>
+<!--
+  Material Symbols Rounded (wght 400, GRAD 0, opsz 24) — Apache License 2.0.
+  Régénéré depuis google/material-design-icons, glyphe « local_fire_department ».
+
+  Le viewport reste la grille 960 d'origine et le décalage du viewBox SVG
+  (`0 -960 960 960`) est repris par un `translateY`, plutôt que de recalculer
+  les coordonnées : c'est précisément une conversion maison qui avait déformé
+  le jeu précédent.
+-->
 <vector xmlns:android="http://schemas.android.com/apk/res/android"
     android:width="24dp"
     android:height="24dp"
-    android:viewportWidth="24"
-    android:viewportHeight="24"
-    >
-    <path
-        android:fillColor="#FF000000"
-        android:pathData="M6.325,19.675 Q4,17.35,1.675,11.675 Q1.675,8.85,3.35,3.425 Q3.9,3.05,5.038,3.013 L5.038,4.312 Q5.038,5.163,5.625,6.588 Q6.05,6.588,6.863,6.4 Q7.062,6.15,7.575,5.838 Q9.15,6.963,11.625,9.838 Q11.625,13.188,9.3,18.863 Q5.95,18.863,0.275,16.538 Z M6,14 Q6,15.3,6.525,17.762 Q6.5,17.637,6.475,17.413 L6.475,17.188 Q6.475,16.387,6.775,14.888 L9.6,12.113 L12.425,14.888 Q13,15.463,13.875,16.738 L13.875,16.963 Q13.875,17.062,13.85,17.288 Q14.825,16.413,16.325,14.375 Q16.325,13.125,15.863,10.763 Q15.363,11.088,14.312,11.575 Q12.763,11.575,10.075,10.55 Q8.125,12.2,5.138,15.713 Z M12,15.3 L10.575,16.7 Q10.3,16.975,9.875,17.6 Q9.875,18.4,10.463,19.775 Q11.288,19.775,12.7,19.2 Q12.7,18.8,12.55,18.062 L11.125,16.663 Z" />
+    android:viewportWidth="960"
+    android:viewportHeight="960">
+    <group android:translateY="960">
+        <path
+            android:fillColor="#FF000000"
+            android:pathData="M480-80q-134 0-227-93t-93-227q0-113 67-217t184-182q22-15 45.5-1.5T480-760v52q0 34 23.5 57t57.5 23q17 0 32.5-7.5T621-657q8-10 20.5-12.5T665-664q63 45 99 115t36 149q0 134-93 227T480-80ZM240-400q0 52 21 98.5t60 81.5q-1-5-1-9v-9q0-32 12-60t35-51l113-111 113 111q23 23 35 51t12 60v9q0 4-1 9 39-35 60-81.5t21-98.5q0-50-18.5-94.5T648-574q-20 13-42 19.5t-45 6.5q-62 0-107.5-41T401-690q-78 66-119.5 140.5T240-400Zm240 52-57 56q-11 11-17 25t-6 29q0 32 23.5 55t56.5 23q33 0 56.5-23t23.5-55q0-16-6-29.5T537-292l-57-56Z" />
+    </group>
 </vector>

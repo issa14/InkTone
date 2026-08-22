@@ -1,12 +1,21 @@
 <?xml version="1.0" encoding="utf-8"?>
+<!--
+  Material Symbols Rounded (wght 400, GRAD 0, opsz 24) — Apache License 2.0.
+  Régénéré depuis google/material-design-icons, glyphe « view_list » (variante pleine).
+
+  Le viewport reste la grille 960 d'origine et le décalage du viewBox SVG
+  (`0 -960 960 960`) est repris par un `translateY`, plutôt que de recalculer
+  les coordonnées : c'est précisément une conversion maison qui avait déformé
+  le jeu précédent.
+-->
 <vector xmlns:android="http://schemas.android.com/apk/res/android"
     android:width="24dp"
     android:height="24dp"
-    android:viewportWidth="24"
-    android:viewportHeight="24"
-    android:autoMirrored="true"
-    >
-    <path
-        android:fillColor="#FF000000"
-        android:pathData="M10,20 Q9.575,20,8.863,19.713 L8.863,17.713 Q8.863,17.288,9.15,16.575 L20.15,16.575 Q20.575,16.575,21.288,16.863 L21.288,18.863 Q21.288,19.288,21,20 L10,20 Z M3,8 Q2.575,8,1.863,7.713 L1.863,5.713 Q1.863,5.288,2.15,4.575 L5.15,4.575 Q5.575,4.575,6.288,4.863 L6.288,6.863 Q6.288,7.288,6,8 L3,8 Z M3,14 Q2.575,14,1.863,13.713 L1.863,11.713 Q1.863,11.288,2.15,10.575 L5.15,10.575 Q5.575,10.575,6.288,10.863 L6.288,12.863 Q6.288,13.288,6,14 L3,14 Z M3,20 Q2.575,20,1.863,19.713 L1.863,17.713 Q1.863,17.288,2.15,16.575 L5.15,16.575 Q5.575,16.575,6.288,16.863 L6.288,18.863 Q6.288,19.288,6,20 L3,20 Z M10,14 Q9.575,14,8.863,13.713 L8.863,11.713 Q8.863,11.288,9.15,10.575 L20.15,10.575 Q20.575,10.575,21.288,10.863 L21.288,12.863 Q21.288,13.288,21,14 L10,14 Z M10,8 Q9.575,8,8.863,7.713 L8.863,5.713 Q8.863,5.288,9.15,4.575 L20.15,4.575 Q20.575,4.575,21.288,4.863 L21.288,6.863 Q21.288,7.288,21,8 L10,8 Z" />
+    android:viewportWidth="960"
+    android:viewportHeight="960">
+    <group android:translateY="960">
+        <path
+            android:fillColor="#FF000000"
+            android:pathData="M840-480ZM160-600q-17 0-28.5-11.5T120-640v-80q0-17 11.5-28.5T160-760h80q17 0 28.5 11.5T280-720v80q0 17-11.5 28.5T240-600h-80Zm200 0q-17 0-28.5-11.5T320-640v-80q0-17 11.5-28.5T360-760h440q17 0 28.5 11.5T840-720v80q0 17-11.5 28.5T800-600H360Zm0 200q-17 0-28.5-11.5T320-440v-80q0-17 11.5-28.5T360-560h440q17 0 28.5 11.5T840-520v80q0 17-11.5 28.5T800-400H360Zm0 200q-17 0-28.5-11.5T320-240v-80q0-17 11.5-28.5T360-360h440q17 0 28.5 11.5T840-320v80q0 17-11.5 28.5T800-200H360Zm-200 0q-17 0-28.5-11.5T120-240v-80q0-17 11.5-28.5T160-360h80q17 0 28.5 11.5T280-320v80q0 17-11.5 28.5T240-200h-80Zm0-200q-17 0-28.5-11.5T120-440v-80q0-17 11.5-28.5T160-560h80q17 0 28.5 11.5T280-520v80q0 17-11.5 28.5T240-400h-80Z" />
+    </group>
 </vector>

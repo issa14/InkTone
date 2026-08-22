@@ -1,11 +1,21 @@
 <?xml version="1.0" encoding="utf-8"?>
+<!--
+  Material Symbols Rounded (wght 400, GRAD 0, opsz 24) — Apache License 2.0.
+  Régénéré depuis google/material-design-icons, glyphe « navigate_before ».
+
+  Le viewport reste la grille 960 d'origine et le décalage du viewBox SVG
+  (`0 -960 960 960`) est repris par un `translateY`, plutôt que de recalculer
+  les coordonnées : c'est précisément une conversion maison qui avait déformé
+  le jeu précédent.
+-->
 <vector xmlns:android="http://schemas.android.com/apk/res/android"
     android:width="24dp"
     android:height="24dp"
-    android:viewportWidth="24"
-    android:viewportHeight="24"
-    >
-    <path
-        android:fillColor="#FF000000"
-        android:pathData="M5.5,17 L5.5,7 Q5.5,6.575,5.788,5.863 Q6.213,5.863,6.925,6.15 L6.925,16.15 Q6.925,16.575,6.638,17.288 Q6.213,17.288,5.5,17 Z M16.95,16.975 L10.75,12.825 Q10.525,12.675,10.188,12.312 Q10.188,12.062,10.3,11.6 L16.5,7.45 Q16.625,7.35,16.9,7.225 Q17.3,7.225,18,7.5 L18,15.75 Q18,16.2,17.7,16.925 Q17.575,16.925,17.3,16.9 Z M16.5,12 Z M16.5,14.25 L16.5,9.75 L13.1,12 L16.5,14.25 Z" />
+    android:viewportWidth="960"
+    android:viewportHeight="960">
+    <group android:translateY="960">
+        <path
+            android:fillColor="#FF000000"
+            android:pathData="m432-480 156 156q11 11 11 28t-11 28q-11 11-28 11t-28-11L348-452q-6-6-8.5-13t-2.5-15q0-8 2.5-15t8.5-13l184-184q11-11 28-11t28 11q11 11 11 28t-11 28L432-480Z" />
+    </group>
 </vector>

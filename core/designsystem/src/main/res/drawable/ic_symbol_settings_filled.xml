@@ -1,11 +1,21 @@
 <?xml version="1.0" encoding="utf-8"?>
+<!--
+  Material Symbols Rounded (wght 400, GRAD 0, opsz 24) — Apache License 2.0.
+  Régénéré depuis google/material-design-icons, glyphe « settings » (variante pleine).
+
+  Le viewport reste la grille 960 d'origine et le décalage du viewBox SVG
+  (`0 -960 960 960`) est repris par un `translateY`, plutôt que de recalculer
+  les coordonnées : c'est précisément une conversion maison qui avait déformé
+  le jeu précédent.
+-->
 <vector xmlns:android="http://schemas.android.com/apk/res/android"
     android:width="24dp"
     android:height="24dp"
-    android:viewportWidth="24"
-    android:viewportHeight="24"
-    >
-    <path
-        android:fillColor="#FF000000"
-        android:pathData="M10.825,22 Q10.15,22,8.988,21.55 L8.763,19.9 Q8.438,19.775,7.825,19.475 L6.275,20.125 Q5.65,20.4,4.4,20.45 L3.225,18.4 Q2.875,17.825,2.675,16.6 L4,15.6 Q3.975,15.425,3.95,15.088 L3.95,14.413 Q3.95,14.25,3.975,13.913 L2.65,12.913 Q2.125,12.488,1.45,11.413 L2.625,9.363 Q2.975,8.787,3.95,7.988 L5.5,8.638 Q5.775,8.438,6.35,8.062 L6.575,6.413 Q6.675,5.763,7.263,4.663 L9.613,4.663 Q10.288,4.663,11.45,5.113 L11.675,6.763 Q12,6.888,12.613,7.188 L14.163,6.538 Q14.788,6.263,16.038,6.213 L17.213,8.263 Q17.562,8.838,17.762,10.062 L16.438,11.062 Q16.463,11.238,16.488,11.575 L16.488,12.25 Q16.488,12.413,16.438,12.75 L17.762,13.75 Q18.288,14.175,18.963,15.25 L17.762,17.3 Q17.413,17.875,16.438,18.675 L14.938,18.025 Q14.663,18.225,14.088,18.6 L13.863,20.25 Q13.763,20.9,13.175,22 L10.825,22 Z M12.05,15.5 Q13.5,15.5,15.975,14.475 Q15.975,13.025,14.95,10.55 Q13.475,10.55,10.988,11.575 Q10.988,13.025,12,15.5 Z" />
+    android:viewportWidth="960"
+    android:viewportHeight="960">
+    <group android:translateY="960">
+        <path
+            android:fillColor="#FF000000"
+            android:pathData="M433-80q-27 0-46.5-18T363-142l-9-66q-13-5-24.5-12T307-235l-62 26q-25 11-50 2t-39-32l-47-82q-14-23-8-49t27-43l53-40q-1-7-1-13.5v-27q0-6.5 1-13.5l-53-40q-21-17-27-43t8-49l47-82q14-23 39-32t50 2l62 26q11-8 23-15t24-12l9-66q4-26 23.5-44t46.5-18h94q27 0 46.5 18t23.5 44l9 66q13 5 24.5 12t22.5 15l62-26q25-11 50-2t39 32l47 82q14 23 8 49t-27 43l-53 40q1 7 1 13.5v27q0 6.5-2 13.5l53 40q21 17 27 43t-8 49l-48 82q-14 23-39 32t-50-2l-60-26q-11 8-23 15t-24 12l-9 66q-4 26-23.5 44T527-80h-94Zm49-260q58 0 99-41t41-99q0-58-41-99t-99-41q-59 0-99.5 41T342-480q0 58 40.5 99t99.5 41Z" />
+    </group>
 </vector>

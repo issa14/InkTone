@@ -1,11 +1,21 @@
 <?xml version="1.0" encoding="utf-8"?>
+<!--
+  Material Symbols Rounded (wght 400, GRAD 0, opsz 24) — Apache License 2.0.
+  Régénéré depuis google/material-design-icons, glyphe « add_circle ».
+
+  Le viewport reste la grille 960 d'origine et le décalage du viewBox SVG
+  (`0 -960 960 960`) est repris par un `translateY`, plutôt que de recalculer
+  les coordonnées : c'est précisément une conversion maison qui avait déformé
+  le jeu précédent.
+-->
 <vector xmlns:android="http://schemas.android.com/apk/res/android"
     android:width="24dp"
     android:height="24dp"
-    android:viewportWidth="24"
-    android:viewportHeight="24"
-    >
-    <path
-        android:fillColor="#FF000000"
-        android:pathData="M11,13 L11,16 Q11,16.425,11.288,17.137 Q11.713,17.137,12.425,16.85 L12.425,13.85 L15.425,13.85 Q15.85,13.85,16.562,13.562 Q16.562,13.138,16.275,12.425 L13,12.425 L13,9.425 Q13,9,12.713,8.287 Q12.288,8.287,11.575,8.575 L11.575,11.575 L8,11.575 Q7.575,11.575,6.863,11.863 Q6.863,12.288,7.15,13 L10.15,13 Z M12,22 Q9.925,22,6.025,21.213 Q4.675,19.863,2.538,16.688 Q2.538,14.613,3.325,10.713 Q4.675,9.363,7.85,7.225 Q9.925,7.225,13.825,8.013 Q15.175,9.363,17.312,12.538 Q17.312,14.613,16.525,18.512 Q15.175,19.863,12,22 Z M12,20 Q15.35,20,21.025,17.675 Q21.025,14.325,18.7,8.65 Q15.35,8.65,9.675,10.975 Q9.675,14.325,12,20 Z M12,12 Z" />
+    android:viewportWidth="960"
+    android:viewportHeight="960">
+    <group android:translateY="960">
+        <path
+            android:fillColor="#FF000000"
+            android:pathData="M440-440v120q0 17 11.5 28.5T480-280q17 0 28.5-11.5T520-320v-120h120q17 0 28.5-11.5T680-480q0-17-11.5-28.5T640-520H520v-120q0-17-11.5-28.5T480-680q-17 0-28.5 11.5T440-640v120H320q-17 0-28.5 11.5T280-480q0 17 11.5 28.5T320-440h120Zm40 360q-83 0-156-31.5T197-197q-54-54-85.5-127T80-480q0-83 31.5-156T197-763q54-54 127-85.5T480-880q83 0 156 31.5T763-763q54 54 85.5 127T880-480q0 83-31.5 156T763-197q-54 54-127 85.5T480-80Zm0-80q134 0 227-93t93-227q0-134-93-227t-227-93q-134 0-227 93t-93 227q0 134 93 227t227 93Zm0-320Z" />
+    </group>
 </vector>

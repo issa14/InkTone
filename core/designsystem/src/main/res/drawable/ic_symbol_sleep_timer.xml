@@ -1,11 +1,21 @@
 <?xml version="1.0" encoding="utf-8"?>
+<!--
+  Material Symbols Rounded (wght 400, GRAD 0, opsz 24) — Apache License 2.0.
+  Régénéré depuis google/material-design-icons, glyphe « bedtime ».
+
+  Le viewport reste la grille 960 d'origine et le décalage du viewBox SVG
+  (`0 -960 960 960`) est repris par un `translateY`, plutôt que de recalculer
+  les coordonnées : c'est précisément une conversion maison qui avait déformé
+  le jeu précédent.
+-->
 <vector xmlns:android="http://schemas.android.com/apk/res/android"
     android:width="24dp"
     android:height="24dp"
-    android:viewportWidth="24"
-    android:viewportHeight="24"
-    >
-    <path
-        android:fillColor="#FF000000"
-        android:pathData="M12.1,22 Q10,22,6.062,21.2 Q3.6,17.675,2.8,15.838 Q2.8,12.638,4.6,6.838 Q5.15,6.638,6.175,6.775 Q6.1,8.9,6.775,12.95 Q8.275,14.45,11.7,16.7 Q12.35,16.675,13.312,17.113 Q12.213,20.113,8.525,24.925 Z M12.1,20 Q14.3,20,18.375,18.9 Q16.225,18.7,12.15,17.613 Q10.625,16.088,8.2,12.638 Q6.275,13.713,3.263,16.675 Q3.263,20.05,5.625,25.788 Z M11.6,12.375 Z" />
+    android:viewportWidth="960"
+    android:viewportHeight="960">
+    <group android:translateY="960">
+        <path
+            android:fillColor="#FF000000"
+            android:pathData="M524-40q-84 0-157.5-32t-128-86.5Q184-213 152-286.5T120-444q0-128 72-232t193-146q22-8 41 5.5t18 36.5q-3 85 27 162t90 137q60 60 137 90t162 27q26-1 38.5 17.5T903-305q-44 120-147.5 192.5T524-40Zm0-80q88 0 163-44t118-121q-86-8-163-43.5T504-425q-61-61-97-138t-43-163q-77 43-120.5 118.5T200-444q0 135 94.5 229.5T524-120Zm-20-305Z" />
+    </group>
 </vector>

@@ -1,11 +1,21 @@
 <?xml version="1.0" encoding="utf-8"?>
+<!--
+  Material Symbols Rounded (wght 400, GRAD 0, opsz 24) — Apache License 2.0.
+  Régénéré depuis google/material-design-icons, glyphe « history ».
+
+  Le viewport reste la grille 960 d'origine et le décalage du viewBox SVG
+  (`0 -960 960 960`) est repris par un `translateY`, plutôt que de recalculer
+  les coordonnées : c'est précisément une conversion maison qui avait déformé
+  le jeu précédent.
+-->
 <vector xmlns:android="http://schemas.android.com/apk/res/android"
     android:width="24dp"
     android:height="24dp"
-    android:viewportWidth="24"
-    android:viewportHeight="24"
-    >
-    <path
-        android:fillColor="#FF000000"
-        android:pathData="M12,21 Q8.85,21,3.275,19.088 Q3.175,18.713,3.325,18.025 Q3.725,17.975,4.45,18.125 Q5.05,20.375,7.525,24.05 Q10.45,24.05,15.413,22.013 Q15.413,19.088,13.375,14.125 Q11.65,14.125,8.425,14.925 L10.175,14.925 Q10.6,14.925,11.312,15.213 Q11.312,15.638,11.025,16.35 L4,16.35 Q3.575,16.35,2.863,16.062 L2.863,12.062 Q2.863,11.638,3.15,10.925 Q3.575,10.925,4.288,11.213 L4.288,12.562 Q5.562,10.963,8.675,8.488 Q10.55,8.488,14.062,9.2 Q15.275,10.413,17.2,13.263 Q17.2,15.138,16.488,18.65 Q15.275,19.863,12.425,21.788 Z M13,11.6 L15.5,14.1 Q15.775,14.375,16.05,15.075 Q15.775,15.35,15.075,15.625 L11.3,12.7 Q11.15,12.55,10.925,12.213 L10.925,8.238 Q10.925,7.812,11.213,7.1 Q11.638,7.1,12.35,7.388 L12.35,10.988 Z" />
+    android:viewportWidth="960"
+    android:viewportHeight="960">
+    <group android:translateY="960">
+        <path
+            android:fillColor="#FF000000"
+            android:pathData="M480-120q-126 0-223-76.5T131-392q-4-15 6-27.5t27-14.5q16-2 29 6t18 24q24 90 99 147t170 57q117 0 198.5-81.5T760-480q0-117-81.5-198.5T480-760q-69 0-129 32t-101 88h70q17 0 28.5 11.5T360-600q0 17-11.5 28.5T320-560H160q-17 0-28.5-11.5T120-600v-160q0-17 11.5-28.5T160-800q17 0 28.5 11.5T200-760v54q51-64 124.5-99T480-840q75 0 140.5 28.5t114 77q48.5 48.5 77 114T840-480q0 75-28.5 140.5t-77 114q-48.5 48.5-114 77T480-120Zm40-376 100 100q11 11 11 28t-11 28q-11 11-28 11t-28-11L452-452q-6-6-9-13.5t-3-15.5v-159q0-17 11.5-28.5T480-680q17 0 28.5 11.5T520-640v144Z" />
+    </group>
 </vector>
