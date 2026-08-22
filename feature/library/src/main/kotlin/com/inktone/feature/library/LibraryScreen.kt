@@ -22,7 +22,10 @@ import androidx.compose.foundation.lazy.grid.GridItemSpan
 import androidx.compose.foundation.lazy.grid.LazyVerticalGrid
 import androidx.compose.foundation.lazy.grid.items as gridItems
 import androidx.compose.foundation.lazy.items as listItems
+import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.material3.ElevatedCard
+import androidx.compose.material3.CardDefaults
+import androidx.compose.material3.Surface
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.ExperimentalMaterial3Api
@@ -61,13 +64,17 @@ import androidx.compose.ui.platform.LocalLifecycleOwner
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextOverflow
+import androidx.compose.ui.draw.clip
+import androidx.compose.ui.draw.shadow
 import androidx.compose.ui.unit.dp
+import androidx.compose.ui.unit.sp
 import androidx.lifecycle.Lifecycle
 import androidx.lifecycle.LifecycleEventObserver
 import androidx.hilt.navigation.compose.hiltViewModel
 import com.inktone.core.designsystem.AppIcon
 import com.inktone.core.designsystem.AppIcons
 import com.inktone.core.designsystem.AppSymbol
+import com.inktone.core.designsystem.InkToneShapes
 import com.inktone.domain.model.FilterMode
 import com.inktone.domain.model.Publication
 import com.inktone.domain.service.ImportProgress
@@ -642,7 +649,11 @@ private fun LibraryContent(
             ) {
                 if (resume != null) {
                     gridItems(listOf(resume), key = { "resume-${it.id}" }, span = { GridItemSpan(maxLineSpan) }) { publication ->
-                        ResumeReadingCard(publication, onClick = { onOpen(publication.id) })
+                        ResumeReadingCard(
+                            publication = publication,
+                            progressPercent = state.progressMap[publication.id] ?: 0,
+                            onClick = { onOpen(publication.id) },
+                        )
                     }
                 }
                 gridItems(state.displayedPublications, key = { it.id }) { publication ->
@@ -663,7 +674,13 @@ private fun LibraryContent(
         LibraryLayoutMode.LIST -> {
             LazyColumn(contentPadding = PaddingValues(8.dp)) {
                 if (resume != null) {
-                    item { ResumeReadingCard(resume, onClick = { onOpen(resume.id) }) }
+                    item {
+                        ResumeReadingCard(
+                            publication = resume,
+                            progressPercent = state.progressMap[resume.id] ?: 0,
+                            onClick = { onOpen(resume.id) },
+                        )
+                    }
                 }
                 listItems(state.displayedPublications, key = { it.id }) { publication ->
                     PublicationListRow(
@@ -797,13 +814,127 @@ internal fun PublicationListRow(
 
 /** Tache 9bis.4 — proeminente en tete de grille, pas seulement un FAB flottant discret (legacy). */
 @Composable
-private fun ResumeReadingCard(publication: Publication, onClick: () -> Unit) {
-    ElevatedCard(onClick = onClick, modifier = Modifier.fillMaxWidth().padding(8.dp)) {
-        Column(Modifier.padding(16.dp)) {
-            Text("Reprendre la lecture", style = MaterialTheme.typography.labelMedium, color = MaterialTheme.colorScheme.primary)
-            Text(publication.title, style = MaterialTheme.typography.titleMedium, maxLines = 1, overflow = TextOverflow.Ellipsis)
-            if (publication.authors.isNotEmpty()) {
-                Text(publication.authors.joinToString(), style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+private fun ResumeReadingCard(
+    publication: Publication,
+    progressPercent: Int,
+    onClick: () -> Unit,
+) {
+    ElevatedCard(
+        onClick = onClick,
+        modifier = Modifier
+            .fillMaxWidth()
+            .padding(8.dp),
+        shape = InkToneShapes.large,
+        colors = CardDefaults.elevatedCardColors(
+            containerColor = Color.Transparent
+        )
+    ) {
+        val gradient = Brush.horizontalGradient(
+            colors = listOf(
+                MaterialTheme.colorScheme.primaryContainer.copy(alpha = 0.25f),
+                MaterialTheme.colorScheme.surface
+            )
+        )
+        Row(
+            modifier = Modifier
+                .fillMaxWidth()
+                .background(brush = gradient)
+                .padding(16.dp),
+            verticalAlignment = Alignment.CenterVertically,
+        ) {
+            // Couverture miniature
+            Box(
+                modifier = Modifier
+                    .size(width = 68.dp, height = 98.dp)
+                    .shadow(4.dp, shape = InkToneShapes.medium)
+                    .clip(InkToneShapes.medium)
+            ) {
+                BookCover(
+                    publication = publication,
+                    onClick = {},
+                    onToggleFavorite = {},
+                    showTitle = false,
+                    showOverlays = false,
+                )
+            }
+
+            Spacer(Modifier.width(16.dp))
+
+            Column(modifier = Modifier.weight(1f)) {
+                // Badge de statut
+                Surface(
+                    color = MaterialTheme.colorScheme.primaryContainer,
+                    shape = InkToneShapes.small,
+                    modifier = Modifier.padding(bottom = 6.dp)
+                ) {
+                    Text(
+                        text = "REPRENDRE LA LECTURE",
+                        style = MaterialTheme.typography.labelSmall.copy(
+                            fontWeight = FontWeight.Bold,
+                            letterSpacing = 0.8.sp
+                        ),
+                        color = MaterialTheme.colorScheme.onPrimaryContainer,
+                        modifier = Modifier.padding(horizontal = 8.dp, vertical = 4.dp)
+                    )
+                }
+
+                // Titre
+                Text(
+                    text = publication.title,
+                    style = MaterialTheme.typography.titleMedium.copy(fontWeight = FontWeight.Bold),
+                    maxLines = 1,
+                    overflow = TextOverflow.Ellipsis
+                )
+
+                // Auteur
+                if (publication.authors.isNotEmpty()) {
+                    Text(
+                        text = publication.authors.joinToString(),
+                        style = MaterialTheme.typography.bodySmall,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                        maxLines = 1,
+                        overflow = TextOverflow.Ellipsis,
+                        modifier = Modifier.padding(bottom = 8.dp)
+                    )
+                }
+
+                // Barre de progression
+                Row(
+                    verticalAlignment = Alignment.CenterVertically,
+                    modifier = Modifier.fillMaxWidth()
+                ) {
+                    LinearProgressIndicator(
+                        progress = { progressPercent / 100f },
+                        modifier = Modifier
+                            .weight(1f)
+                            .height(6.dp)
+                            .clip(CircleShape),
+                    )
+                    Spacer(Modifier.width(8.dp))
+                    Text(
+                        text = "$progressPercent%",
+                        style = MaterialTheme.typography.labelSmall.copy(fontWeight = FontWeight.Bold),
+                        color = MaterialTheme.colorScheme.primary,
+                    )
+                }
+            }
+
+            Spacer(Modifier.width(8.dp))
+
+            // Bouton Play
+            Box(
+                modifier = Modifier
+                    .size(36.dp)
+                    .clip(CircleShape)
+                    .background(MaterialTheme.colorScheme.primaryContainer),
+                contentAlignment = Alignment.Center
+            ) {
+                AppIcon(
+                    symbol = AppSymbol.Play,
+                    contentDescription = null,
+                    tint = MaterialTheme.colorScheme.onPrimaryContainer,
+                    modifier = Modifier.size(20.dp)
+                )
             }
         }
     }
