@@ -25,6 +25,9 @@ kotlin {
 dependencies {
     implementation(platform(libs.compose.bom))
     implementation("androidx.compose.ui:ui")
+    // StatusBarColorEffect : WindowCompat.getInsetsController (contraste des
+    // icones systeme deduit de la luminance de la couleur posee).
+    implementation(libs.androidx.core.ktx)
     implementation("androidx.compose.ui:ui-tooling-preview")
     implementation("androidx.compose.material3:material3")
     implementation("androidx.compose.material3:material3-window-size-class")
