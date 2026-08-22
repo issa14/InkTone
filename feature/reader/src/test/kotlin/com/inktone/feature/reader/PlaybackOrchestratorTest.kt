@@ -462,6 +462,7 @@ class PlaybackOrchestratorTest {
         val saved = CopyOnWriteArrayList<ReadingState>()
         override suspend fun get(publicationId: String): ReadingState? = null
         override fun observe(publicationId: String): Flow<ReadingState?> = emptyFlow()
+        override fun observeAll(): Flow<List<ReadingState>> = emptyFlow()
         override suspend fun getAll(): List<ReadingState> = emptyList()
         override suspend fun save(state: ReadingState) {
             saved.add(state)

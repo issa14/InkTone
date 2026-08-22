@@ -27,6 +27,7 @@ import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.catch
+import kotlinx.coroutines.flow.combine
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.flow.receiveAsFlow
 import kotlinx.coroutines.launch
@@ -207,16 +208,6 @@ class LibraryViewModel @Inject constructor(
     }
 
     /**
-     * Appelé par [LibraryScreen] à chaque ON_RESUME du NavBackStackEntry
-     * (Phase 4 — rafraîchissement au retour du Reader). Force une
-     * ré-observation du filtre actif pour mettre à jour les badges de
-     * progression et la carte "Reprendre la lecture".
-     */
-    fun refreshOnResume() {
-        observePublications(_state.value.activeFilter, _state.value.filterValue)
-    }
-
-    /**
      * Charge les résultats d'import depuis [ImportResultsStore] pour
      * la session en cours (Lot 5). Appelé quand l'import se termine.
      */
@@ -252,6 +243,23 @@ class LibraryViewModel @Inject constructor(
         }
     }
 
+    /**
+     * Observe les publications du filtre actif ET leurs positions de reprise.
+     *
+     * Les deux sont des flux Room combinés : la grille et ses badges de
+     * progression se remettent à jour d'eux-mêmes, y compris pendant une
+     * narration en arrière-plan alors que cet écran est affiché.
+     *
+     * L'écran ne rejoue plus cette observation à chaque retour d'un autre
+     * écran (l'ancien `refreshOnResume`, supprimé) : la progression venait
+     * d'un `getAll()` ponctuel qui, lui, ne se rafraîchissait pas seul. Ce
+     * rejeu reposait `isLoading` et substituait le shimmer à la grille entière
+     * à chaque retour du Lecteur — un rechargement visible pour rien.
+     *
+     * [isLoading] n'est donc plus posé qu'au premier chargement et aux
+     * changements de filtre, les deux seuls appelants restants : là, le
+     * contenu change réellement et le shimmer est légitime.
+     */
     private fun observePublications(filter: FilterMode, value: String? = null) {
         observeJob?.cancel()
         _state.value = _state.value.copy(
@@ -261,22 +269,24 @@ class LibraryViewModel @Inject constructor(
             errorMessage = null,
         )
         observeJob = viewModelScope.launch {
-            publicationRepository.observeFiltered(filter, value)
+            combine(
+                publicationRepository.observeFiltered(filter, value),
+                readingStateRepository.observeAll(),
+            ) { publications, readingStates -> publications to readingStates }
                 .catch { e ->
                     _state.value = _state.value.copy(
                         isLoading = false,
                         errorMessage = e.message ?: "Erreur de chargement de la bibliothèque",
                     )
                 }
-                .collect { publications ->
-                    // Audit v1.0.0 (AUDIT_CONSOLIDATION_V1.md, P5) : la
-                    // 2e requête (getAll des ReadingState) et la boucle O(n)
-                    // de computeProgressMap s'exécutaient sur Main à CHAQUE
+                .collect { (publications, readingStates) ->
+                    // Audit v1.0.0 (AUDIT_CONSOLIDATION_V1.md, P5) : la boucle
+                    // O(n) de computeProgressMap s'exécutait sur Main à CHAQUE
                     // émission du Flow Room (500 émissions pendant un import
-                    // groupé). Déplacé sur Default ; seuls les mises à jour
+                    // groupé). Déplacé sur Default ; seules les mises à jour
                     // d'état repassent sur Main.
                     val progressMap = withContext(defaultDispatcher) {
-                        computeProgressMap(publications, readingStateRepository.getAll())
+                        computeProgressMap(publications, readingStates)
                     }
                     _state.value = _state.value.copy(
                         publications = publications,

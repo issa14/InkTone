@@ -10,6 +10,9 @@ import com.inktone.core.testing.fake.FakeReadingStateRepository
 import com.inktone.core.testing.fake.FakeSyncAccountRepository
 import com.inktone.core.testing.fake.FakeSyncNowService
 import com.inktone.domain.model.Publication
+import com.inktone.domain.model.FilterMode
+import com.inktone.domain.model.ReadingState
+import com.inktone.domain.valueobject.Locator
 import com.inktone.domain.model.PublicationFormat
 import com.inktone.domain.model.SyncAccount
 import com.inktone.domain.model.SyncProviderId
@@ -65,9 +68,10 @@ class LibraryViewModelTest {
         // sinon advanceUntilIdle ne voit pas le calcul de progression.
         defaultDispatcher: CoroutineDispatcher = dispatcher,
         playbackSession: FakePlaybackSession = FakePlaybackSession(),
+        readingStateRepository: FakeReadingStateRepository = FakeReadingStateRepository(),
     ): LibraryViewModel = LibraryViewModel(
         publicationRepository,
-        FakeReadingStateRepository(),
+        readingStateRepository,
         ToggleFavoriteUseCase(publicationRepository),
         TogglePinUseCase(publicationRepository),
         DeletePublicationUseCase(publicationRepository),
@@ -92,6 +96,57 @@ class LibraryViewModelTest {
 
         assertEquals(1, viewModel.state.value.publications.size)
         assertEquals(false, viewModel.state.value.isLoading)
+    }
+
+    // ───── Rechargement de la grille (chantier V1) ─────
+
+    @Test
+    fun `la progression se met a jour sans repasser par le shimmer`() = runTest {
+        val repository = FakePublicationRepository()
+        repository.insert(publication("pub-1").copy(chapterCount = 11))
+        val readingStates = FakeReadingStateRepository()
+        val viewModel = viewModel(
+            publicationRepository = repository,
+            readingStateRepository = readingStates,
+        )
+        dispatcher.scheduler.advanceUntilIdle()
+        assertEquals(0, viewModel.state.value.progressMap["pub-1"])
+
+        // Une position enregistrée pendant une narration en arrière-plan, sans
+        // que l'utilisateur ne touche à cet écran.
+        readingStates.save(
+            ReadingState(
+                publicationId = "pub-1",
+                locator = Locator(resourceHref = "ch5.xhtml", chapterIndex = 5, charOffset = 0),
+                lastReadAt = 1L,
+            ),
+        )
+        dispatcher.scheduler.advanceUntilIdle()
+
+        assertEquals(
+            "la progression dérive d'un flux Room, elle n'attend pas un retour sur l'écran",
+            50,
+            viewModel.state.value.progressMap["pub-1"],
+        )
+        assertEquals(
+            "mettre à jour un badge ne doit jamais faire clignoter la grille entière",
+            false,
+            viewModel.state.value.isLoading,
+        )
+    }
+
+    @Test
+    fun `un changement de filtre pose bien l etat de chargement`() = runTest {
+        val repository = FakePublicationRepository()
+        repository.insert(publication("pub-1"))
+        val viewModel = viewModel(publicationRepository = repository)
+        dispatcher.scheduler.advanceUntilIdle()
+
+        // Le contenu affiché change réellement : le shimmer est ici légitime,
+        // contrairement au simple retour d'un autre écran.
+        viewModel.onIntent(LibraryIntent.ChangeFilter(FilterMode.FAVORITES))
+
+        assertTrue(viewModel.state.value.isLoading)
     }
 
     @Test

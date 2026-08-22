@@ -14,6 +14,8 @@ class FakeReadingStateRepository : ReadingStateRepository {
     override fun observe(publicationId: String): Flow<ReadingState?> =
         state.map { it[publicationId] }
 
+    override fun observeAll(): Flow<List<ReadingState>> = state.map { it.values.toList() }
+
     override suspend fun getAll(): List<ReadingState> = state.value.values.toList()
 
     override suspend fun save(state: ReadingState) {
