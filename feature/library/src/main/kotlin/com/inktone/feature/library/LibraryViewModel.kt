@@ -110,7 +110,7 @@ class LibraryViewModel @Inject constructor(
         viewModelScope.launch {
             preferencesRepository.observe().collect { prefs ->
                 val mode = runCatching { LibraryLayoutMode.valueOf(prefs.libraryLayoutMode) }
-                    .getOrDefault(LibraryLayoutMode.GRID_COVERS)
+                    .getOrDefault(LibraryLayoutMode.GRID_DETAILED)
                 if (mode != _state.value.layoutMode) {
                     _state.value = _state.value.copy(layoutMode = mode)
                 }

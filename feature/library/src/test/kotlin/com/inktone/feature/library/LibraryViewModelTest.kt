@@ -130,7 +130,7 @@ class LibraryViewModelTest {
         val preferencesRepository = FakePreferencesRepository()
         val viewModel = viewModel(preferencesRepository = preferencesRepository)
         dispatcher.scheduler.advanceUntilIdle()
-        assertEquals(LibraryLayoutMode.GRID_COVERS, viewModel.state.value.layoutMode)
+        assertEquals(LibraryLayoutMode.GRID_DETAILED, viewModel.state.value.layoutMode)
 
         preferencesRepository.update(preferencesRepository.get().copy(libraryLayoutMode = "LIST"))
         dispatcher.scheduler.advanceUntilIdle()
@@ -139,6 +139,21 @@ class LibraryViewModelTest {
         viewModel.onIntent(LibraryIntent.SetLayoutMode(LibraryLayoutMode.GRID_COVERS))
         dispatcher.scheduler.advanceUntilIdle()
         assertEquals("GRID_COVERS", preferencesRepository.get().libraryLayoutMode)
+    }
+
+    @Test
+    fun `une disposition persistee inconnue retombe sur le defaut sans planter`() = runTest {
+        // La colonne `libraryLayoutMode` est du TEXTE libre (aucune contrainte
+        // SQL) : une valeur ecrite par une version anterieure ou plus recente
+        // doit degrader proprement, jamais lever IllegalArgumentException.
+        val preferencesRepository = FakePreferencesRepository()
+        preferencesRepository.update(
+            preferencesRepository.get().copy(libraryLayoutMode = "MODE_INEXISTANT"),
+        )
+        val viewModel = viewModel(preferencesRepository = preferencesRepository)
+        dispatcher.scheduler.advanceUntilIdle()
+
+        assertEquals(LibraryLayoutMode.GRID_DETAILED, viewModel.state.value.layoutMode)
     }
 
     // ──── Lot 19 ────

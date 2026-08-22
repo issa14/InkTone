@@ -27,7 +27,7 @@ data class UserPreferencesEntity(
     val eyeRestReminderEnabled: Boolean = true, // 3d.5
     val eyeRestReminderIntervalMinutes: Int = 60, // 3d.5
     val appTheme: String = "SYSTEM", // Lot 6 — thème système de l'app
-    val libraryLayoutMode: String = "GRID_COVERS", // Lot 6 — disposition biblio, pilotée par le préréglage d'accessibilité
+    val libraryLayoutMode: String = "GRID_DETAILED", // Lot 6 — disposition biblio, pilotée par le préréglage d'accessibilité
     val hasSeenOnboarding: Boolean = false, // Lot 10 — pilote le startDestination
     val hasPromptedVoiceDownload: Boolean = false, // Lot 10 — proposition proactive au premier usage TTS
     val deviceId: String? = null, // Lot 11 — identité d'appareil stable

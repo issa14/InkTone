@@ -28,7 +28,7 @@ data class LibraryUiState(
     val filterValue: String? = null,
     val searchQuery: String = "",
     val sortOrder: LibrarySortOrder = LibrarySortOrder.RECENTLY_ADDED,
-    val layoutMode: LibraryLayoutMode = LibraryLayoutMode.GRID_COVERS,
+    val layoutMode: LibraryLayoutMode = LibraryLayoutMode.GRID_DETAILED,
     val selectedFormats: Set<PublicationFormat> = emptySet(),
     // Tache 6.8 — cache par defaut (total == 0 && !hasQueuedChunks).
     val importProgress: ImportProgress = ImportProgress(),
@@ -113,7 +113,19 @@ internal fun List<Publication>.filterAndSort(
 enum class LibrarySortOrder { RECENTLY_ADDED, TITLE, AUTHOR, RECENTLY_OPENED }
 
 /** Lot 2a.1 — 2 dispositions, pas 3 : GRID (couverture + titre) retiree, decision finale UX (grille couvertures seules). */
-enum class LibraryLayoutMode { LIST, GRID_COVERS }
+/**
+ * Dispositions de la Bibliothèque. Persistée en TEXTE dans
+ * `UserPreferences.libraryLayoutMode` et relue via
+ * `runCatching { valueOf(...) }` — ajouter une entrée ici ne demande donc
+ * aucune migration Room (la colonne n'est pas contrainte), et une valeur
+ * inconnue retombe proprement sur le défaut.
+ *
+ * [GRID_DETAILED] est le défaut des NOUVELLES installations : un mur de
+ * jaquettes seules ne dit ni le titre ni l'auteur, illisibles à 120 dp dès
+ * que l'illustration est chargée ou générique. [GRID_COVERS] reste offert
+ * tel quel — c'est un choix esthétique légitime, pas un défaut à corriger.
+ */
+enum class LibraryLayoutMode { LIST, GRID_COVERS, GRID_DETAILED }
 
 /** Lot 19 — progression X/Y de la reconstruction des couvertures (menu legacy « progression live »). */
 data class CoverRegenerationProgress(val processed: Int, val total: Int)

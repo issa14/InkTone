@@ -50,10 +50,11 @@ data class UserPreferences(
     // 3d.5 — rappel de repos oculaire, indépendant du minuteur de sommeil TTS.
     val eyeRestReminderEnabled: Boolean = true,
     val eyeRestReminderIntervalMinutes: Int = 60,
-    // Lot 6 — disposition de la bibliothèque ("LIST" ou "GRID_COVERS"), persistée pour
-    // que le préréglage d'accessibilité (Tâche 8.4) puisse la piloter. Stockée en String
-    // (comme readingMode) : LibraryLayoutMode vit dans feature/library, hors de portée du domaine.
-    val libraryLayoutMode: String = "GRID_COVERS",
+    // Lot 6 — disposition de la bibliothèque ("LIST", "GRID_COVERS" ou
+    // "GRID_DETAILED"), persistée pour que le préréglage d'accessibilité
+    // (Tâche 8.4) puisse la piloter. Stockée en String (comme readingMode) :
+    // LibraryLayoutMode vit dans feature/library, hors de portée du domaine.
+    val libraryLayoutMode: String = "GRID_DETAILED",
     // Lot 10 — indicateur "onboarding vu", pilote le startDestination
     // (Onboarding au premier lancement, Bibliothèque ensuite).
     val hasSeenOnboarding: Boolean = false,
