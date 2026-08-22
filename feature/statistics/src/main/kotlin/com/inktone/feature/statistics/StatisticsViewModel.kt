@@ -71,7 +71,7 @@ class StatisticsViewModel @Inject constructor(
         StatisticsUiState.Ready(
             kpi = rawStats.toKpiState(prefs.dailyGoalMinutes),
             activity = rawStats.toActivityState(period),
-            currentBook = book?.withRemainingTime(rawStats.averageWpm),
+            currentBook = book?.withRemainingTime(),
         )
     }.flowOn(Dispatchers.Default)
         .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), StatisticsUiState.Loading)
@@ -85,16 +85,12 @@ class StatisticsViewModel @Inject constructor(
     private fun StatisticsResult.toKpiState(dailyGoalMinutes: Int) = KpiState(
         totalVisualTimeFormatted = formatDuration(totalVisualMs),
         totalTtsTimeFormatted = formatDuration(totalTtsMs),
-        totalReadingTimeMs = totalVisualMs + totalTtsMs,
         booksFinished = booksFinished,
         currentStreakDays = currentStreakDays,
         maxStreakDays = maxStreakDays,
         averageWpm = averageWpm,
         todayReadingMinutes = todayReadingMinutes,
-        todayReadingMinutesFormatted = "${todayReadingMinutes} min",
         dailyGoalMinutes = dailyGoalMinutes,
-        totalWordsReadFormatted = formatAbbreviated(totalWordsRead),
-        totalPagesReadFormatted = formatAbbreviated(totalWordsRead / WORDS_PER_PAGE_ESTIMATE),
         regularityLabel = regularityLabelFor(currentStreakDays),
     )
 
@@ -141,16 +137,6 @@ class StatisticsViewModel @Inject constructor(
     }
 
     /**
-     * Format abrégé K/M pour les grands nombres (Tache 7.2) — un compteur
-     * de mots à sept chiffres est illisible brut. Ex. 1 250 000 → "1,3M".
-     */
-    private fun formatAbbreviated(value: Long): String = when {
-        value >= 1_000_000L -> String.format(Locale.FRANCE, "%.1fM", value / 1_000_000.0)
-        value >= 1_000L -> String.format(Locale.FRANCE, "%.1fK", value / 1_000.0)
-        else -> value.toString()
-    }
-
-    /**
      * Libellé de régularité de la carte objectif du jour (Tache 7.2),
      * dérivé de la série en cours — jamais un texte constant.
      */
@@ -179,12 +165,16 @@ class StatisticsViewModel @Inject constructor(
     // ───── Livre en cours (formatage, pas de query) ─────
 
     /**
-     * Estime le temps restant pour ce livre à partir du WPM moyen
-     * et du temps déjà passé.
+     * Estime le temps restant pour ce livre à partir du temps déjà passé
+     * dessus et de la progression atteinte.
      *
      * Formule (cible UX) : temps restant ≈ tempsTotal / progression * (1 - progression).
+     *
+     * Volontairement indépendante du WPM : le rythme réel de CE livre est déjà
+     * contenu dans son temps cumulé, et une moyenne tous livres confondus n'y
+     * ajouterait que du bruit.
      */
-    private fun CurrentBookState.withRemainingTime(averageWpm: Int): CurrentBookState {
+    private fun CurrentBookState.withRemainingTime(): CurrentBookState {
         if (progressPercent <= 0f || totalBookTimeMs <= 0L) return this
         val estimatedTotalMs = (totalBookTimeMs / progressPercent).toLong()
         val remainingMs = estimatedTotalMs - totalBookTimeMs
@@ -210,12 +200,6 @@ class StatisticsViewModel @Inject constructor(
     private companion object {
         const val DAYS_IN_WEEK = 7
         const val DAYS_IN_MONTH = 30
-
-        // Tache 7.2 — "Pages lues" n'a pas de source de données propre : le
-        // domaine bannit volontairement un champ pageCount générique (EPUB
-        // reflowable, cf. Publication.kt). Estimation d'affichage seule,
-        // jamais persistée, sur la base d'une moyenne éditoriale courante.
-        const val WORDS_PER_PAGE_ESTIMATE = 250L
     }
 }
 

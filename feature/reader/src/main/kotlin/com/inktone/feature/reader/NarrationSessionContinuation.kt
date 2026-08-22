@@ -6,6 +6,7 @@ import com.inktone.domain.repository.ReadingSessionRepository
 import com.inktone.domain.service.PlaybackSession
 import com.inktone.domain.service.PlaybackSessionState
 import com.inktone.domain.service.ReadingSessionTracker
+import com.inktone.domain.service.TrackerSnapshot
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.Job
@@ -73,6 +74,14 @@ class NarrationSessionContinuation @Inject constructor(
 
         job = scope.launch {
             launch { checkpointLoop() }
+            // Chantier statistiques V1 — pendant ce relais, c'est ici que les
+            // mots prononcés sont comptés : le collecteur du ReaderViewModel a
+            // disparu avec son écran, et le tracker n'a qu'un propriétaire.
+            launch {
+                playbackSession.narratedSentenceWords.collect { words ->
+                    this@NarrationSessionContinuation.tracker?.addProgress(words)
+                }
+            }
             // Attend la fin RÉELLE de la narration. `PAUSED` n'en est pas une :
             // l'utilisateur peut reprendre depuis la notification, et le temps
             // en pause n'est de toute façon pas compté (le tracker est pausé).
@@ -119,9 +128,9 @@ class NarrationSessionContinuation @Inject constructor(
             delay(CHECKPOINT_INTERVAL_MS)
             val current = tracker ?: return
             if (current.isPaused) continue
-            val (visual, tts) = current.snapshot()
-            if (visual + tts < MIN_FRAGMENT_MS) continue
-            persistFragment(current.publicationId, visual, tts)
+            val snapshot = current.snapshot()
+            if (snapshot.totalMs < MIN_FRAGMENT_MS) continue
+            persistFragment(current.publicationId, snapshot)
             current.reset()
         }
     }
@@ -129,9 +138,9 @@ class NarrationSessionContinuation @Inject constructor(
     /** Dernière sauvegarde puis abandon du tracker : la session est close. */
     private fun finish() {
         val current = tracker ?: return
-        val (visual, tts) = current.snapshot()
-        if (visual + tts >= MIN_FRAGMENT_MS) {
-            persistFragment(current.publicationId, visual, tts)
+        val snapshot = current.snapshot()
+        if (snapshot.totalMs >= MIN_FRAGMENT_MS) {
+            persistFragment(current.publicationId, snapshot)
             current.reset()
         }
         tracker = null
@@ -139,7 +148,7 @@ class NarrationSessionContinuation @Inject constructor(
         job = null
     }
 
-    private fun persistFragment(publicationId: String, visualMs: Long, ttsMs: Long) {
+    private fun persistFragment(publicationId: String, snapshot: TrackerSnapshot) {
         val fragmentStart = lastFragmentSavedMs
         lastFragmentSavedMs = System.currentTimeMillis()
         scope.launch {
@@ -149,9 +158,12 @@ class NarrationSessionContinuation @Inject constructor(
                     publicationId = publicationId,
                     startedAt = fragmentStart,
                     endedAt = lastFragmentSavedMs,
-                    mode = if (ttsMs >= visualMs) ReadingMode.AUDIO else ReadingMode.VISUAL,
-                    visualDurationMs = visualMs,
-                    ttsDurationMs = ttsMs,
+                    mode = if (snapshot.ttsMs >= snapshot.visualMs) ReadingMode.AUDIO
+                    else ReadingMode.VISUAL,
+                    sentencesRead = snapshot.sentences,
+                    wordsRead = snapshot.words,
+                    visualDurationMs = snapshot.visualMs,
+                    ttsDurationMs = snapshot.ttsMs,
                 ),
             )
         }

@@ -144,6 +144,22 @@ class PlaybackOrchestrator @Inject constructor(
     private val _currentChapterIndex = MutableStateFlow(0)
     val currentChapterIndex: StateFlow<Int> = _currentChapterIndex.asStateFlow()
 
+    /**
+     * Mots des phrases **effectivement prononcées jusqu'au bout**, émis une
+     * phrase à la fois (Chantier statistiques V1).
+     *
+     * Émis ici et non depuis le Lecteur parce que l'ordonnanceur est le seul à
+     * survivre à la destruction de l'écran : une heure d'écoute écran éteint
+     * doit compter comme le reste. Le propriétaire courant du tracker de
+     * session — `ReaderViewModel` ou `NarrationSessionContinuation`, jamais les
+     * deux — collecte ce flux et le reporte au tracker.
+     *
+     * Une phrase n'est comptée qu'après avoir été jouée entièrement : une
+     * narration coupée en plein milieu ne crédite pas la phrase en cours.
+     */
+    private val _narratedSentenceWords = MutableSharedFlow<Int>(extraBufferCapacity = 64)
+    override val narratedSentenceWords: SharedFlow<Int> = _narratedSentenceWords.asSharedFlow()
+
     /** Timestamps mot-à-mot de la phrase courante — consommés par le surlignage. */
     private val _currentWordTimestamps = MutableStateFlow<List<WordTimestamp>>(emptyList())
     val currentWordTimestamps: StateFlow<List<WordTimestamp>> = _currentWordTimestamps.asStateFlow()
@@ -674,6 +690,10 @@ class PlaybackOrchestrator @Inject constructor(
                 val elapsedMs = (System.nanoTime() - playStartNanos) / 1_000_000L
                 val waitMs = nextPhraseStartMs - elapsedMs
                 if (waitMs > 0) pace(generation, waitMs)
+                // Le pace ci-dessus s'achève quand l'audio de la phrase
+                // précédente est écoulé : c'est là, et pas à son démarrage,
+                // qu'elle est acquise pour les statistiques.
+                creditNarratedSentence(sentences.getOrNull(index - 1))
                 advanceTo(generation, index, publicationId, chapterIndex, resourceHref, sentence, segment.wordTimestamps)
             }
             launchWordTracking(generation, sentenceStartMs, segment.wordTimestamps)
@@ -686,6 +706,9 @@ class PlaybackOrchestrator @Inject constructor(
                 val elapsedMs = (System.nanoTime() - playStartNanos) / 1_000_000L
                 val waitMs = nextPhraseStartMs - elapsedMs
                 if (waitMs > 0) pace(generation, waitMs)
+                // Dernière phrase du chapitre : aucune transition ne viendra
+                // plus la créditer, c'est cette attente-ci qui la termine.
+                creditNarratedSentence(sentences.getOrNull(index - 1))
             }
             _state.value = PlaybackStatus.Idle
             // Après l'`Idle` : l'écran doit d'abord enregistrer la fin de la
@@ -747,6 +770,15 @@ class PlaybackOrchestrator @Inject constructor(
             chapterIndex = nextIndex,
             resourceHref = nextHref,
         )
+    }
+
+    /**
+     * Crédite une phrase entièrement prononcée sur [narratedSentenceWords].
+     * `null` ou phrase vide : rien à créditer, silencieusement.
+     */
+    private fun creditNarratedSentence(sentence: Sentence?) {
+        val words = sentence?.wordCount ?: return
+        if (words > 0) _narratedSentenceWords.tryEmit(words)
     }
 
     /**

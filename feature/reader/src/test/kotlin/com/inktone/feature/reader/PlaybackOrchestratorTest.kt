@@ -90,6 +90,59 @@ class PlaybackOrchestratorTest {
         assertEquals(PlaybackOrchestrator.PlaybackStatus.Idle, orchestrator.state.value)
     }
 
+    // ───── Comptage des mots narrés (chantier statistiques V1) ─────
+
+    @Test
+    fun chaquePhraseEntierementPrononceeCrediteSesMots() = runBlocking {
+        val tts = FakeTtsEngine(segmentDurationMs = 50)
+        val player = FakeAudioPlayer()
+        val orchestrator = PlaybackOrchestrator(tts, player, UpdateReadingStateUseCase(FakeReadingStateRepository()), GetReadingStateUseCase(FakeReadingStateRepository()), FakeChapterParser(), FakePublicationRepository(), FakePublicationParser(), FakePreferencesRepository(), FakeVoiceProfileRepository())
+        val sentences = listOf(
+            sentence(0, "Bonjour tout le monde.", 0),   // 4 mots
+            sentence(1, "Deux mots.", 22),              // 2 mots
+            sentence(2, "Trois petits mots ici.", 32),  // 4 mots
+        )
+        val collected = CopyOnWriteArrayList<Int>()
+        val collector = CoroutineScope(Dispatchers.Default).launch {
+            orchestrator.narratedSentenceWords.collect { collected += it }
+        }
+        // Ne lancer la narration qu'une fois le collecteur abonné : un
+        // SharedFlow sans replay ne rattrape pas ce qui a été émis avant.
+        delay(100)
+
+        orchestrator.play(sentences, profile, 0, "pub1", 0, "ch.xhtml")
+        awaitUntil { orchestrator.state.value == PlaybackOrchestrator.PlaybackStatus.Idle }
+        awaitUntil { collected.size == 3 }
+        collector.cancel()
+
+        assertEquals(listOf(4, 2, 4), collected.toList())
+    }
+
+    @Test
+    fun unePhraseInterrompueEnPleinMilieuNestPasCreditee() = runBlocking {
+        val tts = FakeTtsEngine(segmentDurationMs = 2_000)
+        val player = FakeAudioPlayer()
+        val orchestrator = PlaybackOrchestrator(tts, player, UpdateReadingStateUseCase(FakeReadingStateRepository()), GetReadingStateUseCase(FakeReadingStateRepository()), FakeChapterParser(), FakePublicationRepository(), FakePublicationParser(), FakePreferencesRepository(), FakeVoiceProfileRepository())
+        val sentences = listOf(sentence(0, "Une phrase longue à dire.", 0), sentence(1, "Suivante.", 26))
+        val collected = CopyOnWriteArrayList<Int>()
+        val collector = CoroutineScope(Dispatchers.Default).launch {
+            orchestrator.narratedSentenceWords.collect { collected += it }
+        }
+        delay(100)
+
+        orchestrator.play(sentences, profile, 0, "pub1", 0, "ch.xhtml")
+        awaitUntil { orchestrator.state.value == PlaybackOrchestrator.PlaybackStatus.Playing }
+        orchestrator.stop()
+        delay(200)
+        collector.cancel()
+
+        assertEquals(
+            "seul ce qui a été réellement entendu compte",
+            emptyList<Int>(),
+            collected.toList(),
+        )
+    }
+
     @Test
     fun pauseRepriseConserveIndex() = runBlocking {
         val tts = FakeTtsEngine(segmentDurationMs = 500)

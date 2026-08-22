@@ -74,9 +74,10 @@ class FakeReadingSessionRepository : ReadingSessionRepository {
         getAll().filter { it.publicationId == bookId }
 
     // ───── Audit fix : requêtes ciblées ─────
+    /** Miroir exact du filtre SQL de `ReadingSessionDao` : fragments à dominante visuelle. */
     override suspend fun getRecentSessionsWithWords(limit: Int): List<ReadingSession> =
         getAll()
-            .filter { it.wordsRead > 0 && it.durationMs > 0 }
+            .filter { it.wordsRead > 0 && it.visualDurationMs > it.ttsDurationMs }
             .sortedByDescending { it.startedAt }
             .take(limit)
 

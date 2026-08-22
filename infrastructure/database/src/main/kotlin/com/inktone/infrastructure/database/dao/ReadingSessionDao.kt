@@ -84,10 +84,20 @@ interface ReadingSessionDao {
 
     // ───── Audit fix : sessions récentes avec mots pour WPM (pas getAll) ─────
 
+    /**
+     * Sessions servant au calcul de la vitesse de lecture.
+     *
+     * `visualDurationMs > ttsDurationMs` n'est PAS une restriction arbitraire :
+     * la vitesse d'un fragment narré est celle du synthétiseur, réglée par
+     * l'utilisateur dans les préférences de voix. L'inclure ferait dire au KPI
+     * « vitesse de lecture » la vitesse du TTS — une mesure de son propre
+     * réglage. Seuls les fragments à dominante visuelle mesurent le lecteur.
+     * Ne pas retirer ce filtre sans retirer le KPI qu'il rend honnête.
+     */
     @Query("""
-        SELECT * FROM reading_sessions 
-        WHERE wordsRead > 0 AND (visualDurationMs + ttsDurationMs) > 0 
-        ORDER BY startedAt DESC 
+        SELECT * FROM reading_sessions
+        WHERE wordsRead > 0 AND visualDurationMs > ttsDurationMs
+        ORDER BY startedAt DESC
         LIMIT :limit
     """)
     suspend fun getRecentSessionsWithWords(limit: Int = 30): List<ReadingSessionEntity>

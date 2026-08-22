@@ -27,18 +27,19 @@ sealed interface StatisticsUiState {
 data class KpiState(
     val totalVisualTimeFormatted: String,
     val totalTtsTimeFormatted: String,
-    val totalReadingTimeMs: Long,
     val booksFinished: Int,
     val currentStreakDays: Int,
     val maxStreakDays: Int,
+    /**
+     * Vitesse de lecture en mots par minute, mesurée sur la seule lecture
+     * visuelle. `0` tant qu'aucune session visuelle n'a été enregistrée —
+     * l'écran affiche alors un tiret plutôt qu'un zéro, qui se lirait comme
+     * une mesure.
+     */
     val averageWpm: Int,
     val todayReadingMinutes: Long,
-    val todayReadingMinutesFormatted: String,
     val dailyGoalMinutes: Int,
-    // Tache 7.2 — bloc "Volumes parcourus" et libellé de régularité de la
-    // carte objectif du jour.
-    val totalWordsReadFormatted: String,
-    val totalPagesReadFormatted: String,
+    /** Libellé de régularité de la carte objectif du jour (Tache 7.2). */
     val regularityLabel: String,
 )
 

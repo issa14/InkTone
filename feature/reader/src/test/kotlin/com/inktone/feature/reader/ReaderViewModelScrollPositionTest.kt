@@ -218,6 +218,72 @@ class ReaderViewModelScrollPositionTest {
     // du code ; sa couverture par un test executable est un ecart declare
     // de ce lot, a lever par un test instrumente avec appareil (androidTest).
 
+    // ───── Comptage des mots lus (chantier statistiques V1) ─────
+
+    @Test
+    fun le_defilement_credite_les_phrases_franchies_et_jamais_deux_fois() = runTest {
+        val readingStateRepository = FakeReadingStateRepository()
+        val publicationRepository = FakePublicationRepository()
+        publicationRepository.insert(
+            Publication(
+                id = "pub-1", title = "Test", format = PublicationFormat.EPUB,
+                fileUri = "content://x", fileHash = "hash", fileSize = 10, chapterCount = 1,
+                importDate = 0L,
+            ),
+        )
+        val viewModel = buildViewModel(readingStateRepository, publicationRepository)
+        viewModel.onIntent(ReaderIntent.OpenPublication("pub-1"))
+        dispatcher.scheduler.runCurrent()
+
+        assertEquals(0, viewModel.sessionWordsReadForTest())
+
+        // Arriver à la phrase 2 : les phrases 0 et 1 sont terminées, la 2 est
+        // en cours de lecture — 2 mots chacune.
+        viewModel.onIntent(ReaderIntent.UpdateScrollPosition(2))
+        assertEquals(4, viewModel.sessionWordsReadForTest())
+
+        // Remonter puis redescendre ne recompte rien : la marque haute retient
+        // ce qui a déjà été crédité.
+        viewModel.onIntent(ReaderIntent.UpdateScrollPosition(0))
+        viewModel.onIntent(ReaderIntent.UpdateScrollPosition(2))
+        assertEquals(
+            "relire un passage déjà parcouru ne doit pas gonfler les statistiques",
+            4,
+            viewModel.sessionWordsReadForTest(),
+        )
+
+        viewModel.cancelCheckpointTimerForTest()
+        dispatcher.scheduler.runCurrent()
+    }
+
+    @Test
+    fun avancer_d_une_phrase_a_la_fois_credite_autant_qu_un_saut_direct() = runTest {
+        val readingStateRepository = FakeReadingStateRepository()
+        val publicationRepository = FakePublicationRepository()
+        publicationRepository.insert(
+            Publication(
+                id = "pub-1", title = "Test", format = PublicationFormat.EPUB,
+                fileUri = "content://x", fileHash = "hash", fileSize = 10, chapterCount = 1,
+                importDate = 0L,
+            ),
+        )
+        val viewModel = buildViewModel(readingStateRepository, publicationRepository)
+        viewModel.onIntent(ReaderIntent.OpenPublication("pub-1"))
+        dispatcher.scheduler.runCurrent()
+
+        viewModel.onIntent(ReaderIntent.UpdateScrollPosition(1))
+        viewModel.onIntent(ReaderIntent.UpdateScrollPosition(2))
+
+        assertEquals(
+            "le comptage ne doit pas dépendre de la finesse du défilement",
+            4,
+            viewModel.sessionWordsReadForTest(),
+        )
+
+        viewModel.cancelCheckpointTimerForTest()
+        dispatcher.scheduler.runCurrent()
+    }
+
     @Test
     fun aucune_publication_ouverte_n_ecrit_rien() = runTest {
         val readingStateRepository = FakeReadingStateRepository()

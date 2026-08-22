@@ -7,7 +7,9 @@ import com.inktone.domain.service.PlaybackMetadata
 import com.inktone.domain.service.PlaybackSession
 import com.inktone.domain.service.PlaybackSessionState
 import com.inktone.domain.service.ReadingSessionTracker
+import kotlinx.coroutines.flow.MutableSharedFlow
 import kotlinx.coroutines.flow.MutableStateFlow
+import kotlinx.coroutines.flow.SharedFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.runBlocking
 import kotlinx.coroutines.withTimeout
@@ -32,6 +34,8 @@ class NarrationSessionContinuationTest {
         override val sessionState: StateFlow<PlaybackSessionState> get() = state
         override val isPlaying = MutableStateFlow(true)
         override val currentSentenceIndex = MutableStateFlow(0)
+        val narratedWords = MutableSharedFlow<Int>(extraBufferCapacity = 64)
+        override val narratedSentenceWords: SharedFlow<Int> get() = narratedWords
         override val metadata = MutableStateFlow(PlaybackMetadata())
         override fun togglePlayPause() = Unit
         override fun startNarration(publicationId: String) = Unit

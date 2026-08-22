@@ -224,12 +224,15 @@ class StatisticsViewModelTest {
         assertEquals(45, updated.kpi.dailyGoalMinutes)
     }
 
-    // ───── Tache 7.2 — volumes parcourus, format abrégé, régularité ─────
+    // ───── Vitesse de lecture (chantier statistiques V1) ─────
 
     @Test
-    fun mots_parcourus_sont_formates_en_abrege_pour_les_grands_nombres() = runTest {
+    fun vitesse_de_lecture_est_calculee_sur_la_lecture_visuelle() = runTest {
         val readingSessionRepo = FakeReadingSessionRepository()
-        readingSessionRepo.insert(session("s1", "pub-1", 0L, wordsRead = 1_250_000, visualMs = 1_000L))
+        // 600 mots en 2 minutes de lecture visuelle → 300 mots/min.
+        readingSessionRepo.insert(
+            session("s1", "pub-1", 0L, wordsRead = 600, visualMs = TimeUnit.MINUTES.toMillis(2)),
+        )
 
         val vm = StatisticsViewModel(
             getStatistics = GetStatisticsUseCase(readingSessionRepo, FakePublicationRepository()),
@@ -240,9 +243,33 @@ class StatisticsViewModelTest {
 
         val ready = vm.state.first { it is StatisticsUiState.Ready } as StatisticsUiState.Ready
 
-        // Jamais la forme brute "1250000"
-        assertTrue(ready.kpi.totalWordsReadFormatted.endsWith("M"))
-        assertTrue(!ready.kpi.totalWordsReadFormatted.contains("1250000"))
+        assertEquals(300, ready.kpi.averageWpm)
+    }
+
+    @Test
+    fun vitesse_de_lecture_ignore_les_fragments_narres() = runTest {
+        val readingSessionRepo = FakeReadingSessionRepository()
+        // Écoute seule : la « vitesse » d'un fragment narré n'est que celle du
+        // synthétiseur, réglée par l'utilisateur. La compter reviendrait à lui
+        // afficher son propre réglage sous le nom de vitesse de lecture.
+        readingSessionRepo.insert(
+            session("s1", "pub-1", 0L, wordsRead = 600, ttsMs = TimeUnit.MINUTES.toMillis(2)),
+        )
+
+        val vm = StatisticsViewModel(
+            getStatistics = GetStatisticsUseCase(readingSessionRepo, FakePublicationRepository()),
+            getCurrentBook = GetCurrentBookUseCase(readingSessionRepo, FakePublicationRepository(), FakeReadingStateRepository()),
+            preferencesRepository = FakePreferencesRepository(),
+            exportService = FakeStatisticsExportService(),
+        )
+
+        val ready = vm.state.first { it is StatisticsUiState.Ready } as StatisticsUiState.Ready
+
+        assertEquals(
+            "aucune vitesse ne doit être déduite d'une écoute — l'écran affiche alors un tiret",
+            0,
+            ready.kpi.averageWpm,
+        )
     }
 
     @Test

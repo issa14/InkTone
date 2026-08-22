@@ -203,21 +203,25 @@ private fun Section1Kpis(kpi: com.inktone.domain.usecase.KpiState) {
             )
         }
 
-        // Bloc 3 — Volumes parcourus : Livres finis · Pages lues · Mots
-        // parcourus (format abrégé). Le WPM sort du tableau de bord — il
-        // vit désormais uniquement au niveau de l'ouvrage (Section 4).
+        // Bloc 3 — Livres finis · Vitesse de lecture.
+        //
+        // « Pages lues » et « Mots parcourus » ont été retirés : la première
+        // n'avait aucune source (un nombre de mots divisé par une moyenne
+        // éditoriale inventée, alors que le domaine refuse justement un
+        // pageCount générique pour les EPUB reflowables), et la seconde est un
+        // total brut dont le lecteur ne peut rien faire. La vitesse, elle, dit
+        // quelque chose — et n'est mesurée que sur la lecture visuelle.
         Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(InkToneSpacing.md)) {
             StatCard(
                 icon = AppSymbol.Success, label = "Livres finis",
                 value = kpi.booksFinished.toString(), modifier = Modifier.weight(1f),
             )
             StatCard(
-                icon = AppSymbol.Reading, label = "Pages lues",
-                value = kpi.totalPagesReadFormatted, modifier = Modifier.weight(1f),
-            )
-            StatCard(
-                icon = AppSymbol.Article, label = "Mots parcourus",
-                value = kpi.totalWordsReadFormatted, modifier = Modifier.weight(1f),
+                icon = AppSymbol.Reading, label = "Vitesse de lecture",
+                // Tiret et non « 0 » tant qu'aucune session visuelle n'a été
+                // enregistrée : un zéro se lirait comme une mesure.
+                value = if (kpi.averageWpm > 0) "${kpi.averageWpm} mots/min" else "—",
+                modifier = Modifier.weight(1f),
             )
         }
     }

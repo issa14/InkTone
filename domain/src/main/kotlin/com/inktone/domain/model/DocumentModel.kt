@@ -57,6 +57,22 @@ data class Sentence(
         require(blockIndex >= -1) { "blockIndex doit être >= -1" }
     }
 
+    /**
+     * Nombre de mots de la phrase — définition UNIQUE, partagée par les deux
+     * chemins qui alimentent `ReadingSession.wordsRead` (narration et
+     * défilement manuel). Deux découpages divergents rendraient la vitesse de
+     * lecture dépendante du mode, ce qui la viderait de son sens.
+     *
+     * Découpage sur les blancs : suffisant pour une métrique de vitesse, et
+     * volontairement indépendant de la segmentation TTS, dont tous les moteurs
+     * ne fournissent pas les limites de mots (K9).
+     */
+    val wordCount: Int get() = text.split(WHITESPACE).count { it.isNotBlank() }
+
+    private companion object {
+        val WHITESPACE = Regex("\\s+")
+    }
+
     /** Construit le Locator de début de cette phrase. */
     fun startLocator(
         chapterIndex: Int,

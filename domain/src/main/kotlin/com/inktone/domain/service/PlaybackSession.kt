@@ -1,6 +1,7 @@
 package com.inktone.domain.service
 
 import com.inktone.domain.model.SleepTimerState
+import kotlinx.coroutines.flow.SharedFlow
 import kotlinx.coroutines.flow.StateFlow
 
 /**
@@ -54,6 +55,19 @@ interface PlaybackSession {
 
     /** Index de la phrase courante dans le chapitre. */
     val currentSentenceIndex: StateFlow<Int>
+
+    /**
+     * Nombre de mots de chaque phrase **entièrement prononcée**, émis une
+     * phrase à la fois (Chantier statistiques V1).
+     *
+     * Porté par la session et non par l'écran Lecteur, pour la même raison que
+     * [sleepTimer] : écouter écran éteint est le cas nominal, et un comptage
+     * qui mourrait avec l'écran ne créditerait jamais les longues écoutes.
+     *
+     * Une phrase entamée puis interrompue n'est pas émise — seul ce qui a été
+     * réellement entendu compte.
+     */
+    val narratedSentenceWords: SharedFlow<Int>
 
     /** Métadonnées (titre/auteur) du livre narré, pour la notification. */
     val metadata: StateFlow<PlaybackMetadata>

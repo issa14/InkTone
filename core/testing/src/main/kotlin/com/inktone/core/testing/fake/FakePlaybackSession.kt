@@ -4,7 +4,9 @@ import com.inktone.domain.model.SleepTimerState
 import com.inktone.domain.service.PlaybackMetadata
 import com.inktone.domain.service.PlaybackSession
 import com.inktone.domain.service.PlaybackSessionState
+import kotlinx.coroutines.flow.MutableSharedFlow
 import kotlinx.coroutines.flow.MutableStateFlow
+import kotlinx.coroutines.flow.SharedFlow
 import kotlinx.coroutines.flow.StateFlow
 
 /**
@@ -22,9 +24,16 @@ class FakePlaybackSession : PlaybackSession {
     val metadataFlow = MutableStateFlow(PlaybackMetadata())
     val sleepTimerFlow = MutableStateFlow<SleepTimerState?>(null)
 
+    /**
+     * Mots des phrases prononcées — le test émet dessus pour simuler une
+     * narration qui avance, sans aucune synthèse.
+     */
+    val narratedSentenceWordsFlow = MutableSharedFlow<Int>(extraBufferCapacity = 64)
+
     override val sessionState: StateFlow<PlaybackSessionState> get() = sessionStateFlow
     override val isPlaying: StateFlow<Boolean> get() = isPlayingFlow
     override val currentSentenceIndex: StateFlow<Int> get() = currentSentenceIndexFlow
+    override val narratedSentenceWords: SharedFlow<Int> get() = narratedSentenceWordsFlow
     override val metadata: StateFlow<PlaybackMetadata> get() = metadataFlow
     override val sleepTimer: StateFlow<SleepTimerState?> get() = sleepTimerFlow
 

@@ -38,6 +38,7 @@ import com.inktone.domain.service.FixedPageRenderer
 import com.inktone.domain.service.ParseResult
 import com.inktone.domain.service.PublicationParser
 import com.inktone.domain.service.ReadingSessionTracker
+import com.inktone.domain.service.TrackerSnapshot
 import com.inktone.domain.service.TtsEngine
 import com.inktone.domain.service.WordTimestamp
 import com.inktone.domain.usecase.AddAnnotationUseCase
@@ -222,6 +223,17 @@ class ReaderViewModel @Inject constructor(
                 }
             }
         }
+
+        // Chantier statistiques V1 — les mots prononcés alimentent le tracker
+        // tant que CET écran en est propriétaire. Dès qu'il le cède au relais
+        // (`continueTracking`), `sessionTracker` est nul et ce collecteur ne
+        // crédite plus rien : c'est le relais qui prend la suite, jamais les
+        // deux ensemble.
+        viewModelScope.launch {
+            playbackOrchestrator.narratedSentenceWords.collect { words ->
+                sessionTracker?.addProgress(words)
+            }
+        }
     }
 
     // C.5 — exposé pour clé sharedElement dans ReaderScreen
@@ -232,6 +244,12 @@ class ReaderViewModel @Inject constructor(
 
     // ───── Lot Sessions ─────
     private var sessionTracker: ReadingSessionTracker? = null
+
+    /** Chapitre auquel se rapporte [visualProgressHighWaterMark]. */
+    private var visualProgressChapterIndex: Int = -1
+
+    /** Phrase la plus avancée déjà créditée au défilement dans ce chapitre. */
+    private var visualProgressHighWaterMark: Int = -1
     private var checkpointJob: Job? = null
     private var lastFragmentSavedMs: Long = 0L
     // ───── Fin Lot Sessions ─────
@@ -370,12 +388,56 @@ class ReaderViewModel @Inject constructor(
         if (_state.value.isPlaying) return
         if (sentenceIndex == _state.value.currentSentenceIndex) return
         val chapterIndex = _state.value.currentChapterIndex
+        creditVisuallyReadSentences(chapterIndex, sentenceIndex)
         _state.value = _state.value.copy(currentSentenceIndex = sentenceIndex)
         scrollPersistJob?.cancel()
         scrollPersistJob = viewModelScope.launch {
             delay(SCROLL_PERSIST_DEBOUNCE_MS)
             persistPosition(chapterIndex = chapterIndex, sentenceIndex = sentenceIndex)
         }
+    }
+
+    /**
+     * Chantier statistiques V1 — comptabilise les phrases franchies au
+     * défilement manuel, pendant du comptage TTS de [PlaybackOrchestrator].
+     *
+     * Sans ce chemin, la vitesse de lecture ne serait mesurée que sur les
+     * sessions narrées, où elle ne mesure rien d'autre que le débit du
+     * synthétiseur. Un lecteur silencieux resterait, lui, à zéro mot à vie.
+     *
+     * Une **marque haute par chapitre** empêche le recomptage : elle retient la
+     * dernière phrase déjà créditée, si bien qu'un aller-retour de défilement,
+     * ou la relecture d'un passage, n'ajoute rien. La marque est propre à un
+     * chapitre : en changer la réinitialise.
+     *
+     * Arriver à la phrase `i` signifie avoir terminé les phrases jusqu'à
+     * `i - 1` : celle où le regard se pose est en cours de lecture, pas lue.
+     *
+     * Appelée depuis [updateScrollPosition] seule, qui refuse déjà de
+     * s'exécuter pendant le TTS (K3) — les deux chemins ne peuvent donc pas
+     * créditer la même phrase.
+     */
+    private fun creditVisuallyReadSentences(chapterIndex: Int, sentenceIndex: Int) {
+        val tracker = sessionTracker ?: return
+        val sentences = _state.value.currentChapter?.sentences ?: return
+
+        if (chapterIndex != visualProgressChapterIndex) {
+            visualProgressChapterIndex = chapterIndex
+            // Position d'entrée dans le chapitre : rien n'y a encore été lu, et
+            // ce qui précède relève d'une reprise, pas d'une lecture.
+            visualProgressHighWaterMark = _state.value.currentSentenceIndex - 1
+        }
+
+        val lastCompleted = sentenceIndex - 1
+        if (lastCompleted <= visualProgressHighWaterMark) return
+
+        val from = (visualProgressHighWaterMark + 1).coerceIn(0, sentences.size)
+        val to = (lastCompleted + 1).coerceIn(from, sentences.size)
+        visualProgressHighWaterMark = lastCompleted
+
+        val crossed = sentences.subList(from, to)
+        if (crossed.isEmpty()) return
+        tracker.addProgress(words = crossed.sumOf { it.wordCount }, sentences = crossed.size)
     }
 
     /**
@@ -1428,6 +1490,13 @@ class ReaderViewModel @Inject constructor(
     @VisibleForTesting
     internal fun isSessionTrackerPausedForTest(): Boolean = sessionTracker?.isPaused ?: true
 
+    /**
+     * Mots crédités à la session en cours — exposé pour vérifier le comptage
+     * sans attendre qu'un fragment soit persisté (il faut 5 s d'activité).
+     */
+    @VisibleForTesting
+    internal fun sessionWordsReadForTest(): Int = sessionTracker?.wordsRead ?: 0
+
     /** Timer de checkpoint : sauve un fragment toutes les 5 minutes. */
     private fun startCheckpointTimer() {
         checkpointJob?.cancel()
@@ -1436,9 +1505,9 @@ class ReaderViewModel @Inject constructor(
                 delay(CHECKPOINT_INTERVAL_MS)
                 val t = sessionTracker ?: continue
                 if (t.isPaused) continue
-                val (v, tts) = t.snapshot()
-                if (v + tts < 5_000L) continue
-                persistFragment(v, tts)
+                val snapshot = t.snapshot()
+                if (snapshot.totalMs < 5_000L) continue
+                persistFragment(snapshot)
                 t.reset()
             }
         }
@@ -1447,9 +1516,9 @@ class ReaderViewModel @Inject constructor(
     /** Flush + save d'un fragment sans pauser le tracker. */
     private fun saveCurrentFragment() {
         val t = sessionTracker ?: return
-        val (v, tts) = t.snapshot()
-        if (v + tts < 5_000L) return
-        persistFragment(v, tts)
+        val snapshot = t.snapshot()
+        if (snapshot.totalMs < 5_000L) return
+        persistFragment(snapshot)
         t.reset()
     }
 
@@ -1458,7 +1527,7 @@ class ReaderViewModel @Inject constructor(
      * Chaque fragment est non-chevauchant : [lastFragmentSavedMs]
      * avance à chaque sauvegarde.
      */
-    private fun persistFragment(visualMs: Long, ttsMs: Long) {
+    private fun persistFragment(snapshot: TrackerSnapshot) {
         val fragmentStart = lastFragmentSavedMs
         lastFragmentSavedMs = System.currentTimeMillis()
         viewModelScope.launch(Dispatchers.IO) {
@@ -1468,9 +1537,12 @@ class ReaderViewModel @Inject constructor(
                     publicationId = sessionTracker!!.publicationId,
                     startedAt = fragmentStart,
                     endedAt = lastFragmentSavedMs,
-                    mode = if (ttsMs >= visualMs) DomainReadingMode.AUDIO else DomainReadingMode.VISUAL,
-                    visualDurationMs = visualMs,
-                    ttsDurationMs = ttsMs,
+                    mode = if (snapshot.ttsMs >= snapshot.visualMs) DomainReadingMode.AUDIO
+                    else DomainReadingMode.VISUAL,
+                    sentencesRead = snapshot.sentences,
+                    wordsRead = snapshot.words,
+                    visualDurationMs = snapshot.visualMs,
+                    ttsDurationMs = snapshot.ttsMs,
                 )
             )
         }
