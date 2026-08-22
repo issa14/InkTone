@@ -35,7 +35,14 @@ class InkToneApplicationConventionPlugin : Plugin<Project> {
                 defaultConfig {
                     applicationId = "com.inktone.app"
                     minSdk = 26
-                    targetSdk = 34
+                    // targetSdk 35 : exigence Play, et bascule de comportement
+                    // — Android 15 impose l'edge-to-edge et rend
+                    // `window.statusBarColor`/`navigationBarColor` sans effet.
+                    // L'app ne les utilise plus : `MainActivity` appelle
+                    // `enableEdgeToEdge()`, les barres système sont
+                    // transparentes et leur couleur vient du contenu dessiné
+                    // derrière (voir `SystemBarIconsEffect`).
+                    targetSdk = 35
                     versionCode = 1
                     versionName = "1.0.0"
                 }

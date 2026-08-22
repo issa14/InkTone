@@ -33,6 +33,10 @@ import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.lazy.itemsIndexed
 import androidx.compose.foundation.lazy.rememberLazyListState
+import androidx.compose.foundation.layout.WindowInsets
+import androidx.compose.foundation.layout.navigationBarsIgnoringVisibility
+import androidx.compose.foundation.layout.statusBarsIgnoringVisibility
+import androidx.compose.foundation.layout.windowInsetsPadding
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.text.BasicTextField
@@ -98,7 +102,7 @@ import com.inktone.core.designsystem.AppIcons
 import com.inktone.core.designsystem.AppSymbol
 import com.inktone.core.designsystem.reducedMotionDuration
 import com.inktone.core.designsystem.WindowBackgroundColorEffect
-import com.inktone.core.designsystem.StatusBarColorEffect
+import com.inktone.core.designsystem.SystemBarIconsEffect
 import com.inktone.domain.model.Annotation
 import com.inktone.domain.model.AnnotationColor
 import com.inktone.domain.model.ChapterContent
@@ -331,13 +335,12 @@ fun ReaderScreen(
     // quand elle est visible (les deux se confondent), celle de la page
     // sinon — `barSurface` est un lerp à 10 % vers la couleur du texte,
     // nettement visible en bande claire sur un fond noir sans HUD.
-    // Le Lecteur est la seule exception à la couleur centralisée par
-    // `InkToneNavHost` : la sienne dépend du thème de LECTURE, que le NavHost
-    // ne connaît pas. Aucun conflit d'écriture possible — le drawer n'est
-    // jamais ouvrable depuis cet écran, donc rien ne recompose le NavHost
-    // pendant que celui-ci est affiché. Sert les barres qui reparaissent
-    // transitoirement au balayage (mode immersif).
-    StatusBarColorEffect(ThemeColors.barSurface(state.resolvedTheme))
+    // Seule exception au contraste centralisé par `InkToneNavHost` : celui du
+    // Lecteur dépend du thème de LECTURE, que le NavHost ne connaît pas.
+    // Aucun conflit d'écriture possible — le drawer n'est jamais ouvrable
+    // depuis cet écran, donc rien ne recompose le NavHost pendant qu'il est
+    // affiché. Sert les barres qui reparaissent transitoirement au balayage.
+    SystemBarIconsEffect(ThemeColors.barSurface(state.resolvedTheme))
     WindowBackgroundColorEffect(
         if (isHudVisible) {
             ThemeColors.barSurface(state.resolvedTheme)
@@ -602,7 +605,18 @@ fun ReaderScreen(
                 title = state.title,
                 author = state.author,
                 onBack = onBack,
-                modifier = Modifier.align(Alignment.TopCenter).zIndex(1f),
+                modifier = Modifier
+                    .align(Alignment.TopCenter)
+                    .zIndex(1f)
+                    // Edge-to-edge : le HUD ne doit pas se glisser sous les
+                    // barres système. `statusBarsPadding()` ne conviendrait
+                    // pas ici — le mode immersif MASQUE la barre, son inset
+                    // tombe donc à zéro et le titre reviendrait se coller au
+                    // bord, pour être recouvert par l'horloge dès que le
+                    // balayage rappelle les barres transitoires. La variante
+                    // `IgnoringVisibility` réserve la place que la barre
+                    // OCCUPERAIT, masquée ou non.
+                    .windowInsetsPadding(WindowInsets.statusBarsIgnoringVisibility),
                 surfaceColor = ThemeColors.barSurface(state.resolvedTheme),
                 contentColor = ThemeColors.barContent(state.resolvedTheme),
             )
@@ -1023,7 +1037,10 @@ fun ReaderScreen(
         Box(
             modifier = Modifier
                 .align(Alignment.BottomCenter)
-                .fillMaxWidth(),
+                .fillMaxWidth()
+                // Même raison qu'en haut : la ligne de statut et les commandes
+                // passeraient sous la barre de navigation système.
+                .windowInsetsPadding(WindowInsets.navigationBarsIgnoringVisibility),
         ) {
             Column(modifier = Modifier.fillMaxWidth()) {
                 if (isHudVisible) {

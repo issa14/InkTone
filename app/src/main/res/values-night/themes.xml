@@ -1,10 +1,9 @@
 <?xml version="1.0" encoding="utf-8"?>
 <resources>
+    <!-- Voir values/themes.xml : les attributs de barres système sont sans
+         effet en targetSdk 35 et ne sont plus déclarés. -->
     <style name="Theme.InkTone" parent="@android:style/Theme.Material.NoActionBar">
         <item name="android:windowBackground">@color/brand_background</item>
-        <item name="android:statusBarColor">@color/brand_background</item>
-        <item name="android:navigationBarColor">@color/brand_background</item>
-        <item name="android:windowLightStatusBar">false</item>
     </style>
     <!-- Theme.InkTone.Starting hérité de values/ ; seul brand_background bascule via values-night -->
 </resources>

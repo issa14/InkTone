@@ -1,10 +1,20 @@
 <?xml version="1.0" encoding="utf-8"?>
 <resources>
+    <!--
+      targetSdk 35 : `statusBarColor`, `navigationBarColor` et
+      `windowLightStatusBar` sont retirés d'ici, sans effet depuis
+      Android 15 — les garder aurait laissé croire qu'ils pilotent encore
+      quelque chose. Les barres système sont transparentes
+      (`enableEdgeToEdge`, MainActivity), leur couleur vient du contenu
+      dessiné derrière, et le contraste de leurs icônes de
+      `SystemBarIconsEffect`.
+
+      `windowBackground` reste : il peint la fenêtre avant la première
+      composition (et le Lecteur le repeint à sa couleur de page, voir
+      WindowBackgroundColorEffect).
+    -->
     <style name="Theme.InkTone" parent="@android:style/Theme.Material.Light.NoActionBar">
         <item name="android:windowBackground">@color/brand_background</item>
-        <item name="android:statusBarColor">@color/brand_background</item>
-        <item name="android:navigationBarColor">@color/brand_background</item>
-        <item name="android:windowLightStatusBar">true</item>
     </style>
 
     <style name="Theme.InkTone.Starting" parent="Theme.SplashScreen">

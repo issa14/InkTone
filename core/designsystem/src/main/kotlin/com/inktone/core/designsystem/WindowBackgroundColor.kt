@@ -19,15 +19,20 @@ import androidx.compose.ui.platform.LocalView
  * statut elle-même. Ce que couvre cet effet est la bande que le fond de
  * fenêtre laisse voir là où le contenu n'est pas posé.
  *
- * ## Le cas qui l'a rendu nécessaire
+ * ## Ce qu'il couvre depuis l'edge-to-edge
  *
- * Le Lecteur masque entièrement les barres système (`ImmersiveReaderChrome`),
- * mais l'inset de barre de statut reste consommé : le contenu commence donc
- * sous cette bande, et `themes.xml` l'y peint en `@color/brand_background`
- * (un crème `#FFFBF5`). Sur un thème de lecture sombre, cela donnait un
- * bandeau clair permanent au-dessus de la barre du haut — mesuré au pixel :
- * `(255, 251, 245)` jusqu'à y=44, puis `(3, 3, 3)` pour la page. Aucune
- * valeur de `statusBarColor` ne pouvait le corriger, la barre étant masquée.
+ * Il a été écrit pour une bande blanche en haut du Lecteur : les barres
+ * système étaient masquées mais leur inset restait consommé, si bien que le
+ * contenu commençait dessous et que `themes.xml` peignait la bande en
+ * `@color/brand_background` — mesuré `(255, 251, 245)` jusqu'à y=44 sur un
+ * fond de page `(3, 3, 3)`.
+ *
+ * Cette cause a disparu avec `enableEdgeToEdge()` (targetSdk 35) : le
+ * contenu remplit désormais toute la fenêtre, il ne reste aucune bande à
+ * peindre. L'effet garde pourtant son utilité, plus étroite : le fond de
+ * fenêtre est ce qui s'affiche AVANT la première composition. Sans lui,
+ * ouvrir un livre en thème sombre montrerait brièvement le crème de
+ * `windowBackground` en plein écran — le fond de la page évite ce flash.
  *
  * La couleur d'origine est capturée UNE fois ([remember]) puis restaurée au
  * départ de l'écran : sans cela, un changement de [color] restaurerait la

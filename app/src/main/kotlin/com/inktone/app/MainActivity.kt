@@ -1,7 +1,10 @@
 package com.inktone.app
 
+import android.graphics.Color
 import android.os.Bundle
 import androidx.activity.ComponentActivity
+import androidx.activity.SystemBarStyle
+import androidx.activity.enableEdgeToEdge
 import androidx.activity.compose.setContent
 import androidx.compose.material3.Surface
 import androidx.compose.material3.windowsizeclass.ExperimentalMaterial3WindowSizeClassApi
@@ -42,6 +45,23 @@ class MainActivity : ComponentActivity() {
     @OptIn(ExperimentalMaterial3WindowSizeClassApi::class)
     override fun onCreate(savedInstanceState: Bundle?) {
         val splashScreen = installSplashScreen()
+        // targetSdk 35 : Android 15 impose l'edge-to-edge et rend
+        // `window.statusBarColor` sans effet. On l'active explicitement plutôt
+        // que de le subir — l'appel de compat produit le même comportement dès
+        // API 21, donc la mise en page se vérifie sur n'importe quel appareil
+        // et pas seulement sur Android 15.
+        //
+        // Les deux barres sont déclarées TRANSPARENTES : leur couleur vient
+        // désormais du contenu dessiné DERRIÈRE elles (la `TopAppBar` peint
+        // son fond jusqu'au bord haut), plus d'une propriété de fenêtre. Le
+        // contraste des icônes système reste piloté par
+        // `SystemBarIconsEffect`, qui le déduit de la couleur réellement
+        // dessinée — `SystemBarStyle.auto` ne saurait, lui, que consulter le
+        // mode sombre du SYSTÈME, que le thème d'InkTone peut contredire.
+        enableEdgeToEdge(
+            statusBarStyle = SystemBarStyle.dark(Color.TRANSPARENT),
+            navigationBarStyle = SystemBarStyle.dark(Color.TRANSPARENT),
+        )
         super.onCreate(savedInstanceState)
         // Sous-lot 2d, D5 — le splash couvre exactement le frame vide que
         // `hasSeenOnboarding == null` contournait deja plus bas (Lot 10) :
