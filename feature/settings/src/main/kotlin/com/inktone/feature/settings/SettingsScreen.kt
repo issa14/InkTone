@@ -1,5 +1,6 @@
 package com.inktone.feature.settings
-import com.inktone.core.designsystem.AppIcons
+import com.inktone.core.designsystem.AppIcon
+import com.inktone.core.designsystem.AppSymbol
 
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
@@ -114,7 +115,7 @@ fun SettingsScreen(
                 title = { Text("Réglages") },
                 navigationIcon = {
                     IconButton(onClick = onBack) {
-                        Icon(AppIcons.Back, contentDescription = "Retour")
+                        AppIcon(AppSymbol.Back, contentDescription = "Retour")
                     }
                 },
                 scrollBehavior = scrollBehavior,
@@ -183,7 +184,7 @@ internal fun SettingsContent(
 
         SectionGroup("Présets rapides") {
             PresetRow(
-                icon = { Icon(AppIcons.DarkMode, contentDescription = null) },
+                icon = { AppIcon(AppSymbol.DarkMode, contentDescription = null) },
                 title = "Mode sombre",
                 description = "Thème sombre · Interface sombre",
                 checked = isDarkPresetActive,
@@ -191,7 +192,7 @@ internal fun SettingsContent(
             )
             HorizontalDivider(modifier = Modifier.padding(horizontal = 20.dp))
             PresetRow(
-                icon = { Icon(AppIcons.Accessibility, contentDescription = null) },
+                icon = { AppIcon(AppSymbol.Accessibility, contentDescription = null) },
                 title = "Accessibilité",
                 description = "OpenDyslexic · 24 sp · Animations réduites · Mode Liste",
                 checked = isAccessibilityPresetActive,
@@ -244,8 +245,8 @@ internal fun SettingsContent(
                 label = "Vitesse d'élocution",
                 value = activeSpeed,
                 range = 0.5f..2.0f,
-                minIcon = AppIcons.SlowMotionVideo,
-                maxIcon = AppIcons.FastForward,
+                minIcon = AppSymbol.SlowMotionVideo,
+                maxIcon = AppSymbol.FastForward,
                 displayFormatter = { "%.1f×".format(it) },
                 onValueChange = { onIntent(SettingsIntent.SetVoiceSpeed(it)) },
             )
@@ -253,8 +254,8 @@ internal fun SettingsContent(
                 label = "Gain audio",
                 value = preferences.audioGain,
                 range = 1.0f..4.0f,
-                minIcon = AppIcons.VolumeDown,
-                maxIcon = AppIcons.Speaking,
+                minIcon = AppSymbol.VolumeDown,
+                maxIcon = AppSymbol.Speaking,
                 displayFormatter = { "%.1f×".format(it) },
                 onValueChange = { onIntent(SettingsIntent.SetAudioGain(it)) },
             )
@@ -264,8 +265,8 @@ internal fun SettingsContent(
                 label = "Intonation (pitch)",
                 value = activePitch,
                 range = 0.5f..1.5f,
-                minIcon = AppIcons.KeyboardArrowDown,
-                maxIcon = AppIcons.KeyboardArrowUp,
+                minIcon = AppSymbol.KeyboardArrowDown,
+                maxIcon = AppSymbol.KeyboardArrowUp,
                 displayFormatter = { "%.1f×".format(it) },
                 onValueChange = { onIntent(SettingsIntent.SetVoicePitch(it)) },
             )
@@ -280,8 +281,8 @@ internal fun SettingsContent(
                     .fillMaxWidth()
                     .padding(horizontal = 20.dp, vertical = 8.dp),
             ) {
-                Icon(
-                    if (isPreviewing) AppIcons.Pause else AppIcons.Play,
+                AppIcon(
+                    if (isPreviewing) AppSymbol.Pause else AppSymbol.Play,
                     contentDescription = null,
                 )
                 Spacer(Modifier.width(8.dp))
@@ -398,8 +399,8 @@ internal fun SettingsContent(
                     )
                 }
                 if (!modelsFolderInfo.isEditable) {
-                    Icon(
-                        AppIcons.Lock,
+                    AppIcon(
+                        AppSymbol.Lock,
                         contentDescription = "Lecture seule",
                         modifier = Modifier.size(16.dp),
                         tint = MaterialTheme.colorScheme.onSurfaceVariant,
@@ -411,14 +412,14 @@ internal fun SettingsContent(
 
             // Action directe, sans confirmation — n'écrase rien de local.
             ActionRow(
-                icon = AppIcons.Upload,
+                icon = AppSymbol.Upload,
                 title = "Exporter les données",
                 subtitle = "Signets, règles de prononciation, progression et statistiques",
                 onClick = onExportData,
             )
             // Avertissement préalable — l'import écrase la configuration courante.
             ActionRow(
-                icon = AppIcons.Download,
+                icon = AppSymbol.Download,
                 title = "Importer une sauvegarde",
                 subtitle = "Remplace les données actuelles par celles du fichier sélectionné",
                 onClick = { showImportWarning = true },
@@ -444,7 +445,7 @@ internal fun SettingsContent(
                     )
                 }
                 TextButton(onClick = { showClearCacheConfirm = true }, enabled = cacheSizeBytes > 0) {
-                    Icon(AppIcons.DeleteSweep, contentDescription = null)
+                    AppIcon(AppSymbol.DeleteSweep, contentDescription = null)
                     Spacer(Modifier.width(4.dp))
                     Text("Vider")
                 }
@@ -454,7 +455,7 @@ internal fun SettingsContent(
 
             // Couleur d'alerte + icône triangle : signale le côté destructif.
             ActionRow(
-                icon = AppIcons.WarningAmber,
+                icon = AppSymbol.WarningAmber,
                 title = "Réinitialiser les paramètres",
                 subtitle = "Revient aux réglages par défaut — les livres et les données ne sont pas touchés",
                 tint = MaterialTheme.colorScheme.error,
@@ -705,7 +706,7 @@ private fun SettingRow(label: String, value: String, onClick: () -> Unit) {
  */
 @Composable
 private fun ActionRow(
-    icon: ImageVector,
+    icon: AppSymbol,
     title: String,
     subtitle: String? = null,
     tint: androidx.compose.ui.graphics.Color = MaterialTheme.colorScheme.onSurface,
@@ -720,7 +721,7 @@ private fun ActionRow(
         verticalAlignment = Alignment.CenterVertically,
         horizontalArrangement = Arrangement.spacedBy(12.dp),
     ) {
-        Icon(icon, contentDescription = null, tint = tint)
+        AppIcon(icon, contentDescription = null, tint = tint)
         Column(Modifier.weight(1f)) {
             Text(title, color = tint)
             if (subtitle != null) {
@@ -813,7 +814,7 @@ private fun VoiceDownloadRow(
             // null (jamais lancé) ou Failed (réessayer) : bouton de téléchargement.
             null, is com.inktone.domain.service.VoiceDownloadProgress.Failed ->
                 OutlinedButton(onClick = { showConfirmDialog = true }) {
-                    Icon(AppIcons.Download, contentDescription = null)
+                    AppIcon(AppSymbol.Download, contentDescription = null)
                     Spacer(Modifier.width(8.dp))
                     Text("Télécharger une voix neuronale")
                 }
@@ -884,8 +885,8 @@ private fun SliderSetting(
     label: String,
     value: Float,
     range: ClosedFloatingPointRange<Float>,
-    minIcon: ImageVector,
-    maxIcon: ImageVector,
+    minIcon: AppSymbol,
+    maxIcon: AppSymbol,
     displayFormatter: (Float) -> String = { it.toInt().toString() },
     onValueChange: (Float) -> Unit,
 ) {
@@ -902,8 +903,8 @@ private fun SliderSetting(
             verticalAlignment = Alignment.CenterVertically,
             modifier = Modifier.fillMaxWidth().padding(vertical = 8.dp),
         ) {
-            Icon(
-                imageVector = minIcon,
+            AppIcon(
+                minIcon,
                 contentDescription = null,
                 tint = MaterialTheme.colorScheme.onSurfaceVariant,
             )
@@ -938,8 +939,8 @@ private fun SliderSetting(
                     .padding(horizontal = 12.dp)
                     .semantics { contentDescription = "$label, valeur ${displayFormatter(value)}" },
             )
-            Icon(
-                imageVector = maxIcon,
+            AppIcon(
+                maxIcon,
                 contentDescription = null,
                 tint = MaterialTheme.colorScheme.onSurfaceVariant,
             )
@@ -949,7 +950,7 @@ private fun SliderSetting(
 
 /**
  * Lot 6 — Stepper −/+ par pas, désactivé visuellement quand enabled=false.
- * Refonte — de vrais `IconButton` (48x48dp, `AppIcons.Remove`/`Add`)
+ * Refonte — de vrais `IconButton` (48x48dp, `AppSymbol.Remove`/`Add`)
  * remplacent les boutons texte "−"/"+" ; la valeur est encadrée par les deux.
  * Correctif — le libellé porte `Modifier.weight(1f)` pour prendre tout
  * l'espace disponible et repousser le stepper à droite ; le stepper ne
@@ -992,7 +993,7 @@ private fun StepperSetting(
             IconButton(
                 onClick = { onValueChange((value - step).coerceIn(range)) },
                 enabled = enabled && value > range.first,
-            ) { Icon(AppIcons.Remove, contentDescription = "Diminuer $label") }
+            ) { AppIcon(AppSymbol.Remove, contentDescription = "Diminuer $label") }
             Text(
                 text = displayFormatter(value),
                 style = MaterialTheme.typography.bodyMedium,
@@ -1002,7 +1003,7 @@ private fun StepperSetting(
             IconButton(
                 onClick = { onValueChange((value + step).coerceIn(range)) },
                 enabled = enabled && value < range.last,
-            ) { Icon(AppIcons.Add, contentDescription = "Augmenter $label") }
+            ) { AppIcon(AppSymbol.Add, contentDescription = "Augmenter $label") }
         }
     }
 }
@@ -1029,7 +1030,7 @@ private fun PronunciationCard(
                 color = MaterialTheme.colorScheme.primary,
             )
             IconButton(onClick = onAddClick) {
-                Icon(AppIcons.Add, contentDescription = "Ajouter une règle de prononciation")
+                AppIcon(AppSymbol.Add, contentDescription = "Ajouter une règle de prononciation")
             }
         }
         ElevatedCard(shape = RoundedCornerShape(16.dp), modifier = Modifier.fillMaxWidth()) {
@@ -1061,8 +1062,8 @@ private fun PronunciationRuleRow(
             horizontalArrangement = Arrangement.spacedBy(6.dp),
         ) {
             Text(rule.originalText, style = MaterialTheme.typography.bodyLarge)
-            Icon(
-                AppIcons.ArrowForward,
+            AppIcon(
+                AppSymbol.ArrowForward,
                 contentDescription = null,
                 modifier = Modifier.size(16.dp),
                 tint = MaterialTheme.colorScheme.onSurfaceVariant,
@@ -1081,7 +1082,7 @@ private fun PronunciationRuleRow(
         }
         Switch(checked = rule.isEnabled, onCheckedChange = { onToggle() })
         IconButton(onClick = onDelete) {
-            Icon(AppIcons.Delete, contentDescription = "Supprimer la règle ${rule.originalText}")
+            AppIcon(AppSymbol.Delete, contentDescription = "Supprimer la règle ${rule.originalText}")
         }
     }
 }

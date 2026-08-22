@@ -50,7 +50,6 @@ import androidx.compose.ui.draw.clip
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.hilt.navigation.compose.hiltViewModel
-import com.inktone.core.designsystem.AppIcons
 import com.inktone.core.designsystem.toColor
 
 /**
@@ -87,7 +86,7 @@ fun ThemeStudioScreen(
                 title = { Text("Studio de Thème") },
                 navigationIcon = {
                     IconButton(onClick = onBack) {
-                        Icon(AppIcons.Back, contentDescription = "Retour")
+                        AppIcon(AppSymbol.Back, contentDescription = "Retour")
                     }
                 },
                 actions = {
@@ -272,13 +271,13 @@ private fun StudioLivePreview(state: ThemeStudioUiState) {
 @Composable
 private fun WcagBadge(state: ThemeStudioUiState) {
     val (label, color, icon) = when (state.wcagLevel) {
-        WcagLevel.AAA -> Triple("WCAG AAA (%.1f:1)".format(state.contrastRatio), Color4Ok, AppIcons.Success)
-        WcagLevel.AA -> Triple("WCAG AA (%.1f:1)".format(state.contrastRatio), Color4Ok, AppIcons.Success)
-        WcagLevel.BELOW_THRESHOLD -> Triple("Contraste faible (%.1f:1)".format(state.contrastRatio), MaterialTheme.colorScheme.error, AppIcons.Warning)
+        WcagLevel.AAA -> Triple("WCAG AAA (%.1f:1)".format(state.contrastRatio), Color4Ok, AppSymbol.Success)
+        WcagLevel.AA -> Triple("WCAG AA (%.1f:1)".format(state.contrastRatio), Color4Ok, AppSymbol.Success)
+        WcagLevel.BELOW_THRESHOLD -> Triple("Contraste faible (%.1f:1)".format(state.contrastRatio), MaterialTheme.colorScheme.error, AppSymbol.Warning)
     }
     Surface(color = color.copy(alpha = 0.15f), shape = RoundedCornerShape(8.dp)) {
         Row(Modifier.padding(horizontal = 10.dp, vertical = 6.dp), verticalAlignment = Alignment.CenterVertically) {
-            Icon(icon, contentDescription = null, tint = color, modifier = Modifier.size(16.dp))
+            AppIcon(icon, contentDescription = null, tint = color, modifier = Modifier.size(16.dp))
             Spacer(Modifier.width(6.dp))
             Text(label, style = MaterialTheme.typography.labelSmall, color = color)
         }

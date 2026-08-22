@@ -23,7 +23,8 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.hilt.navigation.compose.hiltViewModel
 import android.text.format.DateUtils
-import com.inktone.core.designsystem.AppIcons
+import com.inktone.core.designsystem.AppIcon
+import com.inktone.core.designsystem.AppSymbol
 import com.inktone.domain.model.ReadingPositionSnapshot
 import java.util.Locale
 
@@ -55,7 +56,7 @@ fun SyncConflictBottomSheet(
             verticalArrangement = Arrangement.spacedBy(16.dp),
         ) {
             Row(verticalAlignment = Alignment.CenterVertically) {
-                Icon(AppIcons.WarningOutlined, contentDescription = null, tint = MaterialTheme.colorScheme.error)
+                AppIcon(AppSymbol.Warning, contentDescription = null, tint = MaterialTheme.colorScheme.error)
                 Row(Modifier.padding(start = 8.dp)) {
                     Text("Conflit de synchronisation", style = MaterialTheme.typography.titleLarge, fontWeight = FontWeight.Bold)
                 }

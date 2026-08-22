@@ -38,7 +38,7 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.window.Popup
 import androidx.compose.ui.window.PopupPositionProvider
 import androidx.compose.ui.window.PopupProperties
-import com.inktone.core.designsystem.AppIcons
+import com.inktone.core.designsystem.AppIcon
 import com.inktone.core.designsystem.AppSymbol
 import com.inktone.domain.model.AnnotationColor
 
@@ -140,15 +140,15 @@ fun SelectionActionPopup(
         ) {
             when (mode) {
                 SelectionPopupMode.ACTIONS -> Row(modifier = Modifier.padding(4.dp)) {
-                    PopupActionButton(icon = AppIcons.Copy, label = "Copier") {
+                    PopupActionButton(icon = AppSymbol.Copy, label = "Copier") {
                         clipboardManager.setText(AnnotatedString(selectedText))
                         Toast.makeText(context, "Texte copié", Toast.LENGTH_SHORT).show()
                         onDismiss()
                     }
-                    PopupActionButton(icon = AppIcons.Highlight, label = "Surligner") {
+                    PopupActionButton(icon = AppSymbol.Highlight, label = "Surligner") {
                         mode = SelectionPopupMode.COLOR_PICKER
                     }
-                    PopupActionButton(icon = AppIcons.Note, label = "Note") {
+                    PopupActionButton(icon = AppSymbol.Note, label = "Note") {
                         mode = SelectionPopupMode.NOTE_INPUT
                     }
                 }
@@ -185,9 +185,9 @@ fun SelectionActionPopup(
 }
 
 @Composable
-private fun PopupActionButton(icon: androidx.compose.ui.graphics.vector.ImageVector, label: String, onClick: () -> Unit) {
+private fun PopupActionButton(icon: AppSymbol, label: String, onClick: () -> Unit) {
     TextButton(onClick = onClick) {
-        Icon(icon, contentDescription = null, modifier = Modifier.padding(end = 4.dp))
+        AppIcon(icon, contentDescription = null, modifier = Modifier.padding(end = 4.dp))
         Text(label)
     }
 }

@@ -33,6 +33,9 @@ jobs:
       - name: Vérifier l'absence de MANAGE_EXTERNAL_STORAGE
         run: bash scripts/check-no-manage-external-storage.sh
 
+      - name: Vérifier l'unicité de la famille d'icônes
+        run: bash scripts/check-icon-family.sh
+
       - name: Couverture de tests minimale
         run: ./gradlew koverVerify
         # Seuil mesure puis fixe (Tache 9.4.1, docs/execution/PHASE_9_HARDENING.md) :

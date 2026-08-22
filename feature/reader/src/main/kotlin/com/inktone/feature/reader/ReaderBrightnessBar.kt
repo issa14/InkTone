@@ -1,6 +1,7 @@
 package com.inktone.feature.reader
 
-import com.inktone.core.designsystem.AppIcons
+import com.inktone.core.designsystem.AppIcon
+import com.inktone.core.designsystem.AppSymbol
 import android.app.Activity
 import android.view.WindowManager
 import androidx.compose.foundation.background
@@ -80,8 +81,8 @@ fun ReaderBrightnessBar(value: Float?, onValueChange: (Float?) -> Unit) {
             modifier = Modifier.fillMaxWidth().padding(horizontal = 16.dp, vertical = 8.dp),
             verticalAlignment = Alignment.CenterVertically,
         ) {
-            Icon(
-                AppIcons.Brightness,
+            AppIcon(
+                AppSymbol.Brightness,
                 contentDescription = "Valeur système",
                 modifier = Modifier
                     .combinedClickable(onClick = { onValueChange(null) })
@@ -101,8 +102,8 @@ fun ReaderBrightnessBar(value: Float?, onValueChange: (Float?) -> Unit) {
                 modifier = Modifier.weight(1f),
             )
             Spacer(Modifier.width(4.dp))
-            Icon(
-                AppIcons.Brightness,
+            AppIcon(
+                AppSymbol.Brightness,
                 contentDescription = "Luminosité maximale",
                 tint = MaterialTheme.colorScheme.onSurfaceVariant,
             )

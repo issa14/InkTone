@@ -48,7 +48,6 @@ import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
-import com.inktone.core.designsystem.AppIcons
 import com.inktone.core.designsystem.InkToneSpacing
 
 /**
@@ -81,7 +80,7 @@ fun BookStatisticsScreen(
                 },
                 navigationIcon = {
                     IconButton(onClick = onBack) {
-                        Icon(AppIcons.Back, contentDescription = "Retour")
+                        AppIcon(AppSymbol.Back, contentDescription = "Retour")
                     }
                 },
                 colors = TopAppBarDefaults.centerAlignedTopAppBarColors(),
@@ -113,11 +112,11 @@ fun BookStatisticsScreen(
                             horizontalArrangement = Arrangement.spacedBy(InkToneSpacing.md),
                         ) {
                             KpiCard(
-                                icon = AppIcons.Speed, label = "Vitesse",
+                                icon = AppSymbol.Speed, label = "Vitesse",
                                 value = s.wpmFormatted, modifier = Modifier.weight(1f),
                             )
                             KpiCard(
-                                icon = AppIcons.Timer, label = "Temps restant",
+                                icon = AppSymbol.Timer, label = "Temps restant",
                                 value = s.remainingTimeFormatted, modifier = Modifier.weight(1f),
                             )
                         }
@@ -186,7 +185,7 @@ private fun BookSelectorTitle(
 
 @Composable
 private fun KpiCard(
-    icon: androidx.compose.ui.graphics.vector.ImageVector,
+    icon: AppSymbol,
     label: String,
     value: String,
     modifier: Modifier = Modifier,
@@ -196,7 +195,7 @@ private fun KpiCard(
             modifier = Modifier.padding(12.dp),
             horizontalAlignment = Alignment.CenterHorizontally,
         ) {
-            Icon(icon, contentDescription = null, tint = MaterialTheme.colorScheme.primary, modifier = Modifier.size(20.dp))
+            AppIcon(icon, contentDescription = null, tint = MaterialTheme.colorScheme.primary, modifier = Modifier.size(20.dp))
             Spacer(Modifier.height(4.dp))
             Text(value, style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.SemiBold)
             Text(label, style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.onSurfaceVariant)

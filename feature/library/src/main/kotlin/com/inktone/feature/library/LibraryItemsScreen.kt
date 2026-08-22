@@ -52,7 +52,6 @@ import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.hilt.navigation.compose.hiltViewModel
 import com.inktone.core.designsystem.AppIcon
-import com.inktone.core.designsystem.AppIcons
 import com.inktone.core.designsystem.AppSymbol
 import com.inktone.domain.model.AnnotationColor
 import com.inktone.domain.model.LibraryItem
@@ -174,8 +173,8 @@ fun LibraryItemsScreen(
 private fun LibraryItemsEmptyState(isFiltered: Boolean) {
     Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
         Column(horizontalAlignment = Alignment.CenterHorizontally) {
-            Icon(
-                AppIcons.Bookmark,
+            AppIcon(
+                AppSymbol.Bookmark,
                 contentDescription = null,
                 modifier = Modifier.size(64.dp),
                 tint = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.5f),
@@ -299,7 +298,7 @@ private fun LibraryItemRow(
             colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceVariant),
         ) {
             Row(Modifier.padding(12.dp), verticalAlignment = Alignment.Top) {
-                Icon(
+                AppIcon(
                     iconFor(item),
                     contentDescription = null,
                     tint = colorFor(item) ?: MaterialTheme.colorScheme.primary,
@@ -348,9 +347,9 @@ private fun LibraryItemRow(
 }
 
 private fun iconFor(item: LibraryItem) = when (item.type) {
-    LibraryItemType.BOOKMARK -> AppIcons.Bookmark
-    LibraryItemType.HIGHLIGHT -> AppIcons.Highlight
-    LibraryItemType.NOTE -> AppIcons.Note
+    LibraryItemType.BOOKMARK -> AppSymbol.Bookmark
+    LibraryItemType.HIGHLIGHT -> AppSymbol.Highlight
+    LibraryItemType.NOTE -> AppSymbol.Note
 }
 
 private fun colorFor(item: LibraryItem): Color? = item.color?.let {

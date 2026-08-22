@@ -24,7 +24,7 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
-import com.inktone.core.designsystem.AppIcons
+import com.inktone.core.designsystem.AppIcon
 import com.inktone.core.designsystem.AppSymbol
 import com.inktone.domain.model.Publication
 import com.inktone.domain.model.PublicationFormat
@@ -64,22 +64,22 @@ fun BookActionsSheet(
             // contrôle superposé encombrant.
             BookActionItem(
                 label = if (publication.isFavorite) "Retirer des favoris" else "Ajouter aux favoris",
-                icon = if (publication.isFavorite) AppIcons.Favorite else AppIcons.FavoriteBorder,
+                icon = if (publication.isFavorite) AppSymbol.Favorite else AppSymbol.Favorite,
                 onClick = { onDismiss(); onToggleFavorite() },
             )
             BookActionItem(
                 label = if (publication.isPinned) "Détacher" else "Épingler",
-                icon = if (publication.isPinned) AppIcons.Pin else AppIcons.PinOutlined,
+                icon = if (publication.isPinned) AppSymbol.Pin else AppSymbol.Pin,
                 onClick = { onDismiss(); onTogglePin() },
             )
             BookActionItem(
                 label = "Détails du livre",
-                icon = AppIcons.Info,
+                icon = AppSymbol.Info,
                 onClick = { onDismiss(); onShowDetails() },
             )
             BookActionItem(
                 label = "Retirer de la bibliothèque",
-                icon = AppIcons.Delete,
+                icon = AppSymbol.Delete,
                 onClick = { onDismiss(); onRequestDelete() },
             )
         }
@@ -87,12 +87,12 @@ fun BookActionsSheet(
 }
 
 @Composable
-private fun BookActionItem(label: String, icon: ImageVector, onClick: () -> Unit) {
+private fun BookActionItem(label: String, icon: AppSymbol, onClick: () -> Unit) {
     Row(
         modifier = Modifier.fillMaxWidth().clickable(onClick = onClick).padding(horizontal = 24.dp, vertical = 14.dp),
         verticalAlignment = Alignment.CenterVertically,
     ) {
-        Icon(icon, contentDescription = null, modifier = Modifier.padding(end = 16.dp))
+        AppIcon(icon, contentDescription = null, modifier = Modifier.padding(end = 16.dp))
         Text(label, style = MaterialTheme.typography.bodyLarge)
     }
 }

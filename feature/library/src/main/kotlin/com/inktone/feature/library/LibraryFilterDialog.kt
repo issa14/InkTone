@@ -28,6 +28,7 @@ import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.window.Dialog
 import androidx.compose.ui.window.DialogProperties
+import com.inktone.core.designsystem.AppIcon
 import com.inktone.domain.model.FilterMode
 import com.inktone.domain.model.PublicationFormat
 
@@ -202,7 +203,7 @@ private fun LayoutModeCell(
         horizontalAlignment = Alignment.CenterHorizontally,
         verticalArrangement = Arrangement.spacedBy(4.dp),
     ) {
-        Icon(
+        AppIcon(
             mode.icon(),
             contentDescription = null, // porte par le libelle ci-dessous
             tint = if (selected) {

@@ -67,7 +67,6 @@ import androidx.hilt.navigation.compose.hiltViewModel
 import coil.compose.SubcomposeAsyncImage
 import coil.request.ImageRequest
 import com.inktone.core.designsystem.AppIcon
-import com.inktone.core.designsystem.AppIcons
 import com.inktone.core.designsystem.AppSymbol
 import com.inktone.core.designsystem.InkToneSpacing
 import com.inktone.domain.model.DailyReadingStats
@@ -194,11 +193,11 @@ private fun Section1Kpis(kpi: com.inktone.domain.usecase.KpiState) {
         // cible, inchangé depuis le palier précédent).
         Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(InkToneSpacing.md)) {
             StatCard(
-                icon = AppIcons.VisualReading, label = "Visuel",
+                icon = AppSymbol.VisualReading, label = "Visuel",
                 value = kpi.totalVisualTimeFormatted, modifier = Modifier.weight(1f),
             )
             StatCard(
-                icon = AppIcons.TtsListening, label = "TTS",
+                icon = AppSymbol.TtsListening, label = "TTS",
                 value = kpi.totalTtsTimeFormatted, modifier = Modifier.weight(1f),
             )
         }
@@ -208,15 +207,15 @@ private fun Section1Kpis(kpi: com.inktone.domain.usecase.KpiState) {
         // vit désormais uniquement au niveau de l'ouvrage (Section 4).
         Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(InkToneSpacing.md)) {
             StatCard(
-                icon = AppIcons.Success, label = "Livres finis",
+                icon = AppSymbol.Success, label = "Livres finis",
                 value = kpi.booksFinished.toString(), modifier = Modifier.weight(1f),
             )
             StatCard(
-                icon = AppIcons.Reading, label = "Pages lues",
+                icon = AppSymbol.Reading, label = "Pages lues",
                 value = kpi.totalPagesReadFormatted, modifier = Modifier.weight(1f),
             )
             StatCard(
-                icon = AppIcons.Article, label = "Mots parcourus",
+                icon = AppSymbol.Article, label = "Mots parcourus",
                 value = kpi.totalWordsReadFormatted, modifier = Modifier.weight(1f),
             )
         }
@@ -264,8 +263,8 @@ private fun DailyGoalGauge(kpi: com.inktone.domain.usecase.KpiState) {
             }
             Spacer(Modifier.height(16.dp))
             Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceEvenly) {
-                GoalStreakItem(icon = AppIcons.Streak, label = "Série", value = "${kpi.currentStreakDays} j")
-                GoalStreakItem(icon = AppIcons.TrendingUp, label = "Record", value = "${kpi.maxStreakDays} j")
+                GoalStreakItem(icon = AppSymbol.Streak, label = "Série", value = "${kpi.currentStreakDays} j")
+                GoalStreakItem(icon = AppSymbol.TrendingUp, label = "Record", value = "${kpi.maxStreakDays} j")
             }
             Spacer(Modifier.height(8.dp))
             Text(
@@ -278,9 +277,9 @@ private fun DailyGoalGauge(kpi: com.inktone.domain.usecase.KpiState) {
 }
 
 @Composable
-private fun GoalStreakItem(icon: ImageVector, label: String, value: String) {
+private fun GoalStreakItem(icon: AppSymbol, label: String, value: String) {
     Row(verticalAlignment = Alignment.CenterVertically) {
-        Icon(icon, contentDescription = null, tint = MaterialTheme.colorScheme.primary, modifier = Modifier.size(18.dp))
+        AppIcon(icon, contentDescription = null, tint = MaterialTheme.colorScheme.primary, modifier = Modifier.size(18.dp))
         Spacer(Modifier.width(6.dp))
         Column {
             Text(value, style = MaterialTheme.typography.titleSmall, fontWeight = FontWeight.SemiBold)
@@ -651,7 +650,7 @@ private fun Section3CurrentBook(book: com.inktone.domain.usecase.CurrentBookStat
                         color = MaterialTheme.colorScheme.onSurfaceVariant,
                     )
                 }
-                Icon(AppIcons.ChevronRight, contentDescription = null, tint = MaterialTheme.colorScheme.onSurfaceVariant)
+                AppIcon(AppSymbol.ChevronRight, contentDescription = null, tint = MaterialTheme.colorScheme.onSurfaceVariant)
             }
         }
     }
@@ -673,8 +672,8 @@ private fun CurrentBookCoverThumbnail(coverUri: String?) {
     }
 
     if (coverModel == null) {
-        Icon(
-            AppIcons.Reading, contentDescription = null,
+        AppIcon(
+            AppSymbol.Reading, contentDescription = null,
             tint = MaterialTheme.colorScheme.primary,
             modifier = Modifier.size(40.dp),
         )
@@ -687,8 +686,8 @@ private fun CurrentBookCoverThumbnail(coverUri: String?) {
         contentScale = ContentScale.Crop,
         modifier = Modifier.size(width = 40.dp, height = 56.dp).clip(RoundedCornerShape(6.dp)),
         error = {
-            Icon(
-                AppIcons.Reading, contentDescription = null,
+            AppIcon(
+                AppSymbol.Reading, contentDescription = null,
                 tint = MaterialTheme.colorScheme.primary,
                 modifier = Modifier.size(40.dp),
             )
@@ -705,7 +704,7 @@ private fun ExportButton(viewModel: StatisticsViewModel) {
         onClick = { showSheet = true },
         modifier = Modifier.fillMaxWidth(),
     ) {
-        Icon(AppIcons.Download, contentDescription = null, modifier = Modifier.size(18.dp))
+        AppIcon(AppSymbol.Download, contentDescription = null, modifier = Modifier.size(18.dp))
         Spacer(Modifier.width(8.dp))
         Text("Exporter les statistiques")
     }
@@ -720,7 +719,7 @@ private fun ExportButton(viewModel: StatisticsViewModel) {
             ListItem(
                 headlineContent = { Text("Format CSV") },
                 supportingContent = { Text("Récapitulatif des sessions") },
-                leadingContent = { Icon(AppIcons.Stats, contentDescription = null) },
+                leadingContent = { AppIcon(AppSymbol.Stats, contentDescription = null) },
                 modifier = Modifier.clickable {
                     showSheet = false
                     viewModel.export(ExportFormat.CSV)
@@ -729,7 +728,7 @@ private fun ExportButton(viewModel: StatisticsViewModel) {
             ListItem(
                 headlineContent = { Text("Format JSON") },
                 supportingContent = { Text("Données brutes d'événements") },
-                leadingContent = { Icon(AppIcons.ReadingModeScroll, contentDescription = null) },
+                leadingContent = { AppIcon(AppSymbol.ReadingModeScroll, contentDescription = null) },
                 modifier = Modifier.clickable {
                     showSheet = false
                     viewModel.export(ExportFormat.JSON)
@@ -743,13 +742,13 @@ private fun ExportButton(viewModel: StatisticsViewModel) {
 // ───── Carte statistique générique ─────
 
 @Composable
-private fun StatCard(icon: androidx.compose.ui.graphics.vector.ImageVector, label: String, value: String, modifier: Modifier = Modifier) {
+private fun StatCard(icon: AppSymbol, label: String, value: String, modifier: Modifier = Modifier) {
     ElevatedCard(shape = RoundedCornerShape(12.dp), modifier = modifier) {
         Column(
             modifier = Modifier.padding(12.dp).fillMaxWidth(),
             horizontalAlignment = Alignment.CenterHorizontally,
         ) {
-            Icon(icon, contentDescription = null, tint = MaterialTheme.colorScheme.primary, modifier = Modifier.size(20.dp))
+            AppIcon(icon, contentDescription = null, tint = MaterialTheme.colorScheme.primary, modifier = Modifier.size(20.dp))
             Spacer(Modifier.height(4.dp))
             Text(value, style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.SemiBold, textAlign = TextAlign.Center)
             Text(label, style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.onSurfaceVariant, textAlign = TextAlign.Center)

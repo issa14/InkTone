@@ -16,7 +16,7 @@ import androidx.compose.ui.unit.dp
 
 /**
  * Lot 10, Tâche 10.6 — dette du lot 2a.6 : « étagère avec emplacements de
- * livres en pointillés », jamais produite (`AppIcons.Reading` servait de
+ * livres en pointillés », jamais produite (`AppSymbol.Reading` servait de
  * repli, signalé comme non conforme). Même procédé que
  * `feature/onboarding/OnboardingIllustrations.kt` (couleur paramétrée,
  * tout en `dp.toPx()`/proportionnel à `size`, décorative explicitement) —

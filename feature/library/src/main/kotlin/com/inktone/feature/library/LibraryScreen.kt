@@ -71,7 +71,6 @@ import androidx.lifecycle.Lifecycle
 import androidx.lifecycle.LifecycleEventObserver
 import androidx.hilt.navigation.compose.hiltViewModel
 import com.inktone.core.designsystem.AppIcon
-import com.inktone.core.designsystem.AppIcons
 import com.inktone.core.designsystem.AppSymbol
 import com.inktone.core.designsystem.InkToneBrandMark
 import com.inktone.core.designsystem.NarrativeAccentFamily
@@ -329,8 +328,8 @@ fun LibraryDrawerContent(
         // UX). Destination à part entière qui navigue vers un écran
         // dédié : ne JAMAIS reproduire le défaut de l'item mort supprimé
         // au lot 1, dont le onClick posait un filtre sur la Bibliothèque
-        // au lieu de naviguer. Icône `AppIcons.Recents` (horloge
-        // d'historique) — pas `AppIcons.Loading` (sablier), défaut de
+        // au lieu de naviguer. Icône `AppSymbol.Recents` (horloge
+        // d'historique) — pas `AppSymbol.Loading` (sablier), défaut de
         // l'item historique corrigé par suppression au lot 1.
         NavigationDrawerItem(
             label = { Text("Récents") },
@@ -390,23 +389,23 @@ fun LibraryDrawerContent(
             modifier = Modifier.fillMaxWidth().padding(vertical = 12.dp),
             horizontalArrangement = Arrangement.SpaceEvenly,
         ) {
-            DrawerFooterItem("Paramètres", AppIcons.Settings) { onOpenSettings() }
+            DrawerFooterItem("Paramètres", AppSymbol.Settings) { onOpenSettings() }
             // Lot 9 — "Thèmes" réactivé, 3e des 4 destinations masquées au
             // lot 1 (aucune destination affichée sans écran derrière).
-            DrawerFooterItem("Thèmes", AppIcons.Appearance) { onOpenThemes() }
-            DrawerFooterItem("À propos", AppIcons.Info) { onOpenAbout() }
+            DrawerFooterItem("Thèmes", AppSymbol.Theme) { onOpenThemes() }
+            DrawerFooterItem("À propos", AppSymbol.Info) { onOpenAbout() }
         }
         } // Column content
     } // Column root
 }
 
 @Composable
-private fun DrawerFooterItem(label: String, icon: androidx.compose.ui.graphics.vector.ImageVector, onClick: () -> Unit) {
+private fun DrawerFooterItem(label: String, icon: AppSymbol, onClick: () -> Unit) {
     Column(
         horizontalAlignment = Alignment.CenterHorizontally,
         modifier = Modifier.clickable(onClick = onClick).padding(8.dp),
     ) {
-        Icon(icon, contentDescription = label, modifier = Modifier.size(18.dp), tint = MaterialTheme.colorScheme.onSurfaceVariant)
+        AppIcon(icon, contentDescription = label, modifier = Modifier.size(18.dp), tint = MaterialTheme.colorScheme.onSurfaceVariant)
         Text(label, style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
     }
 }
@@ -506,8 +505,8 @@ internal fun LibraryTopBar(
                             style = MaterialTheme.typography.titleMedium,
                             color = MaterialTheme.colorScheme.onPrimary,
                         )
-                        Icon(
-                            AppIcons.ChevronDown,
+                        AppIcon(
+                            AppSymbol.ChevronDown,
                             contentDescription = "Changer de vue",
                             tint = MaterialTheme.colorScheme.onPrimary.copy(alpha = 0.5f),
                             modifier = Modifier.size(16.dp),
@@ -579,15 +578,15 @@ internal fun LibraryTopBar(
                 Text("Bibliothèque", style = MaterialTheme.typography.labelLarge,
                     modifier = Modifier.padding(horizontal = 24.dp, vertical = 8.dp),
                     color = MaterialTheme.colorScheme.primary)
-                ActionSheetItem("Importer", AppIcons.Data) { showActionsSheet = false; onImportClick() }
-                ActionSheetItem("Couverture par défaut", AppIcons.CoverOnly) {
+                ActionSheetItem("Importer", AppSymbol.Data) { showActionsSheet = false; onImportClick() }
+                ActionSheetItem("Couverture par défaut", AppSymbol.CoverOnly) {
                     showActionsSheet = false
                     showResetCoversConfirm = true
                 }
                 if (isRegeneratingCovers) {
                     ActionSheetProgress("Reconstruire les couvertures", coverRegeneration)
                 } else {
-                    ActionSheetItem("Reconstruire les couvertures", AppIcons.Refresh) {
+                    ActionSheetItem("Reconstruire les couvertures", AppSymbol.Refresh) {
                         // Le sheet reste ouvert : la progression X/Y est
                         // visible dans l'item, refermé à la fin par
                         // LaunchedEffect(isRegeneratingCovers).
@@ -595,8 +594,8 @@ internal fun LibraryTopBar(
                         onRegenerateCovers()
                     }
                 }
-                ActionSheetItem("Ouvrir un livre au hasard", AppIcons.Reading) { showActionsSheet = false; onOpenRandomBook() }
-                ActionSheetItem("Synchroniser avec le cloud", AppIcons.Sync) { showActionsSheet = false; onSyncNow() }
+                ActionSheetItem("Ouvrir un livre au hasard", AppSymbol.Reading) { showActionsSheet = false; onOpenRandomBook() }
+                ActionSheetItem("Synchroniser avec le cloud", AppSymbol.Sync) { showActionsSheet = false; onSyncNow() }
             }
         }
     }
@@ -619,12 +618,12 @@ internal fun LibraryTopBar(
 }
 
 @Composable
-private fun ActionSheetItem(label: String, icon: androidx.compose.ui.graphics.vector.ImageVector, onClick: () -> Unit) {
+private fun ActionSheetItem(label: String, icon: AppSymbol, onClick: () -> Unit) {
     Row(
         modifier = Modifier.fillMaxWidth().clickable(onClick = onClick).padding(horizontal = 24.dp, vertical = 14.dp),
         verticalAlignment = Alignment.CenterVertically,
     ) {
-        Icon(icon, contentDescription = null, modifier = Modifier.size(22.dp))
+        AppIcon(icon, contentDescription = null, modifier = Modifier.size(22.dp))
         Spacer(Modifier.width(16.dp))
         Text(label, style = MaterialTheme.typography.bodyLarge)
     }
@@ -647,9 +646,9 @@ private fun ActionSheetProgress(label: String, progress: CoverRegenerationProgre
 }
 
 internal fun LibraryLayoutMode.icon() = when (this) {
-    LibraryLayoutMode.GRID_COVERS -> AppIcons.CoverOnly
-    LibraryLayoutMode.GRID_DETAILED -> AppIcons.ViewGrid
-    LibraryLayoutMode.LIST -> AppIcons.ViewList
+    LibraryLayoutMode.GRID_COVERS -> AppSymbol.CoverOnly
+    LibraryLayoutMode.GRID_DETAILED -> AppSymbol.ViewGrid
+    LibraryLayoutMode.LIST -> AppSymbol.ViewList
 }
 
 internal fun LibraryLayoutMode.label() = when (this) {
@@ -1124,7 +1123,7 @@ private fun ImportProgressBanner(progress: ImportProgress) {
  *
  * Illustration : étagère avec emplacements de livres en pointillés,
  * produite au lot 10 (`EmptyLibraryShelfIllustration`) — ferme la dette
- * du lot 2a.6, `AppIcons.Reading` n'est plus un repli.
+ * du lot 2a.6, `AppSymbol.Reading` n'est plus un repli.
  */
 @Composable
 private fun EmptyState(hasActiveImport: Boolean, onImportClick: () -> Unit, searchQuery: String = "") {
@@ -1175,8 +1174,8 @@ private fun EmptyState(hasActiveImport: Boolean, onImportClick: () -> Unit, sear
 private fun ErrorState(message: String, onRetry: () -> Unit, onDismiss: () -> Unit) {
     Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
         Column(horizontalAlignment = Alignment.CenterHorizontally) {
-            Icon(
-                AppIcons.Error,
+            AppIcon(
+                AppSymbol.Error,
                 contentDescription = null,
                 modifier = Modifier.size(48.dp),
                 tint = MaterialTheme.colorScheme.error,

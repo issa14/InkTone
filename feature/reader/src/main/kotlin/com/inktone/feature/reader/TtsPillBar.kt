@@ -36,7 +36,7 @@ import androidx.compose.ui.platform.LocalHapticFeedback
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.semantics.clearAndSetSemantics
 import androidx.compose.ui.unit.dp
-import com.inktone.core.designsystem.AppIcons
+import com.inktone.core.designsystem.AppIcon
 import com.inktone.core.designsystem.AppSymbol
 import com.inktone.core.designsystem.InkToneShapes
 
@@ -102,14 +102,14 @@ fun TtsPillBar(
             verticalAlignment = Alignment.CenterVertically,
         ) {
             PillAction(
-                icon = AppIcons.ChapterPrevious,
+                icon = AppSymbol.ChapterPrevious,
                 contentDescription = "Chapitre précédent",
                 enabled = hasPreviousChapter,
                 tint = accentColor,
                 onClick = onPreviousChapter,
             )
             PillAction(
-                icon = AppIcons.SentencePrevious,
+                icon = AppSymbol.SentencePrevious,
                 contentDescription = "Phrase précédente",
                 enabled = true,
                 tint = accentColor,
@@ -125,22 +125,22 @@ fun TtsPillBar(
                     colors = IconButtonDefaults.filledIconButtonColors(containerColor = accentColor),
                     shape = InkToneShapes.large,
                 ) {
-                    Icon(
-                        if (isPlaying) AppIcons.Pause else AppIcons.Play,
+                    AppIcon(
+                        if (isPlaying) AppSymbol.Pause else AppSymbol.Play,
                         contentDescription = if (isPlaying) "Pause" else "Lire",
                         tint = MaterialTheme.colorScheme.surface,
                     )
                 }
             }
             PillAction(
-                icon = AppIcons.SentenceNext,
+                icon = AppSymbol.SentenceNext,
                 contentDescription = "Phrase suivante",
                 enabled = true,
                 tint = accentColor,
                 onClick = onNextSentence,
             )
             PillAction(
-                icon = AppIcons.ChapterNext,
+                icon = AppSymbol.ChapterNext,
                 contentDescription = "Chapitre suivant",
                 enabled = hasNextChapter,
                 tint = accentColor,
@@ -204,8 +204,8 @@ fun TtsPillBarCollapsed(
             colors = IconButtonDefaults.filledIconButtonColors(containerColor = accentColor),
             shape = InkToneShapes.large,
         ) {
-            Icon(
-                AppIcons.Speaking,
+            AppIcon(
+                AppSymbol.Speaking,
                 contentDescription = "Afficher les contrôles de lecture",
                 tint = MaterialTheme.colorScheme.surface,
             )
@@ -283,7 +283,7 @@ private fun TtsSoundWave(
 
 @Composable
 private fun PillAction(
-    icon: ImageVector,
+    icon: AppSymbol,
     contentDescription: String,
     enabled: Boolean,
     tint: Color,
@@ -298,6 +298,6 @@ private fun PillAction(
             disabledContentColor = tint.copy(alpha = 0.25f),
         ),
     ) {
-        Icon(icon, contentDescription = contentDescription)
+        AppIcon(icon, contentDescription = contentDescription)
     }
 }

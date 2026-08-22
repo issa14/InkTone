@@ -1,6 +1,7 @@
 package com.inktone.feature.reader
 
-import com.inktone.core.designsystem.AppIcons
+import com.inktone.core.designsystem.AppIcon
+import com.inktone.core.designsystem.AppSymbol
 import androidx.compose.foundation.ExperimentalFoundationApi
 import androidx.compose.foundation.gestures.snapping.rememberSnapFlingBehavior
 import androidx.compose.foundation.layout.Arrangement
@@ -138,11 +139,11 @@ fun SleepTimerPanel(
                 Row(verticalAlignment = Alignment.CenterVertically) {
                     IconButton(
                         onClick = { onSetEyeRestReminderInterval((eyeRestReminderIntervalMinutes - 15).coerceAtLeast(15)) },
-                    ) { Icon(AppIcons.Remove, contentDescription = "Diminuer l'intervalle") }
+                    ) { AppIcon(AppSymbol.Remove, contentDescription = "Diminuer l'intervalle") }
                     Text(formatEyeRestInterval(eyeRestReminderIntervalMinutes), style = MaterialTheme.typography.bodyLarge)
                     IconButton(
                         onClick = { onSetEyeRestReminderInterval(eyeRestReminderIntervalMinutes + 15) },
-                    ) { Icon(AppIcons.Add, contentDescription = "Augmenter l'intervalle") }
+                    ) { AppIcon(AppSymbol.Add, contentDescription = "Augmenter l'intervalle") }
                 }
             }
 

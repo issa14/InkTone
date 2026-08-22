@@ -43,7 +43,6 @@ import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.hilt.navigation.compose.hiltViewModel
-import com.inktone.core.designsystem.AppIcons
 import com.inktone.core.designsystem.toColor
 import com.inktone.domain.model.ReadingTheme
 
@@ -86,7 +85,7 @@ fun ThemeGalleryScreen(
                 },
                 navigationIcon = {
                     IconButton(onClick = onBack) {
-                        Icon(AppIcons.Back, contentDescription = "Retour")
+                        AppIcon(AppSymbol.Back, contentDescription = "Retour")
                     }
                 },
             )

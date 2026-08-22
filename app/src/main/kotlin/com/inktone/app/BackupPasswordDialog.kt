@@ -1,6 +1,7 @@
 package com.inktone.app
 
-import com.inktone.core.designsystem.AppIcons
+import com.inktone.core.designsystem.AppIcon
+import com.inktone.core.designsystem.AppSymbol
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.material3.AlertDialog
@@ -50,8 +51,8 @@ fun BackupPasswordDialog(
                     visualTransformation = if (isPasswordVisible) VisualTransformation.None else PasswordVisualTransformation(),
                     trailingIcon = {
                         IconButton(onClick = { isPasswordVisible = !isPasswordVisible }) {
-                            Icon(
-                                if (isPasswordVisible) AppIcons.VisibilityOff else AppIcons.Visibility,
+                            AppIcon(
+                                if (isPasswordVisible) AppSymbol.VisibilityOff else AppSymbol.Visibility,
                                 contentDescription = if (isPasswordVisible) "Masquer le mot de passe" else "Afficher le mot de passe",
                             )
                         }

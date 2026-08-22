@@ -21,7 +21,7 @@ data class DeviceFleetEntry(
 
 /**
  * Type d'événement du journal d'activité (tâche 11.8) — chacun porte une
- * icône de **forme** distincte côté UI (`AppIcons`), la couleur ne vient
+ * icône de **forme** distincte côté UI (`AppSymbol`), la couleur ne vient
  * qu'en renfort (accessibilité daltonisme/TalkBack, jamais seule).
  */
 enum class SyncActivityEventType { SUCCESS, NETWORK_FAILURE, MANUAL_SYNC }

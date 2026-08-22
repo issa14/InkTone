@@ -23,7 +23,7 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
-import com.inktone.core.designsystem.AppIcons
+import com.inktone.core.designsystem.AppIcon
 import com.inktone.core.designsystem.AppSymbol
 import com.inktone.domain.service.ImportResultEntry
 
@@ -140,11 +140,11 @@ private fun ImportResultRow(
             .padding(vertical = 6.dp),
         verticalAlignment = Alignment.CenterVertically,
     ) {
-        Icon(
-            imageVector = when {
-                isAlert -> AppIcons.Error
-                isDuplicate -> AppIcons.Reading
-                else -> AppIcons.Success
+        AppIcon(
+            when {
+                isAlert -> AppSymbol.Error
+                isDuplicate -> AppSymbol.Reading
+                else -> AppSymbol.Success
             },
             contentDescription = when {
                 isAlert -> "Alerte"

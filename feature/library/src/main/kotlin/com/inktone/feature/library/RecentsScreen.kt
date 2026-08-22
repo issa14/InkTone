@@ -26,7 +26,6 @@ import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.hilt.navigation.compose.hiltViewModel
 import com.inktone.core.designsystem.AppIcon
-import com.inktone.core.designsystem.AppIcons
 import com.inktone.core.designsystem.AppSymbol
 
 /**
@@ -108,8 +107,8 @@ fun RecentsScreen(
 private fun RecentsEmptyState() {
     Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
         Column(horizontalAlignment = Alignment.CenterHorizontally) {
-            Icon(
-                AppIcons.Recents,
+            AppIcon(
+                AppSymbol.Recents,
                 contentDescription = null,
                 modifier = Modifier.size(64.dp),
                 tint = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.4f),

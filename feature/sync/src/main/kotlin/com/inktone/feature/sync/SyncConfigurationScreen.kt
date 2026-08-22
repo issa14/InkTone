@@ -58,7 +58,6 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.hilt.navigation.compose.hiltViewModel
 import android.text.format.DateUtils
-import com.inktone.core.designsystem.AppIcons
 import com.inktone.domain.model.DeviceFleetEntry
 import com.inktone.domain.model.SyncActivityEvent
 import com.inktone.domain.model.SyncActivityEventType
@@ -255,8 +254,8 @@ private fun GoogleDriveCard(
     ) {
         Column(Modifier.padding(16.dp)) {
             Row(verticalAlignment = Alignment.CenterVertically) {
-                Icon(
-                    if (isActive) AppIcons.CloudConnected else AppIcons.CloudDisconnected,
+                AppIcon(
+                    if (isActive) AppSymbol.CloudConnected else AppSymbol.CloudDisconnected,
                     contentDescription = null,
                     tint = if (isActive) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurfaceVariant,
                 )
@@ -272,7 +271,7 @@ private fun GoogleDriveCard(
                         Modifier.size(40.dp).clip(CircleShape).background(MaterialTheme.colorScheme.primaryContainer),
                         contentAlignment = Alignment.Center,
                     ) {
-                        Icon(AppIcons.CloudConnected, contentDescription = null, tint = MaterialTheme.colorScheme.onPrimaryContainer)
+                        AppIcon(AppSymbol.CloudConnected, contentDescription = null, tint = MaterialTheme.colorScheme.onPrimaryContainer)
                     }
                     Spacer(Modifier.width(8.dp))
                     Column {
@@ -560,7 +559,7 @@ private fun SyncOperationalContent(state: SyncScreenState, onIntent: (SyncIntent
 private fun AutoSyncFailedBanner() {
     Card(colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.errorContainer)) {
         Row(Modifier.padding(16.dp), verticalAlignment = Alignment.CenterVertically) {
-            Icon(AppIcons.ErrorOutlined, contentDescription = null, tint = MaterialTheme.colorScheme.onErrorContainer)
+            AppIcon(AppSymbol.Error, contentDescription = null, tint = MaterialTheme.colorScheme.onErrorContainer)
             Spacer(Modifier.width(12.dp))
             Text(
                 "La dernière synchronisation automatique a échoué. Réessayez manuellement ci-dessous.",
@@ -657,7 +656,7 @@ private fun DeviceRow(entry: DeviceFleetEntry, isCurrent: Boolean, onRemove: () 
         modifier = Modifier.fillMaxWidth().padding(vertical = 10.dp),
         verticalAlignment = Alignment.CenterVertically,
     ) {
-        Icon(AppIcons.Device, contentDescription = null, tint = MaterialTheme.colorScheme.onSurfaceVariant)
+        AppIcon(AppSymbol.Device, contentDescription = null, tint = MaterialTheme.colorScheme.onSurfaceVariant)
         Spacer(Modifier.width(12.dp))
         Column(Modifier.weight(1f)) {
             Row(verticalAlignment = Alignment.CenterVertically) {
@@ -683,7 +682,7 @@ private fun DeviceRow(entry: DeviceFleetEntry, isCurrent: Boolean, onRemove: () 
         )
         Spacer(Modifier.width(8.dp))
         IconButton(onClick = { showRemoveConfirm = true }) {
-            Icon(AppIcons.Delete, contentDescription = "Retirer ${entry.displayName} de la liste")
+            AppIcon(AppSymbol.Delete, contentDescription = "Retirer ${entry.displayName} de la liste")
         }
     }
 
@@ -770,15 +769,15 @@ private fun ActivityRow(event: SyncActivityEvent) {
     // Icône de forme distincte par type (tâche 11.8/11.9, point 9) — la
     // couleur vient en renfort, jamais seule (daltonisme/TalkBack).
     val (icon, tint) = when (event.type) {
-        SyncActivityEventType.SUCCESS -> AppIcons.Success to MaterialTheme.colorScheme.primary
-        SyncActivityEventType.NETWORK_FAILURE -> AppIcons.ErrorOutlined to MaterialTheme.colorScheme.error
-        SyncActivityEventType.MANUAL_SYNC -> AppIcons.Refresh to MaterialTheme.colorScheme.onSurfaceVariant
+        SyncActivityEventType.SUCCESS -> AppSymbol.Success to MaterialTheme.colorScheme.primary
+        SyncActivityEventType.NETWORK_FAILURE -> AppSymbol.Error to MaterialTheme.colorScheme.error
+        SyncActivityEventType.MANUAL_SYNC -> AppSymbol.Refresh to MaterialTheme.colorScheme.onSurfaceVariant
     }
     Row(
         modifier = Modifier.fillMaxWidth().padding(vertical = 8.dp),
         verticalAlignment = Alignment.CenterVertically,
     ) {
-        Icon(icon, contentDescription = null, tint = tint, modifier = Modifier.size(20.dp))
+        AppIcon(icon, contentDescription = null, tint = tint, modifier = Modifier.size(20.dp))
         Spacer(Modifier.width(12.dp))
         Text(event.message, style = MaterialTheme.typography.bodyMedium, modifier = Modifier.weight(1f))
         Text(relativeTime(event.occurredAt), style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.onSurfaceVariant)

@@ -44,7 +44,6 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import com.inktone.core.designsystem.AppIcon
-import com.inktone.core.designsystem.AppIcons
 import com.inktone.core.designsystem.Motion
 import com.inktone.core.designsystem.AppSymbol
 import com.inktone.domain.model.Annotation

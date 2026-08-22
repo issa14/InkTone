@@ -1,6 +1,7 @@
 package com.inktone.feature.reader
 
-import com.inktone.core.designsystem.AppIcons
+import com.inktone.core.designsystem.AppIcon
+import com.inktone.core.designsystem.AppSymbol
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.ExperimentalLayoutApi
@@ -95,14 +96,14 @@ fun ReaderTtsPanel(
                 verticalAlignment = Alignment.CenterVertically,
             ) {
                 IconButton(onClick = onPreviousSentence) {
-                    Icon(AppIcons.SentencePrevious, contentDescription = "Phrase précédente")
+                    AppIcon(AppSymbol.SentencePrevious, contentDescription = "Phrase précédente")
                 }
                 Text(
                     "Phrase ${currentSentenceIndex + 1} / $totalSentences",
                     style = MaterialTheme.typography.bodyMedium,
                 )
                 IconButton(onClick = onNextSentence) {
-                    Icon(AppIcons.SentenceNext, contentDescription = "Phrase suivante")
+                    AppIcon(AppSymbol.SentenceNext, contentDescription = "Phrase suivante")
                 }
             }
 
@@ -120,8 +121,8 @@ fun ReaderTtsPanel(
                     colors = IconButtonDefaults.filledIconButtonColors(containerColor = MaterialTheme.colorScheme.primary),
                     shape = InkToneShapes.large,
                 ) {
-                    Icon(
-                        if (isPlaying) AppIcons.Pause else AppIcons.Play,
+                    AppIcon(
+                        if (isPlaying) AppSymbol.Pause else AppSymbol.Play,
                         contentDescription = if (isPlaying) "Pause" else "Lire",
                         tint = MaterialTheme.colorScheme.surface,
                     )

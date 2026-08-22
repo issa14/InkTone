@@ -51,7 +51,8 @@ import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.hilt.navigation.compose.hiltViewModel
-import com.inktone.core.designsystem.AppIcons
+import com.inktone.core.designsystem.AppIcon
+import com.inktone.core.designsystem.AppSymbol
 import com.inktone.core.designsystem.NarrativeAccentFamily
 
 /**
@@ -180,13 +181,13 @@ private fun FeaturesCard(accent: Color) {
         Column(verticalArrangement = Arrangement.spacedBy(24.dp)) {
             FeatureRow(
                 accent = accent,
-                icon = AppIcons.Reading,
+                icon = AppSymbol.Reading,
                 title = "Lecture sur mesure",
                 body = "Thèmes, typographie et mise en page entièrement personnalisables pour un confort visuel absolu.",
             )
             FeatureRow(
                 accent = accent,
-                icon = AppIcons.Speaking,
+                icon = AppSymbol.Speaking,
                 title = "Narration naturelle",
                 body = "Des voix ultra-réalistes et fluides. Ajustez la vitesse et laissez-vous porter par l'histoire.",
             )
@@ -196,13 +197,13 @@ private fun FeaturesCard(accent: Color) {
 
 /** Pastille à 48dp et espacement à 12dp (retour Issa) : à 56dp/16dp, la colonne de texte était trop étroite et cassait les descriptions en lignes de deux mots. */
 @Composable
-private fun FeatureRow(accent: Color, icon: ImageVector, title: String, body: String) {
+private fun FeatureRow(accent: Color, icon: AppSymbol, title: String, body: String) {
     Row(verticalAlignment = Alignment.Top) {
         Box(
             Modifier.size(48.dp).clip(CircleShape).background(accent.copy(alpha = 0.1f)),
             contentAlignment = Alignment.Center,
         ) {
-            Icon(icon, contentDescription = null, tint = accent, modifier = Modifier.size(24.dp))
+            AppIcon(icon, contentDescription = null, tint = accent, modifier = Modifier.size(24.dp))
         }
         Spacer(Modifier.width(12.dp))
         Column(Modifier.weight(1f)) {
@@ -237,7 +238,7 @@ private fun ReadyCard(accent: Color, onStart: () -> Unit) {
         Box(contentAlignment = Alignment.Center) {
             Box(Modifier.size(140.dp).clip(CircleShape).border(1.dp, accent.copy(alpha = outerAlpha), CircleShape))
             Box(Modifier.size(112.dp).clip(CircleShape).border(1.dp, accent.copy(alpha = innerAlpha), CircleShape))
-            BrandIcon(icon = AppIcons.Reading, size = 88.dp, tint = accent)
+            BrandIcon(icon = AppSymbol.Reading, size = 88.dp, tint = accent)
         }
         Spacer(Modifier.height(32.dp))
         Text(
@@ -267,8 +268,8 @@ private fun ReadyCard(accent: Color, onStart: () -> Unit) {
 
 /** Icône de marque — remplace les `Canvas` dessinés à la main (retour Issa) : prêt à accueillir un futur `VectorDrawable`/SVG sans changer l'appelant. */
 @Composable
-private fun BrandIcon(icon: ImageVector, size: Dp, tint: Color) {
-    Icon(icon, contentDescription = null, tint = tint, modifier = Modifier.size(size))
+private fun BrandIcon(icon: AppSymbol, size: Dp, tint: Color) {
+    AppIcon(icon, contentDescription = null, tint = tint, modifier = Modifier.size(size))
 }
 
 @Composable
