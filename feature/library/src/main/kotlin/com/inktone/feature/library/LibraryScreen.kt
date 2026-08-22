@@ -846,6 +846,12 @@ private fun ResumeReadingCard(
                     onToggleFavorite = {},
                     showTitle = false,
                     showOverlays = false,
+                    // Ce livre est AUSSI affiché dans la grille/liste en
+                    // dessous : cette couverture-ci est la secondaire et ne
+                    // doit pas revendiquer la clé `"cover-{id}"`, sinon
+                    // l'emplacement de la grille reste vide (voir la note
+                    // détaillée dans `BookCover`).
+                    enableSharedTransition = false,
                 )
             }
 
