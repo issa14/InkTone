@@ -74,6 +74,7 @@ import com.inktone.core.designsystem.AppIcon
 import com.inktone.core.designsystem.AppIcons
 import com.inktone.core.designsystem.AppSymbol
 import com.inktone.core.designsystem.InkToneShapes
+import com.inktone.core.designsystem.StatusBarColorEffect
 import com.inktone.domain.model.FilterMode
 import com.inktone.domain.model.Publication
 import com.inktone.domain.service.ImportProgress
@@ -163,6 +164,10 @@ fun LibraryScreen(
         }
     }
 
+    // Etend la couleur de la barre du haut a la barre de statut Android :
+    // sans cela, le bandeau systeme garde le creme fige de `themes.xml`
+    // au-dessus d'une TopAppBar `primary` (voir StatusBarColorEffect).
+    StatusBarColorEffect(MaterialTheme.colorScheme.primary)
     Scaffold(
         snackbarHost = { SnackbarHost(snackbarHostState) },
         floatingActionButton = {

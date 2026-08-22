@@ -15,6 +15,7 @@ import androidx.compose.material3.DrawerValue
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
+import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.ModalDrawerSheet
 import androidx.compose.material3.ModalNavigationDrawer
 import androidx.compose.material3.Scaffold
@@ -46,6 +47,7 @@ import androidx.navigation.compose.rememberNavController
 import androidx.navigation.toRoute
 import com.inktone.core.designsystem.LocalAnimatedVisibilityScope
 import com.inktone.core.designsystem.LocalSharedTransitionScope
+import com.inktone.core.designsystem.StatusBarColorEffect
 import com.inktone.core.ui.AboutScreen
 import com.inktone.feature.importer.ImportViewModel
 import com.inktone.feature.library.DrawerDestination
@@ -164,6 +166,17 @@ fun InkToneNavHost(navController: NavHostController = rememberNavController(), s
         },
     ) {
     val openDrawer: () -> Unit = { scope.launch { drawerState.open() } }
+    // Ligne de base de la barre de statut, posée ICI et non dans
+    // `InkToneTheme` : ce composable relit `currentBackStackEntryAsState()`,
+    // il recompose donc à CHAQUE navigation, quand le thème, lui, ne
+    // recompose pas. Posée dans le thème, la couleur du dernier écran visité
+    // fuyait vers les écrans qui n'en déclarent pas (Réglages, À propos,
+    // Recherche...), qui gardaient par exemple le fond du Lecteur.
+    //
+    // Les écrans à barre du haut colorée la surchargent avec la leur : les
+    // `SideEffect` sont appliqués dans l'ordre de composition, donc celui de
+    // l'écran (enfant) passe après celui-ci et gagne.
+    StatusBarColorEffect(MaterialTheme.colorScheme.surface)
     SharedTransitionLayout {
         CompositionLocalProvider(LocalSharedTransitionScope provides this@SharedTransitionLayout) {
         // P2 — le mini-lecteur occupe une bande sous le contenu plutôt que de

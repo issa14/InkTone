@@ -35,6 +35,7 @@ import androidx.hilt.navigation.compose.hiltViewModel
 import com.inktone.core.designsystem.AppIcon
 import com.inktone.core.designsystem.AppIcons
 import com.inktone.core.designsystem.AppSymbol
+import com.inktone.core.designsystem.StatusBarColorEffect
 
 /**
  * Écran de détail Séries/Tags (UX §Menu déroulant du titre, écran de
@@ -68,6 +69,10 @@ fun LibraryDetailScreen(
     var isSearchActive by remember { mutableStateOf(false) }
     var showFilterDialog by remember { mutableStateOf(false) }
 
+    // Etend la couleur de la barre du haut a la barre de statut Android :
+    // sans cela, le bandeau systeme garde le creme fige de `themes.xml`
+    // au-dessus d'une TopAppBar `primary` (voir StatusBarColorEffect).
+    StatusBarColorEffect(MaterialTheme.colorScheme.primary)
     Scaffold(
         topBar = {
             if (isSearchActive) {

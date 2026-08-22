@@ -97,6 +97,7 @@ import androidx.lifecycle.LifecycleEventObserver
 import com.inktone.core.designsystem.AppIcons
 import com.inktone.core.designsystem.AppSymbol
 import com.inktone.core.designsystem.reducedMotionDuration
+import com.inktone.core.designsystem.WindowBackgroundColorEffect
 import com.inktone.domain.model.Annotation
 import com.inktone.domain.model.AnnotationColor
 import com.inktone.domain.model.ChapterContent
@@ -320,6 +321,22 @@ fun ReaderScreen(
     // P4 — retiré avec l'écran de lecture (DisposableEffect) : le maintien ne
     // doit jamais survivre au Lecteur.
     KeepScreenOnEffect(enabled = state.keepScreenOn)
+    // Le Lecteur masque les barres système, mais l'inset de barre de statut
+    // reste consommé : le fond de FENÊTRE (crème `brand_background` de
+    // `themes.xml`) transparaissait dans cette bande, au-dessus de la barre
+    // du haut, quel que soit le thème de lecture. Colorer `statusBarColor`
+    // n'y pouvait rien — la barre est masquée, c'est le fond de fenêtre qui
+    // peint là. La bande suit donc le HUD : la couleur de la barre du haut
+    // quand elle est visible (les deux se confondent), celle de la page
+    // sinon — `barSurface` est un lerp à 10 % vers la couleur du texte,
+    // nettement visible en bande claire sur un fond noir sans HUD.
+    WindowBackgroundColorEffect(
+        if (isHudVisible) {
+            ThemeColors.barSurface(state.resolvedTheme)
+        } else {
+            ThemeColors.background(state.resolvedTheme)
+        },
+    )
 
     // C.5 — SharedTransition depuis la couverture de la bibliothèque
     val sharedTransitionScope = runCatching {
