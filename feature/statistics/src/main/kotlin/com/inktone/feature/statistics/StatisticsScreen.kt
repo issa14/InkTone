@@ -254,11 +254,23 @@ private fun DailyGoalGauge(kpi: com.inktone.domain.usecase.KpiState) {
                     color = progressColor,
                     strokeWidth = 8.dp,
                 )
+                // « 98 / 30 min » tenait sur UNE ligne en `headlineSmall` au
+                // centre d'un cercle de 120 dp : le texte était plus large que
+                // la jauge et mordait sur son anneau. Empilé, il tient — et se
+                // lit mieux : le temps atteint devient le chiffre principal,
+                // l'objectif passe en second rang, ce qu'il est.
                 Column(horizontalAlignment = Alignment.CenterHorizontally) {
                     Text(
-                        "${kpi.todayReadingMinutes} / ${kpi.dailyGoalMinutes} min",
-                        style = MaterialTheme.typography.headlineSmall,
+                        "${kpi.todayReadingMinutes}",
+                        style = MaterialTheme.typography.headlineMedium,
                         fontWeight = FontWeight.Bold,
+                        maxLines = 1,
+                    )
+                    Text(
+                        "/ ${kpi.dailyGoalMinutes} min",
+                        style = MaterialTheme.typography.labelMedium,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                        maxLines = 1,
                     )
                 }
             }
