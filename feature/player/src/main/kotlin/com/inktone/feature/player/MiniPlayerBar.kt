@@ -47,11 +47,18 @@ import com.inktone.domain.service.PlaybackSessionState
 fun MiniPlayerBar(
     onOpenReader: (publicationId: String) -> Unit,
     modifier: Modifier = Modifier,
+    /**
+     * Vrai sur la Bibliothèque, seul écran à porter la carte « Reprendre la
+     * lecture ». C'est l'appelant qui le sait (`InkToneNavHost` connaît la
+     * destination) ; ce composable ne devine pas où il est affiché.
+     */
+    isResumeCardVisible: Boolean = false,
     viewModel: MiniPlayerViewModel = hiltViewModel(),
 ) {
     val sessionState by viewModel.sessionState.collectAsStateWithLifecycle()
     val isPlaying by viewModel.isPlaying.collectAsStateWithLifecycle()
     val metadata by viewModel.metadata.collectAsStateWithLifecycle()
+    val resumePublicationId by viewModel.resumePublicationId.collectAsStateWithLifecycle()
 
     MiniPlayerContent(
         state = MiniPlayerUiState(
@@ -60,6 +67,11 @@ fun MiniPlayerBar(
             title = metadata.title,
             author = metadata.author,
             publicationId = metadata.publicationId,
+            // Doublon seulement si les deux conditions tiennent : la carte est
+            // à l'écran ET elle porte le livre narré.
+            isRedundantWithResumeCard = isResumeCardVisible &&
+                metadata.publicationId != null &&
+                metadata.publicationId == resumePublicationId,
         ),
         onIntent = viewModel::onIntent,
         onOpenReader = onOpenReader,

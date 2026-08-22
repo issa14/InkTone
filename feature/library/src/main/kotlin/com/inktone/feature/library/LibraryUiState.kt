@@ -3,6 +3,7 @@ package com.inktone.feature.library
 import com.inktone.domain.model.FilterMode
 import com.inktone.domain.model.Publication
 import com.inktone.domain.model.PublicationFormat
+import com.inktone.domain.usecase.resumePublication
 import com.inktone.domain.service.ImportProgress
 import com.inktone.domain.service.ImportResultEntry
 import com.inktone.domain.service.SyncOperationResult
@@ -66,9 +67,15 @@ data class LibraryUiState(
     val seriesCounts: Map<String, Int> get() = publications.mapNotNull { it.seriesName }.groupingBy { it }.eachCount()
     val tagCounts: Map<String, Int> get() = publications.flatMap { it.subjects }.groupingBy { it }.eachCount()
 
-    /** Tache 9bis.4 — carte "reprendre la lecture" proeminente, pas seulement un FAB (amelioration legacy). */
+    /**
+     * Tache 9bis.4 — carte "reprendre la lecture" proeminente, pas seulement
+     * un FAB (amelioration legacy). La regle vit dans `resumePublication()`
+     * (domaine), partagee avec le mini-lecteur qui doit savoir s'il ferait
+     * doublon avec cette carte — jamais deux definitions du meme "dernier
+     * livre ouvert".
+     */
     val resumeReadingPublication: Publication?
-        get() = publications.filter { it.lastOpened != null }.maxByOrNull { it.lastOpened!! }
+        get() = publications.resumePublication()
 
     val displayedPublications: List<Publication>
         get() = publications.filterAndSort(searchQuery, selectedFormats, sortOrder)
