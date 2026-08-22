@@ -66,6 +66,7 @@ import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.hilt.navigation.compose.hiltViewModel
 import coil.compose.SubcomposeAsyncImage
 import coil.request.ImageRequest
+import com.inktone.domain.model.cleanedForDisplay
 import com.inktone.core.designsystem.AppIcon
 import com.inktone.core.designsystem.AppSymbol
 import com.inktone.core.designsystem.InkToneSpacing
@@ -634,7 +635,7 @@ private fun Section3CurrentBook(book: com.inktone.domain.usecase.CurrentBookStat
                 CurrentBookCoverThumbnail(book.coverUri)
                 Spacer(Modifier.width(12.dp))
                 Column(Modifier.weight(1f)) {
-                    Text(book.title, style = MaterialTheme.typography.titleSmall, maxLines = 1)
+                    Text(book.title.cleanedForDisplay(), style = MaterialTheme.typography.titleSmall, maxLines = 1)
                     Spacer(Modifier.height(6.dp))
                     LinearProgressIndicator(
                         progress = { book.progressPercent },

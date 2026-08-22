@@ -2,6 +2,8 @@ package com.inktone.feature.reader
 
 import com.inktone.domain.model.PublicationFormat
 import com.inktone.domain.model.ReadingState
+import com.inktone.domain.model.cleanedAuthorsForDisplay
+import com.inktone.domain.model.cleanedForDisplay
 import com.inktone.domain.model.Sentence
 import com.inktone.domain.model.TtsEngineId
 import com.inktone.domain.model.SleepTimerState
@@ -511,8 +513,8 @@ class PlaybackOrchestrator @Inject constructor(
 
             setMetadata(
                 publicationId = publication.id,
-                title = publication.title,
-                author = publication.authors.joinToString(", ").ifBlank { null },
+                title = publication.title.cleanedForDisplay(),
+                author = publication.authors.cleanedAuthorsForDisplay().ifBlank { null },
                 coverUri = publication.coverUri,
             )
             setNarrationProgram(publicationId, chapters.map { it.href })

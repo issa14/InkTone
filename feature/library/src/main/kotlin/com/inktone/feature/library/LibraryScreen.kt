@@ -77,6 +77,8 @@ import com.inktone.core.designsystem.NarrativeAccentFamily
 import com.inktone.core.designsystem.InkToneShapes
 import com.inktone.domain.model.FilterMode
 import com.inktone.domain.model.Publication
+import com.inktone.domain.model.cleanedAuthorsForDisplay
+import com.inktone.domain.model.cleanedForDisplay
 import com.inktone.domain.service.ImportProgress
 import com.inktone.domain.service.SyncOperationResult
 import kotlinx.coroutines.launch
@@ -781,7 +783,7 @@ private fun BookGridCell(
             // la carte « Reprendre la lecture » — ces titres viennent des
             // mêmes métadonnées.
             Text(
-                text = publication.title.trimStart('-', '\u2013', '\u2014', ' '),
+                text = publication.title.cleanedForDisplay(),
                 style = MaterialTheme.typography.bodySmall.copy(fontWeight = FontWeight.SemiBold),
                 maxLines = 2,
                 overflow = TextOverflow.Ellipsis,
@@ -789,10 +791,7 @@ private fun BookGridCell(
             )
             if (publication.authors.isNotEmpty()) {
                 Text(
-                    text = publication.authors
-                        .map { it.trimStart('-', '\u2013', '\u2014', ' ') }
-                        .filter { it.isNotBlank() }
-                        .joinToString(),
+                    text = publication.authors.cleanedAuthorsForDisplay(),
                     style = MaterialTheme.typography.labelSmall,
                     maxLines = 1,
                     overflow = TextOverflow.Ellipsis,
@@ -859,14 +858,14 @@ internal fun PublicationListRow(
                     .padding(horizontal = 12.dp),
             ) {
                 Text(
-                    publication.title,
+                    publication.title.cleanedForDisplay(),
                     style = MaterialTheme.typography.titleSmall,
                     maxLines = 1,
                     overflow = TextOverflow.Ellipsis,
                 )
                 if (publication.authors.isNotEmpty()) {
                     Text(
-                        publication.authors.joinToString(),
+                        publication.authors.cleanedAuthorsForDisplay(),
                         style = MaterialTheme.typography.bodySmall,
                         color = MaterialTheme.colorScheme.onSurfaceVariant,
                         maxLines = 1,
@@ -1000,9 +999,8 @@ private fun ResumeReadingCard(
                 }
 
                 // Titre — nettoyage des artefacts EPUB (tiret, espaces en tête)
-                val cleanTitle = publication.title.trimStart('-', '–', '—', ' ')
                 Text(
-                    text = cleanTitle,
+                    text = publication.title.cleanedForDisplay(),
                     style = MaterialTheme.typography.titleMedium.copy(fontWeight = FontWeight.Bold),
                     maxLines = 1,
                     overflow = TextOverflow.Ellipsis
@@ -1010,12 +1008,8 @@ private fun ResumeReadingCard(
 
                 // Auteur — même nettoyage
                 if (publication.authors.isNotEmpty()) {
-                    val cleanAuthors = publication.authors
-                        .map { it.trimStart('-', '–', '—', ' ') }
-                        .filter { it.isNotBlank() }
-                        .joinToString()
                     Text(
-                        text = cleanAuthors,
+                        text = publication.authors.cleanedAuthorsForDisplay(),
                         style = MaterialTheme.typography.bodySmall,
                         color = MaterialTheme.colorScheme.onSurfaceVariant,
                         maxLines = 1,

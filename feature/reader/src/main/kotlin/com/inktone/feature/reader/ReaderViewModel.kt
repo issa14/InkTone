@@ -15,6 +15,8 @@ import com.inktone.domain.model.ReadingMode as DomainReadingMode
 import com.inktone.domain.model.ReadingOverrides
 import com.inktone.domain.model.ReadingSession
 import com.inktone.domain.model.ReadingState
+import com.inktone.domain.model.cleanedAuthorsForDisplay
+import com.inktone.domain.model.cleanedForDisplay
 import com.inktone.domain.model.ReadingTheme
 import com.inktone.domain.model.RenderedPage
 import com.inktone.domain.model.SleepTimerState
@@ -521,8 +523,8 @@ class ReaderViewModel @Inject constructor(
                         // 3b.3 — barre du haut (ReaderTopBar) : source
                         // unique, jamais rechargé depuis un repository
                         // dans le composable.
-                        title = publication.title,
-                        author = publication.authors.joinToString(", ").ifBlank { null },
+                        title = publication.title.cleanedForDisplay(),
+                        author = publication.authors.cleanedAuthorsForDisplay().ifBlank { null },
                         chapters = result.documentModel.chapters,
                         tableOfContents = result.documentModel.tableOfContents,
                         currentChapterIndex = restored?.locator?.chapterIndex ?: 0,
@@ -551,8 +553,8 @@ class ReaderViewModel @Inject constructor(
                     // un repository dans le service.
                     playbackOrchestrator.setMetadata(
                         publicationId = publication.id,
-                        title = publication.title,
-                        author = publication.authors.joinToString(", ").ifBlank { null },
+                        title = publication.title.cleanedForDisplay(),
+                        author = publication.authors.cleanedAuthorsForDisplay().ifBlank { null },
                         coverUri = publication.coverUri,
                     )
                     // Plan v3, Palier 3.6 — initialiser le parsing lazy EPUB

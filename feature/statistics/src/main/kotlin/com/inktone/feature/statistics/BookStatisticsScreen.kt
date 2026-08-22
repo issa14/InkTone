@@ -1,5 +1,6 @@
 package com.inktone.feature.statistics
 
+import com.inktone.domain.model.cleanedForDisplay
 import com.inktone.core.designsystem.AppIcon
 import com.inktone.core.designsystem.AppSymbol
 import androidx.compose.foundation.layout.Arrangement
@@ -170,7 +171,7 @@ private fun BookSelectorTitle(
         ExposedDropdownMenu(expanded = expanded, onDismissRequest = { expanded = false }) {
             books.forEach { book ->
                 DropdownMenuItem(
-                    text = { Text(book.title, maxLines = 1, overflow = TextOverflow.Ellipsis) },
+                    text = { Text(book.title.cleanedForDisplay(), maxLines = 1, overflow = TextOverflow.Ellipsis) },
                     onClick = {
                         expanded = false
                         onSelect(book.id)
