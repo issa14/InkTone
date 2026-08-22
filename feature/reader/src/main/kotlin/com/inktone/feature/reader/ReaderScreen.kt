@@ -939,30 +939,12 @@ fun ReaderScreen(
         // commentaire de tête ci-dessus). Ordre visuel préservé à
         // l'identique (panneau/pilule au-dessus de la barre de luminosité,
         // elle-même au-dessus de la ligne de statut) via une simple Column
-        // interne. `StatusLineBar` est la seule pièce de cette pile sans
-        // fond propre (Row nue) — auparavant hors de tout risque de
-        // chevauchement puisque la Column réservait son propre espace ; en
-        // overlay, un dégradé discret en arrière-plan (scrim) lui redonne
-        // la même lisibilité garantie face au texte qui peut désormais se
-        // trouver juste derrière.
+        // interne.
         Box(
             modifier = Modifier
                 .align(Alignment.BottomCenter)
                 .fillMaxWidth(),
         ) {
-            Box(
-                modifier = Modifier
-                    .matchParentSize()
-                    .background(
-                        Brush.verticalGradient(
-                            colors = listOf(
-                                Color.Transparent,
-                                ThemeColors.background(state.resolvedTheme).copy(alpha = 0.9f),
-                            ),
-                        ),
-                    ),
-            )
-
             Column(modifier = Modifier.fillMaxWidth()) {
                 if (isHudVisible) {
                     // 3e.1 — pendant le TTS, la barre pilule remplace le panneau
@@ -1067,6 +1049,10 @@ fun ReaderScreen(
                             onAaClick = { keepHudVisible(); showSettingsPanel = true },
                             onTtsClick = { keepHudVisible(); showTtsPanel = true },
                             onReadingModeClick = { keepHudVisible(); viewModel.onIntent(ReaderIntent.ToggleReadingMode) },
+                            // Indicateur du mode courant (lot HUD) : l'icône
+                            // « Mode » doit refléter le mode ACTIF, pas un
+                            // glyphe figé.
+                            readingMode = state.readingMode,
                             showTtsControls = !isPdf,
                             // Audit v1.0.0 (M6) : pas de sommaire pour PDF/TXT.
                             showToc = state.publicationFormat == PublicationFormat.EPUB,
@@ -1140,6 +1126,7 @@ fun ReaderScreen(
                         bookProgression = state.bookProgression,
                         showPageCounter = complete,
                         contentColor = ThemeColors.barContent(state.resolvedTheme),
+                        backgroundColor = ThemeColors.barSurface(state.resolvedTheme),
                     )
                 }
             }

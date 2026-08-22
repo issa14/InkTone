@@ -167,6 +167,7 @@ enum class AppSymbol(
     Copy(R.drawable.ic_symbol_copy),
     Highlight(R.drawable.ic_symbol_highlight),
     Brightness(R.drawable.ic_symbol_brightness),
+    FormatSize(R.drawable.ic_symbol_format_size),
     SleepTimer(R.drawable.ic_symbol_sleep_timer),
     Device(R.drawable.ic_symbol_device),
     CloudConnected(R.drawable.ic_symbol_cloud_connected),

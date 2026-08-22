@@ -30,6 +30,7 @@ class UnifiedControlPanelTest {
                 isPlaying = false,
                 sleepTimerActive = false,
                 bookProgression = 0.5f,
+                readingMode = ReadingMode.PAGED,
                 onPlayPause = { clicked += "PlayPause" },
                 onSleepTimerClick = { clicked += "Minuteur" },
                 onSearchClick = { clicked += "Recherche" },
@@ -44,8 +45,8 @@ class UnifiedControlPanelTest {
         }
 
         val expectedActions = listOf(
-            "Sommaire", "Marque-pages", "Lire", "Thème", "TT",
-            "Minuteur", "Haut-parleur", "Mode", "Recherche", "Luminosité",
+            "Sommaire", "Marque-pages", "Lire", "Thème", "Réglages du texte",
+            "Minuteur", "Haut-parleur", "Mode pages", "Recherche", "Luminosité",
         )
         for (action in expectedActions) {
             composeTestRule.onNodeWithContentDescription(action).performClick()

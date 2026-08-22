@@ -12,22 +12,18 @@ import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.FilledIconButton
 import androidx.compose.material3.HorizontalDivider
-import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButtonDefaults
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Surface
-import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
-import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.hapticfeedback.HapticFeedbackType
 import androidx.compose.ui.platform.LocalHapticFeedback
 import androidx.compose.ui.unit.dp
-import androidx.compose.ui.unit.sp
-import com.inktone.core.designsystem.AppIcons
+import com.inktone.core.designsystem.AppIcon
 import com.inktone.core.designsystem.AppSymbol
 import com.inktone.core.designsystem.InkToneShapes
 
@@ -64,6 +60,10 @@ fun UnifiedControlPanel(
     onTtsClick: () -> Unit = {},
     onReadingModeClick: () -> Unit = {},
     onBrightnessClick: () -> Unit = {},
+    // Indicateur du mode d'affichage courant (lot HUD) : l'icône « Mode »
+    // reflète le mode ACTIF (pages vs défilement), contrairement à
+    // l'ancienne version qui affichait toujours « pages ».
+    readingMode: ReadingMode = ReadingMode.SCROLL,
     // Lot 12, tache 12.10 — TTS, minuteur de sommeil et bascule de mode
     // hors perimetre pour le format PDF (decision actee 16 du plan) :
     // emplacements vides plutot que retires de la Row (les slots en
@@ -109,11 +109,11 @@ fun UnifiedControlPanel(
             ) {
                 Box(Modifier.weight(1f), contentAlignment = Alignment.Center) {
                     if (showToc) {
-                        SecondaryAction(icon = AppIcons.Toc, label = "Sommaire", tint = iconTint, onClick = onTocClick)
+                        SecondaryAction(symbol = AppSymbol.Toc, contentDescription = "Sommaire", tint = iconTint, onClick = onTocClick)
                     }
                 }
                 Box(Modifier.weight(1f), contentAlignment = Alignment.Center) {
-                    SecondaryAction(icon = AppIcons.Bookmark, label = "Marque-pages", tint = iconTint, onClick = onBookmarksClick)
+                    SecondaryAction(symbol = AppSymbol.Bookmark, contentDescription = "Marque-pages", tint = iconTint, onClick = onBookmarksClick)
                 }
                 Box(Modifier.weight(1f), contentAlignment = Alignment.Center) {
                     if (showTtsControls) {
@@ -126,8 +126,8 @@ fun UnifiedControlPanel(
                             colors = IconButtonDefaults.filledIconButtonColors(containerColor = accentColor),
                             shape = InkToneShapes.large,
                         ) {
-                            Icon(
-                                if (isPlaying) AppIcons.Pause else AppIcons.Play,
+                            AppIcon(
+                                if (isPlaying) AppSymbol.Pause else AppSymbol.Play,
                                 contentDescription = if (isPlaying) "Pause" else "Lire",
                                 tint = surfaceColor,
                             )
@@ -135,10 +135,10 @@ fun UnifiedControlPanel(
                     }
                 }
                 Box(Modifier.weight(1f), contentAlignment = Alignment.Center) {
-                    SecondaryAction(icon = AppIcons.Theme, label = "Thème", tint = iconTint, onClick = onThemeCycle)
+                    SecondaryAction(symbol = AppSymbol.Theme, contentDescription = "Thème", tint = iconTint, onClick = onThemeCycle)
                 }
                 Box(Modifier.weight(1f), contentAlignment = Alignment.Center) {
-                    SecondaryAction(icon = AppIcons.Appearance, label = "TT", tint = iconTint, onClick = onAaClick)
+                    SecondaryAction(symbol = AppSymbol.FormatSize, contentDescription = "Réglages du texte", tint = iconTint, onClick = onAaClick)
                 }
             }
 
@@ -154,28 +154,35 @@ fun UnifiedControlPanel(
                     // Toujours visible, meme pour un PDF (decision actee
                     // 16) : ce bouton ouvre aussi le repos oculaire,
                     // independant du TTS - voir SleepTimerPanel.showSleepTimer.
+                    // Icône chronomètre (Timer) : l'ancien glyphe « bedtime »
+                    // (demi-lune) n'évoquait pas un minuteur.
                     SecondaryAction(
-                        icon = AppIcons.SleepTimer,
-                        label = "Minuteur",
+                        symbol = AppSymbol.Timer,
+                        contentDescription = "Minuteur",
                         tint = if (sleepTimerActive) accentColor else iconTint,
                         onClick = onSleepTimerClick,
                     )
                 }
                 Box(Modifier.weight(1f), contentAlignment = Alignment.Center) {
                     if (showTtsControls) {
-                        SecondaryAction(icon = AppIcons.Speaking, label = "Haut-parleur", tint = iconTint, onClick = onTtsClick)
+                        SecondaryAction(symbol = AppSymbol.Speaking, contentDescription = "Haut-parleur", tint = iconTint, onClick = onTtsClick)
                     }
                 }
                 Box(Modifier.weight(1f), contentAlignment = Alignment.Center) {
                     if (showTtsControls) {
-                        SecondaryAction(icon = AppIcons.ReadingModePaged, label = "Mode", tint = iconTint, onClick = onReadingModeClick)
+                        SecondaryAction(
+                            symbol = if (readingMode == ReadingMode.PAGED) AppSymbol.ReadingModePaged else AppSymbol.ReadingModeScroll,
+                            contentDescription = if (readingMode == ReadingMode.PAGED) "Mode pages" else "Mode défilement",
+                            tint = iconTint,
+                            onClick = onReadingModeClick,
+                        )
                     }
                 }
                 Box(Modifier.weight(1f), contentAlignment = Alignment.Center) {
-                    SecondaryAction(icon = AppIcons.Search, label = "Recherche", tint = iconTint, onClick = onSearchClick)
+                    SecondaryAction(symbol = AppSymbol.Search, contentDescription = "Recherche", tint = iconTint, onClick = onSearchClick)
                 }
                 Box(Modifier.weight(1f), contentAlignment = Alignment.Center) {
-                    SecondaryAction(icon = AppIcons.Brightness, label = "Luminosité", tint = iconTint, onClick = onBrightnessClick)
+                    SecondaryAction(symbol = AppSymbol.Brightness, contentDescription = "Luminosité", tint = iconTint, onClick = onBrightnessClick)
                 }
             }
         }
@@ -183,13 +190,29 @@ fun UnifiedControlPanel(
 }
 
 @Composable
-private fun SecondaryAction(icon: ImageVector, label: String, tint: Color, onClick: () -> Unit) {
-    Column(
-        horizontalAlignment = Alignment.CenterHorizontally,
-        modifier = Modifier.clip(RoundedCornerShape(8.dp)).clickable(onClick = onClick).padding(horizontal = 8.dp, vertical = 6.dp),
+private fun SecondaryAction(
+    symbol: AppSymbol,
+    contentDescription: String,
+    tint: Color,
+    onClick: () -> Unit,
+    selected: Boolean = false,
+) {
+    // Libellés retirés (lot HUD) : l'icône seule porte l'action, le
+    // `contentDescription` reste complet pour TalkBack. Padding vertical
+    // légèrement augmenté pour conserver une cible tactile ~44dp.
+    Box(
+        contentAlignment = Alignment.Center,
+        modifier = Modifier
+            .clip(RoundedCornerShape(8.dp))
+            .clickable(onClick = onClick)
+            .padding(horizontal = 10.dp, vertical = 10.dp),
     ) {
-        Icon(icon, contentDescription = label, tint = tint, modifier = Modifier.size(20.dp))
-        Spacer(Modifier.height(3.dp))
-        Text(label, fontSize = 10.sp, color = tint, style = MaterialTheme.typography.labelSmall)
+        AppIcon(
+            symbol = symbol,
+            contentDescription = contentDescription,
+            selected = selected,
+            tint = tint,
+            modifier = Modifier.size(24.dp),
+        )
     }
 }

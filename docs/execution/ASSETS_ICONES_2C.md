@@ -43,8 +43,9 @@ Paramètres : `wght 400`, `GRAD 0`, `opsz 24`, grille 24dp.
 | `symbol_more_actions` | `more_vert` | `ic_symbol_more_actions.xml` | `—` | Non |
 | `symbol_copy` | `content_copy` | `ic_symbol_copy.xml` | `—` | Non |
 | `symbol_highlight` | `highlight` | `ic_symbol_highlight.xml` | `—` | Non |
-| `symbol_brightness` | `brightness_medium` | `ic_symbol_brightness.xml` | `—` | Non |
+| `symbol_brightness` | `light_mode` | `ic_symbol_brightness.xml` | `—` | Non |
 | `symbol_sleep_timer` | `bedtime` | `ic_symbol_sleep_timer.xml` | `—` | Non |
+| `symbol_format_size` | `format_size` | `ic_symbol_format_size.xml` | `—` | Non |
 | `symbol_device` | `smartphone` | `ic_symbol_device.xml` | `—` | Non |
 | `symbol_cloud_connected` | `cloud_done` | `ic_symbol_cloud_connected.xml` | `—` | Non |
 | `symbol_cloud_disconnected` | `cloud_off` | `ic_symbol_cloud_disconnected.xml` | `—` | Non |

@@ -16,7 +16,9 @@ import androidx.compose.foundation.layout.fillMaxHeight
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.navigationBarsPadding
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.statusBarsPadding
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.layout.wrapContentSize
 import androidx.compose.foundation.lazy.LazyColumn
@@ -114,7 +116,16 @@ fun BookmarkPanel(
                     .fillMaxHeight(),
                 color = MaterialTheme.colorScheme.surface,
             ) {
-                Column(modifier = Modifier.fillMaxSize()) {
+                Column(
+                    modifier = Modifier
+                        .fillMaxSize()
+                        // Dialog edge-to-edge (decorFitsSystemWindows=false) :
+                        // la barre de statut et la barre de navigation
+                        // mordaient sur le panneau (titre coupé en haut,
+                        // bouton sous la barre de navigation en bas).
+                        .statusBarsPadding()
+                        .navigationBarsPadding(),
+                ) {
                     Row(
                         modifier = Modifier.fillMaxWidth().padding(8.dp),
                         verticalAlignment = Alignment.CenterVertically,
@@ -125,9 +136,38 @@ fun BookmarkPanel(
                         Text("Marque-pages et notes", style = MaterialTheme.typography.titleMedium)
                     }
 
-                    // Toggle « Marquer cette page » — visible quel que soit
-                    // l'onglet actif (cible confirmée, pas lié au filtre).
-                    Row(modifier = Modifier.fillMaxWidth().padding(horizontal = 16.dp, vertical = 8.dp)) {
+                    TabRow(selectedTabIndex = selectedTab) {
+                        BookmarkPanelTab.entries.forEach { tab ->
+                            Tab(
+                                selected = selectedTab == tab.ordinal,
+                                onClick = { selectedTab = tab.ordinal },
+                                text = {
+                                    // « Surlignages »/« Marque-pages » ne
+                                    // tenaient pas sur une ligne : force une
+                                    // seule ligne, police réduite d'un cran.
+                                    Text(
+                                        tab.label,
+                                        maxLines = 1,
+                                        overflow = TextOverflow.Ellipsis,
+                                        style = MaterialTheme.typography.labelMedium,
+                                    )
+                                },
+                            )
+                        }
+                    }
+
+                    // Contenu de l'onglet actif — occupe tout l'espace restant.
+                    Box(modifier = Modifier.weight(1f)) {
+                        when (BookmarkPanelTab.entries[selectedTab]) {
+                            BookmarkPanelTab.NOTES -> NotesTab(notes, onAnnotationClick)
+                            BookmarkPanelTab.HIGHLIGHTS -> HighlightsTab(highlights, onAnnotationClick)
+                            BookmarkPanelTab.BOOKMARKS -> BookmarksTab(bookmarks, onBookmarkClick)
+                        }
+                    }
+
+                    // Toggle « Marquer cette page » — déplacé tout en bas
+                    // (demande UX), visible quel que soit l'onglet actif.
+                    Row(modifier = Modifier.fillMaxWidth().padding(horizontal = 16.dp, vertical = 12.dp)) {
                         if (isCurrentPageBookmarked) {
                             Button(
                                 onClick = onToggleBookmark,
@@ -143,22 +183,6 @@ fun BookmarkPanel(
                                 Text("Marquer cette page")
                             }
                         }
-                    }
-
-                    TabRow(selectedTabIndex = selectedTab) {
-                        BookmarkPanelTab.entries.forEach { tab ->
-                            Tab(
-                                selected = selectedTab == tab.ordinal,
-                                onClick = { selectedTab = tab.ordinal },
-                                text = { Text(tab.label) },
-                            )
-                        }
-                    }
-
-                    when (BookmarkPanelTab.entries[selectedTab]) {
-                        BookmarkPanelTab.NOTES -> NotesTab(notes, onAnnotationClick)
-                        BookmarkPanelTab.HIGHLIGHTS -> HighlightsTab(highlights, onAnnotationClick)
-                        BookmarkPanelTab.BOOKMARKS -> BookmarksTab(bookmarks, onBookmarkClick)
                     }
                 }
             }
