@@ -9,6 +9,7 @@ import com.inktone.domain.service.AudioSegment
 import com.inktone.domain.service.PlaybackEvent
 import com.inktone.domain.service.TtsCapabilities
 import com.inktone.domain.service.TtsEngine
+import com.inktone.domain.usecase.GetReadingStateUseCase
 import com.inktone.domain.usecase.UpdateReadingStateUseCase
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.emptyFlow
@@ -68,6 +69,7 @@ class PlaybackOrchestratorSleepTimerTest {
         ttsEngine = InstantTtsEngine(),
         audioPlayer = FakeAudioPlayer(),
         updateReadingState = UpdateReadingStateUseCase(FakeReadingStateRepository()),
+            getReadingState = GetReadingStateUseCase(FakeReadingStateRepository()),
         chapterParser = FakeChapterParser(),
     )
 

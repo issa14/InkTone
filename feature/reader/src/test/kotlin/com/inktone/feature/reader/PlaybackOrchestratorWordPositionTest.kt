@@ -11,6 +11,7 @@ import com.inktone.domain.service.PlaybackPosition
 import com.inktone.domain.service.TtsCapabilities
 import com.inktone.domain.service.TtsEngine
 import com.inktone.domain.service.WordTimestamp
+import com.inktone.domain.usecase.GetReadingStateUseCase
 import com.inktone.domain.usecase.UpdateReadingStateUseCase
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.Flow
@@ -66,6 +67,7 @@ class PlaybackOrchestratorWordPositionTest {
             ttsEngine = FakeWordTtsEngine(wordTimestamps),
             audioPlayer = player,
             updateReadingState = UpdateReadingStateUseCase(FakeReadingStateRepository()),
+            getReadingState = GetReadingStateUseCase(FakeReadingStateRepository()),
             chapterParser = FakeChapterParser(),
         )
 
@@ -99,6 +101,7 @@ class PlaybackOrchestratorWordPositionTest {
             ttsEngine = FakeWordTtsEngine(listOf(WordTimestamp(word = "x", startMs = 0, endMs = 100, charOffset = 0))),
             audioPlayer = player,
             updateReadingState = UpdateReadingStateUseCase(FakeReadingStateRepository()),
+            getReadingState = GetReadingStateUseCase(FakeReadingStateRepository()),
             chapterParser = FakeChapterParser(),
         )
 
@@ -121,6 +124,7 @@ class PlaybackOrchestratorWordPositionTest {
             ttsEngine = FakeWordTtsEngine(wordTimestamps),
             audioPlayer = player,
             updateReadingState = UpdateReadingStateUseCase(FakeReadingStateRepository()),
+            getReadingState = GetReadingStateUseCase(FakeReadingStateRepository()),
             chapterParser = FakeChapterParser(),
         )
 

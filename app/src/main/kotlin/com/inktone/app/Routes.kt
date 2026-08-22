@@ -23,6 +23,8 @@ data class ReaderRoute(
     val targetCharOffset: Int? = null,
     /** Lot 4, tâche 4.7 — arrivée depuis « Marque-pages et notes » : flash différé du passage visé. */
     val flashOnArrival: Boolean = false,
+    /** Bouton Play de la carte Reprendre : démarre le TTS automatiquement à l'arrivée. */
+    val autoStartTts: Boolean = false,
 )
 
 @Serializable

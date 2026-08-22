@@ -105,7 +105,7 @@ enum class LibraryLayoutMode { LIST, GRID_COVERS }
 data class CoverRegenerationProgress(val processed: Int, val total: Int)
 
 sealed interface LibraryIntent {
-    data class OpenPublication(val publicationId: String) : LibraryIntent
+    data class OpenPublication(val publicationId: String, val autoStartTts: Boolean = false) : LibraryIntent
     data class ToggleFavorite(val publicationId: String, val isFavorite: Boolean) : LibraryIntent
     data class TogglePin(val publicationId: String, val isPinned: Boolean) : LibraryIntent
     data class DeletePublication(val publicationId: String) : LibraryIntent
@@ -132,7 +132,7 @@ sealed interface LibraryIntent {
  * `onNavigateToReader`, qui traduit `publicationId` en `ReaderRoute`.
  */
 sealed interface LibraryEffect {
-    data class NavigateToReader(val publicationId: String) : LibraryEffect
+    data class NavigateToReader(val publicationId: String, val autoStartTts: Boolean = false) : LibraryEffect
     data object NavigateToStats : LibraryEffect
     // Lot 19 — « Synchroniser avec le cloud » non configuré : bascule
     // vers l'écran de configuration, jamais un bouton désactivé.

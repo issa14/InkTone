@@ -379,7 +379,6 @@ fun ReaderScreen(
         // mode SCROLL est désormais un `LazyListState` — un paragraphe = un
         // item, jamais plus tout le chapitre composé d'un coup.
         val scrollState = rememberLazyListState()
-        LaunchedEffect(state.currentChapterIndex) { scrollState.scrollToItem(0) }
 
         val freeSelectedRange = state.freeSelectionRange
 
@@ -398,6 +397,61 @@ fun ReaderScreen(
         // défilement programmatique aussi bien que pour un drag
         // utilisateur — il ne permet donc pas de distinguer les deux.
         var isProgrammaticScroll by remember { mutableStateOf(false) }
+
+        // Diagnostic reprise de lecture (mode SCROLL) — bug réel trouvé à
+        // l'audit : `LaunchedEffect(state.currentChapterIndex) {
+        // scrollState.scrollToItem(0) }` ramenait TOUJOURS la liste en haut
+        // du chapitre à l'ouverture, y compris quand `currentSentenceIndex`
+        // restauré (K3) pointait plus loin. Pire : `topmostVisibleSentenceIndex`
+        // ci-dessous observait alors la phrase 0 réellement visible et
+        // réémettait `UpdateScrollPosition(0)`, qui ÉCRASAIT en base la vraie
+        // position sauvegardée — la position ne se contentait pas de ne pas
+        // s'afficher, elle était détruite dès l'ouverture.
+        //
+        // Corrigé en donnant au mode SCROLL le même ancrage que
+        // `PagedChapterContent` pour le mode PAGED (`pageIndexAt`, granularité
+        // page) : ici, granularité bloc (paragraphe) — un `LazyColumn` ne
+        // connaît qu'un index d'item, pas un offset caractère. Même garde
+        // anti-écho (`lastManuallyEmittedSentenceIndex`) : distingue un
+        // changement de `currentSentenceIndex` provoqué par NOTRE PROPRE
+        // remontée de scroll manuel (topmostVisibleSentenceIndex plus bas) —
+        // qu'il ne faut pas recontredire — d'une navigation externe (TTS,
+        // signet, restauration) qui doit, elle, repositionner la liste.
+        var lastManuallyEmittedSentenceIndex by remember { mutableStateOf<Int?>(null) }
+        var previousChapterIndexForAnchor by remember { mutableStateOf<Int?>(null) }
+        LaunchedEffect(state.currentChapterIndex, state.currentSentenceIndex, state.currentChapter?.sentences?.size) {
+            // L'auto-scroll TTS (effet suivant, `animateScrollToItem`) est
+            // seul responsable pendant la lecture — ne pas le contredire ici.
+            if (state.isPlaying) return@LaunchedEffect
+
+            val chapterChanged = state.currentChapterIndex != previousChapterIndexForAnchor
+            previousChapterIndexForAnchor = state.currentChapterIndex
+
+            if (!chapterChanged && state.currentSentenceIndex == lastManuallyEmittedSentenceIndex) {
+                lastManuallyEmittedSentenceIndex = null
+                return@LaunchedEffect
+            }
+
+            val targetBlock = state.currentChapter?.sentences
+                ?.getOrNull(state.currentSentenceIndex)?.blockIndex
+                ?.takeIf { it >= 0 }
+            if (targetBlock == null) {
+                // Contenu du chapitre pas encore chargé (Rich vide) : sur un
+                // vrai changement de chapitre, démarrer en haut le temps que
+                // le contenu arrive — cet effet se redéclenchera dès que
+                // `sentences.size` changera. Sur un simple chargement
+                // asynchrone dans le MÊME chapitre, ne rien faire : ne pas
+                // ramener une liste déjà positionnée en haut.
+                if (chapterChanged) scrollState.scrollToItem(0)
+                return@LaunchedEffect
+            }
+            isProgrammaticScroll = true
+            try {
+                scrollState.scrollToItem(targetBlock)
+            } finally {
+                isProgrammaticScroll = false
+            }
+        }
 
         // A.1 — Auto-scroll vers la phrase active pendant la lecture TTS.
         // `animateScrollToItem` remplace `animateScrollTo(offsetAbsolu)` :
@@ -449,6 +503,7 @@ fun ReaderScreen(
         LaunchedEffect(topmostVisibleSentenceIndex, state.readingMode) {
             val index = topmostVisibleSentenceIndex
             if (index != null && state.readingMode == ReadingMode.SCROLL) {
+                lastManuallyEmittedSentenceIndex = index
                 viewModel.onIntent(ReaderIntent.UpdateScrollPosition(index))
             }
         }
