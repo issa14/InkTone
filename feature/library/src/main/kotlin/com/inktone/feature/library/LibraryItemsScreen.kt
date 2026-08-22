@@ -1,5 +1,7 @@
 package com.inktone.feature.library
 
+import androidx.compose.foundation.ExperimentalFoundationApi
+import androidx.compose.foundation.combinedClickable
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
@@ -52,7 +54,9 @@ import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.hilt.navigation.compose.hiltViewModel
 import com.inktone.core.designsystem.AppIcon
+import com.inktone.core.designsystem.rememberAppHaptics
 import com.inktone.core.designsystem.AppSymbol
+import com.inktone.domain.model.cleanedForDisplay
 import com.inktone.domain.model.AnnotationColor
 import com.inktone.domain.model.LibraryItem
 import com.inktone.domain.model.LibraryItemFilter
@@ -199,9 +203,13 @@ private fun LibraryItemsEmptyState(isFiltered: Boolean) {
 
 @Composable
 private fun FilterChipsRow(selected: LibraryItemFilter, onSelected: (LibraryItemFilter) -> Unit) {
+    // Resserré : à 16 dp de marge, 8 dp d'écart et un libellé `labelLarge`,
+    // les quatre puces dépassaient la largeur de l'écran et « Notes » se
+    // retrouvait coupé — « Surlignages » est à lui seul deux fois plus large
+    // que « Tous ».
     Row(
-        modifier = Modifier.fillMaxWidth().padding(horizontal = 16.dp, vertical = 8.dp),
-        horizontalArrangement = Arrangement.spacedBy(8.dp),
+        modifier = Modifier.fillMaxWidth().padding(horizontal = 12.dp, vertical = 8.dp),
+        horizontalArrangement = Arrangement.spacedBy(6.dp),
     ) {
         val entries = listOf(
             LibraryItemFilter.ALL to "Tous",
@@ -213,7 +221,7 @@ private fun FilterChipsRow(selected: LibraryItemFilter, onSelected: (LibraryItem
             FilterChip(
                 selected = selected == filter,
                 onClick = { onSelected(filter) },
-                label = { Text(label) },
+                label = { Text(label, style = MaterialTheme.typography.labelMedium, maxLines = 1) },
                 colors = FilterChipDefaults.filterChipColors(),
             )
         }
@@ -291,9 +299,18 @@ private fun LibraryItemRow(
             }
         },
     ) {
+        val haptics = rememberAppHaptics()
         Card(
-            onClick = onClick,
-            modifier = Modifier.fillMaxWidth(),
+            modifier = Modifier
+                .fillMaxWidth()
+                // Épingler est une action rare : elle passe en appui long
+                // plutôt que d'occuper un bouton de 48 dp sur CHAQUE ligne.
+                // Le retour haptique remplace l'affordance visuelle disparue
+                // — sans lui, rien ne confirmerait que l'appui a pris.
+                .combinedClickable(
+                    onClick = onClick,
+                    onLongClick = { haptics.tick(); onTogglePin() },
+                ),
             shape = cardShape,
             colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceVariant),
         ) {
@@ -320,7 +337,7 @@ private fun LibraryItemRow(
                     // Ligne 2 — titre de l'ouvrage, seul sur sa ligne : peut
                     // être tronqué sans jamais pousser le chapitre hors champ.
                     Text(
-                        item.publicationTitle ?: "Ouvrage supprimé",
+                        item.publicationTitle?.cleanedForDisplay() ?: "Ouvrage supprimé",
                         style = MaterialTheme.typography.bodySmall,
                         color = MaterialTheme.colorScheme.onSurfaceVariant,
                         maxLines = 1,
@@ -335,10 +352,15 @@ private fun LibraryItemRow(
                         color = MaterialTheme.colorScheme.onSurfaceVariant,
                     )
                 }
-                IconButton(onClick = onTogglePin) {
-                    AppIcon(AppSymbol.Pin, selected = item.isPinned,
-                        contentDescription = if (item.isPinned) "Désépingler" else "Épingler",
-                        tint = if (item.isPinned) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurfaceVariant,
+                // L'AFFORDANCE disparaît, pas l'ÉTAT : sans ce témoin, rien
+                // ne distinguerait plus une ligne épinglée d'une autre, et
+                // l'appui long deviendrait une bascule à l'aveugle.
+                if (item.isPinned) {
+                    AppIcon(
+                        AppSymbol.Pin,
+                        selected = true,
+                        contentDescription = "Épinglé",
+                        tint = MaterialTheme.colorScheme.primary,
                     )
                 }
             }
