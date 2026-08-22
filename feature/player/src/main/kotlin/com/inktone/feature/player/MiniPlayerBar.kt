@@ -10,6 +10,7 @@ import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.navigationBarsPadding
 import androidx.compose.foundation.layout.padding
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
@@ -114,6 +115,13 @@ internal fun MiniPlayerContent(
                 verticalAlignment = Alignment.CenterVertically,
                 modifier = Modifier
                     .fillMaxWidth()
+                    // Edge-to-edge : cette barre est le dernier élément de la
+                    // colonne racine, hors de tout `Scaffold` — rien ne lui
+                    // applique l'inset du bas. Sans ce padding, ses commandes
+                    // passeraient sous la barre de navigation système. Il est
+                    // posé sur le contenu et non sur la `Surface`, pour que le
+                    // fond, lui, continue de peindre jusqu'au bord.
+                    .navigationBarsPadding()
                     .clickable(enabled = state.publicationId != null) {
                         state.publicationId?.let(onOpenReader)
                     }

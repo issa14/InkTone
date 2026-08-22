@@ -33,7 +33,6 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.graphics.lerp
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.ui.platform.LocalContext
@@ -48,7 +47,7 @@ import androidx.navigation.compose.rememberNavController
 import androidx.navigation.toRoute
 import com.inktone.core.designsystem.LocalAnimatedVisibilityScope
 import com.inktone.core.designsystem.LocalSharedTransitionScope
-import com.inktone.core.designsystem.StatusBarColorEffect
+import com.inktone.core.designsystem.SystemBarIconsEffect
 import com.inktone.core.ui.AboutScreen
 import com.inktone.feature.importer.ImportViewModel
 import com.inktone.feature.library.DrawerDestination
@@ -167,36 +166,33 @@ fun InkToneNavHost(navController: NavHostController = rememberNavController(), s
         },
     ) {
     val openDrawer: () -> Unit = { scope.launch { drawerState.open() } }
-    // Couleur de la barre de statut — décidée ICI, en un seul point, à partir
+    // Contraste des icônes système — décidé ICI, en un seul point, à partir
     // de la destination ET de l'état du drawer.
     //
-    // Elle a d'abord vécu dans chaque écran, au plus près de la barre du haut
-    // qui la définit. Ce placement ne survit pas au drawer : à son ouverture
-    // seul CE composable recompose (il relit `drawerState`), l'écran non ; et
-    // à sa fermeture, l'inverse — personne ne restaure. Deux écrivains pour
-    // une même valeur, aucun des deux ne voyant l'événement de l'autre.
+    // En edge-to-edge il n'y a plus de couleur de barre à poser : le contenu
+    // peint derrière elle. Reste le contraste des icônes, qui dépend de ce
+    // que ce contenu dessine — d'où le même calcul qu'avant, appliqué
+    // désormais à `SystemBarIconsEffect`.
+    //
+    // Ce calcul a d'abord vécu dans chaque écran, au plus près de la barre du
+    // haut qui le définit. Ce placement ne survit pas au drawer : à son
+    // ouverture seul CE composable recompose (il relit `drawerState`), l'écran
+    // non ; à sa fermeture, l'inverse — personne ne restaure. Deux écrivains
+    // pour une même valeur, aucun ne voyant l'événement de l'autre.
     // Centraliser est la seule façon d'en faire une fonction de l'état plutôt
     // qu'une course. Le prix — une table à tenir en phase avec la couleur
     // réelle des barres du haut — est payé par `usesPrimaryTopBar()`, même
     // idiome que `hidesMiniPlayer()`/`toDrawerDestination()` juste à côté.
     //
-    // Drawer ouvert : la couleur est assombrie du scrim. En edge-to-edge, le
-    // scrim du drawer couvrirait aussi la barre de statut ; on ne dessine pas
-    // encore derrière elle (voir StatusBarColorEffect, dette targetSdk 35),
-    // donc on reproduit son effet à la main plutôt que de laisser une bande
-    // pleine lumière au-dessus d'un écran voilé.
-    val baseStatusBarColor = if (currentDestination?.usesPrimaryTopBar() == true) {
-        MaterialTheme.colorScheme.primary
-    } else {
-        MaterialTheme.colorScheme.surface
+    // Drawer ouvert : c'est sa feuille, en `surface`, qui occupe le haut de
+    // l'écran — les icônes doivent contraster avec elle, pas avec la barre du
+    // haut qu'elle recouvre.
+    val systemBarBackground = when {
+        drawerState.isOpen -> MaterialTheme.colorScheme.surface
+        currentDestination?.usesPrimaryTopBar() == true -> MaterialTheme.colorScheme.primary
+        else -> MaterialTheme.colorScheme.surface
     }
-    StatusBarColorEffect(
-        if (drawerState.isOpen) {
-            lerp(baseStatusBarColor, MaterialTheme.colorScheme.scrim, DRAWER_SCRIM_ALPHA)
-        } else {
-            baseStatusBarColor
-        },
-    )
+    SystemBarIconsEffect(systemBarBackground)
     SharedTransitionLayout {
         CompositionLocalProvider(LocalSharedTransitionScope provides this@SharedTransitionLayout) {
         // P2 — le mini-lecteur occupe une bande sous le contenu plutôt que de
@@ -627,8 +623,3 @@ private fun BackScaffold(title: String, onBack: () -> Unit, content: @Composable
  */
 private const val READER_CLOSE_FADE_MS = 120
 
-/**
- * Opacité du scrim appliqué à la barre de statut quand le drawer est ouvert
- * — celle du scrim de `ModalNavigationDrawer` (Material 3).
- */
-private const val DRAWER_SCRIM_ALPHA = 0.32f
