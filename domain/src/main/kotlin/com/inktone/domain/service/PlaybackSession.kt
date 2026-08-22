@@ -62,6 +62,25 @@ interface PlaybackSession {
     fun togglePlayPause()
 
     /**
+     * Démarre la narration d'une publication depuis sa position de reprise
+     * enregistrée (K3), **sans écran Lecteur**.
+     *
+     * [togglePlayPause] ne sait relancer qu'une session déjà constituée
+     * (phrases, voix, chapitre) : depuis la Bibliothèque, aucune ne l'est
+     * encore. Cette fonction est le démarrage à froid — elle résout la
+     * publication, sa position de reprise, sa voix et son programme de
+     * chapitres, puis lance la lecture. C'est le même chemin de position que
+     * le Lecteur (`ReadingState.locator`), jamais un départ implicite à zéro.
+     *
+     * Sans effet si la publication est introuvable, illisible, ou d'un format
+     * sans narration (PDF, décision actée 16 du Lot 12). Idempotente vis-à-vis
+     * du livre déjà narré : la relancer redémarre la narration de sa position
+     * de reprise, ce que l'appelant doit éviter en consultant [metadata] et
+     * [sessionState] (voir `LibraryViewModel.toggleResumeNarration`).
+     */
+    fun startNarration(publicationId: String)
+
+    /**
      * Pause réelle, sans perdre la position ni vider la file (état `PAUSED`).
      *
      * Contrairement à [togglePlayPause], l'appel est **idempotent et

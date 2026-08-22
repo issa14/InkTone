@@ -31,6 +31,7 @@ import org.junit.Before
 import org.junit.Test
 import com.inktone.core.testing.fake.FakeChapterParser
 import com.inktone.core.testing.fake.FakeEpubResourceResolver
+import com.inktone.core.testing.fake.FakeVoiceProfileRepository
 
 /**
  * Tache 8.2 — verifie EffectiveReadingSettings.resolve() (Tache 1.3) en
@@ -72,7 +73,7 @@ class ReaderViewModelOverrideTest {
 
         val viewModel = ReaderViewModel(
             ttsEngine = FakeTtsEngine(),
-            playbackOrchestrator = PlaybackOrchestrator(FakeTtsEngine(), FakeAudioPlayer(), UpdateReadingStateUseCase(readingStateRepository), GetReadingStateUseCase(readingStateRepository), FakeChapterParser()),
+            playbackOrchestrator = PlaybackOrchestrator(FakeTtsEngine(), FakeAudioPlayer(), UpdateReadingStateUseCase(readingStateRepository), GetReadingStateUseCase(readingStateRepository), FakeChapterParser(), FakePublicationRepository(), FakePublicationParser(), FakePreferencesRepository(), FakeVoiceProfileRepository()),
             publicationParser = FakePublicationParser(),
             updateReadingState = UpdateReadingStateUseCase(readingStateRepository),
             getReadingState = GetReadingStateUseCase(readingStateRepository),
@@ -91,7 +92,7 @@ class ReaderViewModelOverrideTest {
             chapterParser = FakeChapterParser(),
             epubResourceResolver = FakeEpubResourceResolver(),
             narrationSessionContinuation = NarrationSessionContinuation(
-                PlaybackOrchestrator(FakeTtsEngine(), FakeAudioPlayer(), UpdateReadingStateUseCase(FakeReadingStateRepository()), GetReadingStateUseCase(FakeReadingStateRepository()), FakeChapterParser()),
+                PlaybackOrchestrator(FakeTtsEngine(), FakeAudioPlayer(), UpdateReadingStateUseCase(FakeReadingStateRepository()), GetReadingStateUseCase(FakeReadingStateRepository()), FakeChapterParser(), FakePublicationRepository(), FakePublicationParser(), FakePreferencesRepository(), FakeVoiceProfileRepository()),
                 FakeReadingSessionRepository(),
             ),
         )

@@ -2,6 +2,10 @@ package com.inktone.feature.reader
 
 import com.inktone.core.testing.fake.FakeChapterParser
 import com.inktone.core.testing.fake.FakeReadingStateRepository
+import com.inktone.core.testing.fake.FakeVoiceProfileRepository
+import com.inktone.core.testing.fake.FakePublicationRepository
+import com.inktone.core.testing.fake.FakePublicationParser
+import com.inktone.core.testing.fake.FakePreferencesRepository
 import com.inktone.domain.model.Sentence
 import com.inktone.domain.model.TtsEngineId
 import com.inktone.domain.model.VoiceProfile
@@ -71,6 +75,10 @@ class PlaybackOrchestratorSleepTimerTest {
         updateReadingState = UpdateReadingStateUseCase(FakeReadingStateRepository()),
             getReadingState = GetReadingStateUseCase(FakeReadingStateRepository()),
         chapterParser = FakeChapterParser(),
+            publicationRepository = FakePublicationRepository(),
+            publicationParser = FakePublicationParser(),
+            preferencesRepository = FakePreferencesRepository(),
+            voiceProfileRepository = FakeVoiceProfileRepository(),
     )
 
     @Test

@@ -1,6 +1,10 @@
 package com.inktone.feature.reader
 
 import com.inktone.core.testing.fake.FakeReadingStateRepository
+import com.inktone.core.testing.fake.FakeVoiceProfileRepository
+import com.inktone.core.testing.fake.FakePublicationRepository
+import com.inktone.core.testing.fake.FakePublicationParser
+import com.inktone.core.testing.fake.FakePreferencesRepository
 import com.inktone.domain.model.Chapter
 import com.inktone.domain.model.ChapterContent
 import com.inktone.domain.model.Sentence
@@ -110,6 +114,10 @@ class PlaybackOrchestratorChapterAdvanceTest {
         updateReadingState = UpdateReadingStateUseCase(FakeReadingStateRepository()),
             getReadingState = GetReadingStateUseCase(FakeReadingStateRepository()),
         chapterParser = parser,
+            publicationRepository = FakePublicationRepository(),
+            publicationParser = FakePublicationParser(),
+            preferencesRepository = FakePreferencesRepository(),
+            voiceProfileRepository = FakeVoiceProfileRepository(),
     )
 
     @Test

@@ -3,6 +3,7 @@ package com.inktone.feature.library
 import com.inktone.core.testing.fake.FakeImportProgressObserver
 import com.inktone.core.testing.fake.FakeImportResultsStore
 import com.inktone.core.testing.fake.FakePreferencesRepository
+import com.inktone.core.testing.fake.FakePlaybackSession
 import com.inktone.core.testing.fake.FakePublicationParser
 import com.inktone.core.testing.fake.FakePublicationRepository
 import com.inktone.core.testing.fake.FakeReadingStateRepository
@@ -13,6 +14,8 @@ import com.inktone.domain.model.PublicationFormat
 import com.inktone.domain.model.SyncAccount
 import com.inktone.domain.model.SyncProviderId
 import com.inktone.domain.service.ImportProgress
+import com.inktone.domain.service.PlaybackMetadata
+import com.inktone.domain.service.PlaybackSessionState
 import com.inktone.domain.service.ImportSessionStore
 import com.inktone.domain.usecase.DeletePublicationUseCase
 import com.inktone.domain.usecase.RegenerateCoversUseCase
@@ -61,6 +64,7 @@ class LibraryViewModelTest {
         // Audit v1.0.0 (P5) : même StandardTestDispatcher que setMain,
         // sinon advanceUntilIdle ne voit pas le calcul de progression.
         defaultDispatcher: CoroutineDispatcher = dispatcher,
+        playbackSession: FakePlaybackSession = FakePlaybackSession(),
     ): LibraryViewModel = LibraryViewModel(
         publicationRepository,
         FakeReadingStateRepository(),
@@ -74,6 +78,7 @@ class LibraryViewModelTest {
         SynchronizeNowUseCase(syncNowService),
         syncAccountRepository,
         RegenerateCoversUseCase(publicationRepository, publicationParser),
+        playbackSession,
         defaultDispatcher,
     )
 
@@ -222,5 +227,88 @@ class LibraryViewModelTest {
 
         assertEquals("cover-reconstruit.jpg", repository.getById("pub-1")?.coverUri)
         assertTrue(effect is LibraryEffect.CoversRegenerated)
+    }
+
+    // ───── Bouton Lecture/Pause de la carte « Reprendre la lecture » ─────
+
+    @Test
+    fun `le bouton lecture demarre la narration sans ouvrir le lecteur`() = runTest {
+        val repository = FakePublicationRepository()
+        repository.insert(publication("pub-1"))
+        val session = FakePlaybackSession()
+        val viewModel = viewModel(publicationRepository = repository, playbackSession = session)
+        dispatcher.scheduler.advanceUntilIdle()
+
+        var effect: LibraryEffect? = null
+        val job = launch(dispatcher) { viewModel.effects.collect { effect = it } }
+        dispatcher.scheduler.advanceUntilIdle()
+
+        viewModel.onIntent(LibraryIntent.ToggleResumeNarration("pub-1"))
+        dispatcher.scheduler.advanceUntilIdle()
+        job.cancel()
+
+        assertEquals(listOf("pub-1"), session.startedNarrations)
+        // Le coeur de la demande : aucune navigation vers le Lecteur.
+        assertNull(effect)
+    }
+
+    @Test
+    fun `le bouton bascule la session quand c est deja ce livre qui est narre`() = runTest {
+        val repository = FakePublicationRepository()
+        repository.insert(publication("pub-1"))
+        val session = FakePlaybackSession()
+        session.metadataFlow.value = PlaybackMetadata(publicationId = "pub-1", title = "Titre pub-1")
+        session.sessionStateFlow.value = PlaybackSessionState.PLAYING
+        val viewModel = viewModel(publicationRepository = repository, playbackSession = session)
+        dispatcher.scheduler.advanceUntilIdle()
+
+        viewModel.onIntent(LibraryIntent.ToggleResumeNarration("pub-1"))
+        dispatcher.scheduler.advanceUntilIdle()
+
+        assertEquals(1, session.togglePlayPauseCount)
+        // Jamais un redemarrage a froid : la position et la file sont gardees.
+        assertTrue(session.startedNarrations.isEmpty())
+    }
+
+    @Test
+    fun `le bouton demarre a froid quand une AUTRE publication est narree`() = runTest {
+        val repository = FakePublicationRepository()
+        repository.insert(publication("pub-1"))
+        val session = FakePlaybackSession()
+        session.metadataFlow.value = PlaybackMetadata(publicationId = "pub-2", title = "Un autre livre")
+        session.sessionStateFlow.value = PlaybackSessionState.PLAYING
+        val viewModel = viewModel(publicationRepository = repository, playbackSession = session)
+        dispatcher.scheduler.advanceUntilIdle()
+
+        viewModel.onIntent(LibraryIntent.ToggleResumeNarration("pub-1"))
+        dispatcher.scheduler.advanceUntilIdle()
+
+        // Sans cette distinction, le bouton reprendrait la lecture de pub-2.
+        assertEquals(listOf("pub-1"), session.startedNarrations)
+        assertEquals(0, session.togglePlayPauseCount)
+    }
+
+    @Test
+    fun `l etat de narration de la carte derive de la session`() = runTest {
+        val repository = FakePublicationRepository()
+        // La carte « Reprendre la lecture » n'existe que pour un livre deja
+        // ouvert (`lastOpened`) : sans cela, `isResumeNarrationPlaying` est
+        // faux quoi que fasse la session, et le test ne verifierait rien.
+        repository.insert(publication("pub-1").copy(lastOpened = 1_000L))
+        val session = FakePlaybackSession()
+        val viewModel = viewModel(publicationRepository = repository, playbackSession = session)
+        dispatcher.scheduler.advanceUntilIdle()
+        assertEquals(false, viewModel.state.value.isResumeNarrationPlaying)
+
+        session.metadataFlow.value = PlaybackMetadata(publicationId = "pub-1", title = "Titre pub-1")
+        session.sessionStateFlow.value = PlaybackSessionState.PLAYING
+        dispatcher.scheduler.advanceUntilIdle()
+        assertTrue(viewModel.state.value.isResumeNarrationPlaying)
+
+        // Une pause venue de la notification doit se refleter sans un mot de
+        // synchronisation cote Bibliotheque.
+        session.sessionStateFlow.value = PlaybackSessionState.PAUSED
+        dispatcher.scheduler.advanceUntilIdle()
+        assertEquals(false, viewModel.state.value.isResumeNarrationPlaying)
     }
 }

@@ -95,7 +95,7 @@ class ReaderViewModelBackgroundTrackerTest {
 
         return ReaderViewModel(
             ttsEngine = FakeTtsEngine(),
-            playbackOrchestrator = PlaybackOrchestrator(FakeTtsEngine(), FakeAudioPlayer(), UpdateReadingStateUseCase(FakeReadingStateRepository()), GetReadingStateUseCase(FakeReadingStateRepository()), FakeChapterParser()),
+            playbackOrchestrator = PlaybackOrchestrator(FakeTtsEngine(), FakeAudioPlayer(), UpdateReadingStateUseCase(FakeReadingStateRepository()), GetReadingStateUseCase(FakeReadingStateRepository()), FakeChapterParser(), FakePublicationRepository(), FakePublicationParser(), FakePreferencesRepository(), FakeVoiceProfileRepository()),
             publicationParser = parser,
             updateReadingState = UpdateReadingStateUseCase(FakeReadingStateRepository()),
             getReadingState = GetReadingStateUseCase(FakeReadingStateRepository()),
@@ -114,7 +114,7 @@ class ReaderViewModelBackgroundTrackerTest {
             chapterParser = FakeChapterParser(),
             epubResourceResolver = FakeEpubResourceResolver(),
             narrationSessionContinuation = NarrationSessionContinuation(
-                PlaybackOrchestrator(FakeTtsEngine(), FakeAudioPlayer(), UpdateReadingStateUseCase(FakeReadingStateRepository()), GetReadingStateUseCase(FakeReadingStateRepository()), FakeChapterParser()),
+                PlaybackOrchestrator(FakeTtsEngine(), FakeAudioPlayer(), UpdateReadingStateUseCase(FakeReadingStateRepository()), GetReadingStateUseCase(FakeReadingStateRepository()), FakeChapterParser(), FakePublicationRepository(), FakePublicationParser(), FakePreferencesRepository(), FakeVoiceProfileRepository()),
                 FakeReadingSessionRepository(),
             ),
         )
