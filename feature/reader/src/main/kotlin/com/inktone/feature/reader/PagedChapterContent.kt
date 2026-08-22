@@ -204,11 +204,36 @@ fun PagedChapterContent(
     // première instruction séquentielle d'une seule et même coroutine :
     // aucune autre branche de cet effet ne peut s'exécuter avant que le
     // reset n'ait eu lieu.
-    var previousChapterIndex by remember { mutableStateOf(chapter?.index) }
+    //
+    // Bug réel trouvé sur appareil (clignotement frénétique après un long
+    // défilement puis bascule SCROLL → PAGED) : `previousChapterIndex`
+    // était initialisé à `chapter?.index`, donc la TOUTE PREMIÈRE
+    // composition du pager n'était PAS traitée comme un changement de
+    // chapitre — l'effet émettait alors `onManualPageChange` pour la page
+    // 0 (ramenant `currentSentenceIndex`, hérité du défilement, à la
+    // première phrase) DANS LA MÊME phase que l'effet d'ancrage qui, lui,
+    // scrolle vers la page de la position profonde. Deux coroutines aux
+    // objectifs contraires (page 0 vs page profonde) s'invalidaient
+    // mutuellement en boucle : le clignotement observé. En partant de
+    // `null`, la première composition emprunte la branche « changement de
+    // chapitre » (reset du pager, AUCUNE émission) et laisse l'effet
+    // d'ancrage positionner seul le pager — même chemin, déjà éprouvé,
+    // que le changement de chapitre réel.
+    var previousChapterIndex by remember { mutableStateOf<Int?>(null) }
+    // Même correctif, second versant : quand la mesure COMPLÈTE arrive
+    // (mesure progressive 3a.3), `pageCount` change sans que l'utilisateur
+    // n'ait swipé. Sans cette garde, l'effet émettait alors
+    // `onManualPageChange` pour la page courante — ce qui écrasait la
+    // position de reprise (`currentSentenceIndex` profond) AVANT que
+    // l'effet d'ancrage n'ait pu positionner le pager. Un changement de
+    // `pageCount` n'est jamais un swipe : on le détecte et on s'abstient
+    // d'émettre.
+    var previousPageCount by remember { mutableStateOf(-1) }
 
     LaunchedEffect(chapter?.index, pagerState.currentPage, pageCount) {
         if (chapter?.index != previousChapterIndex) {
             previousChapterIndex = chapter?.index
+            previousPageCount = pageCount
             if (pagerState.currentPage != 0) {
                 isProgrammaticPageChange = true
                 try {
@@ -217,6 +242,10 @@ fun PagedChapterContent(
                     isProgrammaticPageChange = false
                 }
             }
+            return@LaunchedEffect
+        }
+        if (pageCount != previousPageCount) {
+            previousPageCount = pageCount
             return@LaunchedEffect
         }
         // Remonte la page réellement affichée — swipe manuel inclus,

@@ -86,6 +86,122 @@ class ChapterTextMeasurerTest {
     }
 
     /**
+     * Garde-fou de la page blanche en mode paginé après ~3 swipes.
+     *
+     * `measureRich` mesure par lots de MAX_BATCH_CHARS (10 000) caractères
+     * pour éviter les crashs de texture GPU, mais le rendu paginé tranche
+     * le texte de CHAQUE page depuis `ChapterMeasurement.annotatedString`
+     * (`buildPageAnnotatedString`). Stocker seulement le premier lot
+     * (l'ancien code) rendait donc toute page au-delà des 10 000 premiers
+     * caractères vide — la « page blanche après 3 swipes » signalée sur
+     * appareil. Ce test force 2 lots et vérifie que le texte INTÉGRAL est
+     * stocké, fin comprise.
+     */
+    @Test
+    fun `un chapitre de plusieurs lots stocke le texte integral et pas seulement le premier lot`() {
+        val partA = "a".repeat(4500)
+        val partB = "b".repeat(4500)
+        val partC = "c".repeat(2000)
+        val chapter = Chapter(
+            index = 0,
+            href = "long.xhtml",
+            title = null,
+            content = ChapterContent.Rich(
+                blocks = listOf(
+                    BookBlock.ParagraphBlock(richText = StyledText.plain(partA), globalOffsetRange = 0 until partA.length),
+                    BookBlock.ParagraphBlock(richText = StyledText.plain(partB), globalOffsetRange = (partA.length + 1) until (partA.length + 1 + partB.length)),
+                    BookBlock.ParagraphBlock(richText = StyledText.plain(partC), globalOffsetRange = (partA.length + partB.length + 2) until (partA.length + partB.length + 2 + partC.length)),
+                ),
+            ),
+        )
+
+        val result = measurer.measure(chapter, TextStyle(fontSize = 18.sp), maxWidthPx = 2000)
+
+        val expected = "$partA\n$partB\n$partC"
+        assertEquals(
+            "le texte intégral doit être stocké (sinon pages vides au-delà du premier lot)",
+            expected,
+            result.annotatedString.text,
+        )
+        assertTrue(
+            "la fin du chapitre doit être présente dans le texte stocké",
+            result.annotatedString.text.endsWith(partC),
+        )
+    }
+
+    /**
+     * Reproduit à l'échelle du moteur la « page blanche » : une fois les
+     * pages découpées par `VirtualPaginationEngine`, chaque page doit
+     * trancher un texte NON VIDE depuis `annotatedString`. Si les offsets
+     * de lignes (`allLines`, accumulés par lot) divergeaient de l'espace
+     * d'offsets du texte concaténé, une tranche tomberait hors du texte et
+     * la page serait vide — exactement le symptôme signalé sur appareil.
+     */
+    @Test
+    fun `chaque page d un chapitre multi-lots tranche un texte non vide`() {
+        val partA = "a".repeat(4500)
+        val partB = "b".repeat(4500)
+        val partC = "c".repeat(2000)
+        val chapter = Chapter(
+            index = 0,
+            href = "long.xhtml",
+            title = null,
+            content = ChapterContent.Rich(
+                blocks = listOf(
+                    BookBlock.ParagraphBlock(richText = StyledText.plain(partA), globalOffsetRange = 0 until partA.length),
+                    BookBlock.ParagraphBlock(richText = StyledText.plain(partB), globalOffsetRange = (partA.length + 1) until (partA.length + 1 + partB.length)),
+                    BookBlock.ParagraphBlock(richText = StyledText.plain(partC), globalOffsetRange = (partA.length + partB.length + 2) until (partA.length + partB.length + 2 + partC.length)),
+                ),
+            ),
+        )
+
+        val result = measurer.measure(chapter, TextStyle(fontSize = 18.sp), maxWidthPx = 400)
+        val engine = VirtualPaginationEngine()
+        val styleKey = PaginationStyleKey(
+            fontSizeSp = 18,
+            lineHeightSp = 18,
+            fontFamilyKey = "default",
+            viewportWidthPx = 400,
+            viewportHeightPx = 600,
+            paddingPx = 0,
+        )
+        engine.updateChapter(chapter.index, styleKey, result.lines, result.sentenceStartOffsets, force = true)
+
+        val pageCount = engine.pageCount(chapter.index)
+        assertTrue("un chapitre multi-lots doit produire plusieurs pages", pageCount > 1)
+
+        // Cause racine de la page blanche : les offsets de lignes des lots
+        // suivants n'étaient PAS transposés dans l'espace global (reset à 0
+        // par lot). Le contrôle de monotonie ci-dessous attrape ce reset.
+        for (i in 1 until result.lines.size) {
+            assertTrue(
+                "offsets de lignes non monotones à l'index $i : ${result.lines[i - 1].startOffset} -> ${result.lines[i].startOffset}",
+                result.lines[i].startOffset >= result.lines[i - 1].startOffset,
+            )
+        }
+
+        for (page in 0 until pageCount) {
+            val range = engine.pageOffsetRange(chapter.index, page)
+            val startInclusive = range.first.coerceIn(0, result.annotatedString.length)
+            val endExclusive = (range.last + 1).coerceIn(startInclusive, result.annotatedString.length)
+            assertTrue(
+                "la page $page doit trancher un texte non vide (range=$range, length=${result.annotatedString.length})",
+                startInclusive < endExclusive,
+            )
+        }
+
+        // Les lignes doivent couvrir l'intégralité du texte : la fin de la
+        // dernière ligne doit atteindre la fin du chapitre (à un caractère
+        // près pour la sémantique inclusive/exclusive de getLineEnd).
+        val fullLength = result.annotatedString.length
+        val lastLineEnd = result.lines.lastOrNull()?.endOffset ?: 0
+        assertTrue(
+            "la dernière ligne doit atteindre la fin du chapitre (end=$lastLineEnd, length=$fullLength)",
+            lastLineEnd >= fullLength - 1,
+        )
+    }
+
+    /**
      * Diagnostic d'une page blanche observée en mode paginé (§6.13 du plan) :
      * le compteur de pages disparaissait, signe d'une mesure qui ne produit
      * AUCUNE ligne.
