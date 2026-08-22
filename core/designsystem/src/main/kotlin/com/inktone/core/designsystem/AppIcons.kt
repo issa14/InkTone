@@ -72,6 +72,13 @@ enum class AppSymbol(
     Refresh(R.drawable.ic_symbol_refresh),
     Filter(R.drawable.ic_symbol_filter),
     ChevronDown(R.drawable.ic_symbol_chevron_down),
+    /**
+     * Triangle PLEIN d'ouverture de menu — affordance conventionnelle d'un
+     * déroulant. À préférer à [ChevronDown] quand l'indice doit tenir à côté
+     * d'un texte gras : un chevron `wght 400` réduit se lit comme un filet,
+     * là où une forme pleine garde sa masse à n'importe quelle taille.
+     */
+    ArrowDropDown(R.drawable.ic_symbol_arrow_drop_down),
     MoreActions(R.drawable.ic_symbol_more_actions),
     Menu(R.drawable.ic_symbol_menu),
     Sort(R.drawable.ic_symbol_sort),

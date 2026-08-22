@@ -507,11 +507,21 @@ internal fun LibraryTopBar(
                             style = MaterialTheme.typography.titleMedium,
                             color = MaterialTheme.colorScheme.onPrimary,
                         )
+                        // Unique indice que le titre ouvre un menu : il doit se
+                        // voir. Un chevron à 16 dp et 50 % d'opacité se
+                        // réduisait à un filet à côté d'un titre semi-gras. Le
+                        // défaut n'était PAS le contraste — mesuré à 4,58:1,
+                        // au-dessus du seuil WCAG de 3:1 pour un élément
+                        // d'interface — mais le POIDS visuel : un trait `wght
+                        // 400` rapetissé ne tient pas à côté des jambages du
+                        // texte. Un triangle plein garde sa masse quelle que
+                        // soit la taille, et c'est l'affordance attendue d'un
+                        // déroulant.
                         AppIcon(
-                            AppSymbol.ChevronDown,
+                            AppSymbol.ArrowDropDown,
                             contentDescription = "Changer de vue",
-                            tint = MaterialTheme.colorScheme.onPrimary.copy(alpha = 0.5f),
-                            modifier = Modifier.size(16.dp),
+                            tint = MaterialTheme.colorScheme.onPrimary,
+                            modifier = Modifier.size(24.dp),
                         )
                     }
                     LibraryTitleFlyout(
