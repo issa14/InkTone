@@ -4,8 +4,13 @@ import androidx.lifecycle.ViewModel
 import com.inktone.domain.service.PlaybackMetadata
 import com.inktone.domain.service.PlaybackSession
 import com.inktone.domain.service.PlaybackSessionState
+import com.inktone.domain.usecase.ObserveResumePublicationUseCase
 import dagger.hilt.android.lifecycle.HiltViewModel
+import androidx.lifecycle.viewModelScope
+import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.StateFlow
+import kotlinx.coroutines.flow.map
+import kotlinx.coroutines.flow.stateIn
 import javax.inject.Inject
 
 /**
@@ -18,15 +23,29 @@ data class MiniPlayerUiState(
     val title: String? = null,
     val author: String? = null,
     val publicationId: String? = null,
+    /**
+     * Vrai quand cette barre ferait doublon avec la carte « Reprendre la
+     * lecture » : même écran (Bibliothèque) ET même livre. Faux partout
+     * ailleurs — voir [isVisible].
+     */
+    val isRedundantWithResumeCard: Boolean = false,
 ) {
     /**
      * Visible dès qu'une session est engagée — pause réelle comprise : c'est
      * précisément l'état où l'utilisateur a besoin du bouton pour reprendre.
      * Le titre conditionne l'affichage : une barre sans titre n'apprendrait
      * rien et n'aurait nulle part où ramener.
+     *
+     * Masquée quand elle ferait doublon avec la carte « Reprendre la
+     * lecture » (voir [isRedundantWithResumeCard]) : depuis que cette carte
+     * pilote la narration sans ouvrir le Lecteur, lancer la lecture depuis la
+     * Bibliothèque y faisait apparaître un SECOND lecture/pause pour le même
+     * livre. Le masquage est volontairement étroit : sur tout autre écran, ou
+     * dès que le livre narré diffère de celui de la carte, cette barre reste
+     * la seule prise sur la narration — et le seul chemin de retour vers elle.
      */
     val isVisible: Boolean
-        get() = title != null && when (sessionState) {
+        get() = title != null && !isRedundantWithResumeCard && when (sessionState) {
             PlaybackSessionState.PLAYING,
             PlaybackSessionState.BUFFERING,
             PlaybackSessionState.PAUSED,
@@ -61,6 +80,7 @@ sealed interface MiniPlayerIntent {
 @HiltViewModel
 class MiniPlayerViewModel @Inject constructor(
     private val playbackSession: PlaybackSession,
+    private val observeResumePublication: ObserveResumePublicationUseCase,
 ) : ViewModel() {
 
     val sessionState: StateFlow<PlaybackSessionState> = playbackSession.sessionState
@@ -68,6 +88,11 @@ class MiniPlayerViewModel @Inject constructor(
     val isPlaying: StateFlow<Boolean> = playbackSession.isPlaying
 
     val metadata: StateFlow<PlaybackMetadata> = playbackSession.metadata
+
+    /** Id du livre de reprise — celui que porte la carte de la Bibliothèque. */
+    val resumePublicationId: StateFlow<String?> = observeResumePublication()
+        .map { it?.id }
+        .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), null)
 
     fun onIntent(intent: MiniPlayerIntent) {
         when (intent) {

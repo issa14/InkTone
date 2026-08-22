@@ -34,6 +34,7 @@ import com.inktone.domain.usecase.DeleteCustomThemeUseCase
 import com.inktone.domain.usecase.DeleteLibraryItemUseCase
 import com.inktone.domain.usecase.ExportLibraryUseCase
 import com.inktone.domain.usecase.GetCurrentBookUseCase
+import com.inktone.domain.usecase.ObserveResumePublicationUseCase
 import com.inktone.domain.usecase.GetReadingStateUseCase
 import com.inktone.domain.usecase.GetStatisticsUseCase
 import com.inktone.domain.usecase.GetCatalogsUseCase
@@ -213,6 +214,11 @@ object UseCaseModule {
         publicationRepository: PublicationRepository,
         readingStateRepository: ReadingStateRepository,
     ): GetCurrentBookUseCase = GetCurrentBookUseCase(readingSessionRepository, publicationRepository, readingStateRepository)
+
+    @Provides
+    fun provideObserveResumePublicationUseCase(
+        publicationRepository: PublicationRepository,
+    ): ObserveResumePublicationUseCase = ObserveResumePublicationUseCase(publicationRepository)
 
     @Provides
     fun provideDeleteCustomThemeUseCase(

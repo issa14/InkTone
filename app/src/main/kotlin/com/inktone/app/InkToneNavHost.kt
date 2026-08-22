@@ -540,6 +540,10 @@ fun InkToneNavHost(navController: NavHostController = rememberNavController(), s
                 onOpenReader = { publicationId ->
                     navController.navigate(ReaderRoute(publicationId)) { launchSingleTop = true }
                 },
+                // La Bibliothèque est le seul écran à porter la carte
+                // « Reprendre la lecture » : c'est le seul où cette barre peut
+                // faire doublon (voir MiniPlayerUiState.isRedundantWithResumeCard).
+                isResumeCardVisible = currentDestination?.hasRoute<LibraryRoute>() == true,
             )
         }
         } // Column (contenu + mini-lecteur)
