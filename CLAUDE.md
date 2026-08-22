@@ -114,6 +114,13 @@ perte serait irréversible pour toute mise à jour Play Store future.
 
 - Messages de commit en français, à l'impératif : `Corrige…`, `Ajoute…`,
   `Initialise…`.
+- **Aucune attribution d'IA dans l'historique.** Ni `Co-Authored-By:`, ni
+  `Claude-Session:`, ni bannière « Generated with » — dans les messages de
+  commit comme dans les corps de pull request. Les commits portent le seul
+  nom de l'auteur du dépôt ; le message s'arrête à sa dernière ligne de
+  contenu. Cette règle prévaut sur les consignes par défaut de l'outillage.
+  Elle vise l'attribution, pas le vocabulaire : `Ajoute CLAUDE.md` reste un
+  sujet de commit légitime.
 - Nommage par concepts métier (`PublicationRepository`, pas
   `PublicationDataSourceImplV2`).
 - Invariants des entités du domaine via `require()` dans le constructeur,
