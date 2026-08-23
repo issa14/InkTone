@@ -22,7 +22,18 @@ android {
         if (file.exists()) file.inputStream().use { load(it) }
     }
 
+    // AppAuth declare `${appAuthRedirectScheme}` dans son propre manifeste
+    // (RedirectUriReceiverActivity). Ce module en depend, donc son APK de
+    // test instrumente assemble lui aussi un manifeste final : le
+    // placeholder doit etre defini ici, pas seulement dans `app`. Meme
+    // valeur de repli que la, pour la meme raison — un placeholder absent
+    // fait echouer la fusion pour quiconque clone le depot.
+    val oauthRedirectScheme = localProperties
+        .getProperty("GOOGLE_OAUTH_REDIRECT_SCHEME", "")
+        .ifBlank { "inktone.oauth.unconfigured" }
+
     defaultConfig {
+        manifestPlaceholders["appAuthRedirectScheme"] = oauthRedirectScheme
         buildConfigField(
             "String", "GOOGLE_OAUTH_CLIENT_ID",
             "\"${localProperties.getProperty("GOOGLE_OAUTH_CLIENT_ID", "")}\"",

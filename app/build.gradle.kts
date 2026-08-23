@@ -21,9 +21,10 @@ if (firebaseConfigured) {
 // .kts (local.properties, gitignoré, absent par défaut pour quiconque
 // clone le dépôt). AppAuth a besoin du schéma de redirection comme
 // manifestPlaceholder pour que son RedirectUriReceiverActivity (fusionné
-// depuis son propre manifeste) intercepte le retour du navigateur — ce
-// placeholder ne peut être posé qu'au niveau du module `app`, seul point
-// où le manifeste final est assemblé.
+// depuis son propre manifeste) intercepte le retour du navigateur. Il faut
+// le poser dans chaque module qui assemble un manifeste final : ici pour
+// l'application, et dans infrastructure/sync pour son APK de test
+// instrumenté.
 val syncLocalProperties = Properties().apply {
     val file = rootProject.file("local.properties")
     if (file.exists()) file.inputStream().use { load(it) }
