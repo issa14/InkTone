@@ -47,6 +47,7 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.inktone.core.designsystem.AppIcon
 import com.inktone.core.designsystem.AppSymbol
+import com.inktone.core.designsystem.InkToneBrandMark
 import kotlinx.coroutines.launch
 
 private const val SUPPORT_EMAIL = "issadotnet@gmail.com"
@@ -83,7 +84,14 @@ fun AboutScreen(
             horizontalAlignment = Alignment.CenterHorizontally,
         ) {
             Spacer(Modifier.height(20.dp))
-            AppIcon(AppSymbol.Reading, null, tint = MaterialTheme.colorScheme.primary, modifier = Modifier.height(64.dp).width(64.dp))
+            // La marque, pas un livre ouvert : cet écran présente
+            // l'application, et le glyphe générique de lecture n'y disait rien
+            // qu'elle ne dise mieux. `InkToneBrandMark` porte déjà la teinte
+            // du thème résolu (l'asset ne contient que sa forme).
+            InkToneBrandMark(
+                tint = MaterialTheme.colorScheme.primary,
+                modifier = Modifier.size(64.dp),
+            )
             Spacer(Modifier.height(12.dp))
             Text("InkTone", color = MaterialTheme.colorScheme.onSurface, fontWeight = FontWeight.Bold, fontSize = 26.sp)
             Spacer(Modifier.height(6.dp))
