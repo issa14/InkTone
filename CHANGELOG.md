@@ -81,9 +81,11 @@ antérieur est archivé en lecture seule et ne fait pas partie de cette version.
 - **R8 n'est pas activé en release.** L'AAB tient largement dans le budget
   (30 Mo pour 60 visés), mais l'activation demande une validation des règles de
   conservation Readium/onnxruntime sur appareil, non faite à ce stade.
-- **Les tests instrumentés ne tournent pas en intégration continue** —
+- **Les tests instrumentés ne s'exécutent pas en intégration continue** —
   migrations Room, DAO et accessibilité Compose exigent un appareil ou un
-  émulateur, et restent vérifiés manuellement.
+  émulateur, et restent vérifiés manuellement. La CI les **compile**
+  désormais, ce qui garantit qu'ils resteront exécutables le jour où on
+  les lance, mais ne remplace pas leur exécution.
 - **La vitesse de lecture peut être surestimée.** Le comptage crédite les
   phrases franchies au défilement et ne distingue pas la lecture du survol :
   feuilleter rapidement gonfle la valeur affichée.
