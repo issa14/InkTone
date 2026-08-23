@@ -12,6 +12,21 @@ android {
     compileOptions {
         isCoreLibraryDesugaringEnabled = true
     }
+
+    // Meme conflit que `app` et `infrastructure/tts` : libonnxruntime.so
+    // existe en deux exemplaires (celui vendore par sherpa-onnx et celui
+    // de l'AAR onnxruntime-android), tous deux tires transitivement ici.
+    // La regle de packaging d'un module ne vaut que pour SON merge : ce
+    // module doit donc redeclarer la sienne, sinon
+    // `mergeDebugAndroidTestNativeLibs` echoue.
+    //
+    // Invisible jusqu'ici parce que `build` n'assemble pas les APK de test
+    // instrumente ; l'ajout de `assembleDebugAndroidTest` en CI le revele.
+    packaging {
+        jniLibs {
+            pickFirsts += "**/libonnxruntime.so"
+        }
+    }
 }
 
 dependencies {
