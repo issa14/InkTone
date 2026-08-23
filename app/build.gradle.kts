@@ -36,8 +36,22 @@ val syncLocalProperties = Properties().apply {
 // schéma factice tant que local.properties n'en fournit pas un réel —
 // GoogleAuthConfig.isConfigured (clientId vide) empêche de toute façon
 // tout flux d'authentification de démarrer dans ce cas.
-val googleOAuthRedirectScheme = syncLocalProperties.getProperty("GOOGLE_OAUTH_REDIRECT_SCHEME", "")
-    .ifBlank { "inktone.oauth.unconfigured" }
+// Un couple de clés par buildType, pour la raison detaillée dans
+// infrastructure/sync/build.gradle.kts : un client OAuth Android est lié
+// à un couple `package + SHA-1`, donc le client debug et le client
+// release sont deux clients distincts. Ce fichier ne pose que le
+// placeholder de manifeste ; les BuildConfig correspondants vivent dans
+// infrastructure/sync, et les DEUX doivent designer le même client.
+fun googleOAuthRedirectScheme(debug: Boolean): String {
+    val debugValue = if (debug) {
+        syncLocalProperties.getProperty("GOOGLE_OAUTH_REDIRECT_SCHEME_DEBUG", "")
+    } else {
+        ""
+    }
+    return debugValue
+        .ifBlank { syncLocalProperties.getProperty("GOOGLE_OAUTH_REDIRECT_SCHEME", "") }
+        .ifBlank { "inktone.oauth.unconfigured" }
+}
 
 android {
     compileOptions {
@@ -45,7 +59,9 @@ android {
     }
 
     defaultConfig {
-        manifestPlaceholders["appAuthRedirectScheme"] = googleOAuthRedirectScheme
+        // Valeur du client release : elle vaut pour `release` et
+        // `benchmark`, `debug` la remplacant ci-dessous.
+        manifestPlaceholders["appAuthRedirectScheme"] = googleOAuthRedirectScheme(debug = false)
         // `app` n'a pas le droit de dépendre de `domain` (Blueprint
         // §12.4) : ce booléen traverse la frontière de module vers
         // `CrashReporterModule` (infrastructure/crashreporting, qui PEUT
@@ -55,6 +71,12 @@ android {
         // interdite par transitivité. Remplace la valeur par défaut
         // (false) déclarée dans infrastructure/crashreporting/res.
         resValue("bool", "firebase_crashlytics_configured", firebaseConfigured.toString())
+    }
+
+    buildTypes {
+        getByName("debug") {
+            manifestPlaceholders["appAuthRedirectScheme"] = googleOAuthRedirectScheme(debug = true)
+        }
     }
 
     // Tache 9.3 : trouve par la mesure reelle de la taille de l'AAB

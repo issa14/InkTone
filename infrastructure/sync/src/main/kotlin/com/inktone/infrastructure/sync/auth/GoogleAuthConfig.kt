@@ -5,7 +5,9 @@ import com.inktone.infrastructure.sync.BuildConfig
 /**
  * `clientId`/`redirectScheme` lus depuis `local.properties` au moment du
  * build (voir `infrastructure/sync/build.gradle.kts`), jamais codés en
- * dur (tâche 11.4). `isConfigured` rend l'absence de configuration
+ * dur (tâche 11.4). Le couple dépend du buildType : un client OAuth
+ * Android est lié à un couple `package + SHA-1`, donc le build debug et
+ * le build release en utilisent deux distincts. `isConfigured` rend l'absence de configuration
  * explicite : `GoogleAuthRepository` doit s'appuyer dessus plutôt que de
  * laisser AppAuth échouer avec une erreur réseau opaque sur un
  * `clientId` vide.

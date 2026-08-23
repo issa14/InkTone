@@ -40,13 +40,31 @@ composants. Ne pas les rajouter à la politique de confidentialité.
    (Google Cloud → Identifiants), avec un délai de propagation et une
    réinstallation de l'app pour purger l'état AppAuth en cache.
 
+## Un client OAuth par buildType
+
+Corollaire du piège n°1, traité dans la foulée : `local.properties` porte
+désormais deux couples, et le build choisit selon le buildType.
+
+| Clé | Utilisée par |
+|---|---|
+| `GOOGLE_OAUTH_CLIENT_ID` / `GOOGLE_OAUTH_REDIRECT_SCHEME` | `release` et `benchmark` |
+| `GOOGLE_OAUTH_CLIENT_ID_DEBUG` / `GOOGLE_OAUTH_REDIRECT_SCHEME_DEBUG` | `debug`, avec repli sur les clés ci-dessus si absentes |
+
+Les trois valeurs d'un même buildType (les deux `BuildConfig` et le
+placeholder `appAuthRedirectScheme`) doivent désigner **le même client** :
+les séparer produit une redirection qui n'appartient pas au `clientId`
+annoncé, donc un `invalid_request` que rien dans le code n'explique.
+
+Vérifié en fabriquant un `..._DEBUG` factice : le `BuildConfig` de la
+variante debug et le manifeste fusionné de `app` prennent bien la valeur
+debug, la variante release reste inchangée.
+
+**Tant que les clés `*_DEBUG` ne sont pas renseignées, la synchronisation
+des builds debug ne fonctionne pas** — le repli utilise le client
+release, dont le SHA-1 ne correspond pas à la clé de signature debug.
+
 ## Reste ouvert
 
-- **Un seul couple ID/schéma dans `local.properties`**, lu identiquement
-  par tous les buildTypes (`infrastructure/sync/build.gradle.kts`).
-  Depuis le passage au client release, la synchronisation des builds
-  **debug** ne fonctionne plus. Un couple par buildType est nécessaire
-  pour que les deux coexistent.
 - **Écran de consentement OAuth** : tant qu'il est en état « Test », les
   jetons de rafraîchissement expirent au bout de 7 jours — la
   synchronisation se délierait toute seule chaque semaine. Passage en
