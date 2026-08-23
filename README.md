@@ -1,3 +1,5 @@
+***Français** · [English](README.en.md)*
+
 # InkTone
 
 **Lecteur d'ebooks Android à narration vocale neuronale, synchronisée mot à mot — et entièrement hors ligne.**
