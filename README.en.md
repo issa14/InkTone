@@ -62,9 +62,11 @@ The project is built French-first — voices, interface, sentence segmentation.
 
 ## Installation
 
-**No binary release has been published yet.** Version 1.0.0 is in preparation; there is no Releases page and no Play Store listing for now.
+**A pre-release is available: [1.0.0-beta.1](https://github.com/issa14/InkTone/releases/tag/v1.0.0-beta.1)** — a signed APK, intended for a closed beta. No Play Store listing yet.
 
-In the meantime, see [Building from source](#building-from-source).
+Two things to know about this beta: Google Drive sync unlinks itself after 7 days (the OAuth consent screen is still in "Testing" state on Google's side; this will be lifted before publication), and the APK only runs on `arm64-v8a`.
+
+Otherwise, see [Building from source](#building-from-source).
 
 ### Requirements
 
@@ -101,11 +103,12 @@ A full account of what is collected, sent and stored is in the [privacy policy](
 
 ## Project status
 
-Version `1.0.0` is in preparation and has never been published. Every feature listed above is implemented and verified on a device; none is a stub.
+Version `1.0.0` is in preparation and has never been published as a final release; a [`1.0.0-beta.1`](https://github.com/issa14/InkTone/releases/tag/v1.0.0-beta.1) pre-release exists for the closed beta. Every feature listed above is implemented and verified on a device; none is a stub.
 
 Known and accepted open points:
 
-- **Instrumented tests do not run in CI.** Room migrations, DAOs and Compose accessibility require an emulator or a physical device; they are run and verified manually before every sensitive merge. CI covers the build, JVM tests, architecture rules and the regression guards.
+- **Instrumented tests do not execute in CI.** Room migrations, DAOs and Compose accessibility require an emulator or a physical device; they are run and verified manually before every sensitive merge. CI does **compile** them (the `assembleDebugAndroidTest` step), which keeps them runnable, and covers the build, JVM tests, architecture rules and the regression guards.
+- **The OAuth consent screen for Google Drive sync is in "Testing" state** on Google's side: refresh tokens expire after 7 days there. Moving it to Production is planned before the Play release.
 - **The Edge-TTS cloud engine relies on an unofficial Microsoft API** ([ADR-024](docs/adr/ADR-024-edge-tts-optional-cloud-engine.md)). Disabled by default, it may stop working without notice.
 
 This repository enforces a strict rule: no document claims a feature is finished without the commit, file or test that proves it. To find out where things actually stand, read `docs/execution/` and `git log` — never a summary.

@@ -62,9 +62,11 @@ Le projet est pensé francophone d'abord — voix, interface, découpage des phr
 
 ## Installation
 
-**Aucune version binaire n'est encore publiée.** La 1.0.0 est en préparation ; ni page Releases ni fiche Play Store pour l'instant.
+**Une pré-release est disponible : [1.0.0-beta.1](https://github.com/issa14/InkTone/releases/tag/v1.0.0-beta.1)** — APK signé, destiné à une beta fermée. Pas encore de fiche Play Store.
 
-En attendant, voir [Compiler depuis les sources](#compiler-depuis-les-sources).
+Deux points valables pour cette beta : la synchronisation Google Drive se délie d'elle-même au bout de 7 jours (l'écran de consentement OAuth est encore en état « Test » côté Google, ce sera levé avant la publication), et l'APK ne fonctionne que sur `arm64-v8a`.
+
+Sinon, voir [Compiler depuis les sources](#compiler-depuis-les-sources).
 
 ### Prérequis
 
@@ -101,11 +103,12 @@ Le détail complet de ce qui est collecté, envoyé et stocké est dans la [poli
 
 ## État du projet
 
-Version `1.0.0` en préparation, jamais publiée. Toutes les fonctionnalités listées plus haut sont implémentées et vérifiées sur appareil ; aucune n'est un stub.
+Version `1.0.0` en préparation, publiée nulle part en version définitive ; une pré-release [`1.0.0-beta.1`](https://github.com/issa14/InkTone/releases/tag/v1.0.0-beta.1) existe pour la beta fermée. Toutes les fonctionnalités listées plus haut sont implémentées et vérifiées sur appareil ; aucune n'est un stub.
 
 Points ouverts, connus et assumés :
 
-- **Les tests instrumentés ne tournent pas en CI.** Migrations Room, DAO et accessibilité Compose exigent un émulateur ou un appareil ; ils sont exécutés et vérifiés manuellement avant chaque fusion sensible. La CI couvre le build, les tests JVM, les règles d'architecture et les garde-fous de régression.
+- **Les tests instrumentés ne s'exécutent pas en CI.** Migrations Room, DAO et accessibilité Compose exigent un émulateur ou un appareil ; ils sont exécutés et vérifiés manuellement avant chaque fusion sensible. La CI les **compile** (étape `assembleDebugAndroidTest`), ce qui garantit qu'ils restent exécutables, et couvre le build, les tests JVM, les règles d'architecture et les garde-fous de régression.
+- **L'écran de consentement OAuth de la synchronisation Google Drive est en état « Test »** côté Google : les jetons de rafraîchissement y expirent au bout de 7 jours. Le passage en Production est prévu avant la publication Play.
 - **Le moteur cloud Edge-TTS s'appuie sur une API Microsoft non officielle** ([ADR-024](docs/adr/ADR-024-edge-tts-optional-cloud-engine.md)). Désactivé par défaut, il peut cesser de fonctionner sans préavis.
 
 Ce dépôt applique une règle stricte : aucun document ne déclare une fonctionnalité terminée sans le commit, le fichier ou le test qui le prouve. Pour connaître l'avancement réel, lire `docs/execution/` et `git log`, jamais un résumé.
