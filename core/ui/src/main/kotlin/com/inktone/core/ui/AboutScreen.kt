@@ -122,6 +122,8 @@ fun AboutScreen(
 
             Spacer(Modifier.height(12.dp))
             SectionHeader("Ressources & Support")
+            PrivacyPolicyCard()
+            Spacer(Modifier.height(8.dp))
             GitHubCard()
             Spacer(Modifier.height(8.dp))
             ReportProblemCard(
@@ -223,6 +225,37 @@ private fun EngagementPillar(icon: AppSymbol, title: String, subtitle: String, m
             Spacer(Modifier.height(6.dp))
             Text(title, color = MaterialTheme.colorScheme.onSurface, fontWeight = FontWeight.SemiBold, fontSize = 12.sp, textAlign = TextAlign.Center)
             Text(subtitle, color = MaterialTheme.colorScheme.onSurfaceVariant, fontSize = 10.sp, textAlign = TextAlign.Center)
+        }
+    }
+}
+
+/**
+ * Politique de confidentialité, atteignable depuis l'application.
+ *
+ * Exigence de publication : la politique doit rester accessible à
+ * l'utilisateur, pas seulement depuis la fiche du store. Elle pointe la
+ * branche `main` du dépôt public — la même source que le texte versionné,
+ * donc jamais une copie qui se désynchroniserait.
+ */
+@Composable
+private fun PrivacyPolicyCard() {
+    val uriHandler = LocalUriHandler.current
+    Card(
+        onClick = { uriHandler.openUri("https://github.com/issa14/InkTone/blob/main/PRIVACY.md") },
+        colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface),
+        shape = RoundedCornerShape(14.dp),
+        modifier = Modifier.fillMaxWidth(),
+    ) {
+        Row(
+            modifier = Modifier.fillMaxWidth().padding(16.dp),
+            verticalAlignment = Alignment.CenterVertically,
+        ) {
+            AppIcon(AppSymbol.Lock, null, tint = MaterialTheme.colorScheme.onSurfaceVariant, modifier = Modifier.size(22.dp))
+            Spacer(Modifier.width(12.dp))
+            Column(Modifier.weight(1f)) {
+                Text("Politique de confidentialité", color = MaterialTheme.colorScheme.onSurface, fontWeight = FontWeight.SemiBold, fontSize = 14.sp)
+                Text("Ce qui reste sur l'appareil, et ce qui en sort", color = MaterialTheme.colorScheme.onSurfaceVariant, fontSize = 12.sp)
+            }
         }
     }
 }
