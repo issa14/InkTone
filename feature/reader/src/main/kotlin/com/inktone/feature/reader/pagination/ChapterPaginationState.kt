@@ -14,7 +14,11 @@ import androidx.compose.ui.text.style.Hyphens
 import androidx.compose.ui.text.style.LineBreak
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.font.FontFamily
+import androidx.compose.ui.text.TextMeasurer
 import androidx.compose.ui.text.rememberTextMeasurer
+import androidx.compose.ui.platform.LocalDensity
+import androidx.compose.ui.platform.LocalFontFamilyResolver
+import androidx.compose.ui.platform.LocalLayoutDirection
 import androidx.compose.ui.unit.sp
 import com.inktone.domain.model.Chapter
 import com.inktone.domain.model.ChapterContent
@@ -206,6 +210,19 @@ fun rememberChapterPaginationState(
 ): ChapterPaginationState {
     val textMeasurer = rememberTextMeasurer()
     val chapterTextMeasurer = remember(textMeasurer) { ChapterTextMeasurer(textMeasurer) }
+    // Le TextMeasurer ci-dessus appartient a la composition et porte un
+    // cache de layout qui n'est PAS thread-safe. Il ne doit donc servir
+    // qu'ici, sur le thread principal (mesure de la premiere page).
+    // Les mesures d'arriere-plan en fabriquent un a elles, a partir des
+    // memes parametres de resolution : deux effets qui se chevauchent
+    // (changement de chapitre pendant qu'une mesure tourne encore) ne
+    // peuvent alors plus toucher le meme cache depuis deux threads.
+    val fontFamilyResolver = LocalFontFamilyResolver.current
+    val density = LocalDensity.current
+    val layoutDirection = LocalLayoutDirection.current
+    val newBackgroundMeasurer = {
+        ChapterTextMeasurer(TextMeasurer(fontFamilyResolver, density, layoutDirection))
+    }
     val engine = remember { VirtualPaginationEngine() }
     // Aucune couleur ici : elle ne déplace jamais le texte (3a.1), donc
     // n'a pas sa place dans le style de MESURE. Chaque consommateur
@@ -271,7 +288,7 @@ fun rememberChapterPaginationState(
             nextBudget *= 2
             widenings++
             partial = withContext(Dispatchers.Default) {
-                chapterTextMeasurer.measureFirstPage(chapter, baseTextStyle, contentWidthPx, nextBudget)
+                newBackgroundMeasurer().measureFirstPage(chapter, baseTextStyle, contentWidthPx, nextBudget)
             }
             state.measurement = partial
             state.bumpIfChanged(
@@ -284,7 +301,7 @@ fun rememberChapterPaginationState(
         val full = if (partial.sentenceStartOffsets.size >= totalSentenceCount) {
             partial
         } else {
-            withContext(Dispatchers.Default) { chapterTextMeasurer.measure(chapter, baseTextStyle, contentWidthPx) }
+            withContext(Dispatchers.Default) { newBackgroundMeasurer().measure(chapter, baseTextStyle, contentWidthPx) }
         }
         state.measurement = full
         state.bumpIfChanged(
@@ -295,7 +312,7 @@ fun rememberChapterPaginationState(
         // affiché a priorité (mesuré en premier, ci-dessus).
         if (nextChapter != null) {
             val nextMeasurement = withContext(Dispatchers.Default) {
-                chapterTextMeasurer.measure(nextChapter, baseTextStyle, contentWidthPx)
+                newBackgroundMeasurer().measure(nextChapter, baseTextStyle, contentWidthPx)
             }
             engine.updateChapter(nextChapter.index, styleKey, nextMeasurement.lines, nextMeasurement.sentenceStartOffsets)
         }
