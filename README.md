@@ -95,7 +95,9 @@ Si vous distribuez une version d'InkTone, ces obligations vous incombent. Le cho
 - **Rapport de plantage sur consentement seulement**, et sans effet si aucune configuration n'est fournie.
 - **Services en ligne optionnels et désactivés** : synchronisation, catalogues OPDS, voix cloud.
 
-À savoir : le fichier de **sauvegarde locale n'est pas chiffré**. Il reste sur le stockage que vous désignez et n'est jamais transmis, mais si vous le recopiez vers un cloud personnel, son contenu — quels livres, quel passage, quand — sera lisible par qui y accède. Voir [CONTRIBUTING.md](CONTRIBUTING.md#sauvegarde-locale-backupmanager-tâche-85--fichier-en-clair).
+La **sauvegarde locale est chiffrée de bout en bout** : AES/GCM, clé dérivée par PBKDF2 d'un mot de passe que vous seul connaissez. Il n'est stocké nulle part — **un mot de passe perdu rend la sauvegarde définitivement illisible**, y compris pour vous.
+
+Le détail complet de ce qui est collecté, envoyé et stocké est dans la [politique de confidentialité](PRIVACY.md).
 
 ## État du projet
 
@@ -155,6 +157,8 @@ Le détail — découpage des modules, modèle de domaine, chaîne TTS — est d
 | Les décisions d'architecture et les alternatives écartées | [`docs/adr/`](docs/adr/) |
 | L'avancement réel, plans et critères de validation | [`docs/execution/`](docs/execution/) |
 | Les conventions de contribution | [CONTRIBUTING.md](CONTRIBUTING.md) |
+| Ce que chaque version apporte | [CHANGELOG.md](CHANGELOG.md) |
+| Le traitement des données | [PRIVACY.md](PRIVACY.md) |
 
 ## Contribuer
 

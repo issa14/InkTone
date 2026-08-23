@@ -95,7 +95,9 @@ If you distribute a build of InkTone, these obligations are yours. The reasoning
 - **Crash reporting is opt-in**, and a no-op when no configuration is supplied.
 - **Online services are optional and disabled**: sync, OPDS catalogues, cloud voices.
 
-Worth knowing: the **local backup file is not encrypted**. It stays on the storage you choose and is never transmitted, but if you copy it to a personal cloud, its contents — which books, which passage, when — will be readable by anyone with access. See [CONTRIBUTING.md](CONTRIBUTING.md) (in French).
+The **local backup is end-to-end encrypted**: AES/GCM with a key derived through PBKDF2 from a password only you know. It is stored nowhere — **a lost password makes the backup permanently unreadable**, including to you.
+
+A full account of what is collected, sent and stored is in the [privacy policy](PRIVACY.md) (in French).
 
 ## Project status
 
@@ -157,6 +159,8 @@ Project documentation is written in French.
 | Architecture decisions and the alternatives ruled out | [`docs/adr/`](docs/adr/) |
 | Actual progress, plans and acceptance criteria | [`docs/execution/`](docs/execution/) |
 | Contribution conventions | [CONTRIBUTING.md](CONTRIBUTING.md) |
+| What each version brings | [CHANGELOG.md](CHANGELOG.md) |
+| How data is handled | [PRIVACY.md](PRIVACY.md) |
 
 ## Contributing
 

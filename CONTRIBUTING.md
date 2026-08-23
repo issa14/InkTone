@@ -23,15 +23,22 @@ Voir Blueprint §12.5 : nommage par concepts métier, Use Cases en verbe à
 l'infinitif, aucun emoji dans le code de production, messages de commit
 en français à l'impératif ("Corrige…", "Ajoute…", "Initialise…").
 
-## Sauvegarde locale (`BackupManager`, Tâche 8.5) : fichier en clair
+## Sauvegarde locale (`BackupManager`) : chiffrée de bout en bout
 
-Le fichier JSON exporté (signets, règles de prononciation, progression
-de lecture, sessions) n'est **pas chiffré** — décision tranchée en Tâche
-9.2.4, jamais spécifiée en Phase 8. Le risque reste faible tant que
-l'export SAF reste sur un stockage local choisi par l'utilisateur (aucune
-transmission automatique), mais **un utilisateur qui copie ce fichier
-vers un cloud personnel (Drive, etc.) doit savoir qu'il n'est pas
-protégé** — le contenu (quels livres, quel passage, quand) est lisible
-par quiconque a accès au fichier. Si un besoin de confidentialité plus
-fort émerge, le chiffrement du fichier exporté (ex. passphrase utilisateur
-+ AES-GCM) devra faire l'objet d'un ADR dédié, pas d'un ajout silencieux.
+Le fichier exporté (signets, règles de prononciation, progression de
+lecture, sessions) est chiffré **AES/GCM**, avec une clé dérivée par
+PBKDF2 d'un mot de passe saisi par l'utilisateur (`BackupCrypto`,
+`BackupPasswordDialog`). Le mot de passe n'est stocké nulle part : le
+perdre rend la sauvegarde définitivement illisible, y compris pour son
+propriétaire.
+
+`importFrom` accepte encore les exports antérieurs en JSON clair, que
+`BackupCrypto.isEncryptedEnvelope` reconnaît à l'absence de son en-tête —
+compatibilité ascendante volontaire. **L'export, lui, ne produit plus
+jamais de fichier en clair.**
+
+Cette section a longtemps affirmé l'inverse, après que le chiffrement eut
+été ajouté sans qu'elle soit mise à jour. Elle a induit en erreur une
+rédaction du README, qui a publié l'affirmation périmée. C'est exactement
+ce que la règle « le code fait foi » cherche à éviter : **vérifier dans
+`BackupManager.exportTo` avant de citer cette section.**
