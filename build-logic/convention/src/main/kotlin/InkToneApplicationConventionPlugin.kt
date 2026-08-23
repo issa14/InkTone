@@ -120,11 +120,14 @@ class InkToneApplicationConventionPlugin : Plugin<Project> {
                     }
                 }
 
-                // buildConfig : expose BuildConfig.DEBUG a MainActivity, pour
-                // que le scaffolding de marche a blanc (BootstrapAndOpenFixture)
-                // ne puisse jamais s'executer sur un build de release (revue
-                // suite au bug OnConflictStrategy.REPLACE/CASCADE, voir
-                // PublicationDao).
+                // buildConfig : expose BuildConfig.VERSION_NAME, lu par
+                // BackupViewModel (estampille de l'export de sauvegarde) et par
+                // l'ecran A propos (InkToneNavHost).
+                //
+                // Ce n'est plus BuildConfig.DEBUG qui le justifie : le
+                // scaffolding de marche a blanc (BootstrapAndOpenFixture) qu'il
+                // gardait a ete retire au Lot 10, et plus aucun code de `app`
+                // ne lit DEBUG.
                 buildFeatures { compose = true; buildConfig = true }
                 compileOptions {
                     sourceCompatibility = JavaVersion.VERSION_17
