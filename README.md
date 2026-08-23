@@ -1,266 +1,172 @@
 # InkTone
 
+**Lecteur d'ebooks Android à narration vocale neuronale, synchronisée mot à mot — et entièrement hors ligne.**
+
 [![CI](https://github.com/issa14/InkTone/actions/workflows/ci.yml/badge.svg)](https://github.com/issa14/InkTone/actions/workflows/ci.yml)
-[![License: MIT](https://img.shields.io/badge/License-MIT-blue.svg)](LICENSE)
+[![Licence MIT](https://img.shields.io/badge/licence-MIT-blue.svg)](LICENSE)
+[![Android 8.0+](https://img.shields.io/badge/Android-8.0%2B-brightgreen.svg)](#prérequis)
+[![Kotlin](https://img.shields.io/badge/Kotlin-Compose-7F52FF.svg)](https://kotlinlang.org)
 
-**Lecteur EPUB et PDF pour Android, avec narration vocale neuronale
-surlignée mot à mot.** Francophone-first, offline-first, accessible dès
-la v1.
+<p align="center">
+  <img src="docs/assets/narration.gif" alt="Le texte défile, chaque mot se surligne à mesure qu'il est prononcé" width="560">
+  <br>
+  <em>Le surlignage suit la voix, mot par mot.</em>
+</p>
 
-InkTone traite l'écoute comme un mode de lecture à part entière, et non
-comme une fonctionnalité annexe : la voix est neuronale, le surlignage
-suit le mot réellement prononcé, et la position de lecture reste la même
-que l'on lise des yeux ou que l'on écoute.
-
----
-
-## Ce que fait l'application
-
-### Lecture
-
-- **EPUB** via [Readium](https://github.com/readium/kotlin-toolkit) 3.0
-  et **PDF** via Pdfium — même bibliothèque, même lecteur, même modèle de
-  position.
-- Moteur de pagination Compose maison : chapitres reflowables paginés,
-  pages fixes pour le PDF, table des matières, barre de progression du
-  livre.
-- Chrome de lecture immersif : masquage automatique, luminosité locale,
-  ligne d'état, règle de lecture, rappel de repos oculaire, minuterie de
-  sommeil.
-- Signets, annotations colorées, sélection de texte avec actions
-  contextuelles, recherche plein texte dans la publication.
-- **Une seule notion de position** : le value object `Locator`
-  ([domain/valueobject/Locator.kt](domain/src/main/kotlin/com/inktone/domain/valueobject/Locator.kt))
-  adresse la reprise de lecture, les signets, les annotations et les
-  résultats de recherche. Aucun numéro de page, aucun second système
-  d'adressage.
-
-### Narration vocale
-
-- Trois moteurs derrière un contrat unique `TtsEngine`, chacun déclarant
-  honnêtement ses capacités :
-
-  | Moteur | Hors ligne | Timing mot | Notes |
-  |---|---|---|---|
-  | **Sherpa-ONNX / VITS Piper upmc-medium** (référence) | oui | oui, par alignement forcé CTC | ~80 Mo de voix (2 locuteurs : Jessica & Pierre) + ~102 Mo de modèle d'alignement, téléchargés à la demande |
-  | **Voix du système** (`android.speech.tts`) | oui | oui, via `onRangeStart` | aucun téléchargement, repli automatique tant que les modèles neuronaux ne sont pas installés |
-  | **Edge-TTS** (optionnel, opt-in) | non | oui, métadonnées du service | voix cloud, désactivé par défaut |
-
-- **Le surlignage mot à mot n'est jamais simulé.** Il n'actif que si
-  `TtsCapabilities.wordTimestamps` est vrai pour le moteur en cours
-  ([TtsCapabilities.kt](domain/src/main/kotlin/com/inktone/domain/service/TtsCapabilities.kt)).
-  Aucune interpolation de caractères ne vient combler un moteur qui ne
-  sait pas donner de frontières de mots.
-- Sherpa-ONNX n'exposant pas de timestamps natifs — vérifié
-  empiriquement, voir [ADR-021](docs/adr/ADR-021-tts-word-timing-tiered-architecture.md) —
-  InkTone exécute un **second passage d'alignement forcé sur l'appareil**
-  (modèle NeMo FastConformer CTC int8, décodage de Viterbi contraint par
-  le texte connu) pour produire de vraies frontières temporelles.
-- **Voix neuronale** : le moteur de référence est le modèle VITS Piper
-  `fr_FR-upmc-medium` (~80 Mo, deux voix françaises : **Jessica** et
-  **Pierre**, vérifiées dans les métadonnées du modèle) — RTF ~0,8 mesuré
-  sur le Snapdragon 680 (l'ancien moteur Kokoro était à ~4,7×, non
-  viable). La voix et le modèle d'alignement (~102 Mo) sont téléchargés à
-  la demande, vérifiés par empreinte SHA-256 puis **extraits** ; l'état
-  « installée » n'est affiché que lorsque les modèles sont réellement
-  prêts. La voix du système reste le repli automatique tant que ce n'est
-  pas le cas.
-- Lecture continue sans blanc entre phrases (pipeline gapless,
-  [ADR-025](docs/adr/ADR-025-playback-gapless.md)), session média
-  Media3 : contrôles depuis l'écran verrouillé, casque, Android Auto.
-- Règles de prononciation personnalisables, profils de voix, contrôle de
-  vitesse.
-
-### Bibliothèque et contenu
-
-- Import par Storage Access Framework exclusivement — aucune permission
-  de stockage large
-  ([ADR-015](docs/adr/ADR-015-storage-access-framework-only.md)), détection
-  des EPUB protégés par DRM à l'import avec message explicite.
-- Séries, favoris, sujets, filtres, tri, écran de détail, reprises
-  récentes ; la progression de toute la bibliothèque est calculée par une
-  seule requête groupée, jamais en N+1.
-- **Catalogues OPDS** : navigation de flux distants, couvertures,
-  téléchargement ([ADR-023](docs/adr/ADR-023-opds-scope-reintegration.md)).
-
-### Le reste
-
-- **Synchronisation** de la position et des annotations entre appareils,
-  chiffrée de bout en bout, via **Google Drive** (`appDataFolder`, OAuth
-  AppAuth) ou **WebDAV** — les deux optionnelles, résolution de conflits
-  explicite dans l'interface.
-- **Statistiques** : temps de lecture visuelle et d'écoute distingués,
-  mots lus, carte de chaleur, statistiques par livre — agrégation SQL
-  native, aucun chargement en mémoire.
-- **Thèmes** : galerie de thèmes de lecture et studio de personnalisation
-  avec vérification de contraste.
-- **Accessibilité** de premier rang : cibles tactiles, libellés
-  sémantiques, respect de la réduction de mouvement, tests d'accessibilité
-  Compose instrumentés.
-- **Confidentialité** : tout fonctionne hors ligne par défaut ; le crash
-  reporting est opt-in et se dégrade en no-op sans secret embarqué
-  ([ADR-014](docs/adr/ADR-014-crash-reporting-opt-in.md)). Les seuls
-  échanges réseau sont ceux que vous activez : OPDS, synchronisation,
-  Edge-TTS, téléchargement de modèles de voix.
+| Bibliothèque | Lecture | Narration | Statistiques |
+|:---:|:---:|:---:|:---:|
+| ![Bibliothèque](docs/assets/library.png) | ![Lecture](docs/assets/reader.png) | ![Narration avec surlignage mot à mot](docs/assets/narration.png) | ![Statistiques](docs/assets/stats.png) |
 
 ---
 
-## Stack technique
+## Ce que c'est
 
-| Domaine | Choix |
+InkTone lit vos livres numériques — EPUB, PDF, texte brut — et les lit **à voix haute**, avec une voix neuronale qui tourne sur l'appareil et un surlignage synchronisé mot par mot.
+
+Tout fonctionne sans connexion : l'import, la lecture, la synthèse vocale. Les services en ligne existent, mais ils sont optionnels et désactivés par défaut.
+
+Le projet est pensé francophone d'abord — voix, interface, découpage des phrases.
+
+## Fonctionnalités
+
+**Lire**
+- EPUB, PDF et texte brut, importés depuis n'importe quel dossier de l'appareil
+- Défilement continu ou mode paginé
+- Taille de texte, interligne, marges, police et thème de lecture réglables
+- Luminosité propre au lecteur, indépendante du réglage système
+- Signets, annotations et surlignages, recherche plein texte, table des matières
+
+**Écouter**
+- Synthèse neuronale locale (Sherpa-ONNX), avec **timestamps par mot** pour un surlignage réellement synchronisé — jamais interpolé
+- Voix système Android en repli, moteur cloud optionnel pour qui l'active
+- Vitesse, intonation et gain réglables ; règles de prononciation personnalisées
+- La narration continue écran éteint, pilotable depuis la notification et l'écran verrouillé
+- Minuteur de sommeil
+
+**Organiser**
+- Séries, étiquettes, favoris, épinglage
+- Filtres, tris et trois dispositions d'affichage
+- Catalogues OPDS pour découvrir et importer de nouveaux ouvrages
+
+**Suivre**
+- Temps de lecture visuelle et d'écoute comptés séparément
+- Série de jours consécutifs, objectif quotidien, carte d'activité horaire
+- Vitesse de lecture, statistiques par ouvrage, export CSV et JSON
+
+**Confort**
+- Rappel de repos oculaire
+- Préréglage d'accessibilité qui pilote taille, disposition et contrastes d'un seul geste
+- Sauvegarde locale et restauration ; synchronisation Google Drive optionnelle
+
+## Installation
+
+**Aucune version binaire n'est encore publiée.** La 1.0.0 est en préparation ; ni page Releases ni fiche Play Store pour l'instant.
+
+En attendant, voir [Compiler depuis les sources](#compiler-depuis-les-sources).
+
+### Prérequis
+
+| | |
 |---|---|
-| Langage / UI | Kotlin 2.0.20, Jetpack Compose, Material 3 |
-| Lecture | Readium 3.0 (EPUB), Pdfium (PDF) |
-| TTS | Sherpa-ONNX + onnxruntime 1.27 via JNI, `android.speech.tts`, Edge-TTS |
-| Audio | Media3 / ExoPlayer 1.4.1, MediaSession |
-| Persistance | Room (journal mode WAL), schéma en version 26 |
-| Réseau / auth | OkHttp 4.12, AppAuth 0.11 |
-| DI | Hilt |
-| Architecture | Clean Architecture, présentation MVI |
+| Android | 8.0 (API 26) minimum |
+| Processeur | **`arm64-v8a` uniquement** — le code natif de synthèse n'est compilé que pour cette architecture. Les appareils 32 bits et les émulateurs x86 ne sont pas pris en charge. |
+| Espace disque | ~65 Mo pour l'application, plus les voix neuronales téléchargées séparément |
+| Connexion | requise uniquement pour télécharger une voix, parcourir un catalogue OPDS ou synchroniser |
 
-Cibles : `compileSdk` 35, `minSdk` 26, `targetSdk` 34, AGP 8.6.0.
-**JDK 17 (Temurin)** est requis pour builder, comme en CI. Matériel de
-référence pour les budgets de performance : Snapdragon 680.
+## Voix et modèles
 
----
+Les modèles de synthèse **ne sont pas embarqués dans l'application** : ils se téléchargent à la demande depuis les réglages ([ADR-018](docs/adr/ADR-018-voice-model-distribution.md)). L'application reste utilisable sans eux, avec la voix système Android.
+
+Leurs licences sont distinctes de celle du code et **s'imposent à toute redistribution** :
+
+| Modèle | Rôle | Licence |
+|---|---|---|
+| `fr_FR-upmc-medium` (Piper VITS) | synthèse vocale française | **CC-BY-SA-4.0** |
+| NeMo FastConformer CTC (NVIDIA) | alignement forcé pour le timing par mot | **CC-BY-4.0**, attribution obligatoire |
+
+Si vous distribuez une version d'InkTone, ces obligations vous incombent. Le choix de ces modèles et le rejet documenté des alternatives à licence disqualifiante sont détaillés dans [ADR-022](docs/adr/ADR-022-kokoro-tts-engine-piper-alternatives-rejected.md).
+
+## Vie privée
+
+- **Rien ne sort de l'appareil par défaut.** Synthèse vocale, lecture et import sont locaux.
+- **Aucun accès de masse au stockage.** Les fichiers passent exclusivement par le Storage Access Framework ; la permission `MANAGE_EXTERNAL_STORAGE` est absente, et la CI le vérifie à chaque commit.
+- **Rapport de plantage sur consentement seulement**, et sans effet si aucune configuration n'est fournie.
+- **Services en ligne optionnels et désactivés** : synchronisation, catalogues OPDS, voix cloud.
+
+À savoir : le fichier de **sauvegarde locale n'est pas chiffré**. Il reste sur le stockage que vous désignez et n'est jamais transmis, mais si vous le recopiez vers un cloud personnel, son contenu — quels livres, quel passage, quand — sera lisible par qui y accède. Voir [CONTRIBUTING.md](CONTRIBUTING.md#sauvegarde-locale-backupmanager-tâche-85--fichier-en-clair).
+
+## État du projet
+
+Version `1.0.0` en préparation, jamais publiée. Toutes les fonctionnalités listées plus haut sont implémentées et vérifiées sur appareil ; aucune n'est un stub.
+
+Points ouverts, connus et assumés :
+
+- **Les tests instrumentés ne tournent pas en CI.** Migrations Room, DAO et accessibilité Compose exigent un émulateur ou un appareil ; ils sont exécutés et vérifiés manuellement avant chaque fusion sensible. La CI couvre le build, les tests JVM, les règles d'architecture et les garde-fous de régression.
+- **Le moteur cloud Edge-TTS s'appuie sur une API Microsoft non officielle** ([ADR-024](docs/adr/ADR-024-edge-tts-optional-cloud-engine.md)). Désactivé par défaut, il peut cesser de fonctionner sans préavis.
+
+Ce dépôt applique une règle stricte : aucun document ne déclare une fonctionnalité terminée sans le commit, le fichier ou le test qui le prouve. Pour connaître l'avancement réel, lire `docs/execution/` et `git log`, jamais un résumé.
+
+## Compiler depuis les sources
+
+> **À faire en premier.** `app/libs/sherpa-onnx-1.13.4.aar` est requis pour compiler mais **n'est pas versionné**. Récupérez-le depuis les artefacts du projet [sherpa-onnx](https://github.com/k2-fsa/sherpa-onnx) et déposez-le à ce chemin, sinon le build échoue immédiatement.
+
+```bash
+git clone https://github.com/issa14/InkTone.git
+cd InkTone
+# déposer app/libs/sherpa-onnx-1.13.4.aar (voir ci-dessus)
+./gradlew build          # compile, tests unitaires, règles d'architecture
+./gradlew :app:installDebug
+```
+
+JDK 17 requis.
+
+`google-services.json` (rapport de plantage) et `local.properties` (OAuth de synchronisation) sont facultatifs : sans eux, le build reste vert et les fonctionnalités concernées se désactivent proprement.
+
+Commandes utiles :
+
+```bash
+./gradlew :domain:test                            # tests du domaine seuls
+./gradlew :<module>:checkArchitectureRules        # règles d'un module
+bash scripts/check-no-emoji.sh                    # garde-fou iconographie
+bash scripts/check-no-manage-external-storage.sh  # garde-fou permissions
+```
 
 ## Architecture
 
-Sens de dépendance strict, vérifié par le build et non par la relecture :
+Clean Architecture multi-module, présentation en MVI, un état immuable par écran.
 
 ```
 Presentation → Application → Domain ← Data ← Infrastructure
 ```
 
-`domain/` ne dépend ni d'Android, ni de Room, ni de Compose, ni d'aucun
-autre module du projet. Chaque module applique un convention plugin
-`inktone.*` qui câble la tâche `checkArchitectureRules` : **une dépendance
-interdite fait échouer `./gradlew build`.**
+Le module `domain` ne dépend ni d'Android, ni de Room, ni de Compose, ni d'aucun autre module du projet. **Ce n'est pas une convention de revue : chaque module applique un plugin qui câble `checkArchitectureRules`, et une dépendance interdite fait échouer `./gradlew build`.**
 
-Le dépôt compte 27 modules Gradle, découpés par responsabilité :
+Pile technique : Kotlin, Jetpack Compose (Material 3), Readium, Sherpa-ONNX / ONNX Runtime via JNI, Room, Hilt, Media3.
 
-- **`app`** — coquille applicative, câblage DI, `MainActivity`
-- **`core:*`** — `designsystem` (couleurs, typo, `AppIcons`, contraste),
-  `ui`, `common`, `testing`
-- **`domain`** — entités, value objects, contrats de repository,
-  33 use cases ; zéro dépendance de framework
-- **`data`** — implémentations de repository, mappers
-- **`infrastructure:*`** — `database`, `storage` (SAF), `parser`
-  (EPUB/PDF), `tts`, `media`, `worker`, `crashreporting`, `sync`, `opds`
-- **`feature:*`** — `library`, `reader`, `player`, `search`, `import`,
-  `settings`, `statistics`, `onboarding`, `sync`, `opds`
-- **`benchmark`** — macrobenchmarks, aucun code métier
-
-Chaque écran suit MVI ([ADR-012](docs/adr/ADR-012-mvi-presentation-pattern.md))
-: un état unique immuable, des intents explicites, les effets ponctuels
-sur un canal dédié.
-
-Détail complet des modules et de leurs responsabilités : chapitre 5 du
-[Blueprint d'architecture](docs/blueprint/BLUEPRINT_ARCHITECTURE_INKTONE_v1.2.2.md).
-
----
-
-## Construire
-
-```bash
-./gradlew build          # build + tests unitaires + règles d'architecture
-./gradlew :app:assembleDebug
-```
-
-Vérifications ciblées :
-
-```bash
-./gradlew :domain:test                              # tests du domaine
-./gradlew :<module>:checkArchitectureRules          # un module isolément
-./gradlew koverVerify                               # seuil de couverture
-bash scripts/check-no-emoji.sh                      # aucun emoji en production
-bash scripts/check-no-manage-external-storage.sh    # SAF exclusivement
-```
-
-Les modèles de voix neuronaux ne sont pas embarqués dans l'APK : ils sont
-téléchargés à la demande depuis l'application
-([ADR-018](docs/adr/ADR-018-voice-model-distribution.md)) — voix
-upmc-medium (~80 Mo) + modèle d'alignement CTC (~102 Mo), vérifiés par
-empreinte SHA-256 et extraits avant utilisation.
-
----
-
-## Tests
-
-Environ 100 classes de tests unitaires JVM et 79 classes de tests
-instrumentés.
-
-- **CI** ([`.github/workflows/ci.yml`](.github/workflows/ci.yml)) sur
-  chaque PR et chaque push sur `main` : `./gradlew build` (donc tests
-  unitaires + `checkArchitectureRules`), garde-fous emoji et
-  `MANAGE_EXTERNAL_STORAGE`, puis `koverVerify`.
-- **Migrations Room** : toute migration est accompagnée, *dans le même
-  commit*, d'un test `MigrationTestHelper`
-  ([DatabaseMigrationTest.kt](infrastructure/database/src/androidTest/kotlin/com/inktone/infrastructure/database/DatabaseMigrationTest.kt)).
-  Il n'existe aucun `fallbackToDestructiveMigration` global : une
-  migration manquante fait planter l'application plutôt qu'effacer les
-  données d'un lecteur.
-- **Tests instrumentés** (DAO, migrations, accessibilité Compose) : hors
-  CI, exécutés sur appareil physique avant tout merge sensible.
-- **Garde-fous de régression** : chaque bug structurel du passé a laissé
-  un test derrière lui (position de lecture, hrefs percent-encodés, DRM,
-  progression N+1). Ils ne se contournent pas pour accélérer un build.
-
----
+Le détail — découpage des modules, modèle de domaine, chaîne TTS — est dans le Blueprint, qui fait autorité. Il n'est volontairement pas résumé ici : deux sources finiraient par diverger.
 
 ## Documentation
 
-| Besoin | Emplacement |
+| Pour | Aller voir |
 |---|---|
-| Architecture cible, tous les chapitres | [`docs/blueprint/`](docs/blueprint/) |
-| Décisions d'architecture et alternatives écartées (26 ADR) | [`docs/adr/`](docs/adr/) |
-| Plans d'exécution détaillés et avancement réel | [`docs/execution/`](docs/execution/) |
-| Conventions de contribution | [`CONTRIBUTING.md`](CONTRIBUTING.md) |
-| Contexte permanent pour Claude Code | [`CLAUDE.md`](CLAUDE.md) |
-
-> **L'avancement réel du projet ne se lit pas dans ce README.** Il se
-> vérifie dans `docs/execution/` et dans `git log --oneline main`. Aucun
-> document de statut n'affirme ici qu'une fonctionnalité est terminée
-> sans que le code puisse le prouver.
-
----
+| L'architecture cible, chapitre par chapitre | [`docs/blueprint/`](docs/blueprint/) |
+| Les décisions d'architecture et les alternatives écartées | [`docs/adr/`](docs/adr/) |
+| L'avancement réel, plans et critères de validation | [`docs/execution/`](docs/execution/) |
+| Les conventions de contribution | [CONTRIBUTING.md](CONTRIBUTING.md) |
 
 ## Contribuer
 
-Voir [`CONTRIBUTING.md`](CONTRIBUTING.md). En résumé : toute décision
-d'architecture donne lieu à un ADR, les messages de commit sont en
-français à l'impératif (`Corrige…`, `Ajoute…`), `./gradlew build` doit
-rester vert avant tout commit, et une affirmation de complétude cite le
-commit, le fichier ou le test qui la démontre.
+Lire [CONTRIBUTING.md](CONTRIBUTING.md) avant d'ouvrir une pull request. L'essentiel :
 
----
+- Messages de commit **en français, à l'impératif** (`Corrige…`, `Ajoute…`).
+- Toute décision d'architecture passe par un **ADR** dans `docs/adr/` — jamais de suppression, un ADR remplacé passe en `Superseded`.
+- Toute migration Room est accompagnée de son test **dans le même commit**.
+- `./gradlew build` doit rester vert : il inclut les règles d'architecture.
 
-## Licence
+## Licences
 
-Le code source d'InkTone est publié sous licence **MIT** — voir
-[`LICENSE`](LICENSE), et [ADR-026](docs/adr/ADR-026-licence-mit-ouverture-du-code.md)
-pour le raisonnement et ses conséquences.
+Le code d'InkTone est distribué sous **licence MIT** (voir [LICENSE](LICENSE) et [ADR-026](docs/adr/ADR-026-licence-mit-ouverture-du-code.md)).
 
-Cette licence couvre le code écrit pour ce projet, et lui seul. Elle ne
-s'étend ni au code tiers présent dans le dépôt, ni aux bibliothèques
-liées, ni aux modèles de synthèse vocale téléchargés à l'exécution — dont
-le modèle d'alignement NeMo FastConformer CTC, sous **CC-BY-4.0, qui
-impose une attribution dans toute application distribuée**. L'inventaire
-complet est dans [`THIRD_PARTY_NOTICES.md`](THIRD_PARTY_NOTICES.md).
+Ne sont **pas** couverts par cette licence : les liaisons Kotlin de sherpa-onnx (Apache-2.0), les jeux d'icônes (Material Symbols en Apache-2.0, Lucide en ISC), et les modèles de synthèse téléchargés à l'exécution, dont les obligations d'attribution et de partage à l'identique s'imposent à toute distribution.
 
----
-
-## Historique
-
-Le dépôt a été réécrit intégralement le 26 juillet 2026
-([ADR-019](docs/adr/ADR-019-full-rewrite-orphan-branch.md)).
-L'implémentation précédente est archivée en lecture seule sur la branche
-`legacy/monolith` : elle sert de référence de comportement, jamais de
-source à fusionner dans `main`.
-
-## Secrets
-
-`keystore.properties`, `*.jks` et `google-services.json` sont gitignorés
-et doivent le rester. Ils ne sont ni committés, ni affichés, ni
-supprimés — en particulier le keystore de signature, dont la perte
-rendrait impossible toute mise à jour ultérieure sur le Play Store.
+Le détail complet est dans [THIRD_PARTY_NOTICES.md](THIRD_PARTY_NOTICES.md) — **à lire avant toute redistribution**.
