@@ -160,6 +160,7 @@ fun CatalogDashboardScreen(
                     onOpenNavigation = { viewModel.onIntent(OpdsIntent.OpenNavigation(it)) },
                     onLoadNextPage = { viewModel.onIntent(OpdsIntent.LoadNextPage(it)) },
                     onDownloadBook = { viewModel.onIntent(OpdsIntent.DownloadBook(it)) },
+                    onRetry = { viewModel.onIntent(OpdsIntent.RetryFeed) },
                     httpClient = viewModel.httpClient,
                 )
             }

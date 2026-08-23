@@ -6,12 +6,15 @@ import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.aspectRatio
 import androidx.compose.foundation.layout.fillMaxSize
+import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.lazy.grid.GridCells
 import androidx.compose.foundation.lazy.grid.LazyVerticalGrid
 import androidx.compose.foundation.lazy.grid.itemsIndexed
 import androidx.compose.foundation.lazy.grid.rememberLazyGridState
+import androidx.compose.material3.Button
 import androidx.compose.material3.Card
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.MaterialTheme
@@ -49,6 +52,7 @@ fun OpdsFeedScreen(
     onOpenNavigation: (OpdsItem.Navigation) -> Unit,
     onLoadNextPage: (String) -> Unit,
     onDownloadBook: (OpdsItem.Book) -> Unit,
+    onRetry: () -> Unit,
     httpClient: OpdsHttpClient,
 ) {
     val context = LocalContext.current
@@ -64,7 +68,7 @@ fun OpdsFeedScreen(
             state.isLoading && state.items.isEmpty() -> Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
                 CircularProgressIndicator()
             }
-            state.error != null && state.items.isEmpty() -> FeedError(state.error.message ?: "")
+            state.error != null && state.items.isEmpty() -> FeedError(state.error.message ?: "", onRetry)
             state.items.isEmpty() -> Box(Modifier.fillMaxSize().padding(24.dp), contentAlignment = Alignment.Center) {
                 Text(
                     "Ce dossier est vide.",
@@ -83,7 +87,7 @@ fun OpdsFeedScreen(
 }
 
 @Composable
-private fun FeedError(message: String) {
+private fun FeedError(message: String, onRetry: () -> Unit) {
     Column(
         Modifier.fillMaxSize().padding(24.dp),
         verticalArrangement = Arrangement.Center,
@@ -95,6 +99,11 @@ private fun FeedError(message: String) {
             style = MaterialTheme.typography.bodyLarge,
             color = MaterialTheme.colorScheme.error,
         )
+        // Un flux qui echoue est le plus souvent une coupure reseau ou un
+        // serveur momentanement indisponible : sans cette action, le seul
+        // recours etait de quitter le catalogue et d'y revenir.
+        Spacer(Modifier.height(16.dp))
+        Button(onClick = onRetry) { Text("Réessayer") }
     }
 }
 

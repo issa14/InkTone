@@ -100,6 +100,7 @@ class OpdsViewModel @Inject constructor(
                 updateCatalog(intent.id, intent.name, intent.rootUrl, intent.username, intent.password)
             }
             is OpdsIntent.LoadNextPage -> loadNextPage(intent.nextPageUrl)
+            OpdsIntent.RetryFeed -> urlStack.lastOrNull()?.let { loadFeed(it) }
             is OpdsIntent.Search -> doSearch(intent.query)
             is OpdsIntent.DownloadBook -> onDownloadBook(intent.item)
         }

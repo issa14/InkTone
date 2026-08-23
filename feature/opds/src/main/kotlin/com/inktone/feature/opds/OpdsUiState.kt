@@ -57,6 +57,8 @@ sealed interface OpdsIntent {
         val password: String?,
     ) : OpdsIntent
     data class LoadNextPage(val nextPageUrl: String) : OpdsIntent
+    /** Recharge le flux courant apres un echec — sans cet intent, une erreur reseau est un cul-de-sac. */
+    data object RetryFeed : OpdsIntent
     data class Search(val query: String) : OpdsIntent
     data class DownloadBook(val item: OpdsItem.Book) : OpdsIntent
 }
