@@ -39,14 +39,38 @@ versionné (voir `.gitignore`). Il provient du projet
 ## Bibliothèques liées
 
 Versions exactes dans [`gradle/libs.versions.toml`](gradle/libs.versions.toml).
-Principales dépendances et leurs licences amont, à vérifier à la source
-avant toute distribution :
+Liste des dépendances **réellement embarquées dans l'application distribuée**
+(les dépendances de test — JUnit, Espresso, Robolectric, MockWebServer,
+`androidx.benchmark`, `room-testing`, `work-testing` — ne sont pas
+distribuées et ne figurent donc pas ici). Licences telles qu'annoncées en
+amont, **à revérifier à la source avant toute distribution** :
 
-- Readium Kotlin Toolkit — lecture EPUB
-- ONNX Runtime (Microsoft) — inférence des modèles TTS
-- PdfiumAndroid (`io.legere`) — rendu PDF
-- AndroidX / Jetpack Compose / Room / Media3 / Hilt (Google)
-- OkHttp (Square), AppAuth (OpenID Foundation)
+| Composant | Rôle | Licence annoncée |
+|---|---|---|
+| Readium Kotlin Toolkit (`org.readium.kotlin-toolkit`) | lecture EPUB | BSD-3-Clause |
+| ONNX Runtime (Microsoft) | inférence des modèles TTS et d'alignement | MIT |
+| PdfiumAndroid (`io.legere`) | rendu PDF (enveloppe de Pdfium, BSD-3-Clause) | Apache-2.0 |
+| AndroidX, Jetpack Compose, Room, Media3, WorkManager, Navigation, Lifecycle, `core-splashscreen`, `security-crypto` (Google) | socle applicatif | Apache-2.0 |
+| Hilt / Dagger (Google) | injection de dépendances | Apache-2.0 |
+| kotlinx-coroutines, kotlinx-serialization (JetBrains) | concurrence, sérialisation JSON | Apache-2.0 |
+| OkHttp (Square) | client HTTP et WebSocket | Apache-2.0 |
+| AppAuth (OpenID Foundation) | flux OAuth de la synchronisation Drive | Apache-2.0 |
+| Coil (`io.coil-kt`) | chargement des couvertures | Apache-2.0 |
+| jsoup (`org.jsoup`) | analyse du HTML des chapitres EPUB | MIT |
+| Apache Commons Compress | extraction des archives `.tar.bz2` des modèles de voix | Apache-2.0 |
+| `desugar_jdk_libs` (Google) | rétroportage des API Java 8+ sur minSdk 26 | **GPL-2.0 avec exception Classpath** (dérivé d'OpenJDK) — l'exception couvre la liaison, aucune contamination du code applicatif |
+| Firebase Crashlytics (Google) | rapports de plantage, **opt-in** | SDK Apache-2.0 ; le service relève des conditions Firebase |
+
+Deux points à surveiller avant publication :
+
+- `androidx.security:security-crypto` est en **1.1.0-alpha06** — une
+  version alpha embarquée dans une release, sur le chemin du chiffrement
+  des jetons de synchronisation et des identifiants OPDS/WebDAV. Choix
+  assumé (c'est la seule branche compatible avec les API récentes), à
+  réévaluer dès qu'une stable existe.
+- La licence de `desugar_jdk_libs` est la seule non permissive de la
+  liste ; c'est l'exception Classpath qui la rend utilisable ici, pas sa
+  nature.
 
 ## Modèles téléchargés à l'exécution
 
