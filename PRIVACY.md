@@ -73,8 +73,13 @@ Si — et seulement si — vous configurez la synchronisation :
   `oauth2.googleapis.com`, `www.googleapis.com`.
 - **WebDAV** : le serveur que vous indiquez, et lui seul.
 
-Sont synchronisés votre progression de lecture, vos signets et vos réglages —
-**jamais les fichiers de vos livres**.
+Sont synchronisés votre progression et vos statistiques de lecture, vos
+signets, vos annotations et surlignages, vos thèmes personnalisés et vos règles
+de prononciation — **jamais les fichiers de vos livres**.
+
+Cet instantané est déposé en clair dans cet espace : il n'est pas chiffré par
+un mot de passe comme l'est un export de sauvegarde. Il est protégé par le
+compte qui l'héberge — le vôtre — et par rien d'autre.
 
 Les jetons d'authentification et les identifiants WebDAV sont chiffrés au repos
 par le trousseau Android (`EncryptedSharedPreferences`, AES-256-GCM). Vous
