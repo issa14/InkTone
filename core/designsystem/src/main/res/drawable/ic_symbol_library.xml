@@ -1,0 +1,51 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+  Lucide (https://lucide.dev), glyphe « library » — licence ISC,
+  Copyright (c) for portions of Lucide are held by Cole Bemis 2013-2022
+  dans le cadre de Feather (MIT). Voir THIRD_PARTY_NOTICES.md.
+
+  SEULE icône du jeu qui ne vienne pas de Material Symbols, et seule à être
+  tracée au trait plutôt que pleine : quatre dos de livres alignés, dont un
+  penché. Aucun glyphe Material ne dit « bibliothèque » aussi directement —
+  `library_books` montre une pile de feuillets, `local_library` une personne
+  qui lit, et `Reading` (le livre ouvert) désigne déjà l'acte de lire dans
+  cette application, pas le lieu qui contient les ouvrages.
+
+  Les tracés sont repris tels quels de la source amont, sur sa grille 24
+  d'origine — aucune conversion maison, qui avait déjà déformé le jeu
+  Material par le passé.
+
+  Le trait de 2 unités sur 24 pèse visuellement moins que les glyphes pleins
+  voisins. C'est assumé : l'icône ne côtoie que du texte dans le tiroir et
+  vit seule dans l'état vide.
+-->
+<vector xmlns:android="http://schemas.android.com/apk/res/android"
+    android:width="24dp"
+    android:height="24dp"
+    android:viewportWidth="24"
+    android:viewportHeight="24">
+    <path
+        android:pathData="M4,4v16"
+        android:strokeColor="#FF000000"
+        android:strokeWidth="2"
+        android:strokeLineCap="round"
+        android:strokeLineJoin="round" />
+    <path
+        android:pathData="M8,8v12"
+        android:strokeColor="#FF000000"
+        android:strokeWidth="2"
+        android:strokeLineCap="round"
+        android:strokeLineJoin="round" />
+    <path
+        android:pathData="M12,6v14"
+        android:strokeColor="#FF000000"
+        android:strokeWidth="2"
+        android:strokeLineCap="round"
+        android:strokeLineJoin="round" />
+    <path
+        android:pathData="m16,6 4,14"
+        android:strokeColor="#FF000000"
+        android:strokeWidth="2"
+        android:strokeLineCap="round"
+        android:strokeLineJoin="round" />
+</vector>

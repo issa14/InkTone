@@ -14,6 +14,21 @@ liées à la compilation, et les modèles téléchargés à l'exécution.
 Ce fichier conserve son en-tête de copyright d'origine et **reste sous sa
 licence amont** : la licence MIT d'InkTone ne s'y applique pas.
 
+## Icônes
+
+Les glyphes de `core/designsystem/src/main/res/drawable/ic_symbol_*.xml` ne
+sont pas dessinés pour InkTone : ce sont des tracés amont repris tels quels,
+chacun portant sa provenance en en-tête de fichier.
+
+| Jeu | Fichiers | Origine | Licence |
+|---|---|---|---|
+| Material Symbols Rounded | `ic_symbol_*.xml`, sauf ceux listés ci-dessous | [google/material-design-icons](https://github.com/google/material-design-icons) — Copyright Google | Apache-2.0 |
+| Lucide | [`ic_symbol_library.xml`](core/designsystem/src/main/res/drawable/ic_symbol_library.xml), [`ic_symbol_library_big.xml`](core/designsystem/src/main/res/drawable/ic_symbol_library_big.xml) | [lucide-icons/lucide](https://github.com/lucide-icons/lucide) — portions Copyright (c) 2013-2022 Cole Bemis (Feather, MIT) | ISC |
+
+L'illustration de marque (`ic_brand_inktone`) et les tracés dessinés
+directement en Compose sont, eux, du travail original couvert par la
+licence MIT du dépôt.
+
 ## Binaires non versionnés
 
 `app/libs/sherpa-onnx-1.13.4.aar` est requis pour builder mais n'est pas

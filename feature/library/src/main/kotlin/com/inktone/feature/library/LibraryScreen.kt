@@ -335,7 +335,7 @@ fun LibraryDrawerContent(
         // la destination reelle ([selected]), plus un `true` fige.
         NavigationDrawerItem(
             label = { Text("Bibliothèque") },
-            icon = { AppIcon(AppSymbol.Reading,  contentDescription = null) },
+            icon = { AppIcon(AppSymbol.Library, contentDescription = null) },
             selected = selected == DrawerDestination.LIBRARY,
             onClick = onSelectLibrary,
         )
@@ -1120,9 +1120,13 @@ private fun ImportProgressBanner(progress: ImportProgress) {
  * redemander) — cas absent de la cible, conservé et consigné dans
  * UX_FLOW_DESIGN.md comme ajout plutôt que laissé en zone grise.
  *
- * Illustration : étagère avec emplacements de livres en pointillés,
- * produite au lot 10 (`EmptyLibraryShelfIllustration`) — ferme la dette
- * du lot 2a.6, `AppSymbol.Reading` n'est plus un repli.
+ * Illustration : [AppSymbol.LibraryShelf], variante au trait fin du glyphe
+ * de l'entrée « Bibliothèque » du tiroir — l'écran vide et le chemin qui y
+ * mène portent le même signe, dans le poids qui convient à chacun (seul et
+ * grand ici, en ligne avec d'autres icônes là-bas). Remplace l'étagère à
+ * emplacements pointillés dessinée au lot 10
+ * (`EmptyLibraryShelfIllustration`), qui disait la même chose en un tracé
+ * propre à ce seul écran.
  */
 @Composable
 private fun EmptyState(hasActiveImport: Boolean, onImportClick: () -> Unit, searchQuery: String = "") {
@@ -1134,7 +1138,12 @@ private fun EmptyState(hasActiveImport: Boolean, onImportClick: () -> Unit, sear
             // votre premier livre » alors que la bibliothèque était pleine,
             // avec un CTA d'import trompeur.
             val isSearchNoResult = searchQuery.isNotBlank() && !hasActiveImport
-            EmptyLibraryShelfIllustration(modifier = Modifier.size(width = 160.dp, height = 100.dp))
+            AppIcon(
+                AppSymbol.LibraryShelf,
+                contentDescription = null, // décoratif : le texte juste dessous porte le sens
+                tint = MaterialTheme.colorScheme.onSurfaceVariant,
+                modifier = Modifier.size(96.dp),
+            )
             Spacer(Modifier.height(8.dp))
             Text(
                 when {

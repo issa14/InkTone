@@ -71,6 +71,29 @@ enum class AppSymbol(
     SentenceNext(R.drawable.ic_symbol_sentence_next),
     Refresh(R.drawable.ic_symbol_refresh),
     Filter(R.drawable.ic_symbol_filter),
+
+    /**
+     * Le LIEU qui contient les ouvrages — un livre debout et un livre penché.
+     * Symbole de la destination « Bibliothèque » du tiroir.
+     *
+     * À distinguer de [Reading], le livre ouvert, qui désigne l'acte de lire :
+     * les deux coexistent volontairement, et les confondre est ce qui rendait
+     * l'entrée du tiroir muette, [Reading] servant déjà à quatre autres
+     * usages ailleurs.
+     *
+     * Assez de masse pour tenir la ligne au milieu des glyphes Material
+     * pleins du tiroir, là où [LibraryShelf] se lirait comme une entrée
+     * désactivée.
+     */
+    Library(R.drawable.ic_symbol_library_big),
+
+    /**
+     * Variante au trait fin du précédent — quatre dos de livres alignés, dont
+     * un penché. Réservée à l'ILLUSTRATION de l'état vide de la Bibliothèque,
+     * où le glyphe vit seul, à grande taille, et n'a aucun voisin dont il
+     * devrait épouser le poids.
+     */
+    LibraryShelf(R.drawable.ic_symbol_library),
     ChevronDown(R.drawable.ic_symbol_chevron_down),
     /**
      * Triangle PLEIN d'ouverture de menu — affordance conventionnelle d'un
