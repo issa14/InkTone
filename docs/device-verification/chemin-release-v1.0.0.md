@@ -37,8 +37,17 @@ composants. Ne pas les rajouter à la politique de confidentialité.
    client Android récemment créé — le flux AppAuth échoue alors avec
    `Error 400: invalid_request — Custom URI scheme is not enabled for
    your Android client`. À activer explicitement dans la fiche du client
-   (Google Cloud → Identifiants), avec un délai de propagation et une
-   réinstallation de l'app pour purger l'état AppAuth en cache.
+   (Google Cloud → Identifiants), **sur chacun des deux clients**, avec un
+   délai de propagation et une réinstallation de l'app pour purger l'état
+   AppAuth en cache.
+
+Empreintes des deux clés de signature, à retrouver sur la fiche du client
+OAuth correspondant :
+
+| Clé | SHA-1 |
+|---|---|
+| release (`inktone-release.jks`) | `6E:3D:BF:3B:19:C3:B4:81:FE:1C:99:8D:00:41:E8:87:BD:69:ED:AA` |
+| debug (`~/.android/debug.keystore`, machine de développement) | `19:FB:11:89:0F:56:9A:94:BA:B9:F1:2A:14:7A:DF:1B:8F:E3:00:E7` |
 
 ## Un client OAuth par buildType
 
@@ -62,6 +71,10 @@ debug, la variante release reste inchangée.
 **Tant que les clés `*_DEBUG` ne sont pas renseignées, la synchronisation
 des builds debug ne fonctionne pas** — le repli utilise le client
 release, dont le SHA-1 ne correspond pas à la clé de signature debug.
+
+Une fois les deux clients configurés et les clés renseignées, le cycle
+complet a été vérifié sur appareil dans les deux variantes : liaison,
+synchronisation et déliaison fonctionnent en debug comme en release.
 
 ## Reste ouvert
 
