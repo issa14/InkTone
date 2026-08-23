@@ -27,6 +27,20 @@ jobs:
         # (câblé en Tâche 0.5.5) sur chaque module qui applique un
         # convention plugin inktone.*.
 
+      - name: Compiler les tests instrumentés
+        run: ./gradlew assembleDebugAndroidTest
+        # `build` ne compile PAS les sources androidTest : elles peuvent
+        # donc pourrir sans que rien ne le signale, et ne le montrer qu'au
+        # prochain branchement d'un appareil. C'est exactement ce qui est
+        # arrive a `infrastructure/parser`, dont un fake de test avait
+        # cesse d'implementer `PublicationRepository` apres l'ajout de
+        # trois methodes a l'interface.
+        #
+        # Cette etape ne les EXECUTE pas — il faudrait un appareil ou un
+        # emulateur (voir la limite documentee plus bas) — mais elle
+        # garantit qu'ils compilent, donc qu'ils resteront executables le
+        # jour ou on les lance.
+
       - name: Vérifier l'absence d'emoji en production
         run: bash scripts/check-no-emoji.sh
 
