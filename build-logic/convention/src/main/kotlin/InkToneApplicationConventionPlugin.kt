@@ -79,12 +79,24 @@ class InkToneApplicationConventionPlugin : Plugin<Project> {
 
                 buildTypes {
                     getByName("release") {
-                        // Audit v1.0.0 : R8/minify VOLONTAIREMENT PAS active dans
-                        // cette passe (AAB 196 Mo vs budget Blueprint §11.2 <= 60 Mo,
-                        // mais activation risquee sans validation device des regles
-                        // proguard Readium/onnxruntime — differe declare dans
-                        // AUDIT_CONSOLIDATION_V1.md). Explicitement false pour
-                        // qu'aucune activation accidentelle ne se glisse.
+                        // R8/minify VOLONTAIREMENT PAS active. Explicitement
+                        // false pour qu'aucune activation accidentelle ne se
+                        // glisse.
+                        //
+                        // La justification d'origine — « AAB 196 Mo contre un
+                        // budget Blueprint §11.2 de 60 Mo » — ne tient PLUS :
+                        // le probleme de taille a ete regle autrement, par le
+                        // filtre `abiFilters arm64-v8a` (voir app/build.gradle
+                        // .kts), et l'AAB mesure aujourd'hui 30 Mo. Ne pas
+                        // reprendre cet argument.
+                        //
+                        // Ce qui reste vrai, et seul motif du report : activer
+                        // R8 sans valider sur appareil les regles de
+                        // conservation de Readium et d'onnxruntime (reflexion,
+                        // JNI) risque des pannes que les tests JVM ne verraient
+                        // pas. Le gain attendu est reel — ~40 Mo de classes*.dex
+                        // dans l'APK — donc l'activation vaut une campagne de
+                        // test dediee, pas un report indefini.
                         isMinifyEnabled = false
                         isShrinkResources = false
                         if (releaseSigningConfigured) {
