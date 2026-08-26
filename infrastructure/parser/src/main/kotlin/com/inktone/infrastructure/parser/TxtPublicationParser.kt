@@ -57,8 +57,10 @@ class TxtPublicationParser @Inject constructor(
         // Les offsets (startOffset/endOffset) sont réels, dans l'espace du
         // trimmedText, garantis par FrenchSentenceSplitter (contrat
         // d'offsets stables : substring == phrase).
-        val sentences = FrenchSentenceSplitter.split(trimmedText).mapIndexed { index, (text, startOffset, endOffset) ->
-            Sentence(index = index, text = text, startOffset = startOffset, endOffset = endOffset, blockIndex = 0)
+        // Correctif Lot 21 — le paramètre déstructuré masquait le `text`
+        // brut (non trimé) déclaré plus haut ; renommé pour lever l'ombre.
+        val sentences = FrenchSentenceSplitter.split(trimmedText).mapIndexed { index, (sentenceText, startOffset, endOffset) ->
+            Sentence(index = index, text = sentenceText, startOffset = startOffset, endOffset = endOffset, blockIndex = 0)
         }
 
         val fileName = fileStorageService.getFileName(fileUri) ?: fileUri.substringAfterLast('/')

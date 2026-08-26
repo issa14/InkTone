@@ -57,6 +57,24 @@ class AnnotationSelectionHandlerTest {
     }
 
     @Test
+    fun `paragraphIndex de fin designe le dernier caractere selectionne, pas le bloc de charOffset`() {
+        // charOffset (exclusif) tombe pile sur la frontière du bloc 1 —
+        // dans le séparateur inter-blocs, hors de tout globalOffsetRange —
+        // tandis que le DERNIER caractère réellement sélectionné (13)
+        // appartient encore au bloc 0. paragraphIndex doit suivre ce
+        // dernier caractère, pas charOffset : c'est la convention
+        // documentée sur `endLocator` dans AnnotationSelectionHandler.
+        val blocks = listOf(
+            BookBlock.ParagraphBlock(richText = StyledText.plain("Premier bloc."), globalOffsetRange = 0 until 14),
+            BookBlock.ParagraphBlock(richText = StyledText.plain("Second bloc."), globalOffsetRange = 15 until 28),
+        )
+        val result = AnnotationSelectionHandler().resolveCharRange(0, 14, 0, "ch1.xhtml", blocks)
+        assertNotNull(result)
+        assertEquals(14, result!!.second.charOffset)
+        assertEquals(0, result.second.paragraphIndex)
+    }
+
+    @Test
     fun `resolveCharRange sans blocs conserve paragraphIndex nul pour les annotations existantes`() {
         val result = AnnotationSelectionHandler().resolveCharRange(10, 20, 0, "ch1.xhtml")
         assertNotNull(result)

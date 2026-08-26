@@ -6,6 +6,7 @@ import androidx.compose.animation.core.animateFloatAsState
 import androidx.compose.foundation.gestures.Orientation
 import androidx.compose.foundation.gestures.awaitFirstDown
 import androidx.compose.runtime.snapshotFlow
+import androidx.compose.runtime.withFrameNanos
 import androidx.compose.ui.input.nestedscroll.nestedScroll
 import androidx.compose.ui.input.pointer.pointerInput
 import com.inktone.feature.reader.transition.ChapterTransitionConnection
@@ -13,11 +14,9 @@ import com.inktone.feature.reader.transition.ChapterTransitionDirection
 import com.inktone.feature.reader.transition.ChapterTransitionIndicator
 import com.inktone.feature.reader.transition.ChapterTransitionMath
 import com.inktone.feature.reader.transition.ChapterTransitionState
-import kotlinx.coroutines.Job
 import kotlinx.coroutines.flow.collect
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.isActive
-import kotlinx.coroutines.launch
 import androidx.compose.animation.core.animateIntAsState
 import androidx.compose.animation.core.tween
 import androidx.compose.animation.ExperimentalSharedTransitionApi
@@ -45,6 +44,9 @@ import androidx.compose.material3.Button
 import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedTextField
+import androidx.compose.material3.SnackbarHost
+import androidx.compose.material3.SnackbarHostState
+import androidx.compose.material3.SnackbarResult
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
@@ -57,7 +59,6 @@ import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
-import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.rememberUpdatedState
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
@@ -234,6 +235,28 @@ fun ReaderScreen(
     // B.2/B.3 — états d'affichage des panneaux de réglages in-reader
     var showSettingsPanel by remember { mutableStateOf(false) }
     var showTtsPanel by remember { mutableStateOf(false) }
+
+    // Correctif Lot 21, tâche 5 — la note de signet n'ouvre plus un
+    // AlertDialog modal à CHAQUE création (le plan proscrit d'en faire un
+    // dialogue obligatoire) : un Snackbar transitoire porte l'action
+    // « Ajouter une note », même patron que OpdsEffect.DownloadComplete
+    // (CatalogDashboardScreen). La saisie ne s'ouvre que si l'utilisateur
+    // la demande explicitement.
+    val snackbarHostState = remember { SnackbarHostState() }
+    var showBookmarkNoteDialog by remember { mutableStateOf(false) }
+    LaunchedEffect(state.pendingBookmarkNoteId) {
+        if (state.pendingBookmarkNoteId == null) return@LaunchedEffect
+        val result = snackbarHostState.showSnackbar(
+            message = "Signet ajouté",
+            actionLabel = "Ajouter une note",
+        )
+        if (result == SnackbarResult.ActionPerformed) {
+            showBookmarkNoteDialog = true
+        } else {
+            // Ignoré ou expiré : le signet reste sans note, comme avant.
+            viewModel.onIntent(ReaderIntent.DismissBookmarkNotePrompt)
+        }
+    }
     // 3d.3 — visibilité locale de la barre de luminosité, même patron que
     // les panneaux ci-dessus : purement une décision d'affichage, pas un
     // état MVI (ReaderUiState.readerBrightness porte la vraie donnée).
@@ -668,38 +691,69 @@ fun ReaderScreen(
             justified = state.isTextJustified,
         )
 
-        // Lot 21, tâche 9 — auto-scroll visuel (mode SCROLL uniquement) :
-        // défilement continu à la vitesse réglée, arrêt à la première
-        // interaction (pointerInput sur la LazyColumn), jamais quand
-        // `reduceMotion` est actif (décision 3 du lot). L'effet vit au
-        // niveau du composable, ses clés (vitesse, mode, reduceMotion,
-        // format) annulent le job dès qu'une condition cesse d'être
-        // remplie — y compris en passant en mode PAGED.
-        var autoScrollJob by remember { mutableStateOf<Job?>(null) }
-        val autoScrollScope = rememberCoroutineScope()
+        // Lot 21, tâche 9 — auto-scroll visuel (mode SCROLL uniquement),
+        // corrigé (revue post-lot 21) : la boucle vit directement dans le
+        // LaunchedEffect plutôt que dans un Job suivi à la main. Un `Job`
+        // partagé entre l'effet (qui l'annule et le réaffecte) et son
+        // propre `finally` (qui le remet à `null`) créait une course :
+        // `cancel()` n'étant pas synchrone, le `finally` de l'ANCIEN job
+        // s'exécutait après l'affectation du NOUVEAU et l'écrasait par
+        // `null` — l'arrêt au toucher (pointerInput ci-dessous) ne
+        // trouvait alors plus de job actif. Ici, Compose annule lui-même
+        // la coroutine de l'effet à chaque re-clé ou sortie de
+        // composition : aucune référence mutée depuis deux endroits.
+        var autoScrollRunning by remember { mutableStateOf(false) }
+        // Un appui sur la zone de lecture arrête l'auto-scroll pour la
+        // vitesse/le mode courants ; remis à `false` par le panneau de
+        // réglages quand l'utilisateur reclique un cran (même identique),
+        // ce qui permet de relancer l'auto-scroll sans changer de valeur.
+        var autoScrollUserStopped by remember { mutableStateOf(false) }
         LaunchedEffect(state.autoScrollSpeed, state.readingMode, state.reduceMotion, isPdf) {
-            autoScrollJob?.cancel()
-            autoScrollJob = null
-            if (state.autoScrollSpeed <= 0 || state.readingMode != ReadingMode.SCROLL || state.reduceMotion || isPdf) {
+            autoScrollUserStopped = false
+        }
+        LaunchedEffect(
+            state.autoScrollSpeed, state.readingMode, state.reduceMotion, isPdf, autoScrollUserStopped,
+        ) {
+            autoScrollRunning = false
+            if (
+                state.autoScrollSpeed <= 0 || state.readingMode != ReadingMode.SCROLL ||
+                state.reduceMotion || isPdf || autoScrollUserStopped
+            ) {
                 return@LaunchedEffect
             }
             val pxPerSecond = with(density) { autoScrollDpPerSecond(state.autoScrollSpeed).dp.toPx() }
             if (pxPerSecond <= 0f) return@LaunchedEffect
-            val tickPx = pxPerSecond * AUTO_SCROLL_TICK_MS / 1000f
-            autoScrollJob = autoScrollScope.launch {
-                try {
-                    while (isActive) {
-                        if (!scrollState.canScrollForward) break
-                        // Delta brut sans animation : `LazyListState` n'a pas
-                        // de `scrollBy` (contrairement à `ScrollState`) —
-                        // `dispatchRawDelta` avance le défilement du delta en
-                        // pixels sans course d'animation, adapté au tick.
-                        scrollState.dispatchRawDelta(tickPx)
-                        delay(AUTO_SCROLL_TICK_MS)
+            // Attend la première mesure : `canScrollForward` vaut toujours
+            // `false` tant que la LazyColumn n'a pas encore mesuré son
+            // contenu — sans cette attente, un auto-scroll démarré avant
+            // la première mise en page du chapitre se terminait
+            // immédiatement et ne repartait jamais (les clés de l'effet
+            // ne changent plus une fois la vitesse déjà réglée).
+            snapshotFlow { scrollState.layoutInfo.totalItemsCount }.first { it > 0 }
+            autoScrollRunning = true
+            try {
+                // Cadence sur l'horloge de frame plutôt qu'un `delay` fixe
+                // (16 ms dérive systématiquement au-dessus sous charge) :
+                // le delta appliqué est calculé sur le temps réellement
+                // écoulé entre deux frames, la vitesse en dp/s reste donc
+                // fidèle quelle que soit la cadence de rendu effective.
+                var lastFrameNanos = 0L
+                while (isActive) {
+                    if (!scrollState.canScrollForward) break
+                    withFrameNanos { frameNanos ->
+                        if (lastFrameNanos != 0L) {
+                            val deltaSeconds = (frameNanos - lastFrameNanos) / 1_000_000_000f
+                            // Delta brut sans animation : `LazyListState` n'a
+                            // pas de `scrollBy` (contrairement à `ScrollState`)
+                            // — `dispatchRawDelta` avance le défilement du
+                            // delta en pixels sans course d'animation.
+                            scrollState.dispatchRawDelta(pxPerSecond * deltaSeconds)
+                        }
+                        lastFrameNanos = frameNanos
                     }
-                } finally {
-                    autoScrollJob = null
                 }
+            } finally {
+                autoScrollRunning = false
             }
         }
 
@@ -804,11 +858,14 @@ fun ReaderScreen(
                         textAlign = if (state.isTextJustified) TextAlign.Justify else TextAlign.Unspecified,
                         hyphens = if (state.isTextJustified) Hyphens.Auto else Hyphens.None,
                         lineBreak = if (state.isTextJustified) LineBreak.Paragraph else LineBreak.Unspecified,
-                        // Lot 21 — même locale que le style de MESURE
-                        // (`pagination.baseTextStyle`) : une divergence ferait
+                        // Lot 21 (correctif) — même locale que le style de
+                        // MESURE (`pagination.baseTextStyle`), y compris la
+                        // condition `justified` : une divergence ferait
                         // césurer le rendu différemment de la mesure, donc
-                        // déborder les pages calculées.
-                        localeList = LocaleList("fr"),
+                        // déborder les pages calculées. Voir le commentaire
+                        // de `ChapterPaginationState.kt` pour le choix de
+                        // ne pas l'appliquer hors justification.
+                        localeList = if (state.isTextJustified) LocaleList("fr") else null,
                     )
 
                     // Parité avec le mode PAGED (absoluteHighlightedRange dans
@@ -912,12 +969,11 @@ fun ReaderScreen(
                                     // sur la zone défilable annule le job (le
                                     // down n'est pas consommé, le geste
                                     // utilisateur continue normalement).
-                                    .pointerInput(autoScrollJob != null) {
-                                        if (autoScrollJob != null) {
+                                    .pointerInput(autoScrollRunning) {
+                                        if (autoScrollRunning) {
                                             awaitPointerEventScope {
                                                 awaitFirstDown()
-                                                autoScrollJob?.cancel()
-                                                autoScrollJob = null
+                                                autoScrollUserStopped = true
                                             }
                                         }
                                     },
@@ -1071,13 +1127,17 @@ fun ReaderScreen(
                 },
                 onDismiss = { clearSelectionAndPopup() },
                 // Lot 21, tâche 7 — contexte du partage : titre — auteur —
-                // chapitre courant. Toujours au moins le chapitre, donc
-                // jamais vide.
-                shareContext = buildList {
-                    state.title?.takeIf { it.isNotBlank() }?.let(::add)
-                    state.author?.takeIf { it.isNotBlank() }?.let(::add)
-                    add(state.currentChapter?.title ?: "Chapitre ${state.currentChapterIndex + 1}")
-                }.joinToString(" — "),
+                // chapitre courant. Toujours au moins le chapitre/la page,
+                // donc jamais vide. Extrait en fonction pure testable
+                // (correctif) : c'était auparavant écrit en ligne dans ce
+                // composable, donc invérifiable sans instrumentation.
+                shareContext = buildShareContext(
+                    title = state.title,
+                    author = state.author,
+                    chapterTitle = state.currentChapter?.title,
+                    chapterIndex = state.currentChapterIndex,
+                    isPdf = isPdf,
+                ),
             )
         }
 
@@ -1307,6 +1367,12 @@ fun ReaderScreen(
                 currentMarginStep = state.readerMarginStep,
                 isTextJustified = state.isTextJustified,
                 keepScreenOn = state.keepScreenOn,
+                // Correctif Lot 21 — sélecteur de police, jusqu'ici
+                // inatteignable (aucune UI ne dispatchait
+                // SettingsIntent.SetFontFamily). `effectiveSettings`
+                // reflète déjà `UserPreferences.fontFamily`, aucune
+                // surcharge par publication (voir EffectiveReadingSettings).
+                currentFontFamily = state.effectiveSettings.fontFamily,
                 // Lot 21, tâche 9 — auto-scroll visuel.
                 autoScrollSpeed = state.autoScrollSpeed,
                 reduceMotion = state.reduceMotion,
@@ -1314,7 +1380,13 @@ fun ReaderScreen(
                 onMarginStepChange = { step -> viewModel.onIntent(ReaderIntent.SetReaderMarginStep(step)) },
                 onTextJustifiedChange = { justified -> viewModel.onIntent(ReaderIntent.SetTextJustified(justified)) },
                 onKeepScreenOnChange = { enabled -> viewModel.onIntent(ReaderIntent.SetKeepScreenOn(enabled)) },
-                onAutoScrollSpeedChange = { speed -> viewModel.onIntent(ReaderIntent.SetAutoScrollSpeed(speed)) },
+                onFontFamilyChange = { family -> viewModel.onIntent(ReaderIntent.SetFontFamily(family)) },
+                onAutoScrollSpeedChange = { speed ->
+                    // Reclique sur le même cran après un arrêt au toucher :
+                    // relance sans attendre un changement de valeur.
+                    autoScrollUserStopped = false
+                    viewModel.onIntent(ReaderIntent.SetAutoScrollSpeed(speed))
+                },
                 onDismiss = { showSettingsPanel = false },
             )
         }
@@ -1422,16 +1494,28 @@ fun ReaderScreen(
             }
         }
 
-        // Lot 21, tâche 5 — saisie de note OPTIONNELLE d'un signet venant d'être
-        // créé. Le signet existe déjà (le toggle l'a créé) : ce dialogue ne
-        // bloque jamais le geste — fermer (« Plus tard », tap hors champ) laisse
-        // le signet sans note. La note vide est enregistrée comme `null`.
-        if (state.pendingBookmarkNoteId != null) {
+        // Lot 21, tâche 5 (corrigé) — saisie de note OPTIONNELLE : n'apparaît
+        // que si l'utilisateur a explicitement demandé « Ajouter une note »
+        // depuis le Snackbar ci-dessus, jamais imposée au geste de créer un
+        // signet. Fermer (« Plus tard », tap hors champ) laisse le signet
+        // sans note ; la note vide est enregistrée comme `null`.
+        if (showBookmarkNoteDialog && state.pendingBookmarkNoteId != null) {
             BookmarkNoteDialog(
-                onSave = { note -> viewModel.onIntent(ReaderIntent.SaveBookmarkNote(note)) },
-                onDismiss = { viewModel.onIntent(ReaderIntent.DismissBookmarkNotePrompt) },
+                onSave = { note ->
+                    viewModel.onIntent(ReaderIntent.SaveBookmarkNote(note))
+                    showBookmarkNoteDialog = false
+                },
+                onDismiss = {
+                    viewModel.onIntent(ReaderIntent.DismissBookmarkNotePrompt)
+                    showBookmarkNoteDialog = false
+                },
             )
         }
+
+        SnackbarHost(
+            hostState = snackbarHostState,
+            modifier = Modifier.align(Alignment.BottomCenter),
+        )
 
         // Lot 10 (restauré au Lot 20) — proposition proactive de la voix
         // neuronale au premier usage réel du TTS. « Télécharger » ouvre
@@ -1508,6 +1592,26 @@ internal fun resolveSelectionPopupBounds(
     else -> current
 }
 
+/**
+ * Lot 21, tâche 7 (extrait, correctif) — contexte « titre — auteur —
+ * chapitre » joint au texte partagé. Toujours au moins une entrée (le
+ * repli chapitre/page), donc jamais vide. `isPdf` distingue le repli :
+ * `chapterIndex` est un index de PAGE sur un PDF, jamais un chapitre —
+ * même correction que sur le titre des signets PDF (`ReaderViewModel`).
+ */
+internal fun buildShareContext(
+    title: String?,
+    author: String?,
+    chapterTitle: String?,
+    chapterIndex: Int,
+    isPdf: Boolean,
+): String = buildList {
+    title?.takeIf { it.isNotBlank() }?.let(::add)
+    author?.takeIf { it.isNotBlank() }?.let(::add)
+    val fallback = if (isPdf) "Page ${chapterIndex + 1}" else "Chapitre ${chapterIndex + 1}"
+    add(chapterTitle?.takeIf { it.isNotBlank() } ?: fallback)
+}.joinToString(" — ")
+
 @Composable
 private fun ErrorState(message: String, onRetry: () -> Unit, onBack: () -> Unit) {
     Column(
@@ -1573,5 +1677,3 @@ private fun BookmarkNoteDialog(
     )
 }
 
-/** Lot 21, tâche 9 — cadence du pas d'auto-scroll (≈ 60 fps). */
-private const val AUTO_SCROLL_TICK_MS = 16L

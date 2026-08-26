@@ -15,11 +15,17 @@ import java.util.Locale
  * ## Pourquoi BreakIterator et pas une regex ?
  *
  * BreakIterator utilise les règles de segmentation ICU compilées — il gère
- * nativement les abréviations françaises (M., Mme, etc.), les points de
- * suspension, les points dans les nombres, et les guillemets sans recourir
- * à des listes d'exceptions maintenues manuellement. Une regex, même
- * sophistiquée, échoue sur "M. Dubois est arrivé." (coupure après "M.")
- * sans une liste d'abréviations constamment mise à jour.
+ * nativement les points de suspension, les points dans les nombres et les
+ * guillemets. Les abréviations françaises (M., Mme, etc.) restent, elles,
+ * gérées par [abbreviations] ci-dessous : BreakIterator ne les reconnaît
+ * PAS nativement (correctif de ce commentaire — l'affirmation contraire
+ * était fausse et contredisait le code qui la suit de quelques lignes).
+ * L'intérêt face à une regex reste entier : BreakIterator gère seul les
+ * points de suspension et les guillemets, laissant la liste d'exceptions
+ * ne couvrir que les abréviations — une regex sophistiquée devrait, elle,
+ * tout encoder à la main, y compris ces cas-là. "M. Dubois est arrivé."
+ * (coupure après "M.") reste le cas qui justifie la liste d'exceptions,
+ * pas BreakIterator seul.
  *
  * ## Contrat de stabilité des offsets
  *
@@ -142,8 +148,13 @@ object FrenchSentenceSplitter {
     private fun endsWithAbbreviation(text: String, start: Int, end: Int): Boolean {
         if (end <= start) return false
         val segment = text.substring(start, end).trimEnd()
-        // Trouver le dernier "mot" avant un point final éventuel
-        val lastWord = segment.substringAfterLast(' ')
+        // Dernier "mot" avant un point final éventuel — toute espace
+        // blanche sépare les mots, pas seulement l'espace ASCII :
+        // `substringAfterLast(' ')` manquait les sauts de ligne que
+        // PDFium (une ligne visuelle par `\r\n`) et un TXT dur-wrappé
+        // insèrent entre les mots, rendant le filtre inopérant sur ces
+        // deux formats précisément.
+        val lastWord = segment.takeLastWhile { !it.isWhitespace() }
             .trimEnd('.', ')', '»', '"', '\'')
         return lastWord.isNotEmpty() && lastWord in abbreviations
     }

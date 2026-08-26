@@ -46,8 +46,9 @@ import com.inktone.domain.model.AnnotationColor
 
 /**
  * Tâche 3c.4 — remplace `AnnotationColorPicker` en position fixe basse
- * d'écran par un bloc positionné **près de la sélection**. Trois options
- * de premier niveau (Copier · Surligner · Note), la couleur reste un
+ * d'écran par un bloc positionné **près de la sélection**. Quatre options
+ * de premier niveau (Copier · Surligner · Note · un overflow « Plus
+ * d'actions » menant à Partager, Lot 21 tâche 7), la couleur reste un
  * second temps (`Surligner` seulement) — cible confirmée
  * (`UX_FLOW_DESIGN.md` § popup de sélection de texte, Signet
  * volontairement absent : un signet marque une position, pas une plage).
@@ -265,7 +266,10 @@ private class SelectionPopupPositionProvider(
 internal fun buildShareMessage(selectedText: String, shareContext: String?): String {
     val contextLine = shareContext?.takeIf { it.isNotBlank() }
     return buildString {
-        append('«').append(selectedText).append('»')
+        // Correctif Lot 21 — espace insécable entre le guillemet et le
+        // texte (typographie française), même convention que
+        // XmlOpdsFeedParser (entité `&nbsp;` → `\u00A0`).
+        append('«').append('\u00A0').append(selectedText).append('\u00A0').append('»')
         if (contextLine != null) append("\n\n— ").append(contextLine)
     }
 }

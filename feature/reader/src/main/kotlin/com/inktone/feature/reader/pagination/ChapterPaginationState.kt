@@ -242,16 +242,25 @@ fun rememberChapterPaginationState(
             textAlign = if (justified) TextAlign.Justify else TextAlign.Unspecified,
             hyphens = if (justified) Hyphens.Auto else Hyphens.None,
             lineBreak = if (justified) LineBreak.Paragraph else LineBreak.Unspecified,
-            // Lot 21 — locale de césure explicite. `Hyphens.Auto` sans locale
-            // se rabat sur la locale SYSTÈME, pas nécessairement `fr` : sur
-            // un appareil configuré en anglais, la césure d'un texte français
-            // justifié coupe aux mauvais endroits. Constante `fr` (même
-            // choix que FrenchSentenceSplitter) — la langue de publication
-            // n'est pas portée par les métadonnées aujourd'hui. Si elle le
-            // devient, l'ajouter aux clés du `remember` ET à
-            // `paginationStyleKeyFrom` (la locale déplace les points de
-            // coupure de ligne, donc change la pagination).
-            localeList = LocaleList("fr"),
+            // Lot 21 (correctif) — locale de césure explicite, mais
+            // seulement quand `justified` : posée sans condition, elle
+            // s'appliquait aussi hors justification, où elle n'a rien à
+            // corriger (`Hyphens.None` ne césure pas) mais influence quand
+            // même la sélection de glyphes et la coupure de ligne — un
+            // élargissement de comportement non voulu pour tout contenu
+            // non francophone. `Hyphens.Auto` sans locale se rabat sur la
+            // locale SYSTÈME, pas nécessairement `fr` : sur un appareil
+            // configuré en anglais, la césure d'un texte français justifié
+            // coupe aux mauvais endroits. Constante `fr` (même choix que
+            // FrenchSentenceSplitter) — `Publication.language` existe et
+            // est persisté (Publication.kt, rempli à l'import), mais n'est
+            // pas encore porté jusqu'à `ReaderUiState` : le brancher est
+            // laissé pour quand la césure par langue sera mesurée
+            // insuffisante avec `fr` seul. Si la locale devient variable,
+            // l'ajouter aux clés du `remember` ET à
+            // `paginationStyleKeyFrom` (elle déplace les points de coupure
+            // de ligne, donc change la pagination).
+            localeList = if (justified) LocaleList("fr") else null,
         )
     }
     val state = remember(engine, baseTextStyle) { ChapterPaginationState(engine, baseTextStyle) }

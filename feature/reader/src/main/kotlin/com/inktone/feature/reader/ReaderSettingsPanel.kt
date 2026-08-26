@@ -30,6 +30,7 @@ import androidx.compose.material3.Switch
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.text.style.TextAlign
+import com.inktone.domain.model.FontFamily as DomainFontFamily
 import com.inktone.domain.model.UserPreferences
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
@@ -58,6 +59,12 @@ fun ReaderSettingsPanel(
     currentMarginStep: Int,
     isTextJustified: Boolean,
     keepScreenOn: Boolean,
+    // Correctif Lot 21 — jusqu'ici aucun écran ne dispatchait
+    // `SettingsIntent.SetFontFamily` : OpenDyslexic (hors préréglage
+    // d'accessibilité) et Source Serif 4 étaient rendues mais
+    // inatteignables. Valeurs par défaut pour ne pas casser les appelants
+    // existants (tests inclus).
+    currentFontFamily: DomainFontFamily = DomainFontFamily.DEFAULT,
     // Lot 21, tâche 9 — auto-scroll visuel (vitesse réglable, 0 = off).
     autoScrollSpeed: Int,
     reduceMotion: Boolean,
@@ -71,6 +78,7 @@ fun ReaderSettingsPanel(
     onTextJustifiedChange: (Boolean) -> Unit,
     onKeepScreenOnChange: (Boolean) -> Unit,
     onAutoScrollSpeedChange: (Int) -> Unit,
+    onFontFamilyChange: (DomainFontFamily) -> Unit = {},
     onDismiss: () -> Unit,
 ) {
     val sheetState = rememberModalBottomSheetState(skipPartiallyExpanded = true)
@@ -133,6 +141,31 @@ fun ReaderSettingsPanel(
                 onValueChangeFinished = { onLineHeightChange(lineHeightDraft) },
                 displayFormatter = { "%.1f×".format(it) },
             )
+
+            Spacer(Modifier.height(20.dp))
+
+            // ── Police — correctif Lot 21 : seul point d'accès réel à
+            // OpenDyslexic (hors préréglage d'accessibilité) et Source
+            // Serif 4, mappées mais jusqu'ici inatteignables ──
+            Text(
+                "Police",
+                style = MaterialTheme.typography.labelLarge,
+            )
+            Spacer(Modifier.height(8.dp))
+            SingleChoiceSegmentedButtonRow(modifier = Modifier.fillMaxWidth()) {
+                FONT_FAMILY_CHOICES.forEachIndexed { index, family ->
+                    SegmentedButton(
+                        selected = currentFontFamily == family,
+                        onClick = { onFontFamilyChange(family) },
+                        shape = SegmentedButtonDefaults.itemShape(
+                            index = index,
+                            count = FONT_FAMILY_CHOICES.size,
+                        ),
+                    ) {
+                        Text(fontFamilyLabel(family))
+                    }
+                }
+            }
 
             Spacer(Modifier.height(20.dp))
 
@@ -214,6 +247,23 @@ fun ReaderSettingsPanel(
             Spacer(Modifier.height(32.dp))
         }
     }
+}
+
+/**
+ * Correctif Lot 21 — options du sélecteur de police. `DomainFontFamily`
+ * ne comporte que 5 valeurs au total (Blueprint : une valeur ajoutée ne
+ * se retire jamais) — toutes exposées ici, aucun `when` à maintenir en
+ * double.
+ */
+private val FONT_FAMILY_CHOICES = DomainFontFamily.entries.toList()
+
+/** Correctif Lot 21 — libellé court d'une police pour le segmented row. */
+private fun fontFamilyLabel(family: DomainFontFamily): String = when (family) {
+    DomainFontFamily.DEFAULT -> "Système"
+    DomainFontFamily.SERIF -> "Serif"
+    DomainFontFamily.SANS_SERIF -> "Sans-serif"
+    DomainFontFamily.OPEN_DYSLEXIC -> "Dyslexie"
+    DomainFontFamily.SOURCE_SERIF -> "Empattée FR"
 }
 
 /**

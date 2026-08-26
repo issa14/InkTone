@@ -42,6 +42,34 @@ class FrenchSentenceSplitterTest {
         assertEquals(listOf("Voir p. ex. le chapitre trois.", "Il est clair."), sentences.map { it.first })
     }
 
+    // Lot 21 (correctif) — le filtre d'abréviations doit reconnaître le
+    // dernier mot d'un segment même quand il est précédé d'un saut de
+    // ligne plutôt que d'une espace ASCII : c'est la forme que produisent
+    // PDFium (une ligne visuelle par `\r\n`) et un TXT dur-wrappé, les
+    // deux formats visés par l'unification du découpage.
+
+    @Test
+    fun ne_decoupe_pas_apres_une_abreviation_precedee_d_un_saut_de_ligne() {
+        val sentences = FrenchSentenceSplitter.split(
+            "La liste continue\nM. Dupont a confirmé. Il partit ensuite.",
+        )
+        assertEquals(
+            listOf("La liste continue\nM. Dupont a confirmé.", "Il partit ensuite."),
+            sentences.map { it.first },
+        )
+    }
+
+    @Test
+    fun ne_decoupe_pas_apres_une_abreviation_precedee_d_un_saut_de_ligne_crlf() {
+        val sentences = FrenchSentenceSplitter.split(
+            "La liste continue\r\nM. Dupont a confirmé. Il partit ensuite.",
+        )
+        assertEquals(
+            listOf("La liste continue\r\nM. Dupont a confirmé.", "Il partit ensuite."),
+            sentences.map { it.first },
+        )
+    }
+
     // ───── Ponctuation forte simple ─────
 
     @Test

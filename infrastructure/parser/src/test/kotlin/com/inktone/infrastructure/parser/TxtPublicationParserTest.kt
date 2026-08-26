@@ -65,6 +65,32 @@ class TxtPublicationParserTest {
         assertEquals("Enfin, il salua.", sentences[2].text)
     }
 
+    // Lot 21 (correctif) — le contrat d'offsets absolus de
+    // FrenchSentenceSplitter (substring == phrase) doit survivre au
+    // passage par ce parseur : c'est la propriété dont dépendent le
+    // surlignage mot-à-mot et l'index FTS, et qu'aucun test n'exerçait
+    // au point d'intégration (seulement dans `domain`).
+    @Test
+    fun les_offsets_des_phrases_sont_des_substrings_exacts_du_texte_source() = runTest {
+        val text = "Bonjour le monde. Ceci est un test. Il fonctionne !"
+        val file = File.createTempFile("test", ".txt").apply {
+            writeText(text)
+            deleteOnExit()
+        }
+        val result = parser.parse(file.absolutePath)
+        check(result is ParseResult.Success)
+
+        val trimmedText = text.trim()
+        val sentences = result.documentModel.chapters.single().sentences
+        assertEquals(3, sentences.size)
+        sentences.forEach { sentence ->
+            assertEquals(
+                sentence.text,
+                trimmedText.substring(sentence.startOffset, sentence.endOffset),
+            )
+        }
+    }
+
     @Test
     fun fichier_vide_renvoie_corrompu_pas_un_crash() = runTest {
         val file = File.createTempFile("empty", ".txt").apply { deleteOnExit() }

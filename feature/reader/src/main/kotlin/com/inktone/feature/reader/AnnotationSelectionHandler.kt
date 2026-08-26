@@ -37,6 +37,15 @@ class AnnotationSelectionHandler {
             resourceHref = resourceHref, chapterIndex = chapterIndex,
             charOffset = startOffset, paragraphIndex = startParagraphIndex,
         )
+        // Convention à connaître avant de consommer `endLocator.paragraphIndex` :
+        // `charOffset` reste EXCLUSIF (fin de la sélection), mais
+        // `paragraphIndex` désigne le bloc du DERNIER CARACTÈRE
+        // sélectionné — pas nécessairement le bloc qui contient
+        // `charOffset` lui-même (qui peut être le séparateur inter-blocs
+        // ou le début du bloc suivant si la sélection s'arrête pile à la
+        // frontière). C'est la sémantique voulue pour une sélection
+        // (« quel bloc ai-je sélectionné ? »), pas un bug : ne pas
+        // supposer que `charOffset` tombe dans le bloc `paragraphIndex`.
         val endLocator = Locator(
             resourceHref = resourceHref, chapterIndex = chapterIndex,
             charOffset = endOffsetExclusive, paragraphIndex = endParagraphIndex,

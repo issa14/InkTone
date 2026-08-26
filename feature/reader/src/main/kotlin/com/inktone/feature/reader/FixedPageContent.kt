@@ -38,6 +38,7 @@ import androidx.compose.ui.layout.onSizeChanged
 import androidx.compose.ui.unit.IntSize
 import androidx.compose.ui.unit.dp
 import com.inktone.domain.model.RenderedPage
+import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.isActive
 import kotlin.math.roundToInt
@@ -178,8 +179,11 @@ private fun FixedPage(
     // copyPixelsFromBuffer (inBitmap n'est pas applicable aux IntArray
     // de RenderedPage — pixels bruts, pas de decodage BitmapFactory).
     LaunchedEffect(pageIndex, viewportSizePx, isRenderReady) {
-        if (viewportSizePx.width <= 0 || !isRenderReady) return@LaunchedEffect
+        // Reinitialise avant le garde : un ancien repli ne doit jamais
+        // rester affiche si la page redevient simplement non prete
+        // (document ferme puis rouvert), plutot que verite obsolete.
         renderFailed = false
+        if (viewportSizePx.width <= 0 || !isRenderReady) return@LaunchedEffect
 
         val cached = bitmapCache.get(pageIndex)
         if (cached != null && cached.width == viewportSizePx.width) {
@@ -188,9 +192,18 @@ private fun FixedPage(
             return@LaunchedEffect
         }
 
-        val rendered = runCatching { renderPage(pageIndex, viewportSizePx.width) }
-            .onFailure { throwable -> Log.e(TAG, "Echec du rendu PDF de la page $pageIndex", throwable) }
-            .getOrNull()
+        // L'annulation de cet effet (changement de page, redimensionnement)
+        // ne doit jamais etre journalisee comme un echec de rendu ni
+        // afficher le repli : seul un VRAI echec (page corrompue, OOM)
+        // doit declencher `renderFailed`.
+        val rendered = try {
+            renderPage(pageIndex, viewportSizePx.width)
+        } catch (cancellation: CancellationException) {
+            throw cancellation
+        } catch (throwable: Throwable) {
+            Log.e(TAG, "Echec du rendu PDF de la page $pageIndex", throwable)
+            null
+        }
         if (rendered == null) {
             renderFailed = true
             return@LaunchedEffect
@@ -215,10 +228,17 @@ private fun FixedPage(
         val targetWidthPx = (viewportSizePx.width * targetScale).roundToInt()
         // Lot 21, tâche 8 — même repli qu'au rendu standard : une OOM au
         // zoom ne doit pas faire tomber l'écran (la page au repos reste
-        // affichée, le bitmap HD est simplement abandonné).
-        val rendered = runCatching { renderPage(pageIndex, targetWidthPx) }
-            .onFailure { throwable -> Log.e(TAG, "Echec du rendu PDF HD de la page $pageIndex", throwable) }
-            .getOrNull() ?: return@LaunchedEffect
+        // affichée, le bitmap HD est simplement abandonné). L'annulation
+        // de cet effet (relachement du geste, nouvelle page) n'est pas un
+        // echec de rendu — voir le meme choix sur l'effet standard.
+        val rendered = try {
+            renderPage(pageIndex, targetWidthPx)
+        } catch (cancellation: CancellationException) {
+            throw cancellation
+        } catch (throwable: Throwable) {
+            Log.e(TAG, "Echec du rendu PDF HD de la page $pageIndex", throwable)
+            null
+        } ?: return@LaunchedEffect
         val bmp = Bitmap.createBitmap(rendered.pixelsArgb, rendered.widthPx, rendered.heightPx, Bitmap.Config.ARGB_8888)
         bitmap = bmp.asImageBitmap()
         renderedScale = targetScale
@@ -319,20 +339,28 @@ private fun FixedPage(
         } else if (renderFailed) {
             // Lot 21, tâche 8 — repli gracieux : la page ne se rend pas
             // (page corrompue, OOM). Placeholder explicite plutôt qu'un
-            // écran noir muet ; le détail est dans le Log.
+            // écran noir muet ; le détail est dans le Log. Le fond du Box
+            // parent est toujours noir (theme de lecture PDF) : sans son
+            // propre fond, le repli resterait blanc-sur-noir même en
+            // thème clair/sépia (`invertColors == false`) — même logique
+            // que l'inversion appliquée à l'Image ci-dessus.
+            val placeholderBackground = if (invertColors) Color.Black else Color.White
+            val placeholderTextColor = if (invertColors) Color.White else Color.Black
             Column(
-                modifier = Modifier.fillMaxSize(),
+                modifier = Modifier
+                    .fillMaxSize()
+                    .background(placeholderBackground),
                 horizontalAlignment = Alignment.CenterHorizontally,
-                verticalArrangement = androidx.compose.foundation.layout.Arrangement.Center,
+                verticalArrangement = Arrangement.Center,
             ) {
                 Text(
                     "Page illisible",
-                    color = Color.White,
+                    color = placeholderTextColor,
                     style = MaterialTheme.typography.bodyMedium,
                 )
                 Text(
                     "Cette page du document ne peut pas être affichée.",
-                    color = Color.White.copy(alpha = 0.7f),
+                    color = placeholderTextColor.copy(alpha = 0.7f),
                     style = MaterialTheme.typography.bodySmall,
                     modifier = Modifier.padding(top = 8.dp),
                 )

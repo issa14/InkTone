@@ -5,6 +5,7 @@ import com.inktone.domain.model.AnnotationColor
 import com.inktone.domain.model.Bookmark
 import com.inktone.domain.model.Chapter
 import com.inktone.domain.model.EffectiveReadingSettings
+import com.inktone.domain.model.FontFamily
 import com.inktone.domain.model.PublicationFormat
 import com.inktone.domain.model.ReadingOverrides
 import com.inktone.domain.model.ReadingTheme
@@ -447,6 +448,15 @@ sealed interface ReaderIntent {
 
     /** P4 — justification du texte, césure comprise. */
     data class SetTextJustified(val justified: Boolean) : ReaderIntent
+
+    /**
+     * Correctif Lot 21 — jusqu'ici aucun écran ne permettait de choisir
+     * la famille de police depuis le Lecteur : `SettingsIntent.SetFontFamily`
+     * (feature/settings) n'était dispatché par aucune UI, rendant
+     * OpenDyslexic (hors préréglage d'accessibilité) et Source Serif 4
+     * inatteignables malgré leur rendu réel (Lot 21, tâches 1 et 10).
+     */
+    data class SetFontFamily(val fontFamily: FontFamily) : ReaderIntent
 
     /** P4 — maintien de l'écran allumé pendant la lecture visuelle. */
     data class SetKeepScreenOn(val enabled: Boolean) : ReaderIntent

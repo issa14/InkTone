@@ -7,6 +7,8 @@ import androidx.compose.ui.test.SemanticsMatcher
 import androidx.compose.ui.test.assertIsDisplayed
 import androidx.compose.ui.test.junit4.createComposeRule
 import androidx.compose.ui.test.onNodeWithText
+import androidx.compose.ui.test.performClick
+import com.inktone.domain.model.FontFamily
 import org.junit.Assert.assertEquals
 import org.junit.Rule
 import org.junit.Test
@@ -149,5 +151,74 @@ class ReaderSettingsPanelTest {
         composeTestRule.onNodeWithText("Lente").assertExists()
         composeTestRule.onNodeWithText("Moyenne").assertExists()
         composeTestRule.onNodeWithText("Rapide").assertExists()
+    }
+
+    // ───── Correctif Lot 21 — sélecteur de police, jusqu'ici inatteignable
+    // (aucune UI ne dispatchait SettingsIntent.SetFontFamily) ─────
+
+    @Test
+    fun le_panneau_propose_un_selecteur_de_police() {
+        composeTestRule.setContent {
+            ReaderSettingsPanel(
+                currentFontSize = 18,
+                currentLineHeightMultiplier = 1.4f,
+                previewText = "Aperçu.",
+                previewTextColor = Color.Black,
+                previewBackgroundColor = Color.White,
+                onFontSizeChange = {},
+                onLineHeightChange = {},
+                currentMarginStep = 1,
+                isTextJustified = false,
+                keepScreenOn = false,
+                currentFontFamily = FontFamily.DEFAULT,
+                autoScrollSpeed = 0,
+                reduceMotion = false,
+                isScrollMode = true,
+                onMarginStepChange = {},
+                onTextJustifiedChange = {},
+                onKeepScreenOnChange = {},
+                onAutoScrollSpeedChange = {},
+                onDismiss = {},
+            )
+        }
+
+        composeTestRule.onNodeWithText("Police").assertExists()
+        composeTestRule.onNodeWithText("Système").assertExists()
+        composeTestRule.onNodeWithText("Serif").assertExists()
+        composeTestRule.onNodeWithText("Sans-serif").assertExists()
+        composeTestRule.onNodeWithText("Dyslexie").assertExists()
+        composeTestRule.onNodeWithText("Empattée FR").assertExists()
+    }
+
+    @Test
+    fun choisir_une_police_declenche_le_callback() {
+        var chosen: FontFamily? = null
+        composeTestRule.setContent {
+            ReaderSettingsPanel(
+                currentFontSize = 18,
+                currentLineHeightMultiplier = 1.4f,
+                previewText = "Aperçu.",
+                previewTextColor = Color.Black,
+                previewBackgroundColor = Color.White,
+                onFontSizeChange = {},
+                onLineHeightChange = {},
+                currentMarginStep = 1,
+                isTextJustified = false,
+                keepScreenOn = false,
+                currentFontFamily = FontFamily.DEFAULT,
+                autoScrollSpeed = 0,
+                reduceMotion = false,
+                isScrollMode = true,
+                onMarginStepChange = {},
+                onTextJustifiedChange = {},
+                onKeepScreenOnChange = {},
+                onAutoScrollSpeedChange = {},
+                onFontFamilyChange = { chosen = it },
+                onDismiss = {},
+            )
+        }
+
+        composeTestRule.onNodeWithText("Empattée FR").performClick()
+        assertEquals(FontFamily.SOURCE_SERIF, chosen)
     }
 }
