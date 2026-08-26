@@ -110,6 +110,12 @@ data class ReadingSessionBackup(
     val endedAt: Long?,
     val mode: String,
     val sentencesRead: Int = 0,
+    val wordsRead: Int = 0,
+    val visualDurationMs: Long = 0,
+    val ttsDurationMs: Long = 0,
+    // Compatibilité ascendante (Lot 22, tâche 13) : les exports antérieurs ne
+    // portaient que `durationMs` (total calculé), sans distinguer visuel/TTS.
+    // Conservé en lecture pour ne rien perdre d'une sauvegarde préexistante.
     val durationMs: Long = 0,
 )
 
@@ -160,10 +166,17 @@ fun AnnotationBackup.toDomain(): Annotation = Annotation(
 )
 
 fun ReadingSession.toBackup(): ReadingSessionBackup =
-    ReadingSessionBackup(id, publicationId, startedAt, endedAt, mode.name, sentencesRead, durationMs)
-fun ReadingSessionBackup.toDomain(): ReadingSession =
-    ReadingSession(
+    ReadingSessionBackup(
         id = id, publicationId = publicationId, startedAt = startedAt, endedAt = endedAt,
-        mode = ReadingMode.valueOf(mode), sentencesRead = sentencesRead,
-        visualDurationMs = durationMs, ttsDurationMs = 0,
+        mode = mode.name, sentencesRead = sentencesRead, wordsRead = wordsRead,
+        visualDurationMs = visualDurationMs, ttsDurationMs = ttsDurationMs, durationMs = durationMs,
     )
+fun ReadingSessionBackup.toDomain(): ReadingSession = ReadingSession(
+    id = id, publicationId = publicationId, startedAt = startedAt, endedAt = endedAt,
+    mode = ReadingMode.valueOf(mode), sentencesRead = sentencesRead,
+    wordsRead = wordsRead,
+    // Un export antérieur (avant la tâche 13) ne portait que `durationMs` :
+    // le reporter en visuel évite de perdre la durée des sessions existantes.
+    visualDurationMs = if (visualDurationMs == 0L && ttsDurationMs == 0L && durationMs > 0) durationMs else visualDurationMs,
+    ttsDurationMs = ttsDurationMs,
+)
