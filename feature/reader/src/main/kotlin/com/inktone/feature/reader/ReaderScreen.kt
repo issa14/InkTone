@@ -1132,12 +1132,12 @@ fun ReaderScreen(
                 // SYNCHRONE (voir sa KDoc), le `ClearFreeSelection` qui
                 // suit ne peut donc pas lui retirer les offsets sous les
                 // pieds. L'ordre inverse perdrait l'annotation.
-                onHighlight = { color ->
-                    viewModel.onIntent(ReaderIntent.ConfirmAnnotation(color))
+                onHighlight = { color, kind ->
+                    viewModel.onIntent(ReaderIntent.ConfirmAnnotation(color = color, kind = kind))
                     clearSelectionAndPopup()
                 },
-                onSaveNote = { content, color ->
-                    viewModel.onIntent(ReaderIntent.ConfirmAnnotation(color, content))
+                onSaveNote = { content, color, kind ->
+                    viewModel.onIntent(ReaderIntent.ConfirmAnnotation(color = color, kind = kind, content = content))
                     clearSelectionAndPopup()
                 },
                 onDismiss = { clearSelectionAndPopup() },
