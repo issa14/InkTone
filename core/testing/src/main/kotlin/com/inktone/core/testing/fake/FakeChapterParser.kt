@@ -17,6 +17,9 @@ class FakeChapterParser : ChapterParser {
         registered[publicationId] = fileUri
     }
 
+    /** Correctif — vérifie que `registerPublication` a bien été appelé, tous formats confondus. */
+    fun isRegistered(publicationId: String): Boolean = registered.containsKey(publicationId)
+
     override suspend fun parseChapter(
         publicationId: String,
         chapterHref: String,

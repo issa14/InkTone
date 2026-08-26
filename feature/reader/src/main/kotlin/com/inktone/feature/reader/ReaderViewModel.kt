@@ -636,9 +636,23 @@ class ReaderViewModel @Inject constructor(
                         author = publication.authors.cleanedAuthorsForDisplay().ifBlank { null },
                         coverUri = publication.coverUri,
                     )
-                    // Plan v3, Palier 3.6 — initialiser le parsing lazy EPUB
+                    // Plan v3, Palier 3.6 — initialiser le parsing lazy.
+                    // Correctif : `registerPublication` était réservé à
+                    // l'EPUB, alors que `CompositeChapterParser` l'enregistre
+                    // déjà des DEUX côtés par construction (son KDoc : « le
+                    // format n'est pas connu ici »). Un PDF ouvert une
+                    // deuxième fois restaurait une position au-delà des 5
+                    // pages sondées à l'import (`PdfPublicationParser.
+                    // PROBE_PAGES`) et `PdfChapterParser.parseChapter`
+                    // échouait alors avec `IllegalStateException` (`fileUris`
+                    // jamais renseigné pour ce publicationId) — rattrapée en
+                    // "Impossible de charger ce chapitre." par
+                    // `loadChapterContentIfNeeded`. Le TXT n'est pas
+                    // concerné (chapitre unique déjà entièrement chargé à
+                    // l'import), mais l'enregistrer ne coûte rien de plus
+                    // qu'un `put` en mémoire.
+                    chapterParser.registerPublication(publicationId, publication.fileUri)
                     if (publication.format == PublicationFormat.EPUB) {
-                        chapterParser.registerPublication(publicationId, publication.fileUri)
                         try {
                             epubResourceResolver.open(publicationId, publication.fileUri)
                         } catch (e: CancellationException) {
