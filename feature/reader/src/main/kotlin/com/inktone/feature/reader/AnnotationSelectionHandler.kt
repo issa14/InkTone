@@ -1,5 +1,6 @@
 package com.inktone.feature.reader
 
+import com.inktone.domain.model.BookBlock
 import com.inktone.domain.model.Sentence
 import com.inktone.domain.valueobject.Locator
 
@@ -11,17 +12,52 @@ import com.inktone.domain.valueobject.Locator
  */
 class AnnotationSelectionHandler {
 
+    /**
+     * Lot 21, tâche 6 — `paragraphIndex` renseigné quand les [blocks] du
+     * chapitre sont fournis. `charOffset` reste l'ancre de vérité (jamais
+     * un second système d'adressage) ; `paragraphIndex` renforce la
+     * robustesse (recherche, FTS, reprise partielle). `blocks` vide (ou
+     * paramètre omis) → `paragraphIndex = null`, comportement inchangé
+     * pour les annotations existantes.
+     */
     fun resolveCharRange(
         startOffset: Int,
         endOffsetExclusive: Int,
         chapterIndex: Int,
         resourceHref: String,
+        blocks: List<BookBlock> = emptyList(),
     ): Pair<Locator, Locator>? {
         if (endOffsetExclusive <= startOffset) return null
-        val startLocator = Locator(resourceHref = resourceHref, chapterIndex = chapterIndex, charOffset = startOffset)
-        val endLocator = Locator(resourceHref = resourceHref, chapterIndex = chapterIndex, charOffset = endOffsetExclusive)
+        val startParagraphIndex = blocks.findBlockIndex(startOffset)
+        // Le dernier caractère sélectionné (endOffsetExclusive - 1) : une
+        // sélection à cheval sur deux blocs renseigne le bloc de FIN sur le
+        // Locator de fin, pas celui du début.
+        val endParagraphIndex = blocks.findBlockIndex((endOffsetExclusive - 1).coerceAtLeast(startOffset))
+        val startLocator = Locator(
+            resourceHref = resourceHref, chapterIndex = chapterIndex,
+            charOffset = startOffset, paragraphIndex = startParagraphIndex,
+        )
+        val endLocator = Locator(
+            resourceHref = resourceHref, chapterIndex = chapterIndex,
+            charOffset = endOffsetExclusive, paragraphIndex = endParagraphIndex,
+        )
         return startLocator to endLocator
     }
+}
+
+/**
+ * Lot 21, tâche 6 — index du bloc de texte contenant [charOffset], dans
+ * la liste COMPLÈTE des blocs (même règle que
+ * `JsoupChapterParser.findBlockIndex` : un bloc image/séparateur sans
+ * `globalOffsetRange` ne contient jamais de texte, il est ignoré).
+ * `null` si aucun bloc ne contient l'offset.
+ */
+private fun List<BookBlock>.findBlockIndex(charOffset: Int): Int? {
+    forEachIndexed { index, block ->
+        val range = block.globalOffsetRange
+        if (range != null && charOffset in range) return index
+    }
+    return null
 }
 
 /**

@@ -737,8 +737,12 @@ class ReaderViewModel @Inject constructor(
 
         val freeRange = _state.value.freeSelectionRange ?: return
         val endOffsetExclusive = freeRange.last + 1
+        // Lot 21, tâche 6 — les blocs du chapitre alimentent le
+        // `paragraphIndex` des Locators (renfort, `charOffset` reste
+        // l'ancre de vérité).
+        val blocks = (chapter.content as? ChapterContent.Rich)?.blocks.orEmpty()
         val (startLocator, endLocator) = annotationSelectionHandler.resolveCharRange(
-            freeRange.first, endOffsetExclusive, chapter.index, chapter.href,
+            freeRange.first, endOffsetExclusive, chapter.index, chapter.href, blocks,
         ) ?: return
         val excerpt = sliceChapterText(sentences, freeRange.first, endOffsetExclusive)
             .take(Annotation.MAX_EXCERPT_LENGTH)

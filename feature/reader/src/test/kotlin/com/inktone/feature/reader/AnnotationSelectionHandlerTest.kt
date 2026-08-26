@@ -1,6 +1,8 @@
 package com.inktone.feature.reader
 
+import com.inktone.domain.model.BookBlock
 import com.inktone.domain.model.Sentence
+import com.inktone.domain.model.StyledText
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertNotNull
 import org.junit.Assert.assertNull
@@ -33,6 +35,33 @@ class AnnotationSelectionHandlerTest {
     fun `resolveCharRange retourne null si la borne de fin ne depasse pas le debut`() {
         assertNull(AnnotationSelectionHandler().resolveCharRange(10, 10, 0, "ch1.xhtml"))
         assertNull(AnnotationSelectionHandler().resolveCharRange(10, 5, 0, "ch1.xhtml"))
+    }
+
+    // ───── Lot 21, tâche 6 — paragraphIndex renseigné ─────
+
+    @Test
+    fun `resolveCharRange renseigne paragraphIndex sur une selection a cheval sur deux blocs`() {
+        val blocks = listOf(
+            BookBlock.ParagraphBlock(richText = StyledText.plain("Premier bloc."), globalOffsetRange = 0 until 14),
+            BookBlock.ParagraphBlock(richText = StyledText.plain("Second bloc."), globalOffsetRange = 15 until 28),
+        )
+        // Début dans le bloc 0 (10), fin dans le bloc 1 (19 = dernier
+        // caractère sélectionné, endOffsetExclusive = 20).
+        val result = AnnotationSelectionHandler().resolveCharRange(10, 20, 0, "ch1.xhtml", blocks)
+        assertNotNull(result)
+        assertEquals(0, result!!.first.paragraphIndex)
+        assertEquals(1, result.second.paragraphIndex)
+        // charOffset reste l'ancre de vérité : résolu même avec paragraphIndex.
+        assertEquals(10, result.first.charOffset)
+        assertEquals(20, result.second.charOffset)
+    }
+
+    @Test
+    fun `resolveCharRange sans blocs conserve paragraphIndex nul pour les annotations existantes`() {
+        val result = AnnotationSelectionHandler().resolveCharRange(10, 20, 0, "ch1.xhtml")
+        assertNotNull(result)
+        assertNull(result!!.first.paragraphIndex)
+        assertNull(result.second.paragraphIndex)
     }
 
     @Test
