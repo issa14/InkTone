@@ -33,4 +33,35 @@ class AnnotationColorPickerTest {
             recent.withRecentColor(AnnotationColor.PINK),
         )
     }
+
+    @Test
+    fun `une couleur personnalisee rejoint les couleurs recentes comme les preregles`() {
+        val custom = hexRgbToAnnotationColor("#123456")
+        assertEquals(listOf(custom), emptyList<AnnotationColor>().withRecentColor(custom))
+    }
+}
+
+/**
+ * Lot 23, tâche 10 — `hexRgbToAnnotationColor` : opacité toujours pleine
+ * (`FF`), sensible à la casse hexadécimale (majuscules/minuscules
+ * équivalentes), jamais de couleur translucide pour une annotation.
+ */
+class HexRgbToAnnotationColorTest {
+
+    @Test
+    fun `un hex minuscule et majuscule produit la meme couleur`() {
+        assertEquals(hexRgbToAnnotationColor("#1a2b3c"), hexRgbToAnnotationColor("#1A2B3C"))
+    }
+
+    @Test
+    fun `l'opacite est toujours pleine`() {
+        val color = hexRgbToAnnotationColor("#123456")
+        assertEquals(0xFF, (color.argb ushr 24) and 0xFF)
+    }
+
+    @Test
+    fun `blanc et noir produisent les bornes ARGB attendues`() {
+        assertEquals(0xFFFFFFFF.toInt(), hexRgbToAnnotationColor("#FFFFFF").argb)
+        assertEquals(0xFF000000.toInt(), hexRgbToAnnotationColor("#000000").argb)
+    }
 }
