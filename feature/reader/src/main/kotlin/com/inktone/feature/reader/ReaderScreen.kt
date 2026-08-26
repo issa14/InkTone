@@ -108,6 +108,7 @@ import com.inktone.core.designsystem.WindowBackgroundColorEffect
 import com.inktone.core.designsystem.SystemBarIconsEffect
 import com.inktone.domain.model.Annotation
 import com.inktone.domain.model.AnnotationColor
+import com.inktone.domain.model.Bookmark
 import com.inktone.domain.model.ChapterContent
 import com.inktone.domain.model.PublicationFormat
 import com.inktone.domain.model.ReadingOverrides
@@ -258,6 +259,13 @@ fun ReaderScreen(
             viewModel.onIntent(ReaderIntent.DismissBookmarkNotePrompt)
         }
     }
+
+    // Lot 22, tâche 11 — édition depuis BookmarkPanel : état purement local
+    // à cet écran (contrairement à `pendingBookmarkNoteId`, transient et
+    // sans besoin de survivre à une recomposition du ViewModel), l'élément
+    // en cours d'édition porte lui-même sa note actuelle pour le pré-remplissage.
+    var editingBookmark by remember { mutableStateOf<Bookmark?>(null) }
+    var editingAnnotation by remember { mutableStateOf<Annotation?>(null) }
     // 3d.3 — visibilité locale de la barre de luminosité, même patron que
     // les panneaux ci-dessus : purement une décision d'affichage, pas un
     // état MVI (ReaderUiState.readerBrightness porte la vraie donnée).
@@ -1497,8 +1505,36 @@ fun ReaderScreen(
                         viewModel.onIntent(ReaderIntent.ToggleBookmarkAtCurrentPosition)
                     },
                     onClose = { viewModel.onIntent(ReaderIntent.ToggleBookmarkList) },
+                    onDeleteAnnotation = { annotation -> viewModel.onIntent(ReaderIntent.DeleteAnnotation(annotation.id)) },
+                    onEditAnnotationNote = { annotation -> editingAnnotation = annotation },
+                    onDeleteBookmark = { bookmark -> viewModel.onIntent(ReaderIntent.DeleteBookmark(bookmark.id)) },
+                    onEditBookmarkNote = { bookmark -> editingBookmark = bookmark },
                 )
             }
+        }
+
+        if (editingAnnotation != null) {
+            EditNoteDialog(
+                title = "Modifier la note",
+                initialNote = editingAnnotation?.content.orEmpty(),
+                onSave = { note ->
+                    viewModel.onIntent(ReaderIntent.UpdateAnnotationNote(editingAnnotation!!.id, note.trim().ifBlank { null }))
+                    editingAnnotation = null
+                },
+                onDismiss = { editingAnnotation = null },
+            )
+        }
+
+        if (editingBookmark != null) {
+            EditNoteDialog(
+                title = "Modifier la note",
+                initialNote = editingBookmark?.note.orEmpty(),
+                onSave = { note ->
+                    viewModel.onIntent(ReaderIntent.EditBookmarkNote(editingBookmark!!.id, note))
+                    editingBookmark = null
+                },
+                onDismiss = { editingBookmark = null },
+            )
         }
 
         // Lot 21, tâche 5 (corrigé) — saisie de note OPTIONNELLE : n'apparaît
@@ -1651,6 +1687,40 @@ private fun ErrorState(message: String, onRetry: () -> Unit, onBack: () -> Unit)
  * bloque jamais le geste — fermer (« Plus tard », tap hors champ) laisse
  * le signet sans note. La note vide est enregistrée comme `null`.
  */
+@Composable
+/**
+ * Lot 22, tâche 11 — dialogue d'édition générique (annotation ou signet),
+ * distinct de [BookmarkNoteDialog] : celui-ci ÉDITE une note déjà posée
+ * (pré-remplie), quand [BookmarkNoteDialog] PROPOSE d'en ajouter une juste
+ * après création (jamais pré-rempli, boutons différents).
+ */
+@Composable
+private fun EditNoteDialog(
+    title: String,
+    initialNote: String,
+    onSave: (String) -> Unit,
+    onDismiss: () -> Unit,
+) {
+    var note by remember { mutableStateOf(initialNote) }
+    androidx.compose.material3.AlertDialog(
+        onDismissRequest = onDismiss,
+        title = { Text(title) },
+        text = {
+            OutlinedTextField(
+                value = note,
+                onValueChange = { note = it },
+                modifier = Modifier.fillMaxWidth(),
+            )
+        },
+        confirmButton = {
+            TextButton(onClick = { onSave(note) }) { Text("Enregistrer") }
+        },
+        dismissButton = {
+            TextButton(onClick = onDismiss) { Text("Annuler") }
+        },
+    )
+}
+
 @Composable
 private fun BookmarkNoteDialog(
     onSave: (String) -> Unit,

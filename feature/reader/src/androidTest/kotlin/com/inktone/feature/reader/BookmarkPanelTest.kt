@@ -56,6 +56,10 @@ class BookmarkPanelTest {
                 onAnnotationClick = {},
                 onToggleBookmark = {},
                 onClose = {},
+                onDeleteAnnotation = {},
+                onEditAnnotationNote = {},
+                onDeleteBookmark = {},
+                onEditBookmarkNote = {},
             )
         }
 
@@ -83,6 +87,10 @@ class BookmarkPanelTest {
                 onAnnotationClick = {},
                 onToggleBookmark = { toggled = true },
                 onClose = {},
+                onDeleteAnnotation = {},
+                onEditAnnotationNote = {},
+                onDeleteBookmark = {},
+                onEditBookmarkNote = {},
             )
         }
 
@@ -102,6 +110,10 @@ class BookmarkPanelTest {
                 onAnnotationClick = {},
                 onToggleBookmark = {},
                 onClose = {},
+                onDeleteAnnotation = {},
+                onEditAnnotationNote = {},
+                onDeleteBookmark = {},
+                onEditBookmarkNote = {},
             )
         }
 
@@ -121,11 +133,133 @@ class BookmarkPanelTest {
                 onAnnotationClick = {},
                 onToggleBookmark = {},
                 onClose = { closed = true },
+                onDeleteAnnotation = {},
+                onEditAnnotationNote = {},
+                onDeleteBookmark = {},
+                onEditBookmarkNote = {},
             )
         }
 
         composeTestRule.onNodeWithText("Marque-pages et notes").assertExists()
         composeTestRule.onNodeWithContentDescription("Fermer les marque-pages").performClick()
         assertEquals(true, closed)
+    }
+
+    @Test
+    fun supprimer_une_note_declenche_onDeleteAnnotation() {
+        var deletedId: String? = null
+        composeTestRule.setContent {
+            BookmarkPanel(
+                bookmarks = emptyList(),
+                annotations = listOf(highlightWithNote()),
+                isCurrentPageBookmarked = false,
+                onBookmarkClick = {},
+                onAnnotationClick = {},
+                onToggleBookmark = {},
+                onClose = {},
+                onDeleteAnnotation = { deletedId = it.id },
+                onEditAnnotationNote = {},
+                onDeleteBookmark = {},
+                onEditBookmarkNote = {},
+            )
+        }
+
+        composeTestRule.onNodeWithContentDescription("Supprimer la note").performClick()
+        assertEquals("note-1", deletedId)
+    }
+
+    @Test
+    fun modifier_une_note_declenche_onEditAnnotationNote() {
+        var editedId: String? = null
+        composeTestRule.setContent {
+            BookmarkPanel(
+                bookmarks = emptyList(),
+                annotations = listOf(highlightWithNote()),
+                isCurrentPageBookmarked = false,
+                onBookmarkClick = {},
+                onAnnotationClick = {},
+                onToggleBookmark = {},
+                onClose = {},
+                onDeleteAnnotation = {},
+                onEditAnnotationNote = { editedId = it.id },
+                onDeleteBookmark = {},
+                onEditBookmarkNote = {},
+            )
+        }
+
+        composeTestRule.onNodeWithContentDescription("Modifier la note").performClick()
+        assertEquals("note-1", editedId)
+    }
+
+    @Test
+    fun supprimer_un_surlignage_declenche_onDeleteAnnotation() {
+        var deletedId: String? = null
+        composeTestRule.setContent {
+            BookmarkPanel(
+                bookmarks = emptyList(),
+                annotations = listOf(highlightWithoutNote()),
+                isCurrentPageBookmarked = false,
+                onBookmarkClick = {},
+                onAnnotationClick = {},
+                onToggleBookmark = {},
+                onClose = {},
+                onDeleteAnnotation = { deletedId = it.id },
+                onEditAnnotationNote = {},
+                onDeleteBookmark = {},
+                onEditBookmarkNote = {},
+            )
+        }
+
+        composeTestRule.onNodeWithText("Surlignages").performClick()
+        composeTestRule.onNodeWithContentDescription("Supprimer le surlignage").performClick()
+        assertEquals("highlight-1", deletedId)
+    }
+
+    @Test
+    fun supprimer_un_marque_page_declenche_onDeleteBookmark() {
+        var deletedId: String? = null
+        composeTestRule.setContent {
+            BookmarkPanel(
+                bookmarks = listOf(oneBookmark()),
+                annotations = emptyList(),
+                isCurrentPageBookmarked = false,
+                onBookmarkClick = {},
+                onAnnotationClick = {},
+                onToggleBookmark = {},
+                onClose = {},
+                onDeleteAnnotation = {},
+                onEditAnnotationNote = {},
+                onDeleteBookmark = { deletedId = it.id },
+                onEditBookmarkNote = {},
+            )
+        }
+
+        composeTestRule.onNodeWithText("Marque-pages").performClick()
+        composeTestRule.onNodeWithContentDescription("Supprimer le marque-page").performClick()
+        assertEquals("bookmark-1", deletedId)
+    }
+
+    @Test
+    fun modifier_un_marque_page_declenche_onEditBookmarkNote() {
+        var editedId: String? = null
+        composeTestRule.setContent {
+            BookmarkPanel(
+                bookmarks = listOf(oneBookmark()),
+                annotations = emptyList(),
+                isCurrentPageBookmarked = false,
+                onBookmarkClick = {},
+                onAnnotationClick = {},
+                onToggleBookmark = {},
+                onClose = {},
+                onDeleteAnnotation = {},
+                onEditAnnotationNote = {},
+                onDeleteBookmark = {},
+                onEditBookmarkNote = { editedId = it.id },
+            )
+        }
+
+        composeTestRule.onNodeWithText("Marque-pages").performClick()
+        composeTestRule.onNodeWithContentDescription("Modifier la note").performClick()
+        assertEquals("bookmark-1", editedId)
     }
 }

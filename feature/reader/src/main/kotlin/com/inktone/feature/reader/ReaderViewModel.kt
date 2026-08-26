@@ -45,7 +45,9 @@ import com.inktone.domain.service.TtsEngine
 import com.inktone.domain.service.WordTimestamp
 import com.inktone.domain.usecase.AddAnnotationUseCase
 import com.inktone.domain.usecase.CreateBookmarkUseCase
+import com.inktone.domain.usecase.DeleteAnnotationUseCase
 import com.inktone.domain.usecase.DeleteBookmarkUseCase
+import com.inktone.domain.usecase.UpdateAnnotationUseCase
 import com.inktone.domain.usecase.UpdateBookmarkNoteUseCase
 import com.inktone.domain.usecase.GetReadingStateUseCase
 import com.inktone.domain.usecase.GetVoiceProfilesUseCase
@@ -85,6 +87,12 @@ class ReaderViewModel @Inject constructor(
     private val getVoiceProfiles: GetVoiceProfilesUseCase,
     private val annotationRepository: AnnotationRepository,
     private val addAnnotation: AddAnnotationUseCase,
+    // Lot 22, tâche 11 — édition de note et suppression depuis
+    // `BookmarkPanel` ; même patron que updateBookmarkNote (valeur par
+    // défaut pour ne pas casser les tests qui construisent ce ViewModel
+    // sans passer ces paramètres).
+    private val updateAnnotation: UpdateAnnotationUseCase = UpdateAnnotationUseCase(annotationRepository),
+    private val deleteAnnotation: DeleteAnnotationUseCase = DeleteAnnotationUseCase(annotationRepository),
     private val bookmarkRepository: BookmarkRepository,
     private val createBookmark: CreateBookmarkUseCase,
     private val deleteBookmark: DeleteBookmarkUseCase,
@@ -347,6 +355,11 @@ class ReaderViewModel @Inject constructor(
             is ReaderIntent.DeleteBookmark -> viewModelScope.launch { deleteBookmark(intent.id) }
             is ReaderIntent.SaveBookmarkNote -> saveBookmarkNote(intent.note)
             is ReaderIntent.DismissBookmarkNotePrompt -> _state.value = _state.value.copy(pendingBookmarkNoteId = null)
+            is ReaderIntent.EditBookmarkNote -> viewModelScope.launch {
+                updateBookmarkNote(intent.id, intent.note.trim().ifBlank { null })
+            }
+            is ReaderIntent.DeleteAnnotation -> viewModelScope.launch { deleteAnnotation(intent.id) }
+            is ReaderIntent.UpdateAnnotationNote -> updateAnnotationNote(intent.id, intent.content)
             is ReaderIntent.NavigateToLocator -> navigateToLocator(intent.locator)
             is ReaderIntent.ChapterLayoutCompleted -> onChapterLayoutCompleted(intent.chapterIndex)
             is ReaderIntent.SetOverrides -> setOverrides(intent.overrides)
@@ -913,6 +926,20 @@ class ReaderViewModel @Inject constructor(
         if (_state.value.bookmarks.none { it.id == bookmarkId }) return
         viewModelScope.launch {
             updateBookmarkNote(bookmarkId, note.trim().ifBlank { null })
+        }
+    }
+
+    /**
+     * Lot 22, tâche 11 — édition de note depuis `BookmarkPanel` (onglet
+     * Notes). Préserve tous les autres champs de l'annotation ; met à
+     * jour `updatedAt`. Sans effet si l'annotation a été supprimée entre
+     * l'affichage du panneau et la confirmation (même garde que
+     * [saveBookmarkNote]).
+     */
+    private fun updateAnnotationNote(id: String, content: String?) {
+        val existing = _state.value.annotations.firstOrNull { it.id == id } ?: return
+        viewModelScope.launch {
+            updateAnnotation(existing.copy(content = content, updatedAt = System.currentTimeMillis()))
         }
     }
 
