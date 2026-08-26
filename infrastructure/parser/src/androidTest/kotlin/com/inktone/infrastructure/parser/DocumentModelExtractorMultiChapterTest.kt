@@ -3,6 +3,8 @@ package com.inktone.infrastructure.parser
 import android.content.Context
 import androidx.test.core.app.ApplicationProvider
 import androidx.test.ext.junit.runners.AndroidJUnit4
+import com.inktone.core.testing.fake.FakePreAnalysisStore
+import com.inktone.core.testing.fake.FakePublicationRepository
 import com.inktone.domain.service.ParseResult
 import kotlinx.coroutines.test.runTest
 import org.junit.Assert.assertEquals
@@ -36,7 +38,7 @@ class DocumentModelExtractorMultiChapterTest {
 
         assertEquals("le fixture a 3 chapitres", 3, shells.size)
 
-        val chapterParser = EpubChapterParser(ReadiumPublicationRegistry(context), JsoupChapterParser())
+        val chapterParser = EpubChapterParser(ReadiumPublicationRegistry(context), JsoupChapterParser(), FakePreAnalysisStore(), FakePublicationRepository())
         chapterParser.registerPublication("test-multi-chapitre", fixtureFile.absolutePath)
         val chapters = shells.map { shell -> chapterParser.parseChapter("test-multi-chapitre", shell.href) }
 

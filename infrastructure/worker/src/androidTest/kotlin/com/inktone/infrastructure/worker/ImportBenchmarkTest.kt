@@ -7,6 +7,7 @@ import androidx.room.RoomDatabase
 import androidx.test.core.app.ApplicationProvider
 import androidx.test.ext.junit.runners.AndroidJUnit4
 import com.inktone.data.repository.RoomPublicationRepository
+import com.inktone.core.testing.fake.FakePreAnalysisStore
 import com.inktone.domain.usecase.ImportPublicationUseCase
 import com.inktone.domain.usecase.ImportResult
 import com.inktone.infrastructure.database.InkToneDatabase
@@ -100,7 +101,7 @@ class ImportBenchmarkTest {
             // Plan v3 : l'indexation EPUB passe par ChapterParser (parsing
             // paresseux, D2) - le vrai EpubChapterParser ici aussi, pour la
             // meme raison que RoomSearchService ci-dessus (mesurer le vrai cout).
-            chapterParser = EpubChapterParser(ReadiumPublicationRegistry(context), JsoupChapterParser()),
+            chapterParser = EpubChapterParser(ReadiumPublicationRegistry(context), JsoupChapterParser(), FakePreAnalysisStore(), RoomPublicationRepository(db.publicationDao())),
         )
 
         var successCount = 0
