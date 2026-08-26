@@ -15,6 +15,16 @@ interface TtsEngine {
     val id: TtsEngineId
     val capabilities: TtsCapabilities
 
+    /**
+     * Version de la sortie de synthèse — entre dans la clé du cache TTS
+     * (Lot 22, Palier B). Tout changement du pipeline de synthèse qui
+     * modifie l'audio produit (prosodie, phonémisation, modèle) DOIT
+     * incrémenter cette valeur : un cache périmé servirait un surlignage
+     * faux (ADR-021). Défaut `1` : les moteurs dont la sortie est stable
+     * n'ont rien à surcharger.
+     */
+    val synthesisVersion: Int get() = 1
+
     suspend fun synthesize(sentence: Sentence, voiceProfile: VoiceProfile): AudioSegment
 
     /** Événements de progression pendant la lecture d'un segment (§8.9). */

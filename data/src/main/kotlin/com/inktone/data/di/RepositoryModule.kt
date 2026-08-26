@@ -21,6 +21,7 @@ import com.inktone.data.repository.RoomSyncAccountRepository
 import com.inktone.data.repository.RoomThemeRepository
 import com.inktone.data.repository.RoomVoiceProfileRepository
 import com.inktone.data.sync.SyncNowManager
+import com.inktone.data.ttscache.TtsSegmentCacheImpl
 import com.inktone.domain.repository.AnnotationRepository
 import com.inktone.domain.repository.BookmarkRepository
 import com.inktone.domain.repository.ConflictQueueRepository
@@ -41,6 +42,7 @@ import com.inktone.domain.service.OpdsDownloadObserver
 import com.inktone.domain.service.PreAnalysisStore
 import com.inktone.domain.service.SyncNowService
 import com.inktone.domain.service.SyncOperationTracker
+import com.inktone.domain.service.TtsSegmentCache
 import dagger.Binds
 import dagger.Module
 import dagger.Provides
@@ -73,6 +75,7 @@ abstract class RepositoryModule {
     @Binds @Singleton abstract fun bindOpdsDownloadObserver(impl: InMemoryOpdsDownloadObserver): OpdsDownloadObserver
     @Binds @Singleton abstract fun bindOpdsCatalogRepository(impl: RoomOpdsCatalogRepository): OpdsCatalogRepository
     @Binds @Singleton abstract fun bindPreAnalysisStore(impl: FilePreAnalysisStore): PreAnalysisStore
+    @Binds @Singleton abstract fun bindTtsSegmentCache(impl: TtsSegmentCacheImpl): TtsSegmentCache
 
     companion object {
         @Provides
