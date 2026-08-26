@@ -3,6 +3,8 @@ package com.inktone.infrastructure.parser
 import android.content.Context
 import androidx.test.core.app.ApplicationProvider
 import androidx.test.ext.junit.runners.AndroidJUnit4
+import com.inktone.core.testing.fake.FakePreAnalysisStore
+import com.inktone.core.testing.fake.FakePublicationRepository
 import com.inktone.domain.model.BookBlock
 import com.inktone.domain.model.ChapterContent
 import kotlinx.coroutines.test.runTest
@@ -59,7 +61,7 @@ class EpubChapterParserBinaryImageTest {
             ),
         )
 
-        val chapterParser = EpubChapterParser(ReadiumPublicationRegistry(context), JsoupChapterParser())
+        val chapterParser = EpubChapterParser(ReadiumPublicationRegistry(context), JsoupChapterParser(), FakePreAnalysisStore(), FakePublicationRepository())
         chapterParser.registerPublication("test-image-spine", epubFile.absolutePath)
 
         val imageChapter = chapterParser.parseChapter("test-image-spine", "OEBPS/cover.jpg")
