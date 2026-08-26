@@ -154,7 +154,8 @@ object UseCaseModule {
     @Provides
     fun provideDeletePublicationUseCase(
         publicationRepository: PublicationRepository,
-    ): DeletePublicationUseCase = DeletePublicationUseCase(publicationRepository)
+        preAnalysisStore: PreAnalysisStore,
+    ): DeletePublicationUseCase = DeletePublicationUseCase(publicationRepository, preAnalysisStore)
 
     @Provides
     fun provideRegenerateCoversUseCase(
