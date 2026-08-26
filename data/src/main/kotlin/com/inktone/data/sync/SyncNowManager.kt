@@ -15,6 +15,7 @@ import com.inktone.domain.repository.ConflictQueueRepository
 import com.inktone.domain.repository.DeviceIdentityRepository
 import com.inktone.domain.repository.PronunciationRuleRepository
 import com.inktone.domain.repository.PublicationRepository
+import com.inktone.domain.repository.ReadingSessionRepository
 import com.inktone.domain.repository.ReadingStateRepository
 import com.inktone.domain.repository.SyncAccountRepository
 import com.inktone.domain.repository.SyncActivityLogRepository
@@ -66,6 +67,7 @@ class SyncNowManager @Inject constructor(
     private val annotationRepository: AnnotationRepository,
     private val pronunciationRuleRepository: PronunciationRuleRepository,
     private val themeRepository: ThemeRepository,
+    private val readingSessionRepository: ReadingSessionRepository,
     private val readingStateRepository: ReadingStateRepository,
     private val publicationRepository: PublicationRepository,
     private val conflictQueueRepository: ConflictQueueRepository,
@@ -123,7 +125,12 @@ class SyncNowManager @Inject constructor(
         val fleetLabels = syncFleetRepository.listDevices().associate { it.deviceId to it.displayName }
         val localBookmarkIds = bookmarkRepository.observeAll().first().map { it.id }.toMutableSet()
         val localAnnotationIds = annotationRepository.getAll().map { it.id }.toMutableSet()
+        // Lot 22, tâche 13 — union des sessions par clé primaire (id stable),
+        // idempotente par construction : on ne réinsère jamais un id déjà
+        // local, d'où aucune agrégation à écrire.
+        val localSessionIds = readingSessionRepository.getAll().map { it.id }.toMutableSet()
         val pendingConflictPublicationIds = conflictQueueRepository.listPending().map { it.publicationId }.toMutableSet()
+        var skippedOrphanSessions = 0
 
         for (file in remoteFiles) {
             val bytes = syncProvider.download(file.name) ?: continue
@@ -147,6 +154,22 @@ class SyncNowManager @Inject constructor(
             // Réglages/thèmes : dernier écrit gagne (REPLACE au niveau DAO).
             payload.pronunciationRules.forEach { pronunciationRuleRepository.save(it.toDomain()) }
             payload.customThemes.forEach { themeRepository.saveCustom(it.toDomain()) }
+
+            // Lot 22, tâche 13 — sessions de lecture : union par identifiant.
+            // Une session dont la publication est absente en local est IGNORÉE
+            // et journalisée (décision 6), jamais insérée — insérer violerait
+            // la clé étrangère CASCADE vers publications. Ne jamais conflater
+            // ReadingSession (historique, N par livre) et ReadingState
+            // (position, 1 par livre).
+            payload.readingSessions.forEach { backup ->
+                if (backup.id in localSessionIds) return@forEach
+                if (publicationRepository.getById(backup.publicationId) == null) {
+                    skippedOrphanSessions++
+                    return@forEach
+                }
+                readingSessionRepository.insert(backup.toDomain())
+                localSessionIds += backup.id
+            }
 
             // Position de lecture — jamais fusionnée ni tranchée ici.
             payload.readingStates.forEach { remoteBackup ->
@@ -175,6 +198,20 @@ class SyncNowManager @Inject constructor(
                     pendingConflictPublicationIds += remoteBackup.publicationId
                 }
             }
+        }
+
+        // Journalise les sessions orphelines ignorées — jamais silencieux
+        // (décision 6), mais en un seul événement pour ne pas saturer le
+        // journal d'une synchro à l'autre.
+        if (skippedOrphanSessions > 0) {
+            syncActivityLogRepository.appendEvent(
+                SyncActivityEvent(
+                    UUID.randomUUID().toString(),
+                    SyncActivityEventType.SUCCESS,
+                    "$skippedOrphanSessions session(s) de lecture ignorée(s) : livre absent localement",
+                    System.currentTimeMillis(),
+                ),
+            )
         }
     }
 }
