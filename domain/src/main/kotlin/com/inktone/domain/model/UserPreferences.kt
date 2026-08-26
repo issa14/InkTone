@@ -150,4 +150,13 @@ data class UserPreferences(
     }
 }
 
-enum class FontFamily { DEFAULT, OPEN_DYSLEXIC, SERIF, SANS_SERIF }
+/**
+ * Famille de police persistée en préférence (`UserPreferences.fontFamily`)
+ * : une valeur ajoutée ne se retire plus (Lot 21, décision 2 — les thèmes
+ * et préréglages existants peuvent s'en servir, une valeur manquante à la
+ * lecture d'une vieille préférence planterait la restauration).
+ *
+ * `SOURCE_SERIF` = Source Serif 4 (OFL), police de lecture française à
+ * empattements (Lot 21, tâche 10).
+ */
+enum class FontFamily { DEFAULT, OPEN_DYSLEXIC, SERIF, SANS_SERIF, SOURCE_SERIF }

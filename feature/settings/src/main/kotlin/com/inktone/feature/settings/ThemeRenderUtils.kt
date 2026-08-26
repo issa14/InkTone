@@ -2,6 +2,7 @@ package com.inktone.feature.settings
 
 import androidx.compose.ui.text.font.FontFamily as ComposeFontFamily
 import com.inktone.core.designsystem.OpenDyslexicFamily
+import com.inktone.core.designsystem.SourceSerifFamily
 import com.inktone.domain.model.FontFamily as DomainFontFamily
 
 /**
@@ -20,4 +21,6 @@ internal fun DomainFontFamily.toComposeFontFamily(): ComposeFontFamily = when (t
     DomainFontFamily.SERIF -> ComposeFontFamily.Serif
     DomainFontFamily.SANS_SERIF -> ComposeFontFamily.SansSerif
     DomainFontFamily.OPEN_DYSLEXIC -> OpenDyslexicFamily
+    // Lot 21, tâche 10 — Source Serif 4 (OFL), même famille que le Lecteur.
+    DomainFontFamily.SOURCE_SERIF -> SourceSerifFamily
 }

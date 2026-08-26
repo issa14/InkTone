@@ -3,6 +3,7 @@ package com.inktone.feature.reader
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.text.font.FontFamily as ComposeFontFamily
 import com.inktone.core.designsystem.OpenDyslexicFamily
+import com.inktone.core.designsystem.SourceSerifFamily
 import com.inktone.core.designsystem.toColor
 import com.inktone.domain.model.EffectiveReadingSettings
 import com.inktone.domain.model.FontFamily as DomainFontFamily
@@ -66,5 +67,8 @@ object ThemeColors {
         // de repli silencieux en SansSerif (écart intention↔code constaté
         // dans STRATEGIE_PERF_UX_INSPIREE_MOONREADER.md, lot 21 tâche 1).
         DomainFontFamily.OPEN_DYSLEXIC -> OpenDyslexicFamily
+        // Lot 21, tâche 10 — Source Serif 4 (OFL), police de lecture
+        // française à empattements.
+        DomainFontFamily.SOURCE_SERIF -> SourceSerifFamily
     }
 }

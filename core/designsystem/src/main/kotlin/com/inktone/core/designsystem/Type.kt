@@ -16,6 +16,21 @@ import androidx.compose.ui.unit.sp
  */
 val OpenDyslexicFamily: FontFamily = FontFamily(Font(R.font.opendyslexic_regular))
 
+/**
+ * Source Serif 4 variable (OFL 1.1, github.com/adobe-fonts/source-serif) —
+ * police de lecture française à empattements (Lot 21, tâche 10). Axes
+ * `wght` + `opsz`, 4 poids fonctionnels : 400/500/600/700.
+ */
+@OptIn(ExperimentalTextApi::class)
+private fun sourceSerif(w: Int) = Font(
+    R.font.source_serif4_variable,
+    weight = FontWeight(w),
+    variationSettings = FontVariation.Settings(FontVariation.weight(w)),
+)
+
+/** Police de lecture à empattements dédiée au français (Lot 21). */
+val SourceSerifFamily: FontFamily = FontFamily(sourceSerif(400), sourceSerif(500), sourceSerif(600), sourceSerif(700))
+
 // --- Sous-lot 2b — typographie de marque ---
 
 /** Work Sans variable (OFL 1.1, github.com/weiweihuanghuang/Work-Sans).
