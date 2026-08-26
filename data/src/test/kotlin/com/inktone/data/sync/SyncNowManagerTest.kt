@@ -22,7 +22,9 @@ import com.inktone.domain.model.DeviceIdentity
 import com.inktone.domain.model.Publication
 import com.inktone.domain.model.PublicationFormat
 import com.inktone.domain.model.ReadingState
+import com.inktone.domain.model.SyncAccount
 import com.inktone.domain.model.SyncActivityEventType
+import com.inktone.domain.model.SyncProviderId
 import com.inktone.domain.repository.AnnotationRepository
 import com.inktone.domain.repository.BookmarkRepository
 import com.inktone.domain.repository.PublicationRepository
@@ -343,5 +345,69 @@ class SyncNowManagerTest {
         // Jamais insérée (violerait la clé étrangère), mais journalisée.
         assertTrue(readingSessionRepository.getAll().isEmpty())
         assertTrue(fixture.activityLogRepository.listEvents().any { it.message.contains("ignorée") })
+    }
+
+    @Test
+    fun synchronizeNow_adopte_la_position_distante_quand_seul_le_distant_a_bouge() = runTest {
+        val syncProvider = FakeSyncProvider()
+        val publicationRepository = FakePublicationRepository().apply { insert(publication("pub-1")) }
+        val readingStateRepository = FakeReadingStateRepository().apply {
+            save(ReadingState("pub-1", Locator("ch1.xhtml", 1, null, 0), lastReadAt = 50L))
+        }
+        val syncAccountRepository = FakeSyncAccountRepository().apply {
+            save(SyncAccount(SyncProviderId.GOOGLE_DRIVE, "compte", linkedAt = 0L, lastSyncAt = 100L))
+        }
+        val remotePayload = com.inktone.data.backup.BackupPayload(
+            appVersion = "sync", createdAt = 0L, bookmarks = emptyList(), pronunciationRules = emptyList(),
+            readingStates = listOf(
+                com.inktone.data.backup.ReadingStateBackup(
+                    publicationId = "pub-1", locator = com.inktone.data.backup.LocatorBackup("ch8.xhtml", 8, null, 0), lastReadAt = 200L,
+                ),
+            ),
+            readingSessions = emptyList(), annotations = emptyList(),
+        )
+        syncProvider.upload("snapshot-device-b.json", backupJson.encodeToString(remotePayload).encodeToByteArray())
+        val fixture = Fixture(
+            syncProvider = syncProvider, publicationRepository = publicationRepository,
+            readingStateRepository = readingStateRepository, syncAccountRepository = syncAccountRepository,
+        )
+
+        fixture.manager.synchronizeNow()
+
+        // Seul le distant a bougé depuis la dernière synchro : adopté, pas de conflit.
+        assertEquals(8, readingStateRepository.get("pub-1")?.locator?.chapterIndex)
+        assertTrue(fixture.conflictQueueRepository.listPending().isEmpty())
+    }
+
+    @Test
+    fun synchronizeNow_garde_la_position_locale_quand_seul_le_local_a_bouge() = runTest {
+        val syncProvider = FakeSyncProvider()
+        val publicationRepository = FakePublicationRepository().apply { insert(publication("pub-1")) }
+        val readingStateRepository = FakeReadingStateRepository().apply {
+            save(ReadingState("pub-1", Locator("ch4.xhtml", 4, null, 0), lastReadAt = 150L))
+        }
+        val syncAccountRepository = FakeSyncAccountRepository().apply {
+            save(SyncAccount(SyncProviderId.GOOGLE_DRIVE, "compte", linkedAt = 0L, lastSyncAt = 100L))
+        }
+        val remotePayload = com.inktone.data.backup.BackupPayload(
+            appVersion = "sync", createdAt = 0L, bookmarks = emptyList(), pronunciationRules = emptyList(),
+            readingStates = listOf(
+                com.inktone.data.backup.ReadingStateBackup(
+                    publicationId = "pub-1", locator = com.inktone.data.backup.LocatorBackup("ch1.xhtml", 1, null, 0), lastReadAt = 50L,
+                ),
+            ),
+            readingSessions = emptyList(), annotations = emptyList(),
+        )
+        syncProvider.upload("snapshot-device-b.json", backupJson.encodeToString(remotePayload).encodeToByteArray())
+        val fixture = Fixture(
+            syncProvider = syncProvider, publicationRepository = publicationRepository,
+            readingStateRepository = readingStateRepository, syncAccountRepository = syncAccountRepository,
+        )
+
+        fixture.manager.synchronizeNow()
+
+        // Seul le local a bougé : il fait foi, pas d'écrasement, pas de conflit.
+        assertEquals(4, readingStateRepository.get("pub-1")?.locator?.chapterIndex)
+        assertTrue(fixture.conflictQueueRepository.listPending().isEmpty())
     }
 }
