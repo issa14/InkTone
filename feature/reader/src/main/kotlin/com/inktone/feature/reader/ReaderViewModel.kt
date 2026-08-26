@@ -6,6 +6,7 @@ import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.inktone.domain.model.Annotation
 import com.inktone.domain.model.AnnotationColor
+import com.inktone.domain.model.AnnotationKind
 import com.inktone.domain.model.BookBlock
 import com.inktone.domain.model.Bookmark
 import com.inktone.domain.model.ChapterContent
@@ -348,7 +349,7 @@ class ReaderViewModel @Inject constructor(
             is ReaderIntent.ClearFreeSelection -> _state.value = _state.value.copy(
                 freeSelectionAnchorOffset = null, freeSelectionFocusOffset = null,
             )
-            is ReaderIntent.ConfirmAnnotation -> confirmAnnotation(intent.color, intent.content)
+            is ReaderIntent.ConfirmAnnotation -> confirmAnnotation(intent.color, intent.kind, intent.content)
             is ReaderIntent.ToggleBookmarkAtCurrentPosition -> toggleBookmarkAtCurrentPosition()
             is ReaderIntent.ToggleBookmarkList -> _state.value = _state.value.copy(
                 isBookmarkListVisible = !_state.value.isBookmarkListVisible,
@@ -786,7 +787,7 @@ class ReaderViewModel @Inject constructor(
      * Ne jamais déplacer ces lignes dans le `viewModelScope.launch`
      * ci-dessous (garde-fou : `ReaderViewModelFreeSelectionTest`).
      */
-    private fun confirmAnnotation(color: AnnotationColor, content: String? = null) {
+    private fun confirmAnnotation(color: AnnotationColor, kind: AnnotationKind = AnnotationKind.HIGHLIGHT, content: String? = null) {
         val chapter = _state.value.currentChapter ?: return
         val publicationId = currentPublicationId ?: return
         val sentences = chapter.sentences
@@ -812,6 +813,7 @@ class ReaderViewModel @Inject constructor(
                     startLocator = startLocator,
                     endLocator = endLocator,
                     color = color,
+                    kind = kind,
                     content = content,
                     excerpt = excerpt,
                     createdAt = now,
