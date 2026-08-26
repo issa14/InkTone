@@ -1015,6 +1015,14 @@ fun ReaderScreen(
                     clearSelectionAndPopup()
                 },
                 onDismiss = { clearSelectionAndPopup() },
+                // Lot 21, tâche 7 — contexte du partage : titre — auteur —
+                // chapitre courant. Toujours au moins le chapitre, donc
+                // jamais vide.
+                shareContext = buildList {
+                    state.title?.takeIf { it.isNotBlank() }?.let(::add)
+                    state.author?.takeIf { it.isNotBlank() }?.let(::add)
+                    add(state.currentChapter?.title ?: "Chapitre ${state.currentChapterIndex + 1}")
+                }.joinToString(" — "),
             )
         }
 
