@@ -59,5 +59,7 @@ Paramètres : `wght 400`, `GRAD 0`, `opsz 24`, grille 24dp.
 | `symbol_accessibility` | `accessibility` | `ic_symbol_accessibility.xml` | `—` | Non |
 | `symbol_pronunciation` | `record_voice_over` | `ic_symbol_pronunciation.xml` | `—` | Non |
 | `symbol_add_circle` | `add_circle` | `ic_symbol_add_circle.xml` | `—` | Non |
+| `symbol_underline` | `format_underlined` | `ic_symbol_underline.xml` | `—` | Non |
+| `symbol_strikethrough` | `strikethrough_s` | `ic_symbol_strikethrough.xml` | `—` | Non |
 
-**Total** : 53 icônes générées.
+**Total** : 55 icônes générées (2 ajoutées au Lot 23, tâche 5).
