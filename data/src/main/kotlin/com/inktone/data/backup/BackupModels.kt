@@ -11,6 +11,7 @@ import com.inktone.domain.model.ReadingOverrides
 import com.inktone.domain.model.ReadingSession
 import com.inktone.domain.model.ReadingState
 import com.inktone.domain.model.ReadingTheme
+import com.inktone.domain.model.toHex
 import com.inktone.domain.valueobject.Locator
 import kotlinx.serialization.Serializable
 
@@ -156,12 +157,15 @@ fun CustomThemeBackup.toDomain(): ReadingTheme = ReadingTheme(
 
 fun Annotation.toBackup(): AnnotationBackup = AnnotationBackup(
     id, publicationId, startLocator.toBackup(), endLocator.toBackup(),
-    color.name, kind.name, content, excerpt, isPinned, createdAt, updatedAt,
+    color.toHex(), kind.name, content, excerpt, isPinned, createdAt, updatedAt,
 )
 fun AnnotationBackup.toDomain(): Annotation = Annotation(
     id = id, publicationId = publicationId,
     startLocator = startLocator.toDomain(), endLocator = endLocator.toDomain(),
-    color = AnnotationColor.valueOf(color), kind = AnnotationKind.valueOf(kind), content = content, excerpt = excerpt,
+    // Lot 23, décision 7 — `AnnotationColor.parse` lit aussi bien un ancien
+    // nom d'enum (sauvegarde antérieure à ce Lot) qu'un hex courant : une
+    // sauvegarde plus ancienne reste restaurable sans erreur.
+    color = AnnotationColor.parse(color), kind = AnnotationKind.valueOf(kind), content = content, excerpt = excerpt,
     isPinned = isPinned, createdAt = createdAt, updatedAt = updatedAt,
 )
 

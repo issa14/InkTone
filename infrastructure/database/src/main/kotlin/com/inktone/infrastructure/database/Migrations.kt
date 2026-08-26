@@ -465,3 +465,41 @@ val MIGRATION_29_30 = object : Migration(29, 30) {
         db.execSQL("ALTER TABLE user_preferences ADD COLUMN recentAnnotationColors TEXT NOT NULL DEFAULT ''")
     }
 }
+
+/**
+ * Lot 23, Palier A — `AnnotationColor` passe d'un enum fermé à 5 valeurs à
+ * une couleur ARGB libre (décision 6). La colonne `annotations.color` reste
+ * `TEXT`, mais son contenu passe d'un nom d'enum (`"YELLOW"`) à un hex
+ * `#AARRGGBB` — mêmes teintes exactes que l'ancien enum
+ * (`AnnotationColor.toComposeColor()` avant ce Lot) : **aucune annotation
+ * existante ne change de couleur visuellement**. `recentAnnotationColors`
+ * (Lot 22, tâche 12) subit la même réécriture, entrée par entrée dans son
+ * CSV.
+ */
+val MIGRATION_30_31 = object : Migration(30, 31) {
+    private val legacyColorHex = mapOf(
+        "YELLOW" to "#FFFFF59D",
+        "GREEN" to "#FFA5D6A7",
+        "BLUE" to "#FF90CAF9",
+        "PINK" to "#FFF48FB1",
+        "ORANGE" to "#FFFFCC80",
+    )
+
+    override fun migrate(db: SupportSQLiteDatabase) {
+        legacyColorHex.forEach { (legacyName, hex) ->
+            db.execSQL("UPDATE annotations SET color = '$hex' WHERE color = '$legacyName'")
+        }
+        db.query("SELECT id, recentAnnotationColors FROM user_preferences").use { cursor ->
+            while (cursor.moveToNext()) {
+                val id = cursor.getInt(0)
+                val csv = cursor.getString(1).orEmpty()
+                if (csv.isBlank()) continue
+                val migratedCsv = csv.split(",").joinToString(",") { legacyOrHex -> legacyColorHex[legacyOrHex] ?: legacyOrHex }
+                db.execSQL(
+                    "UPDATE user_preferences SET recentAnnotationColors = ? WHERE id = ?",
+                    arrayOf(migratedCsv, id),
+                )
+            }
+        }
+    }
+}

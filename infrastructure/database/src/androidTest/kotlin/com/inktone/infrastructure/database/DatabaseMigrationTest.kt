@@ -1185,6 +1185,58 @@ class DatabaseMigrationTest {
         v30.close()
     }
 
+    // Lot 23, Palier A — AnnotationColor devient une couleur ARGB libre
+    // (MIGRATION_30_31). Aucune annotation existante ne doit changer de
+    // couleur visuellement : chaque nom d'enum hérité doit se réécrire vers
+    // exactement le même hex qu'utilisait `AnnotationColor.toComposeColor()`
+    // avant ce Lot.
+    @Test
+    fun migration_30_vers_31_reecrit_les_noms_d_enum_herites_vers_leur_hex_exact() {
+        val v30 = helper.createDatabase(TEST_DB_NAME, 30)
+        v30.execSQL(
+            """
+            INSERT INTO publications (id, title, authors, format, fileUri, fileHash, fileSize, chapterCount, subjects, isFavorite, isPinned, isDrmProtected, importDate)
+            VALUES ('pub-1', 'Titre', '', 'EPUB', 'content://pub-1', 'hash1', 1000, 3, '', 0, 0, 0, 500)
+            """.trimIndent(),
+        )
+        v30.execSQL(
+            """
+            INSERT INTO annotations (
+                id, publicationId, startResourceHref, startChapterIndex, startParagraphIndex, startCharOffset,
+                endResourceHref, endChapterIndex, endParagraphIndex, endCharOffset, color, kind, content, excerpt, isPinned, createdAt, updatedAt
+            ) VALUES (
+                'an-1', 'pub-1', 'ch1.xhtml', 0, NULL, 20, 'ch1.xhtml', 0, NULL, 40, 'YELLOW', 'HIGHLIGHT', NULL, NULL, 0, 200, 200
+            )
+            """.trimIndent(),
+        )
+        v30.execSQL(
+            """
+            INSERT INTO user_preferences (id, theme, fontSize, defaultTtsEngine, crashReportingEnabled, language, fontFamily, reduceMotion, dynamicColorEnabled, readingRulerEnabled, dailyGoalMinutes, activeVoiceProfileId, readingMode, audioGain, useSystemFontScale, appTheme, libraryLayoutMode, lineHeightMultiplier, readerBrightness, eyeRestReminderEnabled, eyeRestReminderIntervalMinutes, hasSeenOnboarding, hasPromptedVoiceDownload, syncLastAutoSyncFailed, syncAutoEnabled, syncWifiOnly, readerMarginStep, paragraphSpacingStep, textJustified, keepScreenOn, autoScrollSpeed, recentAnnotationColors)
+            VALUES (0, 'obsidienne', 22, 'SHERPA_ONNX', 0, 'fr', 'SERIF', 0, 1, 0, 20, NULL, 'SCROLL', 1.0, 0, 'SYSTEM', 'GRID_COVERS', 1.6, NULL, 1, 60, 1, 1, 0, 0, 0, 1, 1, 0, 0, 0, 'BLUE,YELLOW')
+            """.trimIndent(),
+        )
+        v30.close()
+
+        val v31 = helper.runMigrationsAndValidate(
+            TEST_DB_NAME, 31, true,
+            MIGRATION_1_2, MIGRATION_2_3, MIGRATION_3_4, MIGRATION_4_5, MIGRATION_5_6, MIGRATION_6_7,
+            MIGRATION_7_8, MIGRATION_8_9, MIGRATION_9_10, MIGRATION_10_11, MIGRATION_11_12, MIGRATION_12_13,
+            MIGRATION_13_14, MIGRATION_14_15, MIGRATION_15_16, MIGRATION_16_17, MIGRATION_17_18, MIGRATION_18_19,
+            MIGRATION_19_20, MIGRATION_20_21, MIGRATION_21_22, MIGRATION_22_23, MIGRATION_23_24, MIGRATION_24_25,
+            MIGRATION_25_26, MIGRATION_26_27, MIGRATION_27_28, MIGRATION_28_29, MIGRATION_29_30, MIGRATION_30_31,
+        )
+
+        v31.query("SELECT color FROM annotations WHERE id = 'an-1'").use { cursor ->
+            assertEquals(true, cursor.moveToFirst())
+            assertEquals("#FFFFF59D", cursor.getString(0))
+        }
+        v31.query("SELECT recentAnnotationColors FROM user_preferences WHERE id = 0").use { cursor ->
+            assertEquals(true, cursor.moveToFirst())
+            assertEquals("#FF90CAF9,#FFFFF59D", cursor.getString(0))
+        }
+        v31.close()
+    }
+
     companion object {
         private const val TEST_DB_NAME = "migration-test"
     }

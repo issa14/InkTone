@@ -21,7 +21,7 @@ fun LibraryItemView.toDomain(): LibraryItem {
     return LibraryItem(
         id = id, type = type, publicationId = publicationId, publicationTitle = publicationTitle,
         startLocator = startLocator, endLocator = endLocator,
-        color = color?.let { AnnotationColor.valueOf(it) },
+        color = color?.let { AnnotationColor.parse(it) },
         excerpt = excerpt, note = note, isPinned = isPinned, createdAt = createdAt,
     )
 }

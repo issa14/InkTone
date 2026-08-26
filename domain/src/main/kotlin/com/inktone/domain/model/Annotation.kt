@@ -2,7 +2,47 @@ package com.inktone.domain.model
 
 import com.inktone.domain.valueobject.Locator
 
-enum class AnnotationColor { YELLOW, GREEN, BLUE, PINK, ORANGE }
+/**
+ * Couleur libre d'annotation (Lot 23, décision 6) — un `Int` ARGB, jamais
+ * `androidx.compose.ui.graphics.Color` (le domaine ne dépend jamais
+ * d'Android/Compose, règle non négociable) ; la conversion vit dans
+ * `feature/reader` (`toComposeColor()`). Remplace l'ancien enum fermé à 5
+ * valeurs : [PRESETS] reste la palette rapide par défaut, mais toute
+ * couleur (y compris personnalisée, Palier D) est désormais représentable.
+ */
+@JvmInline
+value class AnnotationColor(val argb: Int) {
+
+    companion object {
+        // Mêmes teintes que l'ancien enum — une migration ne doit changer
+        // la couleur visuelle d'aucune annotation existante (décision 6).
+        val YELLOW = AnnotationColor(0xFFFFF59D.toInt())
+        val GREEN = AnnotationColor(0xFFA5D6A7.toInt())
+        val BLUE = AnnotationColor(0xFF90CAF9.toInt())
+        val PINK = AnnotationColor(0xFFF48FB1.toInt())
+        val ORANGE = AnnotationColor(0xFFFFCC80.toInt())
+
+        /** Palette rapide par défaut du sélecteur (décision 3, Lot 23). */
+        val PRESETS = listOf(YELLOW, GREEN, BLUE, PINK, ORANGE)
+
+        private val LEGACY_NAMES = mapOf(
+            "YELLOW" to YELLOW, "GREEN" to GREEN, "BLUE" to BLUE, "PINK" to PINK, "ORANGE" to ORANGE,
+        )
+
+        /**
+         * Décode une représentation persistée : hex `#AARRGGBB` (format
+         * courant depuis le Lot 23) ou nom d'enum hérité (`"YELLOW"`...,
+         * format d'avant ce Lot) — une base ou une sauvegarde non migrée
+         * doit rester lisible (décision 7, jamais de `valueOf` non
+         * défensif comme celui de `FontFamily`, constat 11 du Lot 22).
+         */
+        fun parse(raw: String): AnnotationColor =
+            LEGACY_NAMES[raw] ?: AnnotationColor(raw.removePrefix("#").toUInt(16).toInt())
+    }
+}
+
+/** Représentation persistée d'une [AnnotationColor] — hex `#AARRGGBB`. */
+fun AnnotationColor.toHex(): String = "#%08X".format(argb)
 
 /**
  * Type d'annotation (Lot 22, tâche 10) — trois canaux visuels distincts :
