@@ -3,6 +3,8 @@ package com.inktone.feature.reader
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Spacer
+import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.verticalScroll
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
@@ -90,6 +92,13 @@ fun ReaderSettingsPanel(
         Column(
             modifier = Modifier
                 .fillMaxWidth()
+                // Correctif — le panneau TT débordait de l'écran depuis
+                // l'ajout du sélecteur de police (Lot 21, tâche 10) et de
+                // l'auto-scroll (tâche 9) : justification, écran allumé et
+                // auto-scroll étaient coupés en bas, inaccessibles. Le
+                // scroll vertical ne gêne ni les Sliders (drag horizontal)
+                // ni les segments de choix.
+                .verticalScroll(rememberScrollState())
                 .padding(horizontal = 24.dp, vertical = 16.dp),
         ) {
             Text(
