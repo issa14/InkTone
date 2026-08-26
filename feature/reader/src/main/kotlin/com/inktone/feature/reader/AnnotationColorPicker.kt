@@ -12,12 +12,19 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.CircleShape
+import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Button
 import androidx.compose.material3.FilterChip
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
+import androidx.compose.material3.TextButton
+import androidx.compose.material3.TextField
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
+import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.semantics.contentDescription
@@ -89,6 +96,11 @@ fun AnnotationColorPicker(
     val orderedColors = remember(recentColors) {
         recentColors + AnnotationColor.PRESETS.filterNot { it in recentColors }
     }
+    // Lot 23, tâche 9 — état purement local à ce composable : la boîte de
+    // dialogue n'a pas besoin de survivre au-delà d'une confirmation/
+    // annulation, aucune raison de la faire remonter dans ReaderUiState.
+    var showCustomColorDialog by remember { mutableStateOf(false) }
+
     Column(verticalArrangement = Arrangement.spacedBy(4.dp)) {
         Row(horizontalArrangement = Arrangement.spacedBy(4.dp)) {
             AnnotationKindOption(AnnotationKind.HIGHLIGHT, AppSymbol.Highlight, "Surlignage", selectedKind, onSelectKind)
@@ -102,11 +114,85 @@ fun AnnotationColorPicker(
             orderedColors.forEach { color ->
                 ColorSwatch(color = color, isSelected = color == selected, onClick = { onSelect(color) })
             }
+            CustomColorSwatch(onClick = { showCustomColorDialog = true })
             Button(onClick = onConfirm) { Text("Surligner") }
             Button(onClick = onCancel) { Text("Annuler") }
         }
     }
+
+    if (showCustomColorDialog) {
+        CustomColorDialog(
+            onConfirm = { color ->
+                onSelect(color)
+                showCustomColorDialog = false
+            },
+            onDismiss = { showCustomColorDialog = false },
+        )
+    }
 }
+
+/**
+ * Lot 23, tâche 9 — pastille « Personnaliser » : ouvre [CustomColorDialog].
+ * Toute couleur validée y devient une entrée comme une autre (décision 3),
+ * jamais un remplacement de la palette rapide.
+ */
+@Composable
+private fun CustomColorSwatch(onClick: () -> Unit) {
+    Box(
+        modifier = Modifier
+            .size(36.dp)
+            .clip(CircleShape)
+            .background(MaterialTheme.colorScheme.surfaceVariant)
+            .clickable(onClick = onClick)
+            .semantics { contentDescription = "Personnaliser la couleur" },
+        contentAlignment = Alignment.Center,
+    ) {
+        AppIcon(AppSymbol.Add, contentDescription = null)
+    }
+}
+
+/**
+ * Lot 23, tâche 9 — éditeur de couleur personnalisée : champ hex `#RRGGBB`,
+ * même convention que `ThemeStudioScreen.ColorPickerDialog` (cohérence
+ * avec l'éditeur de thème existant plutôt que des curseurs R/V/B inédits
+ * dans le reste de l'app). Opacité toujours pleine (`FF`) : une annotation
+ * translucide n'a pas de sens pour un surlignage/soulignement/barré.
+ */
+@Composable
+private fun CustomColorDialog(onConfirm: (AnnotationColor) -> Unit, onDismiss: () -> Unit) {
+    var hex by remember { mutableStateOf("") }
+    val isValid = remember(hex) { Regex("^#[0-9A-Fa-f]{6}$").matches(hex) }
+
+    AlertDialog(
+        onDismissRequest = onDismiss,
+        title = { Text("Couleur personnalisée") },
+        text = {
+            TextField(
+                value = hex,
+                onValueChange = { hex = it },
+                label = { Text("Valeur hexadécimale") },
+                placeholder = { Text("#RRGGBB") },
+                isError = hex.isNotEmpty() && !isValid,
+                singleLine = true,
+            )
+        },
+        confirmButton = {
+            TextButton(
+                enabled = isValid,
+                onClick = { onConfirm(hexRgbToAnnotationColor(hex)) },
+            ) { Text("Appliquer") }
+        },
+        dismissButton = { TextButton(onClick = onDismiss) { Text("Annuler") } },
+    )
+}
+
+/**
+ * Lot 23, tâche 9 — `#RRGGBB` (opacité toujours pleine, voir
+ * [CustomColorDialog]) vers [AnnotationColor]. `internal` pour rester
+ * testable sans passer par la boîte de dialogue Compose.
+ */
+internal fun hexRgbToAnnotationColor(hex: String): AnnotationColor =
+    AnnotationColor((0xFF000000L or hex.removePrefix("#").toLong(16)).toInt())
 
 /**
  * Lot 23, tâche 8 — pastille pleine plutôt qu'un `FilterChip` texte
