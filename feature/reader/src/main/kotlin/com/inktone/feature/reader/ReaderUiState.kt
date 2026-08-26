@@ -350,6 +350,21 @@ sealed interface ReaderIntent {
     data object DismissBookmarkNotePrompt : ReaderIntent
 
     /**
+     * Lot 22, tâche 11 — édition de la note d'un signet existant depuis
+     * `BookmarkPanel`, distinct de [SaveBookmarkNote] (celui-ci répond à
+     * [pendingBookmarkNoteId], propre à la proposition post-création via
+     * Snackbar — la réutiliser ici redéclencherait ce Snackbar). `note`
+     * vide ou blanche → note nulle, même règle que [SaveBookmarkNote].
+     */
+    data class EditBookmarkNote(val id: String, val note: String) : ReaderIntent
+
+    /** Lot 22, tâche 11 — suppression depuis `BookmarkPanel` (onglets Notes/Surlignages). */
+    data class DeleteAnnotation(val id: String) : ReaderIntent
+
+    /** Lot 22, tâche 11 — édition de note depuis `BookmarkPanel` (onglet Notes). */
+    data class UpdateAnnotationNote(val id: String, val content: String?) : ReaderIntent
+
+    /**
      * Lot 21, tâche 9 — règle la vitesse d'auto-scroll visuel
      * (`UserPreferences.autoScrollSpeed`, `0` = désactivé). Le réglage est
      * global (même patron que reduceMotion), pas une surcharge par

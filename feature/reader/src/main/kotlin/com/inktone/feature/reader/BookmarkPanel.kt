@@ -79,6 +79,13 @@ fun BookmarkPanel(
     onAnnotationClick: (Annotation) -> Unit,
     onToggleBookmark: () -> Unit,
     onClose: () -> Unit,
+    // Lot 22, tâche 11 — édition de note et suppression depuis ce panneau
+    // (jusqu'ici en lecture seule). `onEditAnnotationNote` ne concerne que
+    // l'onglet Notes ; la suppression s'applique aux trois onglets.
+    onDeleteAnnotation: (Annotation) -> Unit,
+    onEditAnnotationNote: (Annotation) -> Unit,
+    onDeleteBookmark: (Bookmark) -> Unit,
+    onEditBookmarkNote: (Bookmark) -> Unit,
 ) {
     var selectedTab by remember { mutableIntStateOf(BookmarkPanelTab.NOTES.ordinal) }
     val notes = remember(annotations) { annotations.filter { !it.content.isNullOrBlank() } }
@@ -158,9 +165,9 @@ fun BookmarkPanel(
                     // Contenu de l'onglet actif — occupe tout l'espace restant.
                     Box(modifier = Modifier.weight(1f)) {
                         when (BookmarkPanelTab.entries[selectedTab]) {
-                            BookmarkPanelTab.NOTES -> NotesTab(notes, onAnnotationClick)
-                            BookmarkPanelTab.HIGHLIGHTS -> HighlightsTab(highlights, onAnnotationClick)
-                            BookmarkPanelTab.BOOKMARKS -> BookmarksTab(bookmarks, onBookmarkClick)
+                            BookmarkPanelTab.NOTES -> NotesTab(notes, onAnnotationClick, onDeleteAnnotation, onEditAnnotationNote)
+                            BookmarkPanelTab.HIGHLIGHTS -> HighlightsTab(highlights, onAnnotationClick, onDeleteAnnotation)
+                            BookmarkPanelTab.BOOKMARKS -> BookmarksTab(bookmarks, onBookmarkClick, onDeleteBookmark, onEditBookmarkNote)
                         }
                     }
 
@@ -190,47 +197,61 @@ fun BookmarkPanel(
 }
 
 @Composable
-private fun NotesTab(notes: List<Annotation>, onClick: (Annotation) -> Unit) {
+private fun NotesTab(
+    notes: List<Annotation>,
+    onClick: (Annotation) -> Unit,
+    onDelete: (Annotation) -> Unit,
+    onEdit: (Annotation) -> Unit,
+) {
     if (notes.isEmpty()) {
         EmptyTabMessage("Aucune note pour ce livre.")
         return
     }
     LazyColumn(modifier = Modifier.fillMaxSize()) {
         items(notes, key = { it.id }) { annotation ->
-            Column(
+            Row(
                 modifier = Modifier
                     .fillMaxWidth()
                     .clickable { onClick(annotation) }
-                    .padding(horizontal = 16.dp, vertical = 12.dp),
+                    .padding(start = 16.dp, top = 12.dp, bottom = 12.dp),
+                verticalAlignment = Alignment.CenterVertically,
             ) {
-                Text(
-                    annotation.content.orEmpty(),
-                    style = MaterialTheme.typography.bodyMedium,
-                    fontWeight = FontWeight.Bold,
-                )
-                annotation.excerpt?.takeIf { it.isNotBlank() }?.let { excerpt ->
+                Column(modifier = Modifier.weight(1f)) {
+                    Text(
+                        annotation.content.orEmpty(),
+                        style = MaterialTheme.typography.bodyMedium,
+                        fontWeight = FontWeight.Bold,
+                    )
+                    annotation.excerpt?.takeIf { it.isNotBlank() }?.let { excerpt ->
+                        Spacer(Modifier.height(4.dp))
+                        Text(
+                            excerpt,
+                            style = MaterialTheme.typography.bodySmall,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant,
+                            maxLines = 2,
+                            overflow = TextOverflow.Ellipsis,
+                        )
+                    }
                     Spacer(Modifier.height(4.dp))
                     Text(
-                        excerpt,
-                        style = MaterialTheme.typography.bodySmall,
+                        "Chapitre ${annotation.startLocator.chapterIndex + 1} · ${formatAnnotationDate(annotation.createdAt)}",
+                        style = MaterialTheme.typography.labelSmall,
                         color = MaterialTheme.colorScheme.onSurfaceVariant,
-                        maxLines = 2,
-                        overflow = TextOverflow.Ellipsis,
                     )
                 }
-                Spacer(Modifier.height(4.dp))
-                Text(
-                    "Chapitre ${annotation.startLocator.chapterIndex + 1} · ${formatAnnotationDate(annotation.createdAt)}",
-                    style = MaterialTheme.typography.labelSmall,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant,
-                )
+                IconButton(onClick = { onEdit(annotation) }) {
+                    AppIcon(AppSymbol.Edit, contentDescription = "Modifier la note")
+                }
+                IconButton(onClick = { onDelete(annotation) }) {
+                    AppIcon(AppSymbol.Delete, contentDescription = "Supprimer la note")
+                }
             }
         }
     }
 }
 
 @Composable
-private fun HighlightsTab(highlights: List<Annotation>, onClick: (Annotation) -> Unit) {
+private fun HighlightsTab(highlights: List<Annotation>, onClick: (Annotation) -> Unit, onDelete: (Annotation) -> Unit) {
     if (highlights.isEmpty()) {
         EmptyTabMessage("Aucun surlignage pour ce livre.")
         return
@@ -241,7 +262,8 @@ private fun HighlightsTab(highlights: List<Annotation>, onClick: (Annotation) ->
                 modifier = Modifier
                     .fillMaxWidth()
                     .clickable { onClick(annotation) }
-                    .padding(horizontal = 16.dp, vertical = 12.dp),
+                    .padding(start = 16.dp, top = 12.dp, bottom = 12.dp),
+                verticalAlignment = Alignment.CenterVertically,
             ) {
                 // Barre de couleur verticale (cible confirmée) — hauteur
                 // étirée sur tout le bloc extrait+métadonnées, pas de fond
@@ -269,13 +291,21 @@ private fun HighlightsTab(highlights: List<Annotation>, onClick: (Annotation) ->
                         color = MaterialTheme.colorScheme.onSurfaceVariant,
                     )
                 }
+                IconButton(onClick = { onDelete(annotation) }) {
+                    AppIcon(AppSymbol.Delete, contentDescription = "Supprimer le surlignage")
+                }
             }
         }
     }
 }
 
 @Composable
-private fun BookmarksTab(bookmarks: List<Bookmark>, onClick: (Bookmark) -> Unit) {
+private fun BookmarksTab(
+    bookmarks: List<Bookmark>,
+    onClick: (Bookmark) -> Unit,
+    onDelete: (Bookmark) -> Unit,
+    onEdit: (Bookmark) -> Unit,
+) {
     if (bookmarks.isEmpty()) {
         EmptyTabMessage("Aucun marque-page pour ce livre.")
         return
@@ -286,7 +316,7 @@ private fun BookmarksTab(bookmarks: List<Bookmark>, onClick: (Bookmark) -> Unit)
                 modifier = Modifier
                     .fillMaxWidth()
                     .clickable { onClick(bookmark) }
-                    .padding(horizontal = 16.dp, vertical = 12.dp),
+                    .padding(start = 16.dp, top = 12.dp, bottom = 12.dp),
                 verticalAlignment = Alignment.CenterVertically,
             ) {
                 AppIcon(AppSymbol.Bookmark,  contentDescription = null, tint = MaterialTheme.colorScheme.primary)
@@ -326,6 +356,12 @@ private fun BookmarksTab(bookmarks: List<Bookmark>, onClick: (Bookmark) -> Unit)
                         style = MaterialTheme.typography.labelSmall,
                         color = MaterialTheme.colorScheme.onSurfaceVariant,
                     )
+                }
+                IconButton(onClick = { onEdit(bookmark) }) {
+                    AppIcon(AppSymbol.Edit, contentDescription = "Modifier la note")
+                }
+                IconButton(onClick = { onDelete(bookmark) }) {
+                    AppIcon(AppSymbol.Delete, contentDescription = "Supprimer le marque-page")
                 }
             }
         }
