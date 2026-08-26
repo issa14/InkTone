@@ -213,6 +213,24 @@ ne pas la rouvrir en cours de lot sans fait nouveau.
 
 ---
 
+## Écart déclaré (contrat point 5)
+
+**Palier E, tâches 11-12 (menu contextuel sur annotation existante) :
+mode SCROLL uniquement, mode PAGED non couvert.** `BookBlockItem.kt`
+(SCROLL) et `PagedChapterContent.kt` (PAGED) sont deux pipelines de
+rendu/geste indépendants (aucun code partagé pour la détection de tap,
+seulement pour le calcul de bornes fenêtre — `rangeBoundsInWindow`).
+Étendre au mode PAGED est mécaniquement similaire (même patron :
+`onValueChange` → `PageBlock`) mais double la surface de risque sur du
+code de geste déjà marqué par plusieurs correctifs device documentés
+(`PagedChapterContent.kt`, `BookBlockItem.kt` — commentaires « Bug réel
+trouvé sur appareil »). Non traité dans ce Lot faute de cycle de
+vérification device pour ce second pipeline ; à couvrir dans un lot
+séparé si le mode PAGED est confirmé comme usage réel pour cette
+interaction.
+
+---
+
 ## Points de vigilance (non négociables)
 
 - **Trois canaux visuels séparés** (annotation / surlignage TTS
@@ -249,5 +267,6 @@ ne pas la rouvrir en cours de lot sans fait nouveau.
       restaure sans erreur.
 - [ ] Taper un passage déjà surligné dans le texte ouvre un menu
       Modifier/Supprimer ; taper ailleurs garde le comportement actuel
-      (bascule HUD).
+      (bascule HUD). **Mode SCROLL seulement — écart déclaré ci-dessus
+      pour le mode PAGED.**
 - [ ] `./gradlew build` vert.
