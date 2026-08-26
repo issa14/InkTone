@@ -107,6 +107,9 @@ enum class AppSymbol(
     Sort(R.drawable.ic_symbol_sort),
     Copy(R.drawable.ic_symbol_copy),
     Highlight(R.drawable.ic_symbol_highlight),
+    // Lot 23, tâche 5 — rangée de type d'annotation (Souligné/Barré).
+    Underline(R.drawable.ic_symbol_underline),
+    Strikethrough(R.drawable.ic_symbol_strikethrough),
     Brightness(R.drawable.ic_symbol_brightness),
     FormatSize(R.drawable.ic_symbol_format_size),
     SleepTimer(R.drawable.ic_symbol_sleep_timer),
