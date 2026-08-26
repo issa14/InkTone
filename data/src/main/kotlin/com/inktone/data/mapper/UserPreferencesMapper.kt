@@ -1,5 +1,6 @@
 package com.inktone.data.mapper
 
+import com.inktone.domain.model.AnnotationColor
 import com.inktone.domain.model.AppTheme
 import com.inktone.domain.model.FontFamily
 import com.inktone.domain.model.TtsEngineId
@@ -34,6 +35,7 @@ fun UserPreferences.toEntity(): UserPreferencesEntity = UserPreferencesEntity(
     textJustified = textJustified,
     keepScreenOn = keepScreenOn,
     autoScrollSpeed = autoScrollSpeed,
+    recentAnnotationColors = recentAnnotationColors.joinToString(",") { it.name },
 )
 
 fun UserPreferencesEntity.toDomain(): UserPreferences = UserPreferences(
@@ -68,4 +70,9 @@ fun UserPreferencesEntity.toDomain(): UserPreferences = UserPreferences(
     textJustified = textJustified,
     keepScreenOn = keepScreenOn,
     autoScrollSpeed = autoScrollSpeed,
+    // Lot 22, tâche 12 — repli défensif (constat 11 : un nom d'enum
+    // inconnu, ex. base restaurée depuis une version future, est ignoré
+    // plutôt que de faire planter la restauration des préférences).
+    recentAnnotationColors = recentAnnotationColors.split(",")
+        .mapNotNull { name -> AnnotationColor.entries.firstOrNull { it.name == name } },
 )

@@ -453,3 +453,15 @@ val MIGRATION_28_29 = object : Migration(28, 29) {
         db.execSQL("ALTER TABLE annotations ADD COLUMN kind TEXT NOT NULL DEFAULT 'HIGHLIGHT'")
     }
 }
+
+/**
+ * Lot 22, tâche 12 — couleurs de surlignage récemment utilisées, proposées
+ * en tête du sélecteur. Défaut `''` (CSV vide) : une bibliothèque
+ * existante ne propose aucune couleur récente tant que l'utilisateur n'a
+ * pas surligné après la mise à jour, même discipline que MIGRATION_27_28.
+ */
+val MIGRATION_29_30 = object : Migration(29, 30) {
+    override fun migrate(db: SupportSQLiteDatabase) {
+        db.execSQL("ALTER TABLE user_preferences ADD COLUMN recentAnnotationColors TEXT NOT NULL DEFAULT ''")
+    }
+}

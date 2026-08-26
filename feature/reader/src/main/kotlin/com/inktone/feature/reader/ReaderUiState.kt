@@ -60,6 +60,9 @@ data class ReaderUiState(
     val freeSelectionAnchorOffset: Int? = null,
     val freeSelectionFocusOffset: Int? = null,
     val annotations: List<Annotation> = emptyList(),
+    // Lot 22, tâche 12 — réglage global (UserPreferences.recentAnnotationColors),
+    // observé en continu, même patron que readerMarginStep/isTextJustified.
+    val recentAnnotationColors: List<AnnotationColor> = emptyList(),
     val bookmarks: List<Bookmark> = emptyList(),
     val isBookmarkListVisible: Boolean = false,
     // Lot 21, tâche 5 — id du signet venant d'être créé par le toggle, en

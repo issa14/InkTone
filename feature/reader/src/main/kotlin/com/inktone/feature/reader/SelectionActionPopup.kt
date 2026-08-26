@@ -80,6 +80,9 @@ fun SelectionActionPopup(
     // seul. Paramètre à défaut : aucun changement pour les appelants
     // existants ni pour les tests.
     shareContext: String? = null,
+    // Lot 22, tâche 12 — couleurs récemment utilisées, transmises telles
+    // quelles à AnnotationColorPicker.
+    recentColors: List<AnnotationColor> = emptyList(),
 ) {
     if (selectionBoundsInWindow == null) return
 
@@ -173,6 +176,7 @@ fun SelectionActionPopup(
                     onSelect = { pendingColor = it },
                     onConfirm = { onHighlight(pendingColor) },
                     onCancel = onDismiss,
+                    recentColors = recentColors,
                 )
 
                 // Lot 21, tâche 7 — « Partager » (ACTION_SEND) : texte

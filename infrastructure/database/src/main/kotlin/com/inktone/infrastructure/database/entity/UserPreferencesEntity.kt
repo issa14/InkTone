@@ -46,4 +46,7 @@ data class UserPreferencesEntity(
     val keepScreenOn: Boolean = false,
     // Lot 21, tâche 9 — auto-scroll visuel (MIGRATION_27_28). 0 = désactivé.
     val autoScrollSpeed: Int = 0,
+    // Lot 22, tâche 12 — couleurs de surlignage récentes (MIGRATION_29_30),
+    // CSV des noms d'AnnotationColor, la plus récente en premier.
+    val recentAnnotationColors: String = "",
 )

@@ -114,6 +114,13 @@ data class UserPreferences(
      * jamais l'auto-scroll dans ce cas.
      */
     val autoScrollSpeed: Int = 0,
+    /**
+     * Lot 22, tâche 12 — couleurs de surlignage récemment utilisées, la
+     * plus récente en tête, proposées en tête du sélecteur de couleur
+     * (`AnnotationColorPicker`, feature/reader). Sans doublon par
+     * construction (voir `withRecentColor`, feature/reader).
+     */
+    val recentAnnotationColors: List<AnnotationColor> = emptyList(),
 ) {
     init {
         require(fontSize > 0) { "fontSize doit être strictement positif" }

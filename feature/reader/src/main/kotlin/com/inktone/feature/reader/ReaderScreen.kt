@@ -1153,6 +1153,7 @@ fun ReaderScreen(
                     chapterIndex = state.currentChapterIndex,
                     isPdf = isPdf,
                 ),
+                recentColors = state.recentAnnotationColors,
             )
         }
 
