@@ -1,17 +1,25 @@
 package com.inktone.feature.reader
 
+import androidx.compose.foundation.background
+import androidx.compose.foundation.clickable
 import androidx.compose.foundation.horizontalScroll
 import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.material3.Button
 import androidx.compose.material3.FilterChip
+import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.remember
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.clip
 import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.graphics.Color
@@ -89,21 +97,44 @@ fun AnnotationColorPicker(
         }
         Row(
             modifier = Modifier.fillMaxWidth().horizontalScroll(rememberScrollState()),
-            horizontalArrangement = Arrangement.spacedBy(4.dp),
+            horizontalArrangement = Arrangement.spacedBy(8.dp),
         ) {
             orderedColors.forEach { color ->
-                val label = color.label()
-                FilterChip(
-                    selected = color == selected,
-                    onClick = { onSelect(color) },
-                    label = { Text(label) },
-                    modifier = Modifier.semantics { contentDescription = "Couleur $label" },
-                )
+                ColorSwatch(color = color, isSelected = color == selected, onClick = { onSelect(color) })
             }
             Button(onClick = onConfirm) { Text("Surligner") }
             Button(onClick = onCancel) { Text("Annuler") }
         }
     }
+}
+
+/**
+ * Lot 23, tâche 8 — pastille pleine plutôt qu'un `FilterChip` texte
+ * (« Jaune », « Vert »…) : rendu direct de la couleur, cible confirmée
+ * (`RAPPORT_POPUP_SELECTION_MOONREADER_v2.md` §4.1/4.2 — Moon+ utilise des
+ * pastilles rondes pour sa palette rapide). Anneau de la couleur primaire
+ * autour de la pastille sélectionnée, même convention que
+ * `ThemeStudioScreen.ColorPickerDialog`.
+ */
+@Composable
+private fun ColorSwatch(color: AnnotationColor, isSelected: Boolean, onClick: () -> Unit) {
+    val label = color.label()
+    Box(
+        modifier = Modifier
+            .size(36.dp)
+            .clip(CircleShape)
+            .then(
+                if (isSelected) {
+                    Modifier.background(MaterialTheme.colorScheme.primary, CircleShape).padding(3.dp)
+                } else {
+                    Modifier
+                },
+            )
+            .clip(CircleShape)
+            .background(color.toComposeColor())
+            .clickable(onClick = onClick)
+            .semantics { contentDescription = "Couleur $label" },
+    )
 }
 
 @Composable

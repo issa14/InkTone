@@ -2,6 +2,7 @@ package com.inktone.feature.reader
 
 import androidx.compose.ui.geometry.Rect
 import androidx.compose.ui.test.junit4.createComposeRule
+import androidx.compose.ui.test.onNodeWithContentDescription
 import androidx.compose.ui.test.onNodeWithText
 import androidx.compose.ui.test.performClick
 import androidx.compose.ui.test.performTextInput
@@ -80,6 +81,27 @@ class SelectionActionPopupTest {
         composeTestRule.onNodeWithText("Surligner").performClick() // confirme dans le second temps (AnnotationColorPicker)
 
         assertEquals(AnnotationColor.YELLOW, highlightedColor) // couleur par défaut
+    }
+
+    /** Lot 23, tâche 8 — pastille pleine (plus de `FilterChip` texte « Vert »). */
+    @Test
+    fun choisir_une_pastille_de_couleur_transmet_cette_couleur() {
+        var highlightedColor: AnnotationColor? = null
+        composeTestRule.setContent {
+            SelectionActionPopup(
+                selectedText = "Un passage sélectionné.",
+                selectionBoundsInWindow = someBounds,
+                onHighlight = { color, _ -> highlightedColor = color },
+                onSaveNote = { _, _, _ -> },
+                onDismiss = {},
+            )
+        }
+
+        composeTestRule.onNodeWithText("Surligner").performClick()
+        composeTestRule.onNodeWithContentDescription("Couleur Vert").performClick()
+        composeTestRule.onNodeWithText("Surligner").performClick()
+
+        assertEquals(AnnotationColor.GREEN, highlightedColor)
     }
 
     /**
