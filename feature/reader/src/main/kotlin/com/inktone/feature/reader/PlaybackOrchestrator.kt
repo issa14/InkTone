@@ -18,8 +18,12 @@ import com.inktone.domain.service.PlaybackSessionState
 import com.inktone.domain.service.ParseResult
 import com.inktone.domain.service.PublicationParser
 import com.inktone.domain.service.TtsEngine
+import com.inktone.domain.service.TtsSegmentCache
 import com.inktone.domain.service.WordTimestamp
+import com.inktone.domain.service.sha256Hex
+import com.inktone.domain.service.ttsCacheKey
 import com.inktone.domain.repository.PreferencesRepository
+import com.inktone.domain.repository.PronunciationRuleRepository
 import com.inktone.domain.repository.PublicationRepository
 import com.inktone.domain.repository.VoiceProfileRepository
 import com.inktone.domain.usecase.GetReadingStateUseCase
@@ -40,6 +44,7 @@ import kotlinx.coroutines.flow.SharedFlow
 import kotlinx.coroutines.flow.asSharedFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.collectLatest
+import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.launch
@@ -92,6 +97,8 @@ class PlaybackOrchestrator @Inject constructor(
     private val publicationParser: PublicationParser,
     private val preferencesRepository: PreferencesRepository,
     private val voiceProfileRepository: VoiceProfileRepository,
+    private val ttsSegmentCache: TtsSegmentCache,
+    private val pronunciationRuleRepository: PronunciationRuleRepository,
 ) : PlaybackSession {
 
     /**
@@ -611,10 +618,13 @@ class PlaybackOrchestrator @Inject constructor(
         chapterIndex: Int,
         resourceHref: String,
     ) {
+        val rulesHash = computeRulesHash()
         val channel = Channel<AudioSegment>(LOOKAHEAD)
-        val producer = scope.launch { produce(generation, channel, sentences, voiceProfile, startFrom) }
+        val producer = scope.launch {
+            produce(generation, channel, sentences, voiceProfile, startFrom, publicationId, chapterIndex, rulesHash)
+        }
         try {
-            consume(generation, channel, sentences, startFrom, publicationId, chapterIndex, resourceHref)
+            consume(generation, channel, sentences, startFrom, publicationId, chapterIndex, resourceHref, voiceProfile, rulesHash)
         } catch (e: CancellationException) {
             throw e
         } catch (e: Exception) {
@@ -634,20 +644,46 @@ class PlaybackOrchestrator @Inject constructor(
         sentences: List<Sentence>,
         voiceProfile: VoiceProfile,
         startFrom: Int,
+        publicationId: String,
+        chapterIndex: Int,
+        rulesHash: String,
     ) {
         try {
             for (i in startFrom until sentences.size) {
                 if (!isCurrent(generation)) break
-                val segment = try {
-                    withTimeout(SYNTHESIS_TIMEOUT_MS) {
-                        ttsEngine.synthesize(sentences[i], voiceProfile)
+                val sentence = sentences[i]
+                val key = ttsCacheKey(
+                    publicationId = publicationId,
+                    chapterIndex = chapterIndex,
+                    sentenceOffset = sentence.startOffset,
+                    voiceProfileId = voiceProfile.id,
+                    pronunciationRulesHash = rulesHash,
+                    engineVersion = ttsEngine.synthesisVersion,
+                )
+                // Lot 22, Palier B — consultation AVANT synthèse, écriture
+                // après. Le LOOKAHEAD=3 (acquis du Lot 15) masque déjà la
+                // latence en lecture linéaire : le gain réel est le
+                // démarrage à froid, la reprise et le retour en arrière.
+                val cached = ttsSegmentCache.get(publicationId, key)
+                val segment = if (cached != null) {
+                    cached
+                } else {
+                    var synthesized = false
+                    val fresh = try {
+                        val s = withTimeout(SYNTHESIS_TIMEOUT_MS) { ttsEngine.synthesize(sentence, voiceProfile) }
+                        synthesized = true
+                        s
+                    } catch (e: TimeoutCancellationException) {
+                        silence(TIMEOUT_SILENCE_MS, audioPlayer.sampleRate)
+                    } catch (e: CancellationException) {
+                        throw e
+                    } catch (e: Exception) {
+                        silence(TIMEOUT_SILENCE_MS, audioPlayer.sampleRate)
                     }
-                } catch (e: TimeoutCancellationException) {
-                    silence(TIMEOUT_SILENCE_MS, audioPlayer.sampleRate)
-                } catch (e: CancellationException) {
-                    throw e
-                } catch (e: Exception) {
-                    silence(TIMEOUT_SILENCE_MS, audioPlayer.sampleRate)
+                    // Seule une synthèse RÉUSSIE est cachée — jamais un
+                    // silence de secours (le rejouer serait du faux texte).
+                    if (synthesized) ttsSegmentCache.put(publicationId, key, fresh)
+                    fresh
                 }
                 if (!isCurrent(generation)) break
                 channel.send(segment)
@@ -672,6 +708,8 @@ class PlaybackOrchestrator @Inject constructor(
         publicationId: String,
         chapterIndex: Int,
         resourceHref: String,
+        voiceProfile: VoiceProfile,
+        rulesHash: String,
     ) {
         var index = startFrom
         var playStartNanos = 0L
@@ -695,7 +733,7 @@ class PlaybackOrchestrator @Inject constructor(
                 audioPlayer.play()
                 _state.value = PlaybackStatus.Playing
                 playStartNanos = System.nanoTime()
-                advanceTo(generation, index, publicationId, chapterIndex, resourceHref, sentence, segment.wordTimestamps)
+                advanceTo(generation, index, publicationId, chapterIndex, resourceHref, sentence, segment.wordTimestamps, voiceProfile, rulesHash)
                 first = false
             } else {
                 // Pace jusqu'au début ABSOLU de cette phrase (cumul des durées),
@@ -708,7 +746,7 @@ class PlaybackOrchestrator @Inject constructor(
                 // précédente est écoulé : c'est là, et pas à son démarrage,
                 // qu'elle est acquise pour les statistiques.
                 creditNarratedSentence(sentences.getOrNull(index - 1))
-                advanceTo(generation, index, publicationId, chapterIndex, resourceHref, sentence, segment.wordTimestamps)
+                advanceTo(generation, index, publicationId, chapterIndex, resourceHref, sentence, segment.wordTimestamps, voiceProfile, rulesHash)
             }
             launchWordTracking(generation, sentenceStartMs, segment.wordTimestamps)
             nextPhraseStartMs += phraseDurationMs
@@ -822,6 +860,8 @@ class PlaybackOrchestrator @Inject constructor(
         resourceHref: String,
         sentence: Sentence?,
         wordTimestamps: List<WordTimestamp>,
+        voiceProfile: VoiceProfile,
+        rulesHash: String,
     ) {
         if (!isCurrent(generation)) return
         _currentSentenceIndex.value = index
@@ -842,8 +882,31 @@ class PlaybackOrchestrator @Inject constructor(
                     overrides = existing?.overrides,
                 ),
             )
+            // Lot 22, Palier B, décision 4 — épingle le segment de la
+            // position de reprise : c'est le cœur du gain, le tap sur
+            // « reprendre » doit démarrer sans synthèse. Épinglé à chaque
+            // transition, le pin suit la position persistée ci-dessus.
+            ttsSegmentCache.pinResumePoint(
+                publicationId,
+                ttsCacheKey(
+                    publicationId = publicationId,
+                    chapterIndex = chapterIndex,
+                    sentenceOffset = sentence.startOffset,
+                    voiceProfileId = voiceProfile.id,
+                    pronunciationRulesHash = rulesHash,
+                    engineVersion = ttsEngine.synthesisVersion,
+                ),
+            )
         }
     }
+
+    /** Hash stable des règles de prononciation actives — dimension d'invalidation du cache TTS. */
+    private suspend fun computeRulesHash(): String =
+        pronunciationRuleRepository.observeAll().first()
+            .filter { it.isEnabled }
+            .sortedBy { it.id }
+            .joinToString("|") { "${it.originalText}\u0000${it.replacementText}\u0000${it.isRegex}" }
+            .let(::sha256Hex)
 
     /**
      * Attend [durationMs] par pas courts, en suspendant pendant une pause et
