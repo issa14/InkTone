@@ -266,6 +266,11 @@ fun ReaderScreen(
     // en cours d'édition porte lui-même sa note actuelle pour le pré-remplissage.
     var editingBookmark by remember { mutableStateOf<Bookmark?>(null) }
     var editingAnnotation by remember { mutableStateOf<Annotation?>(null) }
+    // Lot 23, tâche 12 — menu contextuel au tap sur une annotation déjà
+    // posée dans le texte (mode SCROLL). `tappedAnnotationBounds` porte
+    // les bornes fenêtre remontées par `BookBlockItem.onAnnotationTapped`.
+    var tappedAnnotation by remember { mutableStateOf<Annotation?>(null) }
+    var tappedAnnotationBounds by remember { mutableStateOf<Rect?>(null) }
     // 3d.3 — visibilité locale de la barre de luminosité, même patron que
     // les panneaux ci-dessus : purement une décision d'affichage, pas un
     // état MVI (ReaderUiState.readerBrightness porte la vraie donnée).
@@ -1030,6 +1035,12 @@ fun ReaderScreen(
                                             )
                                         },
                                         onClick = { handleReadingAreaTap() },
+                                        onAnnotationTapped = { annotation, bounds ->
+                                            if (bounds != null) {
+                                                tappedAnnotation = annotation
+                                                tappedAnnotationBounds = bounds
+                                            }
+                                        },
                                         isReadingRulerEnabled = state.isReadingRulerEnabled,
                                         onCurrentLineY = { y -> currentLineYDp = y },
                                         modifier = Modifier.fillMaxWidth(),
@@ -1512,6 +1523,31 @@ fun ReaderScreen(
                     onEditBookmarkNote = { bookmark -> editingBookmark = bookmark },
                 )
             }
+        }
+
+        // Lot 23, tâche 12 — menu contextuel in-situ, tap sur une
+        // annotation déjà posée. `onEdit` réutilise `editingAnnotation`
+        // (même dialogue que depuis BookmarkPanel, Lot 22 tâche 11).
+        val currentTappedAnnotation = tappedAnnotation
+        val currentTappedBounds = tappedAnnotationBounds
+        if (currentTappedAnnotation != null && currentTappedBounds != null) {
+            AnnotationTapPopup(
+                boundsInWindow = currentTappedBounds,
+                onEdit = {
+                    editingAnnotation = currentTappedAnnotation
+                    tappedAnnotation = null
+                    tappedAnnotationBounds = null
+                },
+                onDelete = {
+                    viewModel.onIntent(ReaderIntent.DeleteAnnotation(currentTappedAnnotation.id))
+                    tappedAnnotation = null
+                    tappedAnnotationBounds = null
+                },
+                onDismiss = {
+                    tappedAnnotation = null
+                    tappedAnnotationBounds = null
+                },
+            )
         }
 
         if (editingAnnotation != null) {
