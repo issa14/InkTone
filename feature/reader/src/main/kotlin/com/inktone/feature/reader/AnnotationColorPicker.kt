@@ -8,10 +8,12 @@ import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.CircleShape
+import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Button
 import androidx.compose.material3.FilterChip
@@ -21,6 +23,7 @@ import androidx.compose.material3.TextButton
 import androidx.compose.material3.TextField
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableFloatStateOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
@@ -35,6 +38,7 @@ import androidx.compose.ui.text.style.TextDecoration
 import androidx.compose.ui.unit.dp
 import com.inktone.core.designsystem.AppIcon
 import com.inktone.core.designsystem.AppSymbol
+import com.inktone.core.designsystem.InkToneSlider
 import com.inktone.domain.model.AnnotationColor
 import com.inktone.domain.model.AnnotationKind
 
@@ -152,34 +156,79 @@ private fun CustomColorSwatch(onClick: () -> Unit) {
 }
 
 /**
- * Lot 23, tâche 9 — éditeur de couleur personnalisée : champ hex `#RRGGBB`,
- * même convention que `ThemeStudioScreen.ColorPickerDialog` (cohérence
- * avec l'éditeur de thème existant plutôt que des curseurs R/V/B inédits
- * dans le reste de l'app). Opacité toujours pleine (`FF`) : une annotation
- * translucide n'a pas de sens pour un surlignage/soulignement/barré.
+ * Lot 23, tâche 9 (corrigé après retour Issa) — éditeur de couleur
+ * personnalisée : **des curseurs R/V/B en interaction principale**, avec
+ * aperçu en direct. Un champ hex avait été retenu d'abord pour rester
+ * cohérent avec `ThemeStudioScreen.ColorPickerDialog` — mais un champ
+ * hexadécimal exige de connaître ce système de notation, contre-productif
+ * pour une app grand public (retour direct d'Issa). Les curseurs
+ * réutilisent [InkToneSlider] (forme unique de tout réglage numérique
+ * d'InkTone). Le champ hex reste, mais en second plan : saisie optionnelle
+ * qui met à jour les curseurs (sens unique hex → curseurs), jamais le seul
+ * chemin pour choisir une couleur. Opacité toujours pleine (`FF`) : une
+ * annotation translucide n'a pas de sens pour un surlignage/soulignement/
+ * barré.
  */
 @Composable
 private fun CustomColorDialog(onConfirm: (AnnotationColor) -> Unit, onDismiss: () -> Unit) {
+    var red by remember { mutableFloatStateOf(255f) }
+    var green by remember { mutableFloatStateOf(235f) }
+    var blue by remember { mutableFloatStateOf(59f) }
     var hex by remember { mutableStateOf("") }
-    val isValid = remember(hex) { Regex("^#[0-9A-Fa-f]{6}$").matches(hex) }
+
+    val previewColor = remember(red, green, blue) {
+        Color(red = red / 255f, green = green / 255f, blue = blue / 255f)
+    }
 
     AlertDialog(
         onDismissRequest = onDismiss,
         title = { Text("Couleur personnalisée") },
         text = {
-            TextField(
-                value = hex,
-                onValueChange = { hex = it },
-                label = { Text("Valeur hexadécimale") },
-                placeholder = { Text("#RRGGBB") },
-                isError = hex.isNotEmpty() && !isValid,
-                singleLine = true,
-            )
+            Column {
+                Box(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .height(48.dp)
+                        .clip(RoundedCornerShape(8.dp))
+                        .background(previewColor)
+                        .semantics { contentDescription = "Aperçu de la couleur" },
+                )
+                InkToneSlider(
+                    label = "Rouge",
+                    value = red,
+                    range = 0f..255f,
+                    onValueChange = { red = it },
+                    modifier = Modifier.padding(top = 12.dp),
+                )
+                InkToneSlider(label = "Vert", value = green, range = 0f..255f, onValueChange = { green = it })
+                InkToneSlider(label = "Bleu", value = blue, range = 0f..255f, onValueChange = { blue = it })
+                // Lot 23 (corrigé) — chemin avancé optionnel : une saisie
+                // hex valide met à jour les curseurs, jamais l'inverse (les
+                // curseurs restent la seule source de vérité affichée).
+                TextField(
+                    value = hex,
+                    onValueChange = { typed ->
+                        hex = typed
+                        if (Regex("^#[0-9A-Fa-f]{6}$").matches(typed)) {
+                            val argb = hexRgbToAnnotationColor(typed).argb
+                            red = ((argb shr 16) and 0xFF).toFloat()
+                            green = ((argb shr 8) and 0xFF).toFloat()
+                            blue = (argb and 0xFF).toFloat()
+                        }
+                    },
+                    label = { Text("Ou saisir un code hexadécimal") },
+                    placeholder = { Text("#RRGGBB") },
+                    singleLine = true,
+                    modifier = Modifier.padding(top = 12.dp),
+                )
+            }
         },
         confirmButton = {
             TextButton(
-                enabled = isValid,
-                onClick = { onConfirm(hexRgbToAnnotationColor(hex)) },
+                onClick = {
+                    val argb = 0xFF000000.toInt() or (red.toInt() shl 16) or (green.toInt() shl 8) or blue.toInt()
+                    onConfirm(AnnotationColor(argb))
+                },
             ) { Text("Appliquer") }
         },
         dismissButton = { TextButton(onClick = onDismiss) { Text("Annuler") } },
@@ -187,9 +236,10 @@ private fun CustomColorDialog(onConfirm: (AnnotationColor) -> Unit, onDismiss: (
 }
 
 /**
- * Lot 23, tâche 9 — `#RRGGBB` (opacité toujours pleine, voir
- * [CustomColorDialog]) vers [AnnotationColor]. `internal` pour rester
- * testable sans passer par la boîte de dialogue Compose.
+ * Lot 23, tâche 9 — `#RRGGBB` (opacité toujours pleine) vers
+ * [AnnotationColor]. `internal` pour rester testable indépendamment de la
+ * boîte de dialogue Compose ; utilisé par la saisie hex optionnelle de
+ * [CustomColorDialog].
  */
 internal fun hexRgbToAnnotationColor(hex: String): AnnotationColor =
     AnnotationColor((0xFF000000L or hex.removePrefix("#").toLong(16)).toInt())

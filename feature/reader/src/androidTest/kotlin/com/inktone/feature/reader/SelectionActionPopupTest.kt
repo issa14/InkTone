@@ -120,7 +120,7 @@ class SelectionActionPopupTest {
 
         composeTestRule.onNodeWithText("Surligner").performClick()
         composeTestRule.onNodeWithContentDescription("Personnaliser la couleur").performClick()
-        composeTestRule.onNodeWithText("Valeur hexadécimale").performTextInput("#123456")
+        composeTestRule.onNodeWithText("Ou saisir un code hexadécimal").performTextInput("#123456")
         composeTestRule.onNodeWithText("Appliquer").performClick()
         composeTestRule.onNodeWithText("Surligner").performClick()
 
