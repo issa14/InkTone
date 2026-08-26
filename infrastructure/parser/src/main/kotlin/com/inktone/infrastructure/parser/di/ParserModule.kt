@@ -5,7 +5,7 @@ import com.inktone.domain.service.EpubResourceResolver
 import com.inktone.domain.service.FixedPageRenderer
 import com.inktone.domain.service.PublicationParser
 import com.inktone.infrastructure.parser.CompositePublicationParser
-import com.inktone.infrastructure.parser.EpubChapterParser
+import com.inktone.infrastructure.parser.CompositeChapterParser
 import com.inktone.infrastructure.parser.JsoupChapterParser
 import com.inktone.infrastructure.parser.PdfPageRendererImpl
 import com.inktone.infrastructure.parser.ReadiumResourceResolver
@@ -22,7 +22,7 @@ import javax.inject.Singleton
  * Lie les contrats de domaine aux implémentations dans infrastructure/parser.
  *
  * - [PublicationParser] → [CompositePublicationParser] (EPUB/TXT/PDF)
- * - [ChapterParser] → [EpubChapterParser] (parsing paresseux EPUB)
+ * - [ChapterParser] → [CompositeChapterParser] (parsing paresseux EPUB *et* PDF)
  * - [JsoupChapterParser] fourni comme singleton (utilisé par EpubChapterParser)
  * - [FixedPageRenderer] → [PdfPageRendererImpl] (rendu bitmap PDF)
  *
@@ -38,7 +38,7 @@ abstract class ParserModule {
 
     @Binds
     @Singleton
-    abstract fun bindChapterParser(impl: EpubChapterParser): ChapterParser
+    abstract fun bindChapterParser(impl: CompositeChapterParser): ChapterParser
 
     @Binds
     @Singleton

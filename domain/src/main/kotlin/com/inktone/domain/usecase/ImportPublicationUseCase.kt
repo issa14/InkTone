@@ -94,16 +94,22 @@ class ImportPublicationUseCase(
         // s'execute, meme degradation - limite connue, non traitee ici
         // (pas une perte de donnees).
         //
-        // Plan v3 : pour l'EPUB, le DocumentModel issu du parsing plus haut
-        // n'est plus qu'une coquille (parsing paresseux, D2) -
-        // chapter.sentences y est toujours vide, donc indexPublication
-        // n'indexerait rien. On parse chaque chapitre via ChapterParser
-        // (seul point du plan qui accepte ce cout : Tache 7.3, mesure par
+        // Plan v3 : pour les formats a parsing PARESSEUX, le DocumentModel
+        // issu du parsing plus haut n'est qu'une coquille -
+        // chapter.sentences y est vide, donc indexPublication n'indexerait
+        // rien. On parse chaque chapitre via ChapterParser (seul point du
+        // plan qui accepte ce cout : Tache 7.3, mesure par
         // ImportBenchmarkTest) et on indexe le contenu reel via
-        // indexSentences. PDF/TXT restent inchanges : leur DocumentModel
-        // est deja eagerly peuple par leur parseur respectif.
+        // indexSentences.
+        //
+        // Le PDF a rejoint ce cas le 2026-08-26 : son parseur extrayait
+        // jusque-la tout le livre a chaque parse, y compris a l'ouverture du
+        // lecteur (7 970 ms pour 994 pages, mesure appareil). Le cout total
+        // de l'import est inchange — il est seulement paye ICI, une fois,
+        // dans le worker, au lieu de l'etre a chaque ouverture.
+        // TXT reste eagerly peuple par son parseur.
         try {
-            if (publication.format == PublicationFormat.EPUB) {
+            if (publication.format == PublicationFormat.EPUB || publication.format == PublicationFormat.PDF) {
                 chapterParser.registerPublication(publication.id, fileUri)
                 documentModel.chapters.forEach { shell ->
                     val chapter = chapterParser.parseChapter(publication.id, shell.href)

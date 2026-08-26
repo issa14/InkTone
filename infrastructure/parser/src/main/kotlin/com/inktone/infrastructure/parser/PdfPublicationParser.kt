@@ -1,19 +1,14 @@
 package com.inktone.infrastructure.parser
 
 import android.graphics.Bitmap
-import com.inktone.domain.model.BookBlock
 import com.inktone.domain.model.Chapter
-import com.inktone.domain.model.ChapterContent
 import com.inktone.domain.model.DocumentModel
 import com.inktone.domain.model.PublicationFormat
-import com.inktone.domain.model.Sentence
-import com.inktone.domain.model.StyledText
 import com.inktone.domain.service.CoverExtractionResult
 import com.inktone.domain.service.FileStorageService
 import com.inktone.domain.service.ParseResult
 import com.inktone.domain.service.PublicationMetadata
 import com.inktone.domain.service.PublicationParser
-import io.legere.pdfiumandroid.PdfPage
 import io.legere.pdfiumandroid.PdfPasswordException
 import io.legere.pdfiumandroid.PdfiumCore
 import kotlinx.coroutines.CoroutineDispatcher
@@ -25,10 +20,15 @@ import javax.inject.Singleton
 
 /**
  * Un PDF est traite comme N pages, chacune un [Chapter] a part entiere
- * (Lot 12, tache 12.2/12.3, decision actee 4 du plan) - jamais un
- * `DocumentModel` vide de facade : les `paragraphs` viennent du texte
- * reellement extrait de la page, liste vide seulement si la page est une
- * image scannee sans texte.
+ * (Lot 12, tache 12.2/12.3, decision actee 4 du plan).
+ *
+ * **[parse] est PARESSEUX depuis la mesure device du 2026-08-26** : il rend
+ * des coquilles de pages, le texte etant charge page par page par
+ * [PdfChapterParser] — meme modele que l'EPUB
+ * (`ReadiumPublicationParser.parseLazy` + `EpubChapterParser`). Extraire
+ * tout le livre ici coutait 7 970 ms A CHAQUE OUVERTURE pour un roman de
+ * 994 pages (Snapdragon 680), pour une seule page effectivement lue.
+ * L'import, lui, a bien besoin de tout : il passe par [parseAllPages].
  *
  * Version PDFium retenue : `io.legere:pdfiumandroid:1.0.20`, pas la
  * derniere publiee - `2.0.3`/`2.0.2`/`1.0.35` embarquent une metadonnee
@@ -49,10 +49,6 @@ class PdfPublicationParser @Inject constructor(
     private val pdfiumDispatcher: CoroutineDispatcher = Dispatchers.IO.limitedParallelism(1)
 
     private val pdfiumCore = PdfiumCore()
-
-    // Meme regex naive que TxtPublicationParser (Tache 4.2) - decoupage
-    // linguistique reel hors perimetre d'un parser (Blueprint §8.6).
-    private val sentenceBoundary = Regex("""(?<=[.!?])\s+""")
 
     override suspend fun parse(fileUri: String): ParseResult = withContext(pdfiumDispatcher) {
         val bytes = fileStorageService.openInputStream(fileUri)
@@ -82,26 +78,17 @@ class PdfPublicationParser @Inject constructor(
                 return@withContext ParseResult.Corrupted("PDF sans page exploitable : $fileUri")
             }
 
+            // Coquilles de pages, contenu chargé à la demande par
+            // [PdfChapterParser] — voir le KDoc de classe. Seules les
+            // PROBE_PAGES premières pages sont extraites ici, et uniquement
+            // pour que le lecteur sache s'il a du texte a narrer
+            // (`ReaderUiState.supportsTts`) sans payer le livre entier.
+            val probeUntil = minOf(PROBE_PAGES, pageCount)
             val chapters = (0 until pageCount).map { pageIndex ->
-                document.openPage(pageIndex).use { page ->
-                    val (fullText, sentences) = extractPageContent(page)
-                    val blocks = if (fullText.isNotBlank()) {
-                        listOf(
-                            BookBlock.ParagraphBlock(
-                                richText = StyledText.plain(fullText),
-                                globalOffsetRange = 0 until fullText.length,
-                            ),
-                        )
-                    } else {
-                        emptyList<BookBlock>()
-                    }
-                    Chapter(
-                        index = pageIndex,
-                        href = "page-$pageIndex",
-                        title = null,
-                        content = ChapterContent.Rich(blocks = blocks),
-                        sentences = sentences,
-                    )
+                if (pageIndex < probeUntil) {
+                    document.openPage(pageIndex).use { page -> page.toChapter(pageIndex) }
+                } else {
+                    pageShell(pageIndex)
                 }
             }
 
@@ -117,6 +104,33 @@ class PdfPublicationParser @Inject constructor(
                     coverUri = coverUri,
                 ),
             )
+        } finally {
+            document.close()
+        }
+    }
+
+    /**
+     * Extrait le texte de TOUTES les pages — le seul appelant légitime est
+     * l'import, qui doit alimenter l'index de recherche
+     * (`ImportPublicationUseCase`). Jamais le lecteur : c'est précisément ce
+     * coût (7 970 ms pour 994 pages, mesuré sur appareil) que le parsing
+     * paresseux de [parse] supprime.
+     */
+    suspend fun parseAllPages(fileUri: String): List<Chapter> = withContext(pdfiumDispatcher) {
+        val bytes = fileStorageService.openInputStream(fileUri)
+            ?.use { stream -> runCatching { stream.readBytes() }.getOrNull() }
+            ?: return@withContext emptyList()
+        if (!hasPdfMagicBytes(bytes)) return@withContext emptyList()
+
+        val document = try {
+            pdfiumCore.newDocument(bytes)
+        } catch (e: Exception) {
+            return@withContext emptyList()
+        }
+        try {
+            (0 until document.getPageCount()).map { pageIndex ->
+                document.openPage(pageIndex).use { page -> page.toChapter(pageIndex) }
+            }
         } finally {
             document.close()
         }
@@ -155,39 +169,13 @@ class PdfPublicationParser @Inject constructor(
     }
 
     /**
-     * Extrait le texte complet et les phrases d'une page PDF.
-     *
-     * @return Pair(texte complet trimé, liste de phrases avec offsets).
-     *   Texte vide si la page est une image scannée sans texte.
-     */
-    private fun extractPageContent(page: PdfPage): Pair<String, List<Sentence>> = page.openTextPage().use { textPage ->
-        val charCount = textPage.textPageCountChars()
-        if (charCount <= 0) return@use "" to emptyList()
-        val text = textPage.textPageGetText(0, charCount)?.trim()
-        if (text.isNullOrBlank()) return@use "" to emptyList()
-
-        var offset = 0
-        val sentences = sentenceBoundary.split(text).mapIndexed { index, raw ->
-            val trimmed = raw.trim()
-            // blockIndex = 0 : la page produit toujours exactement un
-            // BookBlock.ParagraphBlock unique (ci-dessous) quand du texte
-            // existe — jamais le défaut -1, sinon l'auto-scroll TTS
-            // (ReaderScreen) ne trouve jamais son bloc pour un PDF.
-            val sentence = Sentence(index = index, text = trimmed, startOffset = offset, endOffset = offset + trimmed.length, blockIndex = 0)
-            offset += trimmed.length + 1
-            sentence
-        }.filter { it.text.isNotBlank() }
-        text to sentences
-    }
-
-    /**
      * Rendu de la page 0 via la primitive partagee [renderToBitmap]
      * (tache 12.7 - reutilisee par `PdfPageRendererImpl` au Palier 2, un
      * seul point d'appel a l'API bitmap PDFium). Sauvegarde au meme
      * format et au meme emplacement que la couverture EPUB
      * ([ReadiumPublicationParser.extractAndSaveCover]) - JPEG qualite 85
      * via [CoverStorage] (`filesDir/covers/`), pas WEBP comme envisage
-     * initialement dans la recherche : un seul format de couverture plutot
+     * dans la recherche : un seul format de couverture dans l'app plutot
      * que deux conventions divergentes sans raison forte.
      */
     private fun extractAndSaveCover(document: io.legere.pdfiumandroid.PdfDocument, fileUri: String): String? =
@@ -210,5 +198,12 @@ class PdfPublicationParser @Inject constructor(
 
     private companion object {
         const val COVER_TARGET_WIDTH_PX = 300
+
+        /**
+         * Nombre de pages réellement extraites par [parse]. Assez pour
+         * décider si le document porte du texte (donc si le TTS a un sens),
+         * assez peu pour rester imperceptible : ~8 ms/page sur Snapdragon 680.
+         */
+        const val PROBE_PAGES = 5
     }
 }
