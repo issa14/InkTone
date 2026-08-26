@@ -120,6 +120,7 @@ class ReaderViewModelBookmarkToggleTest {
             readingSessionRepository = FakeReadingSessionRepository(),
             themeRepository = com.inktone.core.testing.fake.FakeThemeRepository(),
             fixedPageRenderer = com.inktone.core.testing.fake.FakeFixedPageRenderer(),
+            renderedPageCache = com.inktone.core.testing.fake.FakeRenderedPageCache(),
             chapterParser = FakeChapterParser(),
             epubResourceResolver = FakeEpubResourceResolver(),
             narrationSessionContinuation = NarrationSessionContinuation(
@@ -362,6 +363,7 @@ class ReaderViewModelBookmarkToggleTest {
             readingSessionRepository = FakeReadingSessionRepository(),
             themeRepository = com.inktone.core.testing.fake.FakeThemeRepository(),
             fixedPageRenderer = com.inktone.core.testing.fake.FakeFixedPageRenderer(),
+            renderedPageCache = com.inktone.core.testing.fake.FakeRenderedPageCache(),
             chapterParser = FakeChapterParser(),
             epubResourceResolver = FakeEpubResourceResolver(),
             narrationSessionContinuation = NarrationSessionContinuation(

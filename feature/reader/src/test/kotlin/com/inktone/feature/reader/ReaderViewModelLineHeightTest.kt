@@ -82,6 +82,7 @@ class ReaderViewModelLineHeightTest {
             readingSessionRepository = FakeReadingSessionRepository(),
             themeRepository = FakeThemeRepository(),
             fixedPageRenderer = com.inktone.core.testing.fake.FakeFixedPageRenderer(),
+            renderedPageCache = com.inktone.core.testing.fake.FakeRenderedPageCache(),
             chapterParser = FakeChapterParser(),
             epubResourceResolver = FakeEpubResourceResolver(),
             narrationSessionContinuation = NarrationSessionContinuation(

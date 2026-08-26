@@ -2,6 +2,7 @@ package com.inktone.domain.usecase
 
 import com.inktone.domain.repository.PublicationRepository
 import com.inktone.domain.service.PreAnalysisStore
+import com.inktone.domain.service.RenderedPageCache
 import com.inktone.domain.service.TtsSegmentCache
 
 /**
@@ -11,18 +12,21 @@ import com.inktone.domain.service.TtsSegmentCache
  * est garantie par le schéma (`onDelete = ForeignKey.CASCADE`), pas par
  * de la logique ici — voir `CascadeDeleteTest`.
  *
- * Lot 22 — la pré-analyse persistée et le cache TTS vivent hors Room
- * (fichiers par publication) et ne bénéficient donc pas du `CASCADE` :
- * leur purge est explicite ici (décision 1/3), jamais implicite.
+ * Lot 22 — la pré-analyse persistée, le cache TTS et le cache de pages PDF
+ * vivent hors Room (fichiers par publication) et ne bénéficient donc pas
+ * du `CASCADE` : leur purge est explicite ici (décision 1/3), jamais
+ * implicite.
  */
 class DeletePublicationUseCase(
     private val publicationRepository: PublicationRepository,
     private val preAnalysisStore: PreAnalysisStore,
     private val ttsSegmentCache: TtsSegmentCache,
+    private val renderedPageCache: RenderedPageCache,
 ) {
     suspend operator fun invoke(publicationId: String) {
         publicationRepository.delete(publicationId)
         preAnalysisStore.delete(publicationId)
         ttsSegmentCache.deletePublication(publicationId)
+        renderedPageCache.deletePublication(publicationId)
     }
 }

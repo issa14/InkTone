@@ -21,6 +21,7 @@ import com.inktone.domain.service.PublicationParser
 import com.inktone.domain.service.PreAnalysisStore
 import com.inktone.domain.service.SearchService
 import com.inktone.domain.service.SyncOperationTracker
+import com.inktone.domain.service.RenderedPageCache
 import com.inktone.domain.service.TtsSegmentCache
 import com.inktone.domain.service.OpdsCredentialsStore
 import com.inktone.domain.service.OpdsDownloadScheduler
@@ -157,7 +158,8 @@ object UseCaseModule {
         publicationRepository: PublicationRepository,
         preAnalysisStore: PreAnalysisStore,
         ttsSegmentCache: TtsSegmentCache,
-    ): DeletePublicationUseCase = DeletePublicationUseCase(publicationRepository, preAnalysisStore, ttsSegmentCache)
+        renderedPageCache: RenderedPageCache,
+    ): DeletePublicationUseCase = DeletePublicationUseCase(publicationRepository, preAnalysisStore, ttsSegmentCache, renderedPageCache)
 
     @Provides
     fun provideRegenerateCoversUseCase(

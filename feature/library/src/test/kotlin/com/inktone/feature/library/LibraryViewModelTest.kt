@@ -7,6 +7,7 @@ import com.inktone.core.testing.fake.FakePlaybackSession
 import com.inktone.core.testing.fake.FakePublicationParser
 import com.inktone.core.testing.fake.FakePublicationRepository
 import com.inktone.core.testing.fake.FakePreAnalysisStore
+import com.inktone.core.testing.fake.FakeRenderedPageCache
 import com.inktone.core.testing.fake.FakeReadingStateRepository
 import com.inktone.core.testing.fake.FakeTtsSegmentCache
 import com.inktone.core.testing.fake.FakeSyncAccountRepository
@@ -76,7 +77,7 @@ class LibraryViewModelTest {
         readingStateRepository,
         ToggleFavoriteUseCase(publicationRepository),
         TogglePinUseCase(publicationRepository),
-        DeletePublicationUseCase(publicationRepository, FakePreAnalysisStore(), FakeTtsSegmentCache()),
+        DeletePublicationUseCase(publicationRepository, FakePreAnalysisStore(), FakeTtsSegmentCache(), FakeRenderedPageCache()),
         importProgressObserver,
         FakeImportResultsStore(),
         ImportSessionStore(),

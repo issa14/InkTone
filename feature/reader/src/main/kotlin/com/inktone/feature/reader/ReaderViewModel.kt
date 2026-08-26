@@ -39,6 +39,7 @@ import com.inktone.domain.service.FixedPageRenderer
 import com.inktone.domain.service.ParseResult
 import com.inktone.domain.service.PublicationParser
 import com.inktone.domain.service.ReadingSessionTracker
+import com.inktone.domain.service.RenderedPageCache
 import com.inktone.domain.service.TrackerSnapshot
 import com.inktone.domain.service.TtsEngine
 import com.inktone.domain.service.WordTimestamp
@@ -99,6 +100,9 @@ class ReaderViewModel @Inject constructor(
     // infrastructure/parser/di/ParserModule). Jamais le binding PDFium
     // directement (règle de dépendance, Blueprint §4.7).
     private val fixedPageRenderer: FixedPageRenderer,
+    // Lot 22, Palier C, tâche 9 — cache disque des pages PDF déjà rendues,
+    // purgé avec la publication (DeletePublicationUseCase).
+    private val renderedPageCache: RenderedPageCache,
     // Plan v3, Palier 3.6 — parsing lazy EPUB + résolveur d'images
     private val chapterParser: ChapterParser,
     private val epubResourceResolver: EpubResourceResolver,
@@ -474,9 +478,19 @@ class ReaderViewModel @Inject constructor(
      * `FixedPageRenderer`/PDFium directement. `null` si aucun document
      * PDF n'est ouvert (format non PDF, ou échec d'ouverture déjà reflété
      * dans `errorMessage`).
+     *
+     * Lot 22, Palier C, tâche 9 — consulte [renderedPageCache] avant tout
+     * appel PDFium, écrit après un rendu neuf. La clé porte la résolution
+     * (`targetWidthPx`) : un zoom haute définition n'écrase jamais la page
+     * au repos.
      */
-    suspend fun renderPdfPage(pageIndex: Int, targetWidthPx: Int): RenderedPage? =
-        fixedPageDocument?.renderPage(pageIndex, targetWidthPx)
+    suspend fun renderPdfPage(pageIndex: Int, targetWidthPx: Int): RenderedPage? {
+        val publicationId = currentPublicationId ?: return fixedPageDocument?.renderPage(pageIndex, targetWidthPx)
+        renderedPageCache.get(publicationId, pageIndex, targetWidthPx)?.let { return it }
+        val rendered = fixedPageDocument?.renderPage(pageIndex, targetWidthPx) ?: return null
+        renderedPageCache.put(publicationId, pageIndex, targetWidthPx, rendered)
+        return rendered
+    }
 
     /**
      * Tache 9bis.3.3 — minuteur de sommeil. Un seul job actif a la fois :
