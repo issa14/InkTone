@@ -18,6 +18,7 @@ import com.inktone.domain.service.ChapterParser
 import com.inktone.domain.service.FileStorageService
 import com.inktone.domain.service.ImportSessionStore
 import com.inktone.domain.service.PublicationParser
+import com.inktone.domain.service.PreAnalysisStore
 import com.inktone.domain.service.SearchService
 import com.inktone.domain.service.SyncOperationTracker
 import com.inktone.domain.service.OpdsCredentialsStore
@@ -130,8 +131,9 @@ object UseCaseModule {
         fileStorageService: FileStorageService,
         searchService: SearchService,
         chapterParser: ChapterParser,
+        preAnalysisStore: PreAnalysisStore,
     ): ImportPublicationUseCase =
-        ImportPublicationUseCase(publicationParser, publicationRepository, fileStorageService, searchService, chapterParser)
+        ImportPublicationUseCase(publicationParser, publicationRepository, fileStorageService, searchService, chapterParser, preAnalysisStore)
 
     @Provides
     fun provideExportLibraryUseCase(

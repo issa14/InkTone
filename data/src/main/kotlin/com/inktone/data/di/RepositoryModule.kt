@@ -1,5 +1,7 @@
 package com.inktone.data.di
 
+import android.content.Context
+import com.inktone.data.preanalysis.FilePreAnalysisStore
 import com.inktone.data.repository.DeviceIdentityRepositoryImpl
 import com.inktone.data.repository.InMemoryOpdsDownloadObserver
 import com.inktone.data.repository.InMemorySyncOperationTracker
@@ -36,12 +38,16 @@ import com.inktone.domain.repository.SyncFleetRepository
 import com.inktone.domain.repository.ThemeRepository
 import com.inktone.domain.repository.VoiceProfileRepository
 import com.inktone.domain.service.OpdsDownloadObserver
+import com.inktone.domain.service.PreAnalysisStore
 import com.inktone.domain.service.SyncNowService
 import com.inktone.domain.service.SyncOperationTracker
 import dagger.Binds
 import dagger.Module
+import dagger.Provides
 import dagger.hilt.InstallIn
+import dagger.hilt.android.qualifiers.ApplicationContext
 import dagger.hilt.components.SingletonComponent
+import java.io.File
 import javax.inject.Singleton
 
 @Module
@@ -66,4 +72,11 @@ abstract class RepositoryModule {
     @Binds @Singleton abstract fun bindConflictQueueRepository(impl: RoomConflictQueueRepository): ConflictQueueRepository
     @Binds @Singleton abstract fun bindOpdsDownloadObserver(impl: InMemoryOpdsDownloadObserver): OpdsDownloadObserver
     @Binds @Singleton abstract fun bindOpdsCatalogRepository(impl: RoomOpdsCatalogRepository): OpdsCatalogRepository
+    @Binds @Singleton abstract fun bindPreAnalysisStore(impl: FilePreAnalysisStore): PreAnalysisStore
+
+    companion object {
+        @Provides
+        @Singleton
+        fun provideCacheDir(@ApplicationContext context: Context): File = context.cacheDir
+    }
 }
