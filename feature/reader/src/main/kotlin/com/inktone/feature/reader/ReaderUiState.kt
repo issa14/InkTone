@@ -2,6 +2,7 @@ package com.inktone.feature.reader
 
 import com.inktone.domain.model.Annotation
 import com.inktone.domain.model.AnnotationColor
+import com.inktone.domain.model.AnnotationKind
 import com.inktone.domain.model.Bookmark
 import com.inktone.domain.model.Chapter
 import com.inktone.domain.model.EffectiveReadingSettings
@@ -330,7 +331,15 @@ sealed interface ReaderIntent {
      * migration Room nécessaire, `null` reste distinct d'une note vidée
      * volontairement (voir `Annotation.kt`).
      */
-    data class ConfirmAnnotation(val color: AnnotationColor, val content: String? = null) : ReaderIntent
+    // Lot 23, tâche 4 — `kind` comble le trou trouvé à la vérification
+    // device du Lot 22 : `AnnotationKind` existait déjà (rendu +
+    // migration) mais rien ne permettait de le choisir, toute annotation
+    // devenait `HIGHLIGHT` par défaut.
+    data class ConfirmAnnotation(
+        val color: AnnotationColor,
+        val kind: AnnotationKind = AnnotationKind.HIGHLIGHT,
+        val content: String? = null,
+    ) : ReaderIntent
 
     /**
      * Tâche 3c.3 — remplace `CreateBookmark` (Tâche 7.2) : le bouton du
