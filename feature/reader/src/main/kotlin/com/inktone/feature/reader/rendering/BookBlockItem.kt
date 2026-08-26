@@ -49,6 +49,7 @@ import com.inktone.domain.model.BookBlock
 import com.inktone.domain.service.EpubResourceResolver
 import com.inktone.feature.reader.SelectionHighlightColor
 import com.inktone.feature.reader.WordHighlightColor
+import com.inktone.feature.reader.annotationSpanStyle
 import com.inktone.feature.reader.drawAbsoluteRangeHighlight
 import com.inktone.feature.reader.rangeBoundsInWindow
 import com.inktone.feature.reader.toComposeColor
@@ -237,7 +238,7 @@ private fun buildBlockAnnotatedString(
             val localEndExclusive = (minOf(annotation.endLocator.charOffset, range.last + 1) - range.first)
                 .coerceIn(localStart, base.length)
             if (localStart < localEndExclusive) {
-                addStyle(SpanStyle(background = annotation.color.toComposeColor()), localStart, localEndExclusive)
+                addStyle(annotationSpanStyle(annotation.kind, annotation.color), localStart, localEndExclusive)
             }
         }
     }

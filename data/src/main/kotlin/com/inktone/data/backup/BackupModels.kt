@@ -2,6 +2,7 @@ package com.inktone.data.backup
 
 import com.inktone.domain.model.Annotation
 import com.inktone.domain.model.AnnotationColor
+import com.inktone.domain.model.AnnotationKind
 import com.inktone.domain.model.Bookmark
 import com.inktone.domain.model.FontFamily
 import com.inktone.domain.model.PronunciationRule
@@ -93,6 +94,7 @@ data class AnnotationBackup(
     val startLocator: LocatorBackup,
     val endLocator: LocatorBackup,
     val color: String,
+    val kind: String = "HIGHLIGHT",
     val content: String? = null,
     val excerpt: String? = null,
     val isPinned: Boolean = false,
@@ -148,12 +150,12 @@ fun CustomThemeBackup.toDomain(): ReadingTheme = ReadingTheme(
 
 fun Annotation.toBackup(): AnnotationBackup = AnnotationBackup(
     id, publicationId, startLocator.toBackup(), endLocator.toBackup(),
-    color.name, content, excerpt, isPinned, createdAt, updatedAt,
+    color.name, kind.name, content, excerpt, isPinned, createdAt, updatedAt,
 )
 fun AnnotationBackup.toDomain(): Annotation = Annotation(
     id = id, publicationId = publicationId,
     startLocator = startLocator.toDomain(), endLocator = endLocator.toDomain(),
-    color = AnnotationColor.valueOf(color), content = content, excerpt = excerpt,
+    color = AnnotationColor.valueOf(color), kind = AnnotationKind.valueOf(kind), content = content, excerpt = excerpt,
     isPinned = isPinned, createdAt = createdAt, updatedAt = updatedAt,
 )
 
