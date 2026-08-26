@@ -1,6 +1,8 @@
 package com.inktone.feature.reader
 
 import com.inktone.core.testing.fake.FakeChapterParser
+import com.inktone.core.testing.fake.FakeTtsSegmentCache
+import com.inktone.core.testing.fake.FakePronunciationRuleRepository
 import com.inktone.core.testing.fake.FakeReadingStateRepository
 import com.inktone.core.testing.fake.FakeVoiceProfileRepository
 import com.inktone.core.testing.fake.FakePublicationRepository
@@ -77,6 +79,8 @@ class PlaybackOrchestratorWordPositionTest {
             publicationParser = FakePublicationParser(),
             preferencesRepository = FakePreferencesRepository(),
             voiceProfileRepository = FakeVoiceProfileRepository(),
+            ttsSegmentCache = FakeTtsSegmentCache(),
+            pronunciationRuleRepository = FakePronunciationRuleRepository(),
         )
 
         orchestrator.play(listOf(sentence()), profile, 0, "pub1", 0, "ch.xhtml")
@@ -115,6 +119,8 @@ class PlaybackOrchestratorWordPositionTest {
             publicationParser = FakePublicationParser(),
             preferencesRepository = FakePreferencesRepository(),
             voiceProfileRepository = FakeVoiceProfileRepository(),
+            ttsSegmentCache = FakeTtsSegmentCache(),
+            pronunciationRuleRepository = FakePronunciationRuleRepository(),
         )
 
         orchestrator.play(listOf(sentence()), profile, 0, "pub1", 0, "ch.xhtml")
@@ -142,6 +148,8 @@ class PlaybackOrchestratorWordPositionTest {
             publicationParser = FakePublicationParser(),
             preferencesRepository = FakePreferencesRepository(),
             voiceProfileRepository = FakeVoiceProfileRepository(),
+            ttsSegmentCache = FakeTtsSegmentCache(),
+            pronunciationRuleRepository = FakePronunciationRuleRepository(),
         )
 
         orchestrator.play(listOf(sentence()), profile, 0, "pub1", 0, "ch.xhtml")
