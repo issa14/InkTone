@@ -54,14 +54,40 @@ class PdfPageRendererImpl @Inject constructor(
             return@withContext FixedPageOpenResult.Failed("PDF sans page exploitable : $fileUri")
         }
 
-        FixedPageOpenResult.Success(PdfFixedPageDocument(document, pageCount, pdfiumDispatcher))
+        // `bytes` est passe TEL QUEL au natif (voir KDoc de
+        // PdfFixedPageDocument) : il doit survivre au retour de `open`.
+        FixedPageOpenResult.Success(PdfFixedPageDocument(document, pageCount, pdfiumDispatcher, bytes))
     }
 }
 
+/**
+ * **Bug reel trouve sur appareil (2026-08-26) : PDF ouvert = ecran noir.**
+ *
+ * `PdfiumCore.newDocument(ByteArray)` fait un `FPDF_LoadMemDocument` : le
+ * natif conserve un POINTEUR vers le tableau, il n'en copie pas le
+ * contenu. Verifie par decompilation de `pdfiumandroid-1.0.20` —
+ * `PdfDocument` ne porte que `mNativeDocPtr` et un champ
+ * `parcelFileDescriptor` (retenu, lui, pour la surcharge PFD) : AUCUN
+ * champ ne retient le `ByteArray`. C'est donc a l'appelant de le
+ * maintenir en vie aussi longtemps que le document.
+ *
+ * [PdfPublicationParser.parse] y survivait par accident : son `bytes` est
+ * une locale vivante jusqu'au `document.close()` du `finally`. Ici, `open`
+ * RETOURNE et rendait le tableau injoignable — chaque `renderPage`
+ * suivant lisait de la memoire liberee, echouait, et l'echec disparaissait
+ * dans le `catch` ci-dessous. D'ou le symptome exact remonte par les
+ * beta-testeurs : import, titre, auteur et couverture corrects (tous
+ * produits par le parser), mais page noire et muette a la lecture.
+ *
+ * [sourceBytes] n'est jamais lu par ce code : sa seule raison d'etre est
+ * d'empecher le ramasse-miettes de collecter le tampon que PDFium lit.
+ * Ne pas le supprimer parce qu'il "ne sert a rien".
+ */
 private class PdfFixedPageDocument(
     private val document: io.legere.pdfiumandroid.PdfDocument,
     override val pageCount: Int,
     private val pdfiumDispatcher: CoroutineDispatcher,
+    @Suppress("unused") private val sourceBytes: ByteArray,
 ) : FixedPageDocument {
 
     override suspend fun renderPage(pageIndex: Int, targetWidthPx: Int): RenderedPage? = withContext(pdfiumDispatcher) {
@@ -80,7 +106,11 @@ private class PdfFixedPageDocument(
         } catch (e: Exception) {
             // Meme discipline safeNativeCall : un echec de rendu ponctuel
             // (page corrompue isolement, erreur native transitoire) ne
-            // doit jamais crasher la session de lecture en cours.
+            // doit jamais crasher la session de lecture en cours. Mais il
+            // ne doit plus disparaitre sans laisser de trace : c'est ce
+            // silence qui a rendu le bug du tampon collecte (voir KDoc de
+            // cette classe) invisible jusqu'a la verification sur appareil.
+            android.util.Log.w("PdfPageRenderer", "echec de rendu de la page $pageIndex", e)
             null
         }
     }

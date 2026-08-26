@@ -132,6 +132,22 @@ data class ReaderUiState(
     // seul format ouvert avant que ce champ n'existe, aucune valeur
     // initiale ambigue introduite pour l'existant.
     val publicationFormat: PublicationFormat = PublicationFormat.EPUB,
+    /**
+     * Le document de rendu PDF (PDFium) est ouvert et utilisable.
+     *
+     * Bug reel trouve sur appareil (2026-08-26) : `openPublication` peuple
+     * l'etat AVANT d'ouvrir le document (volontairement, pour qu'un echec
+     * s'affiche sur le meme ecran). L'ecran composait donc, mesurait son
+     * viewport et demandait sa premiere page pendant que `fixedPageDocument`
+     * etait encore nul — `renderPdfPage` rendait `null`, et l'effet de rendu
+     * ne repartait JAMAIS, ses cles (page, taille) ne changeant plus. Page
+     * noire definitive, sans erreur ni log : le symptome « la lecture de PDF
+     * ne marche pas » remonte par les premiers beta-testeurs.
+     *
+     * Ce drapeau est une cle d'effet : il fait repartir le rendu au moment
+     * ou le document devient reellement disponible.
+     */
+    val isFixedPageReady: Boolean = false,
     // Plan v3, Palier 3.6 — résolveur d'images EPUB, null pour PDF/TXT
     val epubResourceResolver: EpubResourceResolver? = null,
     // Plan v3, Palier 3.6 — ID de la publication ouverte (pour EpubImageKey)

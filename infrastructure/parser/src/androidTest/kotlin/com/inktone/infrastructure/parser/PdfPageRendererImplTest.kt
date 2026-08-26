@@ -98,4 +98,51 @@ class PdfPageRendererImplTest {
             document.close()
         }
     }
+
+    /**
+     * Bug reel trouve sur appareil (2026-08-26), remonte par les premiers
+     * beta-testeurs sous la forme « la lecture de PDF ne marche pas » :
+     * PDF importe correctement (titre, auteur, couverture), puis page
+     * NOIRE et muette a l'ouverture dans le lecteur.
+     *
+     * Cause : `newDocument(ByteArray)` fait un `FPDF_LoadMemDocument`, le
+     * natif ne garde qu'un POINTEUR vers le tampon. `open()` laissait son
+     * `ByteArray` local devenir injoignable en retournant — le ramasse-
+     * miettes le collectait, et tout `renderPage` ulterieur lisait de la
+     * memoire liberee. L'echec etait avale par le `catch` de renderPage :
+     * aucun message, aucun log, juste du noir.
+     *
+     * Ce test reproduit la condition manquante : rendre APRES que `open`
+     * ait rendu la main ET apres une vraie pression memoire. Sans la
+     * retention du tampon par le document, il echoue.
+     */
+    @Test
+    fun rend_encore_apres_le_retour_de_open_et_sous_pression_memoire() = runTest {
+        val file = copyFixture("fixture-valid.pdf")
+        val openResult = renderer().open(file.absolutePath)
+
+        check(openResult is FixedPageOpenResult.Success)
+        val document = openResult.document
+        try {
+            // `open` a rendu la main : son ByteArray local n'est plus
+            // reference que par le document lui-meme, si celui-ci le retient.
+            @Suppress("ExplicitGarbageCollectionCall")
+            System.gc()
+            // Allocation reelle : un System.gc() seul reste une suggestion,
+            // la pression memoire force un vrai passage.
+            repeat(40) { ByteArray(1 shl 20) }
+            @Suppress("ExplicitGarbageCollectionCall")
+            System.gc()
+
+            val page = document.renderPage(0, targetWidthPx = 300)
+            assertTrue(
+                "le rendu doit encore fonctionner apres GC : le document doit retenir le tampon source",
+                page != null,
+            )
+            assertEquals(300, page!!.widthPx)
+            assertTrue("une page rendue ne peut pas etre vide", page.pixelsArgb.any { it != 0 })
+        } finally {
+            document.close()
+        }
+    }
 }

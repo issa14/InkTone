@@ -65,6 +65,15 @@ fun FixedPageContent(
     renderPage: suspend (pageIndex: Int, targetWidthPx: Int) -> RenderedPage?,
     invertColors: (pageIndex: Int) -> Boolean,
     reduceMotion: Boolean,
+    // Bug reel trouve sur appareil (2026-08-26) — page noire definitive a
+    // l'ouverture d'un PDF. `renderPage` rend `null` tant que le document
+    // PDFium n'est pas ouvert, et l'ouverture se termine APRES la premiere
+    // composition (voir ReaderUiState.isFixedPageReady). Sans cette cle,
+    // l'effet de rendu ne repartait jamais : ses cles (page, viewport) ne
+    // changeaient plus. Symptome revelateur observe a la verification
+    // device : swiper vers la page suivante PUIS revenir affichait tout
+    // correctement — changer `pageIndex` re-clait l'effet a la main.
+    isRenderReady: Boolean,
     modifier: Modifier = Modifier,
 ) {
     if (pageCount <= 0) return
@@ -113,6 +122,7 @@ fun FixedPageContent(
             invertColors = invertColors(pageIndex),
             onPageOffsetChanged = onPageOffsetChanged,
             bitmapCache = bitmapCache,
+            isRenderReady = isRenderReady,
         )
     }
 }
@@ -125,6 +135,7 @@ private fun FixedPage(
     invertColors: Boolean,
     onPageOffsetChanged: (Float) -> Unit,
     bitmapCache: BitmapCache,
+    isRenderReady: Boolean,
 ) {
     var viewportSizePx by remember { mutableStateOf(IntSize.Zero) }
 
@@ -156,8 +167,8 @@ private fun FixedPage(
     // dans un pool d'une entree pour etre reutilisee via
     // copyPixelsFromBuffer (inBitmap n'est pas applicable aux IntArray
     // de RenderedPage — pixels bruts, pas de decodage BitmapFactory).
-    LaunchedEffect(pageIndex, viewportSizePx) {
-        if (viewportSizePx.width <= 0) return@LaunchedEffect
+    LaunchedEffect(pageIndex, viewportSizePx, isRenderReady) {
+        if (viewportSizePx.width <= 0 || !isRenderReady) return@LaunchedEffect
 
         val cached = bitmapCache.get(pageIndex)
         if (cached != null && cached.width == viewportSizePx.width) {

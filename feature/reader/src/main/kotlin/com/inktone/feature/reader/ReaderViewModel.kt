@@ -544,6 +544,7 @@ class ReaderViewModel @Inject constructor(
         // jamais accumuler des handles natifs non fermes.
         fixedPageDocument?.close()
         fixedPageDocument = null
+        _state.value = _state.value.copy(isFixedPageReady = false)
         viewModelScope.launch {
             val publication = publicationRepository.getById(publicationId) ?: run {
                 Log.w("ReaderViewModel", "openPublication: publication introuvable ($publicationId)")
@@ -670,7 +671,12 @@ class ReaderViewModel @Inject constructor(
                     // s'affiche sur le meme ecran en cas d'echec.
                     if (publication.format == PublicationFormat.PDF) {
                         when (val openResult = fixedPageRenderer.open(publication.fileUri)) {
-                            is FixedPageOpenResult.Success -> fixedPageDocument = openResult.document
+                            is FixedPageOpenResult.Success -> {
+                                fixedPageDocument = openResult.document
+                                // Reveille l'effet de rendu de FixedPageContent,
+                                // qui a deja pu demander sa page a vide.
+                                _state.value = _state.value.copy(isFixedPageReady = true)
+                            }
                             is FixedPageOpenResult.Failed -> {
                                 Log.w("ReaderViewModel", "openPublication: echec ouverture rendu PDF (${openResult.reason})")
                                 _state.value = _state.value.copy(errorMessage = openResult.reason)

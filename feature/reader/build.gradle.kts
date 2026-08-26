@@ -20,6 +20,13 @@ android {
     // systeme necessaires au shadow de Robolectric.
     testOptions {
         unitTests.isIncludeAndroidResources = true
+        // `android.util.Log` leve par defaut en test JVM pur ("not mocked"),
+        // ce qui fait planter tout test traversant un chemin qui journalise
+        // (ReaderViewModelPdfOpenTest, ouverture PDF en echec). L'alternative
+        // — Robolectric sur ces classes — est PIRE ici : kotlinx-coroutines
+        // met en cache le dispatcher `Main`, et une classe Robolectric au
+        // milieu de la suite laisse aux suivantes un `Main` casse.
+        unitTests.isReturnDefaultValues = true
     }
 
     // data (androidTest, ci-dessous) tire transitivement infrastructure/parser
