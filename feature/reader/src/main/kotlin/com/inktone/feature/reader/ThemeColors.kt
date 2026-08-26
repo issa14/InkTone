@@ -2,6 +2,8 @@ package com.inktone.feature.reader
 
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.text.font.FontFamily as ComposeFontFamily
+import com.inktone.core.designsystem.OpenDyslexicFamily
+import com.inktone.core.designsystem.SourceSerifFamily
 import com.inktone.core.designsystem.toColor
 import com.inktone.domain.model.EffectiveReadingSettings
 import com.inktone.domain.model.FontFamily as DomainFontFamily
@@ -60,10 +62,13 @@ object ThemeColors {
         DomainFontFamily.DEFAULT -> ComposeFontFamily.Default
         DomainFontFamily.SERIF -> ComposeFontFamily.Serif
         DomainFontFamily.SANS_SERIF -> ComposeFontFamily.SansSerif
-        // OpenDyslexic n'est pas une police système Android — sans-serif
-        // en repli tant qu'aucune police embarquée n'est fournie (hors
-        // périmètre de ce lot, signalé plutôt que simulé silencieusement,
-        // K12 : jamais de compensation aval d'un problème amont).
-        DomainFontFamily.OPEN_DYSLEXIC -> ComposeFontFamily.SansSerif
+        // Lot 21 — OpenDyslexic est embarquée (core/designsystem) et le
+        // préréglage d'accessibilité l'impose : on la rend réellement, plus
+        // de repli silencieux en SansSerif (écart intention↔code constaté
+        // dans STRATEGIE_PERF_UX_INSPIREE_MOONREADER.md, lot 21 tâche 1).
+        DomainFontFamily.OPEN_DYSLEXIC -> OpenDyslexicFamily
+        // Lot 21, tâche 10 — Source Serif 4 (OFL), police de lecture
+        // française à empattements.
+        DomainFontFamily.SOURCE_SERIF -> SourceSerifFamily
     }
 }

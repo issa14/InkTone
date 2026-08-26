@@ -33,6 +33,7 @@ fun UserPreferences.toEntity(): UserPreferencesEntity = UserPreferencesEntity(
     paragraphSpacingStep = paragraphSpacingStep,
     textJustified = textJustified,
     keepScreenOn = keepScreenOn,
+    autoScrollSpeed = autoScrollSpeed,
 )
 
 fun UserPreferencesEntity.toDomain(): UserPreferences = UserPreferences(
@@ -66,4 +67,5 @@ fun UserPreferencesEntity.toDomain(): UserPreferences = UserPreferences(
     paragraphSpacingStep = paragraphSpacingStep,
     textJustified = textJustified,
     keepScreenOn = keepScreenOn,
+    autoScrollSpeed = autoScrollSpeed,
 )

@@ -10,6 +10,17 @@
 - **Périmètre** : rapidité, fluidité, UX. Hors périmètre : le choix de moteur
   de rendu EPUB (Readium est acté et supérieur au rendu approximatif de Moon+).
 
+> **Instruit le 2026-08-26** : ce document a été converti en deux lots
+> d'exécution — `docs/execution/LOT_21_GAINS_RAPIDES_PERF_UX.md` (leviers à
+> effort faible et écarts intention↔code) et
+> `docs/execution/LOT_22_PERSISTANCE_ET_PARITE_ANNOTATIONS.md` (caches
+> persistants, parité des annotations, complétion sync). Il reste la
+> référence des constats et des preuves ; les lots portent l'exécution.
+> **Deux affirmations de ce document ont été corrigées** lors de cette
+> conversion (synthèse VITS non déterministe ; latence déjà masquée par le
+> `LOOKAHEAD = 3` du pipeline gapless) : voir « Corrections apportées au
+> document source » dans le Lot 22, qui fait foi sur ces deux points.
+
 ---
 
 ## 0. Principe directeur transféré depuis Moon+
@@ -80,8 +91,11 @@ critique :
    chapitre — soit une entité `ChapterSentence` Room, soit un fichier
    sérialisé par publication. Élimine le re-`BreakIterator` + re-Jsoup à
    chaque ouverture.
-2. **Cache des segments audio + timestamps** (le vrai gain) : la synthèse
-   Sherpa-ONNX est **déterministe** pour un triplet
+2. **Cache des segments audio + timestamps** (le vrai gain) : ~~la synthèse
+   Sherpa-ONNX est **déterministe**~~ **[CORRIGÉ — voir Lot 22 : `noiseScale`
+   et `noiseScaleW` non nuls, aucune graine exposée, la synthèse VITS n'est
+   pas reproductible ; audio et timestamps doivent donc être cachés
+   ensemble]** pour un triplet
    `(publicationId, chapterIndex, sentenceOffset, voiceProfileId, hash des
    règles de prononciation)`. Cachez `AudioSegment` (audio + `wordTimestamps`)
    sur disque, clé = hash de ce quintuplet.

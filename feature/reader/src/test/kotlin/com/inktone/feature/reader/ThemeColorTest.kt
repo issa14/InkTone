@@ -2,6 +2,8 @@ package com.inktone.feature.reader
 
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.text.font.FontFamily as ComposeFontFamily
+import com.inktone.core.designsystem.OpenDyslexicFamily
+import com.inktone.core.designsystem.SourceSerifFamily
 import com.inktone.domain.model.EffectiveReadingSettings
 import com.inktone.domain.model.FontFamily
 import com.inktone.domain.model.ReadingTheme
@@ -56,5 +58,25 @@ class ThemeColorTest {
         assertEquals(ComposeFontFamily.Serif, ThemeColors.toComposeFontFamily(FontFamily.SERIF))
         assertEquals(ComposeFontFamily.SansSerif, ThemeColors.toComposeFontFamily(FontFamily.SANS_SERIF))
         assertNotEquals(ThemeColors.toComposeFontFamily(FontFamily.SERIF), ThemeColors.toComposeFontFamily(FontFamily.SANS_SERIF))
+    }
+
+    // ───── Lot 21 — OpenDyslexic réellement rendue (tâche 1) ─────
+
+    @Test
+    fun toComposeFontFamily_rend_open_dyslexic_et_non_un_repli_sans_serif() {
+        // Non-régression de l'écart intention↔code : le préréglage
+        // d'accessibilité force OPEN_DYSLEXIC, qui doit produire la police
+        // embarquée et JAMAIS un repli SansSerif silencieux.
+        assertEquals(OpenDyslexicFamily, ThemeColors.toComposeFontFamily(FontFamily.OPEN_DYSLEXIC))
+        assertNotEquals(ComposeFontFamily.SansSerif, ThemeColors.toComposeFontFamily(FontFamily.OPEN_DYSLEXIC))
+    }
+
+    // ───── Lot 21, tâche 10 — Source Serif 4 (police française à empattements) ─────
+
+    @Test
+    fun toComposeFontFamily_rend_source_serif_embarque_et_non_serif_systeme() {
+        assertEquals(SourceSerifFamily, ThemeColors.toComposeFontFamily(FontFamily.SOURCE_SERIF))
+        // La police embarquée est distincte du Serif système générique.
+        assertNotEquals(ComposeFontFamily.Serif, ThemeColors.toComposeFontFamily(FontFamily.SOURCE_SERIF))
     }
 }

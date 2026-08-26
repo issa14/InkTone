@@ -428,3 +428,16 @@ val MIGRATION_26_27 = object : Migration(26, 27) {
         db.execSQL("ALTER TABLE user_preferences ADD COLUMN keepScreenOn INTEGER NOT NULL DEFAULT 0")
     }
 }
+
+/**
+ * Lot 21, tâche 9 — auto-scroll visuel en mode SCROLL (vitesse réglable).
+ * Colonne additive avec défaut neutre `0` = désactivé : une bibliothèque
+ * existante ne défile jamais d'elle-même tant que l'utilisateur n'a pas
+ * réglé une vitesse — aucun changement de comportement après la mise à
+ * jour (même discipline que MIGRATION_26_27).
+ */
+val MIGRATION_27_28 = object : Migration(27, 28) {
+    override fun migrate(db: SupportSQLiteDatabase) {
+        db.execSQL("ALTER TABLE user_preferences ADD COLUMN autoScrollSpeed INTEGER NOT NULL DEFAULT 0")
+    }
+}

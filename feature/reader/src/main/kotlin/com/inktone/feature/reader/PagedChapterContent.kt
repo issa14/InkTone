@@ -2,8 +2,6 @@ package com.inktone.feature.reader
 
 import android.os.SystemClock
 import androidx.compose.animation.core.Animatable
-import androidx.compose.animation.core.Spring
-import androidx.compose.animation.core.spring
 import androidx.compose.foundation.ExperimentalFoundationApi
 import androidx.compose.foundation.gestures.Orientation
 import androidx.compose.runtime.snapshotFlow
@@ -355,14 +353,16 @@ fun PagedChapterContent(
     }
 
     val visualPull = remember { Animatable(0f) }
+    // Lot 21 — le rebond élastique passe par Motion.gestureSpring (réduction
+    // de mouvement système) et la préférence applicative reduceMotion (tâche
+    // 4) : plus de spring en dur. Calculé dans la composition (spec @Composable),
+    // consommé dans la coroutine du LaunchedEffect.
+    val pullBackSpec = gesturePullBackSpec(reduceMotion)
     LaunchedEffect(chapterTransition.isDragging) {
         if (chapterTransition.isDragging) {
             snapshotFlow { chapterTransition.pullPx }.collect { visualPull.snapTo(it) }
         } else {
-            visualPull.animateTo(
-                0f,
-                spring(dampingRatio = Spring.DampingRatioMediumBouncy, stiffness = Spring.StiffnessMediumLow),
-            )
+            visualPull.animateTo(0f, pullBackSpec)
         }
     }
 

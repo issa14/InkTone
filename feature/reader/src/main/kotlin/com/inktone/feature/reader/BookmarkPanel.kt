@@ -295,7 +295,31 @@ private fun BookmarksTab(bookmarks: List<Bookmark>, onClick: (Bookmark) -> Unit)
                     Text(
                         bookmark.title?.takeIf { it.isNotBlank() } ?: "Chapitre ${bookmark.locator.chapterIndex + 1}",
                         style = MaterialTheme.typography.bodyMedium,
+                        maxLines = 2,
+                        overflow = TextOverflow.Ellipsis,
                     )
+                    // Correctif Lot 21 — `title` est désormais toujours
+                    // rempli (excerpt EPUB, "Page N" PDF), donc le repli
+                    // `?: "Chapitre N"` ci-dessus ne s'affiche plus jamais :
+                    // la référence de position disparaissait du panneau.
+                    // Ligne dédiée, toujours affichée.
+                    Text(
+                        "Chapitre ${bookmark.locator.chapterIndex + 1}",
+                        style = MaterialTheme.typography.labelSmall,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    )
+                    // Lot 21, tâche 5 — la note du signet est visible dans
+                    // le panneau (saisie optionnelle à la création).
+                    bookmark.note?.takeIf { it.isNotBlank() }?.let { note ->
+                        Spacer(Modifier.height(4.dp))
+                        Text(
+                            note,
+                            style = MaterialTheme.typography.bodySmall,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant,
+                            maxLines = 3,
+                            overflow = TextOverflow.Ellipsis,
+                        )
+                    }
                     Spacer(Modifier.height(4.dp))
                     Text(
                         formatAnnotationDate(bookmark.createdAt),

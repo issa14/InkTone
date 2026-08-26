@@ -14,6 +14,18 @@ liées à la compilation, et les modèles téléchargés à l'exécution.
 Ce fichier conserve son en-tête de copyright d'origine et **reste sous sa
 licence amont** : la licence MIT d'InkTone ne s'y applique pas.
 
+## Polices embarquées
+
+Polices de `core/designsystem/src/main/res/font/`, distribuées sous licence
+SIL Open Font License 1.1 — la licence MIT d'InkTone ne s'y applique pas.
+
+| Police | Fichier | Origine | Licence |
+|---|---|---|---|
+| Literata (variable) | `core/designsystem/src/main/res/font/literata_variable.ttf` | [googlefonts/literata](https://github.com/googlefonts/literata) | SIL OFL 1.1 |
+| Work Sans (variable) | `core/designsystem/src/main/res/font/work_sans_variable.ttf` | [weiweihuanghuang/Work-Sans](https://github.com/weiweihuanghuang/Work-Sans) | SIL OFL 1.1 |
+| OpenDyslexic | `core/designsystem/src/main/res/font/opendyslexic_regular.otf` | [opendyslexic.org](https://opendyslexic.org/) | SIL OFL 1.1 |
+| Source Serif 4 (variable, Lot 21) | `core/designsystem/src/main/res/font/source_serif4_variable.ttf` | [adobe-fonts/source-serif](https://github.com/adobe-fonts/source-serif) | SIL OFL 1.1 |
+
 ## Icônes
 
 Les glyphes de `core/designsystem/src/main/res/drawable/ic_symbol_*.xml` ne

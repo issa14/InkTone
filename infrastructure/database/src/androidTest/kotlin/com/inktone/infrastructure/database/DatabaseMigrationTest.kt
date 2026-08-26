@@ -1073,6 +1073,43 @@ class DatabaseMigrationTest {
         v27.close()
     }
 
+    // Lot 21, tâche 9 — auto-scroll visuel (MIGRATION_27_28), même gabarit
+    // que migration_26_vers_27 : les préférences existantes survivent, la
+    // nouvelle colonne arrive sur un défaut neutre (0 = désactivé).
+    @Test
+    fun migration_27_vers_28_ajoute_l_auto_scroll_desactive_par_defaut() {
+        val v27 = helper.createDatabase(TEST_DB_NAME, 27)
+        v27.execSQL(
+            """
+            INSERT INTO user_preferences (id, theme, fontSize, defaultTtsEngine, crashReportingEnabled, language, fontFamily, reduceMotion, dynamicColorEnabled, readingRulerEnabled, dailyGoalMinutes, activeVoiceProfileId, readingMode, audioGain, useSystemFontScale, appTheme, libraryLayoutMode, lineHeightMultiplier, readerBrightness, eyeRestReminderEnabled, eyeRestReminderIntervalMinutes, hasSeenOnboarding, hasPromptedVoiceDownload, syncLastAutoSyncFailed, syncAutoEnabled, syncWifiOnly, readerMarginStep, paragraphSpacingStep, textJustified, keepScreenOn)
+            VALUES (0, 'obsidienne', 22, 'SHERPA_ONNX', 0, 'fr', 'SERIF', 0, 1, 0, 20, NULL, 'SCROLL', 1.0, 0, 'SYSTEM', 'GRID_COVERS', 1.6, NULL, 1, 60, 1, 1, 0, 0, 0, 1, 1, 0, 0)
+            """.trimIndent(),
+        )
+        v27.close()
+
+        val v28 = helper.runMigrationsAndValidate(
+            TEST_DB_NAME, 28, true,
+            MIGRATION_1_2, MIGRATION_2_3, MIGRATION_3_4, MIGRATION_4_5, MIGRATION_5_6, MIGRATION_6_7,
+            MIGRATION_7_8, MIGRATION_8_9, MIGRATION_9_10, MIGRATION_10_11, MIGRATION_11_12, MIGRATION_12_13,
+            MIGRATION_13_14, MIGRATION_14_15, MIGRATION_15_16, MIGRATION_16_17, MIGRATION_17_18, MIGRATION_18_19,
+            MIGRATION_19_20, MIGRATION_20_21, MIGRATION_21_22, MIGRATION_22_23, MIGRATION_23_24, MIGRATION_24_25,
+            MIGRATION_25_26, MIGRATION_26_27, MIGRATION_27_28,
+        )
+
+        v28.query(
+            "SELECT theme, fontSize, lineHeightMultiplier, autoScrollSpeed FROM user_preferences WHERE id = 0",
+        ).use { cursor ->
+            assertEquals(true, cursor.moveToFirst())
+            // Aucune perte : les réglages existants traversent la migration.
+            assertEquals("obsidienne", cursor.getString(0))
+            assertEquals(22, cursor.getInt(1))
+            assertEquals(1.6f, cursor.getFloat(2), 0.001f)
+            // Auto-scroll désactivé par défaut : aucun changement de comportement.
+            assertEquals(0, cursor.getInt(3))
+        }
+        v28.close()
+    }
+
     companion object {
         private const val TEST_DB_NAME = "migration-test"
     }

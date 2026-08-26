@@ -1,12 +1,16 @@
 package com.inktone.feature.reader
 
 import android.graphics.Bitmap
+import android.util.Log
 import android.util.LruCache
 import androidx.compose.foundation.background
 import androidx.compose.foundation.gestures.awaitEachGesture
 import androidx.compose.foundation.gestures.awaitFirstDown
+import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.fillMaxSize
+import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.pager.HorizontalPager
 import androidx.compose.foundation.pager.rememberPagerState
 import androidx.compose.runtime.Composable
@@ -27,10 +31,14 @@ import androidx.compose.ui.graphics.asImageBitmap
 import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.foundation.Image
+import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.Text
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.layout.onSizeChanged
 import androidx.compose.ui.unit.IntSize
+import androidx.compose.ui.unit.dp
 import com.inktone.domain.model.RenderedPage
+import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.isActive
 import kotlin.math.roundToInt
@@ -160,6 +168,9 @@ private fun FixedPage(
     // arrivee, deja reactif pendant le geste via graphicsLayer seul.
     var renderedScale by remember(pageIndex) { mutableFloatStateOf(1f) }
     var bitmap by remember(pageIndex) { mutableStateOf<ImageBitmap?>(null) }
+    // Lot 21, tâche 8 — une page corrompue ou une OOM ne doit ni crasher
+    // l'écran ni rester un écran noir muet : repli gracieux + journal.
+    var renderFailed by remember(pageIndex) { mutableStateOf(false) }
 
     // Lot 12, tache 12.8 — LruCache partage (5 pages max) + recyclage
     // Bitmap.inBitmap : une page deja rendue est servie depuis le cache
@@ -168,6 +179,10 @@ private fun FixedPage(
     // copyPixelsFromBuffer (inBitmap n'est pas applicable aux IntArray
     // de RenderedPage — pixels bruts, pas de decodage BitmapFactory).
     LaunchedEffect(pageIndex, viewportSizePx, isRenderReady) {
+        // Reinitialise avant le garde : un ancien repli ne doit jamais
+        // rester affiche si la page redevient simplement non prete
+        // (document ferme puis rouvert), plutot que verite obsolete.
+        renderFailed = false
         if (viewportSizePx.width <= 0 || !isRenderReady) return@LaunchedEffect
 
         val cached = bitmapCache.get(pageIndex)
@@ -177,7 +192,22 @@ private fun FixedPage(
             return@LaunchedEffect
         }
 
-        val rendered = renderPage(pageIndex, viewportSizePx.width) ?: return@LaunchedEffect
+        // L'annulation de cet effet (changement de page, redimensionnement)
+        // ne doit jamais etre journalisee comme un echec de rendu ni
+        // afficher le repli : seul un VRAI echec (page corrompue, OOM)
+        // doit declencher `renderFailed`.
+        val rendered = try {
+            renderPage(pageIndex, viewportSizePx.width)
+        } catch (cancellation: CancellationException) {
+            throw cancellation
+        } catch (throwable: Throwable) {
+            Log.e(TAG, "Echec du rendu PDF de la page $pageIndex", throwable)
+            null
+        }
+        if (rendered == null) {
+            renderFailed = true
+            return@LaunchedEffect
+        }
         val bmp = bitmapCache.createBitmap(rendered)
         bitmapCache.put(pageIndex, bmp)
         bitmap = bmp.asImageBitmap()
@@ -196,7 +226,19 @@ private fun FixedPage(
         if (!isActive) return@LaunchedEffect
         val targetScale = scale.coerceAtMost(MAX_RENDER_SCALE)
         val targetWidthPx = (viewportSizePx.width * targetScale).roundToInt()
-        val rendered = renderPage(pageIndex, targetWidthPx) ?: return@LaunchedEffect
+        // Lot 21, tâche 8 — même repli qu'au rendu standard : une OOM au
+        // zoom ne doit pas faire tomber l'écran (la page au repos reste
+        // affichée, le bitmap HD est simplement abandonné). L'annulation
+        // de cet effet (relachement du geste, nouvelle page) n'est pas un
+        // echec de rendu — voir le meme choix sur l'effet standard.
+        val rendered = try {
+            renderPage(pageIndex, targetWidthPx)
+        } catch (cancellation: CancellationException) {
+            throw cancellation
+        } catch (throwable: Throwable) {
+            Log.e(TAG, "Echec du rendu PDF HD de la page $pageIndex", throwable)
+            null
+        } ?: return@LaunchedEffect
         val bmp = Bitmap.createBitmap(rendered.pixelsArgb, rendered.widthPx, rendered.heightPx, Bitmap.Config.ARGB_8888)
         bitmap = bmp.asImageBitmap()
         renderedScale = targetScale
@@ -294,9 +336,40 @@ private fun FixedPage(
                         translationY = offsetY
                     },
             )
+        } else if (renderFailed) {
+            // Lot 21, tâche 8 — repli gracieux : la page ne se rend pas
+            // (page corrompue, OOM). Placeholder explicite plutôt qu'un
+            // écran noir muet ; le détail est dans le Log. Le fond du Box
+            // parent est toujours noir (theme de lecture PDF) : sans son
+            // propre fond, le repli resterait blanc-sur-noir même en
+            // thème clair/sépia (`invertColors == false`) — même logique
+            // que l'inversion appliquée à l'Image ci-dessus.
+            val placeholderBackground = if (invertColors) Color.Black else Color.White
+            val placeholderTextColor = if (invertColors) Color.White else Color.Black
+            Column(
+                modifier = Modifier
+                    .fillMaxSize()
+                    .background(placeholderBackground),
+                horizontalAlignment = Alignment.CenterHorizontally,
+                verticalArrangement = Arrangement.Center,
+            ) {
+                Text(
+                    "Page illisible",
+                    color = placeholderTextColor,
+                    style = MaterialTheme.typography.bodyMedium,
+                )
+                Text(
+                    "Cette page du document ne peut pas être affichée.",
+                    color = placeholderTextColor.copy(alpha = 0.7f),
+                    style = MaterialTheme.typography.bodySmall,
+                    modifier = Modifier.padding(top = 8.dp),
+                )
+            }
         }
     }
 }
+
+private const val TAG = "FixedPageContent"
 
 private fun RenderedPage.toImageBitmap(): ImageBitmap =
     Bitmap.createBitmap(pixelsArgb, widthPx, heightPx, Bitmap.Config.ARGB_8888).asImageBitmap()

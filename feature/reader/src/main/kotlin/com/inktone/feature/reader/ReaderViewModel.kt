@@ -9,6 +9,7 @@ import com.inktone.domain.model.AnnotationColor
 import com.inktone.domain.model.BookBlock
 import com.inktone.domain.model.Bookmark
 import com.inktone.domain.model.ChapterContent
+import com.inktone.domain.model.FontFamily
 import com.inktone.domain.model.EffectiveReadingSettings
 import com.inktone.domain.model.PublicationFormat
 import com.inktone.domain.model.ReadingMode as DomainReadingMode
@@ -44,6 +45,7 @@ import com.inktone.domain.service.WordTimestamp
 import com.inktone.domain.usecase.AddAnnotationUseCase
 import com.inktone.domain.usecase.CreateBookmarkUseCase
 import com.inktone.domain.usecase.DeleteBookmarkUseCase
+import com.inktone.domain.usecase.UpdateBookmarkNoteUseCase
 import com.inktone.domain.usecase.GetReadingStateUseCase
 import com.inktone.domain.usecase.GetVoiceProfilesUseCase
 import com.inktone.domain.usecase.UpdateReadingStateUseCase
@@ -85,6 +87,10 @@ class ReaderViewModel @Inject constructor(
     private val bookmarkRepository: BookmarkRepository,
     private val createBookmark: CreateBookmarkUseCase,
     private val deleteBookmark: DeleteBookmarkUseCase,
+    // Correctif Lot 21 — même patron que createBookmark/deleteBookmark ;
+    // valeur par défaut pour ne pas casser les tests qui construisent ce
+    // ViewModel sans passer ce paramètre.
+    private val updateBookmarkNote: UpdateBookmarkNoteUseCase = UpdateBookmarkNoteUseCase(bookmarkRepository),
     // ───── Lot Sessions ─────
     private val readingSessionRepository: ReadingSessionRepository,
     // Lot 9 — résolution id → ReadingTheme complet (couleurs + police).
@@ -122,6 +128,7 @@ class ReaderViewModel @Inject constructor(
                     eyeRestReminderEnabled = preferences.eyeRestReminderEnabled,
                     eyeRestReminderIntervalMinutes = preferences.eyeRestReminderIntervalMinutes,
                     reduceMotion = preferences.reduceMotion,
+                    autoScrollSpeed = preferences.autoScrollSpeed,
                 )
             }
         }
@@ -334,6 +341,8 @@ class ReaderViewModel @Inject constructor(
                 isBookmarkListVisible = !_state.value.isBookmarkListVisible,
             )
             is ReaderIntent.DeleteBookmark -> viewModelScope.launch { deleteBookmark(intent.id) }
+            is ReaderIntent.SaveBookmarkNote -> saveBookmarkNote(intent.note)
+            is ReaderIntent.DismissBookmarkNotePrompt -> _state.value = _state.value.copy(pendingBookmarkNoteId = null)
             is ReaderIntent.NavigateToLocator -> navigateToLocator(intent.locator)
             is ReaderIntent.ChapterLayoutCompleted -> onChapterLayoutCompleted(intent.chapterIndex)
             is ReaderIntent.SetOverrides -> setOverrides(intent.overrides)
@@ -346,7 +355,9 @@ class ReaderViewModel @Inject constructor(
             is ReaderIntent.SetLineHeight -> setLineHeight(intent.multiplier)
             is ReaderIntent.SetReaderMarginStep -> setReaderMarginStep(intent.step)
             is ReaderIntent.SetTextJustified -> setTextJustified(intent.justified)
+            is ReaderIntent.SetFontFamily -> setFontFamily(intent.fontFamily)
             is ReaderIntent.SetKeepScreenOn -> setKeepScreenOn(intent.enabled)
+            is ReaderIntent.SetAutoScrollSpeed -> setAutoScrollSpeed(intent.speed)
             is ReaderIntent.SetReaderBrightness -> setReaderBrightness(intent.value)
             is ReaderIntent.SetEyeRestReminderEnabled -> setEyeRestReminderEnabled(intent.enabled)
             is ReaderIntent.SetEyeRestReminderInterval -> setEyeRestReminderInterval(intent.minutes)
@@ -544,7 +555,12 @@ class ReaderViewModel @Inject constructor(
         // jamais accumuler des handles natifs non fermes.
         fixedPageDocument?.close()
         fixedPageDocument = null
-        _state.value = _state.value.copy(isFixedPageReady = false)
+        // Correctif Lot 21 — un `pendingBookmarkNoteId` laissé par une
+        // session précédente (Snackbar ignoré/expiré avant sa résolution,
+        // ou fermeture du lecteur en plein milieu) ne doit jamais survivre
+        // à l'ouverture d'une AUTRE publication : `saveBookmarkNote`
+        // écrirait alors sur l'id d'un signet qui n'a plus de sens ici.
+        _state.value = _state.value.copy(isFixedPageReady = false, pendingBookmarkNoteId = null)
         viewModelScope.launch {
             val publication = publicationRepository.getById(publicationId) ?: run {
                 Log.w("ReaderViewModel", "openPublication: publication introuvable ($publicationId)")
@@ -620,9 +636,23 @@ class ReaderViewModel @Inject constructor(
                         author = publication.authors.cleanedAuthorsForDisplay().ifBlank { null },
                         coverUri = publication.coverUri,
                     )
-                    // Plan v3, Palier 3.6 — initialiser le parsing lazy EPUB
+                    // Plan v3, Palier 3.6 — initialiser le parsing lazy.
+                    // Correctif : `registerPublication` était réservé à
+                    // l'EPUB, alors que `CompositeChapterParser` l'enregistre
+                    // déjà des DEUX côtés par construction (son KDoc : « le
+                    // format n'est pas connu ici »). Un PDF ouvert une
+                    // deuxième fois restaurait une position au-delà des 5
+                    // pages sondées à l'import (`PdfPublicationParser.
+                    // PROBE_PAGES`) et `PdfChapterParser.parseChapter`
+                    // échouait alors avec `IllegalStateException` (`fileUris`
+                    // jamais renseigné pour ce publicationId) — rattrapée en
+                    // "Impossible de charger ce chapitre." par
+                    // `loadChapterContentIfNeeded`. Le TXT n'est pas
+                    // concerné (chapitre unique déjà entièrement chargé à
+                    // l'import), mais l'enregistrer ne coûte rien de plus
+                    // qu'un `put` en mémoire.
+                    chapterParser.registerPublication(publicationId, publication.fileUri)
                     if (publication.format == PublicationFormat.EPUB) {
-                        chapterParser.registerPublication(publicationId, publication.fileUri)
                         try {
                             epubResourceResolver.open(publicationId, publication.fileUri)
                         } catch (e: CancellationException) {
@@ -735,8 +765,12 @@ class ReaderViewModel @Inject constructor(
 
         val freeRange = _state.value.freeSelectionRange ?: return
         val endOffsetExclusive = freeRange.last + 1
+        // Lot 21, tâche 6 — les blocs du chapitre alimentent le
+        // `paragraphIndex` des Locators (renfort, `charOffset` reste
+        // l'ancre de vérité).
+        val blocks = (chapter.content as? ChapterContent.Rich)?.blocks.orEmpty()
         val (startLocator, endLocator) = annotationSelectionHandler.resolveCharRange(
-            freeRange.first, endOffsetExclusive, chapter.index, chapter.href,
+            freeRange.first, endOffsetExclusive, chapter.index, chapter.href, blocks,
         ) ?: return
         val excerpt = sliceChapterText(sentences, freeRange.first, endOffsetExclusive)
             .take(Annotation.MAX_EXCERPT_LENGTH)
@@ -791,20 +825,29 @@ class ReaderViewModel @Inject constructor(
                 if (existing != null) {
                     deleteBookmark(existing.id)
                 } else {
-                    createBookmark(
-                        Bookmark(
-                            id = UUID.randomUUID().toString(),
-                            publicationId = publicationId,
-                            locator = Locator(
-                                resourceHref = "page-$chapterIndex",
-                                chapterIndex = chapterIndex,
-                                charOffset = 0,
-                                pageOffsetY = _state.value.pageOffsetY,
-                            ),
-                            excerpt = "Page ${chapterIndex + 1}",
-                            createdAt = System.currentTimeMillis(),
+                    val bookmark = Bookmark(
+                        id = UUID.randomUUID().toString(),
+                        publicationId = publicationId,
+                        locator = Locator(
+                            resourceHref = "page-$chapterIndex",
+                            chapterIndex = chapterIndex,
+                            charOffset = 0,
+                            pageOffsetY = _state.value.pageOffsetY,
                         ),
+                        // Correctif Lot 21 — `title` était laissé nul sur
+                        // PDF, seule la branche EPUB le remplissait :
+                        // `BookmarkPanel` retombait alors sur
+                        // "Chapitre ${chapterIndex + 1}", faux pour un PDF
+                        // où `chapterIndex` est un index de PAGE.
+                        title = "Page ${chapterIndex + 1}",
+                        excerpt = "Page ${chapterIndex + 1}",
+                        createdAt = System.currentTimeMillis(),
                     )
+                    createBookmark(bookmark)
+                    // Lot 21, tâche 5 — note optionnelle proposée après la
+                    // création (jamais un dialogue bloquant : le signet est
+                    // déjà créé, l'utilisateur peut fermer sans note).
+                    _state.value = _state.value.copy(pendingBookmarkNoteId = bookmark.id)
                 }
             }
             return
@@ -821,16 +864,41 @@ class ReaderViewModel @Inject constructor(
             if (existing != null) {
                 deleteBookmark(existing.id)
             } else {
-                createBookmark(
-                    Bookmark(
-                        id = UUID.randomUUID().toString(),
-                        publicationId = publicationId,
-                        locator = sentence.startLocator(chapterIndex = chapter.index, resourceHref = chapter.href),
-                        excerpt = sentence.text.take(Bookmark.MAX_EXCERPT_LENGTH),
-                        createdAt = System.currentTimeMillis(),
-                    ),
+                val bookmark = Bookmark(
+                    id = UUID.randomUUID().toString(),
+                    publicationId = publicationId,
+                    locator = sentence.startLocator(chapterIndex = chapter.index, resourceHref = chapter.href),
+                    // Lot 21, tâche 5 — le signet porte un titre lisible
+                    // (début de la phrase) au lieu de rester sans titre ;
+                    // la note optionnelle est proposée après la création.
+                    // Correctif — ellipse explicite quand le titre est
+                    // réellement tronqué (coupe en plein mot sinon).
+                    title = sentence.text.truncateWithEllipsis(BOOKMARK_TITLE_MAX_CHARS),
+                    excerpt = sentence.text.take(Bookmark.MAX_EXCERPT_LENGTH),
+                    createdAt = System.currentTimeMillis(),
                 )
+                createBookmark(bookmark)
+                _state.value = _state.value.copy(pendingBookmarkNoteId = bookmark.id)
             }
+        }
+    }
+
+    /**
+     * Lot 21, tâche 5 — pose la note optionnelle sur le signet en attente
+     * (`pendingBookmarkNoteId`), puis referme le dialogue. `note` vide ou
+     * blanche = note nulle, le signet reste valide (jamais un signet
+     * invalide).
+     */
+    private fun saveBookmarkNote(note: String) {
+        val bookmarkId = _state.value.pendingBookmarkNoteId ?: return
+        _state.value = _state.value.copy(pendingBookmarkNoteId = null)
+        // Correctif Lot 21 — le signet peut avoir été supprimé entre la
+        // création et la résolution du Snackbar (un autre chemin : le
+        // panneau de signets, une synchronisation distante) ; écrire quand
+        // même produirait un `UPDATE` silencieux sur une ligne inexistante.
+        if (_state.value.bookmarks.none { it.id == bookmarkId }) return
+        viewModelScope.launch {
+            updateBookmarkNote(bookmarkId, note.trim().ifBlank { null })
         }
     }
 
@@ -1313,11 +1381,43 @@ class ReaderViewModel @Inject constructor(
         }
     }
 
+    /**
+     * Correctif Lot 21 — sélecteur de police du panneau de réglages du
+     * Lecteur (`ReaderSettingsPanel`). La police fait partie
+     * d'`effectiveSettings` : sans le recalcul ci-dessous, la préférence
+     * était persistée mais jamais appliquée au rendu (le collect
+     * preferences n'émettant pas `effectiveSettings`), et le sélecteur
+     * paraissait mort — le même recalcul que `setOverrides`, sans
+     * toucher aux surcharges par publication.
+     */
+    private fun setFontFamily(fontFamily: FontFamily) {
+        viewModelScope.launch {
+            val current = preferencesRepository.get()
+            preferencesRepository.update(current.copy(fontFamily = fontFamily))
+            val overrides = _state.value.currentOverrides
+            val effectiveSettings = EffectiveReadingSettings.resolve(overrides, preferencesRepository.get())
+            _state.value = _state.value.copy(effectiveSettings = effectiveSettings)
+        }
+    }
+
     /** P4 — maintien de l'écran allumé, appliqué à la fenêtre par ReaderScreen. */
     private fun setKeepScreenOn(enabled: Boolean) {
         viewModelScope.launch {
             val current = preferencesRepository.get()
             preferencesRepository.update(current.copy(keepScreenOn = enabled))
+        }
+    }
+
+    /**
+     * Lot 21, tâche 9 — vitesse d'auto-scroll visuel (0 = désactivé).
+     * Bornée dans le domaine, comme setReaderMarginStep : un cran hors
+     * bornes venant de l'UI est un défaut de l'appelant.
+     */
+    private fun setAutoScrollSpeed(speed: Int) {
+        val bounded = speed.coerceIn(UserPreferences.AUTO_SCROLL_SPEED_RANGE)
+        viewModelScope.launch {
+            val current = preferencesRepository.get()
+            preferencesRepository.update(current.copy(autoScrollSpeed = bounded))
         }
     }
 
@@ -1609,6 +1709,12 @@ class ReaderViewModel @Inject constructor(
 
         /** Pages sans texte tolerees avant de renoncer a narrer un PDF. */
         private const val MAX_EMPTY_PAGE_LOOKAHEAD = 20
+
+        /**
+         * Lot 21, tâche 5 — longueur max du titre lisible d'un signet
+         * (début de la phrase), affiché en gras dans `BookmarkPanel`.
+         */
+        private const val BOOKMARK_TITLE_MAX_CHARS = 60
     }
 }
 
@@ -1623,6 +1729,14 @@ private const val FLASH_HIGHLIGHT_DURATION_MS = 2_500L
 
 /** 3d.5 — snooze court du popup de repos oculaire, distinct de l'intervalle configuré. */
 private const val EYE_REST_REMINDER_SNOOZE_MINUTES = 10
+
+/**
+ * Correctif Lot 21 — coupe [maxLength] caractères en ajoutant une
+ * ellipse `…` quand [this] est réellement tronqué, plutôt qu'une coupure
+ * brute en plein mot indiscernable d'un texte court.
+ */
+private fun String.truncateWithEllipsis(maxLength: Int): String =
+    if (length <= maxLength) this else take((maxLength - 1).coerceAtLeast(0)) + "…"
 
 /** A.5 — repli quand `UserPreferences.activeVoiceProfileId` est `null`. */
 private val DEFAULT_VOICE_PROFILE = VoiceProfile(

@@ -1,38 +1,47 @@
 package com.inktone.feature.reader
 
 import androidx.compose.foundation.background
+import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.width
+import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.selection.toggleable
 import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.foundation.verticalScroll
+import androidx.compose.material3.DropdownMenuItem
+import androidx.compose.material3.ExposedDropdownMenuBox
+import androidx.compose.material3.ExposedDropdownMenuDefaults
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.ModalBottomSheet
-import com.inktone.core.designsystem.InkToneSlider
+import androidx.compose.material3.SegmentedButton
+import androidx.compose.material3.SegmentedButtonDefaults
+import androidx.compose.material3.SingleChoiceSegmentedButtonRow
+import androidx.compose.material3.Switch
 import androidx.compose.material3.Text
 import androidx.compose.material3.rememberModalBottomSheetState
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableFloatStateOf
+import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
+import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
-import androidx.compose.ui.text.font.FontWeight
-import androidx.compose.foundation.layout.Row
-import androidx.compose.foundation.selection.toggleable
-import androidx.compose.material3.SegmentedButton
-import androidx.compose.material3.SegmentedButtonDefaults
-import androidx.compose.material3.SingleChoiceSegmentedButtonRow
-import androidx.compose.material3.Switch
-import androidx.compose.ui.Alignment
 import androidx.compose.ui.semantics.Role
+import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
-import com.inktone.domain.model.UserPreferences
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import com.inktone.core.designsystem.InkToneSlider
+import com.inktone.domain.model.FontFamily as DomainFontFamily
+import com.inktone.domain.model.UserPreferences
 import kotlin.math.roundToInt
 
 /**
@@ -58,6 +67,16 @@ fun ReaderSettingsPanel(
     currentMarginStep: Int,
     isTextJustified: Boolean,
     keepScreenOn: Boolean,
+    // Correctif Lot 21 — jusqu'ici aucun écran ne dispatchait
+    // `SettingsIntent.SetFontFamily` : OpenDyslexic (hors préréglage
+    // d'accessibilité) et Source Serif 4 étaient rendues mais
+    // inatteignables. Valeurs par défaut pour ne pas casser les appelants
+    // existants (tests inclus).
+    currentFontFamily: DomainFontFamily = DomainFontFamily.DEFAULT,
+    // Lot 21, tâche 9 — auto-scroll visuel (vitesse réglable, 0 = off).
+    autoScrollSpeed: Int,
+    reduceMotion: Boolean,
+    isScrollMode: Boolean,
     previewText: String,
     previewTextColor: Color,
     previewBackgroundColor: Color,
@@ -66,6 +85,8 @@ fun ReaderSettingsPanel(
     onMarginStepChange: (Int) -> Unit,
     onTextJustifiedChange: (Boolean) -> Unit,
     onKeepScreenOnChange: (Boolean) -> Unit,
+    onAutoScrollSpeedChange: (Int) -> Unit,
+    onFontFamilyChange: (DomainFontFamily) -> Unit = {},
     onDismiss: () -> Unit,
 ) {
     val sheetState = rememberModalBottomSheetState(skipPartiallyExpanded = true)
@@ -77,6 +98,13 @@ fun ReaderSettingsPanel(
         Column(
             modifier = Modifier
                 .fillMaxWidth()
+                // Correctif — le panneau TT débordait de l'écran depuis
+                // l'ajout du sélecteur de police (Lot 21, tâche 10) et de
+                // l'auto-scroll (tâche 9) : justification, écran allumé et
+                // auto-scroll étaient coupés en bas, inaccessibles. Le
+                // scroll vertical ne gêne ni les Sliders (drag horizontal)
+                // ni les segments de choix.
+                .verticalScroll(rememberScrollState())
                 .padding(horizontal = 24.dp, vertical = 16.dp),
         ) {
             Text(
@@ -131,6 +159,20 @@ fun ReaderSettingsPanel(
 
             Spacer(Modifier.height(20.dp))
 
+            // ── Police — menu déroulant (5 segments à libellés longs
+            // débordaient du panneau, rendu grotesque). Seul point
+            // d'accès réel à OpenDyslexic (hors préréglage d'accessibilité)
+            // et Source Serif 4, mappées mais jusqu'ici inatteignables ──
+            SettingsDropdown(
+                label = "Police",
+                current = currentFontFamily,
+                optionLabel = { fontFamilyLabel(it) },
+                options = FONT_FAMILY_CHOICES,
+                onSelect = onFontFamilyChange,
+            )
+
+            Spacer(Modifier.height(20.dp))
+
             // ── Marges — P4 : trois crans, pas un curseur continu ──
             Text(
                 "Marges (${readerMarginLabel(currentMarginStep).lowercase()})",
@@ -171,7 +213,122 @@ fun ReaderSettingsPanel(
                 onCheckedChange = onKeepScreenOnChange,
             )
 
+            Spacer(Modifier.height(20.dp))
+
+            // ── Auto-scroll — Lot 21, tâche 9 : vitesse réglable, mode
+            // SCROLL uniquement, jamais quand reduceMotion est actif. Menu
+            // déroulant (les 4 segments débordaient aussi du panneau) ──
+            Text(
+                "Auto-scroll",
+                style = MaterialTheme.typography.labelLarge,
+            )
+            Spacer(Modifier.height(4.dp))
+            Text(
+                when {
+                    !isScrollMode -> "Disponible en mode défilement uniquement"
+                    reduceMotion -> "Désactivé : le mouvement réduit est actif"
+                    else -> "Défilement continu, arrêté au premier toucher"
+                },
+                style = MaterialTheme.typography.bodySmall,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+            )
+            Spacer(Modifier.height(8.dp))
+            SettingsDropdown(
+                label = "Vitesse",
+                current = autoScrollSpeed,
+                optionLabel = { autoScrollSpeedLabel(it) },
+                options = UserPreferences.AUTO_SCROLL_SPEED_RANGE.toList(),
+                onSelect = onAutoScrollSpeedChange,
+                enabled = isScrollMode && !reduceMotion,
+            )
+
             Spacer(Modifier.height(32.dp))
+        }
+    }
+}
+
+/**
+ * Correctif Lot 21 — options du sélecteur de police. `DomainFontFamily`
+ * ne comporte que 5 valeurs au total (Blueprint : une valeur ajoutée ne
+ * se retire jamais) — toutes exposées ici, aucun `when` à maintenir en
+ * double.
+ */
+private val FONT_FAMILY_CHOICES = DomainFontFamily.entries.toList()
+
+/** Correctif Lot 21 — libellé court d'une police pour le menu déroulant. */
+private fun fontFamilyLabel(family: DomainFontFamily): String = when (family) {
+    DomainFontFamily.DEFAULT -> "Système"
+    DomainFontFamily.SERIF -> "Serif"
+    DomainFontFamily.SANS_SERIF -> "Sans-serif"
+    DomainFontFamily.OPEN_DYSLEXIC -> "Dyslexie"
+    DomainFontFamily.SOURCE_SERIF -> "Empattée FR"
+}
+
+/**
+ * Lot 21, tâche 9 — libellé d'un cran de vitesse d'auto-scroll.
+ * `0` = désactivé, puis trois crans croissants.
+ */
+private fun autoScrollSpeedLabel(speed: Int): String = when (speed) {
+    0 -> "Désactivé"
+    1 -> "Lente"
+    2 -> "Moyenne"
+    3 -> "Rapide"
+    else -> speed.toString()
+}
+
+/**
+ * Correctif Lot 21 — ligne de réglage « libellé + valeur ▾ » ouvrant un
+ * menu déroulant. Remplace les rangées de segments dont les libellés
+ * longs débordaient du panneau (Police à 5 options, Vitesse d'auto-scroll
+ * à 4). `enabled = false` affiche la valeur mais n'ouvre pas le menu.
+ */
+@OptIn(ExperimentalMaterial3Api::class)
+@Composable
+private fun <T> SettingsDropdown(
+    label: String,
+    current: T,
+    optionLabel: (T) -> String,
+    options: List<T>,
+    onSelect: (T) -> Unit,
+    enabled: Boolean = true,
+) {
+    var expanded by remember { mutableStateOf(false) }
+    ExposedDropdownMenuBox(expanded = expanded, onExpandedChange = { expanded = it }) {
+        Row(
+            modifier = Modifier
+                .fillMaxWidth()
+                .menuAnchor()
+                .clickable(enabled = enabled) { expanded = true }
+                .padding(vertical = 12.dp),
+            verticalAlignment = Alignment.CenterVertically,
+        ) {
+            Text(
+                label,
+                style = MaterialTheme.typography.bodyLarge,
+                modifier = Modifier.weight(1f),
+            )
+            Text(
+                optionLabel(current),
+                style = MaterialTheme.typography.bodyMedium,
+                color = if (enabled) {
+                    MaterialTheme.colorScheme.primary
+                } else {
+                    MaterialTheme.colorScheme.onSurfaceVariant
+                },
+            )
+            Spacer(Modifier.width(4.dp))
+            ExposedDropdownMenuDefaults.TrailingIcon(expanded = expanded)
+        }
+        ExposedDropdownMenu(expanded = expanded, onDismissRequest = { expanded = false }) {
+            options.forEach { option ->
+                DropdownMenuItem(
+                    text = { Text(optionLabel(option)) },
+                    onClick = {
+                        expanded = false
+                        onSelect(option)
+                    },
+                )
+            }
         }
     }
 }

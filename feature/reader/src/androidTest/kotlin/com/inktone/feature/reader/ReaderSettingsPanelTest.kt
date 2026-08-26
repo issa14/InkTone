@@ -7,6 +7,8 @@ import androidx.compose.ui.test.SemanticsMatcher
 import androidx.compose.ui.test.assertIsDisplayed
 import androidx.compose.ui.test.junit4.createComposeRule
 import androidx.compose.ui.test.onNodeWithText
+import androidx.compose.ui.test.performClick
+import com.inktone.domain.model.FontFamily
 import org.junit.Assert.assertEquals
 import org.junit.Rule
 import org.junit.Test
@@ -36,9 +38,13 @@ class ReaderSettingsPanelTest {
                 currentMarginStep = 1,
             isTextJustified = false,
             keepScreenOn = false,
+            autoScrollSpeed = 0,
+            reduceMotion = false,
+            isScrollMode = true,
             onMarginStepChange = {},
             onTextJustifiedChange = {},
             onKeepScreenOnChange = {},
+            onAutoScrollSpeedChange = {},
             onDismiss = {},
             )
         }
@@ -62,9 +68,13 @@ class ReaderSettingsPanelTest {
                 currentMarginStep = 1,
             isTextJustified = false,
             keepScreenOn = false,
+            autoScrollSpeed = 0,
+            reduceMotion = false,
+            isScrollMode = true,
             onMarginStepChange = {},
             onTextJustifiedChange = {},
             onKeepScreenOnChange = {},
+            onAutoScrollSpeedChange = {},
             onDismiss = {},
             )
         }
@@ -86,9 +96,13 @@ class ReaderSettingsPanelTest {
                 currentMarginStep = 1,
             isTextJustified = false,
             keepScreenOn = false,
+            autoScrollSpeed = 0,
+            reduceMotion = false,
+            isScrollMode = true,
             onMarginStepChange = {},
             onTextJustifiedChange = {},
             onKeepScreenOnChange = {},
+            onAutoScrollSpeedChange = {},
             onDismiss = {},
             )
         }
@@ -103,5 +117,116 @@ class ReaderSettingsPanelTest {
             val rangeInfo = node.config[SemanticsProperties.ProgressBarRangeInfo]
             assertEquals("curseur continu attendu (steps=0)", 0, rangeInfo.steps)
         }
+    }
+
+    // ───── Lot 21, tâche 9 — auto-scroll visuel ─────
+
+    @Test
+    fun le_panneau_propose_les_crans_de_vitesse_d_auto_scroll() {
+        composeTestRule.setContent {
+            ReaderSettingsPanel(
+                currentFontSize = 18,
+                currentLineHeightMultiplier = 1.4f,
+                previewText = "Aperçu.",
+                previewTextColor = Color.Black,
+                previewBackgroundColor = Color.White,
+                onFontSizeChange = {},
+                onLineHeightChange = {},
+                currentMarginStep = 1,
+                isTextJustified = false,
+                keepScreenOn = false,
+                autoScrollSpeed = 2,
+                reduceMotion = false,
+                isScrollMode = true,
+                onMarginStepChange = {},
+                onTextJustifiedChange = {},
+                onKeepScreenOnChange = {},
+                onAutoScrollSpeedChange = {},
+                onDismiss = {},
+            )
+        }
+
+        composeTestRule.onNodeWithText("Auto-scroll").assertExists()
+        composeTestRule.onNodeWithText("Vitesse").assertExists()
+        // Valeur courante (autoScrollSpeed = 2 → « Moyenne ») affichée.
+        composeTestRule.onNodeWithText("Moyenne").assertExists()
+        // Les autres options sont derrière le menu déroulant : on l'ouvre.
+        composeTestRule.onNodeWithText("Vitesse").performClick()
+        composeTestRule.onNodeWithText("Désactivé").assertExists()
+        composeTestRule.onNodeWithText("Lente").assertExists()
+        composeTestRule.onNodeWithText("Rapide").assertExists()
+    }
+
+    // ───── Correctif Lot 21 — sélecteur de police, jusqu'ici inatteignable
+    // (aucune UI ne dispatchait SettingsIntent.SetFontFamily) ─────
+
+    @Test
+    fun le_panneau_propose_un_selecteur_de_police() {
+        composeTestRule.setContent {
+            ReaderSettingsPanel(
+                currentFontSize = 18,
+                currentLineHeightMultiplier = 1.4f,
+                previewText = "Aperçu.",
+                previewTextColor = Color.Black,
+                previewBackgroundColor = Color.White,
+                onFontSizeChange = {},
+                onLineHeightChange = {},
+                currentMarginStep = 1,
+                isTextJustified = false,
+                keepScreenOn = false,
+                currentFontFamily = FontFamily.DEFAULT,
+                autoScrollSpeed = 0,
+                reduceMotion = false,
+                isScrollMode = true,
+                onMarginStepChange = {},
+                onTextJustifiedChange = {},
+                onKeepScreenOnChange = {},
+                onAutoScrollSpeedChange = {},
+                onDismiss = {},
+            )
+        }
+
+        composeTestRule.onNodeWithText("Police").assertExists()
+        // Valeur courante (DEFAULT → « Système ») affichée.
+        composeTestRule.onNodeWithText("Système").assertExists()
+        // Les autres options sont derrière le menu déroulant : on l'ouvre.
+        composeTestRule.onNodeWithText("Police").performClick()
+        composeTestRule.onNodeWithText("Serif").assertExists()
+        composeTestRule.onNodeWithText("Sans-serif").assertExists()
+        composeTestRule.onNodeWithText("Dyslexie").assertExists()
+        composeTestRule.onNodeWithText("Empattée FR").assertExists()
+    }
+
+    @Test
+    fun choisir_une_police_declenche_le_callback() {
+        var chosen: FontFamily? = null
+        composeTestRule.setContent {
+            ReaderSettingsPanel(
+                currentFontSize = 18,
+                currentLineHeightMultiplier = 1.4f,
+                previewText = "Aperçu.",
+                previewTextColor = Color.Black,
+                previewBackgroundColor = Color.White,
+                onFontSizeChange = {},
+                onLineHeightChange = {},
+                currentMarginStep = 1,
+                isTextJustified = false,
+                keepScreenOn = false,
+                currentFontFamily = FontFamily.DEFAULT,
+                autoScrollSpeed = 0,
+                reduceMotion = false,
+                isScrollMode = true,
+                onMarginStepChange = {},
+                onTextJustifiedChange = {},
+                onKeepScreenOnChange = {},
+                onAutoScrollSpeedChange = {},
+                onFontFamilyChange = { chosen = it },
+                onDismiss = {},
+            )
+        }
+
+        composeTestRule.onNodeWithText("Police").performClick()
+        composeTestRule.onNodeWithText("Empattée FR").performClick()
+        assertEquals(FontFamily.SOURCE_SERIF, chosen)
     }
 }

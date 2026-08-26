@@ -339,7 +339,7 @@ private fun ArchitectureAccordion() {
                     LicenseRow("NeMo FastConformer CTC, NVIDIA (alignement mot a mot)", "CC-BY-4.0", Color(0xFF6A1B9A))
                     LicenseRow("ONNX Runtime (inférence)", "MIT", Color(0xFF1565C0))
                     LicenseRow("Jetpack Compose, Room, Hilt, Media3, WorkManager", "Apache-2.0", Color(0xFF2E7D32))
-                    LicenseRow("Polices Literata, Work Sans, OpenDyslexic", "SIL Open Font License 1.1", Color(0xFFE65100))
+                    LicenseRow("Polices Literata, Work Sans, OpenDyslexic, Source Serif 4", "SIL Open Font License 1.1", Color(0xFFE65100))
                 }
             }
         }

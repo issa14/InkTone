@@ -1,5 +1,7 @@
 package com.inktone.feature.reader
 
+import android.content.Context
+import android.content.Intent
 import android.widget.Toast
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Column
@@ -44,8 +46,9 @@ import com.inktone.domain.model.AnnotationColor
 
 /**
  * Tâche 3c.4 — remplace `AnnotationColorPicker` en position fixe basse
- * d'écran par un bloc positionné **près de la sélection**. Trois options
- * de premier niveau (Copier · Surligner · Note), la couleur reste un
+ * d'écran par un bloc positionné **près de la sélection**. Quatre options
+ * de premier niveau (Copier · Surligner · Note · un overflow « Plus
+ * d'actions » menant à Partager, Lot 21 tâche 7), la couleur reste un
  * second temps (`Surligner` seulement) — cible confirmée
  * (`UX_FLOW_DESIGN.md` § popup de sélection de texte, Signet
  * volontairement absent : un signet marque une position, pas une plage).
@@ -63,7 +66,7 @@ import com.inktone.domain.model.AnnotationColor
  * ci-dessous, qui rend aussi le popup apatride entre deux gestes (mode
  * ACTIONS, texte de note vide à chaque réapparition).
  */
-private enum class SelectionPopupMode { ACTIONS, COLOR_PICKER, NOTE_INPUT }
+private enum class SelectionPopupMode { ACTIONS, COLOR_PICKER, NOTE_INPUT, MORE }
 
 @Composable
 fun SelectionActionPopup(
@@ -72,6 +75,11 @@ fun SelectionActionPopup(
     onHighlight: (AnnotationColor) -> Unit,
     onSaveNote: (String, AnnotationColor) -> Unit,
     onDismiss: () -> Unit,
+    // Lot 21, tâche 7 — contexte du partage (« Titre — Auteur — Chapitre
+    // X », construit par l'appelant). `null`/vide → on partage le texte
+    // seul. Paramètre à défaut : aucun changement pour les appelants
+    // existants ni pour les tests.
+    shareContext: String? = null,
 ) {
     if (selectionBoundsInWindow == null) return
 
@@ -151,6 +159,13 @@ fun SelectionActionPopup(
                     PopupActionButton(icon = AppSymbol.Note, label = "Note") {
                         mode = SelectionPopupMode.NOTE_INPUT
                     }
+                    // Lot 21, tâche 7 — « Partager » derrière un overflow
+                    // « ⋮ » : quatre actions en premier niveau élargiraient
+                    // la barre au-delà du raisonnable. L'action secondaire
+                    // reste à un geste (un tap), jamais « Tout sélectionner ».
+                    TextButton(onClick = { mode = SelectionPopupMode.MORE }) {
+                        AppIcon(AppSymbol.MoreActions, contentDescription = "Plus d'actions")
+                    }
                 }
 
                 SelectionPopupMode.COLOR_PICKER -> AnnotationColorPicker(
@@ -159,6 +174,22 @@ fun SelectionActionPopup(
                     onConfirm = { onHighlight(pendingColor) },
                     onCancel = onDismiss,
                 )
+
+                // Lot 21, tâche 7 — « Partager » (ACTION_SEND) : texte
+                // sélectionné + contexte titre/auteur/chapitre. Le popup
+                // reste non-focusable ici (mode sans clavier) — la gestion
+                // conditionnelle de `focusable` est INCHANGÉE (bug device
+                // documenté : ne pas voler le focus à la zone de lecture).
+                SelectionPopupMode.MORE -> Column(modifier = Modifier.padding(4.dp)) {
+                    PopupActionButton(icon = AppSymbol.Share, label = "Partager") {
+                        shareSelection(context, selectedText, shareContext)
+                        onDismiss()
+                    }
+                    TextButton(onClick = { mode = SelectionPopupMode.ACTIONS }) {
+                        AppIcon(AppSymbol.Back, contentDescription = null, modifier = Modifier.padding(end = 4.dp))
+                        Text("Retour")
+                    }
+                }
 
                 SelectionPopupMode.NOTE_INPUT -> Column(modifier = Modifier.padding(12.dp).width(260.dp)) {
                     OutlinedTextField(
@@ -225,4 +256,29 @@ private class SelectionPopupPositionProvider(
         }
         return IntOffset(x, y.coerceIn(0, (windowSize.height - popupContentSize.height).coerceAtLeast(0)))
     }
+}
+
+/**
+ * Lot 21, tâche 7 — message partagé (ACTION_SEND) : texte sélectionné
+ * entre guillemets français, suivi du contexte (titre — auteur — chapitre)
+ * sur une ligne dédiée s'il est fourni. Pure, testable en JVM.
+ */
+internal fun buildShareMessage(selectedText: String, shareContext: String?): String {
+    val contextLine = shareContext?.takeIf { it.isNotBlank() }
+    return buildString {
+        // Correctif Lot 21 — espace insécable entre le guillemet et le
+        // texte (typographie française), même convention que
+        // XmlOpdsFeedParser (entité `&nbsp;` → `\u00A0`).
+        append('«').append('\u00A0').append(selectedText).append('\u00A0').append('»')
+        if (contextLine != null) append("\n\n— ").append(contextLine)
+    }
+}
+
+/** Lance le partage Android (chooser) avec le message construit. */
+private fun shareSelection(context: Context, selectedText: String, shareContext: String?) {
+    val sendIntent = Intent(Intent.ACTION_SEND).apply {
+        type = "text/plain"
+        putExtra(Intent.EXTRA_TEXT, buildShareMessage(selectedText, shareContext))
+    }
+    context.startActivity(Intent.createChooser(sendIntent, null))
 }

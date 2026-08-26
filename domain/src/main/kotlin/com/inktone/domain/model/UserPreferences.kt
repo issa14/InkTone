@@ -106,6 +106,14 @@ data class UserPreferences(
     val textJustified: Boolean = false,
     /** Empêche l'écran de s'éteindre pendant la lecture visuelle. */
     val keepScreenOn: Boolean = false,
+    /**
+     * Lot 21, tâche 9 — auto-scroll visuel en mode SCROLL. `0` =
+     * désactivé, `1..3` = crans de vitesse croissants (le mapping en
+     * dp/s appartient au rendu, seul à connaître la densité). Désactivé
+     * de fait quand `reduceMotion` est actif : le rendu ne démarre
+     * jamais l'auto-scroll dans ce cas.
+     */
+    val autoScrollSpeed: Int = 0,
 ) {
     init {
         require(fontSize > 0) { "fontSize doit être strictement positif" }
@@ -115,6 +123,9 @@ data class UserPreferences(
         }
         require(paragraphSpacingStep in PARAGRAPH_SPACING_STEP_RANGE) {
             "paragraphSpacingStep doit être dans $PARAGRAPH_SPACING_STEP_RANGE"
+        }
+        require(autoScrollSpeed in AUTO_SCROLL_SPEED_RANGE) {
+            "autoScrollSpeed doit être dans $AUTO_SCROLL_SPEED_RANGE"
         }
         require(readerBrightness == null || readerBrightness in 0.01f..1.0f) {
             "readerBrightness doit être compris entre 0.01 et 1.0, ou null"
@@ -133,7 +144,19 @@ data class UserPreferences(
         /** Crans d'espacement entre paragraphes : 0 serré, 1 normal, 2 aéré. */
         val PARAGRAPH_SPACING_STEP_RANGE = 0..2
         const val PARAGRAPH_SPACING_STEP_DEFAULT = 1
+
+        /** Crans de vitesse d'auto-scroll : 0 désactivé, 1 lente, 2 moyenne, 3 rapide. */
+        val AUTO_SCROLL_SPEED_RANGE = 0..3
     }
 }
 
-enum class FontFamily { DEFAULT, OPEN_DYSLEXIC, SERIF, SANS_SERIF }
+/**
+ * Famille de police persistée en préférence (`UserPreferences.fontFamily`)
+ * : une valeur ajoutée ne se retire plus (Lot 21, décision 2 — les thèmes
+ * et préréglages existants peuvent s'en servir, une valeur manquante à la
+ * lecture d'une vieille préférence planterait la restauration).
+ *
+ * `SOURCE_SERIF` = Source Serif 4 (OFL), police de lecture française à
+ * empattements (Lot 21, tâche 10).
+ */
+enum class FontFamily { DEFAULT, OPEN_DYSLEXIC, SERIF, SANS_SERIF, SOURCE_SERIF }

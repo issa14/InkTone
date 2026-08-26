@@ -5,6 +5,7 @@ import com.inktone.domain.model.AnnotationColor
 import com.inktone.domain.model.Bookmark
 import com.inktone.domain.model.Chapter
 import com.inktone.domain.model.EffectiveReadingSettings
+import com.inktone.domain.model.FontFamily
 import com.inktone.domain.model.PublicationFormat
 import com.inktone.domain.model.ReadingOverrides
 import com.inktone.domain.model.ReadingTheme
@@ -61,6 +62,11 @@ data class ReaderUiState(
     val annotations: List<Annotation> = emptyList(),
     val bookmarks: List<Bookmark> = emptyList(),
     val isBookmarkListVisible: Boolean = false,
+    // Lot 21, tâche 5 — id du signet venant d'être créé par le toggle, en
+    // attente d'une note OPTIONNELLE (dialogue non bloquant, fermable).
+    // null = aucun dialogue à proposer. Consommé une seule fois par
+    // ReaderScreen (SaveBookmarkNote ou DismissBookmarkNotePrompt).
+    val pendingBookmarkNoteId: String? = null,
     // Surcharge par publication actuellement active (Tache 8.2) - null =
     // aucune surcharge, les reglages globaux s'appliquent tels quels.
     val currentOverrides: ReadingOverrides? = null,
@@ -117,6 +123,11 @@ data class ReaderUiState(
     // coexistent, le surlignage mot-à-mot ne respecte aujourd'hui que le
     // premier.
     val reduceMotion: Boolean = false,
+    // Lot 21, tâche 9 — vitesse d'auto-scroll visuel (mode SCROLL
+    // uniquement), réglage global observé en continu comme reduceMotion.
+    // 0 = désactivé ; le rendu n'auto-scrolle JAMAIS quand reduceMotion est
+    // actif, quelle que soit cette valeur.
+    val autoScrollSpeed: Int = 0,
     // Lot 4, tâche 4.7 — cible de flash en attente de la fin de mise en
     // page du chapitre visé (la mesure est asynchrone depuis 3a, voir
     // ChapterPaginationState). Consommée une seule fois par
@@ -328,6 +339,24 @@ sealed interface ReaderIntent {
     data object ToggleBookmarkList : ReaderIntent
     data class DeleteBookmark(val id: String) : ReaderIntent
 
+    /**
+     * Lot 21, tâche 5 — note optionnelle d'un signet. Le signet est créé
+     * immédiatement par le toggle (le geste rapide reste rapide) ; ce
+     * dialogue n'est qu'une PROPOSITION, fermable sans conséquence via
+     * [DismissBookmarkNotePrompt]. `note` vide ou blanche → note nulle,
+     * le signet reste valide.
+     */
+    data class SaveBookmarkNote(val note: String) : ReaderIntent
+    data object DismissBookmarkNotePrompt : ReaderIntent
+
+    /**
+     * Lot 21, tâche 9 — règle la vitesse d'auto-scroll visuel
+     * (`UserPreferences.autoScrollSpeed`, `0` = désactivé). Le réglage est
+     * global (même patron que reduceMotion), pas une surcharge par
+     * publication.
+     */
+    data class SetAutoScrollSpeed(val speed: Int) : ReaderIntent
+
     /** Navigue vers un `Locator` arbitraire — signet (Tâche 7.2) ou résultat de recherche (Tâche 7.5). */
     data class NavigateToLocator(val locator: Locator) : ReaderIntent
 
@@ -419,6 +448,15 @@ sealed interface ReaderIntent {
 
     /** P4 — justification du texte, césure comprise. */
     data class SetTextJustified(val justified: Boolean) : ReaderIntent
+
+    /**
+     * Correctif Lot 21 — jusqu'ici aucun écran ne permettait de choisir
+     * la famille de police depuis le Lecteur : `SettingsIntent.SetFontFamily`
+     * (feature/settings) n'était dispatché par aucune UI, rendant
+     * OpenDyslexic (hors préréglage d'accessibilité) et Source Serif 4
+     * inatteignables malgré leur rendu réel (Lot 21, tâches 1 et 10).
+     */
+    data class SetFontFamily(val fontFamily: FontFamily) : ReaderIntent
 
     /** P4 — maintien de l'écran allumé pendant la lecture visuelle. */
     data class SetKeepScreenOn(val enabled: Boolean) : ReaderIntent
