@@ -109,6 +109,12 @@ fun BookBlockItem(
     onFreeSelectionCleared: () -> Unit = {},
     onFreeSelectionBoundsInWindow: (ownerKey: Int, bounds: Rect?) -> Unit = { _, _ -> },
     onClick: () -> Unit = {},
+    // Lot 23, tâche 11 — un tap qui tombe DANS une annotation déjà posée
+    // déclenche ce callback avec ses bornes fenêtre plutôt que [onClick]
+    // (bascule HUD). `bounds` peut être `null` si le layout n'est pas
+    // encore disponible — l'appelant doit alors ignorer l'appel plutôt que
+    // d'afficher un popup mal positionné.
+    onAnnotationTapped: (Annotation, Rect?) -> Unit = { _, _ -> },
     isReadingRulerEnabled: Boolean = false,
     onCurrentLineY: (Dp) -> Unit = {},
     modifier: Modifier = Modifier,
@@ -124,6 +130,8 @@ fun BookBlockItem(
                 blockOffsetRange = block.globalOffsetRange,
                 plainText = block.richText.plainText,
                 textStyle = textStyle,
+                annotations = annotations,
+                chapterIndex = chapterIndex,
                 highlightedRange = highlightedRange,
                 freeSelectedRange = freeSelectedRange,
                 onFreeSelectionChanged = onFreeSelectionChanged,
@@ -132,6 +140,7 @@ fun BookBlockItem(
                     onFreeSelectionBoundsInWindow(block.globalOffsetRange.first, bounds)
                 },
                 onClick = onClick,
+                onAnnotationTapped = onAnnotationTapped,
                 isReadingRulerEnabled = isReadingRulerEnabled,
                 onCurrentLineY = onCurrentLineY,
                 modifier = modifier,
@@ -245,6 +254,19 @@ private fun buildBlockAnnotatedString(
 }
 
 /**
+ * Lot 23, tâche 11 — l'annotation dont la plage contient [globalOffset]
+ * dans [chapterIndex], ou `null`. Bornes en demi-ouvert
+ * `[startLocator, endLocator[`, même convention que
+ * [buildBlockAnnotatedString].
+ */
+internal fun annotationAtOffset(annotations: List<Annotation>, chapterIndex: Int, globalOffset: Int): Annotation? =
+    annotations.firstOrNull { annotation ->
+        annotation.startLocator.chapterIndex == chapterIndex &&
+            annotation.startLocator.charOffset <= globalOffset &&
+            annotation.endLocator.charOffset > globalOffset
+    }
+
+/**
  * `BasicTextField` en lecture seule d'un [BookBlock.ParagraphBlock], avec
  * sélection native, popup d'action et surlignage mot-à-mot TTS — pendant
  * de `PageBlock` (`PagedChapterContent.kt`) à l'échelle du bloc plutôt
@@ -257,12 +279,15 @@ private fun ParagraphBlockText(
     blockOffsetRange: IntRange,
     plainText: String,
     textStyle: TextStyle,
+    annotations: List<Annotation>,
+    chapterIndex: Int,
     highlightedRange: State<IntRange?>,
     freeSelectedRange: State<IntRange?>,
     onFreeSelectionChanged: (anchorOffset: Int, focusOffset: Int) -> Unit,
     onFreeSelectionCleared: () -> Unit,
     onFreeSelectionBoundsInWindow: (Rect?) -> Unit,
     onClick: () -> Unit,
+    onAnnotationTapped: (Annotation, Rect?) -> Unit,
     isReadingRulerEnabled: Boolean,
     onCurrentLineY: (Dp) -> Unit,
     modifier: Modifier = Modifier,
@@ -346,7 +371,20 @@ private fun ParagraphBlockText(
                         onFreeSelectionCleared()
                         hidePopup()
                     }
-                    onClick()
+                    // Lot 23, tâche 11 — un tap qui tombe dans une
+                    // annotation déjà posée ouvre son menu contextuel au
+                    // lieu de basculer le HUD (comportement inchangé
+                    // ailleurs dans le texte).
+                    val globalOffset = blockOffsetRange.first + newValue.selection.start
+                    val tappedAnnotation = annotationAtOffset(annotations, chapterIndex, globalOffset)
+                    if (tappedAnnotation != null) {
+                        val absolute = maxOf(tappedAnnotation.startLocator.charOffset, blockOffsetRange.first)..
+                            (minOf(tappedAnnotation.endLocator.charOffset, blockOffsetRange.last + 1) - 1)
+                        val bounds = rangeBoundsInWindow(textLayoutResult, textCoordinates, blockOffsetRange, absolute)
+                        onAnnotationTapped(tappedAnnotation, bounds)
+                    } else {
+                        onClick()
+                    }
                 } else {
                     if (selectionChanged) hidePopup()
                     val min = newValue.selection.min
