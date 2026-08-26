@@ -59,6 +59,7 @@ import com.inktone.domain.usecase.ToggleFavoriteUseCase
 import com.inktone.domain.usecase.ToggleLibraryItemPinUseCase
 import com.inktone.domain.usecase.TogglePinUseCase
 import com.inktone.domain.usecase.UpdateReadingStateUseCase
+import com.inktone.domain.usecase.UpdateAnnotationUseCase
 import com.inktone.domain.usecase.UpdateBookmarkNoteUseCase
 import com.inktone.infrastructure.database.dao.ReadingSessionDao
 import dagger.Module
@@ -191,6 +192,11 @@ object UseCaseModule {
     fun provideDeleteAnnotationUseCase(
         annotationRepository: AnnotationRepository,
     ): DeleteAnnotationUseCase = DeleteAnnotationUseCase(annotationRepository)
+
+    @Provides
+    fun provideUpdateAnnotationUseCase(
+        annotationRepository: AnnotationRepository,
+    ): UpdateAnnotationUseCase = UpdateAnnotationUseCase(annotationRepository)
 
     @Provides
     fun provideToggleLibraryItemPinUseCase(
