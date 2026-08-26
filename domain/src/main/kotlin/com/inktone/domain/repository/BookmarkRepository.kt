@@ -13,4 +13,11 @@ interface BookmarkRepository {
 
     /** Lot 4, tâche 4.3 — même patron que Publication.isPinned. */
     suspend fun setPinned(id: String, isPinned: Boolean)
+
+    /**
+     * Lot 21, tâche 5 — note optionnelle d'un signet (saisie proposée à la
+     * création, jamais obligatoire). `note` peut être `null` (signet sans
+     * note) mais la méthode sert à la POSER explicitement.
+     */
+    suspend fun updateNote(id: String, note: String?)
 }

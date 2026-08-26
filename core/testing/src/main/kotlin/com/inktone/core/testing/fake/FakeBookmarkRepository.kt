@@ -25,4 +25,8 @@ class FakeBookmarkRepository : BookmarkRepository {
     override suspend fun setPinned(id: String, isPinned: Boolean) {
         state.value = state.value.map { if (it.id == id) it.copy(isPinned = isPinned) else it }
     }
+
+    override suspend fun updateNote(id: String, note: String?) {
+        state.value = state.value.map { if (it.id == id) it.copy(note = note) else it }
+    }
 }

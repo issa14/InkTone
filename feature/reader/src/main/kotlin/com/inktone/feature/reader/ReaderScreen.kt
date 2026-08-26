@@ -39,6 +39,7 @@ import androidx.compose.foundation.text.selection.TextSelectionColors
 import androidx.compose.material3.Button
 import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
@@ -1353,6 +1354,17 @@ fun ReaderScreen(
             }
         }
 
+        // Lot 21, tâche 5 — saisie de note OPTIONNELLE d'un signet venant d'être
+        // créé. Le signet existe déjà (le toggle l'a créé) : ce dialogue ne
+        // bloque jamais le geste — fermer (« Plus tard », tap hors champ) laisse
+        // le signet sans note. La note vide est enregistrée comme `null`.
+        if (state.pendingBookmarkNoteId != null) {
+            BookmarkNoteDialog(
+                onSave = { note -> viewModel.onIntent(ReaderIntent.SaveBookmarkNote(note)) },
+                onDismiss = { viewModel.onIntent(ReaderIntent.DismissBookmarkNotePrompt) },
+            )
+        }
+
         // Lot 10 (restauré au Lot 20) — proposition proactive de la voix
         // neuronale au premier usage réel du TTS. « Télécharger » ouvre
         // les Réglages (carte Lecture) où le téléchargement réel
@@ -1452,4 +1464,43 @@ private fun ErrorState(message: String, onRetry: () -> Unit, onBack: () -> Unit)
             Text("Retour à la bibliothèque")
         }
     }
+}
+
+/**
+ * Lot 21, tâche 5 — saisie de note OPTIONNELLE d'un signet venant d'être
+ * créé. Le signet existe déjà (le toggle l'a créé) : ce dialogue ne
+ * bloque jamais le geste — fermer (« Plus tard », tap hors champ) laisse
+ * le signet sans note. La note vide est enregistrée comme `null`.
+ */
+@Composable
+private fun BookmarkNoteDialog(
+    onSave: (String) -> Unit,
+    onDismiss: () -> Unit,
+) {
+    var note by remember { mutableStateOf("") }
+    androidx.compose.material3.AlertDialog(
+        onDismissRequest = onDismiss,
+        title = { Text("Note sur ce signet") },
+        text = {
+            Column(modifier = Modifier.fillMaxWidth()) {
+                Text(
+                    "Facultatif : ajoutez une note à ce signet pour le retrouver plus facilement.",
+                    style = MaterialTheme.typography.bodyMedium,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                )
+                OutlinedTextField(
+                    value = note,
+                    onValueChange = { note = it },
+                    modifier = Modifier.fillMaxWidth().padding(top = 12.dp),
+                    placeholder = { Text("Ex. : passage à relire") },
+                )
+            }
+        },
+        confirmButton = {
+            TextButton(onClick = { onSave(note) }) { Text("Enregistrer") }
+        },
+        dismissButton = {
+            TextButton(onClick = onDismiss) { Text("Plus tard") }
+        },
+    )
 }

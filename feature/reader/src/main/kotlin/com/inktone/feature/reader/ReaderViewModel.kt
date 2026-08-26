@@ -334,6 +334,8 @@ class ReaderViewModel @Inject constructor(
                 isBookmarkListVisible = !_state.value.isBookmarkListVisible,
             )
             is ReaderIntent.DeleteBookmark -> viewModelScope.launch { deleteBookmark(intent.id) }
+            is ReaderIntent.SaveBookmarkNote -> saveBookmarkNote(intent.note)
+            is ReaderIntent.DismissBookmarkNotePrompt -> _state.value = _state.value.copy(pendingBookmarkNoteId = null)
             is ReaderIntent.NavigateToLocator -> navigateToLocator(intent.locator)
             is ReaderIntent.ChapterLayoutCompleted -> onChapterLayoutCompleted(intent.chapterIndex)
             is ReaderIntent.SetOverrides -> setOverrides(intent.overrides)
@@ -791,20 +793,23 @@ class ReaderViewModel @Inject constructor(
                 if (existing != null) {
                     deleteBookmark(existing.id)
                 } else {
-                    createBookmark(
-                        Bookmark(
-                            id = UUID.randomUUID().toString(),
-                            publicationId = publicationId,
-                            locator = Locator(
-                                resourceHref = "page-$chapterIndex",
-                                chapterIndex = chapterIndex,
-                                charOffset = 0,
-                                pageOffsetY = _state.value.pageOffsetY,
-                            ),
-                            excerpt = "Page ${chapterIndex + 1}",
-                            createdAt = System.currentTimeMillis(),
+                    val bookmark = Bookmark(
+                        id = UUID.randomUUID().toString(),
+                        publicationId = publicationId,
+                        locator = Locator(
+                            resourceHref = "page-$chapterIndex",
+                            chapterIndex = chapterIndex,
+                            charOffset = 0,
+                            pageOffsetY = _state.value.pageOffsetY,
                         ),
+                        excerpt = "Page ${chapterIndex + 1}",
+                        createdAt = System.currentTimeMillis(),
                     )
+                    createBookmark(bookmark)
+                    // Lot 21, tâche 5 — note optionnelle proposée après la
+                    // création (jamais un dialogue bloquant : le signet est
+                    // déjà créé, l'utilisateur peut fermer sans note).
+                    _state.value = _state.value.copy(pendingBookmarkNoteId = bookmark.id)
                 }
             }
             return
@@ -821,16 +826,34 @@ class ReaderViewModel @Inject constructor(
             if (existing != null) {
                 deleteBookmark(existing.id)
             } else {
-                createBookmark(
-                    Bookmark(
-                        id = UUID.randomUUID().toString(),
-                        publicationId = publicationId,
-                        locator = sentence.startLocator(chapterIndex = chapter.index, resourceHref = chapter.href),
-                        excerpt = sentence.text.take(Bookmark.MAX_EXCERPT_LENGTH),
-                        createdAt = System.currentTimeMillis(),
-                    ),
+                val bookmark = Bookmark(
+                    id = UUID.randomUUID().toString(),
+                    publicationId = publicationId,
+                    locator = sentence.startLocator(chapterIndex = chapter.index, resourceHref = chapter.href),
+                    // Lot 21, tâche 5 — le signet porte un titre lisible
+                    // (début de la phrase) au lieu de rester sans titre ;
+                    // la note optionnelle est proposée après la création.
+                    title = sentence.text.take(BOOKMARK_TITLE_MAX_CHARS),
+                    excerpt = sentence.text.take(Bookmark.MAX_EXCERPT_LENGTH),
+                    createdAt = System.currentTimeMillis(),
                 )
+                createBookmark(bookmark)
+                _state.value = _state.value.copy(pendingBookmarkNoteId = bookmark.id)
             }
+        }
+    }
+
+    /**
+     * Lot 21, tâche 5 — pose la note optionnelle sur le signet en attente
+     * (`pendingBookmarkNoteId`), puis referme le dialogue. `note` vide ou
+     * blanche = note nulle, le signet reste valide (jamais un signet
+     * invalide).
+     */
+    private fun saveBookmarkNote(note: String) {
+        val bookmarkId = _state.value.pendingBookmarkNoteId ?: return
+        _state.value = _state.value.copy(pendingBookmarkNoteId = null)
+        viewModelScope.launch {
+            bookmarkRepository.updateNote(bookmarkId, note.trim().ifBlank { null })
         }
     }
 
@@ -1609,6 +1632,12 @@ class ReaderViewModel @Inject constructor(
 
         /** Pages sans texte tolerees avant de renoncer a narrer un PDF. */
         private const val MAX_EMPTY_PAGE_LOOKAHEAD = 20
+
+        /**
+         * Lot 21, tâche 5 — longueur max du titre lisible d'un signet
+         * (début de la phrase), affiché en gras dans `BookmarkPanel`.
+         */
+        private const val BOOKMARK_TITLE_MAX_CHARS = 60
     }
 }
 

@@ -296,6 +296,18 @@ private fun BookmarksTab(bookmarks: List<Bookmark>, onClick: (Bookmark) -> Unit)
                         bookmark.title?.takeIf { it.isNotBlank() } ?: "Chapitre ${bookmark.locator.chapterIndex + 1}",
                         style = MaterialTheme.typography.bodyMedium,
                     )
+                    // Lot 21, tâche 5 — la note du signet est visible dans
+                    // le panneau (saisie optionnelle à la création).
+                    bookmark.note?.takeIf { it.isNotBlank() }?.let { note ->
+                        Spacer(Modifier.height(4.dp))
+                        Text(
+                            note,
+                            style = MaterialTheme.typography.bodySmall,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant,
+                            maxLines = 3,
+                            overflow = TextOverflow.Ellipsis,
+                        )
+                    }
                     Spacer(Modifier.height(4.dp))
                     Text(
                         formatAnnotationDate(bookmark.createdAt),

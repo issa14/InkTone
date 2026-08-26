@@ -29,6 +29,7 @@ import com.inktone.domain.usecase.GetVoiceProfilesUseCase
 import com.inktone.domain.usecase.UpdateReadingStateUseCase
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.ExperimentalCoroutinesApi
+import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.test.StandardTestDispatcher
 import kotlinx.coroutines.test.resetMain
 import kotlinx.coroutines.test.runTest
@@ -161,6 +162,76 @@ class ReaderViewModelBookmarkToggleTest {
         // Casse le timer de checkpoint (auto-récurrent) comme le ferait
         // onCleared() sur un vrai ViewModel détruit — sinon le drain
         // implicite de fin de runTest boucle indéfiniment.
+        viewModel.cancelCheckpointTimerForTest()
+        dispatcher.scheduler.runCurrent()
+    }
+
+    // ───── Lot 21, tâche 5 — note optionnelle à la création du signet ─────
+
+    @Test
+    fun toggle_cree_le_signet_et_propose_une_note_optionnelle() = runTest {
+        val readingStateRepository = FakeReadingStateRepository()
+        val publicationRepository = FakePublicationRepository()
+        val bookmarkRepository = FakeBookmarkRepository()
+        val annotationRepository = FakeAnnotationRepository()
+        publicationRepository.insert(
+            Publication(
+                id = "pub-1", title = "Test", format = PublicationFormat.EPUB,
+                fileUri = "content://x", fileHash = "hash", fileSize = 10, chapterCount = 1,
+                importDate = 0L,
+            ),
+        )
+        val viewModel = buildViewModel(readingStateRepository, publicationRepository, bookmarkRepository, annotationRepository)
+        viewModel.onIntent(ReaderIntent.OpenPublication("pub-1"))
+        dispatcher.scheduler.runCurrent()
+
+        // Le toggle crée le signet immédiatement (le geste rapide reste rapide)…
+        viewModel.onIntent(ReaderIntent.ToggleBookmarkAtCurrentPosition)
+        dispatcher.scheduler.runCurrent()
+        val created = viewModel.state.value.bookmarks.single()
+        // …et PROPOSE une note sans l'imposer.
+        assertEquals(created.id, viewModel.state.value.pendingBookmarkNoteId)
+        // Le titre du signet est rempli (début de la phrase), plus de null.
+        assertEquals("Phrase unique.", created.title)
+
+        // L'utilisateur saisit une note → persistée, le dialogue se ferme.
+        viewModel.onIntent(ReaderIntent.SaveBookmarkNote("À relire plus tard"))
+        dispatcher.scheduler.runCurrent()
+        assertNull(viewModel.state.value.pendingBookmarkNoteId)
+        assertEquals("À relire plus tard", bookmarkRepository.observeAll().first().single().note)
+
+        viewModel.cancelCheckpointTimerForTest()
+        dispatcher.scheduler.runCurrent()
+    }
+
+    @Test
+    fun fermer_la_proposition_laisse_le_signet_sans_note() = runTest {
+        val readingStateRepository = FakeReadingStateRepository()
+        val publicationRepository = FakePublicationRepository()
+        val bookmarkRepository = FakeBookmarkRepository()
+        val annotationRepository = FakeAnnotationRepository()
+        publicationRepository.insert(
+            Publication(
+                id = "pub-1", title = "Test", format = PublicationFormat.EPUB,
+                fileUri = "content://x", fileHash = "hash", fileSize = 10, chapterCount = 1,
+                importDate = 0L,
+            ),
+        )
+        val viewModel = buildViewModel(readingStateRepository, publicationRepository, bookmarkRepository, annotationRepository)
+        viewModel.onIntent(ReaderIntent.OpenPublication("pub-1"))
+        dispatcher.scheduler.runCurrent()
+
+        viewModel.onIntent(ReaderIntent.ToggleBookmarkAtCurrentPosition)
+        dispatcher.scheduler.runCurrent()
+        assertEquals(1, viewModel.state.value.bookmarks.size)
+
+        // « Plus tard » : la proposition se ferme sans note, le signet reste.
+        viewModel.onIntent(ReaderIntent.DismissBookmarkNotePrompt)
+        dispatcher.scheduler.runCurrent()
+        assertNull(viewModel.state.value.pendingBookmarkNoteId)
+        assertNull(bookmarkRepository.observeAll().first().single().note)
+        assertEquals(1, viewModel.state.value.bookmarks.size)
+
         viewModel.cancelCheckpointTimerForTest()
         dispatcher.scheduler.runCurrent()
     }

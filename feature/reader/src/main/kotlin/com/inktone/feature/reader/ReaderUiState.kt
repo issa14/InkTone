@@ -61,6 +61,11 @@ data class ReaderUiState(
     val annotations: List<Annotation> = emptyList(),
     val bookmarks: List<Bookmark> = emptyList(),
     val isBookmarkListVisible: Boolean = false,
+    // Lot 21, tâche 5 — id du signet venant d'être créé par le toggle, en
+    // attente d'une note OPTIONNELLE (dialogue non bloquant, fermable).
+    // null = aucun dialogue à proposer. Consommé une seule fois par
+    // ReaderScreen (SaveBookmarkNote ou DismissBookmarkNotePrompt).
+    val pendingBookmarkNoteId: String? = null,
     // Surcharge par publication actuellement active (Tache 8.2) - null =
     // aucune surcharge, les reglages globaux s'appliquent tels quels.
     val currentOverrides: ReadingOverrides? = null,
@@ -327,6 +332,16 @@ sealed interface ReaderIntent {
     data object ToggleBookmarkAtCurrentPosition : ReaderIntent
     data object ToggleBookmarkList : ReaderIntent
     data class DeleteBookmark(val id: String) : ReaderIntent
+
+    /**
+     * Lot 21, tâche 5 — note optionnelle d'un signet. Le signet est créé
+     * immédiatement par le toggle (le geste rapide reste rapide) ; ce
+     * dialogue n'est qu'une PROPOSITION, fermable sans conséquence via
+     * [DismissBookmarkNotePrompt]. `note` vide ou blanche → note nulle,
+     * le signet reste valide.
+     */
+    data class SaveBookmarkNote(val note: String) : ReaderIntent
+    data object DismissBookmarkNotePrompt : ReaderIntent
 
     /** Navigue vers un `Locator` arbitraire — signet (Tâche 7.2) ou résultat de recherche (Tâche 7.5). */
     data class NavigateToLocator(val locator: Locator) : ReaderIntent
