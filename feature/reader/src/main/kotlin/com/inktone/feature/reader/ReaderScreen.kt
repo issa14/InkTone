@@ -737,6 +737,7 @@ fun ReaderScreen(
                         }
                     },
                     reduceMotion = state.reduceMotion,
+                    isRenderReady = state.isFixedPageReady,
                 )
             } else {
                 when (state.readingMode) {
@@ -1031,12 +1032,12 @@ fun ReaderScreen(
                     // unifié (navigation par chapitre, retirée du panneau au lot
                     // 3b) ; le panneau complet ne revient que par l'overlay A5 ou
                     // à l'arrêt de la lecture.
-                    // Lot 12, tache 12.10 — la barre pilule TTS n'a pas
-                    // lieu d'apparaitre pour un PDF (isPlaying reste faux,
-                    // playCurrentSentence se neutralise pour ce format,
-                    // decision actee 16) : garde explicite, pas seulement
-                    // transitive.
-                    if (state.isPlaying && !showFullPanelOverlay && !isPdf) {
+                    // ADR-017 volet 2 — la barre pilule TTS suit desormais
+                    // la disponibilite reelle de la narration, pas le format :
+                    // un PDF qui porte du texte l'affiche comme un EPUB, un
+                    // PDF entierement scanne ne la voit jamais (isPlaying
+                    // reste faux, playCurrentSentence n'a aucune phrase).
+                    if (state.isPlaying && !showFullPanelOverlay && state.supportsTts) {
                         // 3e.2 — repli en bouton unique après 4s (isPillCollapsed,
                         // voir onAutoHide plus haut).
                         //
@@ -1133,7 +1134,8 @@ fun ReaderScreen(
                             // « Mode » doit refléter le mode ACTIF, pas un
                             // glyphe figé.
                             readingMode = state.readingMode,
-                            showTtsControls = !isPdf,
+                            showTtsControls = state.supportsTts,
+                            showReadingModeToggle = !isPdf,
                             // Audit v1.0.0 (M6) : pas de sommaire pour PDF/TXT.
                             showToc = state.publicationFormat == PublicationFormat.EPUB,
                             surfaceColor = ThemeColors.barSurface(state.resolvedTheme),
@@ -1277,7 +1279,7 @@ fun ReaderScreen(
                 onSetEyeRestReminderEnabled = { enabled -> viewModel.onIntent(ReaderIntent.SetEyeRestReminderEnabled(enabled)) },
                 onSetEyeRestReminderInterval = { minutes -> viewModel.onIntent(ReaderIntent.SetEyeRestReminderInterval(minutes)) },
                 onDismiss = { showSleepTimerPanel = false },
-                showSleepTimer = !isPdf,
+                showSleepTimer = state.supportsTts,
             )
         }
 

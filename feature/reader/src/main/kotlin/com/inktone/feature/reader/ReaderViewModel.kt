@@ -660,7 +660,7 @@ class ReaderViewModel @Inject constructor(
                     viewModelScope.launch {
                         chapterLoadJob?.join()
                         if (effectiveLocator != null) navigateToLocator(effectiveLocator, flashOnArrival)
-                        if (autoStartTts && publication.format != PublicationFormat.PDF) {
+                        if (autoStartTts) {
                             playCurrentSentence()
                         }
                     }
@@ -1056,6 +1056,32 @@ class ReaderViewModel @Inject constructor(
     }
 
     /**
+     * Positionne l'affichage sur la premiere page porteuse de texte a partir
+     * de la page courante, en les chargeant paresseusement une a une.
+     *
+     * @return `false` si aucune page en aval n'a de texte dans la fenetre
+     *   exploree — il n'y a alors rien a narrer, et la lecture ne demarre pas.
+     *
+     * Fenetre bornee ([MAX_EMPTY_PAGE_LOOKAHEAD]) : sur un PDF entierement
+     * scanne, parcourir 994 pages pour ne rien trouver bloquerait le geste
+     * de l'utilisateur sans rien lui apprendre de plus.
+     */
+    private suspend fun advanceToFirstNarratablePage(): Boolean {
+        val start = _state.value.currentChapterIndex
+        val last = minOf(_state.value.chapters.lastIndex, start + MAX_EMPTY_PAGE_LOOKAHEAD)
+        for (index in start..last) {
+            loadChapterContentIfNeeded(index)?.join()
+            if (_state.value.chapters.getOrNull(index)?.sentences?.isNotEmpty() == true) {
+                if (index != start) {
+                    _state.value = _state.value.copy(currentChapterIndex = index, currentSentenceIndex = 0)
+                }
+                return true
+            }
+        }
+        return false
+    }
+
+    /**
      * A.1 (Lot 15, Tâche 4.1) — délègue la lecture continue au
      * [PlaybackOrchestrator] (producteur/consommateur gapless). Le ViewModel
      * ne fait plus la synthèse ni la boucle : il résout le profil vocal et
@@ -1063,12 +1089,34 @@ class ReaderViewModel @Inject constructor(
      * de l'ordonnanceur (voir init).
      */
     private fun playCurrentSentence() {
-        // Lot 12, tache 12.10 — TTS hors perimetre pour un PDF (decision
-        // actee 16). Le bouton declencheur est deja masque (UnifiedControlPanel,
-        // ReaderTtsPanel inatteignable) ; cette garde couvre un
-        // declencheur externe eventuel (MediaSession/ecran verrouille),
-        // jamais audite pour ce format.
-        if (_state.value.publicationFormat == PublicationFormat.PDF) return
+        // ADR-017 volet 2 — sur un PDF, la page courante peut ne porter aucun
+        // texte (planche scannee, illustration pleine page). Depuis le
+        // passage au parsing paresseux, `sentences` vide ne suffit PLUS a le
+        // conclure : la page peut simplement ne pas encore etre chargee. Il
+        // faut donc la charger avant de decider, ce qui suspend — d'ou le
+        // detour par une coroutine, contrairement au reste de cette methode.
+        //
+        // Abandon silencieux si rien n'est narrable dans la fenetre exploree :
+        // `errorMessage` n'est PAS une notification, il remplace tout l'ecran
+        // de lecture par un `ErrorState` a deux boutons (ReaderScreen ~391).
+        // Le cas « aucune page du livre n'a de texte » est deja traite en
+        // amont — `ReaderUiState.supportsTts` masque les commandes TTS — donc
+        // n'arrive ici qu'un livre dont une longue section est scannee.
+        if (_state.value.publicationFormat == PublicationFormat.PDF) {
+            viewModelScope.launch {
+                if (advanceToFirstNarratablePage()) startNarrationAtCurrentPosition()
+            }
+            return
+        }
+        startNarrationAtCurrentPosition()
+    }
+
+    /**
+     * Demarre la narration a la position courante, celle-ci etant tenue pour
+     * narrable — c'est a l'appelant de s'en etre assure (voir
+     * [advanceToFirstNarratablePage] pour le PDF).
+     */
+    private fun startNarrationAtCurrentPosition() {
         val chapter = _state.value.currentChapter ?: return
         val sentences = chapter.sentences
         if (sentences.isEmpty()) return
@@ -1088,6 +1136,7 @@ class ReaderViewModel @Inject constructor(
         playbackOrchestrator.setNarrationProgram(
             publicationId = publicationId,
             chapterHrefs = _state.value.chapters.map { it.href },
+            skipEmptyChapters = _state.value.publicationFormat == PublicationFormat.PDF,
         )
 
         viewModelScope.launch {
@@ -1557,6 +1606,9 @@ class ReaderViewModel @Inject constructor(
     companion object {
         /** Intervalle de checkpoint : 5 minutes. */
         private const val CHECKPOINT_INTERVAL_MS = 5 * 60 * 1000L
+
+        /** Pages sans texte tolerees avant de renoncer a narrer un PDF. */
+        private const val MAX_EMPTY_PAGE_LOOKAHEAD = 20
     }
 }
 

@@ -167,6 +167,23 @@ data class ReaderUiState(
     val hasPreviousChapter: Boolean get() = currentChapterIndex > 0
 
     /**
+     * ADR-017 volet 2, premier temps — le TTS est désormais disponible sur
+     * PDF, à la granularité de la phrase (les `Sentence` sont extraites
+     * page par page par `PdfPublicationParser`). Le surlignage mot-à-mot
+     * reste hors périmètre : il demande des `BoundingBox` par mot, que ce
+     * volet ne fournit pas encore — un PDF s'écoute, il ne se surligne pas.
+     *
+     * Un PDF entièrement scanné (aucune page ne porte de texte) n'a rien à
+     * narrer : les commandes TTS sont alors masquées plutôt que présentes
+     * et sans effet. Le test ne vaut QUE pour le PDF, dont les chapitres
+     * sont chargés d'un bloc à l'ouverture ; pour un EPUB, `sentences` est
+     * vide tant que le chapitre n'a pas été parsé paresseusement, et s'y
+     * fier masquerait le bouton sur tous les livres.
+     */
+    val supportsTts: Boolean
+        get() = publicationFormat != PublicationFormat.PDF || chapters.any { it.sentences.isNotEmpty() }
+
+    /**
      * Tache 9bis.3.2 — progression du LIVRE ENTIER (`Locator.computeProgression`,
      * ecrite en Tache 1.1, jamais branchee avant cette tache), pas la
      * progression par chapitre du legacy. Recalculee a chaque acces plutot

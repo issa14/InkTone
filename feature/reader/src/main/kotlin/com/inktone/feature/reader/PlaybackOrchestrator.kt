@@ -1,5 +1,6 @@
 package com.inktone.feature.reader
 
+import com.inktone.domain.model.Chapter
 import com.inktone.domain.model.PublicationFormat
 import com.inktone.domain.model.ReadingState
 import com.inktone.domain.model.cleanedAuthorsForDisplay
@@ -108,11 +109,25 @@ class PlaybackOrchestrator @Inject constructor(
      * phrases en mémoire, pour un seul chapitre utile à la fois, dupliquerait
      * l'état déjà porté par l'écran et deviendrait périmé au moindre
      * rechargement.
+     *
+     * Le PDF passe par le même chemin depuis le 2026-08-26
+     * ([PdfChapterParser]) : une page `page-N` se recharge comme un chapitre
+     * EPUB, il n'y a donc rien de particulier à retenir ici pour ce format.
      */
     data class NarrationProgram(
         val publicationId: String,
         /** Hrefs des chapitres, **dans l'ordre du spine** : la position dans la liste EST l'index de chapitre. */
         val chapterHrefs: List<String>,
+        /**
+         * Un chapitre sans phrase interrompt-il la narration, ou se saute-t-il ?
+         *
+         * Faux pour l'EPUB : un chapitre vide y signale un échec de parsing,
+         * et sauter par-dessus ferait perdre du texte à l'auditeur sans
+         * qu'il le sache. Vrai pour le PDF, où une page sans texte est une
+         * planche ou une illustration — parfaitement normale, et sans rien
+         * à narrer (ADR-017 volet 2).
+         */
+        val skipEmptyChapters: Boolean = false,
     )
 
     /** État de lecture exposé à la couche présentation. */
@@ -428,8 +443,8 @@ class PlaybackOrchestrator @Inject constructor(
      * Sans appel, [program] reste `null` et la narration s'arrête en fin de
      * chapitre — jamais de comportement à moitié câblé.
      */
-    fun setNarrationProgram(publicationId: String, chapterHrefs: List<String>) {
-        program = NarrationProgram(publicationId, chapterHrefs)
+    fun setNarrationProgram(publicationId: String, chapterHrefs: List<String>, skipEmptyChapters: Boolean = false) {
+        program = NarrationProgram(publicationId, chapterHrefs, skipEmptyChapters)
     }
 
     /**
@@ -477,11 +492,6 @@ class PlaybackOrchestrator @Inject constructor(
     override fun startNarration(publicationId: String) {
         scope.launch {
             val publication = publicationRepository.getById(publicationId) ?: return@launch
-            // TTS hors périmètre PDF (décision actée 16, Lot 12) — même garde
-            // que `ReaderViewModel.playCurrentSentence`, ici parce que cet
-            // appel vient d'un écran qui ne connaît pas le format.
-            if (publication.format == PublicationFormat.PDF) return@launch
-
             // Préchauffe comme le fait le Lecteur à l'ouverture : dans un
             // process neuf, l'init froide des modèles ONNX dépasse le timeout
             // de synthèse et le moteur retomberait sur la voix système.
@@ -499,11 +509,12 @@ class PlaybackOrchestrator @Inject constructor(
             chapterParser.registerPublication(publicationId, publication.fileUri)
 
             val restored = getReadingState(publicationId)
+            val isPdf = publication.format == PublicationFormat.PDF
             val chapterIndex = (restored?.locator?.chapterIndex ?: 0).coerceIn(chapters.indices)
             val chapter = chapters[chapterIndex]
 
             // EPUB : contenu paresseux, `sentences` est vide tant que le
-            // chapitre n'a pas été parsé. TXT : déjà porté par le parse
+            // chapitre n'a pas été parsé. TXT/PDF : déjà porté par le parse
             // complet ci-dessus (même distinction que
             // `loadChapterContentIfNeeded`, qui ignore les chapitres Legacy).
             val sentences = chapter.sentences.ifEmpty {
@@ -515,7 +526,10 @@ class PlaybackOrchestrator @Inject constructor(
                     return@launch
                 }
             }
-            if (sentences.isEmpty()) return@launch
+            // Une page PDF sans texte (planche scannee) n'est pas une erreur :
+            // `advanceToNextChapter` traversera jusqu'a la prochaine page
+            // narrable. Un chapitre EPUB vide, lui, reste un echec.
+            if (sentences.isEmpty() && !isPdf) return@launch
 
             val charOffset = restored?.locator?.charOffset ?: 0
             val startFrom = sentences
@@ -533,7 +547,7 @@ class PlaybackOrchestrator @Inject constructor(
                 author = publication.authors.cleanedAuthorsForDisplay().ifBlank { null },
                 coverUri = publication.coverUri,
             )
-            setNarrationProgram(publicationId, chapters.map { it.href })
+            setNarrationProgram(publicationId, chapters.map { it.href }, skipEmptyChapters = isPdf)
             play(
                 sentences = sentences,
                 voiceProfile = voiceProfile,
@@ -736,28 +750,43 @@ class PlaybackOrchestrator @Inject constructor(
     private suspend fun advanceToNextChapter(generation: Long, completedChapterIndex: Int) {
         val prog = program ?: return
         val ctx = session ?: return
-        val nextIndex = completedChapterIndex + 1
-        val nextHref = prog.chapterHrefs.getOrNull(nextIndex) ?: return // fin du livre
         if (!isCurrent(generation)) return
 
         _state.value = PlaybackStatus.Buffering
-        val chapter = try {
-            chapterParser.parseChapter(prog.publicationId, nextHref)
-        } catch (e: CancellationException) {
-            throw e
-        } catch (e: Exception) {
-            // Même politique que le Lecteur (K6/K7) : un href introuvable ou un
-            // chapitre malformé n'interrompt pas l'app, il termine la narration.
-            _state.value = PlaybackStatus.Idle
-            return
-        }
-        // Une pause ou un arrêt survenu pendant le parsing a péremé la
-        // génération : ne pas relancer une narration que l'utilisateur vient
-        // d'interrompre.
-        if (!isCurrent(generation)) return
-        if (chapter.sentences.isEmpty()) {
-            _state.value = PlaybackStatus.Idle
-            return
+
+        // Sur un PDF, on traverse les pages sans texte jusqu'a la prochaine
+        // page narrable ([NarrationProgram.skipEmptyChapters]) ; sur un EPUB,
+        // la boucle s'arrete des le premier chapitre (une seule iteration) et
+        // le comportement est strictement celui d'avant.
+        var nextIndex = completedChapterIndex + 1
+        var skipped = 0
+        var chapter: Chapter
+        var nextHref: String
+        while (true) {
+            nextHref = prog.chapterHrefs.getOrNull(nextIndex) ?: return // fin du livre
+
+            chapter = try {
+                chapterParser.parseChapter(prog.publicationId, nextHref)
+            } catch (e: CancellationException) {
+                throw e
+            } catch (e: Exception) {
+                // Même politique que le Lecteur (K6/K7) : un href introuvable ou un
+                // chapitre malformé n'interrompt pas l'app, il termine la narration.
+                _state.value = PlaybackStatus.Idle
+                return
+            }
+            // Une pause ou un arrêt survenu pendant le parsing a péremé la
+            // génération : ne pas relancer une narration que l'utilisateur vient
+            // d'interrompre.
+            if (!isCurrent(generation)) return
+            if (chapter.sentences.isNotEmpty()) break
+
+            if (!prog.skipEmptyChapters || skipped >= MAX_EMPTY_CHAPTER_SKIPS) {
+                _state.value = PlaybackStatus.Idle
+                return
+            }
+            skipped++
+            nextIndex++
         }
         // `chapter.index` recalculé par le parseur peut diverger de la position
         // réelle dans le spine (livres à couverture prépendue — même bug que
@@ -911,6 +940,9 @@ class PlaybackOrchestrator @Inject constructor(
     )
 
     private companion object {
+        /** Pages sans texte traversees avant de renoncer (PDF entierement scanne). */
+        const val MAX_EMPTY_CHAPTER_SKIPS = 20
+
         const val LOOKAHEAD = 3
         /** Timeout de synthèse unique (Edge cloud et Sherpa-ONNX confondus). */
         const val SYNTHESIS_TIMEOUT_MS = 20_000L

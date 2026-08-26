@@ -99,17 +99,30 @@ class ReaderViewModelPdfTest {
             )
         }
 
+    /** PDF entierement scanne : chaque page est une image, sans texte. */
+    private fun pagesSansTexte(pageCount: Int): List<Chapter> =
+        (0 until pageCount).map { pageIndex ->
+            Chapter(
+                index = pageIndex,
+                href = "page-$pageIndex",
+                title = null,
+                content = ChapterContent.Rich(blocks = emptyList()),
+                sentences = emptyList(),
+            )
+        }
+
     private suspend fun buildPdfViewModel(
         readingStateRepository: FakeReadingStateRepository = FakeReadingStateRepository(),
         publicationRepository: FakePublicationRepository = FakePublicationRepository(),
         bookmarkRepository: FakeBookmarkRepository = FakeBookmarkRepository(),
+        chapters: List<Chapter> = pdfChapters(3),
     ): ReaderViewModel {
         val preferencesRepository = FakePreferencesRepository()
         preferencesRepository.update(UserPreferences(eyeRestReminderEnabled = false))
         val parser = FakePublicationParser(
             result = ParseResult.Success(
                 documentModel = DocumentModel(
-                    chapters = pdfChapters(3),
+                    chapters = chapters,
                     tableOfContents = emptyList(),
                     resources = emptyList(),
                 ),
@@ -155,11 +168,12 @@ class ReaderViewModelPdfTest {
     }
 
     // ──────────────────────────────────────────────────────────────
-    // 12.13.1 — TTS neutralisé pour le format PDF
+    // 12.13.1 — TTS sur PDF (ADR-017 volet 2a : narration a la phrase,
+    // remplace la neutralisation totale de la decision actee 16)
     // ──────────────────────────────────────────────────────────────
 
     @Test
-    fun playCurrentSentence_est_sans_effet_pour_un_pdf() = runTest {
+    fun aucune_narration_ne_demarre_sur_un_pdf_entierement_scanne() = runTest {
         val publicationRepository = FakePublicationRepository()
         publicationRepository.insert(
             Publication(
@@ -168,21 +182,36 @@ class ReaderViewModelPdfTest {
                 chapterCount = 3, pageCount = 3, importDate = 0L,
             ),
         )
-        val viewModel = buildPdfViewModel(publicationRepository = publicationRepository)
+        // Toutes les pages scannees : aucune ne porte de texte.
+        val viewModel = buildPdfViewModel(
+            publicationRepository = publicationRepository,
+            chapters = pagesSansTexte(3),
+        )
         viewModel.onIntent(ReaderIntent.OpenPublication("pdf-1"))
         dispatcher.scheduler.runCurrent()
 
         assertEquals(PublicationFormat.PDF, viewModel.state.value.publicationFormat)
-        assertEquals(false, viewModel.state.value.isPlaying)
+        assertEquals(
+            "aucune page ne portant de texte, les commandes TTS sont masquees",
+            false,
+            viewModel.state.value.supportsTts,
+        )
 
-        // playCurrentSentence doit être un no-op pour un PDF
+        // `supportsTts` masque le bouton, mais un declencheur externe
+        // (MediaSession, ecran verrouille) peut encore appeler ce chemin :
+        // il doit renoncer, pas narrer du vide ni planter.
         viewModel.onIntent(ReaderIntent.PlayCurrentSentence)
         dispatcher.scheduler.runCurrent()
 
         assertEquals(
-            "isPlaying doit rester faux pour un PDF — TTS hors périmètre (décision actée 16)",
+            "aucune page narrable en aval : la narration ne demarre pas",
             false,
             viewModel.state.value.isPlaying,
+        )
+        assertEquals(
+            "et la position ne bouge pas — l'utilisateur reste ou il etait",
+            0,
+            viewModel.state.value.currentChapterIndex,
         )
 
         viewModel.cancelCheckpointTimerForTest()

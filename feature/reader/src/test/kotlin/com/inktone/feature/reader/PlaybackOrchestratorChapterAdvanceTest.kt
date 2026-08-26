@@ -215,4 +215,68 @@ class PlaybackOrchestratorChapterAdvanceTest {
         assertEquals(listOf("ch1.xhtml"), parser.parsedHrefs)
         assertEquals(0, orchestrator.currentChapterIndex.value)
     }
+
+    /**
+     * ADR-017 volet 2 — sur un PDF, une page sans texte (planche scannee,
+     * illustration pleine page) est normale : la narration doit la traverser
+     * au lieu de s'arreter. Sur un EPUB, un chapitre vide signale un echec de
+     * parsing, et sauter par-dessus ferait perdre du texte a l'auditeur sans
+     * qu'il le sache — d'ou le drapeau, et les deux cas ci-dessous.
+     */
+    @Test
+    fun pdf_traverse_les_pages_sans_texte_jusqu_a_la_prochaine_page_narrable() = runBlocking {
+        val parser = ProgrammedChapterParser(
+            mapOf(
+                "page-1" to emptyList(),
+                "page-2" to listOf(sentence(0, "Troisieme page.", 0)),
+            ),
+        )
+        val orchestrator = orchestrator(parser)
+        orchestrator.setNarrationProgram(
+            "pub-pdf",
+            listOf("page-0", "page-1", "page-2"),
+            skipEmptyChapters = true,
+        )
+
+        orchestrator.play(
+            sentences = listOf(sentence(0, "Fin de la premiere page.", 0)),
+            voiceProfile = profile,
+            startFrom = 0,
+            publicationId = "pub-pdf",
+            chapterIndex = 0,
+            resourceHref = "page-0",
+        )
+
+        withTimeout(5_000) { orchestrator.currentChapterIndex.first { it == 2 } }
+
+        assertEquals(listOf("page-1", "page-2"), parser.parsedHrefs)
+        assertEquals(2, orchestrator.currentChapterIndex.value)
+    }
+
+    @Test
+    fun epub_s_arrete_sur_un_chapitre_vide_au_lieu_de_le_sauter() = runBlocking {
+        val parser = ProgrammedChapterParser(
+            mapOf(
+                "ch1.xhtml" to emptyList(),
+                "ch2.xhtml" to listOf(sentence(0, "Jamais atteint.", 0)),
+            ),
+        )
+        val orchestrator = orchestrator(parser)
+        // Pas de skipEmptyChapters : comportement EPUB inchange.
+        orchestrator.setNarrationProgram("pub1", listOf("ch0.xhtml", "ch1.xhtml", "ch2.xhtml"))
+
+        orchestrator.play(
+            sentences = listOf(sentence(0, "Fin du premier.", 0)),
+            voiceProfile = profile,
+            startFrom = 0,
+            publicationId = "pub1",
+            chapterIndex = 0,
+            resourceHref = "ch0.xhtml",
+        )
+
+        withTimeout(5_000) { orchestrator.state.first { it is PlaybackOrchestrator.PlaybackStatus.Idle } }
+
+        assertEquals("ch2 ne doit jamais etre parse", listOf("ch1.xhtml"), parser.parsedHrefs)
+        assertEquals(0, orchestrator.currentChapterIndex.value)
+    }
 }
