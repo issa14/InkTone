@@ -104,6 +104,29 @@ class SelectionActionPopupTest {
         assertEquals(AnnotationColor.GREEN, highlightedColor)
     }
 
+    /** Lot 23, tâche 9 — la couleur personnalisée validée devient la couleur du surlignage. */
+    @Test
+    fun personnaliser_une_couleur_puis_confirmer_transmet_cette_couleur() {
+        var highlightedColor: AnnotationColor? = null
+        composeTestRule.setContent {
+            SelectionActionPopup(
+                selectedText = "Un passage sélectionné.",
+                selectionBoundsInWindow = someBounds,
+                onHighlight = { color, _ -> highlightedColor = color },
+                onSaveNote = { _, _, _ -> },
+                onDismiss = {},
+            )
+        }
+
+        composeTestRule.onNodeWithText("Surligner").performClick()
+        composeTestRule.onNodeWithContentDescription("Personnaliser la couleur").performClick()
+        composeTestRule.onNodeWithText("Valeur hexadécimale").performTextInput("#123456")
+        composeTestRule.onNodeWithText("Appliquer").performClick()
+        composeTestRule.onNodeWithText("Surligner").performClick()
+
+        assertEquals(hexRgbToAnnotationColor("#123456"), highlightedColor)
+    }
+
     /**
      * Lot 23, tâche 6 — le trou trouvé à la vérification device du Lot 22 :
      * aucune action ne permettait de choisir souligné/barré. `AnnotationKind`
