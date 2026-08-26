@@ -12,6 +12,7 @@ import com.inktone.core.testing.fake.FakeChapterParser
 import com.inktone.core.testing.fake.FakeFileStorageService
 import com.inktone.core.testing.fake.FakeOpdsDownloadObserver
 import com.inktone.core.testing.fake.FakeOpdsHttpClient
+import com.inktone.core.testing.fake.FakePreAnalysisStore
 import com.inktone.core.testing.fake.FakePublicationParser
 import com.inktone.core.testing.fake.FakePublicationRepository
 import com.inktone.core.testing.fake.FakeSearchService
@@ -51,6 +52,7 @@ class OpdsDownloadWorkerTest {
         fileStorageService = FakeFileStorageService(),
         searchService = FakeSearchService(),
         chapterParser = FakeChapterParser(),
+        preAnalysisStore = FakePreAnalysisStore(),
     )
 
     private fun buildWorker(

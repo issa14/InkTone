@@ -11,6 +11,7 @@ import androidx.work.workDataOf
 import com.inktone.core.testing.fake.FakeChapterParser
 import com.inktone.core.testing.fake.FakeFileStorageService
 import com.inktone.core.testing.fake.FakeImportResultsStore
+import com.inktone.core.testing.fake.FakePreAnalysisStore
 import com.inktone.core.testing.fake.FakePublicationParser
 import com.inktone.core.testing.fake.FakePublicationRepository
 import com.inktone.core.testing.fake.FakeSearchService
@@ -53,6 +54,7 @@ class ImportWorkerTest {
             fileStorageService = FakeFileStorageService(),
             searchService = FakeSearchService(),
             chapterParser = FakeChapterParser(),
+            preAnalysisStore = FakePreAnalysisStore(),
         )
 
         val worker = TestListenableWorkerBuilder<ImportWorker>(context)
@@ -87,6 +89,7 @@ class ImportWorkerTest {
             fileStorageService = FakeFileStorageService(),
             searchService = FakeSearchService(),
             chapterParser = FakeChapterParser(),
+            preAnalysisStore = FakePreAnalysisStore(),
         )
 
         val worker = TestListenableWorkerBuilder<ImportWorker>(context)
@@ -116,6 +119,7 @@ class ImportWorkerTest {
             fileStorageService = FakeFileStorageService(),
             searchService = FakeSearchService(),
             chapterParser = FakeChapterParser(),
+            preAnalysisStore = FakePreAnalysisStore(),
         )
 
         val worker = TestListenableWorkerBuilder<ImportWorker>(context)
