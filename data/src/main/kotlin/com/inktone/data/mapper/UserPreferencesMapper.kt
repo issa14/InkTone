@@ -5,6 +5,7 @@ import com.inktone.domain.model.AppTheme
 import com.inktone.domain.model.FontFamily
 import com.inktone.domain.model.TtsEngineId
 import com.inktone.domain.model.UserPreferences
+import com.inktone.domain.model.toHex
 import com.inktone.infrastructure.database.entity.UserPreferencesEntity
 
 fun UserPreferences.toEntity(): UserPreferencesEntity = UserPreferencesEntity(
@@ -35,7 +36,7 @@ fun UserPreferences.toEntity(): UserPreferencesEntity = UserPreferencesEntity(
     textJustified = textJustified,
     keepScreenOn = keepScreenOn,
     autoScrollSpeed = autoScrollSpeed,
-    recentAnnotationColors = recentAnnotationColors.joinToString(",") { it.name },
+    recentAnnotationColors = recentAnnotationColors.joinToString(",") { it.toHex() },
 )
 
 fun UserPreferencesEntity.toDomain(): UserPreferences = UserPreferences(
@@ -70,9 +71,9 @@ fun UserPreferencesEntity.toDomain(): UserPreferences = UserPreferences(
     textJustified = textJustified,
     keepScreenOn = keepScreenOn,
     autoScrollSpeed = autoScrollSpeed,
-    // Lot 22, tâche 12 — repli défensif (constat 11 : un nom d'enum
-    // inconnu, ex. base restaurée depuis une version future, est ignoré
+    // Lot 22, tâche 12 / Lot 23 — repli défensif (constat 11 : une valeur
+    // illisible, ex. base restaurée depuis une version future, est ignorée
     // plutôt que de faire planter la restauration des préférences).
     recentAnnotationColors = recentAnnotationColors.split(",")
-        .mapNotNull { name -> AnnotationColor.entries.firstOrNull { it.name == name } },
+        .mapNotNull { raw -> if (raw.isBlank()) null else runCatching { AnnotationColor.parse(raw) }.getOrNull() },
 )

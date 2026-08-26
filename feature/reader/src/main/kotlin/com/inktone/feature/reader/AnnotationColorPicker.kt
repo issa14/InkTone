@@ -20,14 +20,12 @@ import androidx.compose.ui.unit.dp
 import com.inktone.domain.model.AnnotationColor
 import com.inktone.domain.model.AnnotationKind
 
-/** Rendu de la couleur pour l'UI (sélecteur ou surlignage d'annotation existante). */
-fun AnnotationColor.toComposeColor(): Color = when (this) {
-    AnnotationColor.YELLOW -> Color(0xFFFFF59D)
-    AnnotationColor.GREEN -> Color(0xFFA5D6A7)
-    AnnotationColor.BLUE -> Color(0xFF90CAF9)
-    AnnotationColor.PINK -> Color(0xFFF48FB1)
-    AnnotationColor.ORANGE -> Color(0xFFFFCC80)
-}
+/**
+ * Rendu de la couleur pour l'UI (sélecteur ou surlignage d'annotation
+ * existante). `AnnotationColor.argb` est déjà un ARGB packé (Lot 23,
+ * décision 6) — même représentation binaire que le constructeur `Color(Int)`.
+ */
+fun AnnotationColor.toComposeColor(): Color = Color(argb)
 
 /**
  * Lot 22, tâche 12 — place [color] en tête, sans doublon, plafonné à
@@ -72,7 +70,7 @@ fun AnnotationColorPicker(
     recentColors: List<AnnotationColor> = emptyList(),
 ) {
     val orderedColors = remember(recentColors) {
-        recentColors + AnnotationColor.entries.filterNot { it in recentColors }
+        recentColors + AnnotationColor.PRESETS.filterNot { it in recentColors }
     }
     Row(
         modifier = Modifier.fillMaxWidth().horizontalScroll(rememberScrollState()),
@@ -92,11 +90,17 @@ fun AnnotationColorPicker(
     }
 }
 
-/** E.2 — Noms français pour les couleurs d'annotation (TalkBack). */
+/**
+ * E.2 — Noms français pour les couleurs d'annotation (TalkBack). Repli
+ * générique pour une couleur hors des 5 préréglages (Lot 23, Palier D —
+ * couleur personnalisée) : aucun nom dédié n'a de sens pour une teinte
+ * arbitraire.
+ */
 private fun AnnotationColor.label(): String = when (this) {
     AnnotationColor.YELLOW -> "Jaune"
     AnnotationColor.GREEN -> "Vert"
     AnnotationColor.BLUE -> "Bleu"
     AnnotationColor.PINK -> "Rose"
     AnnotationColor.ORANGE -> "Orange"
+    else -> "Personnalisée"
 }

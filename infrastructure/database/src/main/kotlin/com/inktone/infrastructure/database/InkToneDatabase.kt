@@ -42,7 +42,7 @@ import com.inktone.infrastructure.database.entity.VoiceProfileEntity
         CatalogEntity::class,
     ],
     views = [LibraryItemView::class],
-    version = 30, // Lot 22, tâche 12 : couleurs de surlignage récentes (MIGRATION_29_30)
+    version = 31, // Lot 23, Palier A : AnnotationColor devient une couleur ARGB libre (MIGRATION_30_31)
     exportSchema = true, // condition du harnais de migration — Tâche 2.4
 )
 @TypeConverters(StringListConverter::class)

@@ -1,6 +1,7 @@
 package com.inktone.domain.model
 
 import com.inktone.domain.valueobject.Locator
+import org.junit.Assert.assertEquals
 import org.junit.Assert.assertThrows
 import org.junit.Test
 
@@ -28,6 +29,32 @@ class AnnotationTest {
             startLocator = locator(100), endLocator = locator(100),
             color = AnnotationColor.YELLOW,
             createdAt = 0L, updatedAt = 0L,
+        )
+    }
+}
+
+class AnnotationColorTest {
+
+    @Test
+    fun `un aller-retour hex preserve la couleur`() {
+        val custom = AnnotationColor(0xFF123456.toInt())
+        assertEquals(custom, AnnotationColor.parse(custom.toHex()))
+    }
+
+    @Test
+    fun `un nom d'enum herite se decode vers le meme hex qu'avant le Lot 23`() {
+        assertEquals("#FFFFF59D", AnnotationColor.parse("YELLOW").toHex())
+        assertEquals("#FFA5D6A7", AnnotationColor.parse("GREEN").toHex())
+        assertEquals("#FF90CAF9", AnnotationColor.parse("BLUE").toHex())
+        assertEquals("#FFF48FB1", AnnotationColor.parse("PINK").toHex())
+        assertEquals("#FFFFCC80", AnnotationColor.parse("ORANGE").toHex())
+    }
+
+    @Test
+    fun `PRESETS contient les 5 couleurs historiques dans leur ordre d'origine`() {
+        assertEquals(
+            listOf(AnnotationColor.YELLOW, AnnotationColor.GREEN, AnnotationColor.BLUE, AnnotationColor.PINK, AnnotationColor.ORANGE),
+            AnnotationColor.PRESETS,
         )
     }
 }

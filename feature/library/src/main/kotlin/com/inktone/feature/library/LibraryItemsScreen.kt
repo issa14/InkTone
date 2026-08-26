@@ -375,12 +375,17 @@ private fun iconFor(item: LibraryItem) = when (item.type) {
 }
 
 private fun colorFor(item: LibraryItem): Color? = item.color?.let {
+    // Teintes plus saturées que la palette pastel du lecteur (contraste
+    // sur les cartes blanches de la bibliothèque). Lot 23 — une couleur
+    // personnalisée (hors des 5 préréglages) n'a pas de variante saturée
+    // dédiée : elle est utilisée telle quelle.
     when (it) {
         AnnotationColor.YELLOW -> Color(0xFFFBC02D)
         AnnotationColor.GREEN -> Color(0xFF66BB6A)
         AnnotationColor.BLUE -> Color(0xFF4FC3F7)
         AnnotationColor.PINK -> Color(0xFFF06292)
         AnnotationColor.ORANGE -> Color(0xFFFFA726)
+        else -> Color(it.argb)
     }
 }
 
