@@ -93,7 +93,38 @@ fun FixedPageContent(
     // evincees pour eviter les a-coups du ramasse-miettes (decision
     // actee du plan). Cree UNE fois par FixedPageContent, partage entre
     // toutes les pages du HorizontalPager.
-    val bitmapCache = remember { BitmapCache(maxSize = 5) }
+    // Lot 22, Palier C, tâche 8 — agrandi a 7 (N-3..N+3) pour laisser de
+    // la marge au pre-rendu des voisins immediats ci-dessous sans les
+    // evincer aussitot lors d'une navigation sequentielle.
+    val bitmapCache = remember { BitmapCache(maxSize = 7) }
+
+    // Lot 22, Palier C, tâche 8 — largeur de viewport de la page active,
+    // remontee par FixedPage pour le pre-rendu des pages voisines
+    // ci-dessous (toutes les pages du pager partagent la meme largeur).
+    var activeViewportWidthPx by remember { mutableStateOf(0) }
+
+    // Pre-rend les pages adjacentes a la page etablie (settledPage, pas
+    // currentPage qui bouge des le franchissement du seuil de 50% —
+    // attendre l'immobilite du geste evite de faire concurrence au rendu
+    // de la page active sur le dispatcher JNI a thread unique). Supprime
+    // le blanc au swipe (constat 5 du Lot 22) sans pre-synthese de fond.
+    LaunchedEffect(pagerState.settledPage, activeViewportWidthPx, isRenderReady) {
+        if (!isRenderReady || activeViewportWidthPx <= 0) return@LaunchedEffect
+        val settled = pagerState.settledPage
+        for (neighbor in listOf(settled - 1, settled + 1)) {
+            if (neighbor !in 0 until pageCount) continue
+            if (bitmapCache.get(neighbor) != null) continue
+            val rendered = try {
+                renderPage(neighbor, activeViewportWidthPx)
+            } catch (cancellation: CancellationException) {
+                throw cancellation
+            } catch (throwable: Throwable) {
+                Log.e(TAG, "Echec du pre-rendu PDF de la page $neighbor", throwable)
+                null
+            } ?: continue
+            bitmapCache.put(neighbor, bitmapCache.createBitmap(rendered))
+        }
+    }
 
     // Meme garde que le mode SCROLL/PAGED existant (isProgrammaticScroll,
     // voir ReaderScreen) : une navigation programmatique (table des
@@ -131,6 +162,7 @@ fun FixedPageContent(
             onPageOffsetChanged = onPageOffsetChanged,
             bitmapCache = bitmapCache,
             isRenderReady = isRenderReady,
+            onViewportWidthChanged = { activeViewportWidthPx = it },
         )
     }
 }
@@ -144,8 +176,17 @@ private fun FixedPage(
     onPageOffsetChanged: (Float) -> Unit,
     bitmapCache: BitmapCache,
     isRenderReady: Boolean,
+    onViewportWidthChanged: (Int) -> Unit,
 ) {
     var viewportSizePx by remember { mutableStateOf(IntSize.Zero) }
+
+    // Lot 22, Palier C, tâche 8 — seule la page active remonte sa largeur
+    // (utilisee par FixedPageContent pour le pre-rendu des voisines) :
+    // toutes les pages partagent la meme largeur de viewport, remonter
+    // celle d'une page inactive serait redondant.
+    LaunchedEffect(isActivePage, viewportSizePx) {
+        if (isActivePage && viewportSizePx.width > 0) onViewportWidthChanged(viewportSizePx.width)
+    }
 
     var scale by remember { mutableFloatStateOf(1f) }
     var offsetX by remember { mutableFloatStateOf(0f) }
