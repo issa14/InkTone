@@ -26,9 +26,9 @@ class CompositePublicationParserPdfTest {
         val context = ApplicationProvider.getApplicationContext<Context>()
         val fileStorageService = LocalFileStorageService()
         val composite = CompositePublicationParser(
-            readiumParser = ReadiumPublicationParser(context),
+            readiumParser = ReadiumPublicationParser(context, CoverStorage(context)),
             txtParser = TxtPublicationParser(fileStorageService),
-            pdfParser = PdfPublicationParser(fileStorageService, context),
+            pdfParser = PdfPublicationParser(fileStorageService, CoverStorage(context)),
             fileStorageService = fileStorageService,
         )
 

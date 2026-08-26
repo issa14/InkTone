@@ -38,7 +38,7 @@ class ReadiumPublicationParserTest {
     fun ouvre_un_epub_de_test_sans_erreur() = runTest {
         val context = ApplicationProvider.getApplicationContext<Context>()
         val fixtureFile = copyAssetToCache(context, "fixture-minimal.epub")
-        val parser = ReadiumPublicationParser(context)
+        val parser = ReadiumPublicationParser(context, CoverStorage(context))
 
         val result = parser.parse(fixtureFile.absolutePath)
 
@@ -53,7 +53,7 @@ class ReadiumPublicationParserTest {
         val context = ApplicationProvider.getApplicationContext<Context>()
         val fixtureFile = copyAssetToCache(context, "fixture-minimal.epub")
 
-        val result = ReadiumPublicationParser(context).parse(fixtureFile.absolutePath)
+        val result = ReadiumPublicationParser(context, CoverStorage(context)).parse(fixtureFile.absolutePath)
         check(result is ParseResult.Success)
         val shell = result.documentModel.chapters.first()
 

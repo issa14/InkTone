@@ -31,7 +31,7 @@ class PdfPublicationParserTest {
 
     private fun parser(): PdfPublicationParser {
         val context = ApplicationProvider.getApplicationContext<Context>()
-        return PdfPublicationParser(LocalFileStorageService(), context)
+        return PdfPublicationParser(LocalFileStorageService(), CoverStorage(context))
     }
 
     @Test

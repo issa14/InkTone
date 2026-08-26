@@ -11,6 +11,7 @@ import com.inktone.domain.usecase.ImportPublicationUseCase
 import com.inktone.domain.usecase.ImportResult
 import com.inktone.infrastructure.database.InkToneDatabase
 import com.inktone.infrastructure.database.search.RoomSearchService
+import com.inktone.infrastructure.parser.CoverStorage
 import com.inktone.infrastructure.parser.EpubChapterParser
 import com.inktone.infrastructure.parser.JsoupChapterParser
 import com.inktone.infrastructure.parser.ReadiumPublicationParser
@@ -90,7 +91,7 @@ class ImportBenchmarkTest {
         val uris = generateCorpus(count = CORPUS_SIZE)
 
         val importPublication = ImportPublicationUseCase(
-            publicationParser = ReadiumPublicationParser(context),
+            publicationParser = ReadiumPublicationParser(context, CoverStorage(context)),
             publicationRepository = RoomPublicationRepository(db.publicationDao()),
             fileStorageService = SafFileStorageService(context),
             // Tache 7.3 : indexation FTS reelle a l'import - le benchmark

@@ -2,6 +2,7 @@ package com.inktone.infrastructure.parser
 
 import android.content.Context
 import android.graphics.Bitmap
+import android.graphics.BitmapFactory
 import android.net.Uri
 import com.inktone.domain.model.Chapter
 import com.inktone.domain.model.ChapterContent
@@ -53,6 +54,7 @@ import javax.inject.Singleton
 @Singleton
 class ReadiumPublicationParser @Inject constructor(
     @ApplicationContext private val context: Context,
+    private val coverStorage: CoverStorage,
 ) : PublicationParser {
 
     override val supportedFormats = listOf(PublicationFormat.EPUB)
@@ -224,11 +226,18 @@ class ReadiumPublicationParser @Inject constructor(
         publication: org.readium.r2.shared.publication.Publication,
         fileUri: String,
     ): String? = withContext(Dispatchers.IO) {
-        val bitmap = publication.cover() ?: return@withContext null
+        // `Publication.cover()` ne sait rien tirer d'un EPUB2 dont la
+        // couverture n'est declaree que dans `<guide>` (ni `<meta
+        // name="cover">`, ni `properties="cover-image"`) — cas reel des
+        // editions Calibre, tous les tomes de Harry Potter compris. Le
+        // repli [EpubGuideCoverResolver.findCoverImageBytes] lit alors
+        // l'image directement dans l'archive ; voir son KDoc.
+        val bitmap = publication.cover()
+            ?: EpubGuideCoverResolver.findCoverImageBytes(context, fileUri)
+                ?.let { bytes -> BitmapFactory.decodeByteArray(bytes, 0, bytes.size) }
+            ?: return@withContext null
 
-        val coverDir = File(context.cacheDir, "covers")
-        coverDir.mkdirs()
-        val coverFile = File(coverDir, "${fileUri.hashCode().toUInt()}.jpg")
+        val coverFile = coverStorage.coverFileFor(fileUri)
 
         try {
             FileOutputStream(coverFile).use { out ->

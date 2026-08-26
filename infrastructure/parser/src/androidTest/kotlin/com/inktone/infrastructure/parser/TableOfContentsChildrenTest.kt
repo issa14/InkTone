@@ -41,7 +41,7 @@ class TableOfContentsChildrenTest {
         val fixtureFile = File(context.cacheDir, "fixture-les-miserables-tome1.epub").apply {
             context.assets.open("fixture-les-miserables-tome1.epub").use { i -> outputStream().use { i.copyTo(it) } }
         }
-        val result = ReadiumPublicationParser(context).parse(fixtureFile.absolutePath)
+        val result = ReadiumPublicationParser(context, CoverStorage(context)).parse(fixtureFile.absolutePath)
         check(result is ParseResult.Success) { "echec de parsing : $result" }
 
         val toc = result.documentModel.tableOfContents

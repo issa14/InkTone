@@ -1,6 +1,5 @@
 package com.inktone.infrastructure.parser
 
-import android.content.Context
 import android.graphics.Bitmap
 import com.inktone.domain.model.BookBlock
 import com.inktone.domain.model.Chapter
@@ -14,14 +13,12 @@ import com.inktone.domain.service.FileStorageService
 import com.inktone.domain.service.ParseResult
 import com.inktone.domain.service.PublicationMetadata
 import com.inktone.domain.service.PublicationParser
-import dagger.hilt.android.qualifiers.ApplicationContext
 import io.legere.pdfiumandroid.PdfPage
 import io.legere.pdfiumandroid.PdfPasswordException
 import io.legere.pdfiumandroid.PdfiumCore
 import kotlinx.coroutines.CoroutineDispatcher
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
-import java.io.File
 import java.io.FileOutputStream
 import javax.inject.Inject
 import javax.inject.Singleton
@@ -41,7 +38,7 @@ import javax.inject.Singleton
 @Singleton
 class PdfPublicationParser @Inject constructor(
     private val fileStorageService: FileStorageService,
-    @ApplicationContext private val context: Context,
+    private val coverStorage: CoverStorage,
 ) : PublicationParser {
 
     override val supportedFormats = listOf(PublicationFormat.PDF)
@@ -189,8 +186,8 @@ class PdfPublicationParser @Inject constructor(
      * seul point d'appel a l'API bitmap PDFium). Sauvegarde au meme
      * format et au meme emplacement que la couverture EPUB
      * ([ReadiumPublicationParser.extractAndSaveCover]) - JPEG qualite 85
-     * dans `context.cacheDir/covers/`, pas WEBP comme envisage initialement
-     * dans la recherche : un seul format de couverture dans l'app plutot
+     * via [CoverStorage] (`filesDir/covers/`), pas WEBP comme envisage
+     * initialement dans la recherche : un seul format de couverture plutot
      * que deux conventions divergentes sans raison forte.
      */
     private fun extractAndSaveCover(document: io.legere.pdfiumandroid.PdfDocument, fileUri: String): String? =
@@ -198,9 +195,7 @@ class PdfPublicationParser @Inject constructor(
             document.openPage(0).use { page ->
                 val bitmap = page.renderToBitmap(COVER_TARGET_WIDTH_PX) ?: return@use null
 
-                val coverDir = File(context.cacheDir, "covers")
-                coverDir.mkdirs()
-                val coverFile = File(coverDir, "${fileUri.hashCode().toUInt()}.jpg")
+                val coverFile = coverStorage.coverFileFor(fileUri)
                 try {
                     FileOutputStream(coverFile).use { out -> bitmap.compress(Bitmap.CompressFormat.JPEG, 85, out) }
                     coverFile.absolutePath

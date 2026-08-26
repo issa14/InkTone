@@ -19,7 +19,7 @@ class DrmDetectionTest {
         val fixtureFile = File(context.cacheDir, "fixture-drm.epub").apply {
             context.assets.open("fixture-drm.epub").use { i -> outputStream().use { i.copyTo(it) } }
         }
-        val result = ReadiumPublicationParser(context).parse(fixtureFile.absolutePath)
+        val result = ReadiumPublicationParser(context, CoverStorage(context)).parse(fixtureFile.absolutePath)
 
         // Le parsing doit reussir (ouverture des metadonnees), meme si le
         // contenu est protege — la detection n'est pas un dechiffrement

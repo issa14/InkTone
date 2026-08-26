@@ -33,7 +33,7 @@ class TableOfContentsChapterIndexTest {
         val fixtureFile = File(context.cacheDir, "fixture-toc-fragments.epub").apply {
             context.assets.open("fixture-toc-fragments.epub").use { i -> outputStream().use { i.copyTo(it) } }
         }
-        val result = ReadiumPublicationParser(context).parse(fixtureFile.absolutePath)
+        val result = ReadiumPublicationParser(context, CoverStorage(context)).parse(fixtureFile.absolutePath)
         check(result is ParseResult.Success)
 
         assertEquals("2 chapitres (ressources de spine)", 2, result.documentModel.chapters.size)

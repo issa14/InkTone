@@ -1,6 +1,7 @@
 package com.inktone.infrastructure.parser
 
 import android.content.Context
+import android.net.Uri
 import org.jsoup.Jsoup
 import org.jsoup.parser.Parser
 
@@ -47,6 +48,77 @@ internal object EpubGuideCoverResolver {
         }
     }
 
+    /**
+     * Octets de l'IMAGE de couverture, quand Readium n'a rien pu déduire
+     * (`Publication.cover()` retourne `null`).
+     *
+     * Bug réel trouvé sur appareil (éditions Calibre EPUB2 — les sept
+     * tomes de Harry Potter, 13 titres sur 481 dans la bibliothèque de
+     * test) : le seul marqueur de couverture de l'OPF est
+     * `<guide><reference type="cover" href="titlepage.xhtml"/>`. Il n'y a
+     * ni `<meta name="cover">` ni `properties="cover-image"`, donc
+     * `Publication.linkWithRel("cover")` — et avec lui
+     * `Publication.cover()` — ne trouve rien : la vignette de la
+     * bibliothèque restait vide alors que le livre s'ouvrait normalement
+     * (le repli [findCoverHref] plaçait bien la page de couverture en
+     * tête des chapitres, mais il n'alimentait QUE cette liste, jamais
+     * `metadata.coverUri`).
+     *
+     * Le href du guide désigne le plus souvent une PAGE XHTML, pas
+     * l'image : il faut alors en extraire le `<img src>` (ou le
+     * `<svg><image xlink:href>` des exports InDesign/Sigil) et résoudre
+     * ce chemin relativement au répertoire de cette page.
+     *
+     * @return les octets bruts de l'image (à décoder par l'appelant), ou
+     *   `null` si l'archive, le guide ou l'image sont introuvables.
+     */
+    fun findCoverImageBytes(context: Context, fileUri: String): ByteArray? {
+        return try {
+            val coverHref = findCoverHref(context, fileUri) ?: return null
+            val imageHref = if (isImageHref(coverHref)) {
+                coverHref
+            } else {
+                val pageBytes = readEntry(context, fileUri, coverHref) ?: return null
+                val embedded = extractFirstImageHref(pageBytes.decodeToString()) ?: return null
+                resolveRelative(coverHref, embedded)
+            }
+            readEntry(context, fileUri, imageHref)
+        } catch (e: Exception) {
+            null
+        }
+    }
+
+    /**
+     * Lecture d'une entrée ZIP tolérante aux deux écarts déjà connus du
+     * projet : href percent-encodé (K6) et casse divergente entre le
+     * href HTML et le nom réel de l'entrée (voir [EpubZipAccess]).
+     */
+    private fun readEntry(context: Context, fileUri: String, href: String): ByteArray? {
+        val decoded = Uri.decode(href.substringBefore('#'))
+        return EpubZipAccess.readEntryBytes(context, fileUri, decoded)
+            ?: EpubZipAccess.readEntryBytes(context, fileUri, decoded, ignoreCase = true)
+    }
+
+    private fun isImageHref(href: String): Boolean {
+        val path = href.substringBefore('#').lowercase()
+        return IMAGE_EXTENSIONS.any { path.endsWith(it) }
+    }
+
+    /**
+     * Premier `<img src>` ou `<svg><image xlink:href|href>` de la page —
+     * les deux formes utilisées en pratique par les pages de couverture.
+     * Parseur XML (et non HTML) : une page de couverture est du XHTML,
+     * et `xlink:href` ne survit pas au parseur HTML de Jsoup.
+     */
+    private fun extractFirstImageHref(pageXhtml: String): String? {
+        val doc = Jsoup.parse(pageXhtml, "", Parser.xmlParser())
+        doc.selectFirst("img[src]")?.attr("src")?.takeIf { it.isNotBlank() }?.let { return it }
+        val svgImage = doc.selectFirst("image") ?: return null
+        return listOf("xlink:href", "href")
+            .map { svgImage.attr(it) }
+            .firstOrNull { it.isNotBlank() }
+    }
+
     private fun extractOpfPath(containerXml: String): String? {
         val doc = Jsoup.parse(containerXml, "", Parser.xmlParser())
         return doc.selectFirst("rootfile")?.attr("full-path")?.takeIf { it.isNotBlank() }
@@ -82,4 +154,10 @@ internal object EpubGuideCoverResolver {
         }
         return resolved.joinToString("/")
     }
+
+    // `.svg` volontairement absent : un SVG n'est pas décodable par
+    // BitmapFactory, et une couverture SVG enveloppe de toute façon un
+    // bitmap dans un `<image>` — la laisser passer par la branche XHTML
+    // ci-dessus extrait justement ce bitmap.
+    private val IMAGE_EXTENSIONS = listOf(".jpg", ".jpeg", ".png", ".gif", ".webp")
 }

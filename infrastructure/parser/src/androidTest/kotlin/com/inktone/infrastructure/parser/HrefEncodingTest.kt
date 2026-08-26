@@ -30,7 +30,7 @@ class HrefEncodingTest {
         val fixtureFile = File(context.cacheDir, "fixture-hrefs-encodes.epub").apply {
             context.assets.open("fixture-hrefs-encodes.epub").use { i -> outputStream().use { i.copyTo(it) } }
         }
-        val result = ReadiumPublicationParser(context).parse(fixtureFile.absolutePath)
+        val result = ReadiumPublicationParser(context, CoverStorage(context)).parse(fixtureFile.absolutePath)
         check(result is ParseResult.Success)
 
         val chapterParser = EpubChapterParser(ReadiumPublicationRegistry(context), JsoupChapterParser())

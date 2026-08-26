@@ -28,7 +28,7 @@ class DocumentModelExtractorMultiChapterTest {
     fun extrait_trois_chapitres_sans_contamination_croisee() = runTest {
         val context = ApplicationProvider.getApplicationContext<Context>()
         val fixtureFile = copyAssetToCache(context, "fixture-multi-chapitre.epub")
-        val parser = ReadiumPublicationParser(context)
+        val parser = ReadiumPublicationParser(context, CoverStorage(context))
 
         val result = parser.parse(fixtureFile.absolutePath)
         check(result is ParseResult.Success)
@@ -68,7 +68,7 @@ class DocumentModelExtractorMultiChapterTest {
     fun le_tableau_des_matieres_correspond_aux_trois_chapitres() = runTest {
         val context = ApplicationProvider.getApplicationContext<Context>()
         val fixtureFile = copyAssetToCache(context, "fixture-multi-chapitre.epub")
-        val result = ReadiumPublicationParser(context).parse(fixtureFile.absolutePath)
+        val result = ReadiumPublicationParser(context, CoverStorage(context)).parse(fixtureFile.absolutePath)
         check(result is ParseResult.Success)
 
         assertEquals(3, result.documentModel.tableOfContents.size)

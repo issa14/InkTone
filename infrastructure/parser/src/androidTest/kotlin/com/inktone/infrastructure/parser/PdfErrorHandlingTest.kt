@@ -20,7 +20,7 @@ import java.io.File
 class PdfErrorHandlingTest {
 
     private val context get() = ApplicationProvider.getApplicationContext<Context>()
-    private val parser get() = PdfPublicationParser(LocalFileStorageService(), context)
+    private val parser get() = PdfPublicationParser(LocalFileStorageService(), CoverStorage(context))
 
     private fun copyFixture(name: String): File =
         File(context.cacheDir, name).apply {

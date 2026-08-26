@@ -5,6 +5,7 @@ import androidx.hilt.work.HiltWorkerFactory
 import androidx.work.Configuration
 import com.inktone.infrastructure.crashreporting.CrashReportingConsentObserver
 import com.inktone.infrastructure.media.PlaybackServiceLauncher
+import com.inktone.infrastructure.parser.CoverStorageMigration
 import com.inktone.infrastructure.worker.SyncScheduleObserver
 import dagger.hilt.android.HiltAndroidApp
 import kotlinx.coroutines.CoroutineScope
@@ -42,6 +43,14 @@ class InkToneApplication : Application(), Configuration.Provider {
     // notification média selon l'état de la session TTS (PlaybackSession).
     @Inject lateinit var playbackServiceLauncher: PlaybackServiceLauncher
 
+    // Déplace les couvertures de `cacheDir` vers `filesDir` et réécrit
+    // les `coverUri` correspondants — opération ponctuelle, idempotente,
+    // qui ne fait plus rien une fois l'ancien répertoire vidé (voir
+    // CoverStorageMigration). Même raison que ci-dessus de la faire vivre
+    // dans `infrastructure` : elle touche `PublicationRepository`, un type
+    // domain que `app` n'a pas le droit de connaître (Blueprint §12.4).
+    @Inject lateinit var coverStorageMigration: CoverStorageMigration
+
     override val workManagerConfiguration: Configuration
         get() = Configuration.Builder().setWorkerFactory(workerFactory).build()
 
@@ -59,5 +68,6 @@ class InkToneApplication : Application(), Configuration.Provider {
         crashReportingConsentObserver.start(CoroutineScope(SupervisorJob() + Dispatchers.Default))
         syncScheduleObserver.start(CoroutineScope(SupervisorJob() + Dispatchers.Default))
         playbackServiceLauncher.start(CoroutineScope(SupervisorJob() + Dispatchers.Default))
+        coverStorageMigration.start(CoroutineScope(SupervisorJob() + Dispatchers.Default))
     }
 }

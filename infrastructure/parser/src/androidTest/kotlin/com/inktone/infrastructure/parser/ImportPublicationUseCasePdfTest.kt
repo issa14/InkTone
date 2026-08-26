@@ -76,7 +76,7 @@ class ImportPublicationUseCasePdfTest {
         val fileStorageService = LocalFileStorageService()
         val repository = InMemoryPublicationRepository()
         val importPublication = ImportPublicationUseCase(
-            publicationParser = PdfPublicationParser(fileStorageService, context),
+            publicationParser = PdfPublicationParser(fileStorageService, CoverStorage(context)),
             publicationRepository = repository,
             fileStorageService = fileStorageService,
             searchService = NoOpSearchService(),

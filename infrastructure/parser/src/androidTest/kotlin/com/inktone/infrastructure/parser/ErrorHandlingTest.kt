@@ -25,14 +25,14 @@ class ErrorHandlingTest {
         val fixtureFile = copyFixture("fixture-corrompu.epub")
         // Le test lui-meme echoue si parse() leve une exception non geree
         // — c'est le point : aucun crash, meme sur un fichier invalide.
-        val result = ReadiumPublicationParser(context).parse(fixtureFile.absolutePath)
+        val result = ReadiumPublicationParser(context, CoverStorage(context)).parse(fixtureFile.absolutePath)
         assertTrue(result is ParseResult.Corrupted)
     }
 
     @Test
     fun ressource_manquante_n_empeche_pas_l_ouverture_des_chapitres_valides() = runTest {
         val fixtureFile = copyFixture("fixture-ressource-manquante.epub")
-        val result = ReadiumPublicationParser(context).parse(fixtureFile.absolutePath)
+        val result = ReadiumPublicationParser(context, CoverStorage(context)).parse(fixtureFile.absolutePath)
         // Une image manquante ne doit pas empecher l'extraction du TEXTE
         // des chapitres valides — degradation partielle, pas un echec total.
         check(result is ParseResult.Success)
@@ -41,7 +41,7 @@ class ErrorHandlingTest {
 
     @Test
     fun uri_totalement_invalide_ne_crash_jamais() = runTest {
-        val result = ReadiumPublicationParser(context).parse("ceci-n-est-pas-une-uri-valide")
+        val result = ReadiumPublicationParser(context, CoverStorage(context)).parse("ceci-n-est-pas-une-uri-valide")
         assertTrue(result is ParseResult.Corrupted)
     }
 }

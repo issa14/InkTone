@@ -1,14 +1,18 @@
 package com.inktone.infrastructure.parser
 
 import android.content.Context
+import android.graphics.Bitmap
 import androidx.test.core.app.ApplicationProvider
 import androidx.test.ext.junit.runners.AndroidJUnit4
 import com.inktone.domain.service.ParseResult
 import kotlinx.coroutines.test.runTest
 import org.junit.Assert.assertEquals
+import org.junit.Assert.assertNotNull
 import org.junit.Assert.assertTrue
 import org.junit.Test
 import org.junit.runner.RunWith
+import java.io.ByteArrayOutputStream
+import java.io.File
 
 /**
  * Bug réel trouvé sur appareil (éditions fantasy type "La Première Loi",
@@ -68,7 +72,7 @@ class ReadiumPublicationParserCoverFallbackTest {
             ),
         )
 
-        val result = ReadiumPublicationParser(context).parse(epubFile.absolutePath)
+        val result = ReadiumPublicationParser(context, CoverStorage(context)).parse(epubFile.absolutePath)
         assertTrue("le parsing doit reussir", result is ParseResult.Success)
         val success = result as ParseResult.Success
 
@@ -127,7 +131,7 @@ class ReadiumPublicationParserCoverFallbackTest {
             ),
         )
 
-        val result = ReadiumPublicationParser(context).parse(epubFile.absolutePath)
+        val result = ReadiumPublicationParser(context, CoverStorage(context)).parse(epubFile.absolutePath)
         assertTrue("le parsing doit reussir", result is ParseResult.Success)
         val success = result as ParseResult.Success
 
@@ -205,7 +209,7 @@ class ReadiumPublicationParserCoverFallbackTest {
             ),
         )
 
-        val result = ReadiumPublicationParser(context).parse(epubFile.absolutePath)
+        val result = ReadiumPublicationParser(context, CoverStorage(context)).parse(epubFile.absolutePath)
         assertTrue("le parsing doit reussir", result is ParseResult.Success)
         val success = result as ParseResult.Success
 
@@ -226,4 +230,77 @@ class ReadiumPublicationParserCoverFallbackTest {
         assertEquals("chapter1.xhtml", success.documentModel.chapters[tocChapter1.chapterIndex].href.substringAfterLast('/'))
         assertEquals("chapter2.xhtml", success.documentModel.chapters[tocChapter2.chapterIndex].href.substringAfterLast('/'))
     }
+
+    /**
+     * Bug réel remonté par les premiers bêta-testeurs (2026-08-26) : la
+     * vignette de bibliothèque restait vide sur les éditions Calibre
+     * EPUB2 — les sept tomes de Harry Potter, 13 titres sur 481 dans la
+     * bibliothèque de test — alors que le livre s'ouvrait normalement.
+     *
+     * `Publication.cover()` (Readium) ne trouve rien quand le SEUL
+     * marqueur de couverture est `<guide><reference type="cover">`, et
+     * le repli [EpubGuideCoverResolver.findCoverHref] n'alimentait que la
+     * liste des chapitres, jamais `metadata.coverUri` — les deux tests
+     * ci-dessus ne vérifiaient que la première moitié du chemin.
+     */
+    @Test
+    fun couverture_declaree_uniquement_via_guide_alimente_aussi_coverUri() = runTest {
+        val context = ApplicationProvider.getApplicationContext<Context>()
+        val opf = """<?xml version="1.0" encoding="UTF-8"?>
+<package xmlns="http://www.idpf.org/2007/opf" version="2.0" unique-identifier="BookId">
+  <metadata xmlns:dc="http://purl.org/dc/elements/1.1/">
+    <dc:title>Test Guide Cover Thumbnail</dc:title>
+    <dc:identifier id="BookId">urn:uuid:test-guide-cover-thumb</dc:identifier>
+    <dc:language>fr</dc:language>
+  </metadata>
+  <manifest>
+    <item id="titlepage" href="titlepage.xhtml" media-type="application/xhtml+xml"/>
+    <item id="cover" href="cover.png" media-type="image/png"/>
+    <item id="chapter1" href="chapter1.xhtml" media-type="application/xhtml+xml"/>
+  </manifest>
+  <spine>
+    <itemref idref="titlepage" linear="no"/>
+    <itemref idref="chapter1"/>
+  </spine>
+  <guide>
+    <reference type="cover" title="Cover" href="titlepage.xhtml"/>
+  </guide>
+</package>"""
+        // Forme exacte des editions Calibre incriminees : le guide pointe
+        // une PAGE XHTML, l'image reelle est dans son <img src>.
+        val titlepage = "$xhtmlHeader<div><img src=\"cover.png\" alt=\"cover\"/></div>$xhtmlFooter"
+        val chapter1 = "$xhtmlHeader<p>Bonjour ceci est le premier chapitre.</p>$xhtmlFooter"
+
+        val epubFile = TestEpubBuilder.writeToCache(
+            context,
+            "fixture-guide-cover-thumbnail.epub",
+            mapOf(
+                "mimetype" to TestEpubBuilder.text(TestEpubBuilder.MIMETYPE),
+                "META-INF/container.xml" to TestEpubBuilder.text(TestEpubBuilder.CONTAINER_XML),
+                "OEBPS/content.opf" to TestEpubBuilder.text(opf),
+                "OEBPS/titlepage.xhtml" to TestEpubBuilder.text(titlepage),
+                "OEBPS/chapter1.xhtml" to TestEpubBuilder.text(chapter1),
+                // Vrai PNG decodable : MINIMAL_JPEG_BYTES (SOI/EOI seuls)
+                // ne passe pas BitmapFactory, or c'est precisement le
+                // decodage qu'on verifie ici.
+                "OEBPS/cover.png" to decodablePngBytes(),
+            ),
+        )
+
+        val result = ReadiumPublicationParser(context, CoverStorage(context)).parse(epubFile.absolutePath)
+        assertTrue("le parsing doit reussir", result is ParseResult.Success)
+        val success = result as ParseResult.Success
+
+        val coverUri = success.metadata.coverUri
+        assertNotNull("la couverture du <guide> doit alimenter metadata.coverUri", coverUri)
+        assertTrue("le fichier de couverture doit exister sur disque", File(coverUri!!).exists())
+    }
+
+    /** PNG 2x2 reellement decodable par BitmapFactory. */
+    private fun decodablePngBytes(): ByteArray =
+        ByteArrayOutputStream().use { out ->
+            Bitmap.createBitmap(2, 2, Bitmap.Config.ARGB_8888)
+                .compress(Bitmap.CompressFormat.PNG, 100, out)
+            out.toByteArray()
+        }
 }
