@@ -6,6 +6,8 @@ import android.widget.Toast
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.navigationBarsPadding
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.shape.RoundedCornerShape
@@ -30,7 +32,6 @@ import androidx.compose.ui.focus.focusRequester
 import androidx.compose.ui.geometry.Rect
 import androidx.compose.ui.platform.LocalClipboardManager
 import androidx.compose.ui.platform.LocalContext
-import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.platform.LocalSoftwareKeyboardController
 import androidx.compose.ui.text.AnnotatedString
 import androidx.compose.ui.text.input.ImeAction
@@ -66,6 +67,15 @@ import com.inktone.domain.model.AnnotationKind
  * la loupe native doit rester dégagée — d'où le retour anticipé
  * ci-dessous, qui rend aussi le popup apatride entre deux gestes (mode
  * ACTIONS, texte de note vide à chaque réapparition).
+ *
+ * **Disposition (Lot 23, tâche 7)** : panneau ancré en bas d'écran, pleine
+ * largeur (inspiré de Moon+ Reader — voir
+ * `RAPPORT_POPUP_SELECTION_MOONREADER_v2.md`), plutôt que positionné près
+ * de la sélection. Reste un `Popup` non-modal (jamais `ModalBottomSheet`) :
+ * ce dernier installerait un scrim plein écran et volerait le focus de
+ * fenêtre en permanence, ce qui masquerait les poignées de sélection et la
+ * loupe natives — précisément le bug device documenté ci-dessous
+ * (`focusable` conditionnel), qu'un `ModalBottomSheet` réintroduirait.
  */
 private enum class SelectionPopupMode { ACTIONS, COLOR_PICKER, NOTE_INPUT, MORE }
 
@@ -95,7 +105,6 @@ fun SelectionActionPopup(
     var noteText by remember { mutableStateOf("") }
     val clipboardManager = LocalClipboardManager.current
     val context = LocalContext.current
-    val density = LocalDensity.current
     val noteFocusRequester = remember { FocusRequester() }
     val keyboardController = LocalSoftwareKeyboardController.current
 
@@ -125,9 +134,7 @@ fun SelectionActionPopup(
         }
     }
 
-    val positionProvider = remember(selectionBoundsInWindow, density) {
-        SelectionPopupPositionProvider(selectionBoundsInWindow, with(density) { 8.dp.roundToPx() })
-    }
+    val positionProvider = remember { BottomAnchoredPositionProvider() }
 
     Popup(
         popupPositionProvider = positionProvider,
@@ -149,75 +156,81 @@ fun SelectionActionPopup(
         ),
     ) {
         Surface(
-            shape = RoundedCornerShape(12.dp),
+            modifier = Modifier.fillMaxWidth(),
+            shape = RoundedCornerShape(topStart = 16.dp, topEnd = 16.dp),
             color = MaterialTheme.colorScheme.surfaceContainerHigh,
             shadowElevation = 6.dp,
         ) {
-            when (mode) {
-                SelectionPopupMode.ACTIONS -> Row(modifier = Modifier.padding(4.dp)) {
-                    PopupActionButton(icon = AppSymbol.Copy, label = "Copier") {
-                        clipboardManager.setText(AnnotatedString(selectedText))
-                        Toast.makeText(context, "Texte copié", Toast.LENGTH_SHORT).show()
-                        onDismiss()
+            // Dialog edge-to-edge (decorFitsSystemWindows=false, même
+            // discipline que BookmarkPanel) : sans ce padding, la barre de
+            // navigation système mord sur les boutons du panneau.
+            Column(modifier = Modifier.navigationBarsPadding()) {
+                when (mode) {
+                    SelectionPopupMode.ACTIONS -> Row(modifier = Modifier.padding(4.dp)) {
+                        PopupActionButton(icon = AppSymbol.Copy, label = "Copier") {
+                            clipboardManager.setText(AnnotatedString(selectedText))
+                            Toast.makeText(context, "Texte copié", Toast.LENGTH_SHORT).show()
+                            onDismiss()
+                        }
+                        PopupActionButton(icon = AppSymbol.Highlight, label = "Surligner") {
+                            mode = SelectionPopupMode.COLOR_PICKER
+                        }
+                        PopupActionButton(icon = AppSymbol.Note, label = "Note") {
+                            mode = SelectionPopupMode.NOTE_INPUT
+                        }
+                        // Lot 21, tâche 7 — « Partager » derrière un overflow
+                        // « ⋮ » : quatre actions en premier niveau élargiraient
+                        // la barre au-delà du raisonnable. L'action secondaire
+                        // reste à un geste (un tap), jamais « Tout sélectionner ».
+                        TextButton(onClick = { mode = SelectionPopupMode.MORE }) {
+                            AppIcon(AppSymbol.MoreActions, contentDescription = "Plus d'actions")
+                        }
                     }
-                    PopupActionButton(icon = AppSymbol.Highlight, label = "Surligner") {
-                        mode = SelectionPopupMode.COLOR_PICKER
-                    }
-                    PopupActionButton(icon = AppSymbol.Note, label = "Note") {
-                        mode = SelectionPopupMode.NOTE_INPUT
-                    }
-                    // Lot 21, tâche 7 — « Partager » derrière un overflow
-                    // « ⋮ » : quatre actions en premier niveau élargiraient
-                    // la barre au-delà du raisonnable. L'action secondaire
-                    // reste à un geste (un tap), jamais « Tout sélectionner ».
-                    TextButton(onClick = { mode = SelectionPopupMode.MORE }) {
-                        AppIcon(AppSymbol.MoreActions, contentDescription = "Plus d'actions")
-                    }
-                }
 
-                SelectionPopupMode.COLOR_PICKER -> AnnotationColorPicker(
-                    selected = pendingColor,
-                    onSelect = { pendingColor = it },
-                    onConfirm = { onHighlight(pendingColor, pendingKind) },
-                    onCancel = onDismiss,
-                    recentColors = recentColors,
-                    selectedKind = pendingKind,
-                    onSelectKind = { pendingKind = it },
-                )
-
-                // Lot 21, tâche 7 — « Partager » (ACTION_SEND) : texte
-                // sélectionné + contexte titre/auteur/chapitre. Le popup
-                // reste non-focusable ici (mode sans clavier) — la gestion
-                // conditionnelle de `focusable` est INCHANGÉE (bug device
-                // documenté : ne pas voler le focus à la zone de lecture).
-                SelectionPopupMode.MORE -> Column(modifier = Modifier.padding(4.dp)) {
-                    PopupActionButton(icon = AppSymbol.Share, label = "Partager") {
-                        shareSelection(context, selectedText, shareContext)
-                        onDismiss()
-                    }
-                    TextButton(onClick = { mode = SelectionPopupMode.ACTIONS }) {
-                        AppIcon(AppSymbol.Back, contentDescription = null, modifier = Modifier.padding(end = 4.dp))
-                        Text("Retour")
-                    }
-                }
-
-                SelectionPopupMode.NOTE_INPUT -> Column(modifier = Modifier.padding(12.dp).width(260.dp)) {
-                    OutlinedTextField(
-                        value = noteText,
-                        onValueChange = { noteText = it },
-                        label = { Text("Note") },
-                        modifier = Modifier.focusRequester(noteFocusRequester),
-                        keyboardOptions = KeyboardOptions(imeAction = ImeAction.Done),
-                        keyboardActions = KeyboardActions(onDone = {
-                            if (noteText.isNotBlank()) onSaveNote(noteText, pendingColor, pendingKind)
-                        }),
+                    SelectionPopupMode.COLOR_PICKER -> AnnotationColorPicker(
+                        selected = pendingColor,
+                        onSelect = { pendingColor = it },
+                        onConfirm = { onHighlight(pendingColor, pendingKind) },
+                        onCancel = onDismiss,
+                        recentColors = recentColors,
+                        selectedKind = pendingKind,
+                        onSelectKind = { pendingKind = it },
                     )
-                    Row(modifier = Modifier.padding(top = 8.dp)) {
-                        TextButton(onClick = onDismiss) { Text("Annuler") }
-                        Button(
-                            onClick = { if (noteText.isNotBlank()) onSaveNote(noteText, pendingColor, pendingKind) },
-                            enabled = noteText.isNotBlank(),
-                        ) { Text("Enregistrer") }
+
+                    // Lot 21, tâche 7 — « Partager » (ACTION_SEND) : texte
+                    // sélectionné + contexte titre/auteur/chapitre. Le popup
+                    // reste non-focusable ici (mode sans clavier) — la gestion
+                    // conditionnelle de `focusable` est INCHANGÉE (bug device
+                    // documenté : ne pas voler le focus à la zone de lecture).
+                    SelectionPopupMode.MORE -> Column(modifier = Modifier.padding(4.dp)) {
+                        PopupActionButton(icon = AppSymbol.Share, label = "Partager") {
+                            shareSelection(context, selectedText, shareContext)
+                            onDismiss()
+                        }
+                        TextButton(onClick = { mode = SelectionPopupMode.ACTIONS }) {
+                            AppIcon(AppSymbol.Back, contentDescription = null, modifier = Modifier.padding(end = 4.dp))
+                            Text("Retour")
+                        }
+                    }
+
+                    SelectionPopupMode.NOTE_INPUT -> Column(modifier = Modifier.padding(12.dp).width(260.dp)) {
+                        OutlinedTextField(
+                            value = noteText,
+                            onValueChange = { noteText = it },
+                            label = { Text("Note") },
+                            modifier = Modifier.focusRequester(noteFocusRequester),
+                            keyboardOptions = KeyboardOptions(imeAction = ImeAction.Done),
+                            keyboardActions = KeyboardActions(onDone = {
+                                if (noteText.isNotBlank()) onSaveNote(noteText, pendingColor, pendingKind)
+                            }),
+                        )
+                        Row(modifier = Modifier.padding(top = 8.dp)) {
+                            TextButton(onClick = onDismiss) { Text("Annuler") }
+                            Button(
+                                onClick = { if (noteText.isNotBlank()) onSaveNote(noteText, pendingColor, pendingKind) },
+                                enabled = noteText.isNotBlank(),
+                            ) { Text("Enregistrer") }
+                        }
                     }
                 }
             }
@@ -234,37 +247,21 @@ private fun PopupActionButton(icon: AppSymbol, label: String, onClick: () -> Uni
 }
 
 /**
- * Tâche 3c.4 — contrainte d'implémentation : positionnement alimenté par
- * les `LayoutCoordinates` réelles de la zone sélectionnée
- * (`selectionBoundsInWindow`, calculées par l'appelant à partir de
- * `onGloballyPositioned`/`TextLayoutResult.getPathForRange`), jamais des
- * coordonnées d'écran calculées à la main. Ignore délibérément
- * `anchorBounds` fourni par `Popup` (bounds du site d'appel du composable,
- * pas de la sélection) — c'est `selectionBoundsInWindow`, recalculé à
- * chaque recomposition par l'appelant pendant un défilement ou une
- * rotation, qui pilote la position, pas l'ancre par défaut de `Popup`.
+ * Lot 23, tâche 7 — panneau ancré en bas d'écran, pleine largeur, quelle
+ * que soit la position de la sélection dans le texte. Remplace
+ * `SelectionPopupPositionProvider` (positionnement près de la sélection,
+ * Tâche 3c.4) : `selectionBoundsInWindow` ne pilote plus la position, la
+ * disposition Moon+ ancre systématiquement en bas (voir KDoc de tête).
  */
-private class SelectionPopupPositionProvider(
-    private val selectionBoundsInWindow: Rect,
-    private val marginPx: Int,
-) : PopupPositionProvider {
+private class BottomAnchoredPositionProvider : PopupPositionProvider {
     override fun calculatePosition(
         anchorBounds: androidx.compose.ui.unit.IntRect,
         windowSize: IntSize,
         layoutDirection: androidx.compose.ui.unit.LayoutDirection,
         popupContentSize: IntSize,
     ): IntOffset {
-        val centerX = (selectionBoundsInWindow.left + selectionBoundsInWindow.right) / 2f
-        val x = (centerX - popupContentSize.width / 2f).toInt()
-            .coerceIn(0, (windowSize.width - popupContentSize.width).coerceAtLeast(0))
-
-        val spaceAbove = selectionBoundsInWindow.top
-        val y = if (spaceAbove >= popupContentSize.height + marginPx) {
-            (selectionBoundsInWindow.top - popupContentSize.height - marginPx).toInt()
-        } else {
-            (selectionBoundsInWindow.bottom + marginPx).toInt()
-        }
-        return IntOffset(x, y.coerceIn(0, (windowSize.height - popupContentSize.height).coerceAtLeast(0)))
+        val y = (windowSize.height - popupContentSize.height).coerceAtLeast(0)
+        return IntOffset(0, y)
     }
 }
 
