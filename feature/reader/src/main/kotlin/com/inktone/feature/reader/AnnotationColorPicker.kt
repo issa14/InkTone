@@ -9,6 +9,7 @@ import androidx.compose.material3.Button
 import androidx.compose.material3.FilterChip
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.remember
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.semantics
@@ -27,6 +28,17 @@ fun AnnotationColor.toComposeColor(): Color = when (this) {
     AnnotationColor.PINK -> Color(0xFFF48FB1)
     AnnotationColor.ORANGE -> Color(0xFFFFCC80)
 }
+
+/**
+ * Lot 22, tâche 12 — place [color] en tête, sans doublon, plafonné à
+ * [MAX_RECENT_ANNOTATION_COLORS] (la palette entière tiendrait de toute
+ * façon dans le sélecteur, ce plafond ne fait que borner explicitement ce
+ * qui compte comme « récent »).
+ */
+fun List<AnnotationColor>.withRecentColor(color: AnnotationColor): List<AnnotationColor> =
+    (listOf(color) + filterNot { it == color }).take(MAX_RECENT_ANNOTATION_COLORS)
+
+private const val MAX_RECENT_ANNOTATION_COLORS = 3
 
 /**
  * Style de rendu d'une annotation selon son [AnnotationKind] (Lot 22,
@@ -54,12 +66,19 @@ fun AnnotationColorPicker(
     onSelect: (AnnotationColor) -> Unit,
     onConfirm: () -> Unit,
     onCancel: () -> Unit,
+    // Lot 22, tâche 12 — couleurs récemment utilisées (la plus récente en
+    // tête, voir `UserPreferences.recentAnnotationColors`), proposées en
+    // premier ; le reste de la palette suit dans son ordre habituel.
+    recentColors: List<AnnotationColor> = emptyList(),
 ) {
+    val orderedColors = remember(recentColors) {
+        recentColors + AnnotationColor.entries.filterNot { it in recentColors }
+    }
     Row(
         modifier = Modifier.fillMaxWidth().horizontalScroll(rememberScrollState()),
         horizontalArrangement = Arrangement.spacedBy(4.dp),
     ) {
-        AnnotationColor.entries.forEach { color ->
+        orderedColors.forEach { color ->
             val label = color.label()
             FilterChip(
                 selected = color == selected,

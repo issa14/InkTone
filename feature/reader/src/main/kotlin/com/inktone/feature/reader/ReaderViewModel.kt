@@ -141,6 +141,7 @@ class ReaderViewModel @Inject constructor(
                     eyeRestReminderIntervalMinutes = preferences.eyeRestReminderIntervalMinutes,
                     reduceMotion = preferences.reduceMotion,
                     autoScrollSpeed = preferences.autoScrollSpeed,
+                    recentAnnotationColors = preferences.recentAnnotationColors,
                 )
             }
         }
@@ -820,6 +821,10 @@ class ReaderViewModel @Inject constructor(
             _state.value = _state.value.copy(
                 freeSelectionAnchorOffset = null, freeSelectionFocusOffset = null,
             )
+            // Lot 22, tâche 12 — mémorise la couleur pour la proposer en
+            // tête du sélecteur au prochain surlignage.
+            val prefs = preferencesRepository.get()
+            preferencesRepository.update(prefs.copy(recentAnnotationColors = prefs.recentAnnotationColors.withRecentColor(color)))
         }
     }
 

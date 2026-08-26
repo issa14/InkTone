@@ -1152,6 +1152,39 @@ class DatabaseMigrationTest {
         v29.close()
     }
 
+    // Lot 22, tâche 12 — couleurs de surlignage récentes (MIGRATION_29_30).
+    // Défaut CSV vide : une bibliothèque existante ne propose aucune
+    // couleur récente tant que l'utilisateur n'a pas surligné après la
+    // mise à jour, aucune perte des réglages existants.
+    @Test
+    fun migration_29_vers_30_ajoute_recentAnnotationColors_vide_par_defaut() {
+        val v29 = helper.createDatabase(TEST_DB_NAME, 29)
+        v29.execSQL(
+            """
+            INSERT INTO user_preferences (id, theme, fontSize, defaultTtsEngine, crashReportingEnabled, language, fontFamily, reduceMotion, dynamicColorEnabled, readingRulerEnabled, dailyGoalMinutes, activeVoiceProfileId, readingMode, audioGain, useSystemFontScale, appTheme, libraryLayoutMode, lineHeightMultiplier, readerBrightness, eyeRestReminderEnabled, eyeRestReminderIntervalMinutes, hasSeenOnboarding, hasPromptedVoiceDownload, syncLastAutoSyncFailed, syncAutoEnabled, syncWifiOnly, readerMarginStep, paragraphSpacingStep, textJustified, keepScreenOn, autoScrollSpeed)
+            VALUES (0, 'obsidienne', 22, 'SHERPA_ONNX', 0, 'fr', 'SERIF', 0, 1, 0, 20, NULL, 'SCROLL', 1.0, 0, 'SYSTEM', 'GRID_COVERS', 1.6, NULL, 1, 60, 1, 1, 0, 0, 0, 1, 1, 0, 0, 2)
+            """.trimIndent(),
+        )
+        v29.close()
+
+        val v30 = helper.runMigrationsAndValidate(
+            TEST_DB_NAME, 30, true,
+            MIGRATION_1_2, MIGRATION_2_3, MIGRATION_3_4, MIGRATION_4_5, MIGRATION_5_6, MIGRATION_6_7,
+            MIGRATION_7_8, MIGRATION_8_9, MIGRATION_9_10, MIGRATION_10_11, MIGRATION_11_12, MIGRATION_12_13,
+            MIGRATION_13_14, MIGRATION_14_15, MIGRATION_15_16, MIGRATION_16_17, MIGRATION_17_18, MIGRATION_18_19,
+            MIGRATION_19_20, MIGRATION_20_21, MIGRATION_21_22, MIGRATION_22_23, MIGRATION_23_24, MIGRATION_24_25,
+            MIGRATION_25_26, MIGRATION_26_27, MIGRATION_27_28, MIGRATION_28_29, MIGRATION_29_30,
+        )
+
+        v30.query("SELECT theme, autoScrollSpeed, recentAnnotationColors FROM user_preferences WHERE id = 0").use { cursor ->
+            assertEquals(true, cursor.moveToFirst())
+            assertEquals("obsidienne", cursor.getString(0)) // aucune perte
+            assertEquals(2, cursor.getInt(1)) // aucune perte
+            assertEquals("", cursor.getString(2)) // défaut = aucune couleur récente
+        }
+        v30.close()
+    }
+
     companion object {
         private const val TEST_DB_NAME = "migration-test"
     }

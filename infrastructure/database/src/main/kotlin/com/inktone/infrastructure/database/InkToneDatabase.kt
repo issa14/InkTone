@@ -42,7 +42,7 @@ import com.inktone.infrastructure.database.entity.VoiceProfileEntity
         CatalogEntity::class,
     ],
     views = [LibraryItemView::class],
-    version = 29, // Lot 22, tâche 10 : type d'annotation (MIGRATION_28_29)
+    version = 30, // Lot 22, tâche 12 : couleurs de surlignage récentes (MIGRATION_29_30)
     exportSchema = true, // condition du harnais de migration — Tâche 2.4
 )
 @TypeConverters(StringListConverter::class)
