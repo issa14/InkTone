@@ -14,6 +14,7 @@ import com.inktone.domain.model.ChapterContent
 import com.inktone.domain.model.DocumentModel
 import com.inktone.domain.model.BookBlock
 import com.inktone.domain.model.StyledText
+import com.inktone.domain.model.FontFamily
 import com.inktone.domain.model.Publication
 import com.inktone.domain.model.PublicationFormat
 import com.inktone.domain.model.Sentence
@@ -233,6 +234,38 @@ class ReaderViewModelScrollPositionTest {
         // L'état reflète la préférence persistée (même patron que
         // reduceMotion) : le rendu peut démarrer l'auto-scroll.
         assertEquals(2, viewModel.state.value.autoScrollSpeed)
+
+        viewModel.cancelCheckpointTimerForTest()
+        dispatcher.scheduler.runCurrent()
+    }
+
+    // ───── Lot 21 (correctif) — le sélecteur de police recalcule
+    // `effectiveSettings` (sans quoi la préférence était persistée mais
+    // jamais appliquée au rendu) ─────
+
+    @Test
+    fun changer_de_police_recalcule_effectiveSettings() = runTest {
+        val readingStateRepository = FakeReadingStateRepository()
+        val publicationRepository = FakePublicationRepository()
+        publicationRepository.insert(
+            Publication(
+                id = "pub-1", title = "Test", format = PublicationFormat.EPUB,
+                fileUri = "content://x", fileHash = "hash", fileSize = 10, chapterCount = 1,
+                importDate = 0L,
+            ),
+        )
+        val viewModel = buildViewModel(readingStateRepository, publicationRepository)
+        viewModel.onIntent(ReaderIntent.OpenPublication("pub-1"))
+        dispatcher.scheduler.runCurrent()
+
+        // Défaut : pas de préférence de police explicite.
+        assertEquals(FontFamily.DEFAULT, viewModel.state.value.effectiveSettings.fontFamily)
+
+        // Le sélecteur du panneau TT : la police doit s'appliquer au rendu.
+        viewModel.onIntent(ReaderIntent.SetFontFamily(FontFamily.OPEN_DYSLEXIC))
+        dispatcher.scheduler.runCurrent()
+
+        assertEquals(FontFamily.OPEN_DYSLEXIC, viewModel.state.value.effectiveSettings.fontFamily)
 
         viewModel.cancelCheckpointTimerForTest()
         dispatcher.scheduler.runCurrent()

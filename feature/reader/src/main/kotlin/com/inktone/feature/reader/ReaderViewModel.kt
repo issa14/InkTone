@@ -1369,12 +1369,20 @@ class ReaderViewModel @Inject constructor(
 
     /**
      * Correctif Lot 21 — sélecteur de police du panneau de réglages du
-     * Lecteur (`ReaderSettingsPanel`), même patron que `setTextJustified`.
+     * Lecteur (`ReaderSettingsPanel`). La police fait partie
+     * d'`effectiveSettings` : sans le recalcul ci-dessous, la préférence
+     * était persistée mais jamais appliquée au rendu (le collect
+     * preferences n'émettant pas `effectiveSettings`), et le sélecteur
+     * paraissait mort — le même recalcul que `setOverrides`, sans
+     * toucher aux surcharges par publication.
      */
     private fun setFontFamily(fontFamily: FontFamily) {
         viewModelScope.launch {
             val current = preferencesRepository.get()
             preferencesRepository.update(current.copy(fontFamily = fontFamily))
+            val overrides = _state.value.currentOverrides
+            val effectiveSettings = EffectiveReadingSettings.resolve(overrides, preferencesRepository.get())
+            _state.value = _state.value.copy(effectiveSettings = effectiveSettings)
         }
     }
 

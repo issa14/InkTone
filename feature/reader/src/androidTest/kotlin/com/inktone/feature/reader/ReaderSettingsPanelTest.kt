@@ -147,9 +147,13 @@ class ReaderSettingsPanelTest {
         }
 
         composeTestRule.onNodeWithText("Auto-scroll").assertExists()
+        composeTestRule.onNodeWithText("Vitesse").assertExists()
+        // Valeur courante (autoScrollSpeed = 2 → « Moyenne ») affichée.
+        composeTestRule.onNodeWithText("Moyenne").assertExists()
+        // Les autres options sont derrière le menu déroulant : on l'ouvre.
+        composeTestRule.onNodeWithText("Vitesse").performClick()
         composeTestRule.onNodeWithText("Désactivé").assertExists()
         composeTestRule.onNodeWithText("Lente").assertExists()
-        composeTestRule.onNodeWithText("Moyenne").assertExists()
         composeTestRule.onNodeWithText("Rapide").assertExists()
     }
 
@@ -183,7 +187,10 @@ class ReaderSettingsPanelTest {
         }
 
         composeTestRule.onNodeWithText("Police").assertExists()
+        // Valeur courante (DEFAULT → « Système ») affichée.
         composeTestRule.onNodeWithText("Système").assertExists()
+        // Les autres options sont derrière le menu déroulant : on l'ouvre.
+        composeTestRule.onNodeWithText("Police").performClick()
         composeTestRule.onNodeWithText("Serif").assertExists()
         composeTestRule.onNodeWithText("Sans-serif").assertExists()
         composeTestRule.onNodeWithText("Dyslexie").assertExists()
@@ -218,6 +225,7 @@ class ReaderSettingsPanelTest {
             )
         }
 
+        composeTestRule.onNodeWithText("Police").performClick()
         composeTestRule.onNodeWithText("Empattée FR").performClick()
         assertEquals(FontFamily.SOURCE_SERIF, chosen)
     }

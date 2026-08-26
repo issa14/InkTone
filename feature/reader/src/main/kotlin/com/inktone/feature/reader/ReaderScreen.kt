@@ -17,6 +17,7 @@ import com.inktone.feature.reader.transition.ChapterTransitionState
 import kotlinx.coroutines.flow.collect
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.isActive
+import kotlinx.coroutines.withTimeoutOrNull
 import androidx.compose.animation.core.animateIntAsState
 import androidx.compose.animation.core.tween
 import androidx.compose.animation.ExperimentalSharedTransitionApi
@@ -723,13 +724,6 @@ fun ReaderScreen(
             }
             val pxPerSecond = with(density) { autoScrollDpPerSecond(state.autoScrollSpeed).dp.toPx() }
             if (pxPerSecond <= 0f) return@LaunchedEffect
-            // Attend la première mesure : `canScrollForward` vaut toujours
-            // `false` tant que la LazyColumn n'a pas encore mesuré son
-            // contenu — sans cette attente, un auto-scroll démarré avant
-            // la première mise en page du chapitre se terminait
-            // immédiatement et ne repartait jamais (les clés de l'effet
-            // ne changent plus une fois la vitesse déjà réglée).
-            snapshotFlow { scrollState.layoutInfo.totalItemsCount }.first { it > 0 }
             autoScrollRunning = true
             try {
                 // Cadence sur l'horloge de frame plutôt qu'un `delay` fixe
@@ -739,7 +733,20 @@ fun ReaderScreen(
                 // fidèle quelle que soit la cadence de rendu effective.
                 var lastFrameNanos = 0L
                 while (isActive) {
-                    if (!scrollState.canScrollForward) break
+                    // `canScrollForward` est `false` tant que la LazyColumn
+                    // n'a pas encore mesuré son contenu (chapitre en
+                    // chargement lazy) : on attend sa première mesure,
+                    // borné à 2 s, au lieu de sortir d'emblée — un
+                    // auto-scroll réglé juste après l'ouverture d'un
+                    // chapitre s'arrêtait autrefois net et ne repartait
+                    // jamais. Une fois la boucle lancée, `false` signifie
+                    // la fin du chapitre : on sort.
+                    if (!scrollState.canScrollForward) {
+                        val measured = withTimeoutOrNull(2_000) {
+                            snapshotFlow { scrollState.layoutInfo.totalItemsCount }.first { it > 0 }
+                        } ?: break
+                        continue
+                    }
                     withFrameNanos { frameNanos ->
                         if (lastFrameNanos != 0L) {
                             val deltaSeconds = (frameNanos - lastFrameNanos) / 1_000_000_000f
