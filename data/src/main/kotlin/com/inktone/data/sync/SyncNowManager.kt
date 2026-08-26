@@ -131,6 +131,10 @@ class SyncNowManager @Inject constructor(
         val localSessionIds = readingSessionRepository.getAll().map { it.id }.toMutableSet()
         val pendingConflictPublicationIds = conflictQueueRepository.listPending().map { it.publicationId }.toMutableSet()
         var skippedOrphanSessions = 0
+        // Lot 22, tâche 14 — dernière synchro réussie, repère de l'arbitrage
+        // automatique : on ne tranche seul que si UN SEUL appareil a bougé
+        // depuis ce moment (décision 5).
+        val lastSyncAt = syncAccountRepository.get()?.lastSyncAt ?: 0L
 
         for (file in remoteFiles) {
             val bytes = syncProvider.download(file.name) ?: continue
@@ -171,7 +175,10 @@ class SyncNowManager @Inject constructor(
                 localSessionIds += backup.id
             }
 
-            // Position de lecture — jamais fusionnée ni tranchée ici.
+            // Position de lecture — jamais fusionnée à l'aveugle. Décision 5 :
+            // arbitrage automatique seulement si un seul appareil a bougé
+            // depuis la dernière synchro réussie ; sinon, choix explicite via
+            // SyncConflictBottomSheet (file PendingConflictEntity).
             payload.readingStates.forEach { remoteBackup ->
                 if (remoteBackup.publicationId in pendingConflictPublicationIds) return@forEach
                 val publication = publicationRepository.getById(remoteBackup.publicationId) ?: return@forEach
@@ -181,21 +188,32 @@ class SyncNowManager @Inject constructor(
                 if (localState == null) {
                     readingStateRepository.save(remoteState)
                 } else if (localState.locator != remoteState.locator) {
-                    conflictQueueRepository.enqueue(
-                        PositionConflict(
-                            publicationId = remoteBackup.publicationId,
-                            bookTitle = publication.title,
-                            local = ReadingPositionSnapshot(
-                                locator = localState.locator, deviceLabel = currentDeviceLabel, at = localState.lastReadAt,
-                                chapterIndex = localState.locator.chapterIndex, chapterCount = publication.chapterCount,
-                            ),
-                            remote = ReadingPositionSnapshot(
-                                locator = remoteState.locator, deviceLabel = remoteDeviceLabel, at = remoteState.lastReadAt,
-                                chapterIndex = remoteState.locator.chapterIndex, chapterCount = publication.chapterCount,
-                            ),
-                        ),
-                    )
-                    pendingConflictPublicationIds += remoteBackup.publicationId
+                    val localMoved = localState.lastReadAt > lastSyncAt
+                    val remoteMoved = remoteState.lastReadAt > lastSyncAt
+                    when {
+                        // Seul le local a bougé : il fait foi, rien à changer.
+                        localMoved && !remoteMoved -> Unit
+                        // Seul le distant a bougé : on l'adopte sans demander.
+                        !localMoved && remoteMoved -> readingStateRepository.save(remoteState)
+                        // Les deux ont bougé (ou ni l'un ni l'autre) : conflit réel.
+                        else -> {
+                            conflictQueueRepository.enqueue(
+                                PositionConflict(
+                                    publicationId = remoteBackup.publicationId,
+                                    bookTitle = publication.title,
+                                    local = ReadingPositionSnapshot(
+                                        locator = localState.locator, deviceLabel = currentDeviceLabel, at = localState.lastReadAt,
+                                        chapterIndex = localState.locator.chapterIndex, chapterCount = publication.chapterCount,
+                                    ),
+                                    remote = ReadingPositionSnapshot(
+                                        locator = remoteState.locator, deviceLabel = remoteDeviceLabel, at = remoteState.lastReadAt,
+                                        chapterIndex = remoteState.locator.chapterIndex, chapterCount = publication.chapterCount,
+                                    ),
+                                ),
+                            )
+                            pendingConflictPublicationIds += remoteBackup.publicationId
+                        }
+                    }
                 }
             }
         }
