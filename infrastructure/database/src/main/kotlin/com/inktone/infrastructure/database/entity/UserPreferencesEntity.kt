@@ -44,4 +44,6 @@ data class UserPreferencesEntity(
     val paragraphSpacingStep: Int = 1,
     val textJustified: Boolean = false,
     val keepScreenOn: Boolean = false,
+    // Lot 21, tâche 9 — auto-scroll visuel (MIGRATION_27_28). 0 = désactivé.
+    val autoScrollSpeed: Int = 0,
 )

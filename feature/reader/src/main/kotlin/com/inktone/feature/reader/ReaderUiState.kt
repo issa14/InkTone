@@ -122,6 +122,11 @@ data class ReaderUiState(
     // coexistent, le surlignage mot-à-mot ne respecte aujourd'hui que le
     // premier.
     val reduceMotion: Boolean = false,
+    // Lot 21, tâche 9 — vitesse d'auto-scroll visuel (mode SCROLL
+    // uniquement), réglage global observé en continu comme reduceMotion.
+    // 0 = désactivé ; le rendu n'auto-scrolle JAMAIS quand reduceMotion est
+    // actif, quelle que soit cette valeur.
+    val autoScrollSpeed: Int = 0,
     // Lot 4, tâche 4.7 — cible de flash en attente de la fin de mise en
     // page du chapitre visé (la mesure est asynchrone depuis 3a, voir
     // ChapterPaginationState). Consommée une seule fois par
@@ -342,6 +347,14 @@ sealed interface ReaderIntent {
      */
     data class SaveBookmarkNote(val note: String) : ReaderIntent
     data object DismissBookmarkNotePrompt : ReaderIntent
+
+    /**
+     * Lot 21, tâche 9 — règle la vitesse d'auto-scroll visuel
+     * (`UserPreferences.autoScrollSpeed`, `0` = désactivé). Le réglage est
+     * global (même patron que reduceMotion), pas une surcharge par
+     * publication.
+     */
+    data class SetAutoScrollSpeed(val speed: Int) : ReaderIntent
 
     /** Navigue vers un `Locator` arbitraire — signet (Tâche 7.2) ou résultat de recherche (Tâche 7.5). */
     data class NavigateToLocator(val locator: Locator) : ReaderIntent

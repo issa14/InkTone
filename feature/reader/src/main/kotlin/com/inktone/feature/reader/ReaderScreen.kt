@@ -4,15 +4,20 @@ import android.os.SystemClock
 import androidx.compose.animation.core.Animatable
 import androidx.compose.animation.core.animateFloatAsState
 import androidx.compose.foundation.gestures.Orientation
+import androidx.compose.foundation.gestures.awaitFirstDown
 import androidx.compose.runtime.snapshotFlow
 import androidx.compose.ui.input.nestedscroll.nestedScroll
+import androidx.compose.ui.input.pointer.pointerInput
 import com.inktone.feature.reader.transition.ChapterTransitionConnection
 import com.inktone.feature.reader.transition.ChapterTransitionDirection
 import com.inktone.feature.reader.transition.ChapterTransitionIndicator
 import com.inktone.feature.reader.transition.ChapterTransitionMath
 import com.inktone.feature.reader.transition.ChapterTransitionState
+import kotlinx.coroutines.Job
 import kotlinx.coroutines.flow.collect
 import kotlinx.coroutines.flow.first
+import kotlinx.coroutines.isActive
+import kotlinx.coroutines.launch
 import androidx.compose.animation.core.animateIntAsState
 import androidx.compose.animation.core.tween
 import androidx.compose.animation.ExperimentalSharedTransitionApi
@@ -52,6 +57,7 @@ import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.rememberUpdatedState
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
@@ -662,6 +668,41 @@ fun ReaderScreen(
             justified = state.isTextJustified,
         )
 
+        // Lot 21, tâche 9 — auto-scroll visuel (mode SCROLL uniquement) :
+        // défilement continu à la vitesse réglée, arrêt à la première
+        // interaction (pointerInput sur la LazyColumn), jamais quand
+        // `reduceMotion` est actif (décision 3 du lot). L'effet vit au
+        // niveau du composable, ses clés (vitesse, mode, reduceMotion,
+        // format) annulent le job dès qu'une condition cesse d'être
+        // remplie — y compris en passant en mode PAGED.
+        var autoScrollJob by remember { mutableStateOf<Job?>(null) }
+        val autoScrollScope = rememberCoroutineScope()
+        LaunchedEffect(state.autoScrollSpeed, state.readingMode, state.reduceMotion, isPdf) {
+            autoScrollJob?.cancel()
+            autoScrollJob = null
+            if (state.autoScrollSpeed <= 0 || state.readingMode != ReadingMode.SCROLL || state.reduceMotion || isPdf) {
+                return@LaunchedEffect
+            }
+            val pxPerSecond = with(density) { autoScrollDpPerSecond(state.autoScrollSpeed).dp.toPx() }
+            if (pxPerSecond <= 0f) return@LaunchedEffect
+            val tickPx = pxPerSecond * AUTO_SCROLL_TICK_MS / 1000f
+            autoScrollJob = autoScrollScope.launch {
+                try {
+                    while (isActive) {
+                        if (!scrollState.canScrollForward) break
+                        // Delta brut sans animation : `LazyListState` n'a pas
+                        // de `scrollBy` (contrairement à `ScrollState`) —
+                        // `dispatchRawDelta` avance le défilement du delta en
+                        // pixels sans course d'animation, adapté au tick.
+                        scrollState.dispatchRawDelta(tickPx)
+                        delay(AUTO_SCROLL_TICK_MS)
+                    }
+                } finally {
+                    autoScrollJob = null
+                }
+            }
+        }
+
         // Lot 4, tâche 4.7 — signale la fin de mise en page du chapitre
         // affiché seulement quand la mesure couvre la totalité de ses
         // phrases (pas seulement la première page, mesurée en priorité —
@@ -865,7 +906,21 @@ fun ReaderScreen(
                                 modifier = Modifier
                                     .fillMaxSize()
                                     .graphicsLayer { translationY = visualPull.value }
-                                    .nestedScroll(chapterTransitionConnection),
+                                    .nestedScroll(chapterTransitionConnection)
+                                    // Lot 21, tâche 9 — arrêt de l'auto-scroll
+                                    // à la première interaction : tout appui
+                                    // sur la zone défilable annule le job (le
+                                    // down n'est pas consommé, le geste
+                                    // utilisateur continue normalement).
+                                    .pointerInput(autoScrollJob != null) {
+                                        if (autoScrollJob != null) {
+                                            awaitPointerEventScope {
+                                                awaitFirstDown()
+                                                autoScrollJob?.cancel()
+                                                autoScrollJob = null
+                                            }
+                                        }
+                                    },
                                 userScrollEnabled = freeSelectedRange == null,
                                 // P4 — même marge qu'en mode paginé : un
                                 // réglage de lecture ne doit pas dépendre du
@@ -1252,9 +1307,14 @@ fun ReaderScreen(
                 currentMarginStep = state.readerMarginStep,
                 isTextJustified = state.isTextJustified,
                 keepScreenOn = state.keepScreenOn,
+                // Lot 21, tâche 9 — auto-scroll visuel.
+                autoScrollSpeed = state.autoScrollSpeed,
+                reduceMotion = state.reduceMotion,
+                isScrollMode = state.readingMode == ReadingMode.SCROLL,
                 onMarginStepChange = { step -> viewModel.onIntent(ReaderIntent.SetReaderMarginStep(step)) },
                 onTextJustifiedChange = { justified -> viewModel.onIntent(ReaderIntent.SetTextJustified(justified)) },
                 onKeepScreenOnChange = { enabled -> viewModel.onIntent(ReaderIntent.SetKeepScreenOn(enabled)) },
+                onAutoScrollSpeedChange = { speed -> viewModel.onIntent(ReaderIntent.SetAutoScrollSpeed(speed)) },
                 onDismiss = { showSettingsPanel = false },
             )
         }
@@ -1512,3 +1572,6 @@ private fun BookmarkNoteDialog(
         },
     )
 }
+
+/** Lot 21, tâche 9 — cadence du pas d'auto-scroll (≈ 60 fps). */
+private const val AUTO_SCROLL_TICK_MS = 16L

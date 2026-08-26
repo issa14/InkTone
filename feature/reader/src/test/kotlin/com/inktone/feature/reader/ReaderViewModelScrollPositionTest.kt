@@ -207,6 +207,37 @@ class ReaderViewModelScrollPositionTest {
         dispatcher.scheduler.runCurrent()
     }
 
+    // ───── Lot 21, tâche 9 — auto-scroll visuel (vitesse persistée) ─────
+
+    @Test
+    fun regler_la_vitesse_d_auto_scroll_la_persiste_et_l_observe() = runTest {
+        val readingStateRepository = FakeReadingStateRepository()
+        val publicationRepository = FakePublicationRepository()
+        publicationRepository.insert(
+            Publication(
+                id = "pub-1", title = "Test", format = PublicationFormat.EPUB,
+                fileUri = "content://x", fileHash = "hash", fileSize = 10, chapterCount = 1,
+                importDate = 0L,
+            ),
+        )
+        val viewModel = buildViewModel(readingStateRepository, publicationRepository)
+        viewModel.onIntent(ReaderIntent.OpenPublication("pub-1"))
+        dispatcher.scheduler.runCurrent()
+
+        // Désactivé par défaut (0), et le réglage est observé en continu.
+        assertEquals(0, viewModel.state.value.autoScrollSpeed)
+
+        viewModel.onIntent(ReaderIntent.SetAutoScrollSpeed(2))
+        dispatcher.scheduler.runCurrent()
+
+        // L'état reflète la préférence persistée (même patron que
+        // reduceMotion) : le rendu peut démarrer l'auto-scroll.
+        assertEquals(2, viewModel.state.value.autoScrollSpeed)
+
+        viewModel.cancelCheckpointTimerForTest()
+        dispatcher.scheduler.runCurrent()
+    }
+
     // Le scenario K3 "defilement ignore pendant le TTS" n'est pas testable
     // ici en JUnit JVM pur : declencher une lecture reelle
     // (ReaderIntent.PlayCurrentSentence) invoque AudioSegmentPlayer, qui

@@ -122,6 +122,7 @@ class ReaderViewModel @Inject constructor(
                     eyeRestReminderEnabled = preferences.eyeRestReminderEnabled,
                     eyeRestReminderIntervalMinutes = preferences.eyeRestReminderIntervalMinutes,
                     reduceMotion = preferences.reduceMotion,
+                    autoScrollSpeed = preferences.autoScrollSpeed,
                 )
             }
         }
@@ -349,6 +350,7 @@ class ReaderViewModel @Inject constructor(
             is ReaderIntent.SetReaderMarginStep -> setReaderMarginStep(intent.step)
             is ReaderIntent.SetTextJustified -> setTextJustified(intent.justified)
             is ReaderIntent.SetKeepScreenOn -> setKeepScreenOn(intent.enabled)
+            is ReaderIntent.SetAutoScrollSpeed -> setAutoScrollSpeed(intent.speed)
             is ReaderIntent.SetReaderBrightness -> setReaderBrightness(intent.value)
             is ReaderIntent.SetEyeRestReminderEnabled -> setEyeRestReminderEnabled(intent.enabled)
             is ReaderIntent.SetEyeRestReminderInterval -> setEyeRestReminderInterval(intent.minutes)
@@ -1345,6 +1347,19 @@ class ReaderViewModel @Inject constructor(
         viewModelScope.launch {
             val current = preferencesRepository.get()
             preferencesRepository.update(current.copy(keepScreenOn = enabled))
+        }
+    }
+
+    /**
+     * Lot 21, tâche 9 — vitesse d'auto-scroll visuel (0 = désactivé).
+     * Bornée dans le domaine, comme setReaderMarginStep : un cran hors
+     * bornes venant de l'UI est un défaut de l'appelant.
+     */
+    private fun setAutoScrollSpeed(speed: Int) {
+        val bounded = speed.coerceIn(UserPreferences.AUTO_SCROLL_SPEED_RANGE)
+        viewModelScope.launch {
+            val current = preferencesRepository.get()
+            preferencesRepository.update(current.copy(autoScrollSpeed = bounded))
         }
     }
 

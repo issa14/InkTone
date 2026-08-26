@@ -58,6 +58,10 @@ fun ReaderSettingsPanel(
     currentMarginStep: Int,
     isTextJustified: Boolean,
     keepScreenOn: Boolean,
+    // Lot 21, tâche 9 — auto-scroll visuel (vitesse réglable, 0 = off).
+    autoScrollSpeed: Int,
+    reduceMotion: Boolean,
+    isScrollMode: Boolean,
     previewText: String,
     previewTextColor: Color,
     previewBackgroundColor: Color,
@@ -66,6 +70,7 @@ fun ReaderSettingsPanel(
     onMarginStepChange: (Int) -> Unit,
     onTextJustifiedChange: (Boolean) -> Unit,
     onKeepScreenOnChange: (Boolean) -> Unit,
+    onAutoScrollSpeedChange: (Int) -> Unit,
     onDismiss: () -> Unit,
 ) {
     val sheetState = rememberModalBottomSheetState(skipPartiallyExpanded = true)
@@ -171,9 +176,56 @@ fun ReaderSettingsPanel(
                 onCheckedChange = onKeepScreenOnChange,
             )
 
+            Spacer(Modifier.height(20.dp))
+
+            // ── Auto-scroll — Lot 21, tâche 9 : vitesse réglable, mode
+            // SCROLL uniquement, jamais quand reduceMotion est actif ──
+            Text(
+                "Auto-scroll",
+                style = MaterialTheme.typography.labelLarge,
+            )
+            Spacer(Modifier.height(4.dp))
+            Text(
+                when {
+                    !isScrollMode -> "Disponible en mode défilement uniquement"
+                    reduceMotion -> "Désactivé : le mouvement réduit est actif"
+                    else -> "Défilement continu, arrêté au premier toucher"
+                },
+                style = MaterialTheme.typography.bodySmall,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+            )
+            Spacer(Modifier.height(8.dp))
+            SingleChoiceSegmentedButtonRow(modifier = Modifier.fillMaxWidth()) {
+                UserPreferences.AUTO_SCROLL_SPEED_RANGE.forEachIndexed { index, speed ->
+                    SegmentedButton(
+                        selected = autoScrollSpeed == speed,
+                        enabled = isScrollMode && !reduceMotion,
+                        onClick = { onAutoScrollSpeedChange(speed) },
+                        shape = SegmentedButtonDefaults.itemShape(
+                            index = index,
+                            count = UserPreferences.AUTO_SCROLL_SPEED_RANGE.count(),
+                        ),
+                    ) {
+                        Text(autoScrollSpeedLabel(speed))
+                    }
+                }
+            }
+
             Spacer(Modifier.height(32.dp))
         }
     }
+}
+
+/**
+ * Lot 21, tâche 9 — libellé d'un cran de vitesse d'auto-scroll.
+ * `0` = désactivé, puis trois crans croissants.
+ */
+private fun autoScrollSpeedLabel(speed: Int): String = when (speed) {
+    0 -> "Désactivé"
+    1 -> "Lente"
+    2 -> "Moyenne"
+    3 -> "Rapide"
+    else -> speed.toString()
 }
 
 /** Ligne libellé + interrupteur, toute la ligne étant cliquable (cible tactile). */

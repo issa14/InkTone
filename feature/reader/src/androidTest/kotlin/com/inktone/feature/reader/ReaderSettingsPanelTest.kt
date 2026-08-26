@@ -36,9 +36,13 @@ class ReaderSettingsPanelTest {
                 currentMarginStep = 1,
             isTextJustified = false,
             keepScreenOn = false,
+            autoScrollSpeed = 0,
+            reduceMotion = false,
+            isScrollMode = true,
             onMarginStepChange = {},
             onTextJustifiedChange = {},
             onKeepScreenOnChange = {},
+            onAutoScrollSpeedChange = {},
             onDismiss = {},
             )
         }
@@ -62,9 +66,13 @@ class ReaderSettingsPanelTest {
                 currentMarginStep = 1,
             isTextJustified = false,
             keepScreenOn = false,
+            autoScrollSpeed = 0,
+            reduceMotion = false,
+            isScrollMode = true,
             onMarginStepChange = {},
             onTextJustifiedChange = {},
             onKeepScreenOnChange = {},
+            onAutoScrollSpeedChange = {},
             onDismiss = {},
             )
         }
@@ -86,9 +94,13 @@ class ReaderSettingsPanelTest {
                 currentMarginStep = 1,
             isTextJustified = false,
             keepScreenOn = false,
+            autoScrollSpeed = 0,
+            reduceMotion = false,
+            isScrollMode = true,
             onMarginStepChange = {},
             onTextJustifiedChange = {},
             onKeepScreenOnChange = {},
+            onAutoScrollSpeedChange = {},
             onDismiss = {},
             )
         }
@@ -103,5 +115,39 @@ class ReaderSettingsPanelTest {
             val rangeInfo = node.config[SemanticsProperties.ProgressBarRangeInfo]
             assertEquals("curseur continu attendu (steps=0)", 0, rangeInfo.steps)
         }
+    }
+
+    // ───── Lot 21, tâche 9 — auto-scroll visuel ─────
+
+    @Test
+    fun le_panneau_propose_les_crans_de_vitesse_d_auto_scroll() {
+        composeTestRule.setContent {
+            ReaderSettingsPanel(
+                currentFontSize = 18,
+                currentLineHeightMultiplier = 1.4f,
+                previewText = "Aperçu.",
+                previewTextColor = Color.Black,
+                previewBackgroundColor = Color.White,
+                onFontSizeChange = {},
+                onLineHeightChange = {},
+                currentMarginStep = 1,
+                isTextJustified = false,
+                keepScreenOn = false,
+                autoScrollSpeed = 2,
+                reduceMotion = false,
+                isScrollMode = true,
+                onMarginStepChange = {},
+                onTextJustifiedChange = {},
+                onKeepScreenOnChange = {},
+                onAutoScrollSpeedChange = {},
+                onDismiss = {},
+            )
+        }
+
+        composeTestRule.onNodeWithText("Auto-scroll").assertExists()
+        composeTestRule.onNodeWithText("Désactivé").assertExists()
+        composeTestRule.onNodeWithText("Lente").assertExists()
+        composeTestRule.onNodeWithText("Moyenne").assertExists()
+        composeTestRule.onNodeWithText("Rapide").assertExists()
     }
 }
