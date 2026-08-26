@@ -1683,13 +1683,6 @@ private fun ErrorState(message: String, onRetry: () -> Unit, onBack: () -> Unit)
 }
 
 /**
- * Lot 21, tâche 5 — saisie de note OPTIONNELLE d'un signet venant d'être
- * créé. Le signet existe déjà (le toggle l'a créé) : ce dialogue ne
- * bloque jamais le geste — fermer (« Plus tard », tap hors champ) laisse
- * le signet sans note. La note vide est enregistrée comme `null`.
- */
-@Composable
-/**
  * Lot 22, tâche 11 — dialogue d'édition générique (annotation ou signet),
  * distinct de [BookmarkNoteDialog] : celui-ci ÉDITE une note déjà posée
  * (pré-remplie), quand [BookmarkNoteDialog] PROPOSE d'en ajouter une juste
@@ -1722,6 +1715,12 @@ private fun EditNoteDialog(
     )
 }
 
+/**
+ * Lot 21, tâche 5 — saisie de note OPTIONNELLE d'un signet venant d'être
+ * créé. Le signet existe déjà (le toggle l'a créé) : ce dialogue ne
+ * bloque jamais le geste — fermer (« Plus tard », tap hors champ) laisse
+ * le signet sans note. La note vide est enregistrée comme `null`.
+ */
 @Composable
 private fun BookmarkNoteDialog(
     onSave: (String) -> Unit,
