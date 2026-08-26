@@ -2,9 +2,7 @@ package com.inktone.feature.reader
 
 import android.os.SystemClock
 import androidx.compose.animation.core.Animatable
-import androidx.compose.animation.core.Spring
 import androidx.compose.animation.core.animateFloatAsState
-import androidx.compose.animation.core.spring
 import androidx.compose.foundation.gestures.Orientation
 import androidx.compose.runtime.snapshotFlow
 import androidx.compose.ui.input.nestedscroll.nestedScroll
@@ -799,17 +797,16 @@ fun ReaderScreen(
                     // Décalage visuel : suit le doigt instantanément (snapTo) pendant
                     // le tirage, puis rebond élastique (spring) au relâchement.
                     val visualPull = remember { Animatable(0f) }
+                    // Lot 21 — même discipline qu'en mode paginé :
+                    // Motion.gestureSpring + préférence applicative
+                    // reduceMotion (tâche 4), plus de spring en dur.
+                    // Calculée dans la composition (spec @Composable).
+                    val pullBackSpec = gesturePullBackSpec(state.reduceMotion)
                     LaunchedEffect(chapterTransition.isDragging) {
                         if (chapterTransition.isDragging) {
                             snapshotFlow { chapterTransition.pullPx }.collect { visualPull.snapTo(it) }
                         } else {
-                            visualPull.animateTo(
-                                0f,
-                                spring(
-                                    dampingRatio = Spring.DampingRatioMediumBouncy,
-                                    stiffness = Spring.StiffnessMediumLow,
-                                ),
-                            )
+                            visualPull.animateTo(0f, pullBackSpec)
                         }
                     }
 
