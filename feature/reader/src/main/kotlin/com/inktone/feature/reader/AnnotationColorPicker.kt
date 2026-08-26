@@ -2,6 +2,7 @@ package com.inktone.feature.reader
 
 import androidx.compose.foundation.horizontalScroll
 import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.rememberScrollState
@@ -17,6 +18,8 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.text.SpanStyle
 import androidx.compose.ui.text.style.TextDecoration
 import androidx.compose.ui.unit.dp
+import com.inktone.core.designsystem.AppIcon
+import com.inktone.core.designsystem.AppSymbol
 import com.inktone.domain.model.AnnotationColor
 import com.inktone.domain.model.AnnotationKind
 
@@ -68,26 +71,56 @@ fun AnnotationColorPicker(
     // tête, voir `UserPreferences.recentAnnotationColors`), proposées en
     // premier ; le reste de la palette suit dans son ordre habituel.
     recentColors: List<AnnotationColor> = emptyList(),
+    // Lot 23, tâche 6 — comble le trou trouvé à la vérification device du
+    // Lot 22 : `AnnotationKind` existait (rendu + migration) mais rien ne
+    // permettait de le choisir. Pas de Squiggly (décision 2) : seulement
+    // les 3 valeurs d'`AnnotationKind`.
+    selectedKind: AnnotationKind = AnnotationKind.HIGHLIGHT,
+    onSelectKind: (AnnotationKind) -> Unit = {},
 ) {
     val orderedColors = remember(recentColors) {
         recentColors + AnnotationColor.PRESETS.filterNot { it in recentColors }
     }
-    Row(
-        modifier = Modifier.fillMaxWidth().horizontalScroll(rememberScrollState()),
-        horizontalArrangement = Arrangement.spacedBy(4.dp),
-    ) {
-        orderedColors.forEach { color ->
-            val label = color.label()
-            FilterChip(
-                selected = color == selected,
-                onClick = { onSelect(color) },
-                label = { Text(label) },
-                modifier = Modifier.semantics { contentDescription = "Couleur $label" },
-            )
+    Column(verticalArrangement = Arrangement.spacedBy(4.dp)) {
+        Row(horizontalArrangement = Arrangement.spacedBy(4.dp)) {
+            AnnotationKindOption(AnnotationKind.HIGHLIGHT, AppSymbol.Highlight, "Surlignage", selectedKind, onSelectKind)
+            AnnotationKindOption(AnnotationKind.UNDERLINE, AppSymbol.Underline, "Souligné", selectedKind, onSelectKind)
+            AnnotationKindOption(AnnotationKind.STRIKETHROUGH, AppSymbol.Strikethrough, "Barré", selectedKind, onSelectKind)
         }
-        Button(onClick = onConfirm) { Text("Surligner") }
-        Button(onClick = onCancel) { Text("Annuler") }
+        Row(
+            modifier = Modifier.fillMaxWidth().horizontalScroll(rememberScrollState()),
+            horizontalArrangement = Arrangement.spacedBy(4.dp),
+        ) {
+            orderedColors.forEach { color ->
+                val label = color.label()
+                FilterChip(
+                    selected = color == selected,
+                    onClick = { onSelect(color) },
+                    label = { Text(label) },
+                    modifier = Modifier.semantics { contentDescription = "Couleur $label" },
+                )
+            }
+            Button(onClick = onConfirm) { Text("Surligner") }
+            Button(onClick = onCancel) { Text("Annuler") }
+        }
     }
+}
+
+@Composable
+private fun AnnotationKindOption(
+    kind: AnnotationKind,
+    icon: AppSymbol,
+    label: String,
+    selectedKind: AnnotationKind,
+    onSelectKind: (AnnotationKind) -> Unit,
+) {
+    FilterChip(
+        selected = kind == selectedKind,
+        onClick = { onSelectKind(kind) },
+        label = { Text(label) },
+        leadingIcon = { AppIcon(icon, contentDescription = null) },
+        modifier = Modifier.semantics { contentDescription = "Type $label" },
+    )
 }
 
 /**

@@ -268,7 +268,7 @@ class ReaderViewModelBookmarkToggleTest {
         // Note (action « Note » du popup 3c.4) : contenu reellement rempli
         // et relu depuis l'etat observe.
         viewModel.onIntent(ReaderIntent.SetFreeSelection(0, 13))
-        viewModel.onIntent(ReaderIntent.ConfirmAnnotation(AnnotationColor.GREEN, "Ma note de lecture"))
+        viewModel.onIntent(ReaderIntent.ConfirmAnnotation(AnnotationColor.GREEN, content = "Ma note de lecture"))
         dispatcher.scheduler.runCurrent()
 
         val withNote = viewModel.state.value.annotations.first { it.content != null }

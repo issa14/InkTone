@@ -13,6 +13,7 @@ import com.inktone.core.testing.fake.FakeThemeRepository
 import com.inktone.core.testing.fake.FakeTtsEngine
 import com.inktone.core.testing.fake.FakeVoiceProfileRepository
 import com.inktone.domain.model.AnnotationColor
+import com.inktone.domain.model.AnnotationKind
 import com.inktone.domain.model.Chapter
 import com.inktone.domain.model.ChapterContent
 import com.inktone.domain.model.DocumentModel
@@ -189,6 +190,29 @@ class ReaderViewModelFreeSelectionTest {
         assertEquals(11, annotation.startLocator.charOffset)
         assertEquals(16, annotation.endLocator.charOffset)
         assertEquals("monde", annotation.excerpt)
+
+        viewModel.cancelCheckpointTimerForTest()
+        dispatcher.scheduler.runCurrent()
+    }
+
+    /**
+     * Lot 23, tâche 4 — le trou trouvé à la vérification device du Lot 22 :
+     * `kind` n'était jamais transmis, toute annotation devenait `HIGHLIGHT`
+     * par défaut quel que soit le choix de l'utilisateur.
+     */
+    @Test
+    fun confirmAnnotation_transmet_le_kind_choisi() = runTest {
+        val readingStateRepository = FakeReadingStateRepository()
+        val publicationRepository = FakePublicationRepository()
+        val annotationRepository = FakeAnnotationRepository()
+        val viewModel = buildViewModel(readingStateRepository, publicationRepository, FakeBookmarkRepository(), annotationRepository)
+        openTestPublication(viewModel, publicationRepository)
+
+        viewModel.onIntent(ReaderIntent.SetFreeSelection(anchorOffset = 11, focusOffset = 15))
+        viewModel.onIntent(ReaderIntent.ConfirmAnnotation(AnnotationColor.YELLOW, kind = AnnotationKind.STRIKETHROUGH))
+        dispatcher.scheduler.runCurrent()
+
+        assertEquals(AnnotationKind.STRIKETHROUGH, viewModel.state.value.annotations.single().kind)
 
         viewModel.cancelCheckpointTimerForTest()
         dispatcher.scheduler.runCurrent()

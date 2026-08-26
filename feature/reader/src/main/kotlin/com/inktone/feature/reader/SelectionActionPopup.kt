@@ -43,6 +43,7 @@ import androidx.compose.ui.window.PopupProperties
 import com.inktone.core.designsystem.AppIcon
 import com.inktone.core.designsystem.AppSymbol
 import com.inktone.domain.model.AnnotationColor
+import com.inktone.domain.model.AnnotationKind
 
 /**
  * Tâche 3c.4 — remplace `AnnotationColorPicker` en position fixe basse
@@ -72,8 +73,8 @@ private enum class SelectionPopupMode { ACTIONS, COLOR_PICKER, NOTE_INPUT, MORE 
 fun SelectionActionPopup(
     selectedText: String,
     selectionBoundsInWindow: Rect?,
-    onHighlight: (AnnotationColor) -> Unit,
-    onSaveNote: (String, AnnotationColor) -> Unit,
+    onHighlight: (AnnotationColor, AnnotationKind) -> Unit,
+    onSaveNote: (String, AnnotationColor, AnnotationKind) -> Unit,
     onDismiss: () -> Unit,
     // Lot 21, tâche 7 — contexte du partage (« Titre — Auteur — Chapitre
     // X », construit par l'appelant). `null`/vide → on partage le texte
@@ -88,6 +89,9 @@ fun SelectionActionPopup(
 
     var mode by remember { mutableStateOf(SelectionPopupMode.ACTIONS) }
     var pendingColor by remember { mutableStateOf(AnnotationColor.YELLOW) }
+    // Lot 23, tâche 6 — type par défaut HIGHLIGHT (comportement identique
+    // à avant ce Lot tant que l'utilisateur ne choisit pas autre chose).
+    var pendingKind by remember { mutableStateOf(AnnotationKind.HIGHLIGHT) }
     var noteText by remember { mutableStateOf("") }
     val clipboardManager = LocalClipboardManager.current
     val context = LocalContext.current
@@ -174,9 +178,11 @@ fun SelectionActionPopup(
                 SelectionPopupMode.COLOR_PICKER -> AnnotationColorPicker(
                     selected = pendingColor,
                     onSelect = { pendingColor = it },
-                    onConfirm = { onHighlight(pendingColor) },
+                    onConfirm = { onHighlight(pendingColor, pendingKind) },
                     onCancel = onDismiss,
                     recentColors = recentColors,
+                    selectedKind = pendingKind,
+                    onSelectKind = { pendingKind = it },
                 )
 
                 // Lot 21, tâche 7 — « Partager » (ACTION_SEND) : texte
@@ -203,13 +209,13 @@ fun SelectionActionPopup(
                         modifier = Modifier.focusRequester(noteFocusRequester),
                         keyboardOptions = KeyboardOptions(imeAction = ImeAction.Done),
                         keyboardActions = KeyboardActions(onDone = {
-                            if (noteText.isNotBlank()) onSaveNote(noteText, pendingColor)
+                            if (noteText.isNotBlank()) onSaveNote(noteText, pendingColor, pendingKind)
                         }),
                     )
                     Row(modifier = Modifier.padding(top = 8.dp)) {
                         TextButton(onClick = onDismiss) { Text("Annuler") }
                         Button(
-                            onClick = { if (noteText.isNotBlank()) onSaveNote(noteText, pendingColor) },
+                            onClick = { if (noteText.isNotBlank()) onSaveNote(noteText, pendingColor, pendingKind) },
                             enabled = noteText.isNotBlank(),
                         ) { Text("Enregistrer") }
                     }

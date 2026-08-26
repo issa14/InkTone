@@ -6,6 +6,7 @@ import androidx.compose.ui.test.onNodeWithText
 import androidx.compose.ui.test.performClick
 import androidx.compose.ui.test.performTextInput
 import com.inktone.domain.model.AnnotationColor
+import com.inktone.domain.model.AnnotationKind
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertTrue
 import org.junit.Rule
@@ -31,8 +32,8 @@ class SelectionActionPopupTest {
             SelectionActionPopup(
                 selectedText = "Un passage sélectionné.",
                 selectionBoundsInWindow = someBounds,
-                onHighlight = {},
-                onSaveNote = { _, _ -> },
+                onHighlight = { _, _ -> },
+                onSaveNote = { _, _, _ -> },
                 onDismiss = {},
             )
         }
@@ -52,8 +53,8 @@ class SelectionActionPopupTest {
             SelectionActionPopup(
                 selectedText = "Un passage sélectionné.",
                 selectionBoundsInWindow = someBounds,
-                onHighlight = {},
-                onSaveNote = { _, _ -> },
+                onHighlight = { _, _ -> },
+                onSaveNote = { _, _, _ -> },
                 onDismiss = { dismissed = true },
             )
         }
@@ -69,8 +70,8 @@ class SelectionActionPopupTest {
             SelectionActionPopup(
                 selectedText = "Un passage sélectionné.",
                 selectionBoundsInWindow = someBounds,
-                onHighlight = { highlightedColor = it },
-                onSaveNote = { _, _ -> },
+                onHighlight = { color, _ -> highlightedColor = color },
+                onSaveNote = { _, _, _ -> },
                 onDismiss = {},
             )
         }
@@ -81,6 +82,32 @@ class SelectionActionPopupTest {
         assertEquals(AnnotationColor.YELLOW, highlightedColor) // couleur par défaut
     }
 
+    /**
+     * Lot 23, tâche 6 — le trou trouvé à la vérification device du Lot 22 :
+     * aucune action ne permettait de choisir souligné/barré. `AnnotationKind`
+     * par défaut reste `HIGHLIGHT` tant que l'utilisateur ne choisit pas
+     * explicitement autre chose (aucun changement de comportement).
+     */
+    @Test
+    fun choisir_souligne_transmet_AnnotationKind_UNDERLINE() {
+        var highlightedKind: AnnotationKind? = null
+        composeTestRule.setContent {
+            SelectionActionPopup(
+                selectedText = "Un passage sélectionné.",
+                selectionBoundsInWindow = someBounds,
+                onHighlight = { _, kind -> highlightedKind = kind },
+                onSaveNote = { _, _, _ -> },
+                onDismiss = {},
+            )
+        }
+
+        composeTestRule.onNodeWithText("Surligner").performClick()
+        composeTestRule.onNodeWithText("Souligné").performClick()
+        composeTestRule.onNodeWithText("Surligner").performClick() // confirme
+
+        assertEquals(AnnotationKind.UNDERLINE, highlightedKind)
+    }
+
     @Test
     fun note_saisie_puis_enregistree_transmet_le_texte() {
         var savedContent: String? = null
@@ -88,8 +115,8 @@ class SelectionActionPopupTest {
             SelectionActionPopup(
                 selectedText = "Un passage sélectionné.",
                 selectionBoundsInWindow = someBounds,
-                onHighlight = {},
-                onSaveNote = { content, _ -> savedContent = content },
+                onHighlight = { _, _ -> },
+                onSaveNote = { content, _, _ -> savedContent = content },
                 onDismiss = {},
             )
         }
@@ -107,8 +134,8 @@ class SelectionActionPopupTest {
             SelectionActionPopup(
                 selectedText = "",
                 selectionBoundsInWindow = null,
-                onHighlight = {},
-                onSaveNote = { _, _ -> },
+                onHighlight = { _, _ -> },
+                onSaveNote = { _, _, _ -> },
                 onDismiss = {},
             )
         }
