@@ -1,12 +1,16 @@
 package com.inktone.feature.reader
 
 import android.graphics.Bitmap
+import android.util.Log
 import android.util.LruCache
 import androidx.compose.foundation.background
 import androidx.compose.foundation.gestures.awaitEachGesture
 import androidx.compose.foundation.gestures.awaitFirstDown
+import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.fillMaxSize
+import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.pager.HorizontalPager
 import androidx.compose.foundation.pager.rememberPagerState
 import androidx.compose.runtime.Composable
@@ -27,9 +31,12 @@ import androidx.compose.ui.graphics.asImageBitmap
 import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.foundation.Image
+import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.Text
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.layout.onSizeChanged
 import androidx.compose.ui.unit.IntSize
+import androidx.compose.ui.unit.dp
 import com.inktone.domain.model.RenderedPage
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.isActive
@@ -160,6 +167,9 @@ private fun FixedPage(
     // arrivee, deja reactif pendant le geste via graphicsLayer seul.
     var renderedScale by remember(pageIndex) { mutableFloatStateOf(1f) }
     var bitmap by remember(pageIndex) { mutableStateOf<ImageBitmap?>(null) }
+    // Lot 21, tâche 8 — une page corrompue ou une OOM ne doit ni crasher
+    // l'écran ni rester un écran noir muet : repli gracieux + journal.
+    var renderFailed by remember(pageIndex) { mutableStateOf(false) }
 
     // Lot 12, tache 12.8 — LruCache partage (5 pages max) + recyclage
     // Bitmap.inBitmap : une page deja rendue est servie depuis le cache
@@ -169,6 +179,7 @@ private fun FixedPage(
     // de RenderedPage — pixels bruts, pas de decodage BitmapFactory).
     LaunchedEffect(pageIndex, viewportSizePx, isRenderReady) {
         if (viewportSizePx.width <= 0 || !isRenderReady) return@LaunchedEffect
+        renderFailed = false
 
         val cached = bitmapCache.get(pageIndex)
         if (cached != null && cached.width == viewportSizePx.width) {
@@ -177,7 +188,13 @@ private fun FixedPage(
             return@LaunchedEffect
         }
 
-        val rendered = renderPage(pageIndex, viewportSizePx.width) ?: return@LaunchedEffect
+        val rendered = runCatching { renderPage(pageIndex, viewportSizePx.width) }
+            .onFailure { throwable -> Log.e(TAG, "Echec du rendu PDF de la page $pageIndex", throwable) }
+            .getOrNull()
+        if (rendered == null) {
+            renderFailed = true
+            return@LaunchedEffect
+        }
         val bmp = bitmapCache.createBitmap(rendered)
         bitmapCache.put(pageIndex, bmp)
         bitmap = bmp.asImageBitmap()
@@ -196,7 +213,12 @@ private fun FixedPage(
         if (!isActive) return@LaunchedEffect
         val targetScale = scale.coerceAtMost(MAX_RENDER_SCALE)
         val targetWidthPx = (viewportSizePx.width * targetScale).roundToInt()
-        val rendered = renderPage(pageIndex, targetWidthPx) ?: return@LaunchedEffect
+        // Lot 21, tâche 8 — même repli qu'au rendu standard : une OOM au
+        // zoom ne doit pas faire tomber l'écran (la page au repos reste
+        // affichée, le bitmap HD est simplement abandonné).
+        val rendered = runCatching { renderPage(pageIndex, targetWidthPx) }
+            .onFailure { throwable -> Log.e(TAG, "Echec du rendu PDF HD de la page $pageIndex", throwable) }
+            .getOrNull() ?: return@LaunchedEffect
         val bmp = Bitmap.createBitmap(rendered.pixelsArgb, rendered.widthPx, rendered.heightPx, Bitmap.Config.ARGB_8888)
         bitmap = bmp.asImageBitmap()
         renderedScale = targetScale
@@ -294,9 +316,32 @@ private fun FixedPage(
                         translationY = offsetY
                     },
             )
+        } else if (renderFailed) {
+            // Lot 21, tâche 8 — repli gracieux : la page ne se rend pas
+            // (page corrompue, OOM). Placeholder explicite plutôt qu'un
+            // écran noir muet ; le détail est dans le Log.
+            Column(
+                modifier = Modifier.fillMaxSize(),
+                horizontalAlignment = Alignment.CenterHorizontally,
+                verticalArrangement = androidx.compose.foundation.layout.Arrangement.Center,
+            ) {
+                Text(
+                    "Page illisible",
+                    color = Color.White,
+                    style = MaterialTheme.typography.bodyMedium,
+                )
+                Text(
+                    "Cette page du document ne peut pas être affichée.",
+                    color = Color.White.copy(alpha = 0.7f),
+                    style = MaterialTheme.typography.bodySmall,
+                    modifier = Modifier.padding(top = 8.dp),
+                )
+            }
         }
     }
 }
+
+private const val TAG = "FixedPageContent"
 
 private fun RenderedPage.toImageBitmap(): ImageBitmap =
     Bitmap.createBitmap(pixelsArgb, widthPx, heightPx, Bitmap.Config.ARGB_8888).asImageBitmap()
