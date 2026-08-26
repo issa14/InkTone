@@ -134,6 +134,7 @@ class ReaderViewModelChapterIndexTest {
             readingSessionRepository = FakeReadingSessionRepository(),
             themeRepository = FakeThemeRepository(),
             fixedPageRenderer = com.inktone.core.testing.fake.FakeFixedPageRenderer(),
+            renderedPageCache = com.inktone.core.testing.fake.FakeRenderedPageCache(),
             // Reproduit le défaut réel : toujours index = 0, quel que soit
             // le chapitre demandé (voir KDoc de cette classe de test).
             chapterParser = FakeChapterParser(),

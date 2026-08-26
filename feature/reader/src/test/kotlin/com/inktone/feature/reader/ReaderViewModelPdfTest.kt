@@ -160,6 +160,7 @@ class ReaderViewModelPdfTest {
                     com.inktone.core.testing.fake.FakeFixedPageDocument(pageCount = 3),
                 ),
             ),
+            renderedPageCache = com.inktone.core.testing.fake.FakeRenderedPageCache(),
             chapterParser = FakeChapterParser(),
             epubResourceResolver = FakeEpubResourceResolver(),
             narrationSessionContinuation = NarrationSessionContinuation(

@@ -2,6 +2,7 @@ package com.inktone.domain.usecase
 
 import com.inktone.core.testing.fake.FakePreAnalysisStore
 import com.inktone.core.testing.fake.FakePublicationRepository
+import com.inktone.core.testing.fake.FakeRenderedPageCache
 import com.inktone.core.testing.fake.FakeTtsSegmentCache
 import com.inktone.domain.model.Publication
 import com.inktone.domain.model.PublicationFormat
@@ -24,6 +25,7 @@ class DeletePublicationUseCaseTest {
         val publicationRepository = FakePublicationRepository()
         val preAnalysisStore = FakePreAnalysisStore()
         val ttsSegmentCache = FakeTtsSegmentCache()
+        val renderedPageCache = FakeRenderedPageCache()
         val publication = Publication(
             id = "pub-1", title = "Titre", format = PublicationFormat.EPUB,
             fileUri = "content://fake/pub-1", fileHash = "hash-1", fileSize = 100L,
@@ -31,11 +33,12 @@ class DeletePublicationUseCaseTest {
         )
         publicationRepository.insert(publication)
 
-        val useCase = DeletePublicationUseCase(publicationRepository, preAnalysisStore, ttsSegmentCache)
+        val useCase = DeletePublicationUseCase(publicationRepository, preAnalysisStore, ttsSegmentCache, renderedPageCache)
         useCase("pub-1")
 
         assertTrue(publicationRepository.observeAll().first().isEmpty())
         assertEquals(listOf("pub-1"), preAnalysisStore.deleted)
         assertEquals(listOf("pub-1"), ttsSegmentCache.deletedPublications)
+        assertEquals(listOf("pub-1"), renderedPageCache.deletedPublications)
     }
 }
