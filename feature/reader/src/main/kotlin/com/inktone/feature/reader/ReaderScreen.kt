@@ -82,6 +82,7 @@ import androidx.compose.ui.text.TextStyle
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.LineBreak
 import androidx.compose.ui.text.style.Hyphens
+import androidx.compose.ui.text.intl.LocaleList
 import androidx.compose.ui.text.buildAnnotatedString
 import androidx.compose.ui.text.input.TextFieldValue
 import androidx.compose.ui.unit.Dp
@@ -763,6 +764,11 @@ fun ReaderScreen(
                         textAlign = if (state.isTextJustified) TextAlign.Justify else TextAlign.Unspecified,
                         hyphens = if (state.isTextJustified) Hyphens.Auto else Hyphens.None,
                         lineBreak = if (state.isTextJustified) LineBreak.Paragraph else LineBreak.Unspecified,
+                        // Lot 21 — même locale que le style de MESURE
+                        // (`pagination.baseTextStyle`) : une divergence ferait
+                        // césurer le rendu différemment de la mesure, donc
+                        // déborder les pages calculées.
+                        localeList = LocaleList("fr"),
                     )
 
                     // Parité avec le mode PAGED (absoluteHighlightedRange dans

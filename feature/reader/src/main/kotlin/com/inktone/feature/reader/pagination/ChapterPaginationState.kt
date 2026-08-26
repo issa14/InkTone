@@ -25,6 +25,7 @@ import com.inktone.domain.model.ChapterContent
 import com.inktone.domain.model.BookBlock
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
+import androidx.compose.ui.text.intl.LocaleList
 
 /**
  * Porteur d'état de pagination hoisté au-dessus du choix de mode de
@@ -241,6 +242,16 @@ fun rememberChapterPaginationState(
             textAlign = if (justified) TextAlign.Justify else TextAlign.Unspecified,
             hyphens = if (justified) Hyphens.Auto else Hyphens.None,
             lineBreak = if (justified) LineBreak.Paragraph else LineBreak.Unspecified,
+            // Lot 21 — locale de césure explicite. `Hyphens.Auto` sans locale
+            // se rabat sur la locale SYSTÈME, pas nécessairement `fr` : sur
+            // un appareil configuré en anglais, la césure d'un texte français
+            // justifié coupe aux mauvais endroits. Constante `fr` (même
+            // choix que FrenchSentenceSplitter) — la langue de publication
+            // n'est pas portée par les métadonnées aujourd'hui. Si elle le
+            // devient, l'ajouter aux clés du `remember` ET à
+            // `paginationStyleKeyFrom` (la locale déplace les points de
+            // coupure de ligne, donc change la pagination).
+            localeList = LocaleList("fr"),
         )
     }
     val state = remember(engine, baseTextStyle) { ChapterPaginationState(engine, baseTextStyle) }
