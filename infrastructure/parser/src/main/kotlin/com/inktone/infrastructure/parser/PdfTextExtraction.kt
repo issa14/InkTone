@@ -5,6 +5,7 @@ import com.inktone.domain.model.Chapter
 import com.inktone.domain.model.ChapterContent
 import com.inktone.domain.model.Sentence
 import com.inktone.domain.model.StyledText
+import com.inktone.domain.service.FrenchSentenceSplitter
 import io.legere.pdfiumandroid.PdfPage
 
 /**
@@ -17,11 +18,14 @@ import io.legere.pdfiumandroid.PdfPage
  *   pour alimenter l'index de recherche ;
  * - [PdfChapterParser] à la lecture, qui n'en charge qu'une à la fois.
  *
- * Découpage en phrases : même regex naïve que `TxtPublicationParser`
- * (Tâche 4.2) — le découpage linguistique réel est hors périmètre d'un
- * parseur (Blueprint §8.6).
+ * Découpage en phrases : [FrenchSentenceSplitter] — le découpeur unifié
+ * (BreakIterator FR + filtre d'abréviations), identique à l'EPUB
+ * (JsoupChapterParser) et au TXT (TxtPublicationParser). Lot 21 : la
+ * regex naïve `(?<=[.!?])\s+` cassait les abréviations françaises et
+ * produisait des offsets approximatifs (`+1` par phrase) — le splitter
+ * garantit des offsets réels et stables (substring == phrase), critiques
+ * pour le surlignage mot-à-mot et l'index FTS.
  */
-internal val PDF_SENTENCE_BOUNDARY = Regex("""(?<=[.!?])\s+""")
 
 /**
  * Texte complet et phrases d'une page.
@@ -35,23 +39,14 @@ internal fun PdfPage.extractPageContent(): Pair<String, List<Sentence>> = openTe
     val text = textPage.textPageGetText(0, charCount)?.trim()
     if (text.isNullOrBlank()) return@use "" to emptyList()
 
-    var offset = 0
-    val sentences = PDF_SENTENCE_BOUNDARY.split(text).mapIndexed { index, raw ->
-        val trimmed = raw.trim()
-        // blockIndex = 0 : la page produit toujours exactement un
-        // BookBlock.ParagraphBlock unique (voir [toChapter]) quand du texte
-        // existe — jamais le défaut -1, sinon l'auto-scroll TTS
-        // (ReaderScreen) ne trouve jamais son bloc pour un PDF.
-        val sentence = Sentence(
-            index = index,
-            text = trimmed,
-            startOffset = offset,
-            endOffset = offset + trimmed.length,
-            blockIndex = 0,
-        )
-        offset += trimmed.length + 1
-        sentence
-    }.filter { it.text.isNotBlank() }
+    // blockIndex = 0 : la page produit toujours exactement un
+    // BookBlock.ParagraphBlock unique (voir [toChapter]) quand du texte
+    // existe — jamais le défaut -1, sinon l'auto-scroll TTS
+    // (ReaderScreen) ne trouve jamais son bloc pour un PDF. Les offsets
+    // sont réels, dans l'espace du [text], garantis par le splitter.
+    val sentences = FrenchSentenceSplitter.split(text).mapIndexed { index, (trimmed, start, end) ->
+        Sentence(index = index, text = trimmed, startOffset = start, endOffset = end, blockIndex = 0)
+    }
     text to sentences
 }
 
