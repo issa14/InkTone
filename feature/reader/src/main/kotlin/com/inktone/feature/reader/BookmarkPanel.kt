@@ -23,6 +23,8 @@ import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.layout.wrapContentSize
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
+import androidx.compose.foundation.pager.HorizontalPager
+import androidx.compose.foundation.pager.rememberPagerState
 import androidx.compose.material3.Button
 import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.Icon
@@ -35,8 +37,8 @@ import androidx.compose.material3.TabRow
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
-import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -49,6 +51,7 @@ import com.inktone.core.designsystem.AppSymbol
 import com.inktone.domain.model.Annotation
 import com.inktone.domain.model.AnnotationColor
 import com.inktone.domain.model.Bookmark
+import kotlinx.coroutines.launch
 import java.text.SimpleDateFormat
 import java.util.Locale
 
@@ -91,7 +94,13 @@ fun BookmarkPanel(
     onDeleteBookmark: (Bookmark) -> Unit,
     onEditBookmarkNote: (Bookmark) -> Unit,
 ) {
-    var selectedTab by remember { mutableIntStateOf(BookmarkPanelTab.NOTES.ordinal) }
+    // Lot 24, tâche 7 — `pagerState.currentPage` devient la seule source de
+    // vérité de l'onglet actif (remplace l'ancien `selectedTab` local) :
+    // un tap sur un onglet fait défiler le pager (`animateScrollToPage`),
+    // un swipe avance le pager directement — jamais deux états à
+    // resynchroniser manuellement (pas de LaunchedEffect en boucle).
+    val pagerState = rememberPagerState(initialPage = BookmarkPanelTab.NOTES.ordinal) { BookmarkPanelTab.entries.size }
+    val coroutineScope = rememberCoroutineScope()
     val notes = remember(annotations) { annotations.filter { !it.content.isNullOrBlank() } }
     val highlights = remember(annotations) { annotations.sortedByDescending { it.createdAt } }
 
@@ -146,13 +155,13 @@ fun BookmarkPanel(
                         Text("Marque-pages et notes", style = MaterialTheme.typography.titleMedium)
                     }
 
-                    TabRow(selectedTabIndex = selectedTab) {
+                    TabRow(selectedTabIndex = pagerState.currentPage) {
                         BookmarkPanelTab.entries.forEach { tab ->
                             Tab(
-                                selected = selectedTab == tab.ordinal,
-                                onClick = { selectedTab = tab.ordinal },
+                                selected = pagerState.currentPage == tab.ordinal,
+                                onClick = { coroutineScope.launch { pagerState.animateScrollToPage(tab.ordinal) } },
                                 text = {
-                                    // « Surlignages »/« Marque-pages » ne
+                                    // « Surlignages »/« Signets » ne
                                     // tenaient pas sur une ligne : force une
                                     // seule ligne, police réduite d'un cran.
                                     Text(
@@ -166,9 +175,12 @@ fun BookmarkPanel(
                         }
                     }
 
-                    // Contenu de l'onglet actif — occupe tout l'espace restant.
-                    Box(modifier = Modifier.weight(1f)) {
-                        when (BookmarkPanelTab.entries[selectedTab]) {
+                    // Lot 24, tâche 7 — contenu swipeable, occupe tout
+                    // l'espace restant. Reprend tel quel le `when` déjà
+                    // existant (Tâche 3c.3), aucune reprise des composables
+                    // `*Tab`.
+                    HorizontalPager(state = pagerState, modifier = Modifier.weight(1f)) { page ->
+                        when (BookmarkPanelTab.entries[page]) {
                             BookmarkPanelTab.NOTES -> NotesTab(notes, onAnnotationClick, onDeleteAnnotation, onEditAnnotationNote)
                             BookmarkPanelTab.HIGHLIGHTS -> HighlightsTab(highlights, onAnnotationClick, onDeleteAnnotation)
                             BookmarkPanelTab.BOOKMARKS -> BookmarksTab(bookmarks, onBookmarkClick, onDeleteBookmark, onEditBookmarkNote)
