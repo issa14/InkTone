@@ -850,7 +850,7 @@ internal fun buildPageAnnotatedString(
             val localEndExclusive = (minOf(annotation.endLocator.charOffset, endExclusive) - startInclusive)
                 .coerceIn(localStart, base.length)
             if (localStart < localEndExclusive) {
-                addStyle(SpanStyle(background = annotation.color.toComposeColor()), localStart, localEndExclusive)
+                addStyle(annotationSpanStyle(annotation.kind, annotation.color), localStart, localEndExclusive)
             }
         }
     }

@@ -13,8 +13,11 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.text.SpanStyle
+import androidx.compose.ui.text.style.TextDecoration
 import androidx.compose.ui.unit.dp
 import com.inktone.domain.model.AnnotationColor
+import com.inktone.domain.model.AnnotationKind
 
 /** Rendu de la couleur pour l'UI (sélecteur ou surlignage d'annotation existante). */
 fun AnnotationColor.toComposeColor(): Color = when (this) {
@@ -23,6 +26,19 @@ fun AnnotationColor.toComposeColor(): Color = when (this) {
     AnnotationColor.BLUE -> Color(0xFF90CAF9)
     AnnotationColor.PINK -> Color(0xFFF48FB1)
     AnnotationColor.ORANGE -> Color(0xFFFFCC80)
+}
+
+/**
+ * Style de rendu d'une annotation selon son [AnnotationKind] (Lot 22,
+ * tâche 10). Trois canaux visuels restent séparés — jamais mélangés :
+ * - l'annotation : fond (surlignage) ou décoration de texte (souligné/barré) ;
+ * - le surlignage TTS : [WordHighlightColor] ;
+ * - la sélection : [SelectionHighlightColor].
+ */
+fun annotationSpanStyle(kind: AnnotationKind, color: AnnotationColor): SpanStyle = when (kind) {
+    AnnotationKind.HIGHLIGHT -> SpanStyle(background = color.toComposeColor())
+    AnnotationKind.UNDERLINE -> SpanStyle(color = color.toComposeColor(), textDecoration = TextDecoration.Underline)
+    AnnotationKind.STRIKETHROUGH -> SpanStyle(color = color.toComposeColor(), textDecoration = TextDecoration.LineThrough)
 }
 
 /**

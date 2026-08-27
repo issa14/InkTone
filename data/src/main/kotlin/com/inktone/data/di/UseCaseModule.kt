@@ -18,8 +18,10 @@ import com.inktone.domain.service.ChapterParser
 import com.inktone.domain.service.FileStorageService
 import com.inktone.domain.service.ImportSessionStore
 import com.inktone.domain.service.PublicationParser
+import com.inktone.domain.service.PreAnalysisStore
 import com.inktone.domain.service.SearchService
 import com.inktone.domain.service.SyncOperationTracker
+import com.inktone.domain.service.TtsSegmentCache
 import com.inktone.domain.service.OpdsCredentialsStore
 import com.inktone.domain.service.OpdsDownloadScheduler
 import com.inktone.domain.service.OpdsFeedParser
@@ -130,8 +132,9 @@ object UseCaseModule {
         fileStorageService: FileStorageService,
         searchService: SearchService,
         chapterParser: ChapterParser,
+        preAnalysisStore: PreAnalysisStore,
     ): ImportPublicationUseCase =
-        ImportPublicationUseCase(publicationParser, publicationRepository, fileStorageService, searchService, chapterParser)
+        ImportPublicationUseCase(publicationParser, publicationRepository, fileStorageService, searchService, chapterParser, preAnalysisStore)
 
     @Provides
     fun provideExportLibraryUseCase(
@@ -152,7 +155,9 @@ object UseCaseModule {
     @Provides
     fun provideDeletePublicationUseCase(
         publicationRepository: PublicationRepository,
-    ): DeletePublicationUseCase = DeletePublicationUseCase(publicationRepository)
+        preAnalysisStore: PreAnalysisStore,
+        ttsSegmentCache: TtsSegmentCache,
+    ): DeletePublicationUseCase = DeletePublicationUseCase(publicationRepository, preAnalysisStore, ttsSegmentCache)
 
     @Provides
     fun provideRegenerateCoversUseCase(

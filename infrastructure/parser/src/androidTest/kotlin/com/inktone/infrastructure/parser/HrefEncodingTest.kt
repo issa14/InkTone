@@ -3,6 +3,8 @@ package com.inktone.infrastructure.parser
 import android.content.Context
 import androidx.test.core.app.ApplicationProvider
 import androidx.test.ext.junit.runners.AndroidJUnit4
+import com.inktone.core.testing.fake.FakePreAnalysisStore
+import com.inktone.core.testing.fake.FakePublicationRepository
 import com.inktone.domain.service.ParseResult
 import kotlinx.coroutines.test.runTest
 import org.junit.Assert.assertTrue
@@ -33,7 +35,7 @@ class HrefEncodingTest {
         val result = ReadiumPublicationParser(context, CoverStorage(context)).parse(fixtureFile.absolutePath)
         check(result is ParseResult.Success)
 
-        val chapterParser = EpubChapterParser(ReadiumPublicationRegistry(context), JsoupChapterParser())
+        val chapterParser = EpubChapterParser(ReadiumPublicationRegistry(context), JsoupChapterParser(), FakePreAnalysisStore(), FakePublicationRepository())
         chapterParser.registerPublication("test-hrefs-encodes", fixtureFile.absolutePath)
         val allSentences = result.documentModel.chapters.flatMap { shell ->
             chapterParser.parseChapter("test-hrefs-encodes", shell.href).sentences
