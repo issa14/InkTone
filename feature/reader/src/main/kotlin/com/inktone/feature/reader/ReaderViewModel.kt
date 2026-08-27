@@ -810,12 +810,15 @@ class ReaderViewModel @Inject constructor(
         // Lot 24, tâche 2 — créer-ou-mettre-à-jour : une annotation déjà
         // appliquée pour cette sélection (voir SetFreeSelection/
         // ClearFreeSelection) se voit modifier sa couleur/son type au lieu
-        // d'en faire naître une seconde superposée. `content` reste celui
-        // de l'annotation existante (ce chemin n'est atteint qu'après un
-        // premier surlignage sans note — voir KDoc de SelectionActionPopup,
-        // aucun pont COLOR_PICKER → NOTE_INPUT n'existe).
+        // d'en faire naître une seconde superposée. `content != null` (mode
+        // Note, `onSaveNote`) est exclu de ce chemin : ce n'est PAS un
+        // ajustement de couleur/type sur l'annotation déjà appliquée, c'est
+        // une action distincte qui doit créer sa propre annotation, jamais
+        // écraser silencieusement la couleur/le type d'une autre en
+        // abandonnant le contenu qu'on cherchait justement à enregistrer
+        // (régression trouvée par `ReaderViewModelBookmarkToggleTest`).
         val pendingId = _state.value.pendingAnnotationId
-        if (pendingId != null) {
+        if (pendingId != null && content == null) {
             val existing = _state.value.annotations.firstOrNull { it.id == pendingId } ?: return
             viewModelScope.launch {
                 updateAnnotation(existing.copy(color = color, kind = kind, updatedAt = System.currentTimeMillis()))
