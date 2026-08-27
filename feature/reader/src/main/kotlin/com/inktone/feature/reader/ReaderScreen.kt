@@ -1137,15 +1137,15 @@ fun ReaderScreen(
             SelectionActionPopup(
                 selectedText = selectedText,
                 selectionBoundsInWindow = selectionBoundsInWindow,
-                // Phase 4 — l'intent est dispatché AVANT la purge :
-                // `ReaderViewModel.confirmAnnotation` lit
-                // `freeSelectionRange` et résout ses locators de façon
-                // SYNCHRONE (voir sa KDoc), le `ClearFreeSelection` qui
-                // suit ne peut donc pas lui retirer les offsets sous les
-                // pieds. L'ordre inverse perdrait l'annotation.
+                // Lot 24, tâche 2 — application immédiate SANS purger la
+                // sélection : le popup reste ouvert (décision 1, Lot 24),
+                // un tap suivant sur une autre couleur/type modifie la même
+                // annotation (`ReaderViewModel.confirmAnnotation`,
+                // `pendingAnnotationId`). Seule la fermeture externe du
+                // popup (tap hors sélection, `onDismiss` ci-dessous) purge
+                // désormais l'état — plus cette closure elle-même.
                 onHighlight = { color, kind ->
                     viewModel.onIntent(ReaderIntent.ConfirmAnnotation(color = color, kind = kind))
-                    clearSelectionAndPopup()
                 },
                 onSaveNote = { content, color, kind ->
                     viewModel.onIntent(ReaderIntent.ConfirmAnnotation(color = color, kind = kind, content = content))
