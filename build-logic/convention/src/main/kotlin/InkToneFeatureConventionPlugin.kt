@@ -4,6 +4,7 @@ import org.gradle.api.Plugin
 import org.gradle.api.Project
 import org.gradle.kotlin.dsl.dependencies
 import org.gradle.kotlin.dsl.configure
+import org.jetbrains.kotlin.compose.compiler.gradle.ComposeCompilerGradlePluginExtension
 import org.jetbrains.kotlin.gradle.dsl.JvmTarget
 import org.jetbrains.kotlin.gradle.dsl.KotlinAndroidProjectExtension
 
@@ -31,6 +32,17 @@ class InkToneFeatureConventionPlugin : Plugin<Project> {
             }
             extensions.configure<KotlinAndroidProjectExtension> {
                 compilerOptions { jvmTarget.set(JvmTarget.JVM_17) }
+            }
+
+            // AUDIT_REACTIVITE_UX.md §6.2 : voir InkToneApplicationConventionPlugin.
+            // Déclaration de stabilité du domaine + rapports à la demande.
+            extensions.configure<ComposeCompilerGradlePluginExtension> {
+                stabilityConfigurationFile.set(rootProject.file("compose-stability.conf"))
+                if (rootProject.findProperty("inktone.composeCompilerReports") == "true") {
+                    val reportsDir = layout.buildDirectory.dir("reports/compose_compiler")
+                    reportsDestination.set(reportsDir)
+                    metricsDestination.set(reportsDir)
+                }
             }
 
             dependencies {
