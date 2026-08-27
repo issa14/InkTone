@@ -60,6 +60,13 @@ data class ReaderUiState(
     // (TextLayoutResult.getWordBoundary par l'appelant).
     val freeSelectionAnchorOffset: Int? = null,
     val freeSelectionFocusOffset: Int? = null,
+    // Lot 24, tâche 1 — id de l'annotation créée par le popup de sélection
+    // en cours (null = aucune annotation appliquée pour cette sélection).
+    // Un second tap sur une couleur/un type modifie CETTE annotation
+    // (UpdateAnnotationUseCase) plutôt que d'en créer une nouvelle.
+    // Réinitialisé par ClearFreeSelection et par tout changement de
+    // freeSelectionRange (nouvelle sélection = nouvelle annotation).
+    val pendingAnnotationId: String? = null,
     val annotations: List<Annotation> = emptyList(),
     // Lot 22, tâche 12 — réglage global (UserPreferences.recentAnnotationColors),
     // observé en continu, même patron que readerMarginStep/isTextJustified.

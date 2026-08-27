@@ -343,11 +343,24 @@ class ReaderViewModel @Inject constructor(
                     preferencesRepository.update(current.copy(readingMode = newMode.name))
                 }
             }
-            is ReaderIntent.SetFreeSelection -> _state.value = _state.value.copy(
-                freeSelectionAnchorOffset = intent.anchorOffset, freeSelectionFocusOffset = intent.focusOffset,
-            )
+            is ReaderIntent.SetFreeSelection -> {
+                // Lot 24, tâche 1 — une annotation déjà appliquée
+                // (pendingAnnotationId) ne doit survivre qu'à la plage pour
+                // laquelle elle a été créée. Si la sélection change de
+                // plage (poignée déplacée, ou nouvelle sélection sans
+                // ClearFreeSelection intermédiaire), le prochain tap de
+                // couleur/type doit créer une nouvelle annotation, jamais
+                // continuer à modifier l'ancienne sur un texte différent.
+                val previousRange = _state.value.freeSelectionRange
+                val newRange = minOf(intent.anchorOffset, intent.focusOffset)..maxOf(intent.anchorOffset, intent.focusOffset)
+                val resetPending = _state.value.pendingAnnotationId != null && previousRange != newRange
+                _state.value = _state.value.copy(
+                    freeSelectionAnchorOffset = intent.anchorOffset, freeSelectionFocusOffset = intent.focusOffset,
+                    pendingAnnotationId = if (resetPending) null else _state.value.pendingAnnotationId,
+                )
+            }
             is ReaderIntent.ClearFreeSelection -> _state.value = _state.value.copy(
-                freeSelectionAnchorOffset = null, freeSelectionFocusOffset = null,
+                freeSelectionAnchorOffset = null, freeSelectionFocusOffset = null, pendingAnnotationId = null,
             )
             is ReaderIntent.ConfirmAnnotation -> confirmAnnotation(intent.color, intent.kind, intent.content)
             is ReaderIntent.ToggleBookmarkAtCurrentPosition -> toggleBookmarkAtCurrentPosition()
