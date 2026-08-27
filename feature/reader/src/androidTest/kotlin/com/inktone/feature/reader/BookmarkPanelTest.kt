@@ -3,7 +3,10 @@ package com.inktone.feature.reader
 import androidx.compose.ui.test.junit4.createComposeRule
 import androidx.compose.ui.test.onNodeWithContentDescription
 import androidx.compose.ui.test.onNodeWithText
+import androidx.compose.ui.test.onRoot
 import androidx.compose.ui.test.performClick
+import androidx.compose.ui.test.performTouchInput
+import androidx.compose.ui.test.swipeLeft
 import com.inktone.domain.model.Annotation
 import com.inktone.domain.model.AnnotationColor
 import com.inktone.domain.model.Bookmark
@@ -72,6 +75,65 @@ class BookmarkPanelTest {
 
         composeTestRule.onNodeWithText("Signets").performClick()
         composeTestRule.onNodeWithText("Chapitre 3").assertExists()
+    }
+
+    /** Lot 24, tâche 7 — le swipe complète le tap sur onglet, ne le remplace pas. */
+    @Test
+    fun un_swipe_horizontal_change_l_onglet_affiche() {
+        composeTestRule.setContent {
+            BookmarkPanel(
+                bookmarks = listOf(oneBookmark()),
+                annotations = listOf(highlightWithNote(), highlightWithoutNote()),
+                isCurrentPageBookmarked = false,
+                onBookmarkClick = {},
+                onAnnotationClick = {},
+                onToggleBookmark = {},
+                onClose = {},
+                onDeleteAnnotation = {},
+                onEditAnnotationNote = {},
+                onDeleteBookmark = {},
+                onEditBookmarkNote = {},
+            )
+        }
+
+        // Onglet Notes par défaut.
+        composeTestRule.onNodeWithText("Une vraie note").assertExists()
+
+        // Swipe vers la gauche : avance vers l'onglet suivant (Surlignages).
+        composeTestRule.onRoot().performTouchInput { swipeLeft() }
+        composeTestRule.waitForIdle()
+        composeTestRule.onNodeWithText("Chapitre 2").assertExists() // startLocator.chapterIndex 1 + 1
+    }
+
+    /**
+     * Lot 24, tâche 8 — pas de désynchronisation entre les deux
+     * interactions : un tap sur un onglet après un swipe doit toujours
+     * mener au bon contenu.
+     */
+    @Test
+    fun tap_sur_un_onglet_apres_un_swipe_reste_synchronise() {
+        composeTestRule.setContent {
+            BookmarkPanel(
+                bookmarks = listOf(oneBookmark()),
+                annotations = listOf(highlightWithNote(), highlightWithoutNote()),
+                isCurrentPageBookmarked = false,
+                onBookmarkClick = {},
+                onAnnotationClick = {},
+                onToggleBookmark = {},
+                onClose = {},
+                onDeleteAnnotation = {},
+                onEditAnnotationNote = {},
+                onDeleteBookmark = {},
+                onEditBookmarkNote = {},
+            )
+        }
+
+        composeTestRule.onRoot().performTouchInput { swipeLeft() }
+        composeTestRule.waitForIdle()
+        composeTestRule.onNodeWithText("Chapitre 2").assertExists() // Surlignages, après swipe
+
+        composeTestRule.onNodeWithText("Notes").performClick()
+        composeTestRule.onNodeWithText("Une vraie note").assertExists()
     }
 
     @Test
