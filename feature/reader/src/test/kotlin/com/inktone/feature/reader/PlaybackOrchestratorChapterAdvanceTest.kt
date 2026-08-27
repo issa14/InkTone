@@ -1,8 +1,6 @@
 package com.inktone.feature.reader
 
 import com.inktone.core.testing.fake.FakeReadingStateRepository
-import com.inktone.core.testing.fake.FakeTtsSegmentCache
-import com.inktone.core.testing.fake.FakePronunciationRuleRepository
 import com.inktone.core.testing.fake.FakeVoiceProfileRepository
 import com.inktone.core.testing.fake.FakePublicationRepository
 import com.inktone.core.testing.fake.FakePublicationParser
@@ -120,8 +118,6 @@ class PlaybackOrchestratorChapterAdvanceTest {
             publicationParser = FakePublicationParser(),
             preferencesRepository = FakePreferencesRepository(),
             voiceProfileRepository = FakeVoiceProfileRepository(),
-            ttsSegmentCache = FakeTtsSegmentCache(),
-            pronunciationRuleRepository = FakePronunciationRuleRepository(),
     )
 
     @Test

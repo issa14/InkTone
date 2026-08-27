@@ -441,15 +441,3 @@ val MIGRATION_27_28 = object : Migration(27, 28) {
         db.execSQL("ALTER TABLE user_preferences ADD COLUMN autoScrollSpeed INTEGER NOT NULL DEFAULT 0")
     }
 }
-
-/**
- * Lot 22, tâche 10 — type d'annotation (surligné / souligné / barré).
- * Défaut `HIGHLIGHT` : toute annotation existante est un surlignage, aucune
- * perte — le rendu des annotations d'avant la migration est strictement
- * identique après elle.
- */
-val MIGRATION_28_29 = object : Migration(28, 29) {
-    override fun migrate(db: SupportSQLiteDatabase) {
-        db.execSQL("ALTER TABLE annotations ADD COLUMN kind TEXT NOT NULL DEFAULT 'HIGHLIGHT'")
-    }
-}

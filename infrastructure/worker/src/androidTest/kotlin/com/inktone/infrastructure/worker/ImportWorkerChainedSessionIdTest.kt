@@ -14,7 +14,6 @@ import androidx.work.testing.WorkManagerTestInitHelper
 import com.inktone.core.testing.fake.FakeChapterParser
 import com.inktone.core.testing.fake.FakeFileStorageService
 import com.inktone.core.testing.fake.FakeImportResultsStore
-import com.inktone.core.testing.fake.FakePreAnalysisStore
 import com.inktone.core.testing.fake.FakePublicationParser
 import com.inktone.core.testing.fake.FakePublicationRepository
 import com.inktone.core.testing.fake.FakeSearchService
@@ -53,7 +52,6 @@ class ImportWorkerChainedSessionIdTest {
             fileStorageService = FakeFileStorageService(),
             searchService = FakeSearchService(),
             chapterParser = FakeChapterParser(),
-            preAnalysisStore = FakePreAnalysisStore(),
         )
 
         val workerFactory = object : WorkerFactory() {

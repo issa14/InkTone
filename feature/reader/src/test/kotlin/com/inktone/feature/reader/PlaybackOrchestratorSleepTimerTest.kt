@@ -1,8 +1,6 @@
 package com.inktone.feature.reader
 
 import com.inktone.core.testing.fake.FakeChapterParser
-import com.inktone.core.testing.fake.FakeTtsSegmentCache
-import com.inktone.core.testing.fake.FakePronunciationRuleRepository
 import com.inktone.core.testing.fake.FakeReadingStateRepository
 import com.inktone.core.testing.fake.FakeVoiceProfileRepository
 import com.inktone.core.testing.fake.FakePublicationRepository
@@ -81,8 +79,6 @@ class PlaybackOrchestratorSleepTimerTest {
             publicationParser = FakePublicationParser(),
             preferencesRepository = FakePreferencesRepository(),
             voiceProfileRepository = FakeVoiceProfileRepository(),
-            ttsSegmentCache = FakeTtsSegmentCache(),
-            pronunciationRuleRepository = FakePronunciationRuleRepository(),
     )
 
     @Test

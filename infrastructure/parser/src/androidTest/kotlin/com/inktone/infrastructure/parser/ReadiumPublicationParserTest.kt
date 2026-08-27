@@ -3,8 +3,6 @@ package com.inktone.infrastructure.parser
 import android.content.Context
 import androidx.test.core.app.ApplicationProvider
 import androidx.test.ext.junit.runners.AndroidJUnit4
-import com.inktone.core.testing.fake.FakePreAnalysisStore
-import com.inktone.core.testing.fake.FakePublicationRepository
 import com.inktone.domain.service.ParseResult
 import kotlinx.coroutines.test.runTest
 import org.junit.Assert.assertEquals
@@ -66,7 +64,7 @@ class ReadiumPublicationParserTest {
             shell.sentences.isEmpty(),
         )
 
-        val chapterParser = EpubChapterParser(ReadiumPublicationRegistry(context), JsoupChapterParser(), FakePreAnalysisStore(), FakePublicationRepository())
+        val chapterParser = EpubChapterParser(ReadiumPublicationRegistry(context), JsoupChapterParser())
         chapterParser.registerPublication("test-minimal", fixtureFile.absolutePath)
         val sentences = chapterParser.parseChapter("test-minimal", shell.href).sentences
 
