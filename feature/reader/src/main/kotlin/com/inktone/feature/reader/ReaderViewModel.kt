@@ -791,16 +791,39 @@ class ReaderViewModel @Inject constructor(
      *
      * **Contrat de synchronicité (Phase 4 de la refonte du cycle de vie de
      * la sélection)** : la lecture de `freeSelectionRange` et la résolution
-     * des locators sont volontairement faites AVANT tout `launch`. L'UI
-     * purge son état de sélection immédiatement après avoir dispatché cet
-     * intent (`ReaderScreen.clearSelectionAndPopup`, pour que le lecteur
-     * redevienne propre sans attendre l'écriture en base) : si la
-     * résolution passait dans la coroutine, ce `ClearFreeSelection`
-     * arriverait le premier et l'annotation serait silencieusement perdue.
-     * Ne jamais déplacer ces lignes dans le `viewModelScope.launch`
-     * ci-dessous (garde-fou : `ReaderViewModelFreeSelectionTest`).
+     * des locators sont volontairement faites AVANT tout `launch`. Pour le
+     * mode Note (`onSaveNote`), l'UI purge son état de sélection
+     * immédiatement après avoir dispatché cet intent
+     * (`ReaderScreen.clearSelectionAndPopup`) : si la résolution passait
+     * dans la coroutine, ce `ClearFreeSelection` arriverait le premier et
+     * l'annotation serait silencieusement perdue. Ne jamais déplacer ces
+     * lignes dans le `viewModelScope.launch` ci-dessous (garde-fou :
+     * `ReaderViewModelFreeSelectionTest`).
+     *
+     * **Créer-ou-mettre-à-jour (Lot 24, tâche 2)** : pour le mode
+     * Surligner (`onHighlight`), l'UI ne purge PLUS la sélection après
+     * dispatch — le popup reste ouvert (décision 1, Lot 24) et
+     * `pendingAnnotationId` route les taps suivants vers une mise à jour
+     * de la même annotation plutôt qu'une nouvelle création.
      */
     private fun confirmAnnotation(color: AnnotationColor, kind: AnnotationKind = AnnotationKind.HIGHLIGHT, content: String? = null) {
+        // Lot 24, tâche 2 — créer-ou-mettre-à-jour : une annotation déjà
+        // appliquée pour cette sélection (voir SetFreeSelection/
+        // ClearFreeSelection) se voit modifier sa couleur/son type au lieu
+        // d'en faire naître une seconde superposée. `content` reste celui
+        // de l'annotation existante (ce chemin n'est atteint qu'après un
+        // premier surlignage sans note — voir KDoc de SelectionActionPopup,
+        // aucun pont COLOR_PICKER → NOTE_INPUT n'existe).
+        val pendingId = _state.value.pendingAnnotationId
+        if (pendingId != null) {
+            val existing = _state.value.annotations.firstOrNull { it.id == pendingId } ?: return
+            viewModelScope.launch {
+                updateAnnotation(existing.copy(color = color, kind = kind, updatedAt = System.currentTimeMillis()))
+                rememberRecentAnnotationColor(color)
+            }
+            return
+        }
+
         val chapter = _state.value.currentChapter ?: return
         val publicationId = currentPublicationId ?: return
         val sentences = chapter.sentences
@@ -816,12 +839,13 @@ class ReaderViewModel @Inject constructor(
         ) ?: return
         val excerpt = sliceChapterText(sentences, freeRange.first, endOffsetExclusive)
             .take(Annotation.MAX_EXCERPT_LENGTH)
+        val newId = UUID.randomUUID().toString()
 
         viewModelScope.launch {
             val now = System.currentTimeMillis()
             addAnnotation(
                 Annotation(
-                    id = UUID.randomUUID().toString(),
+                    id = newId,
                     publicationId = publicationId,
                     startLocator = startLocator,
                     endLocator = endLocator,
@@ -833,14 +857,22 @@ class ReaderViewModel @Inject constructor(
                     updatedAt = now,
                 ),
             )
-            _state.value = _state.value.copy(
-                freeSelectionAnchorOffset = null, freeSelectionFocusOffset = null,
-            )
-            // Lot 22, tâche 12 — mémorise la couleur pour la proposer en
-            // tête du sélecteur au prochain surlignage.
-            val prefs = preferencesRepository.get()
-            preferencesRepository.update(prefs.copy(recentAnnotationColors = prefs.recentAnnotationColors.withRecentColor(color)))
+            rememberRecentAnnotationColor(color)
         }
+        // Lot 24, tâche 2 — devient tout de suite l'annotation « en cours
+        // d'édition » du popup (pas seulement à la fin de la coroutine) :
+        // `freeSelectionAnchorOffset`/`freeSelectionFocusOffset` restent
+        // INCHANGÉS ici (contrairement à l'ancien comportement one-shot) —
+        // la sélection doit rester visible tant que le popup reste ouvert
+        // (décision 1, Lot 24), sa purge ne se fait plus qu'à la fermeture
+        // du popup (`ClearFreeSelection`, `ReaderScreen.clearSelectionAndPopup`).
+        _state.value = _state.value.copy(pendingAnnotationId = newId)
+    }
+
+    /** Lot 22, tâche 12 — mémorise la couleur pour la proposer en tête du sélecteur au prochain surlignage. */
+    private suspend fun rememberRecentAnnotationColor(color: AnnotationColor) {
+        val prefs = preferencesRepository.get()
+        preferencesRepository.update(prefs.copy(recentAnnotationColors = prefs.recentAnnotationColors.withRecentColor(color)))
     }
 
     /** Tâche 7.2 — même principe que [observeAnnotations] : observation continue, pas un chargement figé. */
