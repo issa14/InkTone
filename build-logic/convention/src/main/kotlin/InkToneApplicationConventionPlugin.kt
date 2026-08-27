@@ -29,9 +29,10 @@ class InkToneApplicationConventionPlugin : Plugin<Project> {
                 compileSdk = 35
 
                 // Audit de consolidation v1.0.0 (AUDIT_CONSOLIDATION_V1.md) :
-                // versionName aligne sur la release. versionCode reste 1 :
-                // aucun artifact 0.1.0 n'a ete distribue, un premier
-                // versionCode 1 est donc valide pour le Play Store.
+                // versionName aligne sur la release. versionCode incremente a
+                // chaque artifact distribue (v1.0.0-beta.1 = 1, publiee sur
+                // GitHub Releases le 2026-08-23) — jamais reutilise, meme hors
+                // Play Store, pour que les mises a jour restent ordonnees.
                 defaultConfig {
                     applicationId = "com.inktone.app"
                     minSdk = 26
@@ -43,8 +44,8 @@ class InkToneApplicationConventionPlugin : Plugin<Project> {
                     // transparentes et leur couleur vient du contenu dessiné
                     // derrière (voir `SystemBarIconsEffect`).
                     targetSdk = 35
-                    versionCode = 1
-                    versionName = "1.0.0"
+                    versionCode = 2
+                    versionName = "1.0.0-beta.2"
                 }
 
                 // ── Signature release (audit v1.0.0) ────────────────────────────
