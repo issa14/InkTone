@@ -215,6 +215,17 @@ ne pas la rouvrir en cours de lot sans fait nouveau.
 
 ## Écart déclaré (contrat point 5)
 
+**Palier C, tâche 7 (panneau ancré en bas d'écran) : abandonné après
+vérification device, ancrage près de la sélection restauré.** L'essai
+d'ancrage en bas pleine largeur (décision 5, inspiré de Moon+) a été
+livré puis testé sur appareil par Issa : la distance main-œil pour un
+texte affiché en haut de l'écran et la rupture du lien spatial entre le
+panneau et la sélection l'emportaient sur l'intérêt du panneau plus
+large. Retour à `SelectionPopupPositionProvider` (disposition d'origine
+de la Tâche 3c.4). Les ajouts de tâche 8/9 (type d'annotation, pastilles,
+éditeur personnalisé) sont indépendants du conteneur et non affectés —
+voir KDoc de tête de `SelectionActionPopup.kt`.
+
 **Palier E, tâches 11-12 (menu contextuel sur annotation existante) :
 mode SCROLL uniquement, mode PAGED non couvert.** `BookBlockItem.kt`
 (SCROLL) et `PagedChapterContent.kt` (PAGED) sont deux pipelines de
@@ -255,9 +266,10 @@ interaction.
 
 - [ ] Créer un surlignage souligné et un surlignage barré depuis le
       panneau de sélection (le trou signalé par Issa est comblé).
-- [ ] Le panneau de sélection s'ouvre ancré en bas de l'écran ; Note/Plus/
-      Partager fonctionnent toujours (pas de régression de focus clavier
-      en mode Note).
+- [ ] Note/Plus/Partager fonctionnent toujours (pas de régression de focus
+      clavier en mode Note). **Ancrage en bas abandonné après vérification
+      device — écart déclaré ci-dessus ; le popup reste ancré près de la
+      sélection (Tâche 3c.4).**
 - [ ] Le sélecteur de couleur affiche des pastilles pleines, propose une
       personnalisation RGB, et la couleur personnalisée survit à une
       fermeture/réouverture du lecteur (persistée).
