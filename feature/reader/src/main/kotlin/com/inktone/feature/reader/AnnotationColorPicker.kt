@@ -15,7 +15,6 @@ import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.AlertDialog
-import androidx.compose.material3.Button
 import androidx.compose.material3.FilterChip
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
@@ -75,17 +74,25 @@ fun annotationSpanStyle(kind: AnnotationKind, color: AnnotationColor): SpanStyle
 
 /**
  * Défilement horizontal (Tâche 7.1, corrigé après vérification visuelle
- * sur device) : 5 `FilterChip` + 2 `Button` dépassent la largeur d'un
- * écran étroit — un `Row` sans défilement laissait « Surligner »/« Annuler »
- * inatteignables, découvert en testant réellement sur le device connecté,
- * pas supposé correct après compilation seule.
+ * sur device) : les pastilles peuvent dépasser la largeur d'un écran
+ * étroit — un `Row` sans défilement les rendrait inatteignables,
+ * découvert en testant réellement sur le device connecté, pas supposé
+ * correct après compilation seule.
+ *
+ * **Application immédiate, sans confirmation (Lot 24, décision 1)** :
+ * chaque tap sur une pastille ou un type applique tout de suite
+ * l'annotation ([onApply]/[onSelectKind]) — il n'y a plus de bouton
+ * `Surligner`/`Annuler` à ce niveau. Fermer le popup (tap en dehors de la
+ * sélection, géré par l'appelant) est la seule façon de « terminer »,
+ * avant ou après avoir appliqué une couleur.
  */
 @Composable
 fun AnnotationColorPicker(
     selected: AnnotationColor,
-    onSelect: (AnnotationColor) -> Unit,
-    onConfirm: () -> Unit,
-    onCancel: () -> Unit,
+    // Lot 24, tâche 3 — remplace onSelect+onConfirm : un seul appel
+    // applique directement la couleur à l'annotation en cours (créée ou
+    // mise à jour côté ViewModel, voir ReaderViewModel.confirmAnnotation).
+    onApply: (AnnotationColor) -> Unit,
     // Lot 22, tâche 12 — couleurs récemment utilisées (la plus récente en
     // tête, voir `UserPreferences.recentAnnotationColors`), proposées en
     // premier ; le reste de la palette suit dans son ordre habituel.
@@ -93,7 +100,8 @@ fun AnnotationColorPicker(
     // Lot 23, tâche 6 — comble le trou trouvé à la vérification device du
     // Lot 22 : `AnnotationKind` existait (rendu + migration) mais rien ne
     // permettait de le choisir. Pas de Squiggly (décision 2) : seulement
-    // les 3 valeurs d'`AnnotationKind`.
+    // les 3 valeurs d'`AnnotationKind`. Lot 24 : appliqué immédiatement
+    // comme une couleur, même discipline.
     selectedKind: AnnotationKind = AnnotationKind.HIGHLIGHT,
     onSelectKind: (AnnotationKind) -> Unit = {},
 ) {
@@ -116,18 +124,18 @@ fun AnnotationColorPicker(
             horizontalArrangement = Arrangement.spacedBy(8.dp),
         ) {
             orderedColors.forEach { color ->
-                ColorSwatch(color = color, isSelected = color == selected, onClick = { onSelect(color) })
+                ColorSwatch(color = color, isSelected = color == selected, onClick = { onApply(color) })
             }
             CustomColorSwatch(onClick = { showCustomColorDialog = true })
-            Button(onClick = onConfirm) { Text("Surligner") }
-            Button(onClick = onCancel) { Text("Annuler") }
         }
     }
 
     if (showCustomColorDialog) {
         CustomColorDialog(
+            // Lot 24, tâche 4 — la validation du dialogue applique
+            // directement (décision 3), même chemin que les pastilles.
             onConfirm = { color ->
-                onSelect(color)
+                onApply(color)
                 showCustomColorDialog = false
             },
             onDismiss = { showCustomColorDialog = false },

@@ -186,14 +186,23 @@ fun SelectionActionPopup(
                     }
                 }
 
+                // Lot 24, décision 1 — chaque tap couleur/type applique
+                // tout de suite (`onHighlight`), le popup reste en
+                // COLOR_PICKER : aucun retour à ACTIONS ni fermeture ici,
+                // seule une fermeture externe (tap hors sélection) y met
+                // fin (voir KDoc de tête).
                 SelectionPopupMode.COLOR_PICKER -> AnnotationColorPicker(
                     selected = pendingColor,
-                    onSelect = { pendingColor = it },
-                    onConfirm = { onHighlight(pendingColor, pendingKind) },
-                    onCancel = onDismiss,
+                    onApply = { color ->
+                        pendingColor = color
+                        onHighlight(color, pendingKind)
+                    },
                     recentColors = recentColors,
                     selectedKind = pendingKind,
-                    onSelectKind = { pendingKind = it },
+                    onSelectKind = { kind ->
+                        pendingKind = kind
+                        onHighlight(pendingColor, kind)
+                    },
                 )
 
                 // Lot 21, tâche 7 — « Partager » (ACTION_SEND) : texte
