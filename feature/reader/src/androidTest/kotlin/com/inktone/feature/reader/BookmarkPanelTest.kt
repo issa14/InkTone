@@ -70,7 +70,7 @@ class BookmarkPanelTest {
         composeTestRule.onNodeWithText("Surlignages").performClick()
         composeTestRule.onNodeWithText("Chapitre 2").assertExists() // startLocator.chapterIndex 1 + 1
 
-        composeTestRule.onNodeWithText("Marque-pages").performClick()
+        composeTestRule.onNodeWithText("Signets").performClick()
         composeTestRule.onNodeWithText("Chapitre 3").assertExists()
     }
 
@@ -234,7 +234,7 @@ class BookmarkPanelTest {
             )
         }
 
-        composeTestRule.onNodeWithText("Marque-pages").performClick()
+        composeTestRule.onNodeWithText("Signets").performClick()
         composeTestRule.onNodeWithContentDescription("Supprimer le marque-page").performClick()
         assertEquals("bookmark-1", deletedId)
     }
@@ -258,7 +258,7 @@ class BookmarkPanelTest {
             )
         }
 
-        composeTestRule.onNodeWithText("Marque-pages").performClick()
+        composeTestRule.onNodeWithText("Signets").performClick()
         composeTestRule.onNodeWithContentDescription("Modifier la note").performClick()
         assertEquals("bookmark-1", editedId)
     }

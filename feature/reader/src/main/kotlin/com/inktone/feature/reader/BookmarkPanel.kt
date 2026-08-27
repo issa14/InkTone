@@ -67,7 +67,11 @@ import java.util.Locale
 private enum class BookmarkPanelTab(val label: String) {
     NOTES("Notes"),
     HIGHLIGHTS("Surlignages"),
-    BOOKMARKS("Marque-pages"),
+    // Lot 24, décision 5 — renommé de "Marque-pages" : tronqué par le
+    // correctif de largeur d'onglet ci-dessous (Tâche 3c.3), "Signets" est
+    // plus court et tient sans coupure. Seul ce libellé change (pas le
+    // titre d'écran ni la destination de drawer, hors périmètre).
+    BOOKMARKS("Signets"),
 }
 
 @Composable
