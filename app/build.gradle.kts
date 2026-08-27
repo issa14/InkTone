@@ -3,6 +3,7 @@ import java.util.Properties
 plugins {
     id("inktone.application")
     alias(libs.plugins.kotlin.serialization)
+    alias(libs.plugins.androidx.baselineprofile)
 }
 
 // K10/ADR-014 — le plugin Crashlytics (et google-services, qui genere les
@@ -146,4 +147,18 @@ dependencies {
     implementation(libs.androidx.work.runtime.ktx)
     implementation(libs.androidx.hilt.work)
     ksp(libs.androidx.hilt.compiler)
+
+    // AUDIT_REACTIVITE_UX §3.1 — Baseline Profile : dépendance vers le module
+    // producteur (générateur du profil). Le plugin androidx.baselineprofile
+    // (alias ci-dessus) crée la configuration `baselineProfile`.
+    baselineProfile(project(":benchmark"))
+}
+
+// AUDIT_REACTIVITE_UX §3.1 — désactive la génération automatique pendant le
+// build : par défaut le plugin câble `generateBaselineProfile` (donc
+// `connectedNonMinified*AndroidTest`) dans `check`/`build`, ce qui fait échouer
+// `./gradlew build` sans appareil. La génération reste manuelle
+// (`./gradlew :app:generateReleaseBaselineProfile`, appareil requis).
+baselineProfile {
+    automaticGenerationDuringBuild = false
 }
