@@ -114,14 +114,26 @@ fun AnnotationColorPicker(
     var showCustomColorDialog by remember { mutableStateOf(false) }
 
     Column(verticalArrangement = Arrangement.spacedBy(4.dp)) {
-        Row(horizontalArrangement = Arrangement.spacedBy(4.dp)) {
+        // Centrée pour rester cohérente avec la rangée de couleurs
+        // juste en dessous (voir son commentaire, retour device Lot 24).
+        Row(
+            modifier = Modifier.fillMaxWidth(),
+            horizontalArrangement = Arrangement.spacedBy(4.dp, Alignment.CenterHorizontally),
+        ) {
             AnnotationKindOption(AnnotationKind.HIGHLIGHT, AppSymbol.Highlight, "Surlignage", selectedKind, onSelectKind)
             AnnotationKindOption(AnnotationKind.UNDERLINE, AppSymbol.Underline, "Souligné", selectedKind, onSelectKind)
             AnnotationKindOption(AnnotationKind.STRIKETHROUGH, AppSymbol.Strikethrough, "Barré", selectedKind, onSelectKind)
         }
+        // Lot 24 (retour device) — le retrait des boutons Surligner/Annuler
+        // (décision 1) laissait un vide à droite : `fillMaxWidth` + un
+        // `Arrangement` par défaut alignait les pastilles à gauche du
+        // `Row`, plus vide à combler par ces boutons. Centré à la place —
+        // `horizontalScroll` continue de s'appliquer si la palette déborde
+        // sur un écran étroit (couleurs récentes + préréglages + pastille
+        // « Personnaliser »).
         Row(
             modifier = Modifier.fillMaxWidth().horizontalScroll(rememberScrollState()),
-            horizontalArrangement = Arrangement.spacedBy(8.dp),
+            horizontalArrangement = Arrangement.spacedBy(8.dp, Alignment.CenterHorizontally),
         ) {
             orderedColors.forEach { color ->
                 ColorSwatch(color = color, isSelected = color == selected, onClick = { onApply(color) })
