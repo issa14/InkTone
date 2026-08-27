@@ -64,8 +64,14 @@ class SelectionActionPopupTest {
         assertTrue(dismissed)
     }
 
+    /**
+     * Lot 24, décision 1 — remplace l'ancien
+     * `surligner_ouvre_le_choix_de_couleur_puis_confirme` : il n'y a plus
+     * de bouton de confirmation, taper la pastille par défaut (déjà
+     * sélectionnée) applique directement.
+     */
     @Test
-    fun surligner_ouvre_le_choix_de_couleur_puis_confirme() {
+    fun taper_la_pastille_par_defaut_applique_directement_sans_confirmation() {
         var highlightedColor: AnnotationColor? = null
         composeTestRule.setContent {
             SelectionActionPopup(
@@ -78,9 +84,34 @@ class SelectionActionPopupTest {
         }
 
         composeTestRule.onNodeWithText("Surligner").performClick()
-        composeTestRule.onNodeWithText("Surligner").performClick() // confirme dans le second temps (AnnotationColorPicker)
+        composeTestRule.onNodeWithContentDescription("Couleur Jaune").performClick()
 
         assertEquals(AnnotationColor.YELLOW, highlightedColor) // couleur par défaut
+    }
+
+    /**
+     * Lot 24, décision 1 — le popup ne se ferme pas après une application :
+     * un second tap sur une autre pastille réapplique (change) la couleur,
+     * sans qu'il faille rouvrir « Surligner ».
+     */
+    @Test
+    fun retaper_une_autre_pastille_reapplique_sans_rouvrir_surligner() {
+        val highlightedColors = mutableListOf<AnnotationColor>()
+        composeTestRule.setContent {
+            SelectionActionPopup(
+                selectedText = "Un passage sélectionné.",
+                selectionBoundsInWindow = someBounds,
+                onHighlight = { color, _ -> highlightedColors += color },
+                onSaveNote = { _, _, _ -> },
+                onDismiss = {},
+            )
+        }
+
+        composeTestRule.onNodeWithText("Surligner").performClick()
+        composeTestRule.onNodeWithContentDescription("Couleur Jaune").performClick()
+        composeTestRule.onNodeWithContentDescription("Couleur Vert").performClick()
+
+        assertEquals(listOf(AnnotationColor.YELLOW, AnnotationColor.GREEN), highlightedColors)
     }
 
     /** Lot 23, tâche 8 — pastille pleine (plus de `FilterChip` texte « Vert »). */
@@ -99,12 +130,15 @@ class SelectionActionPopupTest {
 
         composeTestRule.onNodeWithText("Surligner").performClick()
         composeTestRule.onNodeWithContentDescription("Couleur Vert").performClick()
-        composeTestRule.onNodeWithText("Surligner").performClick()
 
         assertEquals(AnnotationColor.GREEN, highlightedColor)
     }
 
-    /** Lot 23, tâche 9 — la couleur personnalisée validée devient la couleur du surlignage. */
+    /**
+     * Lot 23, tâche 9 — la couleur personnalisée validée devient la couleur
+     * du surlignage. Lot 24, décision 3 — « Appliquer » du dialogue RGB
+     * applique directement, aucun second tap sur « Surligner » requis.
+     */
     @Test
     fun personnaliser_une_couleur_puis_confirmer_transmet_cette_couleur() {
         var highlightedColor: AnnotationColor? = null
@@ -122,7 +156,6 @@ class SelectionActionPopupTest {
         composeTestRule.onNodeWithContentDescription("Personnaliser la couleur").performClick()
         composeTestRule.onNodeWithText("Ou saisir un code hexadécimal").performTextInput("#123456")
         composeTestRule.onNodeWithText("Appliquer").performClick()
-        composeTestRule.onNodeWithText("Surligner").performClick()
 
         assertEquals(hexRgbToAnnotationColor("#123456"), highlightedColor)
     }
@@ -131,7 +164,9 @@ class SelectionActionPopupTest {
      * Lot 23, tâche 6 — le trou trouvé à la vérification device du Lot 22 :
      * aucune action ne permettait de choisir souligné/barré. `AnnotationKind`
      * par défaut reste `HIGHLIGHT` tant que l'utilisateur ne choisit pas
-     * explicitement autre chose (aucun changement de comportement).
+     * explicitement autre chose (aucun changement de comportement). Lot 24,
+     * décision 1 — choisir un type applique directement, aucun second tap
+     * sur « Surligner » requis.
      */
     @Test
     fun choisir_souligne_transmet_AnnotationKind_UNDERLINE() {
@@ -148,7 +183,6 @@ class SelectionActionPopupTest {
 
         composeTestRule.onNodeWithText("Surligner").performClick()
         composeTestRule.onNodeWithText("Souligné").performClick()
-        composeTestRule.onNodeWithText("Surligner").performClick() // confirme
 
         assertEquals(AnnotationKind.UNDERLINE, highlightedKind)
     }
