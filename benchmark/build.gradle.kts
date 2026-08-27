@@ -5,13 +5,13 @@ plugins {
 
 android {
     namespace = "com.inktone.benchmark"
-    compileSdk = 34
+    compileSdk = 35
     targetProjectPath = ":app"
     experimentalProperties["android.experimental.self-instrumenting"] = true
 
     defaultConfig {
         minSdk = 26
-        targetSdk = 34
+        targetSdk = 35
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
         // P3 (plan polissage Pareto) — le suppressErrors=DEBUGGABLE qui
         // masquait la mesure sur un build debogable est retire : :app
