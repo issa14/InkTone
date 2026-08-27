@@ -40,6 +40,7 @@ import kotlinx.coroutines.test.setMain
 import org.junit.After
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertNull
+import org.junit.Assert.assertTrue
 import org.junit.Before
 import org.junit.Test
 import com.inktone.core.testing.fake.FakeChapterParser
@@ -218,8 +219,15 @@ class ReaderViewModelFreeSelectionTest {
         dispatcher.scheduler.runCurrent()
     }
 
+    /**
+     * Lot 24, décision 1 — remplace l'ancien
+     * `confirmAnnotation_reinitialise_la_selection_libre` : la sélection ne
+     * se purge PLUS toute seule après `ConfirmAnnotation` (le popup doit
+     * rester ouvert avec la sélection visible), seule `ClearFreeSelection`
+     * (fermeture externe du popup) le fait désormais.
+     */
     @Test
-    fun confirmAnnotation_reinitialise_la_selection_libre() = runTest {
+    fun confirmAnnotation_ne_purge_plus_seule_la_selection_libre() = runTest {
         val readingStateRepository = FakeReadingStateRepository()
         val publicationRepository = FakePublicationRepository()
         val annotationRepository = FakeAnnotationRepository()
@@ -230,7 +238,7 @@ class ReaderViewModelFreeSelectionTest {
         viewModel.onIntent(ReaderIntent.ConfirmAnnotation(AnnotationColor.YELLOW))
         dispatcher.scheduler.runCurrent()
 
-        assertNull(viewModel.state.value.freeSelectionRange)
+        assertEquals(0..6, viewModel.state.value.freeSelectionRange)
 
         viewModel.cancelCheckpointTimerForTest()
         dispatcher.scheduler.runCurrent()
@@ -284,6 +292,106 @@ class ReaderViewModelFreeSelectionTest {
         dispatcher.scheduler.runCurrent()
 
         assertEquals(0, viewModel.state.value.annotations.size)
+
+        viewModel.cancelCheckpointTimerForTest()
+        dispatcher.scheduler.runCurrent()
+    }
+
+    /**
+     * Lot 24, tâche 5 — créer-ou-mettre-à-jour : un second
+     * `ConfirmAnnotation` sur la MÊME sélection (aucune `SetFreeSelection`
+     * intermédiaire vers une autre plage) modifie l'annotation déjà créée,
+     * jamais une seconde superposée.
+     */
+    @Test
+    fun confirmAnnotation_deux_fois_de_suite_sur_la_meme_selection_met_a_jour_sans_dupliquer() = runTest {
+        val readingStateRepository = FakeReadingStateRepository()
+        val publicationRepository = FakePublicationRepository()
+        val annotationRepository = FakeAnnotationRepository()
+        val viewModel = buildViewModel(readingStateRepository, publicationRepository, FakeBookmarkRepository(), annotationRepository)
+        openTestPublication(viewModel, publicationRepository)
+
+        // "monde" : offsets locaux 11-15 inclus.
+        viewModel.onIntent(ReaderIntent.SetFreeSelection(anchorOffset = 11, focusOffset = 15))
+        viewModel.onIntent(ReaderIntent.ConfirmAnnotation(AnnotationColor.YELLOW))
+        dispatcher.scheduler.runCurrent()
+        val firstId = viewModel.state.value.annotations.single().id
+
+        viewModel.onIntent(ReaderIntent.ConfirmAnnotation(AnnotationColor.GREEN, kind = AnnotationKind.UNDERLINE))
+        dispatcher.scheduler.runCurrent()
+
+        val annotations = viewModel.state.value.annotations
+        assertEquals(1, annotations.size)
+        val updated = annotations.single()
+        assertEquals(firstId, updated.id)
+        assertEquals(AnnotationColor.GREEN, updated.color)
+        assertEquals(AnnotationKind.UNDERLINE, updated.kind)
+
+        viewModel.cancelCheckpointTimerForTest()
+        dispatcher.scheduler.runCurrent()
+    }
+
+    /**
+     * Lot 24, tâche 5, point de vigilance du plan — une nouvelle sélection
+     * (plage différente) doit repartir sur une nouvelle annotation, jamais
+     * continuer à modifier la précédente.
+     */
+    @Test
+    fun une_nouvelle_selection_de_plage_differente_cree_une_seconde_annotation() = runTest {
+        val readingStateRepository = FakeReadingStateRepository()
+        val publicationRepository = FakePublicationRepository()
+        val annotationRepository = FakeAnnotationRepository()
+        val viewModel = buildViewModel(readingStateRepository, publicationRepository, FakeBookmarkRepository(), annotationRepository)
+        openTestPublication(viewModel, publicationRepository)
+
+        // "monde" : offsets locaux 11-15 inclus.
+        viewModel.onIntent(ReaderIntent.SetFreeSelection(anchorOffset = 11, focusOffset = 15))
+        viewModel.onIntent(ReaderIntent.ConfirmAnnotation(AnnotationColor.YELLOW))
+        dispatcher.scheduler.runCurrent()
+        val firstId = viewModel.state.value.annotations.single().id
+
+        // "Bonjour" : offsets locaux 0-6 inclus, plage différente.
+        viewModel.onIntent(ReaderIntent.SetFreeSelection(anchorOffset = 0, focusOffset = 6))
+        viewModel.onIntent(ReaderIntent.ConfirmAnnotation(AnnotationColor.GREEN))
+        dispatcher.scheduler.runCurrent()
+
+        val annotations = viewModel.state.value.annotations
+        assertEquals(2, annotations.size)
+        assertTrue(annotations.any { it.id == firstId && it.color == AnnotationColor.YELLOW })
+        assertTrue(annotations.any { it.id != firstId && it.color == AnnotationColor.GREEN })
+
+        viewModel.cancelCheckpointTimerForTest()
+        dispatcher.scheduler.runCurrent()
+    }
+
+    /**
+     * Lot 24, tâche 1 — `ClearFreeSelection` (fermeture externe du popup)
+     * réinitialise aussi `pendingAnnotationId` : après une fermeture, une
+     * nouvelle sélection ne peut pas hériter de l'annotation précédente
+     * même si elle retombe par coïncidence sur la même plage de caractères.
+     */
+    @Test
+    fun clearFreeSelection_reinitialise_l_annotation_en_cours() = runTest {
+        val readingStateRepository = FakeReadingStateRepository()
+        val publicationRepository = FakePublicationRepository()
+        val annotationRepository = FakeAnnotationRepository()
+        val viewModel = buildViewModel(readingStateRepository, publicationRepository, FakeBookmarkRepository(), annotationRepository)
+        openTestPublication(viewModel, publicationRepository)
+
+        viewModel.onIntent(ReaderIntent.SetFreeSelection(anchorOffset = 11, focusOffset = 15))
+        viewModel.onIntent(ReaderIntent.ConfirmAnnotation(AnnotationColor.YELLOW))
+        dispatcher.scheduler.runCurrent()
+        val firstId = viewModel.state.value.annotations.single().id
+
+        viewModel.onIntent(ReaderIntent.ClearFreeSelection)
+        viewModel.onIntent(ReaderIntent.SetFreeSelection(anchorOffset = 11, focusOffset = 15))
+        viewModel.onIntent(ReaderIntent.ConfirmAnnotation(AnnotationColor.GREEN))
+        dispatcher.scheduler.runCurrent()
+
+        val annotations = viewModel.state.value.annotations
+        assertEquals(2, annotations.size)
+        assertTrue(annotations.any { it.id == firstId && it.color == AnnotationColor.YELLOW })
+        assertTrue(annotations.any { it.id != firstId && it.color == AnnotationColor.GREEN })
 
         viewModel.cancelCheckpointTimerForTest()
         dispatcher.scheduler.runCurrent()
