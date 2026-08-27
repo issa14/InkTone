@@ -1110,48 +1110,6 @@ class DatabaseMigrationTest {
         v28.close()
     }
 
-    // Lot 22, tâche 10 — type d'annotation (MIGRATION_28_29). Toute
-    // annotation existante devient un surlignage (défaut HIGHLIGHT) : aucune
-    // perte, le rendu d'avant la migration est strictement identique après.
-    @Test
-    fun migration_28_vers_29_ajoute_le_type_d_annotation_surligne_par_defaut() {
-        val v28 = helper.createDatabase(TEST_DB_NAME, 28)
-        v28.execSQL(
-            """
-            INSERT INTO publications (id, title, authors, format, fileUri, fileHash, fileSize, chapterCount, subjects, isFavorite, isPinned, isDrmProtected, importDate)
-            VALUES ('pub-1', 'Titre', '', 'EPUB', 'content://pub-1', 'hash1', 1000, 3, '', 0, 0, 0, 500)
-            """.trimIndent(),
-        )
-        v28.execSQL(
-            """
-            INSERT INTO annotations (
-                id, publicationId, startResourceHref, startChapterIndex, startParagraphIndex, startCharOffset,
-                endResourceHref, endChapterIndex, endParagraphIndex, endCharOffset, color, content, excerpt, isPinned, createdAt, updatedAt
-            ) VALUES (
-                'an-1', 'pub-1', 'ch1.xhtml', 0, NULL, 20, 'ch1.xhtml', 0, NULL, 40, 'YELLOW', NULL, NULL, 0, 200, 200
-            )
-            """.trimIndent(),
-        )
-        v28.close()
-
-        val v29 = helper.runMigrationsAndValidate(
-            TEST_DB_NAME, 29, true,
-            MIGRATION_1_2, MIGRATION_2_3, MIGRATION_3_4, MIGRATION_4_5, MIGRATION_5_6, MIGRATION_6_7,
-            MIGRATION_7_8, MIGRATION_8_9, MIGRATION_9_10, MIGRATION_10_11, MIGRATION_11_12, MIGRATION_12_13,
-            MIGRATION_13_14, MIGRATION_14_15, MIGRATION_15_16, MIGRATION_16_17, MIGRATION_17_18, MIGRATION_18_19,
-            MIGRATION_19_20, MIGRATION_20_21, MIGRATION_21_22, MIGRATION_22_23, MIGRATION_23_24, MIGRATION_24_25,
-            MIGRATION_25_26, MIGRATION_26_27, MIGRATION_27_28, MIGRATION_28_29,
-        )
-
-        v29.query("SELECT color, kind, content FROM annotations WHERE id = 'an-1'").use { cursor ->
-            assertEquals(true, cursor.moveToFirst())
-            assertEquals("YELLOW", cursor.getString(0)) // aucune perte
-            assertEquals("HIGHLIGHT", cursor.getString(1)) // défaut = surlignage
-            assertEquals(true, cursor.isNull(2))
-        }
-        v29.close()
-    }
-
     companion object {
         private const val TEST_DB_NAME = "migration-test"
     }

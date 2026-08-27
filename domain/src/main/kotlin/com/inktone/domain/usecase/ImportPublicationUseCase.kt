@@ -2,12 +2,10 @@ package com.inktone.domain.usecase
 
 import com.inktone.domain.model.Publication
 import com.inktone.domain.model.PublicationFormat
-import com.inktone.domain.model.Chapter
 import com.inktone.domain.repository.PublicationRepository
 import com.inktone.domain.service.ChapterParser
 import com.inktone.domain.service.FileStorageService
 import com.inktone.domain.service.ParseResult
-import com.inktone.domain.service.PreAnalysisStore
 import com.inktone.domain.service.PublicationMetadata
 import com.inktone.domain.service.PublicationParser
 import com.inktone.domain.service.SearchService
@@ -35,7 +33,6 @@ class ImportPublicationUseCase(
     private val fileStorageService: FileStorageService,
     private val searchService: SearchService,
     private val chapterParser: ChapterParser,
-    private val preAnalysisStore: PreAnalysisStore,
 ) {
     // Protege la section verification+insertion (Tache 6.3, K2) : plusieurs
     // invocations concurrentes de la meme instance (ImportWorker parallelise,
@@ -114,21 +111,9 @@ class ImportPublicationUseCase(
         try {
             if (publication.format == PublicationFormat.EPUB || publication.format == PublicationFormat.PDF) {
                 chapterParser.registerPublication(publication.id, fileUri)
-                // Lot 22, Palier A — les chapitres déjà parsés pour
-                // l'indexation FTS sont aussi matérialisés en pré-analyse
-                // persistée (jamais un second accès ZIP : on réutilise le
-                // Chapter déjà produit par ChapterParser, décision 1).
-                val parsedChapters = mutableListOf<Chapter>()
                 documentModel.chapters.forEach { shell ->
                     val chapter = chapterParser.parseChapter(publication.id, shell.href)
-                    parsedChapters += chapter
                     searchService.indexSentences(publication.id, chapter.index, chapter.href, chapter.sentences)
-                }
-                // Le PDF est géré par son propre chemin page-à-page
-                // (Palier C) : la pré-analyse de chapitres/sentences ne
-                // concerne que l'EPUB reflowable.
-                if (publication.format == PublicationFormat.EPUB) {
-                    preAnalysisStore.save(publication.id, hash, parsedChapters)
                 }
                 chapterParser.invalidate(publication.id)
             } else {

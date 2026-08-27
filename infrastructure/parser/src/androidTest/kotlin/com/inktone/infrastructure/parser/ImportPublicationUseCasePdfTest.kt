@@ -83,7 +83,6 @@ class ImportPublicationUseCasePdfTest {
             // Format PDF : indexation via indexPublication (eager), le
             // chapterParser n'est exercé que pour l'EPUB.
             chapterParser = com.inktone.core.testing.fake.FakeChapterParser(),
-            preAnalysisStore = com.inktone.core.testing.fake.FakePreAnalysisStore(),
         )
 
         val file = File(context.cacheDir, "fixture-valid.pdf").apply {

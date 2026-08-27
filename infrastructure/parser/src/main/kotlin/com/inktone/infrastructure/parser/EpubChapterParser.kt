@@ -1,9 +1,7 @@
 package com.inktone.infrastructure.parser
 
 import com.inktone.domain.model.Chapter
-import com.inktone.domain.repository.PublicationRepository
 import com.inktone.domain.service.ChapterParser
-import com.inktone.domain.service.PreAnalysisStore
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Job
@@ -19,7 +17,6 @@ import org.readium.r2.shared.util.Url
 import org.readium.r2.shared.util.getOrElse
 import org.readium.r2.shared.util.resource.Resource
 import java.io.ByteArrayInputStream
-import java.util.concurrent.ConcurrentHashMap
 import java.util.concurrent.Executors
 import javax.inject.Inject
 import javax.inject.Singleton
@@ -56,17 +53,7 @@ import javax.inject.Singleton
 class EpubChapterParser @Inject constructor(
     private val registry: ReadiumPublicationRegistry,
     private val jsoupParser: JsoupChapterParser,
-    private val preAnalysisStore: PreAnalysisStore,
-    private val publicationRepository: PublicationRepository,
 ) : ChapterParser {
-
-    // ---- Pré-analyse persistée (Lot 22, Palier A) ----
-
-    // Mémoïsation du chargement du fichier de pré-analyse par publication.
-    // `emptyList()` sert de sentinelle « absent/périmé » (une publication
-    // a toujours au moins un chapitre), jamais de chapitre réel. Vidée par
-    // [invalidate].
-    private val persistedChapters = ConcurrentHashMap<String, List<Chapter>>()
 
     // ---- Cache LRU par octets ----
 
@@ -109,15 +96,6 @@ class EpubChapterParser @Inject constructor(
     ): Chapter {
         val cacheKey = "$publicationId:$chapterHref${fragment?.let { ":$it" } ?: ""}"
         cache.get(cacheKey)?.let { return it }
-
-        // Lot 22, Palier A — consomme la pré-analyse persistée quand elle
-        // existe (pas de re-parsing Jsoup ni re-BreakIterator). Un fragment
-        // (#ancre) n'est jamais servi depuis le cache : ce dernier ne
-        // stocke que des chapitres entiers.
-        persistedChapterOrNull(publicationId, chapterHref, fragment)?.let { chapter ->
-            cache.put(cacheKey, chapter)
-            return chapter
-        }
 
         return semaphore.withPermit {
             withContext(parserDispatcher) {
@@ -213,34 +191,7 @@ class EpubChapterParser @Inject constructor(
         val prefix = "$publicationId:"
         cache.snapshot().keys.filter { it.startsWith(prefix) }.forEach { cache.remove(it) }
 
-        // Libère aussi la pré-analyse mémoïsée (le fichier disque, lui,
-        // survit : [invalidate] ne purge que la mémoire, pas le cache
-        // persistant — la purge disque relève de la suppression de la
-        // publication, pas de la fermeture du lecteur).
-        persistedChapters.remove(publicationId)
-
         registry.release(publicationId)
-    }
-
-    /**
-     * Sert le chapitre [chapterHref] depuis la pré-analyse persistée, ou
-     * `null` si elle est absente, périmée (hash/version divergents) ou si
-     * un fragment est demandé. Le fichier est chargé une seule fois par
-     * publication (mémoïsé), jamais re-lu à chaque chapitre.
-     */
-    private suspend fun persistedChapterOrNull(
-        publicationId: String,
-        chapterHref: String,
-        fragment: String?,
-    ): Chapter? {
-        if (fragment != null) return null
-        val fileHash = publicationRepository.getById(publicationId)?.fileHash ?: return null
-        var chapters = persistedChapters[publicationId]
-        if (chapters == null) {
-            chapters = preAnalysisStore.load(publicationId, fileHash) ?: emptyList()
-            persistedChapters[publicationId] = chapters
-        }
-        return chapters.firstOrNull { it.href == chapterHref }
     }
 
     // ---- Interne ----

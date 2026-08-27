@@ -26,7 +26,6 @@ data class AnnotationEntity(
     val endParagraphIndex: Int?,
     val endCharOffset: Int,
     val color: String,
-    val kind: String = "HIGHLIGHT",
     val content: String?,
     val excerpt: String? = null,
     val isPinned: Boolean = false,

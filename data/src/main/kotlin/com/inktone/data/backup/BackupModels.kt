@@ -2,7 +2,6 @@ package com.inktone.data.backup
 
 import com.inktone.domain.model.Annotation
 import com.inktone.domain.model.AnnotationColor
-import com.inktone.domain.model.AnnotationKind
 import com.inktone.domain.model.Bookmark
 import com.inktone.domain.model.FontFamily
 import com.inktone.domain.model.PronunciationRule
@@ -94,7 +93,6 @@ data class AnnotationBackup(
     val startLocator: LocatorBackup,
     val endLocator: LocatorBackup,
     val color: String,
-    val kind: String = "HIGHLIGHT",
     val content: String? = null,
     val excerpt: String? = null,
     val isPinned: Boolean = false,
@@ -110,12 +108,6 @@ data class ReadingSessionBackup(
     val endedAt: Long?,
     val mode: String,
     val sentencesRead: Int = 0,
-    val wordsRead: Int = 0,
-    val visualDurationMs: Long = 0,
-    val ttsDurationMs: Long = 0,
-    // Compatibilité ascendante (Lot 22, tâche 13) : les exports antérieurs ne
-    // portaient que `durationMs` (total calculé), sans distinguer visuel/TTS.
-    // Conservé en lecture pour ne rien perdre d'une sauvegarde préexistante.
     val durationMs: Long = 0,
 )
 
@@ -156,27 +148,20 @@ fun CustomThemeBackup.toDomain(): ReadingTheme = ReadingTheme(
 
 fun Annotation.toBackup(): AnnotationBackup = AnnotationBackup(
     id, publicationId, startLocator.toBackup(), endLocator.toBackup(),
-    color.name, kind.name, content, excerpt, isPinned, createdAt, updatedAt,
+    color.name, content, excerpt, isPinned, createdAt, updatedAt,
 )
 fun AnnotationBackup.toDomain(): Annotation = Annotation(
     id = id, publicationId = publicationId,
     startLocator = startLocator.toDomain(), endLocator = endLocator.toDomain(),
-    color = AnnotationColor.valueOf(color), kind = AnnotationKind.valueOf(kind), content = content, excerpt = excerpt,
+    color = AnnotationColor.valueOf(color), content = content, excerpt = excerpt,
     isPinned = isPinned, createdAt = createdAt, updatedAt = updatedAt,
 )
 
 fun ReadingSession.toBackup(): ReadingSessionBackup =
-    ReadingSessionBackup(
+    ReadingSessionBackup(id, publicationId, startedAt, endedAt, mode.name, sentencesRead, durationMs)
+fun ReadingSessionBackup.toDomain(): ReadingSession =
+    ReadingSession(
         id = id, publicationId = publicationId, startedAt = startedAt, endedAt = endedAt,
-        mode = mode.name, sentencesRead = sentencesRead, wordsRead = wordsRead,
-        visualDurationMs = visualDurationMs, ttsDurationMs = ttsDurationMs, durationMs = durationMs,
+        mode = ReadingMode.valueOf(mode), sentencesRead = sentencesRead,
+        visualDurationMs = durationMs, ttsDurationMs = 0,
     )
-fun ReadingSessionBackup.toDomain(): ReadingSession = ReadingSession(
-    id = id, publicationId = publicationId, startedAt = startedAt, endedAt = endedAt,
-    mode = ReadingMode.valueOf(mode), sentencesRead = sentencesRead,
-    wordsRead = wordsRead,
-    // Un export antérieur (avant la tâche 13) ne portait que `durationMs` :
-    // le reporter en visuel évite de perdre la durée des sessions existantes.
-    visualDurationMs = if (visualDurationMs == 0L && ttsDurationMs == 0L && durationMs > 0) durationMs else visualDurationMs,
-    ttsDurationMs = ttsDurationMs,
-)
