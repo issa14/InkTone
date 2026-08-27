@@ -81,26 +81,25 @@ class InkToneApplicationConventionPlugin : Plugin<Project> {
 
                 buildTypes {
                     getByName("release") {
-                        // R8/minify VOLONTAIREMENT PAS active. Explicitement
-                        // false pour qu'aucune activation accidentelle ne se
-                        // glisse.
+                        // AUDIT_REACTIVITE_UX.md §3.2 : R8 active. La
+                        // justification d'origine du report (« AAB 196 Mo »)
+                        // ne tient plus — taille reglee par `abiFilters
+                        // arm64-v8a` (AAB ~30 Mo). Restent ~40 Mo de
+                        // classes*.dex non optimisees, payees au demarrage a
+                        // froid et cumulees avec §3.1 (Baseline Profile).
                         //
-                        // La justification d'origine — « AAB 196 Mo contre un
-                        // budget Blueprint §11.2 de 60 Mo » — ne tient PLUS :
-                        // le probleme de taille a ete regle autrement, par le
-                        // filtre `abiFilters arm64-v8a` (voir app/build.gradle
-                        // .kts), et l'AAB mesure aujourd'hui 30 Mo. Ne pas
-                        // reprendre cet argument.
-                        //
-                        // Ce qui reste vrai, et seul motif du report : activer
-                        // R8 sans valider sur appareil les regles de
-                        // conservation de Readium et d'onnxruntime (reflexion,
-                        // JNI) risque des pannes que les tests JVM ne verraient
-                        // pas. Le gain attendu est reel — ~40 Mo de classes*.dex
-                        // dans l'APK — donc l'activation vaut une campagne de
-                        // test dediee, pas un report indefini.
-                        isMinifyEnabled = false
-                        isShrinkResources = false
+                        // Regles de conservation (JNI sherpa-onnx/onnxruntime,
+                        // kotlinx.serialization de Readium) dans
+                        // app/proguard-rules.pro. La validation sur appareil du
+                        // parcours import -> lecture -> TTS neuronal est
+                        // OBLIGATOIRE : les tests JVM ne verraient pas une
+                        // panne JNI ni de deserialisation.
+                        isMinifyEnabled = true
+                        isShrinkResources = true
+                        proguardFiles(
+                            getDefaultProguardFile("proguard-android-optimize.txt"),
+                            "proguard-rules.pro",
+                        )
                         if (releaseSigningConfigured) {
                             signingConfig = signingConfigs.getByName("release")
                         }
