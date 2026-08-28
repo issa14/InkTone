@@ -299,8 +299,13 @@ fun rememberChapterPaginationState(
             engine.updateChapter(chapter.index, styleKey, partial.lines, partial.sentenceStartOffsets, force = true),
         )
 
-        // Reprise en milieu de chapitre : élargit le préfixe jusqu'à
-        // couvrir la phrase visée (3a.3).
+        // Reprise en milieu de chapitre : élargit le préfixe jusqu'à couvrir
+        // la phrase visée, mais borne le nombre de doublements. Mesurer
+        // 6k→12k→24k→48k→96k en repartant de zéro à chaque tour mesurait le
+        // même texte jusqu'à ~3 fois (~186k chars pour couvrir 96k) avant la
+        // mesure complète (audit §4.4) — et retardait l'ancrage final. Un
+        // seul doublement suffit : la mesure complète (déjà par lots) devient
+        // ensuite le chemin le plus court et atteint l'ancrage plus vite.
         var nextBudget = FIRST_PAGE_CHAR_BUDGET
         var widenings = 0
         while (
@@ -347,5 +352,5 @@ fun rememberChapterPaginationState(
 /** Doit correspondre à la valeur par défaut de `ChapterTextMeasurer.measureFirstPage` — premier palier de la mesure en deux temps (3a.3). */
 private const val FIRST_PAGE_CHAR_BUDGET = 6000
 
-/** Nombre maximal de doublements du préfixe pour couvrir une reprise en milieu de chapitre (3a.3) — au-delà, on bascule sur la mesure complète sans attendre plus longtemps. */
-private const val MAX_PROGRESSIVE_WIDENINGS = 4
+/** Nombre maximal de doublements du préfixe pour couvrir une reprise en milieu de chapitre — borné à 1 (audit §4.4) : au-delà, la mesure complète par lots devient le chemin le plus court sans re-mesurer le même texte. */
+private const val MAX_PROGRESSIVE_WIDENINGS = 1
