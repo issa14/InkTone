@@ -30,3 +30,26 @@ internal fun wordRangeAt(
     }
     return null
 }
+
+/**
+ * AUDIT_REACTIVITE_UX §5.3 — millisecondes avant la prochaine échéance
+ * connue (début du prochain mot si on est dans un silence inter-mots, fin
+ * du mot courant sinon), à partir des [WordTimestamp] déjà en main. Permet
+ * à [com.inktone.feature.reader.PlaybackOrchestrator] de cadencer son
+ * sondage sur la durée réelle du mot plutôt que sur un intervalle fixe —
+ * `0` si [wordTimestamps] est vide ou si `playedMs` a déjà dépassé la fin
+ * du dernier mot (l'appelant sort de sa boucle sur ce cas avant d'appeler
+ * cette fonction).
+ */
+internal fun msUntilNextWordBoundary(
+    playedMs: Long,
+    sentenceStartMs: Long,
+    wordTimestamps: List<WordTimestamp>,
+): Long {
+    val relative = playedMs - sentenceStartMs
+    for (timestamp in wordTimestamps) {
+        if (relative < timestamp.startMs) return timestamp.startMs - relative
+        if (relative < timestamp.endMs) return timestamp.endMs - relative
+    }
+    return 0L
+}

@@ -52,3 +52,45 @@ class WordRangeMappingTest {
         assertNull(wordRangeAt(playedMs = 100, sentenceStartMs = 0, wordTimestamps = emptyList()))
     }
 }
+
+/**
+ * AUDIT_REACTIVITE_UX §5.3 — [msUntilNextWordBoundary] cadence le sondage
+ * de [PlaybackOrchestrator] sur la durée réelle du mot plutôt qu'un
+ * intervalle fixe : mêmes timestamps que [WordRangeMappingTest], mêmes
+ * bornes exactes.
+ */
+class MsUntilNextWordBoundaryTest {
+
+    private val timestamps = listOf(
+        WordTimestamp(word = "Bonjour", startMs = 0, endMs = 200, charOffset = 0),
+        WordTimestamp(word = "tout", startMs = 250, endMs = 450, charOffset = 8),
+        WordTimestamp(word = "le", startMs = 500, endMs = 600, charOffset = 13),
+    )
+
+    @Test
+    fun dansUnMot_attendSaFin() {
+        assertEquals(100L, msUntilNextWordBoundary(playedMs = 100, sentenceStartMs = 0, wordTimestamps = timestamps))
+        assertEquals(200L, msUntilNextWordBoundary(playedMs = 0, sentenceStartMs = 0, wordTimestamps = timestamps))
+    }
+
+    @Test
+    fun dansUnSilenceInterMots_attendLeDebutDuProchainMot() {
+        assertEquals(50L, msUntilNextWordBoundary(playedMs = 200, sentenceStartMs = 0, wordTimestamps = timestamps))
+        assertEquals(1L, msUntilNextWordBoundary(playedMs = 249, sentenceStartMs = 0, wordTimestamps = timestamps))
+    }
+
+    @Test
+    fun tientCompteDuDebutDePhrase() {
+        assertEquals(100L, msUntilNextWordBoundary(playedMs = 1_100, sentenceStartMs = 1_000, wordTimestamps = timestamps))
+    }
+
+    @Test
+    fun surLeDernierMot_attendSaFin() {
+        assertEquals(50L, msUntilNextWordBoundary(playedMs = 550, sentenceStartMs = 0, wordTimestamps = timestamps))
+    }
+
+    @Test
+    fun sansTimestamps_retourneZero() {
+        assertEquals(0L, msUntilNextWordBoundary(playedMs = 100, sentenceStartMs = 0, wordTimestamps = emptyList()))
+    }
+}
