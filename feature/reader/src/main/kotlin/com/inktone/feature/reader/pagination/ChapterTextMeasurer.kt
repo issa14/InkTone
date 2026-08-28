@@ -31,6 +31,16 @@ data class ChapterMeasurement(
 )
 
 /**
+ * Indexe les phrases par [Sentence.blockIndex], en un seul passage (O(n)).
+ * Partagé entre le mesureur ([ChapterTextMeasurer.measureRich]) et le
+ * compteur d'offsets mesurables ([measurableOffsetCount]) : filtrer
+ * `sentences.filter { it.blockIndex == X }` une fois par bloc rendait la
+ * mesure quadratique sur les longs chapitres (O(blocs × phrases)).
+ */
+internal fun sentencesByBlockIndex(sentences: List<Sentence>): Map<Int, List<Sentence>> =
+    sentences.groupBy { it.blockIndex }
+
+/**
  * Adaptateur Compose du moteur de pagination (Tâche 3a.1, étapes 1-4) :
  * construit l'AnnotatedString du chapitre (ou d'un préfixe, 3a.3) en
  * préservant les `ParagraphStyle` réels de l'EPUB (voir `spanStyleFor` —
@@ -120,6 +130,11 @@ class ChapterTextMeasurer(private val textMeasurer: TextMeasurer) {
     ): ChapterMeasurement {
         val content = chapter.content as? ChapterContent.Rich
             ?: error("ChapterTextMeasurer.measureRich appelé sur un chapitre sans ChapterContent.Rich (${chapter.href})")
+        // Index des phrases par bloc, construit UNE FOIS (O(n)) puis partagé
+        // entre tous les lots : le filtrage par bloc répété dans
+        // `buildBatchAnnotatedString` était quadratique (voir §4.5 de
+        // l'audit de réactivité).
+        val sentencesByBlock = sentencesByBlockIndex(chapter.sentences)
         // IndexedValue : conserve l'index ORIGINAL dans `content.blocks` — le
         // même référentiel que Sentence.blockIndex — pour retrouver les
         // phrases de chaque bloc plus bas malgré le filtrage.
@@ -165,7 +180,7 @@ class ChapterTextMeasurer(private val textMeasurer: TextMeasurer) {
         batches.forEachIndexed { batchIndex, batch ->
             val (annotatedString, localOffsets) = buildBatchAnnotatedString(
                 blocks = batch,
-                sentences = chapter.sentences,
+                sentencesByBlock = sentencesByBlock,
                 // Un "\n" doit séparer TOUT couple de blocs de texte
                 // consécutifs, y compris à une frontière de lot — sinon
                 // l'espace d'offsets global dérive de 1 caractère par
@@ -290,7 +305,7 @@ class ChapterTextMeasurer(private val textMeasurer: TextMeasurer) {
      */
     private fun buildBatchAnnotatedString(
         blocks: List<IndexedValue<BookBlock>>,
-        sentences: List<Sentence>,
+        sentencesByBlock: Map<Int, List<Sentence>>,
         leadingSeparator: Boolean,
     ): Pair<AnnotatedString, List<Int>> {
         val sentenceStartOffsets = mutableListOf<Int>()
@@ -305,7 +320,7 @@ class ChapterTextMeasurer(private val textMeasurer: TextMeasurer) {
                 if (position > 0 || leadingSeparator) append('\n')
                 val blockStartInBatch = length
                 val blockGlobalStart = block.globalOffsetRange?.first ?: 0
-                val blockSentences = sentences.filter { it.blockIndex == originalIndex }
+                val blockSentences = sentencesByBlock[originalIndex].orEmpty()
                 if (blockSentences.isNotEmpty()) {
                     blockSentences.forEach { sentence ->
                         sentenceStartOffsets.add(blockStartInBatch + (sentence.startOffset - blockGlobalStart))
