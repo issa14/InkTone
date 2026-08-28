@@ -859,34 +859,48 @@ fun ReaderScreen(
                 ReadingMode.SCROLL -> {
                     val chapter = state.currentChapter
                     val blocks = (chapter?.content as? ChapterContent.Rich)?.blocks.orEmpty()
-                    val textStyle = TextStyle(
-                        fontSize = state.effectiveSettings.fontSize.sp,
-                        // Bug réel signalé à la vérification device : le
-                        // réglage d'interligne n'avait AUCUN effet en mode
-                        // défilement. `lineHeightSp` n'alimentait que la mesure
-                        // de pagination (mode paginé) ; le style de rendu du
-                        // défilement ne le posait nulle part, et le commentaire
-                        // de sa déclaration affirmait pourtant le contraire —
-                        // resté vrai à l'époque de `ParagraphText`, faux depuis
-                        // la migration vers LazyColumn/BookBlockItem.
-                        lineHeight = lineHeightSp.sp,
-                        color = ThemeColors.text(state.resolvedTheme),
-                        fontFamily = effectiveFontFamily,
-                        // P4 — mêmes règles qu'en mode paginé (où elles
-                        // viennent de `pagination.baseTextStyle`) : un réglage
-                        // de lecture ne doit jamais dépendre du mode choisi.
-                        textAlign = if (state.isTextJustified) TextAlign.Justify else TextAlign.Unspecified,
-                        hyphens = if (state.isTextJustified) Hyphens.Auto else Hyphens.None,
-                        lineBreak = if (state.isTextJustified) LineBreak.Paragraph else LineBreak.Unspecified,
-                        // Lot 21 (correctif) — même locale que le style de
-                        // MESURE (`pagination.baseTextStyle`), y compris la
-                        // condition `justified` : une divergence ferait
-                        // césurer le rendu différemment de la mesure, donc
-                        // déborder les pages calculées. Voir le commentaire
-                        // de `ChapterPaginationState.kt` pour le choix de
-                        // ne pas l'appliquer hors justification.
-                        localeList = if (state.isTextJustified) LocaleList("fr") else null,
-                    )
+                    // AUDIT_REACTIVITE_UX §6.3 — le style de rendu du mode
+                    // défilement était reconstruit à chaque recomposition de
+                    // l'écran (dont à chaque mot prononcé pendant le TTS, via
+                    // §3.3), puis redistribué à chaque BookBlockItem visible.
+                    // `remember` sur les valeurs dont il dérive : un changement
+                    // de réglage le recrée, un mot prononcé ne le recrée plus.
+                    val textStyle = remember(
+                        state.effectiveSettings.fontSize,
+                        lineHeightSp,
+                        state.resolvedTheme,
+                        effectiveFontFamily,
+                        state.isTextJustified,
+                    ) {
+                        TextStyle(
+                            fontSize = state.effectiveSettings.fontSize.sp,
+                            // Bug réel signalé à la vérification device : le
+                            // réglage d'interligne n'avait AUCUN effet en mode
+                            // défilement. `lineHeightSp` n'alimentait que la mesure
+                            // de pagination (mode paginé) ; le style de rendu du
+                            // défilement ne le posait nulle part, et le commentaire
+                            // de sa déclaration affirmait pourtant le contraire —
+                            // resté vrai à l'époque de `ParagraphText`, faux depuis
+                            // la migration vers LazyColumn/BookBlockItem.
+                            lineHeight = lineHeightSp.sp,
+                            color = ThemeColors.text(state.resolvedTheme),
+                            fontFamily = effectiveFontFamily,
+                            // P4 — mêmes règles qu'en mode paginé (où elles
+                            // viennent de `pagination.baseTextStyle`) : un réglage
+                            // de lecture ne doit jamais dépendre du mode choisi.
+                            textAlign = if (state.isTextJustified) TextAlign.Justify else TextAlign.Unspecified,
+                            hyphens = if (state.isTextJustified) Hyphens.Auto else Hyphens.None,
+                            lineBreak = if (state.isTextJustified) LineBreak.Paragraph else LineBreak.Unspecified,
+                            // Lot 21 (correctif) — même locale que le style de
+                            // MESURE (`pagination.baseTextStyle`), y compris la
+                            // condition `justified` : une divergence ferait
+                            // césurer le rendu différemment de la mesure, donc
+                            // déborder les pages calculées. Voir le commentaire
+                            // de `ChapterPaginationState.kt` pour le choix de
+                            // ne pas l'appliquer hors justification.
+                            localeList = if (state.isTextJustified) LocaleList("fr") else null,
+                        )
+                    }
 
                     // Parité avec le mode PAGED (absoluteHighlightedRange dans
                     // PagedChapterContent) : offset absolu (espace chapitre)
