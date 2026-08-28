@@ -15,6 +15,7 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
+import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.ButtonDefaults
@@ -45,6 +46,7 @@ import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
+import androidx.compose.runtime.snapshotFlow
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
@@ -145,14 +147,33 @@ fun LibraryItemsScreen(
                 state.items.isEmpty() -> LibraryItemsEmptyState(
                     isFiltered = state.searchQuery.isNotBlank() || state.filter != LibraryItemFilter.ALL,
                 )
-                else -> LazyColumn(Modifier.fillMaxSize().padding(horizontal = 8.dp)) {
-                    items(state.items, key = { it.id }) { item ->
-                        LibraryItemRow(
-                            item = item,
-                            onClick = { viewModel.onIntent(LibraryItemsIntent.OpenItem(item)) },
-                            onTogglePin = { viewModel.onIntent(LibraryItemsIntent.TogglePin(item)) },
-                            onRequestDelete = { viewModel.onIntent(LibraryItemsIntent.RequestDelete(item)) },
-                        )
+                else -> {
+                    val listState = rememberLazyListState()
+
+                    // AUDIT_REACTIVITE_UX §6.1 — la requête est bornée
+                    // (LibraryItemsViewModel.visibleLimit) ; ce déclencheur
+                    // relève la borne quand le dernier élément visible
+                    // approche du bas, même patron que la pagination OPDS
+                    // (OpdsFeedScreen.FeedGrid).
+                    LaunchedEffect(listState, state.items.size, state.canLoadMore) {
+                        if (!state.canLoadMore) return@LaunchedEffect
+                        snapshotFlow {
+                            val last = listState.layoutInfo.visibleItemsInfo.lastOrNull()?.index ?: -1
+                            last >= listState.layoutInfo.totalItemsCount - 5
+                        }.collect { nearEnd ->
+                            if (nearEnd) viewModel.onIntent(LibraryItemsIntent.LoadMore)
+                        }
+                    }
+
+                    LazyColumn(Modifier.fillMaxSize().padding(horizontal = 8.dp), state = listState) {
+                        items(state.items, key = { it.id }) { item ->
+                            LibraryItemRow(
+                                item = item,
+                                onClick = { viewModel.onIntent(LibraryItemsIntent.OpenItem(item)) },
+                                onTogglePin = { viewModel.onIntent(LibraryItemsIntent.TogglePin(item)) },
+                                onRequestDelete = { viewModel.onIntent(LibraryItemsIntent.RequestDelete(item)) },
+                            )
+                        }
                     }
                 }
             }

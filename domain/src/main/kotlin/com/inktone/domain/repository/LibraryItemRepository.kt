@@ -14,9 +14,15 @@ import kotlinx.coroutines.flow.Flow
  * volume de données.
  */
 interface LibraryItemRepository {
+    /**
+     * AUDIT_REACTIVITE_UX §6.1 — [limit] borne le nombre d'éléments
+     * remontés ; l'appelant l'augmente pour charger la suite (chargement
+     * à la demande, pas une requête sans fin par défaut).
+     */
     fun observe(
         filter: LibraryItemFilter,
         searchQuery: String,
         sortOrder: LibraryItemSortOrder,
+        limit: Int,
     ): Flow<List<LibraryItem>>
 }
