@@ -123,6 +123,13 @@ class ReaderViewModel @Inject constructor(
     private val _state = MutableStateFlow(ReaderUiState())
     val state: StateFlow<ReaderUiState> = _state.asStateFlow()
 
+    // §3.3 — le surlignage mot-à-mot est publié dans un StateFlow distinct,
+    // hors de l'état monolithique : sa cadence (un mot prononcé, 3 à 5 fois/s)
+    // ne doit plus dicter la recomposition du corps entier de ReaderScreen.
+    // Le motif est celui de `highlightedRangeState` déjà utilisé en interne.
+    private val _highlightedWordRange = MutableStateFlow<IntRange?>(null)
+    val highlightedWordRange: StateFlow<IntRange?> = _highlightedWordRange.asStateFlow()
+
     init {
         // Tache 9bis.3.6 - reglage global (UserPreferences.readingRulerEnabled,
         // Tache 9bis.5), pas une cascade overrides/preferences comme
@@ -153,15 +160,17 @@ class ReaderViewModel @Inject constructor(
         viewModelScope.launch {
             playbackOrchestrator.state.collect { status ->
                 when (status) {
-                    PlaybackOrchestrator.PlaybackStatus.Idle ->
+                    PlaybackOrchestrator.PlaybackStatus.Idle -> {
                         // P1 — plus d'auto-avance déduite ici : `Idle` signifie
                         // seulement « plus rien ne joue », qu'il s'agisse d'une
                         // fin de chapitre, d'un arrêt volontaire ou d'une pause
                         // demandée pendant la synthèse. La fin de chapitre a son
                         // signal propre (`chapterCompleted`, collecté plus bas).
+                        _highlightedWordRange.value = null
                         _state.value = _state.value.copy(
-                            isPlaying = false, isAudioActive = false, highlightedWordRange = null,
+                            isPlaying = false, isAudioActive = false,
                         )
+                    }
                     PlaybackOrchestrator.PlaybackStatus.Buffering ->
                         _state.value = _state.value.copy(isAudioActive = false)
                     PlaybackOrchestrator.PlaybackStatus.Playing -> {
@@ -177,11 +186,13 @@ class ReaderViewModel @Inject constructor(
                         // doit refléter isPlaying = false sans auto-avancer
                         // (seul Idle déclenche la fin de chapitre).
                         _state.value = _state.value.copy(isAudioActive = false, isPlaying = false)
-                    is PlaybackOrchestrator.PlaybackStatus.Error ->
+                    is PlaybackOrchestrator.PlaybackStatus.Error -> {
+                        _highlightedWordRange.value = null
                         _state.value = _state.value.copy(
-                            isPlaying = false, isAudioActive = false, highlightedWordRange = null,
+                            isPlaying = false, isAudioActive = false,
                             errorMessage = status.message,
                         )
+                    }
                 }
             }
         }
@@ -211,7 +222,7 @@ class ReaderViewModel @Inject constructor(
         viewModelScope.launch {
             playbackOrchestrator.currentWordRange.collect { range ->
                 if (_state.value.isPlaying) {
-                    _state.value = _state.value.copy(highlightedWordRange = range)
+                    _highlightedWordRange.value = range
                 }
             }
         }
@@ -1026,9 +1037,10 @@ class ReaderViewModel @Inject constructor(
         val wasPlaying = _state.value.isPlaying
         pausePlayback()
 
+        _highlightedWordRange.value = null
         _state.value = _state.value.copy(
             currentChapterIndex = locator.chapterIndex, currentSentenceIndex = sentenceIndex,
-            highlightedWordRange = null, isTocVisible = false, isBookmarkListVisible = false,
+            isTocVisible = false, isBookmarkListVisible = false,
         )
         persistPosition(chapterIndex = locator.chapterIndex, sentenceIndex = sentenceIndex)
         preloadAdjacentChapters(locator.chapterIndex)
@@ -1065,15 +1077,15 @@ class ReaderViewModel @Inject constructor(
         pendingHighlightTimeoutJob?.cancel()
         val sentence = _state.value.chapters.getOrNull(chapterIndex)
             ?.sentences?.getOrNull(target.sentenceIndex)
+        _highlightedWordRange.value = sentence?.let { 0 until it.text.length }
         _state.value = _state.value.copy(
             pendingHighlightTarget = null,
-            highlightedWordRange = sentence?.let { 0 until it.text.length },
         )
         flashClearJob?.cancel()
         flashClearJob = viewModelScope.launch {
             delay(FLASH_HIGHLIGHT_DURATION_MS)
             if (_state.value.currentSentenceIndex == target.sentenceIndex && !_state.value.isPlaying) {
-                _state.value = _state.value.copy(highlightedWordRange = null)
+                _highlightedWordRange.value = null
             }
         }
     }
@@ -1094,9 +1106,10 @@ class ReaderViewModel @Inject constructor(
         val wasPlaying = _state.value.isPlaying
         pausePlayback()
 
+        _highlightedWordRange.value = null
         _state.value = _state.value.copy(
             currentChapterIndex = targetIndex, currentSentenceIndex = 0,
-            highlightedWordRange = null, isTocVisible = false,
+            isTocVisible = false,
         )
         persistPosition(chapterIndex = targetIndex, sentenceIndex = 0)
         // Plan v3, Palier 3.6 — charger le contenu Rich si chapitre vide
@@ -1334,17 +1347,15 @@ class ReaderViewModel @Inject constructor(
     private fun startWordHighlight(timestamps: List<WordTimestamp>) {
         highlightJob?.cancel()
         if (timestamps.isEmpty()) {
-            _state.value = _state.value.copy(highlightedWordRange = null)
+            _highlightedWordRange.value = null
             return
         }
         highlightJob = viewModelScope.launch {
             timestamps.forEach { wt ->
-                _state.value = _state.value.copy(
-                    highlightedWordRange = wt.charOffset until (wt.charOffset + wt.word.length),
-                )
+                _highlightedWordRange.value = wt.charOffset until (wt.charOffset + wt.word.length)
                 delay((wt.endMs - wt.startMs).coerceAtLeast(0L))
             }
-            _state.value = _state.value.copy(highlightedWordRange = null)
+            _highlightedWordRange.value = null
         }
     }
 
@@ -1385,10 +1396,10 @@ class ReaderViewModel @Inject constructor(
      */
     private fun syncDisplayToNarratedChapter(targetIndex: Int) {
         if (targetIndex !in _state.value.chapters.indices) return
+        _highlightedWordRange.value = null
         _state.value = _state.value.copy(
             currentChapterIndex = targetIndex,
             currentSentenceIndex = 0,
-            highlightedWordRange = null,
         )
         loadChapterContentIfNeeded(targetIndex)
         preloadAdjacentChapters(targetIndex)
@@ -1401,7 +1412,8 @@ class ReaderViewModel @Inject constructor(
      * suit est un arrêt volontaire, pas une fin naturelle de chapitre.
      */
     private fun pausePlayback() {
-        _state.value = _state.value.copy(isPlaying = false, isAudioActive = false, highlightedWordRange = null)
+        _highlightedWordRange.value = null
+        _state.value = _state.value.copy(isPlaying = false, isAudioActive = false)
         highlightJob?.cancel()
         playbackOrchestrator.stop()
 

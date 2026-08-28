@@ -193,6 +193,9 @@ fun ReaderScreen(
     onOpenSettings: () -> Unit = {},
 ) {
     val state by viewModel.state.collectAsState()
+    // §3.3 — le surlignage mot-à-mot est collecté séparément : sa cadence
+    // (un mot prononcé, 3 à 5 fois/s) ne recompose plus le corps de l'écran.
+    val highlightedWordRange by viewModel.highlightedWordRange.collectAsState()
 
     // P1 — la notification média est la voie de contrôle en arrière-plan et
     // sur écran verrouillé. Sur Android 13+, elle n'apparaît qu'avec
@@ -907,7 +910,7 @@ fun ReaderScreen(
                     // du mot TTS actif, dérivé de Chapter.sentences —
                     // aligné avec ChapterTextMeasurer depuis la correction
                     // du séparateur de bloc (voir ChapterTextMeasurer.kt).
-                    val scrollHighlightedRange = state.highlightedWordRange?.let { wordRange ->
+                    val scrollHighlightedRange = highlightedWordRange?.let { wordRange ->
                         chapter?.sentences?.getOrNull(state.currentSentenceIndex)?.startOffset?.let { sentenceStart ->
                             (sentenceStart + wordRange.first)..(sentenceStart + wordRange.last)
                         }
@@ -1089,7 +1092,7 @@ fun ReaderScreen(
                         chapter = state.currentChapter,
                         pagination = pagination,
                         currentSentenceIndex = state.currentSentenceIndex,
-                        highlightedWordRange = state.highlightedWordRange,
+                        highlightedWordRange = highlightedWordRange,
                         annotations = state.annotations,
                         currentChapterIndex = state.currentChapterIndex,
                         chapterCount = state.chapters.size,

@@ -154,7 +154,7 @@ class ReaderViewModelPendingHighlightTest {
         assertNotNull(pending)
         assertEquals(0, pending!!.chapterIndex)
         assertEquals(1, pending.sentenceIndex)
-        assertNull("pas de flash tant que la mise en page n'est pas confirmée", viewModel.state.value.highlightedWordRange)
+        assertNull("pas de flash tant que la mise en page n'est pas confirmée", viewModel.highlightedWordRange.value)
 
         // Casse le timer de checkpoint de session (Lot Sessions), démarré
         // inconditionnellement à l'ouverture, auto-récurrent — sinon le
@@ -189,18 +189,18 @@ class ReaderViewModelPendingHighlightTest {
         dispatcher.scheduler.runCurrent()
 
         assertNull("la cible est consommée", viewModel.state.value.pendingHighlightTarget)
-        assertEquals(0 until "Deuxieme phrase plus longue.".length, viewModel.state.value.highlightedWordRange)
+        assertEquals(0 until "Deuxieme phrase plus longue.".length, viewModel.highlightedWordRange.value)
 
         // Un second signal pour le même chapitre (ex. changement de taille de
         // police qui remesure) ne rejoue pas le flash : rien à consommer.
         viewModel.onIntent(ReaderIntent.ChapterLayoutCompleted(0))
         dispatcher.scheduler.runCurrent()
-        assertEquals(0 until "Deuxieme phrase plus longue.".length, viewModel.state.value.highlightedWordRange)
+        assertEquals(0 until "Deuxieme phrase plus longue.".length, viewModel.highlightedWordRange.value)
 
         // Le flash s'efface tout seul après son délai.
         dispatcher.scheduler.advanceTimeBy(10_000)
         dispatcher.scheduler.runCurrent()
-        assertNull(viewModel.state.value.highlightedWordRange)
+        assertNull(viewModel.highlightedWordRange.value)
 
         viewModel.cancelCheckpointTimerForTest()
         dispatcher.scheduler.runCurrent()
@@ -234,7 +234,7 @@ class ReaderViewModelPendingHighlightTest {
         dispatcher.scheduler.runCurrent()
 
         assertNull(viewModel.state.value.pendingHighlightTarget)
-        assertNull(viewModel.state.value.highlightedWordRange)
+        assertNull(viewModel.highlightedWordRange.value)
 
         viewModel.cancelCheckpointTimerForTest()
         dispatcher.scheduler.runCurrent()
