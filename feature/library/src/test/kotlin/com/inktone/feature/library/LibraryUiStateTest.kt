@@ -26,7 +26,7 @@ class LibraryUiStateTest {
                 publication("2", "Germinal", "Émile Zola", importDate = 0L),
             ),
             searchQuery = "hugo",
-        )
+        ).withDerivedFields()
 
         assertEquals(listOf("1"), state.displayedPublications.map { it.id })
     }
@@ -40,7 +40,7 @@ class LibraryUiStateTest {
                 publication("3", "C", "X", importDate = 0L, lastOpened = 200L),
             ),
             sortOrder = LibrarySortOrder.RECENTLY_OPENED,
-        )
+        ).withDerivedFields()
 
         assertEquals(listOf("3", "1", "2"), state.displayedPublications.map { it.id })
     }
@@ -53,7 +53,7 @@ class LibraryUiStateTest {
                 publication("2", "B", "X", importDate = 0L, lastOpened = 300L),
                 publication("3", "C", "X", importDate = 0L, lastOpened = null),
             ),
-        )
+        ).withDerivedFields()
 
         assertEquals("2", state.resumeReadingPublication?.id)
     }
@@ -67,7 +67,7 @@ class LibraryUiStateTest {
                 publication("3", "C", "", importDate = 0L).copy(authors = emptyList()),
             ),
             sortOrder = LibrarySortOrder.AUTHOR,
-        )
+        ).withDerivedFields()
 
         assertEquals(listOf("2", "1", "3"), state.displayedPublications.map { it.id })
     }
@@ -76,7 +76,7 @@ class LibraryUiStateTest {
     fun filtre_par_format_vide_n_exclut_rien() {
         val epub = publication("1", "A", "X", importDate = 0L)
         val txt = publication("2", "B", "X", importDate = 0L).copy(format = PublicationFormat.TXT)
-        val state = LibraryUiState(publications = listOf(epub, txt))
+        val state = LibraryUiState(publications = listOf(epub, txt)).withDerivedFields()
 
         assertEquals(listOf("1", "2"), state.displayedPublications.map { it.id })
     }
@@ -88,7 +88,7 @@ class LibraryUiStateTest {
         val state = LibraryUiState(
             publications = listOf(epub, txt),
             selectedFormats = setOf(PublicationFormat.EPUB),
-        )
+        ).withDerivedFields()
 
         assertEquals(listOf("1"), state.displayedPublications.map { it.id })
     }
@@ -102,7 +102,7 @@ class LibraryUiStateTest {
                 publication("3", "C", "X", importDate = 100L),
             ),
             sortOrder = LibrarySortOrder.RECENTLY_ADDED,
-        )
+        ).withDerivedFields()
 
         assertEquals(listOf("2", "1", "3"), state.displayedPublications.map { it.id })
     }

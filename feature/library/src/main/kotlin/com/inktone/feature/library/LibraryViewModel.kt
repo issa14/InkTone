@@ -23,6 +23,7 @@ import dagger.hilt.android.lifecycle.HiltViewModel
 import kotlinx.coroutines.CoroutineDispatcher
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.channels.Channel
+import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
@@ -65,6 +66,10 @@ class LibraryViewModel @Inject constructor(
     val effects = _effects.receiveAsFlow()
 
     private var observeJob: Job? = null
+
+    // §3.5 — debounce de la recherche de bibliothèque (titre/auteur) : chaque
+    // frappe ne doit pas rejouer filterAndSort sur toute la bibliothèque.
+    private var searchDebounceJob: Job? = null
 
     init {
         observePublications(FilterMode.ALL)
@@ -141,8 +146,19 @@ class LibraryViewModel @Inject constructor(
                 deletePublication(intent.publicationId)
             }
             is LibraryIntent.ChangeFilter -> observePublications(intent.filter, intent.value)
-            is LibraryIntent.SetSearchQuery -> _state.value = _state.value.copy(searchQuery = intent.query)
-            is LibraryIntent.SetSortOrder -> _state.value = _state.value.copy(sortOrder = intent.order)
+            is LibraryIntent.SetSearchQuery -> {
+                // §3.5 — la requête est posée immédiatement (le champ de texte
+                // affiche ce qui est tapé), mais filterAndSort n'est rejoué
+                // qu'après un debounce : une frappe ne re-tri/qu-filtre plus
+                // toute la bibliothèque.
+                _state.value = _state.value.copy(searchQuery = intent.query)
+                searchDebounceJob?.cancel()
+                searchDebounceJob = viewModelScope.launch {
+                    delay(SEARCH_DEBOUNCE_MS)
+                    _state.value = _state.value.withDerivedFields()
+                }
+            }
+            is LibraryIntent.SetSortOrder -> _state.value = _state.value.copy(sortOrder = intent.order).withDerivedFields()
             is LibraryIntent.SetLayoutMode -> {
                 _state.value = _state.value.copy(layoutMode = intent.mode)
                 viewModelScope.launch {
@@ -154,8 +170,8 @@ class LibraryViewModel @Inject constructor(
                 selectedFormats = _state.value.selectedFormats.let {
                     if (intent.format in it) it - intent.format else it + intent.format
                 },
-            )
-            is LibraryIntent.ClearFileFormats -> _state.value = _state.value.copy(selectedFormats = emptySet())
+            ).withDerivedFields()
+            is LibraryIntent.ClearFileFormats -> _state.value = _state.value.copy(selectedFormats = emptySet()).withDerivedFields()
             is LibraryIntent.Refresh -> observePublications(
                 _state.value.activeFilter,
                 _state.value.filterValue,
@@ -285,15 +301,22 @@ class LibraryViewModel @Inject constructor(
                     // émission du Flow Room (500 émissions pendant un import
                     // groupé). Déplacé sur Default ; seules les mises à jour
                     // d'état repassent sur Main.
-                    val progressMap = withContext(defaultDispatcher) {
-                        computeProgressMap(publications, readingStates)
+                    //
+                    // AUDIT_REACTIVITE_UX §3.5 — même traitement pour les sept
+                    // dérivations (withDerivedFields) : calculées une fois par
+                    // émission sur Default, plus rejouées par la composition.
+                    _state.value = withContext(defaultDispatcher) {
+                        val progressMap = computeProgressMap(publications, readingStates)
+                        _state.value.copy(
+                            publications = publications,
+                            progressMap = progressMap,
+                            isLoading = false,
+                        ).withDerivedFields()
                     }
-                    _state.value = _state.value.copy(
-                        publications = publications,
-                        progressMap = progressMap,
-                        isLoading = false,
-                    )
                 }
         }
     }
 }
+
+/** §3.5 — debounce de la recherche de bibliothèque (titre/auteur). */
+private const val SEARCH_DEBOUNCE_MS = 250L
