@@ -20,7 +20,20 @@ data class LibraryItemsUiState(
     val isLoading: Boolean = true,
     /** Élément en attente de confirmation de suppression (balayage) — aucune suppression n'est immédiate (tâche 4.6). */
     val pendingDelete: LibraryItem? = null,
-)
+    // AUDIT_REACTIVITE_UX §6.1 — borne de la requête (LibraryItemRepository.observe),
+    // relevée par LoadMore quand l'utilisateur approche du bas de la liste.
+    val visibleLimit: Int = LIBRARY_ITEMS_PAGE_SIZE,
+) {
+    /**
+     * `items.size == visibleLimit` : la requête a peut-être encore des
+     * lignes au-delà de la borne (ou s'arrête pile dessus par coïncidence
+     * — un LoadMore de plus le confirmera sans effet visible). Moins que
+     * `visibleLimit` : la requête a tout remonté, plus rien à charger.
+     */
+    val canLoadMore: Boolean get() = items.size >= visibleLimit
+}
+
+internal const val LIBRARY_ITEMS_PAGE_SIZE = 100
 
 sealed interface LibraryItemsIntent {
     data class SetSearchQuery(val query: String) : LibraryItemsIntent
@@ -32,6 +45,7 @@ sealed interface LibraryItemsIntent {
     data object ConfirmDelete : LibraryItemsIntent
     data object CancelDelete : LibraryItemsIntent
     data class TogglePin(val item: LibraryItem) : LibraryItemsIntent
+    data object LoadMore : LibraryItemsIntent
 }
 
 sealed interface LibraryItemsEffect {

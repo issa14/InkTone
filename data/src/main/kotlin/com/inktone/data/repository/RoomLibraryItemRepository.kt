@@ -18,9 +18,11 @@ class RoomLibraryItemRepository @Inject constructor(
         filter: LibraryItemFilter,
         searchQuery: String,
         sortOrder: LibraryItemSortOrder,
+        limit: Int,
     ): Flow<List<LibraryItem>> = dao.observe(
         typeFilter = filter.toSqlTypeFilter(),
         searchQuery = searchQuery,
         alphabetical = sortOrder == LibraryItemSortOrder.ALPHABETICAL,
+        limit = limit,
     ).map { list -> list.map { it.toDomain() } }
 }

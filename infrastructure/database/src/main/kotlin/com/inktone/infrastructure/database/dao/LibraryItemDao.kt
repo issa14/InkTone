@@ -12,6 +12,12 @@ import kotlinx.coroutines.flow.Flow
  */
 @Dao
 interface LibraryItemDao {
+    // AUDIT_REACTIVITE_UX §6.1 — aucune borne : toute la vue (tous ouvrages
+    // confondus) arrivait en mémoire d'un bloc, quelle que soit sa taille.
+    // `:limit` est fourni par l'appelant (chargement à la demande, pas de
+    // pagination Room complète — voir LibraryItemsViewModel) ; la requête
+    // reste réactive (Flow), rejouée avec un `:limit` plus grand quand
+    // l'utilisateur approche du bas de la liste.
     @Query(
         """
         SELECT * FROM library_items
@@ -28,11 +34,13 @@ interface LibraryItemDao {
             isPinned DESC,
             CASE WHEN :alphabetical THEN publicationTitle END ASC,
             CASE WHEN :alphabetical THEN NULL ELSE createdAt END DESC
+        LIMIT :limit
         """,
     )
     fun observe(
         typeFilter: String?,
         searchQuery: String,
         alphabetical: Boolean,
+        limit: Int,
     ): Flow<List<LibraryItemView>>
 }

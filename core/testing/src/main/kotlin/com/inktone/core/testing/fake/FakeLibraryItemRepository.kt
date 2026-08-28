@@ -16,6 +16,7 @@ class FakeLibraryItemRepository : LibraryItemRepository {
         filter: LibraryItemFilter,
         searchQuery: String,
         sortOrder: LibraryItemSortOrder,
+        limit: Int,
     ): Flow<List<LibraryItem>> = state.map { items ->
         items
             .filter { item ->
@@ -40,5 +41,6 @@ class FakeLibraryItemRepository : LibraryItemRepository {
                     }
                 },
             )
+            .take(limit)
     }
 }
