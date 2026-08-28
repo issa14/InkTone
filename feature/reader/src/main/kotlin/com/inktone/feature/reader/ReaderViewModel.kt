@@ -1196,6 +1196,42 @@ class ReaderViewModel @Inject constructor(
                 chapterParser.preload(publicationId, chapter.href, this)
             }
         }
+        evictChapterContentOutsideWindow(centerIndex)
+    }
+
+    /**
+     * AUDIT_REACTIVITE_UX §5.2 — un chapitre visité n'était jamais évincé de
+     * l'état : `chapters[i].content` (les [BookBlock] riches — texte stylé,
+     * images) reste retenu pour tout chapitre déjà ouvert une fois, alors
+     * que le parseur (`EpubChapterParser`/`PdfChapterParser`) borne déjà SON
+     * propre cache par un `LruCache` en octets — un budget neutralisé en
+     * aval par cette rétention.
+     *
+     * Fenêtre glissante identique à [preloadAdjacentChapters] (N-1 à N+2,
+     * centrée sur le chapitre affiché) : hors de cette fenêtre, le contenu
+     * riche revient à sa coquille vide ([ChapterContent.Rich] sans blocs) —
+     * [loadChapterContentIfNeeded] la considère alors comme non chargée et
+     * la redemande au parseur si ce chapitre redevient courant, qui la
+     * reproduit depuis SON cache (coût d'un hit LRU, pas un re-parsing).
+     *
+     * `chapter.sentences` n'est volontairement PAS touché : léger comparé
+     * aux blocs riches, et la progression (§3.4, `chapterCharPrefix`) en
+     * dépend pour tout chapitre déjà visité, même hors fenêtre.
+     */
+    private fun evictChapterContentOutsideWindow(centerIndex: Int) {
+        val window = (centerIndex - 1)..(centerIndex + 2)
+        val chapters = _state.value.chapters
+        var changed = false
+        val trimmed = chapters.mapIndexed { index, chapter ->
+            if (index in window) return@mapIndexed chapter
+            val rich = chapter.content as? ChapterContent.Rich ?: return@mapIndexed chapter
+            if (rich.blocks.isEmpty()) return@mapIndexed chapter
+            changed = true
+            chapter.copy(content = ChapterContent.Rich(emptyList()))
+        }
+        if (changed) {
+            _state.value = _state.value.copy(chapters = trimmed)
+        }
     }
 
     /**
@@ -1261,9 +1297,16 @@ class ReaderViewModel @Inject constructor(
                 if (index != start) {
                     _state.value = _state.value.copy(currentChapterIndex = index, currentSentenceIndex = 0)
                 }
+                // AUDIT_REACTIVITE_UX §5.2 — jusqu'à MAX_EMPTY_PAGE_LOOKAHEAD
+                // pages ont pu être chargées avant de trouver celle-ci ;
+                // preloadAdjacentChapters (appelé plus loin sur navigation
+                // normale) ne les revoit pas dans ce chemin, donc éviction
+                // explicite ici pour ne pas les retenir toutes.
+                evictChapterContentOutsideWindow(index)
                 return true
             }
         }
+        evictChapterContentOutsideWindow(start)
         return false
     }
 
