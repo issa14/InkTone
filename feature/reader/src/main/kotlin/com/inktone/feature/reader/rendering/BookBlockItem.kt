@@ -12,6 +12,7 @@ import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.CompositionLocalProvider
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.State
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
@@ -19,9 +20,10 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberUpdatedState
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.draw.drawWithContent
+import androidx.compose.ui.draw.drawWithCache
 import androidx.compose.ui.geometry.Rect
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.Path
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.layout.LayoutCoordinates
 import androidx.compose.ui.layout.onGloballyPositioned
@@ -49,8 +51,8 @@ import com.inktone.domain.model.BookBlock
 import com.inktone.domain.service.EpubResourceResolver
 import com.inktone.feature.reader.SelectionHighlightColor
 import com.inktone.feature.reader.WordHighlightColor
+import com.inktone.feature.reader.absoluteRangePath
 import com.inktone.feature.reader.annotationSpanStyle
-import com.inktone.feature.reader.drawAbsoluteRangeHighlight
 import com.inktone.feature.reader.rangeBoundsInWindow
 import com.inktone.feature.reader.toComposeColor
 
@@ -77,7 +79,7 @@ import com.inktone.feature.reader.toComposeColor
  * « Limites connues » : pas de sélection inter-bloc). La logique de
  * sélection/toolbar/surlignage est le pendant, à l'échelle du BLOC, de
  * `PageBlock` dans `PagedChapterContent.kt` (mêmes fonctions partagées :
- * [rangeBoundsInWindow], [drawAbsoluteRangeHighlight], [WordHighlightColor],
+ * [rangeBoundsInWindow], [absoluteRangePath], [WordHighlightColor],
  * [SelectionHighlightColor]).
  *
  * @param block Le bloc à rendre.
@@ -296,6 +298,23 @@ private fun ParagraphBlockText(
     var textCoordinates by remember(blockOffsetRange) { mutableStateOf<LayoutCoordinates?>(null) }
     val density = LocalDensity.current
 
+    // §4.2 (audit réactivité) — lecture de `highlightedRange` + écriture de
+    // `onCurrentLineY` sorties de `onTextLayout` : lire un état pendant la
+    // phase de layout y abonne la mise en page (chaque mot prononcé
+    // invalidait le layout de tous les blocs visibles), et écrire pendant le
+    // layout déclenche une passe aval. Dérivé ici, dans un effet, à partir
+    // du `TextLayoutResult` déjà capturé.
+    LaunchedEffect(textLayoutResult, highlightedRange.value, isReadingRulerEnabled, blockOffsetRange) {
+        if (!isReadingRulerEnabled) return@LaunchedEffect
+        val layout = textLayoutResult ?: return@LaunchedEffect
+        val absRange = highlightedRange.value ?: return@LaunchedEffect
+        val local = absRange.first - blockOffsetRange.first
+        if (local in 0 until layout.layoutInput.text.length) {
+            val line = layout.getLineForOffset(local)
+            onCurrentLineY(with(density) { layout.getLineTop(line).toDp() })
+        }
+    }
+
     var localSelection by remember(blockOffsetRange) { mutableStateOf(TextRange.Zero) }
 
     val globalSelection = freeSelectedRange.value
@@ -395,17 +414,10 @@ private fun ParagraphBlockText(
             readOnly = true,
             textStyle = textStyle,
             onTextLayout = { layout ->
+                // §4.2 (audit réactivité) — capture seule du résultat : plus
+                // aucune lecture d'état ni écriture pendant la phase de
+                // layout (voir le `LaunchedEffect` dédié plus haut).
                 textLayoutResult = layout
-                if (isReadingRulerEnabled) {
-                    val absRange = highlightedRange.value
-                    if (absRange != null) {
-                        val local = absRange.first - blockOffsetRange.first
-                        if (local in 0 until layout.layoutInput.text.length) {
-                            val line = layout.getLineForOffset(local)
-                            onCurrentLineY(with(density) { layout.getLineTop(line).toDp() })
-                        }
-                    }
-                }
             },
             modifier = modifier
                 .fillMaxWidth()
@@ -419,16 +431,22 @@ private fun ParagraphBlockText(
                         true
                     }
                 }
-                .drawWithContent {
-                    textLayoutResult?.let { layout ->
-                        freeSelectedRange.value?.let { absolute ->
-                            drawAbsoluteRangeHighlight(layout, blockOffsetRange, absolute, SelectionHighlightColor)
-                        }
-                        highlightedRange.value?.let { absolute ->
-                            drawAbsoluteRangeHighlight(layout, blockOffsetRange, absolute, WordHighlightColor)
-                        }
+                .drawWithCache {
+                    // §4.2 (audit réactivité) — `Path` de surlignage calculé
+                    // une fois par changement de plage/layout, puis mis en
+                    // cache par `drawWithCache` : plus d'allocation de `Path`
+                    // à chaque frame via `getPathForRange`.
+                    val layout = textLayoutResult
+                    val selectionPath = layout?.let { l ->
+                        freeSelectedRange.value?.let { absoluteRangePath(l, blockOffsetRange, it) }
                     }
-                    drawContent()
+                    val wordPath = layout?.let { l ->
+                        highlightedRange.value?.let { absoluteRangePath(l, blockOffsetRange, it) }
+                    }
+                    onDrawBehind {
+                        selectionPath?.let { drawPath(it, SelectionHighlightColor) }
+                        wordPath?.let { drawPath(it, WordHighlightColor) }
+                    }
                 },
         )
     }
