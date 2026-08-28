@@ -52,21 +52,16 @@ data class LibraryUiState(
      */
     val narratingPublicationId: String? = null,
     val isNarrationPlaying: Boolean = false,
-) {
-
-    /** Vrai si la carte « Reprendre la lecture » porte le livre en cours de narration. */
-    val isResumeNarrationPlaying: Boolean
-        get() = isNarrationPlaying && narratingPublicationId != null &&
-            narratingPublicationId == resumeReadingPublication?.id
-    /** Tags distincts de la bibliotheque COMPLETE, pas seulement du filtre actif — le drawer doit pouvoir en changer. */
-    val availableTags: List<String> get() = publications.flatMap { it.subjects }.distinct().sorted()
-    val availableSeries: List<String> get() = publications.mapNotNull { it.seriesName }.distinct().sorted()
-    val availableAuthors: List<String> get() = publications.flatMap { it.authors }.distinct().sorted()
-
-    /** Lot 2a.3 — compteurs du flyout du titre (ex. « Trilogie du Vide (3) »). */
-    val seriesCounts: Map<String, Int> get() = publications.mapNotNull { it.seriesName }.groupingBy { it }.eachCount()
-    val tagCounts: Map<String, Int> get() = publications.flatMap { it.subjects }.groupingBy { it }.eachCount()
-
+    // AUDIT_REACTIVITE_UX §3.5 — ces sept dérivations étaient des `get()`
+    // rejouées à CHAQUE recomposition de LibraryScreen (dont à chaque frappe,
+    // sans debounce). Elles sont désormais des champs calculés UNE FOIS par
+    // émission dans LibraryViewModel (voir `withDerivedFields`), à l'image de
+    // `computeProgressMap` déjà déplacé sur `defaultDispatcher`.
+    val availableTags: List<String> = emptyList(),
+    val availableSeries: List<String> = emptyList(),
+    val availableAuthors: List<String> = emptyList(),
+    val seriesCounts: Map<String, Int> = emptyMap(),
+    val tagCounts: Map<String, Int> = emptyMap(),
     /**
      * Tache 9bis.4 — carte "reprendre la lecture" proeminente, pas seulement
      * un FAB (amelioration legacy). La regle vit dans `resumePublication()`
@@ -74,11 +69,14 @@ data class LibraryUiState(
      * doublon avec cette carte — jamais deux definitions du meme "dernier
      * livre ouvert".
      */
-    val resumeReadingPublication: Publication?
-        get() = publications.resumePublication()
+    val resumeReadingPublication: Publication? = null,
+    val displayedPublications: List<Publication> = emptyList(),
+) {
 
-    val displayedPublications: List<Publication>
-        get() = publications.filterAndSort(searchQuery, selectedFormats, sortOrder)
+    /** Vrai si la carte « Reprendre la lecture » porte le livre en cours de narration. */
+    val isResumeNarrationPlaying: Boolean
+        get() = isNarrationPlaying && narratingPublicationId != null &&
+            narratingPublicationId == resumeReadingPublication?.id
 }
 
 /**
@@ -105,8 +103,18 @@ internal fun List<Publication>.filterAndSort(
         searched.filter { it.format in selectedFormats }
     }
     val sorted = when (sortOrder) {
-        LibrarySortOrder.TITLE -> filtered.sortedBy { it.title.lowercase() }
-        LibrarySortOrder.AUTHOR -> filtered.sortedWith(compareBy(nullsLast()) { it.authors.firstOrNull()?.lowercase() })
+        // §3.5 — clés de tri précalculées : `sortedBy { it.title.lowercase() }`
+        // réévalue le sélecteur (donc alloue une String) à CHAQUE comparaison,
+        // soit O(n log n) allocations. Ici la clé est calculée une fois par
+        // élément (O(n)), puis le tri compare la clé déjà en cache.
+        LibrarySortOrder.TITLE -> filtered
+            .map { it to it.title.lowercase() }
+            .sortedBy { it.second }
+            .map { it.first }
+        LibrarySortOrder.AUTHOR -> filtered
+            .map { it to it.authors.firstOrNull()?.lowercase() }
+            .sortedWith(compareBy(nullsLast()) { it.second })
+            .map { it.first }
         LibrarySortOrder.RECENTLY_ADDED -> filtered.sortedByDescending { it.importDate }
         LibrarySortOrder.RECENTLY_OPENED -> filtered.sortedByDescending { it.lastOpened ?: 0L }
     }
@@ -115,6 +123,22 @@ internal fun List<Publication>.filterAndSort(
     // ci-dessus est conservé au sein de chaque groupe (épinglé/non).
     return sorted.sortedByDescending { it.isPinned }
 }
+
+/**
+ * AUDIT_REACTIVITE_UX §3.5 — calcule les sept dérivations de [LibraryUiState]
+ * une fois, à partir des champs de base (publications + filtre/tri/recherche).
+ * Appelée dans LibraryViewModel à chaque émission où ces champs changent (et
+ * après le debounce de la recherche), jamais dans la composition.
+ */
+internal fun LibraryUiState.withDerivedFields(): LibraryUiState = copy(
+    availableTags = publications.flatMap { it.subjects }.distinct().sorted(),
+    availableSeries = publications.mapNotNull { it.seriesName }.distinct().sorted(),
+    availableAuthors = publications.flatMap { it.authors }.distinct().sorted(),
+    seriesCounts = publications.mapNotNull { it.seriesName }.groupingBy { it }.eachCount(),
+    tagCounts = publications.flatMap { it.subjects }.groupingBy { it }.eachCount(),
+    resumeReadingPublication = publications.resumePublication(),
+    displayedPublications = publications.filterAndSort(searchQuery, selectedFormats, sortOrder),
+)
 
 /** Lot 2a.1 — « Récents » et « Récemment lus » fusionnés en RECENTLY_OPENED (decision actee, un seul `lastOpened` dans le domaine). */
 enum class LibrarySortOrder { RECENTLY_ADDED, TITLE, AUTHOR, RECENTLY_OPENED }
