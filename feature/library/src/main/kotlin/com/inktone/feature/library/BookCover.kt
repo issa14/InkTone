@@ -34,7 +34,7 @@ import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
-import coil.compose.SubcomposeAsyncImage
+import coil.compose.AsyncImage
 import coil.request.ImageRequest
 import com.inktone.core.designsystem.AppIcon
 import com.inktone.core.designsystem.AppSymbol
@@ -89,10 +89,17 @@ fun BookCover(
 
     val context = LocalContext.current
     // E.3 — Support content:// URI (SAF) en plus de file://
+    //
+    // AUDIT_REACTIVITE_UX §4.6 — `File(...).exists()` était évalué en
+    // composition, donc un `stat()` disque à CHAQUE composition de chaque
+    // couverture visible. Le fichier est maintenant passé sans vérifier
+    // son existence : Coil échoue silencieusement la requête si absent,
+    // et le dégradé de repli ([CoverPlaceholder]) reste visible dessous
+    // (voir §4.7) — même résultat visuel, sans I/O sur le thread de rendu.
     val coverModel: Any? = when {
         publication.coverUri == null -> null
         publication.coverUri!!.startsWith("content://") -> Uri.parse(publication.coverUri)
-        else -> File(publication.coverUri!!).takeIf { it.exists() }
+        else -> File(publication.coverUri!!)
     }
 
     // E.2 — contentDescription global pour TalkBack
@@ -136,7 +143,15 @@ fun BookCover(
             .clickable(onClick = onClick),
     ) {
         if (coverModel != null) {
-            SubcomposeAsyncImage(
+            // AUDIT_REACTIVITE_UX §4.7 — `SubcomposeAsyncImage` subcompose
+            // ses emplacements `loading`/`error`, coût payé par vignette ;
+            // ici les deux affichaient de toute façon le même
+            // `CoverPlaceholder`, qui n'achetait rien. Le dégradé de repli
+            // reste dessous en permanence (chargement ET erreur, y compris
+            // le fichier absent de §4.6 ci-dessus) ; `AsyncImage` le
+            // recouvre seulement une fois l'image effectivement décodée.
+            CoverPlaceholder(title = publication.title, showTitle = !showTitle)
+            AsyncImage(
                 model = ImageRequest.Builder(context)
                     .data(coverModel)
                     .crossfade(true)
@@ -144,12 +159,6 @@ fun BookCover(
                 contentDescription = publication.title,
                 contentScale = ContentScale.Crop,
                 modifier = Modifier.fillMaxSize(),
-                loading = {
-                    CoverPlaceholder(title = publication.title, showTitle = !showTitle)
-                },
-                error = {
-                    CoverPlaceholder(title = publication.title, showTitle = !showTitle)
-                },
             )
         } else {
             CoverPlaceholder(title = publication.title, showTitle = !showTitle)
@@ -291,23 +300,27 @@ private fun CoverPlaceholder(title: String, showTitle: Boolean) {
     }
 }
 
+// AUDIT_REACTIVITE_UX §4.8 — hissée hors composition : la liste (8 paires
+// de Color) était réallouée à chaque composition de rememberCoverGradient,
+// malgré son nom, pour CHAQUE vignette sans couverture.
+private val CoverGradientPalette = listOf(
+    Color(0xFF1565C0) to Color(0xFF1E88E5), // Bleu
+    Color(0xFF6A1B9A) to Color(0xFF8E24AA), // Violet
+    Color(0xFF2E7D32) to Color(0xFF43A047), // Vert
+    Color(0xFFE65100) to Color(0xFFF57C00), // Orange
+    Color(0xFFC62828) to Color(0xFFE53935), // Rouge
+    Color(0xFF00695C) to Color(0xFF00897B), // Teal
+    Color(0xFF283593) to Color(0xFF3949AB), // Indigo
+    Color(0xFF4E342E) to Color(0xFF6D4C41), // Brun
+)
+
 /**
  * Dégradé déterministe basé sur le hash du titre — 3 couleurs parmi
  * 8 prédéfinies, sélectionnées par [title.hashCode()].
  */
 @Composable
-private fun rememberCoverGradient(title: String): Brush {
-    val colors = listOf(
-        Color(0xFF1565C0) to Color(0xFF1E88E5), // Bleu
-        Color(0xFF6A1B9A) to Color(0xFF8E24AA), // Violet
-        Color(0xFF2E7D32) to Color(0xFF43A047), // Vert
-        Color(0xFFE65100) to Color(0xFFF57C00), // Orange
-        Color(0xFFC62828) to Color(0xFFE53935), // Rouge
-        Color(0xFF00695C) to Color(0xFF00897B), // Teal
-        Color(0xFF283593) to Color(0xFF3949AB), // Indigo
-        Color(0xFF4E342E) to Color(0xFF6D4C41), // Brun
-    )
-    val pair = colors[title.hashCode().mod(colors.size)]
-    return Brush.verticalGradient(listOf(pair.first, pair.second))
+private fun rememberCoverGradient(title: String): Brush = remember(title) {
+    val pair = CoverGradientPalette[title.hashCode().mod(CoverGradientPalette.size)]
+    Brush.verticalGradient(listOf(pair.first, pair.second))
 }
 
