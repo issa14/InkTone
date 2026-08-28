@@ -647,6 +647,10 @@ class ReaderViewModel @Inject constructor(
                         title = publication.title.cleanedForDisplay(),
                         author = publication.authors.cleanedAuthorsForDisplay().ifBlank { null },
                         chapters = result.documentModel.chapters,
+                        // §3.4 — précalcule les cumuls de caractères une fois
+                        // à l'ouverture (invalide ensuite au chargement de
+                        // chapitre) pour que bookProgression reste O(1).
+                        chapterCharPrefix = computeChapterCharPrefix(result.documentModel.chapters),
                         tableOfContents = result.documentModel.tableOfContents,
                         currentChapterIndex = restored?.locator?.chapterIndex ?: 0,
                         effectiveSettings = effectiveSettings,
@@ -1147,7 +1151,12 @@ class ReaderViewModel @Inject constructor(
             // ne matchent jamais, la couleur ne s'affiche donc jamais.
             // Seule source de vérité désormais : la position dans `chapters`.
             chapters[chapterIndex] = richChapter.copy(index = chapterIndex)
-            _state.value = _state.value.copy(chapters = chapters)
+            _state.value = _state.value.copy(
+                chapters = chapters,
+                // §3.4 — le contenu de ce chapitre vient d'être chargé : le
+                // cumul de caractères change, on invalide le tableau préfixe.
+                chapterCharPrefix = computeChapterCharPrefix(chapters),
+            )
         }
     }
 
