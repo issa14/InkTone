@@ -11,7 +11,7 @@ import androidx.compose.material3.windowsizeclass.ExperimentalMaterial3WindowSiz
 import androidx.compose.material3.windowsizeclass.calculateWindowSizeClass
 import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.runtime.LaunchedEffect
-import androidx.compose.runtime.collectAsState
+import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.setValue
@@ -76,13 +76,13 @@ class MainActivity : ComponentActivity() {
             val windowSizeClass = calculateWindowSizeClass(this)
             CompositionLocalProvider(LocalWindowSizeClass provides windowSizeClass) {
                 val appThemeViewModel: AppThemeViewModel = hiltViewModel()
-                val useDynamicColor by appThemeViewModel.useDynamicColor.collectAsState()
-                val appTheme by appThemeViewModel.appTheme.collectAsState()
+                val useDynamicColor by appThemeViewModel.useDynamicColor.collectAsStateWithLifecycle()
+                val appTheme by appThemeViewModel.appTheme.collectAsStateWithLifecycle()
                 // Lot 10 — null tant que la préférence n'est pas encore
                 // chargée depuis Room : un seul frame de retard plutôt
                 // qu'un flash sur LibraryRoute avant redirection vers
                 // l'onboarding (piège explicite du plan, Tâche 10.4).
-                val hasSeenOnboarding by appThemeViewModel.hasSeenOnboarding.collectAsState()
+                val hasSeenOnboarding by appThemeViewModel.hasSeenOnboarding.collectAsStateWithLifecycle()
                 LaunchedEffect(hasSeenOnboarding) {
                     if (hasSeenOnboarding != null) isReady = true
                 }

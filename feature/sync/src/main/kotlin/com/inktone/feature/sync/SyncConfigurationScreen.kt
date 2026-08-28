@@ -44,7 +44,7 @@ import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.TopAppBarDefaults
 import androidx.compose.ui.text.input.PasswordVisualTransformation
 import androidx.compose.runtime.Composable
-import androidx.compose.runtime.collectAsState
+import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
@@ -93,7 +93,7 @@ fun SyncConfigurationScreen(
     onConnectWebDav: (url: String, username: String, password: String) -> Unit = { _, _, _ -> },
     onDisconnectWebDav: () -> Unit = {},
 ) {
-    val state by viewModel.state.collectAsState()
+    val state by viewModel.state.collectAsStateWithLifecycle()
     var manualShowConfig by remember { mutableStateOf(false) }
 
     val isConfigured = state.syncUiState is SyncUiState.Configured || state.syncUiState is SyncUiState.Syncing

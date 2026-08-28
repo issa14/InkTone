@@ -125,6 +125,10 @@ dependencies {
     implementation("androidx.activity:activity-compose:1.9.1")
     implementation(libs.androidx.hilt.navigation.compose)
     implementation(libs.androidx.core.splashscreen)
+    // AUDIT_REACTIVITE_UX §5.5 — collectAsStateWithLifecycle : les
+    // collecteurs de MainActivity/InkToneNavHost restaient actifs écran
+    // éteint et application en arrière-plan avec collectAsState().
+    implementation(libs.androidx.lifecycle.runtime.compose)
     // P3 (plan polissage Pareto) — installe au demarrage le Baseline
     // Profile (profil de reference) compile a la livraison, pour reduire
     // le temps de demarrage a froid sur Snapdragon 680 (Blueprint §11.2).
