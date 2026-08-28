@@ -34,6 +34,7 @@ import androidx.compose.ui.unit.dp
 import coil.ImageLoader
 import coil.compose.AsyncImage
 import coil.compose.LocalImageLoader
+import coil.memory.MemoryCache
 import com.inktone.core.designsystem.AppIcon
 import com.inktone.core.designsystem.AppSymbol
 import com.inktone.domain.model.OpdsItem
@@ -60,6 +61,12 @@ fun OpdsFeedScreen(
         ImageLoader.Builder(context)
             .components { add(OpdsCoverFetcher.Factory(httpClient)) }
             .crossfade(true)
+            // AUDIT_REACTIVITE_UX §5.1 — même défaut que l'ImageLoader du
+            // Lecteur (non listé dans l'audit, trouvé en marge en
+            // appliquant sa correction) : un 3e cache mémoire concurrent
+            // au budget par défaut (~25% du tas). Borné explicitement pour
+            // la même raison.
+            .memoryCache { MemoryCache.Builder(context).maxSizePercent(0.10).build() }
             .build()
     }
 

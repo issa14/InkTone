@@ -117,6 +117,7 @@ import com.inktone.domain.model.Sentence
 import com.inktone.feature.reader.pagination.rememberChapterPaginationState
 import coil.ImageLoader
 import coil.compose.LocalImageLoader
+import coil.memory.MemoryCache
 import com.inktone.feature.reader.rendering.BookBlockItem
 import com.inktone.feature.reader.rendering.BookBlockStyleMapper
 import com.inktone.feature.reader.rendering.EpubImageFetcher
@@ -811,6 +812,16 @@ fun ReaderScreen(
             state.epubResourceResolver?.let { resolver ->
                 ImageLoader.Builder(context)
                     .components { add(EpubImageFetcher.Factory(resolver)) }
+                    // AUDIT_REACTIVITE_UX §5.1 — sans budget explicite, ce
+                    // second cache mémoire (en plus de celui de l'ImageLoader
+                    // par défaut, utilisé par les couvertures de la
+                    // Bibliothèque) se dimensionne lui aussi à ~25% du tas
+                    // disponible : les deux ensemble aggravent la pression
+                    // mémoire sur un aller-retour Bibliothèque ↔ Lecteur, sur
+                    // un appareil à faible mémoire. Borné explicitement, pas
+                    // de mise en cache prématurée au-delà de ce qu'un
+                    // chapitre illustré affiche réellement à l'écran.
+                    .memoryCache { MemoryCache.Builder(context).maxSizePercent(0.10).build() }
                     .build()
             }
         }
