@@ -15,7 +15,6 @@ import androidx.compose.ui.text.style.LineBreak
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.text.TextMeasurer
-import androidx.compose.ui.text.rememberTextMeasurer
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.platform.LocalFontFamilyResolver
 import androidx.compose.ui.platform.LocalLayoutDirection
@@ -134,11 +133,11 @@ internal fun isMeasurementComplete(measuredSentences: Int, totalSentences: Int):
  */
 internal fun measurableOffsetCount(chapter: Chapter?): Int {
     val blocks = (chapter?.content as? ChapterContent.Rich)?.blocks ?: return chapter?.sentences?.size ?: 0
-    val sentences = chapter.sentences
+    val sentencesByBlock = sentencesByBlockIndex(chapter.sentences)
     return blocks.withIndex()
         .filter { it.value is BookBlock.ParagraphBlock || it.value is BookBlock.HeadingBlock }
         .sumOf { (originalIndex, _) ->
-            sentences.count { it.blockIndex == originalIndex }.coerceAtLeast(1)
+            (sentencesByBlock[originalIndex]?.size ?: 0).coerceAtLeast(1)
         }
 }
 
@@ -209,15 +208,13 @@ fun rememberChapterPaginationState(
     // sert au rendu — les séparer ferait diverger mesure et affichage.
     justified: Boolean = false,
 ): ChapterPaginationState {
-    val textMeasurer = rememberTextMeasurer()
-    val chapterTextMeasurer = remember(textMeasurer) { ChapterTextMeasurer(textMeasurer) }
-    // Le TextMeasurer ci-dessus appartient a la composition et porte un
-    // cache de layout qui n'est PAS thread-safe. Il ne doit donc servir
-    // qu'ici, sur le thread principal (mesure de la premiere page).
-    // Les mesures d'arriere-plan en fabriquent un a elles, a partir des
-    // memes parametres de resolution : deux effets qui se chevauchent
-    // (changement de chapitre pendant qu'une mesure tourne encore) ne
-    // peuvent alors plus toucher le meme cache depuis deux threads.
+    // Chaque mesure — y compris la première page depuis l'audit §4.3 —
+    // s'exécute sur `Dispatchers.Default` avec un `TextMeasurer` dédié.
+    // Le `TextMeasurer` de composition n'est PAS thread-safe : un mesureur
+    // par mesure d'arrière-plan, à partir des mêmes paramètres de
+    // résolution, garantit que deux effets qui se chevauchent (changement
+    // de chapitre pendant qu'une mesure tourne encore) ne touchent jamais
+    // le même cache depuis deux threads.
     val fontFamilyResolver = LocalFontFamilyResolver.current
     val density = LocalDensity.current
     val layoutDirection = LocalLayoutDirection.current
@@ -288,9 +285,15 @@ fun rememberChapterPaginationState(
         val targetSentenceIndex = currentSentenceIndexAtOpen.value
 
         // Première page : préfixe borné, coût indépendant de la longueur
-        // du chapitre — assez rapide pour rester sur le thread de
-        // composition (3a.3).
-        var partial = chapterTextMeasurer.measureFirstPage(chapter, baseTextStyle, contentWidthPx)
+        // du chapitre. Mesurée en arrière-plan comme le reste : la KDoc
+        // historique (« assez rapide pour rester sur le thread de
+        // composition ») n'est pas vérifiée par une mesure et devient
+        // fausse dès que la justification + césure sont actives (audit
+        // §4.3). Rejouée à chaque cran du curseur de police / rotation,
+        // elle doit sortir du thread principal.
+        var partial = withContext(Dispatchers.Default) {
+            newBackgroundMeasurer().measureFirstPage(chapter, baseTextStyle, contentWidthPx)
+        }
         state.measurement = partial
         state.bumpIfChanged(
             engine.updateChapter(chapter.index, styleKey, partial.lines, partial.sentenceStartOffsets, force = true),
