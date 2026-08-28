@@ -26,7 +26,7 @@ import androidx.compose.material3.rememberDrawerState
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.runtime.LaunchedEffect
-import androidx.compose.runtime.collectAsState
+import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
@@ -335,7 +335,7 @@ fun InkToneNavHost(navController: NavHostController = rememberNavController(), s
             // ViewModel et les deux lanceurs SAF (CreateDocument/OpenDocument,
             // meme pattern que ImportPickerButton) restent donc ici, dans app.
             val backupViewModel: BackupViewModel = hiltViewModel()
-            val dataOperationResult by backupViewModel.lastResult.collectAsState()
+            val dataOperationResult by backupViewModel.lastResult.collectAsStateWithLifecycle()
             // Lot 11, tâche 11.1 — le fichier est désormais chiffré E2EE ;
             // un mot de passe est demandé après le choix de
             // l'emplacement/du fichier. Reste ici (tâche 11.6) : la carte
@@ -405,10 +405,10 @@ fun InkToneNavHost(navController: NavHostController = rememberNavController(), s
             // réseau/identifiants dans un module feature), donc pilotés
             // ici via SyncAuthViewModel (app -> infrastructure/sync + data).
             val syncAuthViewModel: SyncAuthViewModel = hiltViewModel()
-            val isAuthenticating by syncAuthViewModel.isAuthenticating.collectAsState()
-            val authError by syncAuthViewModel.authError.collectAsState()
-            val isWebDavConnecting by syncAuthViewModel.isWebDavConnecting.collectAsState()
-            val webDavError by syncAuthViewModel.webDavError.collectAsState()
+            val isAuthenticating by syncAuthViewModel.isAuthenticating.collectAsStateWithLifecycle()
+            val authError by syncAuthViewModel.authError.collectAsStateWithLifecycle()
+            val isWebDavConnecting by syncAuthViewModel.isWebDavConnecting.collectAsStateWithLifecycle()
+            val webDavError by syncAuthViewModel.webDavError.collectAsStateWithLifecycle()
             val authLauncher = rememberLauncherForActivityResult(
                 ActivityResultContracts.StartActivityForResult(),
             ) { result -> syncAuthViewModel.onAuthorizationResult(result.data) }
@@ -488,7 +488,7 @@ fun InkToneNavHost(navController: NavHostController = rememberNavController(), s
         }
         composable<AboutRoute> {
             val aboutViewModel: AboutViewModel = hiltViewModel()
-            val ttsEngineLabel by aboutViewModel.ttsEngineLabel.collectAsState()
+            val ttsEngineLabel by aboutViewModel.ttsEngineLabel.collectAsStateWithLifecycle()
             BackScaffold(title = "A propos", onBack = navController::popBackStack) {
                 AboutScreen(
                     versionName = BuildConfig.VERSION_NAME,

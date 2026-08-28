@@ -54,7 +54,7 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.LaunchedEffect
-import androidx.compose.runtime.collectAsState
+import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.compose.runtime.derivedStateOf
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableIntStateOf
@@ -193,10 +193,10 @@ fun ReaderScreen(
     onOpenPronunciationRules: () -> Unit = {},
     onOpenSettings: () -> Unit = {},
 ) {
-    val state by viewModel.state.collectAsState()
+    val state by viewModel.state.collectAsStateWithLifecycle()
     // §3.3 — le surlignage mot-à-mot est collecté séparément : sa cadence
     // (un mot prononcé, 3 à 5 fois/s) ne recompose plus le corps de l'écran.
-    val highlightedWordRange by viewModel.highlightedWordRange.collectAsState()
+    val highlightedWordRange by viewModel.highlightedWordRange.collectAsStateWithLifecycle()
 
     // P1 — la notification média est la voie de contrôle en arrière-plan et
     // sur écran verrouillé. Sur Android 13+, elle n'apparaît qu'avec
