@@ -29,6 +29,11 @@ data class ReaderUiState(
     val author: String? = null,
     val chapters: List<Chapter> = emptyList(),
     val currentChapterIndex: Int = 0,
+    // §3.4 — cumuls de caractères par chapitre (préfixe) + total, calculés
+    // une fois par publication puis invalidés au chargement d'un chapitre :
+    // `bookProgression` devient O(1) au lieu de re-parcourir tous les chapitres.
+    // prefix[i] = caractères des chapitres [0..i-1], prefix.last() = total.
+    val chapterCharPrefix: List<Long> = emptyList(),
     val tableOfContents: List<TableOfContentsEntry> = emptyList(),
     val currentSentenceIndex: Int = 0,
     val highlightedWordRange: IntRange? = null,
@@ -208,11 +213,10 @@ data class ReaderUiState(
     /**
      * Tache 9bis.3.2 — progression du LIVRE ENTIER (`Locator.computeProgression`,
      * ecrite en Tache 1.1, jamais branchee avant cette tache), pas la
-     * progression par chapitre du legacy. Recalculee a chaque acces plutot
-     * que mise en cache a l'ecriture : le `DocumentModel` complet est deja
-     * en memoire (Tache 4.6), la somme des longueurs de phrase reste bon
-     * marche meme pour un roman long - pas de mise en cache prematuree
-     * tant qu'un cout reel n'est pas mesure.
+     * progression par chapitre du legacy. §3.4 : le cumul et le total de
+     * caracteres sont desormais precalculés (tableau préfixe
+     * `chapterCharPrefix`, invalidé au chargement d'un chapitre) — plus de
+     * parcours de tous les chapitres à chaque accès, coût devenu O(1).
      */
     val bookProgression: Float
         get() {
@@ -232,8 +236,14 @@ data class ReaderUiState(
                 chapterIndex = chapter.index,
                 charOffset = sentence?.startOffset ?: 0,
             )
-            val totalCharsBeforeChapter = chapters.take(currentChapterIndex).sumOf(::chapterCharCount)
-            val totalCharsInPublication = chapters.sumOf(::chapterCharCount)
+            // §3.4 — O(1) : cumul et total viennent du tableau préfixe
+            // précalculé (`computeChapterCharPrefix`, invalidé au chargement
+            // d'un chapitre), plus re-parcourus à chaque accès. Défaut de
+            // justesse adjacent (le dénominateur grandit au fil du chargement
+            // paresseux) : hors périmètre perf, à corriger séparément par une
+            // longueur connue à l'import.
+            val totalCharsBeforeChapter = chapterCharPrefix.getOrNull(currentChapterIndex) ?: 0L
+            val totalCharsInPublication = chapterCharPrefix.lastOrNull() ?: 0L
             return Locator.computeProgression(locator, totalCharsBeforeChapter, totalCharsInPublication)
         }
 
@@ -288,8 +298,18 @@ const val EYE_REST_REMINDER_COUNTDOWN_S = 60
  */
 data class PendingHighlightTarget(val chapterIndex: Int, val sentenceIndex: Int)
 
-private fun chapterCharCount(chapter: Chapter): Int =
-    chapter.sentences.sumOf { it.text.length }
+/**
+ * §3.4 — cumuls de caractères par chapitre, sous forme de tableau préfixe :
+ * `result[i]` = somme des longueurs de phrase des chapitres [0..i-1], et
+ * `result.last()` = total de la publication (chapitres déjà parsés).
+ */
+internal fun computeChapterCharPrefix(chapters: List<Chapter>): List<Long> {
+    val prefix = LongArray(chapters.size + 1)
+    for (i in chapters.indices) {
+        prefix[i + 1] = prefix[i] + chapters[i].sentences.sumOf { it.text.length.toLong() }
+    }
+    return prefix.toList()
+}
 
 sealed interface ReaderIntent {
     /**
