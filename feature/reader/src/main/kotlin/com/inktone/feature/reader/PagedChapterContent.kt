@@ -35,9 +35,10 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberUpdatedState
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.draw.drawWithContent
+import androidx.compose.ui.draw.drawWithCache
 import androidx.compose.ui.geometry.Rect
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.Path
 import androidx.compose.ui.graphics.drawscope.DrawScope
 import androidx.compose.ui.layout.LayoutCoordinates
 import androidx.compose.ui.layout.onGloballyPositioned
@@ -82,9 +83,10 @@ import com.inktone.feature.reader.pagination.ChapterPaginationState
  *
  * **Isolation du surlignage (contrainte structurante de 3a.2)** : le mot
  * en cours et la sélection sont lus **au plus tard**, via `State` capturé
- * en phase de dessin (`drawWithContent`), jamais passés en paramètre du
- * bloc de page — un changement de mot prononcé ne déclenche donc qu'un
- * redessin, jamais une remesure ni un replacement de la page.
+ * en phase de dessin (`drawWithCache`, dont le `Path` est mis en cache),
+ * jamais passés en paramètre du bloc de page — un changement de mot
+ * prononcé ne déclenche donc qu'un redessin, jamais une remesure ni un
+ * replacement de la page.
  *
  * **Phrase à cheval sur deux pages** (design validé avant implémentation,
  * voir revue du lot 3a) : une phrase appartient entièrement, pour
@@ -486,7 +488,8 @@ fun PagedChapterContent(
  * porte déjà les couleurs d'annotation existantes (posées une fois à la
  * construction, elles ne changent pas à cadence TTS). Le surlignage
  * mot-à-mot et la sélection en cours, eux, sont lus en phase de dessin
- * (`drawWithContent`) pour ne jamais invalider mesure ni placement.
+ * (`drawWithCache`, `Path` mis en cache) pour ne jamais invalider mesure
+ * ni placement.
  */
 @OptIn(ExperimentalFoundationApi::class)
 @Composable
@@ -511,6 +514,24 @@ private fun PageBlock(
     var textLayoutResult by remember(pageOffsetRange) { mutableStateOf<TextLayoutResult?>(null) }
     var textCoordinates by remember(pageOffsetRange) { mutableStateOf<LayoutCoordinates?>(null) }
     val density = LocalDensity.current
+
+    // §4.2 (audit réactivité) — la lecture de `highlightedRange` et l'écriture
+    // de `onCurrentLineY` ne se font PLUS dans `onTextLayout` : lire un état
+    // dans la phase de layout y abonne la mise en page (chaque mot prononcé
+    // invalidait le layout de tous les blocs visibles), et écrire un état
+    // pendant le layout déclenche une passe aval. La position de la règle de
+    // lecture est donc dérivée ici, dans un effet, à partir du
+    // `TextLayoutResult` déjà capturé — hors phase de mesure.
+    LaunchedEffect(textLayoutResult, highlightedRange.value, isDisplayedPage, isReadingRulerEnabled, pageOffsetRange) {
+        if (!isDisplayedPage || !isReadingRulerEnabled) return@LaunchedEffect
+        val layout = textLayoutResult ?: return@LaunchedEffect
+        val absRange = highlightedRange.value ?: return@LaunchedEffect
+        val local = absRange.first - pageOffsetRange.first
+        if (local in 0 until layout.layoutInput.text.length) {
+            val line = layout.getLineForOffset(local)
+            onCurrentLineY(with(density) { layout.getLineTop(line).toDp() })
+        }
+    }
 
     // Un `BasicTextField` en lecture seule délègue directement à la
     // sélection NATIVE de Compose (appui long calé sur le mot via
@@ -717,17 +738,11 @@ private fun PageBlock(
             readOnly = true,
             textStyle = textStyle,
             onTextLayout = { layout ->
+                // §4.2 (audit réactivité) — capture seule du résultat : plus
+                // aucune lecture d'état ni écriture pendant la phase de
+                // layout (voir le `LaunchedEffect` dédié à la règle de
+                // lecture plus haut).
                 textLayoutResult = layout
-                if (isDisplayedPage && isReadingRulerEnabled) {
-                    val absRange = highlightedRange.value
-                    if (absRange != null) {
-                        val local = absRange.first - pageOffsetRange.first
-                        if (local in 0 until layout.layoutInput.text.length) {
-                            val line = layout.getLineForOffset(local)
-                            onCurrentLineY(with(density) { layout.getLineTop(line).toDp() })
-                        }
-                    }
-                }
             },
             modifier = Modifier
                 .fillMaxSize()
@@ -753,16 +768,22 @@ private fun PageBlock(
                         true
                     }
                 }
-                .drawWithContent {
-                    textLayoutResult?.let { layout ->
-                        freeSelectedRange.value?.let { absolute ->
-                            drawAbsoluteRangeHighlight(layout, pageOffsetRange, absolute, SelectionHighlightColor)
-                        }
-                        highlightedRange.value?.let { absolute ->
-                            drawAbsoluteRangeHighlight(layout, pageOffsetRange, absolute, WordHighlightColor)
-                        }
+                .drawWithCache {
+                    // §4.2 (audit réactivité) — le `Path` de surlignage est
+                    // calculé UNE fois par changement de plage/layout, puis
+                    // mis en cache par `drawWithCache` : plus d'allocation de
+                    // `Path` à chaque frame via `getPathForRange`.
+                    val layout = textLayoutResult
+                    val selectionPath = layout?.let { l ->
+                        freeSelectedRange.value?.let { absoluteRangePath(l, pageOffsetRange, it) }
                     }
-                    drawContent()
+                    val wordPath = layout?.let { l ->
+                        highlightedRange.value?.let { absoluteRangePath(l, pageOffsetRange, it) }
+                    }
+                    onDrawBehind {
+                        selectionPath?.let { drawPath(it, SelectionHighlightColor) }
+                        wordPath?.let { drawPath(it, WordHighlightColor) }
+                    }
                 },
         )
     }
@@ -785,17 +806,28 @@ internal fun rangeBoundsInWindow(
     return Rect(topLeft, bottomRight)
 }
 
-internal fun DrawScope.drawAbsoluteRangeHighlight(
+/**
+ * `Path` du surlignage d'une plage absolue, exprimée dans l'espace local du
+ * layout ([pageOffsetRange] = offset global du premier caractère). `null` si
+ * la plage ne chevauche pas le layout. Séparé du dessin pour être mis en
+ * cache par `drawWithCache` (une allocation seulement quand la plage ou le
+ * layout changent, pas à chaque frame — §4.2 de l'audit de réactivité).
+ */
+internal fun absoluteRangePath(
     layout: TextLayoutResult,
     pageOffsetRange: IntRange,
     absoluteRange: IntRange,
-    color: Color,
-) {
+): Path? {
     val textLength = layout.layoutInput.text.length
     val localStart = (absoluteRange.first - pageOffsetRange.first).coerceAtLeast(0)
     val localEndExclusive = (absoluteRange.last + 1 - pageOffsetRange.first).coerceAtMost(textLength)
-    if (localStart >= localEndExclusive) return
-    drawPath(layout.getPathForRange(localStart, localEndExclusive), color = color)
+    if (localStart >= localEndExclusive) return null
+    return layout.getPathForRange(localStart, localEndExclusive)
+}
+
+internal fun DrawScope.drawAbsoluteRangeHighlight(path: Path?, color: Color) {
+    if (path == null) return
+    drawPath(path, color = color)
 }
 
 internal val WordHighlightColor = Color(0xFFFFEB3B)
