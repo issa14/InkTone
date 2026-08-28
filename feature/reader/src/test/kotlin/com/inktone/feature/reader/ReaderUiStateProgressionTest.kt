@@ -35,10 +35,14 @@ class ReaderUiStateProgressionTest {
         // 3 chapitres de 10 caracteres chacun (30 au total) - positionne
         // au debut du 2e chapitre : 10/30, pas 0/10 (progression par
         // chapitre, ce que faisait le legacy).
+        val chapters = listOf(chapterOf(0, "0123456789"), chapterOf(1, "abcdefghij"), chapterOf(2, "ABCDEFGHIJ"))
         val state = ReaderUiState(
-            chapters = listOf(chapterOf(0, "0123456789"), chapterOf(1, "abcdefghij"), chapterOf(2, "ABCDEFGHIJ")),
+            chapters = chapters,
             currentChapterIndex = 1,
             currentSentenceIndex = 0,
+            // §3.4 — le cumul est précalculé (computeChapterCharPrefix) et
+            // porté par l'état ; le test le pose explicitement.
+            chapterCharPrefix = computeChapterCharPrefix(chapters),
         )
 
         assertEquals(10f / 30f, state.bookProgression, 0.001f)

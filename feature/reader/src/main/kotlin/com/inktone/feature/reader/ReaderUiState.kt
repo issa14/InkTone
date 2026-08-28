@@ -33,10 +33,9 @@ data class ReaderUiState(
     // une fois par publication puis invalidés au chargement d'un chapitre :
     // `bookProgression` devient O(1) au lieu de re-parcourir tous les chapitres.
     // prefix[i] = caractères des chapitres [0..i-1], prefix.last() = total.
-    val chapterCharPrefix: List<Long> = emptyList(),
+    val chapterCharPrefix: List<Int> = emptyList(),
     val tableOfContents: List<TableOfContentsEntry> = emptyList(),
     val currentSentenceIndex: Int = 0,
-    val highlightedWordRange: IntRange? = null,
     val isPlaying: Boolean = false,
     // 3e.3 — distinct de isPlaying : isPlaying passe à vrai avant la
     // synthèse (ReaderViewModel.playCurrentSentence), isAudioActive ne
@@ -242,8 +241,8 @@ data class ReaderUiState(
             // justesse adjacent (le dénominateur grandit au fil du chargement
             // paresseux) : hors périmètre perf, à corriger séparément par une
             // longueur connue à l'import.
-            val totalCharsBeforeChapter = chapterCharPrefix.getOrNull(currentChapterIndex) ?: 0L
-            val totalCharsInPublication = chapterCharPrefix.lastOrNull() ?: 0L
+            val totalCharsBeforeChapter = chapterCharPrefix.getOrNull(currentChapterIndex) ?: 0
+            val totalCharsInPublication = chapterCharPrefix.lastOrNull() ?: 0
             return Locator.computeProgression(locator, totalCharsBeforeChapter, totalCharsInPublication)
         }
 
@@ -303,10 +302,10 @@ data class PendingHighlightTarget(val chapterIndex: Int, val sentenceIndex: Int)
  * `result[i]` = somme des longueurs de phrase des chapitres [0..i-1], et
  * `result.last()` = total de la publication (chapitres déjà parsés).
  */
-internal fun computeChapterCharPrefix(chapters: List<Chapter>): List<Long> {
-    val prefix = LongArray(chapters.size + 1)
+internal fun computeChapterCharPrefix(chapters: List<Chapter>): List<Int> {
+    val prefix = IntArray(chapters.size + 1)
     for (i in chapters.indices) {
-        prefix[i + 1] = prefix[i] + chapters[i].sentences.sumOf { it.text.length.toLong() }
+        prefix[i + 1] = prefix[i] + chapters[i].sentences.sumOf { it.text.length }
     }
     return prefix.toList()
 }
