@@ -933,6 +933,14 @@ class PlaybackOrchestrator @Inject constructor(
      * [_currentWordRange]. Si la position est invalide, aucune plage n'est
      * émise (le consommateur retombe sur le repli `delay()`). Sort dès que la
      * position dépasse le dernier mot, ou que la génération est périmée.
+     *
+     * AUDIT_REACTIVITE_UX §5.3 — le sondage était cadencé sur un intervalle
+     * fixe ([WORD_TRACKING_STEP_MS], 20 ms) tout du long, soit 50 réveils par
+     * seconde pendant des heures de narration cumulées. La prochaine échéance
+     * est connue à l'avance ([msUntilNextWordBoundary], déduite des
+     * [WordTimestamp] déjà en main) : le sondage y dort directement, avec une
+     * marge ([WORD_TRACKING_RESYNC_MARGIN_MS]) pour se recaler sur la
+     * position réelle avant l'échéance plutôt qu'après.
      */
     private fun launchWordTracking(generation: Long, sentenceStartMs: Long, wordTimestamps: List<WordTimestamp>) {
         wordTrackingJob?.cancel()
@@ -955,7 +963,13 @@ class PlaybackOrchestrator @Inject constructor(
                     _currentWordRange.value = range
                 }
                 if (position.valid && position.playedMs >= lastEndMs) return@launch
-                delay(WORD_TRACKING_STEP_MS)
+                val nextStep = if (position.valid) {
+                    (msUntilNextWordBoundary(position.playedMs, sentenceStartMs, wordTimestamps) - WORD_TRACKING_RESYNC_MARGIN_MS)
+                        .coerceIn(WORD_TRACKING_STEP_MS, WORD_TRACKING_MAX_STEP_MS)
+                } else {
+                    WORD_TRACKING_STEP_MS
+                }
+                delay(nextStep)
             }
         }
     }
@@ -1012,7 +1026,14 @@ class PlaybackOrchestrator @Inject constructor(
         /** Silence injecté après une synthèse en échec. */
         const val TIMEOUT_SILENCE_MS = 50L
         const val PACE_STEP_MS = 50L
+        // AUDIT_REACTIVITE_UX §5.3 — plancher (position invalide, en pause,
+        // ou échéance déjà dépassée de moins de ce délai) et plafond (un mot
+        // anormalement long ne doit pas endormir le sondage trop longtemps
+        // sans possibilité de recalage) de l'attente cadencée sur les
+        // WordTimestamp — voir launchWordTracking.
         const val WORD_TRACKING_STEP_MS = 20L
+        const val WORD_TRACKING_MAX_STEP_MS = 300L
+        const val WORD_TRACKING_RESYNC_MARGIN_MS = 15L
         const val SILENCE_COMMA_MS = 150L
         const val SILENCE_SENTENCE_MS = 650L
         const val SILENCE_PARAGRAPH_MS = 1000L
