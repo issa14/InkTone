@@ -24,7 +24,7 @@ class InkToneAndroidLibraryConventionPlugin : Plugin<Project> {
             pluginManager.apply("inktone.architecture.check")
 
             extensions.configure<LibraryExtension> {
-                compileSdk = 35
+                compileSdk = 36
                 defaultConfig {
                     minSdk = 26
                     testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
