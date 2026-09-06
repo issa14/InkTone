@@ -27,7 +27,7 @@ class InkToneApplicationConventionPlugin : Plugin<Project> {
 
             extensions.configure<ApplicationExtension> {
                 namespace = "com.inktone.app"
-                compileSdk = 35
+                compileSdk = 36
 
                 // Audit de consolidation v1.0.0 (AUDIT_CONSOLIDATION_V1.md) :
                 // versionName aligne sur la release. versionCode incremente a
@@ -37,14 +37,17 @@ class InkToneApplicationConventionPlugin : Plugin<Project> {
                 defaultConfig {
                     applicationId = "com.inktone.app"
                     minSdk = 26
-                    // targetSdk 35 : exigence Play, et bascule de comportement
+                    // targetSdk 36 : exigence Play (nouvelles soumissions,
+                    // echeance du 31 aout 2026) — releve depuis 35. La
+                    // bascule edge-to-edge (Android 15, ci-dessous) reste
+                    // valable sans changement sur Android 16.
                     // — Android 15 impose l'edge-to-edge et rend
                     // `window.statusBarColor`/`navigationBarColor` sans effet.
                     // L'app ne les utilise plus : `MainActivity` appelle
                     // `enableEdgeToEdge()`, les barres système sont
                     // transparentes et leur couleur vient du contenu dessiné
                     // derrière (voir `SystemBarIconsEffect`).
-                    targetSdk = 35
+                    targetSdk = 36
                     versionCode = 2
                     versionName = "1.0.0-beta.2"
                 }
