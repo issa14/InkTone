@@ -182,6 +182,30 @@ class InkToneApplicationConventionPlugin : Plugin<Project> {
                 add("implementation", "androidx.compose.material3:material3")
                 add("testImplementation", "junit:junit:4.13.2")
             }
+
+            // Bug réel trouvé en CI (checkout propre, sans cache) — reproduit
+            // en local en vidant app/build/intermediates/metadata_library_dependencies_report :
+            // `./gradlew build` échoue sur `:app:sdkNonMinifiedReleaseDependencyData`
+            // avec "specifies file '.../dependencies.pb' which doesn't exist".
+            // Incohérence interne d'AGP pour les variantes injectées par le
+            // plugin androidx.baselineprofile (nonMinifiedRelease, ici, et le
+            // même défaut existait pour nonMinifiedBenchmark) : la tâche qui
+            // PRODUIT ce fichier (`collectNonMinifiedReleaseDependencies`) est
+            // elle-même désactivée par AGP pour ces variantes qui ne sont
+            // jamais empaquetées ni publiées (`onlyIf 'Task is enabled' is
+            // false`, vérifié avec --info), mais la tâche AVAL qui en dépend
+            // ne l'est pas — elle réclame un fichier que sa propre dépendance
+            // ne produira jamais. Seule `release` sera un jour publiée ;
+            // désactiver la même tâche avale pour les variantes synthétiques
+            // (nonMinified*, benchmark) referme l'incohérence sans toucher au
+            // rapport de dépendances de la variante réellement livrée.
+            tasks.matching { task ->
+                task.name.startsWith("sdk") &&
+                    task.name.endsWith("DependencyData") &&
+                    (task.name.contains("NonMinified") || task.name.contains("Benchmark"))
+            }.configureEach {
+                enabled = false
+            }
         }
     }
 }
