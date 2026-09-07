@@ -44,6 +44,20 @@ class BaselineProfileGenerator {
     @Test
     fun parcoursDuPremierUsage() = baselineProfileRule.collect(
         packageName = PACKAGE_NAME,
+        // AUDIT_REACTIVITE_UX §3.1 — défauts de la bibliothèque (15/3) :
+        // jusqu'à 15 itérations pour obtenir 3 profils consécutifs
+        // identiques. Mesuré sur device réel (V2206) : ~35-40s par
+        // itération tant qu'aucun profil n'existe encore (interprété à
+        // froid, exactement ce que cette collecte doit corriger) — 15
+        // itérations dépassent largement le délai que l'instrumentation
+        // tolère avant de tuer le process (échec observé après ~209s,
+        // ~5 itérations). Bornées à un total qui tient sous ce délai ;
+        // un profil non parfaitement stable reste un vrai gain contre
+        // aucun profil du tout (strictStability reste à false, la
+        // collecte ne s'interrompt donc pas si les 3 itérations
+        // divergent légèrement).
+        maxIterations = 3,
+        stableIterations = 1,
     ) {
         pressHome()
         startActivityAndWait()
