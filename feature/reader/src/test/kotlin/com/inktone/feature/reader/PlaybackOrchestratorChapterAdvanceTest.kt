@@ -278,7 +278,9 @@ class PlaybackOrchestratorChapterAdvanceTest {
             resourceHref = "ch0.xhtml",
         )
 
-        withTimeout(5_000) { orchestrator.state.first { it is PlaybackOrchestrator.PlaybackStatus.Idle } }
+        withTimeout(5_000) {
+            orchestrator.state.first { it is PlaybackOrchestrator.PlaybackStatus.Idle && parser.parsedHrefs.isNotEmpty() }
+        }
 
         assertEquals("ch2 ne doit jamais etre parse", listOf("ch1.xhtml"), parser.parsedHrefs)
         assertEquals(0, orchestrator.currentChapterIndex.value)
