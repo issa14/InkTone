@@ -35,6 +35,9 @@ class LibraryItemDaoTest {
     @After
     fun tearDown() { db.close() }
 
+    /** AUDIT_REACTIVITE_UX §6.1 — observe() est désormais borné ; large ici pour ne pas tronquer les jeux de test. */
+    private val testLimit = Int.MAX_VALUE
+
     private suspend fun insertPublication(id: String, title: String) {
         db.publicationDao().insert(
             PublicationEntity(
@@ -77,7 +80,7 @@ class LibraryItemDaoTest {
         insertAnnotation("an-1", "pub-2", createdAt = 300)
         insertAnnotation("an-2", "pub-1", createdAt = 200, content = "Une note")
 
-        val items = db.libraryItemDao().observe(typeFilter = null, searchQuery = "", alphabetical = false).first()
+        val items = db.libraryItemDao().observe(typeFilter = null, searchQuery = "", alphabetical = false, limit = testLimit).first()
 
         assertEquals(3, items.size)
         assertEquals(listOf("an-1", "an-2", "bm-1"), items.map { it.id }) // ordre chronologique décroissant
@@ -88,13 +91,13 @@ class LibraryItemDaoTest {
         insertPublication("pub-1", "Ancien titre")
         insertBookmark("bm-1", "pub-1", createdAt = 100)
 
-        assertEquals("Ancien titre", db.libraryItemDao().observe(null, "", false).first().single().publicationTitle)
+        assertEquals("Ancien titre", db.libraryItemDao().observe(null, "", false, testLimit).first().single().publicationTitle)
 
         db.publicationDao().update(
             db.publicationDao().observeAll().first().single().copy(title = "Nouveau titre"),
         )
 
-        assertEquals("Nouveau titre", db.libraryItemDao().observe(null, "", false).first().single().publicationTitle)
+        assertEquals("Nouveau titre", db.libraryItemDao().observe(null, "", false, testLimit).first().single().publicationTitle)
     }
 
     @Test
@@ -104,10 +107,10 @@ class LibraryItemDaoTest {
         insertAnnotation("an-1", "pub-1", createdAt = 200) // surlignage sans note
         insertAnnotation("an-2", "pub-1", createdAt = 300, content = "Note") // annotation avec note
 
-        assertEquals(listOf("bm-1"), db.libraryItemDao().observe("BOOKMARK", "", false).first().map { it.id })
-        assertEquals(listOf("an-1"), db.libraryItemDao().observe("HIGHLIGHT", "", false).first().map { it.id })
-        assertEquals(listOf("an-2"), db.libraryItemDao().observe("NOTE", "", false).first().map { it.id })
-        assertEquals(3, db.libraryItemDao().observe(null, "", false).first().size)
+        assertEquals(listOf("bm-1"), db.libraryItemDao().observe("BOOKMARK", "", false, testLimit).first().map { it.id })
+        assertEquals(listOf("an-1"), db.libraryItemDao().observe("HIGHLIGHT", "", false, testLimit).first().map { it.id })
+        assertEquals(listOf("an-2"), db.libraryItemDao().observe("NOTE", "", false, testLimit).first().map { it.id })
+        assertEquals(3, db.libraryItemDao().observe(null, "", false, testLimit).first().size)
     }
 
     @Test
@@ -119,11 +122,11 @@ class LibraryItemDaoTest {
         insertBookmark("bm-2", "pub-2", createdAt = 300, excerpt = "Rien à voir")
 
         // Un mot présent seulement dans un extrait remonte l'élément.
-        assertEquals(listOf("bm-1"), db.libraryItemDao().observe(null, "Valjean", false).first().map { it.id })
+        assertEquals(listOf("bm-1"), db.libraryItemDao().observe(null, "Valjean", false, testLimit).first().map { it.id })
         // Un mot présent seulement dans une note remonte l'élément.
-        assertEquals(listOf("an-1"), db.libraryItemDao().observe(null, "Cosette", false).first().map { it.id })
+        assertEquals(listOf("an-1"), db.libraryItemDao().observe(null, "Cosette", false, testLimit).first().map { it.id })
         // Un mot présent seulement dans le titre d'ouvrage remonte tous ses éléments.
-        assertEquals(setOf("an-1", "bm-2"), db.libraryItemDao().observe(null, "Autre", false).first().map { it.id }.toSet())
+        assertEquals(setOf("an-1", "bm-2"), db.libraryItemDao().observe(null, "Autre", false, testLimit).first().map { it.id }.toSet())
     }
 
     @Test
@@ -135,8 +138,8 @@ class LibraryItemDaoTest {
 
         db.bookmarkDao().setPinned("bm-1", true)
 
-        assertEquals("bm-1", db.libraryItemDao().observe(null, "", alphabetical = false).first().first().id)
-        assertEquals("bm-1", db.libraryItemDao().observe(null, "", alphabetical = true).first().first().id)
+        assertEquals("bm-1", db.libraryItemDao().observe(null, "", alphabetical = false, testLimit).first().first().id)
+        assertEquals("bm-1", db.libraryItemDao().observe(null, "", alphabetical = true, testLimit).first().first().id)
     }
 
     @Test
@@ -146,6 +149,6 @@ class LibraryItemDaoTest {
         insertBookmark("bm-1", "pub-1", createdAt = 100)
         insertBookmark("bm-2", "pub-2", createdAt = 200)
 
-        assertEquals(listOf("bm-2", "bm-1"), db.libraryItemDao().observe(null, "", alphabetical = true).first().map { it.id })
+        assertEquals(listOf("bm-2", "bm-1"), db.libraryItemDao().observe(null, "", alphabetical = true, testLimit).first().map { it.id })
     }
 }
