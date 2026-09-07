@@ -189,22 +189,35 @@ class InkToneApplicationConventionPlugin : Plugin<Project> {
             // avec "specifies file '.../dependencies.pb' which doesn't exist".
             // Incohérence interne d'AGP pour les variantes injectées par le
             // plugin androidx.baselineprofile (nonMinifiedRelease, ici, et le
-            // même défaut existait pour nonMinifiedBenchmark) : la tâche qui
-            // PRODUIT ce fichier (`collectNonMinifiedReleaseDependencies`) est
-            // elle-même désactivée par AGP pour ces variantes qui ne sont
-            // jamais empaquetées ni publiées (`onlyIf 'Task is enabled' is
-            // false`, vérifié avec --info), mais la tâche AVAL qui en dépend
-            // ne l'est pas — elle réclame un fichier que sa propre dépendance
-            // ne produira jamais. Seule `release` sera un jour publiée ;
-            // désactiver la même tâche avale pour les variantes synthétiques
-            // (nonMinified*, benchmark) referme l'incohérence sans toucher au
-            // rapport de dépendances de la variante réellement livrée.
-            tasks.matching { task ->
-                task.name.startsWith("sdk") &&
-                    task.name.endsWith("DependencyData") &&
-                    (task.name.contains("NonMinified") || task.name.contains("Benchmark"))
-            }.configureEach {
-                enabled = false
+            // même défaut existait pour benchmark) : la tâche qui PRODUIT ce
+            // fichier (`collectXDependencies`) est elle-même désactivée par
+            // AGP pour ces variantes jamais empaquetées ni publiées (`onlyIf
+            // 'Task is enabled' is false`, vérifié avec --info), mais la tâche
+            // avale qui en dépend ne l'est pas.
+            //
+            // Première tentative écartée : désactiver directement la tâche
+            // `sdk*DependencyData` avale — masque le symptôme en local (le
+            // fichier .pb d'une exécution antérieure traîne encore sur
+            // disque) mais casse `packageBenchmark`/`packageNonMinifiedRelease`
+            // sur un checkout propre (CI) : `PackageApplication.dependencyDataFile`
+            // reste câblé vers un fichier qui n'existe plus jamais.
+            //
+            // Correctif réel : couper la fonctionnalité "SDK dependency info"
+            // à la source, uniquement pour les variantes qui ne sont jamais
+            // publiées (androidx.build.api.variant.ApplicationVariantBuilder.
+            // dependenciesInfo, disponible dans beforeVariants — pas
+            // onVariants, dont l'équivalent en lecture seule ne peut pas
+            // désactiver la génération). AGP ne câble alors ni le producteur
+            // ni le consommateur pour ces variantes. Seule `release` sera un
+            // jour publiée : son rapport de dépendances (exigé par la Play
+            // Console) reste intact.
+            extensions.configure<com.android.build.api.variant.ApplicationAndroidComponentsExtension> {
+                beforeVariants(selector().all()) { variantBuilder ->
+                    if (variantBuilder.name != "release") {
+                        variantBuilder.dependenciesInfo.includedInApk = false
+                        variantBuilder.dependenciesInfo.includedInBundle = false
+                    }
+                }
             }
         }
     }
