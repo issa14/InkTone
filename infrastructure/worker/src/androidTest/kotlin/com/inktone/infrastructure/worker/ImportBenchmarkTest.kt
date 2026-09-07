@@ -102,6 +102,7 @@ class ImportBenchmarkTest {
             // paresseux, D2) - le vrai EpubChapterParser ici aussi, pour la
             // meme raison que RoomSearchService ci-dessus (mesurer le vrai cout).
             chapterParser = EpubChapterParser(ReadiumPublicationRegistry(context), JsoupChapterParser(), FakePreAnalysisStore(), RoomPublicationRepository(db.publicationDao())),
+            preAnalysisStore = FakePreAnalysisStore(),
         )
 
         var successCount = 0
