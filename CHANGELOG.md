@@ -3,7 +3,7 @@
 Format inspiré de [Keep a Changelog](https://keepachangelog.com/fr/1.1.0/).
 Ce projet suit le [versionnage sémantique](https://semver.org/lang/fr/).
 
-## [1.0.0] — non publiée
+## [1.0.0] — 2026-09-12
 
 Première version. Le dépôt a été réécrit intégralement le 26 juillet 2026
 ([ADR-019](docs/adr/ADR-019-full-rewrite-orphan-branch.md)) ; l'historique

@@ -62,9 +62,9 @@ Le projet est pensé francophone d'abord — voix, interface, découpage des phr
 
 ## Installation
 
-**Une pré-release est disponible : [1.0.0-beta.1](https://github.com/issa14/InkTone/releases/tag/v1.0.0-beta.1)** — APK signé, destiné à une beta fermée. Pas encore de fiche Play Store.
+**La version 1.0.0 est disponible : [1.0.0](https://github.com/issa14/InkTone/releases/tag/v1.0.0)** — APK signé. Pas encore de fiche Play Store.
 
-Deux points valables pour cette beta : la synchronisation Google Drive se délie d'elle-même au bout de 7 jours (l'écran de consentement OAuth est encore en état « Test » côté Google, ce sera levé avant la publication), et l'APK ne fonctionne que sur `arm64-v8a`.
+Deux points valables pour cette version : la synchronisation Google Drive se délie d'elle-même au bout de 7 jours (l'écran de consentement OAuth est encore en état « Test » côté Google, ce sera levé avant la publication), et l'APK ne fonctionne que sur `arm64-v8a`.
 
 Sinon, voir [Compiler depuis les sources](#compiler-depuis-les-sources).
 
@@ -103,7 +103,7 @@ Le détail complet de ce qui est collecté, envoyé et stocké est dans la [poli
 
 ## État du projet
 
-Version `1.0.0` en préparation, publiée nulle part en version définitive ; une pré-release [`1.0.0-beta.1`](https://github.com/issa14/InkTone/releases/tag/v1.0.0-beta.1) existe pour la beta fermée. Toutes les fonctionnalités listées plus haut sont implémentées et vérifiées sur appareil ; aucune n'est un stub.
+Version `1.0.0` publiée le 12 septembre 2026 ([release v1.0.0](https://github.com/issa14/InkTone/releases/tag/v1.0.0)). Toutes les fonctionnalités listées plus haut sont implémentées et vérifiées sur appareil ; aucune n'est un stub.
 
 Points ouverts, connus et assumés :
 

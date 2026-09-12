@@ -48,8 +48,8 @@ class InkToneApplicationConventionPlugin : Plugin<Project> {
                     // transparentes et leur couleur vient du contenu dessiné
                     // derrière (voir `SystemBarIconsEffect`).
                     targetSdk = 36
-                    versionCode = 2
-                    versionName = "1.0.0-beta.2"
+                    versionCode = 3
+                    versionName = "1.0.0"
                 }
 
                 // ── Signature release (audit v1.0.0) ────────────────────────────

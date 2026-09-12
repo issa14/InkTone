@@ -62,9 +62,9 @@ The project is built French-first — voices, interface, sentence segmentation.
 
 ## Installation
 
-**A pre-release is available: [1.0.0-beta.1](https://github.com/issa14/InkTone/releases/tag/v1.0.0-beta.1)** — a signed APK, intended for a closed beta. No Play Store listing yet.
+**Version 1.0.0 is available: [1.0.0](https://github.com/issa14/InkTone/releases/tag/v1.0.0)** — a signed APK. No Play Store listing yet.
 
-Two things to know about this beta: Google Drive sync unlinks itself after 7 days (the OAuth consent screen is still in "Testing" state on Google's side; this will be lifted before publication), and the APK only runs on `arm64-v8a`.
+Two things to know about this version: Google Drive sync unlinks itself after 7 days (the OAuth consent screen is still in "Testing" state on Google's side; this will be lifted before publication), and the APK only runs on `arm64-v8a`.
 
 Otherwise, see [Building from source](#building-from-source).
 
@@ -103,7 +103,7 @@ A full account of what is collected, sent and stored is in the [privacy policy](
 
 ## Project status
 
-Version `1.0.0` is in preparation and has never been published as a final release; a [`1.0.0-beta.1`](https://github.com/issa14/InkTone/releases/tag/v1.0.0-beta.1) pre-release exists for the closed beta. Every feature listed above is implemented and verified on a device; none is a stub.
+Version `1.0.0` was published on 12 September 2026 ([v1.0.0 release](https://github.com/issa14/InkTone/releases/tag/v1.0.0)). Every feature listed above is implemented and verified on a device; none is a stub.
 
 Known and accepted open points:
 
