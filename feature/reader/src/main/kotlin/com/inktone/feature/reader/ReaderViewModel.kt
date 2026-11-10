@@ -646,6 +646,28 @@ class ReaderViewModel @Inject constructor(
                 _state.value = _state.value.copy(errorMessage = "Publication introuvable.")
                 return@launch
             }
+
+            // Apparence AVANT l'ouverture du fichier : thème, titre et réglages
+            // ne dépendent que de la base, jamais de l'EPUB. Publiés tout de
+            // suite, ils remplacent l'écran blanc (thème par défaut) que
+            // l'utilisateur voyait pendant toute l'ouverture du livre (~1 s sur
+            // V2206). Aucune position n'est encore exposée ici : les chapitres
+            // restent vides et `currentPublicationId` nul, donc aucun chemin
+            // d'écriture de position (K3) ne peut se déclencher.
+            val restored = getReadingState(publicationId)
+            val prefs = preferencesRepository.get()
+            val effectiveSettings = EffectiveReadingSettings.resolve(
+                overrides = restored?.overrides,
+                global = prefs,
+            )
+            val resolvedTheme = themeRepository.getById(effectiveSettings.theme) ?: ReadingTheme.DEFAULT
+            _state.value = _state.value.copy(
+                title = publication.title.cleanedForDisplay(),
+                author = publication.authors.cleanedAuthorsForDisplay().ifBlank { null },
+                effectiveSettings = effectiveSettings,
+                resolvedTheme = resolvedTheme,
+            )
+
             // Ouverture pour LECTURE : jamais les effets de bord d'import
             // (extraction de couverture) — voir PublicationParser.openForReading.
             when (val result = publicationParser.openForReading(publication)) {
@@ -670,13 +692,6 @@ class ReaderViewModel @Inject constructor(
                     startCheckpointTimer()
                     // ───── Fin Lot Sessions ─────
 
-                    val restored = getReadingState(publicationId)
-                    val effectiveSettings = EffectiveReadingSettings.resolve(
-                        overrides = restored?.overrides,
-                        global = preferencesRepository.get(),
-                    )
-                    val prefs = preferencesRepository.get()
-                    val resolvedTheme = themeRepository.getById(effectiveSettings.theme) ?: ReadingTheme.DEFAULT
                     val activeVoiceProfile = resolveVoiceProfile(prefs)
                     val availableVoiceProfiles = getVoiceProfiles()
                     _state.value = ReaderUiState(
