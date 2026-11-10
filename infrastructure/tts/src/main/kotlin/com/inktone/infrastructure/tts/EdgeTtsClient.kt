@@ -25,7 +25,6 @@ import java.security.MessageDigest
 import java.util.UUID
 import javax.inject.Inject
 import javax.inject.Singleton
-import kotlin.math.floor
 
 /**
  * Frontière de mot renvoyée par Edge TTS via les trames `Path:audio.metadata`
@@ -75,7 +74,7 @@ class EdgeTtsClient @Inject constructor(
          *  dans le projet Python `edge-tts`) — constante technique, pas un
          *  secret (ADR-024, décision 4). */
         const val TRUSTED_CLIENT_TOKEN = "6A5AA1D4EAFF4E9FB37E23D68491D6F4"
-        const val SEC_MS_GEC_VERSION = "1-143.0.3650.75"
+        const val SEC_MS_GEC_VERSION = "2-143.0.3650.75"
         const val WS_BASE =
             "wss://speech.platform.bing.com/consumer/speech/synthesize/readaloud/edge/v1" +
                 "?TrustedClientToken=$TRUSTED_CLIENT_TOKEN"
@@ -83,26 +82,13 @@ class EdgeTtsClient @Inject constructor(
         private const val SYNTHESIS_TIMEOUT_MS = 15_000L
         private const val MAX_RETRIES = 3
         private const val RETRY_BASE_DELAY_MS = 500L
-        private const val WIN_EPOCH_SECONDS = 11_644_473_600L
 
         val VOICES = listOf("fr-FR-VivienneNeural", "fr-FR-HenriNeural")
         const val DEFAULT_VOICE = "fr-FR-VivienneNeural"
 
-        /** SHA256("{ticks}{token}") hex uppercase — algorithme edge-tts v7.2.8. */
-        fun generateSecMsGec(): String {
-            val nowSeconds = System.currentTimeMillis() / 1000.0
-            val winSeconds = nowSeconds + WIN_EPOCH_SECONDS
-            val rounded = floor(winSeconds / 300.0) * 300.0
-            return secMsGecForTicks((rounded * 10_000_000).toLong())
-        }
-
-        /** Fonction pure : SHA256("{ticks}{token}") uppercase. `internal` pour test déterministe (K13). */
-        internal fun secMsGecForTicks(ticks: Long): String {
-            val input = "${ticks}${TRUSTED_CLIENT_TOKEN}"
-            val digest = MessageDigest.getInstance("SHA-256")
-                .digest(input.toByteArray(Charsets.US_ASCII))
-            return digest.joinToString("") { "%02x".format(it) }.uppercase()
-        }
+        /** Jeton `Sec-MS-GEC` v2 (`<16 hex>-<64 hex>`), voir [EdgeTtsGecToken]. */
+        fun generateSecMsGec(): String =
+            EdgeTtsGecToken.generate(System.currentTimeMillis() / 1000, TRUSTED_CLIENT_TOKEN)
 
         fun generateMuid(): String {
             val bytes = ByteArray(16)

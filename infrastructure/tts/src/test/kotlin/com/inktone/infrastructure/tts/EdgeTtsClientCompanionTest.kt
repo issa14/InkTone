@@ -17,22 +17,6 @@ import java.net.UnknownHostException
 class EdgeTtsClientCompanionTest {
 
     @Test
-    fun secMsGec_pour_ticks_connus_est_deterministe() {
-        // SHA256("0" + TrustedClientToken) — valeur calculée indépendamment
-        // (echo -n "06A5AA1D4EAFF4E9FB37E23D68491D6F4" | sha256sum).
-        assertEquals(
-            "7AB174E6E876C889B72314DC006A41035E841EA101B856325AD05528DCFE1A4A",
-            EdgeTtsClient.secMsGecForTicks(0L),
-        )
-        // Déterministe : même ticks → même résultat, format 64 hex uppercase
-        // (SHA256 = 32 octets = 64 caractères hex).
-        val value = EdgeTtsClient.secMsGecForTicks(123_456_789L)
-        assertEquals(value, EdgeTtsClient.secMsGecForTicks(123_456_789L))
-        assertEquals(64, value.length)
-        assertTrue(value.all { it in '0'..'9' || it in 'A'..'F' })
-    }
-
-    @Test
     fun buildSsml_echappe_le_texte_xml() {
         val ssml = EdgeTtsClient.buildSsml("a<b>&c'd\"e", "fr-FR-VivienneNeural", 1.0f)
         assertTrue(ssml.contains("a&lt;b&gt;&amp;c&apos;d&quot;e"))
