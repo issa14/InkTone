@@ -50,7 +50,12 @@ class PdfPublicationParser @Inject constructor(
 
     private val pdfiumCore = PdfiumCore()
 
-    override suspend fun parse(fileUri: String): ParseResult = withContext(pdfiumDispatcher) {
+    override suspend fun parse(fileUri: String): ParseResult = parse(fileUri, extractCover = true)
+
+    /** Voir [PublicationParser.openForReading] : aucun rendu ni écriture de couverture. */
+    override suspend fun openForReading(fileUri: String): ParseResult = parse(fileUri, extractCover = false)
+
+    private suspend fun parse(fileUri: String, extractCover: Boolean): ParseResult = withContext(pdfiumDispatcher) {
         val bytes = fileStorageService.openInputStream(fileUri)
             ?.use { stream -> runCatching { stream.readBytes() }.getOrNull() }
             ?: return@withContext ParseResult.Corrupted("Fichier introuvable ou illisible : $fileUri")
@@ -93,7 +98,7 @@ class PdfPublicationParser @Inject constructor(
             }
 
             val meta = runCatching { document.getDocumentMeta() }.getOrNull()
-            val coverUri = extractAndSaveCover(document, fileUri)
+            val coverUri = if (extractCover) extractAndSaveCover(document, fileUri) else null
 
             ParseResult.Success(
                 documentModel = DocumentModel(chapters = chapters, tableOfContents = emptyList(), resources = emptyList()),

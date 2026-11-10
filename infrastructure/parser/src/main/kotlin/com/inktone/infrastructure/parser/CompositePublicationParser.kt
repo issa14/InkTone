@@ -33,23 +33,18 @@ class CompositePublicationParser @Inject constructor(
 
     override val supportedFormats = readiumParser.supportedFormats + txtParser.supportedFormats + pdfParser.supportedFormats
 
-    override suspend fun parse(fileUri: String): ParseResult {
-        val fileName = fileStorageService.getFileName(fileUri) ?: fileUri
-        val delegate = when {
-            fileName.endsWith(".txt", ignoreCase = true) -> txtParser
-            fileName.endsWith(".pdf", ignoreCase = true) -> pdfParser
-            else -> readiumParser
-        }
-        return delegate.parse(fileUri)
-    }
+    override suspend fun parse(fileUri: String): ParseResult = delegateFor(fileUri).parse(fileUri)
 
-    override suspend fun extractCover(fileUri: String): CoverExtractionResult {
+    override suspend fun openForReading(fileUri: String): ParseResult = delegateFor(fileUri).openForReading(fileUri)
+
+    override suspend fun extractCover(fileUri: String): CoverExtractionResult = delegateFor(fileUri).extractCover(fileUri)
+
+    private suspend fun delegateFor(fileUri: String): PublicationParser {
         val fileName = fileStorageService.getFileName(fileUri) ?: fileUri
-        val delegate = when {
+        return when {
             fileName.endsWith(".txt", ignoreCase = true) -> txtParser
             fileName.endsWith(".pdf", ignoreCase = true) -> pdfParser
             else -> readiumParser
         }
-        return delegate.extractCover(fileUri)
     }
 }

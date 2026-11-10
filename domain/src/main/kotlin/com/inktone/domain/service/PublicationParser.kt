@@ -9,7 +9,30 @@ import com.inktone.domain.model.PublicationFormat
  */
 interface PublicationParser {
     val supportedFormats: List<PublicationFormat>
+
+    /**
+     * Parsing d'IMPORT : structure de la publication ET effets de bord
+     * propres à l'import — extraction et écriture de la couverture
+     * ([PublicationMetadata.coverUri]).
+     */
     suspend fun parse(fileUri: String): ParseResult
+
+    /**
+     * Ouverture pour la LECTURE (Lecteur, narration) d'une publication déjà
+     * importée : structure seule (chapitres, sommaire, DRM), sans aucun
+     * effet de bord d'import. [PublicationMetadata.coverUri] y vaut `null` —
+     * la couverture fait foi dans `Publication.coverUri`, écrite à l'import.
+     *
+     * Raison d'être : [parse] ré-extrayait la couverture à CHAQUE ouverture.
+     * Sur un EPUB dont la couverture n'est déclarée que dans `<guide>`
+     * (éditions Calibre), cela coûtait plusieurs lectures séquentielles de
+     * l'archive, un décodage d'image pleine résolution et une réécriture
+     * JPEG — premier affichage observé à ~7 s sur V2206 (L'Arcane des Épées).
+     *
+     * Défaut = [parse] : un format sans effet de bord d'import (TXT) n'a
+     * rien à distinguer.
+     */
+    suspend fun openForReading(fileUri: String): ParseResult = parse(fileUri)
 
     /**
      * Ré-extrait la seule couverture depuis le fichier source, sans

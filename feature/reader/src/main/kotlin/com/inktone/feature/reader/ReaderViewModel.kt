@@ -646,7 +646,9 @@ class ReaderViewModel @Inject constructor(
                 _state.value = _state.value.copy(errorMessage = "Publication introuvable.")
                 return@launch
             }
-            when (val result = publicationParser.parse(publication.fileUri)) {
+            // Ouverture pour LECTURE : jamais les effets de bord d'import
+            // (extraction de couverture) — voir PublicationParser.openForReading.
+            when (val result = publicationParser.openForReading(publication.fileUri)) {
                 is ParseResult.Success -> {
                     currentPublicationId = publicationId
 

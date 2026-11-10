@@ -86,7 +86,10 @@ class ReadiumPublicationParser @Inject constructor(
         )
     }
 
-    override suspend fun parse(fileUri: String): ParseResult = parseLazy(fileUri)
+    override suspend fun parse(fileUri: String): ParseResult = parseLazy(fileUri, extractCover = true)
+
+    /** Voir [PublicationParser.openForReading] : aucune extraction de couverture. */
+    override suspend fun openForReading(fileUri: String): ParseResult = parseLazy(fileUri, extractCover = false)
 
     /**
      * Lot 19 — ré-extrait la couverture sans re-parser le contenu. Ouvre
@@ -116,10 +119,11 @@ class ReadiumPublicationParser @Inject constructor(
      * un [ChapterContent.Rich] avec `blocks` vide — le contenu réel sera
      * chargé à la demande via [EpubChapterParser.parseChapter].
      *
-     * L'ancien [parse] continue de fonctionner (backward compat) — il
-     * utilise encore [DocumentModelExtractor] pour un parsing complet.
+     * @param extractCover vrai à l'import seulement ([parse]) : extraire,
+     *   décoder et réécrire la couverture est un effet de bord d'import,
+     *   jamais d'une ouverture pour lecture ([openForReading]).
      */
-    suspend fun parseLazy(fileUri: String): ParseResult = withContext(Dispatchers.IO) {
+    private suspend fun parseLazy(fileUri: String, extractCover: Boolean): ParseResult = withContext(Dispatchers.IO) {
         val url = if (fileUri.contains("://")) {
             Uri.parse(fileUri).toAbsoluteUrl()
                 ?: return@withContext ParseResult.Corrupted("URI non absolue: $fileUri")
@@ -136,7 +140,7 @@ class ReadiumPublicationParser @Inject constructor(
         }
 
         val metadata = publication.metadata.toDomain()
-        val coverUri = extractAndSaveCover(publication, fileUri)
+        val coverUri = if (extractCover) extractAndSaveCover(publication, fileUri) else null
 
         // Coquilles de chapitres : index, href, title, contenu vide
         val readingOrderChapters = publication.readingOrder.mapIndexed { index, link ->

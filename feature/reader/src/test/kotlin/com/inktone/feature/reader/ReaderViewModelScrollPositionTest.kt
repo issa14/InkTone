@@ -84,9 +84,22 @@ class ReaderViewModelScrollPositionTest {
         ),
     )
 
+    private fun defaultParser() = FakePublicationParser(
+        result = ParseResult.Success(
+            documentModel = DocumentModel(
+                chapters = listOf(threeSentenceChapter()),
+                tableOfContents = emptyList(),
+                resources = emptyList(),
+            ),
+            isDrmProtected = false,
+            metadata = PublicationMetadata(title = "Titre de test"),
+        ),
+    )
+
     private suspend fun buildViewModel(
         readingStateRepository: FakeReadingStateRepository,
         publicationRepository: FakePublicationRepository,
+        parser: FakePublicationParser = defaultParser(),
     ): ReaderViewModel {
         // 3d.5 — le rappel de repos oculaire est activé par défaut et se
         // reprogramme indéfiniment (voir ReaderViewModel.resumeFromEyeRestReminder) :
@@ -102,18 +115,6 @@ class ReaderViewModelScrollPositionTest {
         preferencesRepository.update(UserPreferences(eyeRestReminderEnabled = false))
         val bookmarkRepository = FakeBookmarkRepository()
         val annotationRepository = FakeAnnotationRepository()
-        val parser = FakePublicationParser(
-            result = ParseResult.Success(
-                documentModel = DocumentModel(
-                    chapters = listOf(threeSentenceChapter()),
-                    tableOfContents = emptyList(),
-                    resources = emptyList(),
-                ),
-                isDrmProtected = false,
-                metadata = PublicationMetadata(title = "Titre de test"),
-            ),
-        )
-
         return ReaderViewModel(
             ttsEngine = FakeTtsEngine(),
             playbackOrchestrator = PlaybackOrchestrator(FakeTtsEngine(), FakeAudioPlayer(), UpdateReadingStateUseCase(readingStateRepository), GetReadingStateUseCase(readingStateRepository), FakeChapterParser(), FakePublicationRepository(), FakePublicationParser(), FakePreferencesRepository(), FakeVoiceProfileRepository(), FakeTtsSegmentCache(), FakePronunciationRuleRepository()),
@@ -263,6 +264,36 @@ class ReaderViewModelScrollPositionTest {
             24, // Sentence(2).startOffset
             readingStateRepository.get("pub-1")?.locator?.charOffset,
         )
+    }
+
+    /**
+     * Ouvrir un livre passe par l'ouverture pour LECTURE, jamais par le
+     * parsing d'IMPORT : ce dernier ré-extrait et réécrit la couverture, ce
+     * qui retardait le premier affichage de ~7 s sur un EPUB à couverture
+     * déclarée dans `<guide>` (L'Arcane des Épées, V2206).
+     */
+    @Test
+    fun ouvrir_un_livre_n_utilise_jamais_le_parsing_d_import() = runTest {
+        val readingStateRepository = FakeReadingStateRepository()
+        val publicationRepository = FakePublicationRepository()
+        publicationRepository.insert(
+            Publication(
+                id = "pub-1", title = "Test", format = PublicationFormat.EPUB,
+                fileUri = "content://x", fileHash = "hash", fileSize = 10, chapterCount = 1,
+                importDate = 0L,
+            ),
+        )
+        val parser = defaultParser()
+        val viewModel = buildViewModel(readingStateRepository, publicationRepository, parser)
+
+        viewModel.onIntent(ReaderIntent.OpenPublication("pub-1"))
+        dispatcher.scheduler.runCurrent()
+
+        assertEquals(1, parser.openForReadingCount)
+        assertEquals("le parsing d'import ne doit jamais servir à ouvrir un livre", 0, parser.importParseCount)
+
+        viewModel.cancelCheckpointTimerForTest()
+        dispatcher.scheduler.runCurrent()
     }
 
     // ───── Lot 21, tâche 9 — auto-scroll visuel (vitesse persistée) ─────

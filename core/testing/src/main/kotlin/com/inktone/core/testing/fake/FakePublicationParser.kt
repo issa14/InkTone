@@ -43,7 +43,22 @@ class FakePublicationParser(
         this.extractCoverHandler = handler
     }
 
+    /** Nombre d'appels au parsing d'IMPORT ([parse]). */
+    var importParseCount = 0
+        private set
+
+    /** Nombre d'ouvertures pour LECTURE ([openForReading]). */
+    var openForReadingCount = 0
+        private set
+
     override suspend fun parse(fileUri: String): ParseResult {
+        importParseCount++
+        if (delayMs > 0) delay(delayMs)
+        return result
+    }
+
+    override suspend fun openForReading(fileUri: String): ParseResult {
+        openForReadingCount++
         if (delayMs > 0) delay(delayMs)
         return result
     }
