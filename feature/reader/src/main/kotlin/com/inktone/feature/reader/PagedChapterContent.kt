@@ -171,11 +171,25 @@ fun PagedChapterContent(
     // currentSentenceIndex, jamais mis à jour par un swipe — seuls le TTS
     // ou une navigation explicite l'avancent. Même antipattern que celui
     // corrigé en mode SCROLL (3c.1), pour le mode PAGED. Même garde
-    // anti-boucle : un drapeau posé explicitement autour des deux SEULS
-    // appels programmatiques au pager (restauration de position ci-dessous,
-    // suivi du mot prononcé plus bas), jamais isScrollInProgress qui ne
-    // distingue pas swipe manuel et scrollToPage/animateScrollToPage.
-    var isProgrammaticPageChange by remember { mutableStateOf(false) }
+    // anti-boucle : distinguer les défilements programmatiques du pager
+    // (restauration de position, suivi du mot prononcé, retour en page 0 au
+    // changement de chapitre — tous via `scrollToPageProgrammatically`) d'un
+    // swipe manuel, jamais via isScrollInProgress qui ne fait pas la
+    // différence.
+    //
+    // Discriminant : la page VISÉE par le dernier défilement programmatique,
+    // plutôt qu'un drapeau levé autour de l'appel (version précédente). La page n'est validée
+    // qu'une fois posée (`settledPage`, voir l'effet plus bas) — donc APRÈS
+    // le retour de `scrollToPage`/`animateScrollToPage`, quand un drapeau
+    // serait déjà retombé. Une page posée qui n'est pas la page visée vient
+    // d'un geste (y compris un geste qui interrompt une animation), quel que
+    // soit l'ordre d'exécution des coroutines.
+    var programmaticTargetPage by remember { mutableStateOf<Int?>(null) }
+
+    suspend fun scrollToPageProgrammatically(page: Int, animate: Boolean) {
+        programmaticTargetPage = page
+        if (animate) pagerState.animateScrollToPage(page) else pagerState.scrollToPage(page)
+    }
 
     // Bug réel trouvé sur appareil (clignotement frénétique après 2-3
     // swipes) : `onManualPageChange` pousse `sentenceRangeOf(page).first`
@@ -238,18 +252,17 @@ fun PagedChapterContent(
     // d'émettre.
     var previousPageCount by remember { mutableStateOf(-1) }
 
-    LaunchedEffect(chapter?.index, pagerState.currentPage, pageCount) {
+    // Validation de page sur `settledPage`, jamais `currentPage` : ce dernier
+    // bascule dès que le doigt dépasse la moitié de l'écran, ce qui
+    // déclenchait vibration, remontée de position au ViewModel et
+    // recomposition complète du Lecteur EN PLEINE animation de la page —
+    // l'instant précis où une frame perdue se voit le plus.
+    LaunchedEffect(chapter?.index, pagerState.settledPage, pageCount) {
         if (chapter?.index != previousChapterIndex) {
             previousChapterIndex = chapter?.index
             previousPageCount = pageCount
-            if (pagerState.currentPage != 0) {
-                isProgrammaticPageChange = true
-                try {
-                    pagerState.scrollToPage(0)
-                } finally {
-                    isProgrammaticPageChange = false
-                }
-            }
+            programmaticTargetPage = null
+            if (pagerState.currentPage != 0) scrollToPageProgrammatically(0, animate = false)
             return@LaunchedEffect
         }
         if (pageCount != previousPageCount) {
@@ -261,16 +274,19 @@ fun PagedChapterContent(
         // trouvé sur appareil (lot 3b) : le compteur de la ligne de
         // statut restait figé à 1 pendant un swipe manuel, puisque
         // rien ne faisait remonter la position du pager avant ceci.
-        onPageChanged(pagerState.currentPage)
+        val page = pagerState.settledPage
+        onPageChanged(page)
 
-        if (!isProgrammaticPageChange && chapter != null) {
+        val wasProgrammatic = programmaticTargetPage == page
+        programmaticTargetPage = null
+        if (!wasProgrammatic && chapter != null) {
             // P5 — le cran haptique de la page tournée est posé ICI, dans la
             // branche du swipe MANUEL, et pas sur `onPageChanged` ci-dessus :
             // ce dernier suit aussi les changements de page pilotés par la
             // narration, qui feraient vibrer l'appareil en continu pendant
             // une écoute — précisément quand l'utilisateur ne le touche pas.
             haptics.tick()
-            val sentenceRange = pagination.sentenceRangeOf(chapter.index, pagerState.currentPage)
+            val sentenceRange = pagination.sentenceRangeOf(chapter.index, page)
             if (!sentenceRange.isEmpty()) {
                 lastManuallyEmittedSentenceIndex = sentenceRange.first
                 onManualPageChange(sentenceRange.first)
@@ -301,12 +317,7 @@ fun PagedChapterContent(
         ) {
             val targetPage = pagination.pageIndexAt(chapter.index, currentSentenceIndex)
             if (pagerState.currentPage != targetPage) {
-                isProgrammaticPageChange = true
-                try {
-                    pagerState.scrollToPage(targetPage)
-                } finally {
-                    isProgrammaticPageChange = false
-                }
+                scrollToPageProgrammatically(targetPage, animate = false)
             }
         }
     }
@@ -346,12 +357,7 @@ fun PagedChapterContent(
             if (range == null) return@collectLatest
             val wordPage = pagination.pageIndexAtOffset(chapterIndex, range.first)
             if (wordPage >= 0 && wordPage != pagerState.currentPage) {
-                isProgrammaticPageChange = true
-                try {
-                    pagerState.animateScrollToPage(wordPage)
-                } finally {
-                    isProgrammaticPageChange = false
-                }
+                scrollToPageProgrammatically(wordPage, animate = true)
             }
         }
     }
@@ -461,7 +467,10 @@ fun PagedChapterContent(
                         pageOffsetRange = pageOffsetRange,
                         textStyle = renderTextStyle,
                         highlightedRange = highlightedRangeState,
-                        isDisplayedPage = pageIndex == pagerState.currentPage,
+                        // `settledPage` : la page affichée change une fois la
+                        // page posée, pas à mi-geste (trois pages recomposées
+                        // pendant l'animation sinon).
+                        isDisplayedPage = pageIndex == pagerState.settledPage,
                         isReadingRulerEnabled = isReadingRulerEnabled,
                         onCurrentLineY = onCurrentLineY,
                         freeSelectedRange = freeSelectedRangeState,
