@@ -2,6 +2,7 @@ package com.inktone.app
 
 import com.inktone.core.designsystem.AppIcon
 import com.inktone.core.designsystem.AppSymbol
+import androidx.compose.animation.EnterExitState
 import androidx.compose.animation.EnterTransition
 import androidx.compose.animation.core.tween
 import androidx.compose.animation.fadeIn
@@ -298,10 +299,14 @@ fun InkToneNavHost(navController: NavHostController = rememberNavController(), s
                 onBack = { navController.popBackStack() },
                 onOpenPronunciationRules = { navController.navigate(PronunciationRulesRoute) },
                 onOpenSettings = { navController.navigate(SettingsRoute) },
-                // Mis à jour dès `navigate`/`popBackStack`, donc au DÉBUT de
-                // la transition sortante — alors que ce composable reste
-                // affiché jusqu'à sa fin (voir KDoc de `ReaderScreen`).
-                isForeground = backStackEntry?.id == entry.id,
+                // Cible de la transition de CET écran : `Visible` dès sa
+                // première frame, `PostExit` dès le DÉBUT d'une transition
+                // sortante — alors que ce composable reste affiché jusqu'à sa
+                // fin (voir KDoc de `ReaderScreen`). Pas `backStackEntry`
+                // (`currentBackStackEntryAsState`) : collecté depuis un Flow,
+                // il ne change qu'une frame plus tard et désignait encore la
+                // Bibliothèque à la première composition du Lecteur.
+                isForeground = transition.targetState == EnterExitState.Visible,
             )
         }
         composable<SearchRoute> {

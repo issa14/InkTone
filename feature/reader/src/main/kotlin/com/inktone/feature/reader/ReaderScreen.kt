@@ -673,7 +673,20 @@ fun ReaderScreen(
         // retenue) : la remesure de pagination déclenchée par chaque
         // masquage/réapparition du HUD, dont les étapes intermédiaires
         // faisaient clignoter la page affichée, ne se produit plus.
-        var readingAreaSize by remember { mutableStateOf(IntSize.Zero) }
+        var measuredAreaSize by remember { mutableStateOf(IntSize.Zero) }
+        // Hors premier plan (fondu de sortie), la fenêtre peut changer de
+        // taille sous cet écran — barres système rétablies, mini-lecteur qui
+        // réapparaît sous le NavHost. Propager cette taille relancerait une
+        // pagination complète du chapitre pour un écran qui disparaît : elle
+        // est donc GELÉE à sa dernière valeur de premier plan.
+        //
+        // Gel dérivé ici, jamais en filtrant le callback de mesure : un
+        // callback ignoré n'est pas rejoué. Filtré, il laissait la taille à
+        // zéro si la première mesure tombait avant que le Lecteur soit
+        // reconnu au premier plan — mode paginé vide jusqu'à la relayout
+        // suivante (masquage du HUD, ~4 s).
+        val frozenAreaSize = remember(isForeground) { if (isForeground) null else measuredAreaSize }
+        val readingAreaSize = frozenAreaSize ?: measuredAreaSize
         // P4 — marge latérale réglable. UNE seule valeur, consommée à la fois
         // par la mesure de pagination et par le rendu (PagedChapterContent) :
         // deux sources distinctes feraient mesurer une page plus large que
@@ -835,14 +848,7 @@ fun ReaderScreen(
         Box(
             modifier = Modifier
                 .fillMaxSize()
-                // Hors premier plan (fondu de sortie), la fenêtre peut changer
-                // de taille sous cet écran — barres système rétablies,
-                // mini-lecteur qui réapparaît sous le NavHost. Propager cette
-                // taille relancerait une pagination complète du chapitre pour
-                // un écran qui disparaît.
-                .onGloballyPositioned { coordinates ->
-                    if (isForeground) readingAreaSize = coordinates.size
-                },
+                .onGloballyPositioned { coordinates -> measuredAreaSize = coordinates.size },
         ) {
             if (state.isReadingRulerEnabled && !isPdf) {
                 ReadingRuler(currentLineY = currentLineYDp, enabled = true)
