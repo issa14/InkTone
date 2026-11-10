@@ -277,7 +277,6 @@ class ReaderViewModel @Inject constructor(
         }
     }
 
-    // C.5 — exposé pour clé sharedElement dans ReaderScreen
     internal var currentPublicationId: String? = null
     /** Plan v4 — scope dédié aux préchargements, annulé indépendamment du chargement courant. */
     private var preloadScope: CoroutineScope? = null

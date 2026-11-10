@@ -2,9 +2,9 @@ package com.inktone.app
 
 import com.inktone.core.designsystem.AppIcon
 import com.inktone.core.designsystem.AppSymbol
-import androidx.compose.animation.ExperimentalSharedTransitionApi
-import androidx.compose.animation.SharedTransitionLayout
+import androidx.compose.animation.EnterTransition
 import androidx.compose.animation.core.tween
+import androidx.compose.animation.fadeIn
 import androidx.compose.animation.fadeOut
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -24,7 +24,6 @@ import androidx.compose.material3.TextButton
 import androidx.compose.material3.TopAppBar
 import androidx.compose.material3.rememberDrawerState
 import androidx.compose.runtime.Composable
-import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.runtime.LaunchedEffect
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.compose.runtime.getValue
@@ -45,9 +44,9 @@ import androidx.navigation.compose.composable
 import androidx.navigation.compose.currentBackStackEntryAsState
 import androidx.navigation.compose.rememberNavController
 import androidx.navigation.toRoute
-import com.inktone.core.designsystem.LocalAnimatedVisibilityScope
-import com.inktone.core.designsystem.LocalSharedTransitionScope
+import com.inktone.core.designsystem.Motion
 import com.inktone.core.designsystem.SystemBarIconsEffect
+import com.inktone.core.designsystem.reducedMotionDuration
 import com.inktone.core.ui.AboutScreen
 import com.inktone.feature.importer.ImportViewModel
 import com.inktone.feature.library.DrawerDestination
@@ -95,7 +94,6 @@ import kotlinx.coroutines.launch
  * écran ne consomme le geste retour lui-même (pas de swipe interne à
  * distinguer du retour système, contrairement à un pager ou un drawer).
  */
-@OptIn(ExperimentalSharedTransitionApi::class)
 @Composable
 fun InkToneNavHost(navController: NavHostController = rememberNavController(), startDestination: Any = LibraryRoute) {
     // Lot 18 — un seul drawer, hoisté ici plutôt que local à
@@ -193,16 +191,42 @@ fun InkToneNavHost(navController: NavHostController = rememberNavController(), s
         else -> MaterialTheme.colorScheme.surface
     }
     SystemBarIconsEffect(systemBarBackground)
-    SharedTransitionLayout {
-        CompositionLocalProvider(LocalSharedTransitionScope provides this@SharedTransitionLayout) {
-        // P2 — le mini-lecteur occupe une bande sous le contenu plutôt que de
-        // le recouvrir : une barre flottante masquerait les actions ancrées en
-        // bas des écrans (import, filtres de bibliothèque).
-        Column(modifier = Modifier.fillMaxSize()) {
+    // Transition d'écran UNIQUE, déclarée ici une fois pour toutes les
+    // destinations — plus de surcharge par route.
+    //
+    // Sans elle, Navigation applique son fondu croisé par défaut de 700 ms :
+    // les deux écrans y sont translucides en même temps, et c'est le fond de
+    // FENÊTRE qui transparaît entre eux. En quittant le Lecteur, ce fond
+    // portait encore la couleur du thème de lecture — la Bibliothèque
+    // apparaissait teintée puis s'éclaircissait lentement (« ralentissement
+    // en couleur »).
+    //
+    // Ici, un seul écran est animé à la fois et l'autre reste opaque dessous :
+    // - aller : le nouvel écran apparaît en fondu PAR-DESSUS l'ancien, gardé
+    //   opaque jusqu'à la fin (`screenHoldSpec` : aucune variation d'alpha
+    //   avant le terme du fondu d'entrée — `ExitTransition
+    //   .KeepUntilTransitionsFinished` est interne à compose-animation 1.8) ;
+    // - retour : l'écran quitté s'efface PAR-DESSUS celui d'arrivée, affiché
+    //   d'emblée. NavHost place lui-même la cible d'un dépilement SOUS
+    //   l'écran quitté (z-index − 1, vérifié dans navigation-compose 2.8.0).
+    // Le fond de fenêtre n'est donc jamais visible pendant une transition.
+    // `reducedMotionDuration` respecte l'échelle d'animation système.
+    val screenDurationMs = reducedMotionDuration(Motion.DURATION_STANDARD_MS)
+    val screenEnterSpec = tween<Float>(screenDurationMs, easing = Motion.EnterEasing)
+    val screenExitSpec = tween<Float>(screenDurationMs, easing = Motion.StandardEasing)
+    val screenHoldSpec = tween<Float>(durationMillis = 0, delayMillis = screenDurationMs)
+    // P2 — le mini-lecteur occupe une bande sous le contenu plutôt que de
+    // le recouvrir : une barre flottante masquerait les actions ancrées en
+    // bas des écrans (import, filtres de bibliothèque).
+    Column(modifier = Modifier.fillMaxSize()) {
         NavHost(
             navController = navController,
             startDestination = startDestination,
             modifier = Modifier.weight(1f),
+            enterTransition = { fadeIn(animationSpec = screenEnterSpec) },
+            exitTransition = { fadeOut(animationSpec = screenHoldSpec) },
+            popEnterTransition = { EnterTransition.None },
+            popExitTransition = { fadeOut(animationSpec = screenExitSpec) },
         ) {
         composable<OnboardingRoute> {
             OnboardingScreen(
@@ -217,7 +241,6 @@ fun InkToneNavHost(navController: NavHostController = rememberNavController(), s
             )
         }
         composable<LibraryRoute> {
-            CompositionLocalProvider(LocalAnimatedVisibilityScope provides this@composable) {
             val importViewModel: ImportViewModel = hiltViewModel()
             val importLauncher = rememberLauncherForActivityResult(
                 ActivityResultContracts.OpenMultipleDocuments(),
@@ -247,45 +270,14 @@ fun InkToneNavHost(navController: NavHostController = rememberNavController(), s
             // l'onboarding) : un conflit détecté en arrière-plan ne se
             // résout jamais tout seul.
             SyncConflictBottomSheet()
-            } // CompositionLocalProvider
         }
         composable<RecentsRoute> {
-            // Diagnostic flash de fermeture — bug réel trouvé à l'audit :
-            // sans ce scope, `ReaderScreen` ne trouve pas de
-            // `LocalAnimatedVisibilityScope` (runCatching retombe sur
-            // null) et désactive silencieusement la transition partagée
-            // vers la couverture. À la fermeture, plus de morphing vers
-            // une petite couverture : Compose Navigation retombe sur son
-            // fondu par défaut du Lecteur PLEIN ÉCRAN (fond coloré du
-            // thème + texte du chapitre), visible ~300 ms — la « page
-            // colorée avec texte » signalée. `RecentsScreen` affiche des
-            // `BookCover`/`PublicationListRow` porteurs de la même clé
-            // `"cover-$id"` (voir `BookCover.kt`) : leur fournir ce scope
-            // suffit à réactiver le morphing, même correctif que
-            // `LibraryRoute`/`ReaderRoute` ci-dessus.
-            CompositionLocalProvider(LocalAnimatedVisibilityScope provides this@composable) {
             RecentsScreen(
                 onNavigateToReader = { publicationId -> navController.navigate(ReaderRoute(publicationId)) },
                 onMenuClick = openDrawer,
             )
-            } // CompositionLocalProvider
         }
-        composable<ReaderRoute>(
-            // Diagnostic flash de fermeture — filet de sécurité pour les
-            // cas où la transition partagée vers la couverture ne trouve
-            // aucune correspondance (Recherche sans couverture, item
-            // scrollé hors écran, livre réordonné entre-temps par
-            // `setLastOpened`) : par défaut, Compose Navigation applique
-            // alors son propre fondu (~300 ms) au Lecteur PLEIN ÉCRAN
-            // (fond coloré du thème + texte du chapitre), visible le
-            // temps du fondu — la « page colorée » signalée. Un fondu de
-            // fermeture volontairement court rend ce repli imperceptible
-            // sans toucher au cas nominal (morphing shared element),
-            // prioritaire sur cette transition par défaut quand il existe.
-            exitTransition = { fadeOut(animationSpec = tween(READER_CLOSE_FADE_MS)) },
-            popExitTransition = { fadeOut(animationSpec = tween(READER_CLOSE_FADE_MS)) },
-        ) { entry ->
-            CompositionLocalProvider(LocalAnimatedVisibilityScope provides this@composable) {
+        composable<ReaderRoute> { entry ->
             val route = entry.toRoute<ReaderRoute>()
             val readerViewModel: ReaderViewModel = hiltViewModel()
             LaunchedEffect(route) {
@@ -306,8 +298,11 @@ fun InkToneNavHost(navController: NavHostController = rememberNavController(), s
                 onBack = { navController.popBackStack() },
                 onOpenPronunciationRules = { navController.navigate(PronunciationRulesRoute) },
                 onOpenSettings = { navController.navigate(SettingsRoute) },
+                // Mis à jour dès `navigate`/`popBackStack`, donc au DÉBUT de
+                // la transition sortante — alors que ce composable reste
+                // affiché jusqu'à sa fin (voir KDoc de `ReaderScreen`).
+                isForeground = backStackEntry?.id == entry.id,
             )
-            } // CompositionLocalProvider
         }
         composable<SearchRoute> {
             BackScaffold(title = "Rechercher", onBack = navController::popBackStack) {
@@ -464,11 +459,6 @@ fun InkToneNavHost(navController: NavHostController = rememberNavController(), s
             )
         }
         composable<BookmarksRoute> {
-            // Diagnostic flash de fermeture — même correctif que
-            // `RecentsRoute` ci-dessus : sans ce scope, la transition
-            // partagée vers la couverture est désactivée et la fermeture
-            // laisse voir le fondu par défaut du Lecteur plein écran.
-            CompositionLocalProvider(LocalAnimatedVisibilityScope provides this@composable) {
             LibraryItemsScreen(
                 onMenuClick = openDrawer,
                 onNavigateToReader = { publicationId, resourceHref, chapterIndex, charOffset ->
@@ -484,7 +474,6 @@ fun InkToneNavHost(navController: NavHostController = rememberNavController(), s
                     )
                 },
             )
-            } // CompositionLocalProvider
         }
         composable<AboutRoute> {
             val aboutViewModel: AboutViewModel = hiltViewModel()
@@ -516,17 +505,12 @@ fun InkToneNavHost(navController: NavHostController = rememberNavController(), s
             // Tache 2a.4 : LibraryDetailScreen possede son propre Scaffold
             // (titre a deux niveaux), pas de BackScaffold generique ici,
             // meme raison que SettingsScreen.
-            //
-            // Diagnostic flash de fermeture — même correctif que
-            // `RecentsRoute`/`BookmarksRoute` ci-dessus.
-            CompositionLocalProvider(LocalAnimatedVisibilityScope provides this@composable) {
             LibraryDetailScreen(
                 category = if (route.category == "series") LibraryDetailCategory.SERIES else LibraryDetailCategory.TAG,
                 value = route.value,
                 onNavigateToReader = { publicationId -> navController.navigate(ReaderRoute(publicationId)) },
                 onBack = navController::popBackStack,
             )
-            } // CompositionLocalProvider
         }
     }
         // Masqué sur le Lecteur (qui a ses propres commandes TTS) et sur
@@ -542,9 +526,7 @@ fun InkToneNavHost(navController: NavHostController = rememberNavController(), s
                 isResumeCardVisible = currentDestination?.hasRoute<LibraryRoute>() == true,
             )
         }
-        } // Column (contenu + mini-lecteur)
-        } // CompositionLocalProvider (SharedTransitionScope)
-    } // SharedTransitionLayout
+    } // Column (contenu + mini-lecteur)
     } // ModalNavigationDrawer
 }
 
@@ -615,11 +597,4 @@ private fun BackScaffold(title: String, onBack: () -> Unit, content: @Composable
         }
     }
 }
-
-/**
- * Durée du fondu de fermeture du Lecteur (voir `composable<ReaderRoute>`) —
- * volontairement courte, repli pour les cas sans transition partagée
- * (shared element) plutôt qu'une animation soignée en soi.
- */
-private const val READER_CLOSE_FADE_MS = 120
 

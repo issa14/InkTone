@@ -20,7 +20,6 @@ import kotlinx.coroutines.isActive
 import kotlinx.coroutines.withTimeoutOrNull
 import androidx.compose.animation.core.animateIntAsState
 import androidx.compose.animation.core.tween
-import androidx.compose.animation.ExperimentalSharedTransitionApi
 import androidx.compose.foundation.ExperimentalFoundationApi
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
@@ -183,8 +182,18 @@ import kotlin.math.roundToInt
  * la phrase en cours de lecture TTS — la vue défile uniquement sur
  * changement de chapitre. Un chapitre long avec lecture TTS active peut
  * donc surligner un mot hors de l'écran visible.
+ *
+ * [isForeground] — vrai tant que le Lecteur est la destination COURANTE de
+ * la navigation. Il retombe à faux dès le début d'une transition sortante
+ * (retour à la Bibliothèque, ouverture des Réglages ou de la Recherche),
+ * alors que cet écran reste composé jusqu'à la FIN du fondu. Tout ce que le
+ * Lecteur impose à la FENÊTRE (barres système masquées, fond de fenêtre,
+ * contraste des icônes, luminosité, écran maintenu allumé) en dépend : lié
+ * à la seule durée de vie du composable, ce réglage n'était rendu qu'après
+ * l'animation, et l'écran d'arrivée se dessinait pendant tout le fondu sur
+ * le fond coloré du thème de lecture, sans barre de statut.
  */
-@OptIn(ExperimentalFoundationApi::class, ExperimentalLayoutApi::class, ExperimentalSharedTransitionApi::class)
+@OptIn(ExperimentalFoundationApi::class, ExperimentalLayoutApi::class)
 @Composable
 fun ReaderScreen(
     viewModel: ReaderViewModel = hiltViewModel(),
@@ -192,6 +201,7 @@ fun ReaderScreen(
     onBack: () -> Unit = {},
     onOpenPronunciationRules: () -> Unit = {},
     onOpenSettings: () -> Unit = {},
+    isForeground: Boolean = true,
 ) {
     val state by viewModel.state.collectAsStateWithLifecycle()
     // §3.3 — le surlignage mot-à-mot est collecté séparément : sa cadence
@@ -349,6 +359,7 @@ fun ReaderScreen(
     ImmersiveReaderChrome(
         isHudVisible = isHudVisible,
         hudActivityTick = hudActivityTick,
+        immersive = isForeground,
         onAutoHide = {
             // 3e.2 — pendant le TTS (barre pilule affichée, pas l'overlay
             // panneau complet), l'inactivité replie la barre au lieu de
@@ -364,6 +375,11 @@ fun ReaderScreen(
     // 3d.3 — applique la luminosité choisie à la fenêtre du lecteur
     // seulement, restaurée à la sortie (voir ReaderBrightnessEffect).
     val haptics = rememberAppHaptics()
+    // Effets de FENÊTRE ci-dessous : appelés seulement tant que le Lecteur
+    // est au premier plan (voir [isForeground]). Leur sortie de composition
+    // déclenche leur `onDispose` — restauration immédiate, au début de la
+    // transition sortante plutôt qu'à sa fin.
+    if (isForeground) {
     ReaderBrightnessEffect(value = state.readerBrightness)
     // P4 — retiré avec l'écran de lecture (DisposableEffect) : le maintien ne
     // doit jamais survivre au Lecteur.
@@ -380,8 +396,11 @@ fun ReaderScreen(
     // Seule exception au contraste centralisé par `InkToneNavHost` : celui du
     // Lecteur dépend du thème de LECTURE, que le NavHost ne connaît pas.
     // Aucun conflit d'écriture possible — le drawer n'est jamais ouvrable
-    // depuis cet écran, donc rien ne recompose le NavHost pendant qu'il est
-    // affiché. Sert les barres qui reparaissent transitoirement au balayage.
+    // depuis cet écran, et dès que le Lecteur n'est plus au premier plan cet
+    // effet n'est plus appelé : le `SystemBarIconsEffect` du NavHost
+    // redevient seul écrivain, y compris pendant le fondu de sortie (où cet
+    // écran recompose encore). Sert les barres qui reparaissent
+    // transitoirement au balayage.
     SystemBarIconsEffect(ThemeColors.barSurface(state.resolvedTheme))
     WindowBackgroundColorEffect(
         if (isHudVisible) {
@@ -390,22 +409,7 @@ fun ReaderScreen(
             ThemeColors.background(state.resolvedTheme)
         },
     )
-
-    // C.5 — SharedTransition depuis la couverture de la bibliothèque
-    val sharedTransitionScope = runCatching {
-        com.inktone.core.designsystem.LocalSharedTransitionScope.current
-    }.getOrNull()
-    val animatedVisibilityScope = runCatching {
-        com.inktone.core.designsystem.LocalAnimatedVisibilityScope.current
-    }.getOrNull()
-    val sharedElementMod = if (sharedTransitionScope != null && animatedVisibilityScope != null) {
-        with(sharedTransitionScope) {
-            Modifier.sharedElement(
-                sharedContentState = rememberSharedContentState(key = "cover-${viewModel.currentPublicationId ?: ""}"),
-                animatedVisibilityScope = animatedVisibilityScope,
-            )
-        }
-    } else Modifier
+    }
 
     // Refonte HUD/viewport (voir NOTE_REGRESSION_CLIGNOTEMENT_PAGE_HUD.md,
     // option 3) : Box plutôt que Column — la zone de lecture occupe
@@ -422,7 +426,6 @@ fun ReaderScreen(
     Box(
         modifier = Modifier
             .fillMaxSize()
-            .then(sharedElementMod)
             .background(ThemeColors.background(state.resolvedTheme))
             .clickable(
                 interactionSource = remember { MutableInteractionSource() },
@@ -832,7 +835,14 @@ fun ReaderScreen(
         Box(
             modifier = Modifier
                 .fillMaxSize()
-                .onGloballyPositioned { coordinates -> readingAreaSize = coordinates.size },
+                // Hors premier plan (fondu de sortie), la fenêtre peut changer
+                // de taille sous cet écran — barres système rétablies,
+                // mini-lecteur qui réapparaît sous le NavHost. Propager cette
+                // taille relancerait une pagination complète du chapitre pour
+                // un écran qui disparaît.
+                .onGloballyPositioned { coordinates ->
+                    if (isForeground) readingAreaSize = coordinates.size
+                },
         ) {
             if (state.isReadingRulerEnabled && !isPdf) {
                 ReadingRuler(currentLineY = currentLineYDp, enabled = true)

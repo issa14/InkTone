@@ -1,7 +1,6 @@
 package com.inktone.feature.library
 
 import android.net.Uri
-import androidx.compose.animation.ExperimentalSharedTransitionApi
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Box
@@ -64,12 +63,7 @@ import java.io.File
  * @param showOverlays  menu 3-points superposé à la couverture —
  *   désactivé pour la miniature du mode Liste
  *   ([PublicationListRow] porte ses propres contrôles, lot 2b.4).
- * @param enableSharedTransition  participe à la transition partagée vers
- *   le Lecteur (clé `"cover-{id}"`). À passer à `false` pour toute
- *   couverture SECONDAIRE d'une publication déjà affichée ailleurs sur
- *   le même écran — voir la note sur l'unicité de la clé ci-dessous.
  */
-@OptIn(ExperimentalSharedTransitionApi::class)
 @Composable
 fun BookCover(
     publication: Publication,
@@ -81,7 +75,6 @@ fun BookCover(
     showOverlays: Boolean = true,
     onTogglePin: () -> Unit = {},
     onDelete: () -> Unit = {},
-    enableSharedTransition: Boolean = true,
 ) {
     var showActionsSheet by remember { mutableStateOf(false) }
     var showDetailsSheet by remember { mutableStateOf(false) }
@@ -105,41 +98,15 @@ fun BookCover(
     // E.2 — contentDescription global pour TalkBack
     val a11yLabel = "${publication.title}, ${if (progressPercent > 0) "$progressPercent% lu" else "Non commencé"}"
 
-    // C.5 — SharedTransition couverture vers Reader.
-    //
-    // Bug réel trouvé sur appareil : la clé `"cover-{id}"` doit être
-    // UNIQUE parmi les composables vivants d'un même écran. La carte
-    // « Reprendre la lecture » affiche la publication la plus récemment
-    // ouverte, qui reste AUSSI présente dans la grille/liste en dessous
-    // (`resumeReadingPublication` dérive de `publications` sans l'en
-    // retirer) : depuis que cette carte porte une couverture, deux
-    // `BookCover` revendiquaient donc la même clé simultanément.
-    // Compose ne peut pas départager deux revendications identiques — il
-    // en élit une et l'autre n'est plus dessinée du tout, laissant dans
-    // la grille un emplacement VIDE qui occupe pourtant sa place et
-    // reste cliquable (symptôme exact remonté). `enableSharedTransition`
-    // laisse l'instance canonique (grille/liste) seule propriétaire de
-    // la clé ; toute couverture secondaire du même livre s'en abstient.
-    val sharedTransitionScope = runCatching {
-        com.inktone.core.designsystem.LocalSharedTransitionScope.current
-    }.getOrNull()
-    val animatedVisibilityScope = runCatching {
-        com.inktone.core.designsystem.LocalAnimatedVisibilityScope.current
-    }.getOrNull()
-    val sharedElementMod = if (enableSharedTransition && sharedTransitionScope != null && animatedVisibilityScope != null) {
-        with(sharedTransitionScope) {
-            Modifier.sharedElement(
-                sharedContentState = rememberSharedContentState(key = "cover-${publication.id}"),
-                animatedVisibilityScope = animatedVisibilityScope,
-            )
-        }
-    } else Modifier
-
+    // Aucune transition partagée couverture ↔ Lecteur (retirée) : la
+    // couverture et l'écran de lecture ne sont pas le même contenu, le
+    // morphing étirait la vignette en plein écran — le « bloc coloré » vu à
+    // la fermeture d'un livre. La navigation porte une transition unique
+    // (`InkToneNavHost`).
     Box(
         modifier = modifier
             .aspectRatio(0.7f)
             .semantics { contentDescription = a11yLabel }
-            .then(sharedElementMod)
             .clickable(onClick = onClick),
     ) {
         if (coverModel != null) {

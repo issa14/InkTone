@@ -20,16 +20,25 @@ import kotlinx.coroutines.delay
  * `onAutoHide` : appele apres 4s quand [isHudVisible] devient vrai —
  * l'appelant decide comment repasser `isHudVisible` a faux (ReaderScreen
  * pilote son propre etat, ce composable ne fait que le delai).
+ *
+ * [immersive] : faux dès que le Lecteur cesse d'être la destination
+ * courante (retour à la Bibliothèque, ouverture des Réglages), donc au
+ * DÉBUT de la transition de navigation. Lier le masquage à la seule durée
+ * de vie du composable restaurait les barres à la FIN de la transition :
+ * l'écran d'arrivée, mis en page sans barre de statut pendant tout le
+ * fondu, sautait alors d'un cran vers le bas une fois l'animation finie.
  */
 @Composable
 fun ImmersiveReaderChrome(
     isHudVisible: Boolean,
     onAutoHide: () -> Unit,
     hudActivityTick: Int = 0,
+    immersive: Boolean = true,
     content: @Composable () -> Unit,
 ) {
     val view = LocalView.current
-    DisposableEffect(Unit) {
+    DisposableEffect(immersive) {
+        if (!immersive) return@DisposableEffect onDispose {}
         val activity = view.context as? Activity
         val controller = activity?.let { WindowCompat.getInsetsController(it.window, view) }
         controller?.hide(WindowInsetsCompat.Type.systemBars())
