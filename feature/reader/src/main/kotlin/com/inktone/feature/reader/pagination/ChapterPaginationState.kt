@@ -278,7 +278,16 @@ fun rememberChapterPaginationState(
 
     val currentSentenceIndexAtOpen = rememberUpdatedState(currentSentenceIndex)
 
-    LaunchedEffect(chapter?.index, styleKey) {
+    // Le CONTENU fait partie de la clé, pas seulement le numéro : à
+    // l'ouverture, le chapitre courant arrive d'abord comme coquille vide
+    // (contenu chargé ensuite, en parallèle). Clé sur le seul numéro, la
+    // mesure tournait une fois sur cette coquille — 0 phrase, mesure
+    // « complète » d'un chapitre vide — et n'était jamais relancée à
+    // l'arrivée du texte : pas de compteur de pages, et en mode paginé un
+    // pager réduit à cette mesure vide, dont les pages ne tournaient pas.
+    // Une même instance de contenu se compare par identité : aucun coût
+    // tant que le contenu ne change pas réellement.
+    LaunchedEffect(chapter?.index, chapter?.content, styleKey) {
         if (chapter == null || contentWidthPx <= 0) return@LaunchedEffect
         val sentences = chapter.sentences
         val totalSentenceCount = sentences.size

@@ -4,6 +4,7 @@ import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.size
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableIntStateOf
+import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.test.junit4.createComposeRule
@@ -94,5 +95,46 @@ class ChapterPaginationStateComposeTest {
 
         assertTrue("la fixture doit produire plusieurs pages pour que ce test soit significatif", pageCountA > 1)
         assertEquals(pageCountA, pageCountB)
+    }
+
+    /**
+     * Cas réel trouvé sur appareil : à l'ouverture, le chapitre courant arrive
+     * d'abord comme coquille vide, son contenu ensuite. La mesure doit être
+     * relancée à l'arrivée du contenu — sans quoi elle restait celle d'un
+     * chapitre vide (pas de compteur de pages, pages qui ne tournent pas en
+     * mode paginé).
+     */
+    @Test
+    fun la_mesure_est_relancee_quand_le_contenu_du_chapitre_arrive() {
+        val loaded = fixtureChapter()
+        val shell = loaded.copy(content = ChapterContent.Rich(blocks = emptyList()), sentences = emptyList())
+        var chapter by mutableStateOf(shell)
+        var pagination: ChapterPaginationState? = null
+
+        composeTestRule.setContent {
+            Box(modifier = Modifier.size(320.dp, 180.dp)) {
+                pagination = rememberChapterPaginationState(
+                    chapter = chapter,
+                    nextChapter = null,
+                    currentSentenceIndex = 0,
+                    fontSizeSp = 20,
+                    lineHeightSp = 20,
+                    viewportWidthPx = 900,
+                    viewportHeightPx = 500,
+                    paddingPx = 40,
+                )
+            }
+        }
+        composeTestRule.waitForIdle()
+
+        composeTestRule.runOnIdle { chapter = loaded }
+
+        composeTestRule.waitUntil(timeoutMillis = 5_000) {
+            pagination?.isMeasurementComplete(loaded) == true
+        }
+        assertTrue(
+            "la mesure doit couvrir le chapitre chargé, pas sa coquille vide",
+            (pagination?.pageCount(loaded.index) ?: 0) > 1,
+        )
     }
 }
