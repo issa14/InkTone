@@ -115,12 +115,23 @@ class InkToneApplicationConventionPlugin : Plugin<Project> {
                     // chiffres de demarrage etaient donc non representatifs.
                     // matchingFallbacks vers release : les modules bibliotheque
                     // n'exposent que debug/release.
+                    //
+                    // Signé avec la clé DEBUG, jamais la clé release : même
+                    // applicationId et même signature que la version debug
+                    // installée, il s'installe par-dessus comme une MISE À
+                    // JOUR — bibliothèque, positions et préférences conservées
+                    // — pour mesurer la fluidité sur les vraies données de
+                    // l'appareil (scripts/measure-reader-frames.sh). Signé avec
+                    // la clé release, il exigeait de désinstaller l'app, donc
+                    // d'effacer ces données. Sans effet sur la génération du
+                    // profil de base, qui ne dépend pas de la signature.
+                    // Conséquence assumée : la connexion Google Drive (client
+                    // OAuth release, lié à l'empreinte de la clé release) n'y
+                    // fonctionne pas — sans objet pour une mesure.
                     create("benchmark") {
                         isDebuggable = false
                         matchingFallbacks += listOf("release")
-                        if (releaseSigningConfigured) {
-                            signingConfig = signingConfigs.getByName("release")
-                        }
+                        signingConfig = signingConfigs.getByName("debug")
                     }
                 }
 
