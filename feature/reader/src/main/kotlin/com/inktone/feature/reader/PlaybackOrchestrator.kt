@@ -19,6 +19,7 @@ import com.inktone.domain.service.ParseResult
 import com.inktone.domain.service.PublicationParser
 import com.inktone.domain.service.TtsEngine
 import com.inktone.domain.service.TtsSegmentCache
+import com.inktone.domain.service.cacheIdentity
 import com.inktone.domain.service.WordTimestamp
 import com.inktone.domain.service.sha256Hex
 import com.inktone.domain.service.ttsCacheKey
@@ -656,7 +657,7 @@ class PlaybackOrchestrator @Inject constructor(
                     publicationId = publicationId,
                     chapterIndex = chapterIndex,
                     sentenceOffset = sentence.startOffset,
-                    voiceProfileId = voiceProfile.id,
+                    voiceProfileId = voiceProfile.cacheIdentity(),
                     pronunciationRulesHash = rulesHash,
                     engineVersion = ttsEngine.synthesisVersion,
                 )
@@ -892,7 +893,7 @@ class PlaybackOrchestrator @Inject constructor(
                     publicationId = publicationId,
                     chapterIndex = chapterIndex,
                     sentenceOffset = sentence.startOffset,
-                    voiceProfileId = voiceProfile.id,
+                    voiceProfileId = voiceProfile.cacheIdentity(),
                     pronunciationRulesHash = rulesHash,
                     engineVersion = ttsEngine.synthesisVersion,
                 ),

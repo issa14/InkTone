@@ -1,5 +1,7 @@
 package com.inktone.domain.service
 
+import com.inktone.domain.model.TtsEngineId
+import com.inktone.domain.model.VoiceProfile
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertNotEquals
 import org.junit.Test
@@ -29,5 +31,21 @@ class TtsCacheKeyTest {
         assertNotEquals(base, ttsCacheKey("pub", 1, 10, "vp2", "rules", 1)) // voix
         assertNotEquals(base, ttsCacheKey("pub", 1, 10, "vp", "rules2", 1)) // règles de prononciation
         assertNotEquals(base, ttsCacheKey("pub", 1, 10, "vp", "rules", 2)) // version du moteur
+    }
+
+    @Test
+    fun `modifier un profil en place invalide la cle - moteur, voix, vitesse, hauteur`() {
+        val base = VoiceProfile(
+            id = "vp-settings-default", engine = TtsEngineId.ANDROID_NATIVE,
+            voice = "fr-fr-default", language = "fr",
+        )
+        fun key(p: VoiceProfile) = ttsCacheKey("pub", 1, 10, p.cacheIdentity(), "rules", 1)
+
+        val k = key(base)
+        assertEquals(k, key(base.copy()))
+        assertNotEquals(k, key(base.copy(engine = TtsEngineId.EDGE_TTS)))
+        assertNotEquals(k, key(base.copy(voice = "autre")))
+        assertNotEquals(k, key(base.copy(speed = 1.5f)))
+        assertNotEquals(k, key(base.copy(pitch = 0.8f)))
     }
 }

@@ -1,5 +1,6 @@
 package com.inktone.domain.service
 
+import com.inktone.domain.model.VoiceProfile
 import java.security.MessageDigest
 
 /**
@@ -82,3 +83,13 @@ fun sha256Hex(input: String): String =
     MessageDigest.getInstance("SHA-256")
         .digest(input.toByteArray(Charsets.UTF_8))
         .joinToString("") { "%02x".format(it) }
+
+/**
+ * Identité de synthèse d'un profil vocal, à passer comme `voiceProfileId` de
+ * [ttsCacheKey]. L'`id` seul ne suffit pas : un profil est modifié EN PLACE
+ * (changement de moteur, de voix, de vitesse ou de hauteur depuis les
+ * réglages), son `id` restant identique. Sans ces dimensions, des segments
+ * synthétisés par un autre moteur (ex. voix système) étaient servis depuis le
+ * cache alors que l'utilisateur avait sélectionné Edge.
+ */
+fun VoiceProfile.cacheIdentity(): String = "$id|$engine|$voice|$speed|$pitch"
