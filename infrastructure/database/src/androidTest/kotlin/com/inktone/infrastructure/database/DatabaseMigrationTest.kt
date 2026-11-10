@@ -1237,6 +1237,52 @@ class DatabaseMigrationTest {
         v31.close()
     }
 
+    // Voix Edge Vivienne renommée vers son nom officiel (MIGRATION_31_32) :
+    // seul le nom de voix change ; vitesse, hauteur et autres profils intacts.
+    @Test
+    fun migration_31_vers_32_renomme_la_voix_vivienne_et_conserve_le_reste() {
+        val v31 = helper.createDatabase(TEST_DB_NAME, 31)
+        v31.execSQL(
+            "INSERT INTO voice_profiles (id, engine, voice, language, speed, pitch, volume, style) " +
+                "VALUES ('vp-settings-default', 'EDGE_TTS', 'fr-FR-VivienneNeural', 'fr', 1.25, 0.9, 1.0, NULL)",
+        )
+        v31.execSQL(
+            "INSERT INTO voice_profiles (id, engine, voice, language, speed, pitch, volume, style) " +
+                "VALUES ('vp-henri', 'EDGE_TTS', 'fr-FR-HenriNeural', 'fr', 1.0, 1.0, 1.0, NULL)",
+        )
+        v31.execSQL(
+            "INSERT INTO voice_profiles (id, engine, voice, language, speed, pitch, volume, style) " +
+                "VALUES ('vp-sherpa', 'SHERPA_ONNX', 'jessica', 'fr', 1.0, 1.0, 1.0, NULL)",
+        )
+        v31.close()
+
+        val v32 = helper.runMigrationsAndValidate(
+            TEST_DB_NAME, 32, true,
+            MIGRATION_1_2, MIGRATION_2_3, MIGRATION_3_4, MIGRATION_4_5, MIGRATION_5_6, MIGRATION_6_7,
+            MIGRATION_7_8, MIGRATION_8_9, MIGRATION_9_10, MIGRATION_10_11, MIGRATION_11_12, MIGRATION_12_13,
+            MIGRATION_13_14, MIGRATION_14_15, MIGRATION_15_16, MIGRATION_16_17, MIGRATION_17_18, MIGRATION_18_19,
+            MIGRATION_19_20, MIGRATION_20_21, MIGRATION_21_22, MIGRATION_22_23, MIGRATION_23_24, MIGRATION_24_25,
+            MIGRATION_25_26, MIGRATION_26_27, MIGRATION_27_28, MIGRATION_28_29, MIGRATION_29_30, MIGRATION_30_31,
+            MIGRATION_31_32,
+        )
+
+        v32.query("SELECT voice, speed, pitch FROM voice_profiles WHERE id = 'vp-settings-default'").use { cursor ->
+            assertEquals(true, cursor.moveToFirst())
+            assertEquals("fr-FR-VivienneMultilingualNeural", cursor.getString(0))
+            assertEquals(1.25, cursor.getDouble(1), 0.0001)
+            assertEquals(0.9, cursor.getDouble(2), 0.0001)
+        }
+        v32.query("SELECT voice FROM voice_profiles WHERE id = 'vp-henri'").use { cursor ->
+            assertEquals(true, cursor.moveToFirst())
+            assertEquals("fr-FR-HenriNeural", cursor.getString(0))
+        }
+        v32.query("SELECT voice FROM voice_profiles WHERE id = 'vp-sherpa'").use { cursor ->
+            assertEquals(true, cursor.moveToFirst())
+            assertEquals("jessica", cursor.getString(0))
+        }
+        v32.close()
+    }
+
     companion object {
         private const val TEST_DB_NAME = "migration-test"
     }

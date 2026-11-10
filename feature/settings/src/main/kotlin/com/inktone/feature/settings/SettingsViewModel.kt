@@ -377,7 +377,7 @@ class SettingsViewModel @Inject constructor(
         // Lot 20 — Sherpa = upmc-medium, voix par défaut jessica (sid 0, comme le legacy).
         TtsEngineId.SHERPA_ONNX -> "jessica"
         TtsEngineId.ANDROID_NATIVE -> "fr-fr-default"
-        TtsEngineId.EDGE_TTS -> "fr-FR-VivienneNeural"
+        TtsEngineId.EDGE_TTS -> "fr-FR-VivienneMultilingualNeural"
         TtsEngineId.PIPER -> "default"
     }
 

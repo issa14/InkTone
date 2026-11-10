@@ -90,13 +90,28 @@ class EdgeTtsClient @Inject constructor(
          * remplacée par la voix par défaut.
          */
         val VOICES = listOf(
-            "fr-FR-VivienneNeural",
+            "fr-FR-VivienneMultilingualNeural",
             "fr-FR-HenriNeural",
             "fr-FR-RemyMultilingualNeural",
             "fr-CH-ArianeNeural",
             "fr-BE-CharlineNeural",
         )
-        const val DEFAULT_VOICE = "fr-FR-VivienneNeural"
+        const val DEFAULT_VOICE = "fr-FR-VivienneMultilingualNeural"
+
+        /**
+         * Ancien nom -> nom officiel. Le service tolère encore l'ancien comme
+         * alias, mais le retirera sans préavis ; un profil restauré d'une
+         * sauvegarde antérieure à la migration 31->32 est ainsi redirigé.
+         */
+        private val LEGACY_VOICE_ALIASES = mapOf(
+            "fr-FR-VivienneNeural" to "fr-FR-VivienneMultilingualNeural",
+        )
+
+        /** Voix réellement envoyée au service pour [voiceName] (jamais une voix inconnue). */
+        fun resolveVoice(voiceName: String): String {
+            val canonical = LEGACY_VOICE_ALIASES[voiceName] ?: voiceName
+            return if (canonical in VOICES) canonical else DEFAULT_VOICE
+        }
 
         /** Jeton `Sec-MS-GEC` v2 (`<16 hex>-<64 hex>`), voir [EdgeTtsGecToken]. */
         fun generateSecMsGec(): String =
@@ -163,7 +178,7 @@ class EdgeTtsClient @Inject constructor(
         voiceName: String,
         speed: Float,
     ): EdgeTtsResult = withContext(Dispatchers.IO) {
-        val voice = if (voiceName in VOICES) voiceName else DEFAULT_VOICE
+        val voice = resolveVoice(voiceName)
         val ssml = buildSsml(text, voice, speed.coerceIn(0.5f, 2.0f))
 
         var lastException: Exception? = null

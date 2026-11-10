@@ -38,4 +38,15 @@ class EdgeTtsVoiceCatalogTest {
         listOf("fr-FR-RemyMultilingualNeural", "fr-CH-ArianeNeural", "fr-BE-CharlineNeural")
             .forEach { assertTrue("$it absente", it in EdgeTtsClient.VOICES) }
     }
+
+    @Test
+    fun l_ancien_nom_de_vivienne_est_redirige_vers_le_nom_officiel() {
+        assertEquals("fr-FR-VivienneMultilingualNeural", EdgeTtsClient.resolveVoice("fr-FR-VivienneNeural"))
+    }
+
+    @Test
+    fun une_voix_inconnue_retombe_sur_la_voix_par_defaut() {
+        assertEquals(EdgeTtsClient.DEFAULT_VOICE, EdgeTtsClient.resolveVoice("n-importe-quoi"))
+        assertEquals("fr-CH-ArianeNeural", EdgeTtsClient.resolveVoice("fr-CH-ArianeNeural"))
+    }
 }

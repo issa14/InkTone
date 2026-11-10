@@ -45,7 +45,7 @@ class EdgeTtsWebSocketSpikeTest {
             "wss://speech.platform.bing.com/consumer/speech/synthesize/readaloud/edge/v1" +
                 "?TrustedClientToken=$TRUSTED_CLIENT_TOKEN"
         const val TEST_SENTENCE = "Bonjour, ceci est une phrase de test."
-        const val VOICE = "fr-FR-VivienneNeural"
+        const val VOICE = "fr-FR-VivienneMultilingualNeural"
         const val TIMEOUT_SECONDS = 20L
     }
 

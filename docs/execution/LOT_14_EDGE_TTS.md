@@ -86,11 +86,18 @@ Cinq écarts sont actés — à ne pas « corriger en sens inverse » en exécut
    connectivité à masquer. Le retry (3 tentatives, backoff exponentiel
    500 ms → 1000 ms) ne s'applique qu'aux erreurs transitoires (même
    classification `isNetworkError` que le legacy).
-6. **Voix : deux voix françaises, bornées.** `fr-FR-VivienneNeural`
-   (défaut), `fr-FR-HenriNeural`. Toute `VoiceProfile.voice` hors de cette
-   liste retombe sur la voix par défaut (jamais une voix invalide envoyée
-   au serveur). Le mapping affichable suit `ReaderTtsPanel` : « Vivienne » /
-   « Henri », pas l'identifiant brut.
+6. **Voix : une liste bornée de voix françaises** (`EdgeTtsClient.VOICES`,
+   alignée sur `availableVoicesFor(EDGE_TTS)` par `EdgeTtsVoiceCatalogTest`) :
+   `fr-FR-VivienneMultilingualNeural` (défaut), `fr-FR-HenriNeural`,
+   `fr-FR-RemyMultilingualNeural`, `fr-CH-ArianeNeural`,
+   `fr-BE-CharlineNeural`. Toute `VoiceProfile.voice` hors de cette liste
+   retombe sur la voix par défaut (jamais une voix invalide envoyée au
+   serveur). Le mapping affichable suit `voiceLabel` (« Vivienne (FR) »…),
+   pas l'identifiant brut.
+   *Mise à jour 2026-11-10 :* `fr-FR-VivienneNeural` n'est plus au catalogue
+   du service (simple alias toléré). Les profils enregistrés sont réécrits
+   vers le nom officiel par `MIGRATION_31_32`, et `EdgeTtsClient.resolveVoice`
+   redirige l'ancien nom (profil restauré d'une sauvegarde antérieure).
 7. **Aucun emoji** dans le code de production (K12) ; icônes via `AppIcons`.
    Pas d'ajout d'icône ad hoc hors du registre `core/designsystem`.
 8. **Tests par couche.** `EdgeTtsClient` (protocole WebSocket, auth, retry)

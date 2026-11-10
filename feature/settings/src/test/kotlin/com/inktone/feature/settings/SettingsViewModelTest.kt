@@ -121,7 +121,7 @@ class SettingsViewModelTest {
         val activeProfile = voiceProfileRepository.getById(prefs.activeVoiceProfileId!!)
         assertTrue("un profil actif doit être créé", activeProfile != null)
         assertEquals(TtsEngineId.EDGE_TTS, activeProfile!!.engine)
-        assertEquals("fr-FR-VivienneNeural", activeProfile.voice)
+        assertEquals("fr-FR-VivienneMultilingualNeural", activeProfile.voice)
     }
 
     @Test

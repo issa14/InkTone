@@ -18,7 +18,7 @@ fun availableVoicesFor(engine: TtsEngineId): List<String> = when (engine) {
     TtsEngineId.SHERPA_ONNX -> listOf("jessica", "pierre")
     TtsEngineId.ANDROID_NATIVE -> listOf("fr-fr-default")
     TtsEngineId.EDGE_TTS -> listOf(
-        "fr-FR-VivienneNeural",
+        "fr-FR-VivienneMultilingualNeural",
         "fr-FR-HenriNeural",
         "fr-FR-RemyMultilingualNeural",
         "fr-CH-ArianeNeural",
@@ -29,7 +29,7 @@ fun availableVoicesFor(engine: TtsEngineId): List<String> = when (engine) {
 
 /** Libellé lisible d'une voix technique (jamais le nom brut — K12). */
 fun voiceLabel(voice: String): String = when (voice) {
-    "fr-FR-VivienneNeural" -> "Vivienne (FR)"
+    "fr-FR-VivienneMultilingualNeural", "fr-FR-VivienneNeural" -> "Vivienne (FR)"
     "fr-FR-HenriNeural" -> "Henri (FR)"
     "fr-FR-RemyMultilingualNeural" -> "Rémy (FR)"
     "fr-CH-ArianeNeural" -> "Ariane (CH)"

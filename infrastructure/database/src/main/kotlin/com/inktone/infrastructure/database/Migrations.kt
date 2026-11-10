@@ -503,3 +503,19 @@ val MIGRATION_30_31 = object : Migration(30, 31) {
         }
     }
 }
+
+/**
+ * Voix Edge TTS : `fr-FR-VivienneNeural` n'existe plus au catalogue du
+ * service, qui publie `fr-FR-VivienneMultilingualNeural` (l'ancien nom n'est
+ * plus qu'un alias toléré, révocable sans préavis). Les profils vocaux
+ * enregistrés sont réécrits vers le nom officiel : aucune autre colonne ne
+ * change, réglages de vitesse et de hauteur conservés.
+ */
+val MIGRATION_31_32 = object : Migration(31, 32) {
+    override fun migrate(db: SupportSQLiteDatabase) {
+        db.execSQL(
+            "UPDATE voice_profiles SET voice = 'fr-FR-VivienneMultilingualNeural' " +
+                "WHERE voice = 'fr-FR-VivienneNeural'",
+        )
+    }
+}

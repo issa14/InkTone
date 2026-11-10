@@ -42,7 +42,7 @@ import com.inktone.infrastructure.database.entity.VoiceProfileEntity
         CatalogEntity::class,
     ],
     views = [LibraryItemView::class],
-    version = 31, // Lot 23, Palier A : AnnotationColor devient une couleur ARGB libre (MIGRATION_30_31)
+    version = 32, // Voix Edge Vivienne renommée vers son nom officiel (MIGRATION_31_32)
     exportSchema = true, // condition du harnais de migration — Tâche 2.4
 )
 @TypeConverters(StringListConverter::class)
