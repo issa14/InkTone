@@ -20,6 +20,7 @@ import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberUpdatedState
 import androidx.compose.runtime.setValue
+import androidx.compose.runtime.snapshotFlow
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.drawWithCache
 import androidx.compose.ui.geometry.Rect
@@ -385,14 +386,21 @@ private fun ParagraphBlockDisplay(
     // Même mécanisme que ParagraphBlockField (§4.2 de l'audit) : lecture de
     // highlightedRange et écriture de onCurrentLineY hors de la phase de
     // layout, dérivées dans un effet à partir du TextLayoutResult capturé.
-    LaunchedEffect(textLayoutResult, highlightedRange.value, isReadingRulerEnabled, blockOffsetRange) {
+    // Le mot prononcé est COLLECTÉ (`snapshotFlow`), jamais lu en clé
+    // d'effet : `highlightedRange.value` en argument de `LaunchedEffect` se
+    // lit pendant la composition, ce qui recomposait ce bloc à chaque mot
+    // (3 à 5 fois par seconde pendant le TTS) — précisément ce que le
+    // passage par un `State` devait éviter.
+    LaunchedEffect(textLayoutResult, isReadingRulerEnabled, blockOffsetRange) {
         if (!isReadingRulerEnabled) return@LaunchedEffect
         val layout = textLayoutResult ?: return@LaunchedEffect
-        val absRange = highlightedRange.value ?: return@LaunchedEffect
-        val local = absRange.first - blockOffsetRange.first
-        if (local in 0 until layout.layoutInput.text.length) {
-            val line = layout.getLineForOffset(local)
-            onCurrentLineY(with(density) { layout.getLineTop(line).toDp() })
+        snapshotFlow { highlightedRange.value }.collect { absRange ->
+            if (absRange == null) return@collect
+            val local = absRange.first - blockOffsetRange.first
+            if (local in 0 until layout.layoutInput.text.length) {
+                val line = layout.getLineForOffset(local)
+                onCurrentLineY(with(density) { layout.getLineTop(line).toDp() })
+            }
         }
     }
 
@@ -495,14 +503,21 @@ private fun ParagraphBlockField(
     // invalidait le layout de tous les blocs visibles), et écrire pendant le
     // layout déclenche une passe aval. Dérivé ici, dans un effet, à partir
     // du `TextLayoutResult` déjà capturé.
-    LaunchedEffect(textLayoutResult, highlightedRange.value, isReadingRulerEnabled, blockOffsetRange) {
+    // Le mot prononcé est COLLECTÉ (`snapshotFlow`), jamais lu en clé
+    // d'effet : `highlightedRange.value` en argument de `LaunchedEffect` se
+    // lit pendant la composition, ce qui recomposait ce bloc à chaque mot
+    // (3 à 5 fois par seconde pendant le TTS) — précisément ce que le
+    // passage par un `State` devait éviter.
+    LaunchedEffect(textLayoutResult, isReadingRulerEnabled, blockOffsetRange) {
         if (!isReadingRulerEnabled) return@LaunchedEffect
         val layout = textLayoutResult ?: return@LaunchedEffect
-        val absRange = highlightedRange.value ?: return@LaunchedEffect
-        val local = absRange.first - blockOffsetRange.first
-        if (local in 0 until layout.layoutInput.text.length) {
-            val line = layout.getLineForOffset(local)
-            onCurrentLineY(with(density) { layout.getLineTop(line).toDp() })
+        snapshotFlow { highlightedRange.value }.collect { absRange ->
+            if (absRange == null) return@collect
+            val local = absRange.first - blockOffsetRange.first
+            if (local in 0 until layout.layoutInput.text.length) {
+                val line = layout.getLineForOffset(local)
+                onCurrentLineY(with(density) { layout.getLineTop(line).toDp() })
+            }
         }
     }
 

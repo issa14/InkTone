@@ -5,6 +5,7 @@ import androidx.compose.animation.core.Animatable
 import androidx.compose.foundation.ExperimentalFoundationApi
 import androidx.compose.foundation.gestures.Orientation
 import androidx.compose.runtime.snapshotFlow
+import kotlinx.coroutines.flow.collectLatest
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.input.nestedscroll.nestedScroll
@@ -29,6 +30,7 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.State
+import androidx.compose.runtime.derivedStateOf
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
@@ -102,7 +104,13 @@ fun PagedChapterContent(
     chapter: Chapter?,
     pagination: ChapterPaginationState,
     currentSentenceIndex: Int,
-    highlightedWordRange: IntRange?,
+    /**
+     * Mot prononcé, relatif à la phrase courante. Un `State`, jamais une
+     * valeur : il change 3 à 5 fois par seconde pendant le TTS, et n'est lu
+     * qu'en dessin et dans des collecteurs — ce composable ne se recompose
+     * donc plus à chaque mot.
+     */
+    highlightedWordRange: State<IntRange?>,
     annotations: List<Annotation>,
     currentChapterIndex: Int,
     chapterCount: Int = currentChapterIndex + 1,
@@ -308,14 +316,19 @@ fun PagedChapterContent(
     // nullable partout où c'est nécessaire.
     val currentMeasurement = pagination.measurement
 
-    val absoluteHighlightedRange = if (
-        chapter != null && currentMeasurement != null && highlightedWordRange != null &&
-        currentSentenceIndex in currentMeasurement.sentenceStartOffsets.indices
-    ) {
-        val sentenceStart = currentMeasurement.sentenceStartOffsets[currentSentenceIndex]
-        (sentenceStart + highlightedWordRange.first)..(sentenceStart + highlightedWordRange.last)
-    } else {
-        null
+    // Offset absolu (chapitre) du mot prononcé, DÉRIVÉ hors composition :
+    // seuls le dessin des pages et le suivi de page ci-dessous le lisent.
+    val latestSentenceIndex = rememberUpdatedState(currentSentenceIndex)
+    val latestMeasurement = rememberUpdatedState(currentMeasurement)
+    val absoluteHighlightedRange = remember(highlightedWordRange) {
+        derivedStateOf {
+            val wordRange = highlightedWordRange.value ?: return@derivedStateOf null
+            val measurement = latestMeasurement.value ?: return@derivedStateOf null
+            val sentenceIndex = latestSentenceIndex.value
+            if (sentenceIndex !in measurement.sentenceStartOffsets.indices) return@derivedStateOf null
+            val sentenceStart = measurement.sentenceStartOffsets[sentenceIndex]
+            (sentenceStart + wordRange.first)..(sentenceStart + wordRange.last)
+        }
     }
 
     // Design validé (revue du lot 3a) : une phrase à cheval sur deux
@@ -325,9 +338,13 @@ fun PagedChapterContent(
     // pas sur l'index de phrase — sinon le surlignage deviendrait
     // invisible (rendu sur une page non affichée) sans que rien ne le
     // signale.
-    LaunchedEffect(chapter?.index, absoluteHighlightedRange) {
-        if (chapter != null && absoluteHighlightedRange != null) {
-            val wordPage = pagination.pageIndexAtOffset(chapter.index, absoluteHighlightedRange.first)
+    // `collectLatest` : un nouveau mot annule l'animation vers la page du
+    // précédent, comme le faisait la relance d'effet à chaque mot.
+    LaunchedEffect(chapter?.index) {
+        val chapterIndex = chapter?.index ?: return@LaunchedEffect
+        snapshotFlow { absoluteHighlightedRange.value }.collectLatest { range ->
+            if (range == null) return@collectLatest
+            val wordPage = pagination.pageIndexAtOffset(chapterIndex, range.first)
             if (wordPage >= 0 && wordPage != pagerState.currentPage) {
                 isProgrammaticPageChange = true
                 try {
@@ -341,7 +358,7 @@ fun PagedChapterContent(
 
     // Lus en phase de dessin par PageBlock, jamais en paramètre de
     // composable : un mot prononcé ne doit invalider que le dessin.
-    val highlightedRangeState = rememberUpdatedState(absoluteHighlightedRange)
+    val highlightedRangeState: State<IntRange?> = absoluteHighlightedRange
 
     // Déjà en offsets de caractère absolus (calés sur des bornes de mot
     // par PageBlock), aucune conversion à faire ici.
@@ -522,14 +539,21 @@ private fun PageBlock(
     // pendant le layout déclenche une passe aval. La position de la règle de
     // lecture est donc dérivée ici, dans un effet, à partir du
     // `TextLayoutResult` déjà capturé — hors phase de mesure.
-    LaunchedEffect(textLayoutResult, highlightedRange.value, isDisplayedPage, isReadingRulerEnabled, pageOffsetRange) {
+    // Le mot prononcé est COLLECTÉ (`snapshotFlow`), jamais lu en clé
+    // d'effet : `highlightedRange.value` en argument de `LaunchedEffect` se
+    // lit pendant la composition, ce qui recomposait ce bloc à chaque mot
+    // (3 à 5 fois par seconde pendant le TTS) — précisément ce que le
+    // passage par un `State` devait éviter.
+    LaunchedEffect(textLayoutResult, isDisplayedPage, isReadingRulerEnabled, pageOffsetRange) {
         if (!isDisplayedPage || !isReadingRulerEnabled) return@LaunchedEffect
         val layout = textLayoutResult ?: return@LaunchedEffect
-        val absRange = highlightedRange.value ?: return@LaunchedEffect
-        val local = absRange.first - pageOffsetRange.first
-        if (local in 0 until layout.layoutInput.text.length) {
-            val line = layout.getLineForOffset(local)
-            onCurrentLineY(with(density) { layout.getLineTop(line).toDp() })
+        snapshotFlow { highlightedRange.value }.collect { absRange ->
+            if (absRange == null) return@collect
+            val local = absRange.first - pageOffsetRange.first
+            if (local in 0 until layout.layoutInput.text.length) {
+                val line = layout.getLineForOffset(local)
+                onCurrentLineY(with(density) { layout.getLineTop(line).toDp() })
+            }
         }
     }
 

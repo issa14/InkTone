@@ -206,7 +206,10 @@ fun ReaderScreen(
     val state by viewModel.state.collectAsStateWithLifecycle()
     // §3.3 — le surlignage mot-à-mot est collecté séparément : sa cadence
     // (un mot prononcé, 3 à 5 fois/s) ne recompose plus le corps de l'écran.
-    val highlightedWordRange by viewModel.highlightedWordRange.collectAsStateWithLifecycle()
+    // Gardé en `State` et jamais lu ici : seuls le dessin des blocs et des
+    // collecteurs le lisent. Le déléguer (`by`) et le lire dans le corps de
+    // l'écran recomposait toute la zone de lecture à chaque mot.
+    val highlightedWordRangeState = viewModel.highlightedWordRange.collectAsStateWithLifecycle()
 
     // P1 — la notification média est la voie de contrôle en arrière-plan et
     // sur écran verrouillé. Sur Android 13+, elle n'apparaît qu'avec
@@ -937,16 +940,20 @@ fun ReaderScreen(
                     // du mot TTS actif, dérivé de Chapter.sentences —
                     // aligné avec ChapterTextMeasurer depuis la correction
                     // du séparateur de bloc (voir ChapterTextMeasurer.kt).
-                    val scrollHighlightedRange = highlightedWordRange?.let { wordRange ->
-                        chapter?.sentences?.getOrNull(state.currentSentenceIndex)?.startOffset?.let { sentenceStart ->
-                            (sentenceStart + wordRange.first)..(sentenceStart + wordRange.last)
-                        }
-                    }
+                    val currentSentenceStart = rememberUpdatedState(
+                        chapter?.sentences?.getOrNull(state.currentSentenceIndex)?.startOffset,
+                    )
                     // Lues en phase de dessin (drawWithContent dans
                     // BookBlockItem), jamais en paramètre direct — un mot
                     // prononcé n'invalide donc que le dessin, jamais la
                     // mesure du BasicTextField (même contrainte que PageBlock).
-                    val scrollHighlightedRangeState = rememberUpdatedState(scrollHighlightedRange)
+                    val scrollHighlightedRangeState = remember(highlightedWordRangeState) {
+                        derivedStateOf {
+                            val wordRange = highlightedWordRangeState.value ?: return@derivedStateOf null
+                            val sentenceStart = currentSentenceStart.value ?: return@derivedStateOf null
+                            (sentenceStart + wordRange.first)..(sentenceStart + wordRange.last)
+                        }
+                    }
                     val scrollFreeSelectedRangeState = rememberUpdatedState(freeSelectedRange)
 
                     // Transition de chapitre par résistance spatiale (overscroll).
@@ -1119,7 +1126,7 @@ fun ReaderScreen(
                         chapter = state.currentChapter,
                         pagination = pagination,
                         currentSentenceIndex = state.currentSentenceIndex,
-                        highlightedWordRange = highlightedWordRange,
+                        highlightedWordRange = highlightedWordRangeState,
                         annotations = state.annotations,
                         currentChapterIndex = state.currentChapterIndex,
                         chapterCount = state.chapters.size,

@@ -6,6 +6,7 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.rememberUpdatedState
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.geometry.Offset
@@ -105,7 +106,7 @@ class PagedChapterContentTest {
                 chapter = chapter,
                 pagination = pagination,
                 currentSentenceIndex = currentSentenceIndex,
-                highlightedWordRange = highlightedWordRange,
+                highlightedWordRange = rememberUpdatedState(highlightedWordRange),
                 annotations = emptyList<Annotation>(),
                 currentChapterIndex = 0,
                 textColor = Color.Black,
