@@ -425,10 +425,66 @@ class PlaybackOrchestratorTest {
         assertFalse("arrêt : plus rien à préserver", orchestrator.isSessionEngaged())
     }
 
+    // ───── Edge : synthèse parallèle, ordre préservé ─────
+
+    private val edgeProfile = profile.copy(id = "vp-edge", engine = TtsEngineId.EDGE_TTS, voice = "fr-FR-VivienneNeural")
+
+    private fun newOrchestrator(tts: TtsEngine, player: FakeAudioPlayer) = PlaybackOrchestrator(tts, player, UpdateReadingStateUseCase(FakeReadingStateRepository()), GetReadingStateUseCase(FakeReadingStateRepository()), FakeChapterParser(), FakePublicationRepository(), FakePublicationParser(), FakePreferencesRepository(), FakeVoiceProfileRepository(), FakeTtsSegmentCache(), FakePronunciationRuleRepository())
+
+    @Test
+    fun edgeSynthetiseEnParalleleEtLivreDansLOrdre() = runBlocking {
+        // La phrase 0 est la plus lente : sans réordonnancement elle sortirait en dernier.
+        val tts = FakeTtsEngine(segmentDurationMs = 50, delayBySentence = mapOf(0 to 300L, 1 to 50L, 2 to 50L, 3 to 50L))
+        val player = FakeAudioPlayer()
+        val orchestrator = newOrchestrator(tts, player)
+        val sentences = (0..3).map { sentence(it, "Phrase $it.", it * 10) }
+
+        orchestrator.play(sentences, edgeProfile, 0, "pub1", 0, "ch.xhtml")
+        awaitUntil { orchestrator.state.value == PlaybackOrchestrator.PlaybackStatus.Idle }
+
+        assertTrue("au moins 2 requêtes simultanées", tts.maxConcurrent.get() >= 2)
+        assertTrue("au plus 3 requêtes simultanées", tts.maxConcurrent.get() <= 3)
+        // segments aux positions paires (un silence suit chacun) : 1, 2, 3, 4
+        val markers = player.enqueued.filterIndexed { i, _ -> i % 2 == 0 }.map { it.audioData[0].toInt() }
+        assertEquals(listOf(1, 2, 3, 4), markers)
+        assertEquals("play() une seule fois", 1, player.events.count { it == "play" })
+    }
+
+    @Test
+    fun moteurLocalResteSequentiel() = runBlocking {
+        val tts = FakeTtsEngine(segmentDurationMs = 50, synthesisDelayMs = 40)
+        val player = FakeAudioPlayer()
+        val orchestrator = newOrchestrator(tts, player)
+        val sentences = (0..3).map { sentence(it, "Phrase $it.", it * 10) }
+
+        orchestrator.play(sentences, profile, 0, "pub1", 0, "ch.xhtml")
+        awaitUntil { orchestrator.state.value == PlaybackOrchestrator.PlaybackStatus.Idle }
+
+        assertEquals("un moteur local ne synthétise jamais en parallèle", 1, tts.maxConcurrent.get())
+    }
+
+    @Test
+    fun edgeAttendLeDeuxiemeSegmentAvantLePremierPlay() = runBlocking {
+        val tts = FakeTtsEngine(segmentDurationMs = 2_000, delayBySentence = mapOf(0 to 50L, 1 to 400L, 2 to 50L))
+        val player = FakeAudioPlayer()
+        val orchestrator = newOrchestrator(tts, player)
+        val sentences = (0..2).map { sentence(it, "Phrase $it.", it * 10) }
+
+        val startedAt = System.currentTimeMillis()
+        orchestrator.play(sentences, edgeProfile, 0, "pub1", 0, "ch.xhtml")
+        awaitUntil { player.events.contains("play") }
+        val elapsed = System.currentTimeMillis() - startedAt
+        // La phrase 0 est prête en ~50 ms, la 1 en ~400 ms : sans préremplissage
+        // play() partirait à ~50 ms ; avec, il attend le 2e segment.
+        assertTrue("play() doit attendre le 2e segment (délai observé : $elapsed ms)", elapsed >= 300)
+        orchestrator.stop()
+    }
+
     private class FakeTtsEngine(
         private val segmentDurationMs: Long = 200,
         private val failSynthesisCount: Int? = null,
         private val synthesisDelayMs: Long = 0,
+        private val delayBySentence: Map<Int, Long> = emptyMap(),
     ) : TtsEngine {
         override val id = TtsEngineId.ANDROID_NATIVE
         override val capabilities = TtsCapabilities(
@@ -443,10 +499,19 @@ class PlaybackOrchestratorTest {
             license = "test",
         )
         val synthesizeCount = AtomicInteger(0)
+        private val concurrent = AtomicInteger(0)
+        val maxConcurrent = AtomicInteger(0)
 
         override suspend fun synthesize(sentence: Sentence, voiceProfile: VoiceProfile): AudioSegment {
             val n = synthesizeCount.incrementAndGet()
-            if (synthesisDelayMs > 0) delay(synthesisDelayMs)
+            val now = concurrent.incrementAndGet()
+            maxConcurrent.updateAndGet { maxOf(it, now) }
+            try {
+                val d = delayBySentence[sentence.index] ?: synthesisDelayMs
+                if (d > 0) delay(d)
+            } finally {
+                concurrent.decrementAndGet()
+            }
             if (failSynthesisCount == n) throw RuntimeException("échec synthèse #$n")
             val marker = (sentence.index + 1).toByte()
             return AudioSegment(

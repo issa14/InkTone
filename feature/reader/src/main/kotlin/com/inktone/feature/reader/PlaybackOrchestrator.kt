@@ -1,5 +1,6 @@
 package com.inktone.feature.reader
 
+import android.util.Log
 import com.inktone.domain.model.Chapter
 import com.inktone.domain.model.PublicationFormat
 import com.inktone.domain.model.ReadingState
@@ -31,11 +32,14 @@ import com.inktone.domain.usecase.GetReadingStateUseCase
 import com.inktone.domain.usecase.UpdateReadingStateUseCase
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.Deferred
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.TimeoutCancellationException
+import kotlinx.coroutines.async
 import kotlinx.coroutines.channels.Channel
+import kotlinx.coroutines.coroutineScope
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.MutableSharedFlow
 import kotlinx.coroutines.flow.MutableStateFlow
@@ -638,7 +642,19 @@ class PlaybackOrchestrator @Inject constructor(
         }
     }
 
-    /** Producteur : synthétise dans l'ordre, timeout unique, silence court sur erreur. */
+    /**
+     * Producteur : synthétise, timeout unique, silence court sur erreur, et
+     * livre les segments **dans l'ordre**.
+     *
+     * Edge (cloud) : chaque phrase coûte un aller-retour réseau complet
+     * (handshake WebSocket + synthèse + décodage), plus lent que le temps réel
+     * quand il est séquentiel (mesuré : 1,42 s de calcul par seconde d'audio,
+     * d'où des underruns audibles). Jusqu'à [EDGE_PARALLELISM] requêtes sont
+     * donc en vol, et les [EDGE_PREFILL] premiers segments sont retenus puis
+     * livrés d'un bloc, pour que `play()` démarre avec de l'avance. Les moteurs
+     * locaux restent strictement séquentiels (CPU-bound, une seule synthèse à
+     * la fois) : fenêtre de 1, aucun préremplissage.
+     */
     private suspend fun produce(
         generation: Long,
         channel: Channel<AudioSegment>,
@@ -649,50 +665,90 @@ class PlaybackOrchestrator @Inject constructor(
         chapterIndex: Int,
         rulesHash: String,
     ) {
+        val isEdge = voiceProfile.engine == TtsEngineId.EDGE_TTS
+        val parallelism = if (isEdge) EDGE_PARALLELISM else 1
+        val prefill = if (isEdge) EDGE_PREFILL else 1
         try {
-            for (i in startFrom until sentences.size) {
-                if (!isCurrent(generation)) break
-                val sentence = sentences[i]
-                val key = ttsCacheKey(
-                    publicationId = publicationId,
-                    chapterIndex = chapterIndex,
-                    sentenceOffset = sentence.startOffset,
-                    sentenceText = sentence.text,
-                    voiceProfileId = voiceProfile.cacheIdentity(),
-                    pronunciationRulesHash = rulesHash,
-                    engineVersion = ttsEngine.synthesisVersion,
-                )
-                // Lot 22, Palier B — consultation AVANT synthèse, écriture
-                // après. Le LOOKAHEAD=3 (acquis du Lot 15) masque déjà la
-                // latence en lecture linéaire : le gain réel est le
-                // démarrage à froid, la reprise et le retour en arrière.
-                val cached = ttsSegmentCache.get(publicationId, key)
-                val segment = if (cached != null) {
-                    cached
-                } else {
-                    var synthesized = false
-                    val fresh = try {
-                        val s = withTimeout(SYNTHESIS_TIMEOUT_MS) { ttsEngine.synthesize(sentence, voiceProfile) }
-                        synthesized = true
-                        s
-                    } catch (e: TimeoutCancellationException) {
-                        silence(TIMEOUT_SILENCE_MS, audioPlayer.sampleRate)
-                    } catch (e: CancellationException) {
-                        throw e
-                    } catch (e: Exception) {
-                        silence(TIMEOUT_SILENCE_MS, audioPlayer.sampleRate)
+            coroutineScope {
+                val inFlight = ArrayDeque<Deferred<AudioSegment>>()
+                val held = ArrayList<AudioSegment>()
+                var released = false
+                var next = startFrom
+                try {
+                    while (isCurrent(generation)) {
+                        while (inFlight.size < parallelism && next < sentences.size) {
+                            val sentence = sentences[next]
+                            inFlight.addLast(
+                                async {
+                                    segmentFor(sentence, voiceProfile, publicationId, chapterIndex, rulesHash)
+                                },
+                            )
+                            next++
+                        }
+                        if (inFlight.isEmpty()) break
+                        val segment = inFlight.removeFirst().await()
+                        if (!isCurrent(generation)) break
+                        if (released) {
+                            channel.send(segment)
+                        } else {
+                            held.add(segment)
+                            val exhausted = next >= sentences.size && inFlight.isEmpty()
+                            if (held.size >= prefill || exhausted) {
+                                for (h in held) channel.send(h)
+                                held.clear()
+                                released = true
+                            }
+                        }
                     }
-                    // Seule une synthèse RÉUSSIE est cachée — jamais un
-                    // silence de secours (le rejouer serait du faux texte).
-                    if (synthesized) ttsSegmentCache.put(publicationId, key, fresh)
-                    fresh
+                } finally {
+                    // Sans ceci, coroutineScope attendrait la fin des
+                    // synthèses réseau encore en vol après un stop/skip.
+                    inFlight.forEach { it.cancel() }
                 }
-                if (!isCurrent(generation)) break
-                channel.send(segment)
             }
         } finally {
             channel.close()
         }
+    }
+
+    /** Un segment : cache d'abord, sinon synthèse ; silence de secours sur échec (jamais caché). */
+    private suspend fun segmentFor(
+        sentence: Sentence,
+        voiceProfile: VoiceProfile,
+        publicationId: String,
+        chapterIndex: Int,
+        rulesHash: String,
+    ): AudioSegment {
+        val key = ttsCacheKey(
+            publicationId = publicationId,
+            chapterIndex = chapterIndex,
+            sentenceOffset = sentence.startOffset,
+            sentenceText = sentence.text,
+            voiceProfileId = voiceProfile.cacheIdentity(),
+            pronunciationRulesHash = rulesHash,
+            engineVersion = ttsEngine.synthesisVersion,
+        )
+        // Lot 22, Palier B — consultation AVANT synthèse, écriture après.
+        ttsSegmentCache.get(publicationId, key)?.let { return it }
+        var synthesized = false
+        val fresh = try {
+            val s = withTimeout(SYNTHESIS_TIMEOUT_MS) { ttsEngine.synthesize(sentence, voiceProfile) }
+            synthesized = true
+            s
+        } catch (e: TimeoutCancellationException) {
+            Log.w(TAG, "Synthèse en timeout, phrase sautée : ${sentence.describeForLog()}")
+            silence(TIMEOUT_SILENCE_MS, audioPlayer.sampleRate)
+        } catch (e: CancellationException) {
+            throw e
+        } catch (e: Exception) {
+            // Sans trace, une phrase sautée en lecture était indiagnostiquable.
+            Log.w(TAG, "Synthèse en échec, phrase sautée : ${sentence.describeForLog()} — $e")
+            silence(TIMEOUT_SILENCE_MS, audioPlayer.sampleRate)
+        }
+        // Seule une synthèse RÉUSSIE est cachée — jamais un silence de
+        // secours (le rejouer serait du faux texte).
+        if (synthesized) ttsSegmentCache.put(publicationId, key, fresh)
+        return fresh
     }
 
     /**
@@ -1019,11 +1075,20 @@ class PlaybackOrchestrator @Inject constructor(
         val resourceHref: String,
     )
 
+    private fun Sentence.describeForLog(): String =
+        "#$index offset=$startOffset ${text.length} car. « ${text.take(40).replace('\n', ' ')} »"
+
     private companion object {
+        private const val TAG = "PlaybackOrchestrator"
+
         /** Pages sans texte traversees avant de renoncer (PDF entierement scanne). */
         const val MAX_EMPTY_CHAPTER_SKIPS = 20
 
         const val LOOKAHEAD = 3
+        /** Requêtes Edge simultanées (cloud : la latence réseau domine, pas le CPU). */
+        const val EDGE_PARALLELISM = 3
+        /** Segments Edge retenus avant le premier `play()` pour éviter l'underrun initial. */
+        const val EDGE_PREFILL = 2
         /** Timeout de synthèse unique (Edge cloud et Sherpa-ONNX confondus). */
         const val SYNTHESIS_TIMEOUT_MS = 20_000L
         /** Silence injecté après une synthèse en échec. */
