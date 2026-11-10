@@ -17,7 +17,13 @@ package com.inktone.domain.model
 fun availableVoicesFor(engine: TtsEngineId): List<String> = when (engine) {
     TtsEngineId.SHERPA_ONNX -> listOf("jessica", "pierre")
     TtsEngineId.ANDROID_NATIVE -> listOf("fr-fr-default")
-    TtsEngineId.EDGE_TTS -> listOf("fr-FR-VivienneNeural", "fr-FR-HenriNeural")
+    TtsEngineId.EDGE_TTS -> listOf(
+        "fr-FR-VivienneNeural",
+        "fr-FR-HenriNeural",
+        "fr-FR-RemyMultilingualNeural",
+        "fr-CH-ArianeNeural",
+        "fr-BE-CharlineNeural",
+    )
     TtsEngineId.PIPER -> emptyList()
 }
 
@@ -25,6 +31,9 @@ fun availableVoicesFor(engine: TtsEngineId): List<String> = when (engine) {
 fun voiceLabel(voice: String): String = when (voice) {
     "fr-FR-VivienneNeural" -> "Vivienne (FR)"
     "fr-FR-HenriNeural" -> "Henri (FR)"
+    "fr-FR-RemyMultilingualNeural" -> "Rémy (FR)"
+    "fr-CH-ArianeNeural" -> "Ariane (CH)"
+    "fr-BE-CharlineNeural" -> "Charline (BE)"
     "jessica" -> "Jessica (FR)"
     "pierre" -> "Pierre (FR)"
     "fr-fr-default" -> "Voix système"

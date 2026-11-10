@@ -83,7 +83,19 @@ class EdgeTtsClient @Inject constructor(
         private const val MAX_RETRIES = 3
         private const val RETRY_BASE_DELAY_MS = 500L
 
-        val VOICES = listOf("fr-FR-VivienneNeural", "fr-FR-HenriNeural")
+        /**
+         * Voix acceptées (sinon repli sur [DEFAULT_VOICE]). Doit rester alignée
+         * sur `availableVoicesFor(TtsEngineId.EDGE_TTS)` (domaine) : une voix
+         * proposée par le sélecteur mais absente d'ici serait silencieusement
+         * remplacée par la voix par défaut.
+         */
+        val VOICES = listOf(
+            "fr-FR-VivienneNeural",
+            "fr-FR-HenriNeural",
+            "fr-FR-RemyMultilingualNeural",
+            "fr-CH-ArianeNeural",
+            "fr-BE-CharlineNeural",
+        )
         const val DEFAULT_VOICE = "fr-FR-VivienneNeural"
 
         /** Jeton `Sec-MS-GEC` v2 (`<16 hex>-<64 hex>`), voir [EdgeTtsGecToken]. */
