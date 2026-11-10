@@ -16,21 +16,29 @@ class TtsCacheKeyTest {
 
     @Test
     fun `la meme entree produit la meme cle - deterministe`() {
-        val a = ttsCacheKey("pub", 1, 10, "vp", "rules", 1)
-        val b = ttsCacheKey("pub", 1, 10, "vp", "rules", 1)
+        val a = ttsCacheKey("pub", 1, 10, "texte", "vp", "rules", 1)
+        val b = ttsCacheKey("pub", 1, 10, "texte", "vp", "rules", 1)
         assertEquals(a, b)
     }
 
     @Test
     fun `chaque dimension d'invalidation change la cle`() {
-        val base = ttsCacheKey("pub", 1, 10, "vp", "rules", 1)
+        val base = ttsCacheKey("pub", 1, 10, "texte", "vp", "rules", 1)
 
-        assertNotEquals(base, ttsCacheKey("pub2", 1, 10, "vp", "rules", 1)) // publication
-        assertNotEquals(base, ttsCacheKey("pub", 2, 10, "vp", "rules", 1)) // chapitre
-        assertNotEquals(base, ttsCacheKey("pub", 1, 11, "vp", "rules", 1)) // offset de phrase (texte source)
-        assertNotEquals(base, ttsCacheKey("pub", 1, 10, "vp2", "rules", 1)) // voix
-        assertNotEquals(base, ttsCacheKey("pub", 1, 10, "vp", "rules2", 1)) // règles de prononciation
-        assertNotEquals(base, ttsCacheKey("pub", 1, 10, "vp", "rules", 2)) // version du moteur
+        assertNotEquals(base, ttsCacheKey("pub2", 1, 10, "texte", "vp", "rules", 1)) // publication
+        assertNotEquals(base, ttsCacheKey("pub", 2, 10, "texte", "vp", "rules", 1)) // chapitre
+        assertNotEquals(base, ttsCacheKey("pub", 1, 11, "texte", "vp", "rules", 1)) // offset de phrase (texte source)
+        assertNotEquals(base, ttsCacheKey("pub", 1, 10, "texte", "vp2", "rules", 1)) // voix
+        assertNotEquals(base, ttsCacheKey("pub", 1, 10, "texte", "vp", "rules2", 1)) // règles de prononciation
+        assertNotEquals(base, ttsCacheKey("pub", 1, 10, "texte", "vp", "rules", 2)) // version du moteur
+    }
+
+    @Test
+    fun `un texte de phrase different a meme offset produit une cle differente`() {
+        // Changement de découpage : phrase plus longue démarrant au même offset.
+        val court = ttsCacheKey("pub", 1, 10, "Il marchait dans", "vp", "rules", 1)
+        val long = ttsCacheKey("pub", 1, 10, "Il marchait dans la rue sombre.", "vp", "rules", 1)
+        assertNotEquals(court, long)
     }
 
     @Test
@@ -39,7 +47,7 @@ class TtsCacheKeyTest {
             id = "vp-settings-default", engine = TtsEngineId.ANDROID_NATIVE,
             voice = "fr-fr-default", language = "fr",
         )
-        fun key(p: VoiceProfile) = ttsCacheKey("pub", 1, 10, p.cacheIdentity(), "rules", 1)
+        fun key(p: VoiceProfile) = ttsCacheKey("pub", 1, 10, "texte", p.cacheIdentity(), "rules", 1)
 
         val k = key(base)
         assertEquals(k, key(base.copy()))

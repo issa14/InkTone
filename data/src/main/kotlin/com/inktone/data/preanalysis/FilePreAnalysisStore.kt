@@ -70,6 +70,6 @@ class FilePreAnalysisStore @Inject constructor(
         const val FORMAT_VERSION = 1
 
         /** Version de la sortie du parseur — incrémenter à toute évolution du parsing. */
-        const val PARSER_VERSION = 1
+        const val PARSER_VERSION = 2
     }
 }

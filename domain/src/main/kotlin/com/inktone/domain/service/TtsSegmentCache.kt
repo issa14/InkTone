@@ -55,25 +55,32 @@ value class TtsCacheKey(val value: String) {
 /**
  * Calcule la clé de cache d'un segment (Lot 22, Palier B, tâche 4) —
  * hash SHA-256 d'un tuple canonique :
- * `(publicationId, chapterIndex, sentenceOffset, voiceProfileId, hash des
- * règles de prononciation, version du moteur)`.
+ * `(publicationId, chapterIndex, sentenceOffset, hash du texte de la phrase,
+ * voiceProfileId, hash des règles de prononciation, version du moteur)`.
  *
  * Chaque composant est une dimension d'invalidation : changer de voix, de
  * règle de prononciation, de moteur ou de texte source (via le
  * `sentenceOffset`, unique par phrase dans un chapitre) produit une clé
  * différente — jamais un segment périmé servi.
+ *
+ * Le **texte** de la phrase est une dimension à part entière : l'offset de
+ * début seul ne suffit pas, car un changement de découpage (parseur,
+ * normalisation du texte) peut faire démarrer une phrase plus longue au même
+ * offset qu'une ancienne, plus courte — l'audio caché (partiel) serait alors
+ * rejoué à sa place, avec des phrases tronquées et sautées.
  */
 fun ttsCacheKey(
     publicationId: String,
     chapterIndex: Int,
     sentenceOffset: Int,
+    sentenceText: String,
     voiceProfileId: String,
     pronunciationRulesHash: String,
     engineVersion: Int,
 ): TtsCacheKey {
     val canonical = listOf(
         publicationId, chapterIndex.toString(), sentenceOffset.toString(),
-        voiceProfileId, pronunciationRulesHash, engineVersion.toString(),
+        sha256Hex(sentenceText), voiceProfileId, pronunciationRulesHash, engineVersion.toString(),
     ).joinToString("|")
     return TtsCacheKey(sha256Hex(canonical))
 }

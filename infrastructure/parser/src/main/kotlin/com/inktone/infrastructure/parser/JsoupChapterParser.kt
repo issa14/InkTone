@@ -534,7 +534,7 @@ class JsoupChapterParser {
     ) {
         when (node) {
             is TextNode -> {
-                val text = node.wholeText
+                val text = node.wholeText.softWrapsToSpaces(preserve = node.isInsidePre())
                 if (text.isNotEmpty()) {
                     val start = textBuilder.length
                     textBuilder.append(text)
@@ -758,6 +758,36 @@ class JsoupChapterParser {
             }
         }
         return -1
+    }
+
+    /**
+     * Un saut de ligne dans le SOURCE HTML n'est qu'une espace (règle de
+     * collapse du HTML) : seul `<br>` ou un nouveau bloc coupe une ligne.
+     * Conservé tel quel, il produit deux défauts : Compose l'affiche en saut
+     * de ligne dur, et le `BreakIterator` ICU d'Android coupe la phrase après
+     * un `\n` (UAX#29, SB4) — la phrase est alors lue en plusieurs morceaux,
+     * avec une pause audible à chaque retour à la ligne du source.
+     *
+     * Remplacement **un caractère pour un caractère** : la longueur du texte
+     * ne change pas, donc aucun offset (`Locator`, annotations, signets déjà
+     * enregistrés — K3) ne se décale. `<pre>` garde ses sauts de ligne.
+     */
+    private fun String.softWrapsToSpaces(preserve: Boolean): String {
+        if (preserve || none { it == '\n' || it == '\r' || it == '\t' || it == '\u000C' }) return this
+        val chars = toCharArray()
+        for (i in chars.indices) {
+            if (chars[i] == '\n' || chars[i] == '\r' || chars[i] == '\t' || chars[i] == '\u000C') chars[i] = ' '
+        }
+        return String(chars)
+    }
+
+    private fun TextNode.isInsidePre(): Boolean {
+        var ancestor: Node? = parent()
+        while (ancestor != null) {
+            if (ancestor is Element && ancestor.normalName() == "pre") return true
+            ancestor = ancestor.parent()
+        }
+        return false
     }
 
     private companion object {

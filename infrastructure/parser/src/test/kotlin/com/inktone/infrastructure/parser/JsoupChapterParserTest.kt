@@ -583,6 +583,32 @@ class JsoupChapterParserTest {
 
     // ---- Helpers ----
 
+    // ---- Retours à la ligne du source HTML (coupures audibles en lecture) ----
+
+    @Test
+    fun `un retour a la ligne du source dans un paragraphe ne reste pas dans le texte`() {
+        // Source « hard-wrappé » : ICU (Android) coupe les phrases après un \n,
+        // et Compose l'affiche en saut de ligne dur — d'où une phrase lue en
+        // plusieurs morceaux, à chaque retour à la ligne visible.
+        val html = "<html><body><p>Il marchait dans\nla rue sombre,\r\n  sans un mot.</p></body></html>"
+        val chapter = parse(html)
+
+        val block = richBlocks(chapter)[0] as BookBlock.ParagraphBlock
+        assertTrue("aucun saut de ligne dur dans le texte", block.richText.plainText.none { it == '\n' || it == '\r' })
+        // Offsets inchangés (K3) : un caractère remplacé par un caractère.
+        assertEquals("Il marchait dans\nla rue sombre,\r\n  sans un mot.".length, block.richText.plainText.length)
+        assertEquals(1, chapter.sentences.size)
+    }
+
+    @Test
+    fun `un retour a la ligne dans un pre est conserve`() {
+        val html = "<html><body><pre>vers un\nvers deux</pre></body></html>"
+        val chapter = parse(html)
+
+        val text = (richBlocks(chapter)[0] as BookBlock.ParagraphBlock).richText.plainText
+        assertTrue(text.contains('\n'))
+    }
+
     private fun parse(html: String, fragment: String? = null): Chapter {
         val stream = ByteArrayInputStream(html.toByteArray(Charsets.UTF_8))
         return parser.parse(stream, "http://example.com/chapter.xhtml", 0, "chapter.xhtml", fragment)
