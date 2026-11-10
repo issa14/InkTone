@@ -3,6 +3,7 @@ package com.inktone.infrastructure.parser
 import android.graphics.Bitmap
 import com.inktone.domain.model.Chapter
 import com.inktone.domain.model.DocumentModel
+import com.inktone.domain.model.Publication
 import com.inktone.domain.model.PublicationFormat
 import com.inktone.domain.service.CoverExtractionResult
 import com.inktone.domain.service.FileStorageService
@@ -53,7 +54,7 @@ class PdfPublicationParser @Inject constructor(
     override suspend fun parse(fileUri: String): ParseResult = parse(fileUri, extractCover = true)
 
     /** Voir [PublicationParser.openForReading] : aucun rendu ni écriture de couverture. */
-    override suspend fun openForReading(fileUri: String): ParseResult = parse(fileUri, extractCover = false)
+    override suspend fun openForReading(publication: Publication): ParseResult = parse(publication.fileUri, extractCover = false)
 
     private suspend fun parse(fileUri: String, extractCover: Boolean): ParseResult = withContext(pdfiumDispatcher) {
         val bytes = fileStorageService.openInputStream(fileUri)

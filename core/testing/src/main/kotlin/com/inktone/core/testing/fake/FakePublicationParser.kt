@@ -1,6 +1,7 @@
 package com.inktone.core.testing.fake
 
 import com.inktone.domain.model.DocumentModel
+import com.inktone.domain.model.Publication
 import com.inktone.domain.model.PublicationFormat
 import com.inktone.domain.service.CoverExtractionResult
 import com.inktone.domain.service.ParseResult
@@ -57,7 +58,7 @@ class FakePublicationParser(
         return result
     }
 
-    override suspend fun openForReading(fileUri: String): ParseResult {
+    override suspend fun openForReading(publication: Publication): ParseResult {
         openForReadingCount++
         if (delayMs > 0) delay(delayMs)
         return result

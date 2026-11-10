@@ -8,6 +8,7 @@ import com.inktone.domain.model.Chapter
 import com.inktone.domain.model.ChapterContent
 import com.inktone.domain.model.DocumentModel
 import com.inktone.domain.model.PublicationFormat
+import com.inktone.domain.model.Publication as DomainPublication
 import com.inktone.domain.model.TableOfContentsEntry
 import com.inktone.domain.service.CoverExtractionResult
 import com.inktone.domain.service.ParseResult
@@ -15,6 +16,7 @@ import com.inktone.domain.service.PublicationMetadata
 import com.inktone.domain.service.PublicationParser
 import org.readium.r2.shared.publication.Metadata
 import dagger.hilt.android.qualifiers.ApplicationContext
+import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
 import org.readium.r2.shared.ExperimentalReadiumApi
@@ -55,6 +57,11 @@ import javax.inject.Singleton
 class ReadiumPublicationParser @Inject constructor(
     @ApplicationContext private val context: Context,
     private val coverStorage: CoverStorage,
+    // Ouverture PARTAGÉE avec EpubChapterParser et ReadiumResourceResolver
+    // pour la lecture (K2) — voir [openForReading]. Valeur par défaut pour
+    // les tests instrumentés qui construisent ce parseur directement ; Hilt
+    // injecte, lui, le singleton.
+    private val registry: ReadiumPublicationRegistry = ReadiumPublicationRegistry(context),
 ) : PublicationParser {
 
     override val supportedFormats = listOf(PublicationFormat.EPUB)
@@ -86,10 +93,57 @@ class ReadiumPublicationParser @Inject constructor(
         )
     }
 
-    override suspend fun parse(fileUri: String): ParseResult = parseLazy(fileUri, extractCover = true)
+    /**
+     * Parsing d'IMPORT : ouverture dédiée de l'archive (l'import n'a pas de
+     * session de lecture à partager) et extraction de la couverture.
+     */
+    override suspend fun parse(fileUri: String): ParseResult = withContext(Dispatchers.IO) {
+        val url = if (fileUri.contains("://")) {
+            Uri.parse(fileUri).toAbsoluteUrl()
+                ?: return@withContext ParseResult.Corrupted("URI non absolue: $fileUri")
+        } else {
+            File(fileUri).toUrl()
+        }
 
-    /** Voir [PublicationParser.openForReading] : aucune extraction de couverture. */
-    override suspend fun openForReading(fileUri: String): ParseResult = parseLazy(fileUri, extractCover = false)
+        val asset = assetRetriever.retrieve(url).getOrElse {
+            return@withContext ParseResult.Corrupted("Echec de lecture de l'asset: $it")
+        }
+
+        val publication = publicationOpener.open(asset, allowUserInteraction = false).getOrElse {
+            return@withContext ParseResult.Corrupted("Echec d'ouverture de la publication: $it")
+        }
+
+        // Instance propre à ce parsing, jamais partagée : refermée ici (elle
+        // ne l'était jamais — un descripteur de fichier perdu par import,
+        // et désormais par régénération de pré-analyse).
+        try {
+            structureOf(publication, fileUri, extractCover = true)
+        } finally {
+            publication.close()
+        }
+    }
+
+    /**
+     * Ouverture pour LECTURE (voir [PublicationParser.openForReading]) : la
+     * [Publication][org.readium.r2.shared.publication.Publication] vient du
+     * [registry], celle-là même que [EpubChapterParser] (texte) et
+     * [ReadiumResourceResolver] (images) réutilisent ensuite. Avant, ce
+     * parseur ouvrait sa propre instance puis la jetait, et le résolveur
+     * rouvrait l'archive aussitôt après : deux ouvertures par livre ouvert
+     * (~600 ms de plus mesurés sur V2206). Libérée avec le reste de la
+     * session par `ChapterParser.invalidate` (fermeture du Lecteur).
+     */
+    override suspend fun openForReading(publication: DomainPublication): ParseResult = withContext(Dispatchers.IO) {
+        registry.register(publication.id, publication.fileUri)
+        val readium = try {
+            registry.getOrOpen(publication.id)
+        } catch (e: CancellationException) {
+            throw e
+        } catch (e: Exception) {
+            return@withContext ParseResult.Corrupted(e.message ?: "Echec d'ouverture de la publication")
+        }
+        structureOf(readium, publication.fileUri, extractCover = false)
+    }
 
     /**
      * Lot 19 — ré-extrait la couverture sans re-parser le contenu. Ouvre
@@ -114,31 +168,20 @@ class ReadiumPublicationParser @Inject constructor(
     }
 
     /**
-     * Ouvre un EPUB et extrait UNIQUEMENT les métadonnées, la TOC et les
-     * coquilles de chapitres (sans contenu). Les chapitres retournés ont
-     * un [ChapterContent.Rich] avec `blocks` vide — le contenu réel sera
-     * chargé à la demande via [EpubChapterParser.parseChapter].
+     * Extrait d'une publication DÉJÀ OUVERTE uniquement les métadonnées, la
+     * TOC et les coquilles de chapitres (sans contenu). Les chapitres
+     * retournés ont un [ChapterContent.Rich] avec `blocks` vide — le contenu
+     * réel est chargé à la demande via [EpubChapterParser.parseChapter].
      *
      * @param extractCover vrai à l'import seulement ([parse]) : extraire,
      *   décoder et réécrire la couverture est un effet de bord d'import,
      *   jamais d'une ouverture pour lecture ([openForReading]).
      */
-    private suspend fun parseLazy(fileUri: String, extractCover: Boolean): ParseResult = withContext(Dispatchers.IO) {
-        val url = if (fileUri.contains("://")) {
-            Uri.parse(fileUri).toAbsoluteUrl()
-                ?: return@withContext ParseResult.Corrupted("URI non absolue: $fileUri")
-        } else {
-            File(fileUri).toUrl()
-        }
-
-        val asset = assetRetriever.retrieve(url).getOrElse {
-            return@withContext ParseResult.Corrupted("Echec de lecture de l'asset: $it")
-        }
-
-        val publication = publicationOpener.open(asset, allowUserInteraction = false).getOrElse {
-            return@withContext ParseResult.Corrupted("Echec d'ouverture de la publication: $it")
-        }
-
+    private suspend fun structureOf(
+        publication: org.readium.r2.shared.publication.Publication,
+        fileUri: String,
+        extractCover: Boolean,
+    ): ParseResult {
         val metadata = publication.metadata.toDomain()
         val coverUri = if (extractCover) extractAndSaveCover(publication, fileUri) else null
 
@@ -186,7 +229,7 @@ class ReadiumPublicationParser @Inject constructor(
         val readingOrderUrls = publication.readingOrder.map { it.href.resolve().removeFragment() }
         val toc = publication.tableOfContents.map { link -> toTocEntry(link, readingOrderUrls, chapterIndexOffset) }
 
-        ParseResult.Success(
+        return ParseResult.Success(
             documentModel = DocumentModel(
                 chapters = chapters,
                 tableOfContents = toc,
@@ -285,7 +328,7 @@ class ReadiumPublicationParser @Inject constructor(
      * Même logique que [DocumentModelExtractor.toTocEntry].
      *
      * @param chapterIndexOffset décalage à appliquer (1 quand la couverture
-     *   a été ajoutée en tête de `chapters` — voir [parseLazy], sinon 0).
+     *   a été ajoutée en tête de `chapters` — voir [structureOf], sinon 0).
      *   Bug réel trouvé sur appareil : `readingOrderUrls` reste indexé sur
      *   `publication.readingOrder` (non décalé), alors que `chapters`
      *   (utilisé par le lecteur pour charger le contenu par index) l'est —

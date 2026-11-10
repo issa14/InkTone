@@ -509,7 +509,7 @@ class PlaybackOrchestrator @Inject constructor(
             // de synthèse et le moteur retomberait sur la voix système.
             ttsEngine.warmUp()
 
-            val chapters = when (val result = publicationParser.openForReading(publication.fileUri)) {
+            val chapters = when (val result = publicationParser.openForReading(publication)) {
                 is ParseResult.Success -> result.documentModel.chapters
                 // K6/K7 : un livre corrompu, protégé ou illisible ne fait pas
                 // planter l'app — la narration ne démarre simplement pas. Le

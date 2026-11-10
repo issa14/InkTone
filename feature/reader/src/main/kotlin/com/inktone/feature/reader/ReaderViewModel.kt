@@ -648,7 +648,7 @@ class ReaderViewModel @Inject constructor(
             }
             // Ouverture pour LECTURE : jamais les effets de bord d'import
             // (extraction de couverture) — voir PublicationParser.openForReading.
-            when (val result = publicationParser.openForReading(publication.fileUri)) {
+            when (val result = publicationParser.openForReading(publication)) {
                 is ParseResult.Success -> {
                     currentPublicationId = publicationId
 

@@ -1,5 +1,7 @@
 package com.inktone.infrastructure.parser
 
+import com.inktone.domain.model.Publication
+import com.inktone.domain.model.PublicationFormat
 import com.inktone.domain.service.CoverExtractionResult
 import com.inktone.domain.service.FileStorageService
 import com.inktone.domain.service.ParseResult
@@ -35,7 +37,16 @@ class CompositePublicationParser @Inject constructor(
 
     override suspend fun parse(fileUri: String): ParseResult = delegateFor(fileUri).parse(fileUri)
 
-    override suspend fun openForReading(fileUri: String): ParseResult = delegateFor(fileUri).openForReading(fileUri)
+    /**
+     * Dispatch sur le format PERSISTÉ, jamais sur le nom de fichier : le
+     * format est connu depuis l'import, et [delegateFor] coûte une requête
+     * au fournisseur SAF à chaque appel.
+     */
+    override suspend fun openForReading(publication: Publication): ParseResult = when (publication.format) {
+        PublicationFormat.EPUB -> readiumParser
+        PublicationFormat.PDF -> pdfParser
+        PublicationFormat.TXT -> txtParser
+    }.openForReading(publication)
 
     override suspend fun extractCover(fileUri: String): CoverExtractionResult = delegateFor(fileUri).extractCover(fileUri)
 

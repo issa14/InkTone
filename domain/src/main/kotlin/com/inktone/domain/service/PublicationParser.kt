@@ -1,6 +1,7 @@
 package com.inktone.domain.service
 
 import com.inktone.domain.model.DocumentModel
+import com.inktone.domain.model.Publication
 import com.inktone.domain.model.PublicationFormat
 
 /**
@@ -29,10 +30,18 @@ interface PublicationParser {
      * l'archive, un décodage d'image pleine résolution et une réécriture
      * JPEG — premier affichage observé à ~7 s sur V2206 (L'Arcane des Épées).
      *
+     * Reçoit la [Publication] déjà importée, pas un simple chemin :
+     * - son [Publication.format] fait foi — aucune interrogation du
+     *   fournisseur de fichiers pour deviner le format d'après le nom
+     *   (~250 ms par requête SAF mesurés sur V2206) ;
+     * - son [Publication.id] permet à l'implémentation de partager UNE
+     *   ouverture de l'archive avec le chargement des chapitres et des
+     *   images (K2) au lieu d'en ouvrir une de plus.
+     *
      * Défaut = [parse] : un format sans effet de bord d'import (TXT) n'a
      * rien à distinguer.
      */
-    suspend fun openForReading(fileUri: String): ParseResult = parse(fileUri)
+    suspend fun openForReading(publication: Publication): ParseResult = parse(publication.fileUri)
 
     /**
      * Ré-extrait la seule couverture depuis le fichier source, sans
