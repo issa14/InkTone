@@ -54,11 +54,13 @@ import com.inktone.domain.usecase.GetReadingStateUseCase
 import com.inktone.domain.usecase.GetVoiceProfilesUseCase
 import com.inktone.domain.usecase.UpdateReadingStateUseCase
 import com.inktone.domain.valueobject.Locator
+import com.inktone.feature.reader.di.ApplicationScope
 import dagger.hilt.android.lifecycle.HiltViewModel
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.Job
+import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
@@ -118,6 +120,13 @@ class ReaderViewModel @Inject constructor(
     // P2-b — relais du suivi statistique quand cet écran meurt pendant une
     // narration : le tracker lui est cédé, jamais partagé.
     private val narrationSessionContinuation: NarrationSessionContinuation,
+    // Sauvegarde finale à la fermeture (voir `onCleared`) : `viewModelScope`
+    // y est déjà fermé. Valeur par défaut pour les tests qui construisent ce
+    // ViewModel directement — `Dispatchers.Main` y est le dispatcher de test,
+    // ce qui garde ces écritures déterministes ; Hilt injecte, lui, le scope
+    // processus d'`ApplicationScopeModule`.
+    @ApplicationScope
+    private val applicationScope: CoroutineScope = CoroutineScope(SupervisorJob() + Dispatchers.Main.immediate),
 ) : ViewModel() {
 
     private val _state = MutableStateFlow(ReaderUiState())
@@ -415,6 +424,30 @@ class ReaderViewModel @Inject constructor(
 
     private var scrollPersistJob: Job? = null
 
+    /**
+     * Position déplacée par un geste (défilement, panoramique PDF) mais pas
+     * encore écrite en base — le débounce court. Posée au début du débounce,
+     * levée à l'écriture.
+     *
+     * État EXPLICITE plutôt que `scrollPersistJob?.isActive` : à
+     * `onCleared()`, `viewModelScope` est déjà fermé et ses jobs avec lui —
+     * `isActive` y vaut toujours faux, et la sauvegarde finale était sautée.
+     */
+    private var pendingPosition: PendingPosition? = null
+
+    private data class PendingPosition(val chapterIndex: Int, val sentenceIndex: Int)
+
+    /** Débounce de persistance commun au défilement et au panoramique PDF. */
+    private fun schedulePositionPersist(chapterIndex: Int, sentenceIndex: Int): Job {
+        val pending = PendingPosition(chapterIndex, sentenceIndex)
+        pendingPosition = pending
+        return viewModelScope.launch {
+            delay(SCROLL_PERSIST_DEBOUNCE_MS)
+            pendingPosition = null
+            persistPosition(chapterIndex = pending.chapterIndex, sentenceIndex = pending.sentenceIndex)
+        }
+    }
+
     // Lot 12, Palier 2 (tache 12.9) — cycle de vie distinct du parsing
     // (decision actee 14 du plan) : ouvert une fois a l'ouverture d'une
     // publication PDF, ferme explicitement a la fermeture de celle-ci ou
@@ -445,10 +478,7 @@ class ReaderViewModel @Inject constructor(
         creditVisuallyReadSentences(chapterIndex, sentenceIndex)
         _state.value = _state.value.copy(currentSentenceIndex = sentenceIndex)
         scrollPersistJob?.cancel()
-        scrollPersistJob = viewModelScope.launch {
-            delay(SCROLL_PERSIST_DEBOUNCE_MS)
-            persistPosition(chapterIndex = chapterIndex, sentenceIndex = sentenceIndex)
-        }
+        scrollPersistJob = schedulePositionPersist(chapterIndex = chapterIndex, sentenceIndex = sentenceIndex)
     }
 
     /**
@@ -505,10 +535,7 @@ class ReaderViewModel @Inject constructor(
         val chapterIndex = _state.value.currentChapterIndex
         _state.value = _state.value.copy(pageOffsetY = offsetY)
         pageOffsetPersistJob?.cancel()
-        pageOffsetPersistJob = viewModelScope.launch {
-            delay(SCROLL_PERSIST_DEBOUNCE_MS)
-            persistPosition(chapterIndex = chapterIndex, sentenceIndex = 0)
-        }
+        pageOffsetPersistJob = schedulePositionPersist(chapterIndex = chapterIndex, sentenceIndex = 0)
     }
 
     /**
@@ -1240,26 +1267,33 @@ class ReaderViewModel @Inject constructor(
      * la navigation manuelle interrompt implicitement toute lecture en
      * cours (isPlaying repasse a false via l'etat recompose).
      */
-    private fun persistPosition(chapterIndex: Int, sentenceIndex: Int) {
-        viewModelScope.launch {
-            val publicationId = currentPublicationId ?: return@launch
-            // Lot 12, tache 12.9 — branche PDF : page = chapitre, jamais
-            // de Sentence a chercher (une page scannee n'en a aucune, ce
-            // qui faisait echouer silencieusement ce chemin avant cette
-            // branche — bug trouve en cablant cette tache). `sentenceIndex`
-            // est ignore pour ce format, `pageOffsetY` deja dans l'etat.
-            val locator = if (_state.value.publicationFormat == PublicationFormat.PDF) {
-                Locator(
-                    resourceHref = "page-$chapterIndex",
-                    chapterIndex = chapterIndex,
-                    charOffset = 0,
-                    pageOffsetY = _state.value.pageOffsetY,
-                )
-            } else {
-                val chapter = _state.value.chapters.getOrNull(chapterIndex) ?: return@launch
-                val sentence = chapter.sentences.getOrNull(sentenceIndex) ?: return@launch
-                sentence.startLocator(chapterIndex = chapterIndex, resourceHref = chapter.href)
-            }
+    /**
+     * @param scope `viewModelScope` en usage courant ; `applicationScope`
+     *   pour la sauvegarde finale d'`onCleared`, où `viewModelScope` est déjà
+     *   fermé. Le [Locator] est calculé AVANT le lancement, sur l'état du
+     *   moment : la coroutine n'a ainsi plus besoin de relire l'état d'un
+     *   ViewModel éventuellement détruit.
+     */
+    private fun persistPosition(chapterIndex: Int, sentenceIndex: Int, scope: CoroutineScope = viewModelScope) {
+        val publicationId = currentPublicationId ?: return
+        // Lot 12, tache 12.9 — branche PDF : page = chapitre, jamais
+        // de Sentence a chercher (une page scannee n'en a aucune, ce
+        // qui faisait echouer silencieusement ce chemin avant cette
+        // branche — bug trouve en cablant cette tache). `sentenceIndex`
+        // est ignore pour ce format, `pageOffsetY` deja dans l'etat.
+        val locator = if (_state.value.publicationFormat == PublicationFormat.PDF) {
+            Locator(
+                resourceHref = "page-$chapterIndex",
+                chapterIndex = chapterIndex,
+                charOffset = 0,
+                pageOffsetY = _state.value.pageOffsetY,
+            )
+        } else {
+            val chapter = _state.value.chapters.getOrNull(chapterIndex) ?: return
+            val sentence = chapter.sentences.getOrNull(sentenceIndex) ?: return
+            sentence.startLocator(chapterIndex = chapterIndex, resourceHref = chapter.href)
+        }
+        scope.launch {
             // Bug réel trouvé au diagnostic : reconstruire un ReadingState
             // « nu » ici écrasait silencieusement overrides/voiceProfileId
             // déjà enregistrés à chaque scroll ou phrase TTS — préserver
@@ -1686,26 +1720,30 @@ class ReaderViewModel @Inject constructor(
      * que corrigeait la Tâche A.2 à l'origine.
      */
     override fun onCleared() {
+        // `viewModelScope` est DÉJÀ fermé ici : depuis lifecycle 2.8,
+        // `ViewModel.clear()` ferme ses closeables (dont ce scope) avant
+        // d'appeler `onCleared()`. Toute écriture finale passe donc par
+        // `applicationScope` — un `viewModelScope.launch` posé ici ne
+        // s'exécuterait jamais (c'était le cas jusqu'ici, malgré le
+        // commentaire qui affirmait le contraire).
+
         // ───── Lot Sessions : sauvegarde finale + arrêt timer ─────
-        saveCurrentFragment()
+        saveCurrentFragment(scope = applicationScope)
         checkpointJob?.cancel()
         // ───── Fin Lot Sessions ─────
 
-        // Bug réel trouvé au diagnostic : `scrollPersistJob?.cancel()` /
-        // `pageOffsetPersistJob?.cancel()` plus bas annulaient un débounce de
-        // position encore en attente (SCROLL_PERSIST_DEBOUNCE_MS) SANS écrire
-        // la position qu'il portait — fermer le livre juste après un
-        // défilement ou un geste PDF perdait ce dernier déplacement, la
-        // reprise retombant sur la position précédente. Même remède que
-        // `saveCurrentFragment` ci-dessus : flush immédiat AVANT
-        // `super.onCleared()`, tant que `viewModelScope` est encore actif.
-        if (scrollPersistJob?.isActive == true) {
-            scrollPersistJob?.cancel()
-            persistPosition(chapterIndex = _state.value.currentChapterIndex, sentenceIndex = _state.value.currentSentenceIndex)
-        }
-        if (pageOffsetPersistJob?.isActive == true) {
-            pageOffsetPersistJob?.cancel()
-            persistPosition(chapterIndex = _state.value.currentChapterIndex, sentenceIndex = 0)
+        // Débounce de position encore en attente (SCROLL_PERSIST_DEBOUNCE_MS) :
+        // fermer le livre juste après un défilement ou un geste PDF perdait
+        // ce dernier déplacement, la reprise retombant sur la position
+        // précédente (K3). Écrit immédiatement la position qu'il portait —
+        // repérée par `pendingPosition`, jamais par l'état du job (déjà annulé).
+        pendingPosition?.let { pending ->
+            pendingPosition = null
+            persistPosition(
+                chapterIndex = pending.chapterIndex,
+                sentenceIndex = pending.sentenceIndex,
+                scope = applicationScope,
+            )
         }
 
         super.onCleared()
@@ -1822,18 +1860,18 @@ class ReaderViewModel @Inject constructor(
                 if (t.isPaused) continue
                 val snapshot = t.snapshot()
                 if (snapshot.totalMs < 5_000L) continue
-                persistFragment(snapshot)
+                persistFragment(t.publicationId, snapshot)
                 t.reset()
             }
         }
     }
 
     /** Flush + save d'un fragment sans pauser le tracker. */
-    private fun saveCurrentFragment() {
+    private fun saveCurrentFragment(scope: CoroutineScope = viewModelScope) {
         val t = sessionTracker ?: return
         val snapshot = t.snapshot()
         if (snapshot.totalMs < 5_000L) return
-        persistFragment(snapshot)
+        persistFragment(t.publicationId, snapshot, scope)
         t.reset()
     }
 
@@ -1841,17 +1879,25 @@ class ReaderViewModel @Inject constructor(
      * Insère un fragment de session en base (Dispatchers.IO).
      * Chaque fragment est non-chevauchant : [lastFragmentSavedMs]
      * avance à chaque sauvegarde.
+     *
+     * Bornes et publication capturées AVANT le lancement : lues dans la
+     * coroutine, `lastFragmentSavedMs` pouvait déjà avoir avancé (fragment
+     * suivant) et `sessionTracker` être cédé au relais de narration.
+     *
+     * @param scope `applicationScope` depuis `onCleared` (voir
+     *   [persistPosition]).
      */
-    private fun persistFragment(snapshot: TrackerSnapshot) {
+    private fun persistFragment(publicationId: String, snapshot: TrackerSnapshot, scope: CoroutineScope = viewModelScope) {
         val fragmentStart = lastFragmentSavedMs
-        lastFragmentSavedMs = System.currentTimeMillis()
-        viewModelScope.launch(Dispatchers.IO) {
+        val fragmentEnd = System.currentTimeMillis()
+        lastFragmentSavedMs = fragmentEnd
+        scope.launch(Dispatchers.IO) {
             readingSessionRepository.insert(
                 ReadingSession(
                     id = java.util.UUID.randomUUID().toString(),
-                    publicationId = sessionTracker!!.publicationId,
+                    publicationId = publicationId,
                     startedAt = fragmentStart,
-                    endedAt = lastFragmentSavedMs,
+                    endedAt = fragmentEnd,
                     mode = if (snapshot.ttsMs >= snapshot.visualMs) DomainReadingMode.AUDIO
                     else DomainReadingMode.VISUAL,
                     sentencesRead = snapshot.sentences,

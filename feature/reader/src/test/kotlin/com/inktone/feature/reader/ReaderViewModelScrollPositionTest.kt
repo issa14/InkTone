@@ -29,6 +29,9 @@ import com.inktone.domain.usecase.DeleteBookmarkUseCase
 import com.inktone.domain.usecase.GetReadingStateUseCase
 import com.inktone.domain.usecase.GetVoiceProfilesUseCase
 import com.inktone.domain.usecase.UpdateReadingStateUseCase
+import androidx.lifecycle.ViewModel
+import androidx.lifecycle.ViewModelProvider
+import androidx.lifecycle.ViewModelStore
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.test.StandardTestDispatcher
@@ -209,6 +212,57 @@ class ReaderViewModelScrollPositionTest {
 
         viewModel.cancelCheckpointTimerForTest()
         dispatcher.scheduler.runCurrent()
+    }
+
+    /**
+     * Fermeture du livre pendant le débounce de persistance : la position
+     * défilée doit être écrite quand même (K3).
+     *
+     * Passe par `ViewModelStore.clear()` — le chemin réel d'une destination
+     * dépilée — et jamais par un appel direct à `onCleared()` : depuis
+     * lifecycle 2.8, `ViewModel.clear()` ferme `viewModelScope` AVANT
+     * d'appeler `onCleared()`. Un `launch` posé dans `onCleared()` sur ce
+     * scope ne s'exécute donc jamais ; seul ce chemin le révèle.
+     */
+    @Test
+    fun fermer_le_livre_pendant_le_debounce_persiste_la_derniere_position() = runTest {
+        val readingStateRepository = FakeReadingStateRepository()
+        val publicationRepository = FakePublicationRepository()
+        publicationRepository.insert(
+            Publication(
+                id = "pub-1", title = "Test", format = PublicationFormat.EPUB,
+                fileUri = "content://x", fileHash = "hash", fileSize = 10, chapterCount = 1,
+                importDate = 0L,
+            ),
+        )
+        val viewModel = buildViewModel(readingStateRepository, publicationRepository)
+        val store = ViewModelStore()
+        ViewModelProvider(
+            store,
+            object : ViewModelProvider.Factory {
+                @Suppress("UNCHECKED_CAST")
+                override fun <T : ViewModel> create(modelClass: Class<T>): T = viewModel as T
+            },
+        )[ReaderViewModel::class.java]
+
+        viewModel.onIntent(ReaderIntent.OpenPublication("pub-1"))
+        dispatcher.scheduler.runCurrent()
+
+        viewModel.onIntent(ReaderIntent.UpdateScrollPosition(2))
+        // Débounce (400 ms) encore en attente : rien n'est écrit.
+        dispatcher.scheduler.advanceTimeBy(50)
+        assertEquals(0, readingStateRepository.get("pub-1")?.locator?.charOffset ?: 0)
+
+        // Retour à la Bibliothèque : la destination est dépilée.
+        store.clear()
+        dispatcher.scheduler.advanceTimeBy(1_000L)
+        dispatcher.scheduler.runCurrent()
+
+        assertEquals(
+            "la position défilée juste avant la fermeture doit survivre à la fermeture",
+            24, // Sentence(2).startOffset
+            readingStateRepository.get("pub-1")?.locator?.charOffset,
+        )
     }
 
     // ───── Lot 21, tâche 9 — auto-scroll visuel (vitesse persistée) ─────
