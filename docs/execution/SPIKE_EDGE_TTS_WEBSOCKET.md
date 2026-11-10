@@ -43,19 +43,30 @@ wss://speech.platform.bing.com/consumer/speech/synthesize/readaloud/edge/v1
   ?TrustedClientToken=6A5AA1D4EAFF4E9FB37E23D68491D6F4
   &ConnectionId={uuid-sans-tirets}
   &Sec-MS-GEC={token}
-  &Sec-MS-GEC-Version=1-143.0.3650.75
+  &Sec-MS-GEC-Version=2-143.0.3650.75
 ```
 
 ### 3.2 Authentification `Sec-MS-GEC`
 
+> **Mise à jour 2026-11-10 — jeton v2.** Depuis mi-octobre 2026, Microsoft
+> rejette le jeton v1 (`SHA256("{ticks}{token}")`) par un `403 Forbidden` au
+> handshake WebSocket. Le spike d'origine (v1, préfixe de version `1-`) n'est
+> plus reproductible tel quel ; l'algorithme ci-dessous est celui en vigueur.
+
 ```
-ticks = floor((unixSeconds + 11644473600) / 300) * 300 * 10^7
-Sec-MS-GEC = SHA256("{ticks}6A5AA1D4EAFF4E9FB37E23D68491D6F4").hex.uppercase()
+ticks      = floor((unixSeconds + 11644473600) / 300) * 300 * 10^7
+Sec-MS-GEC = "<CS64 : 16 hex>-<SHA256 modifié : 64 hex>"   (majuscules)
 ```
 
+`CS64` et le SHA-256 modifié (état initial et calendrier de messages
+altérés) sont calculés sur `"{ticks}6A5AA1D4EAFF4E9FB37E23D68491D6F4"`.
+Implémentation : `EdgeTtsGecToken.kt`, port de `generate_sec_ms_gec_v2`
+(projet Python `edge-tts` >= 7.3.0, `drm.py`). Vecteurs de test générés par
+l'implémentation de référence : `EdgeTtsGecTokenTest`.
+
 `11644473600` = écart epoch Unix ↔ epoch Windows FILETIME. `TrustedClientToken`
-et `Sec-MS-GEC-Version` sont portés tels quels du legacy (déjà éprouvés, pas à
-réinventer — ADR-024, décision 4 : constante technique, pas un secret).
+est inchangé (ADR-024, décision 4 : constante technique, pas un secret) ;
+`Sec-MS-GEC-Version` passe de `1-143.0.3650.75` à `2-143.0.3650.75`.
 
 ### 3.3 En-têtes de connexion
 

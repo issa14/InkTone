@@ -7,6 +7,7 @@ import android.media.MediaFormat
 import android.util.Log
 import androidx.test.core.app.ApplicationProvider
 import androidx.test.ext.junit.runners.AndroidJUnit4
+import com.inktone.infrastructure.tts.EdgeTtsGecToken
 import okhttp3.OkHttpClient
 import okhttp3.Request
 import okhttp3.Response
@@ -23,7 +24,6 @@ import java.util.UUID
 import java.util.concurrent.CountDownLatch
 import java.util.concurrent.TimeUnit
 import java.util.concurrent.atomic.AtomicInteger
-import kotlin.math.floor
 
 /**
  * SPIKE — Lot 14, Palier 1, Tâche 1.2 (round-trip) et 1.3 (word boundaries).
@@ -40,7 +40,7 @@ class EdgeTtsWebSocketSpikeTest {
     private companion object {
         const val TAG = "EdgeTtsSpike"
         const val TRUSTED_CLIENT_TOKEN = "6A5AA1D4EAFF4E9FB37E23D68491D6F4"
-        const val SEC_MS_GEC_VERSION = "1-143.0.3650.75"
+        const val SEC_MS_GEC_VERSION = "2-143.0.3650.75"
         const val WS_BASE =
             "wss://speech.platform.bing.com/consumer/speech/synthesize/readaloud/edge/v1" +
                 "?TrustedClientToken=$TRUSTED_CLIENT_TOKEN"
@@ -217,16 +217,9 @@ class EdgeTtsWebSocketSpikeTest {
             "</voice></speak>"
     }
 
-    private fun generateSecMsGec(): String {
-        val nowSeconds = System.currentTimeMillis() / 1000.0
-        val winSeconds = nowSeconds + 11_644_473_600L
-        val rounded = floor(winSeconds / 300.0) * 300.0
-        val ticks = (rounded * 10_000_000).toLong()
-        val input = "${ticks}${TRUSTED_CLIENT_TOKEN}"
-        val digest = MessageDigest.getInstance("SHA-256")
-            .digest(input.toByteArray(Charsets.US_ASCII))
-        return digest.joinToString("") { "%02x".format(it) }.uppercase()
-    }
+    /** Jeton v2 (depuis mi-octobre 2026, le v1 est rejeté en 403) — voir [EdgeTtsGecToken]. */
+    private fun generateSecMsGec(): String =
+        EdgeTtsGecToken.generate(System.currentTimeMillis() / 1000, TRUSTED_CLIENT_TOKEN)
 
     private fun generateMuid(): String {
         val bytes = ByteArray(16)

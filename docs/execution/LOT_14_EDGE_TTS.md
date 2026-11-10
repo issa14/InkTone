@@ -238,9 +238,11 @@ Fichier `infrastructure/tts/src/main/kotlin/com/inktone/infrastructure/tts/EdgeT
 
 - Portage du protocole validé au Palier 1 dans une classe `@Singleton`
   injectable, **sans** dépendance Compose/Room (module `infrastructure`).
-- Auth `Sec-MS-GEC` : SHA-256(`{ticks}{TrustedClientToken}`) uppercase, avec
-  `ticks` = timestamp Windows FILETIME arrondi à la tranche de 5 minutes —
-  porté tel quel du legacy (algorithme déjà éprouvé, pas à réinventer).
+- Auth `Sec-MS-GEC` : jeton **v2** (`<16 hex>-<64 hex>`, SHA-256 modifié +
+  condensé CS64) calculé sur `{ticks}{TrustedClientToken}`, avec `ticks` =
+  timestamp Windows FILETIME arrondi à la tranche de 5 minutes ; préfixe de
+  version `2-`. Le jeton v1 initialement porté du legacy (SHA-256 simple) est
+  rejeté en 403 depuis mi-octobre 2026 : voir `EdgeTtsGecToken.kt`.
   `TrustedClientToken` en constante documentée (décision actée 4).
 - Trames config + SSML identiques au protocole validé ; SSML avec échappement
   XML (`&`, `<`, `>`, `"`, `'`) et `prosody rate` dérivé de la vitesse.
@@ -278,7 +280,8 @@ Fichier `infrastructure/tts/src/main/kotlin/com/inktone/infrastructure/tts/Mp3De
     deux trames (config puis SSML) dans l'ordre, collecte des chunks binaires,
     complétion sur `turn.end`, timeout (réponse jamais close → exception),
     retry sur erreur transitoire, **pas** de retry sur erreur permanente.
-  - Test pur de `generateSecMsGec` (valeur déterministe pour un ticks connu)
+  - `EdgeTtsGecTokenTest` : vecteurs du jeton v2 générés par l'implémentation
+    Python de référence (`edge-tts` >= 7.3.0)
     et de `buildSsml` (échappement XML, taux de vitesse positif/négatif).
   - `isNetworkError` : classification par type d'exception, pas par message.
 - **Instrumenté (`androidTest`)**, fixture MP3 réelle :
