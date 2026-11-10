@@ -236,24 +236,9 @@ fun ReaderScreen(
     }
     // ───── Fin Lot Sessions ─────
 
-    // Tache 9bis.3.1 : HUD (panneau de controle + boutons) visible par
-    // defaut, se masque seul apres 4s (ImmersiveReaderChrome), un appui
-    // sur la zone de lecture le fait reapparaitre.
-    var isHudVisible by remember { mutableStateOf(true) }
-    // Bug réel trouvé à l'audit : le délai de 4s ne redémarrait jamais
-    // pendant qu'on interagit avec le HUD (il se masquait sous les
-    // doigts de l'utilisateur au milieu d'une action) — ce compteur,
-    // incrémenté à chaque interaction, force ImmersiveReaderChrome à
-    // relancer son délai.
-    var hudActivityTick by remember { mutableIntStateOf(0) }
-    fun keepHudVisible() {
-        isHudVisible = true
-        hudActivityTick++
-    }
-
-    // B.2/B.3 — états d'affichage des panneaux de réglages in-reader
-    var showSettingsPanel by remember { mutableStateOf(false) }
-    var showTtsPanel by remember { mutableStateOf(false) }
+    // États d'affichage (HUD, panneaux, dialogues, popups) : voir
+    // ReaderChromeState, qui porte aussi leurs règles de bascule.
+    val chrome = rememberReaderChromeState()
 
     // Correctif Lot 21, tâche 5 — la note de signet n'ouvre plus un
     // AlertDialog modal à CHAQUE création (le plan proscrit d'en faire un
@@ -262,7 +247,6 @@ fun ReaderScreen(
     // (CatalogDashboardScreen). La saisie ne s'ouvre que si l'utilisateur
     // la demande explicitement.
     val snackbarHostState = remember { SnackbarHostState() }
-    var showBookmarkNoteDialog by remember { mutableStateOf(false) }
     LaunchedEffect(state.pendingBookmarkNoteId) {
         if (state.pendingBookmarkNoteId == null) return@LaunchedEffect
         val result = snackbarHostState.showSnackbar(
@@ -270,110 +254,31 @@ fun ReaderScreen(
             actionLabel = "Ajouter une note",
         )
         if (result == SnackbarResult.ActionPerformed) {
-            showBookmarkNoteDialog = true
+            chrome.showBookmarkNoteDialog = true
         } else {
             // Ignoré ou expiré : le signet reste sans note, comme avant.
             viewModel.onIntent(ReaderIntent.DismissBookmarkNotePrompt)
         }
     }
 
-    // Lot 22, tâche 11 — édition depuis BookmarkPanel : état purement local
-    // à cet écran (contrairement à `pendingBookmarkNoteId`, transient et
-    // sans besoin de survivre à une recomposition du ViewModel), l'élément
-    // en cours d'édition porte lui-même sa note actuelle pour le pré-remplissage.
-    var editingBookmark by remember { mutableStateOf<Bookmark?>(null) }
-    var editingAnnotation by remember { mutableStateOf<Annotation?>(null) }
-    // Lot 23, tâche 12 — menu contextuel au tap sur une annotation déjà
-    // posée dans le texte (mode SCROLL). `tappedAnnotationBounds` porte
-    // les bornes fenêtre remontées par `BookBlockItem.onAnnotationTapped`.
-    var tappedAnnotation by remember { mutableStateOf<Annotation?>(null) }
-    var tappedAnnotationBounds by remember { mutableStateOf<Rect?>(null) }
-    // 3d.3 — visibilité locale de la barre de luminosité, même patron que
-    // les panneaux ci-dessus : purement une décision d'affichage, pas un
-    // état MVI (ReaderUiState.readerBrightness porte la vraie donnée).
-    //
-    // Bug réel trouvé à la vérification device (lot 3d) : la barre ne
-    // disparaissait plus jamais une fois ouverte, y compris aux
-    // réapparitions ultérieures du HUD. Corrigé : ouvrir la barre masque
-    // le HUD (au lieu de le garder visible) et démarre un délai
-    // d'auto-masquage — même principe que hudActivityTick/ImmersiveReaderChrome,
-    // relancé à chaque ajustement (brightnessBarActivityTick).
-    var showBrightnessBar by remember { mutableStateOf(false) }
-    var brightnessBarActivityTick by remember { mutableIntStateOf(0) }
-    LaunchedEffect(showBrightnessBar, brightnessBarActivityTick) {
-        if (showBrightnessBar) {
+    // 3d.3 — auto-masquage de la barre de luminosité, relancé à chaque
+    // ajustement (voir ReaderChromeState.showBrightnessBar).
+    LaunchedEffect(chrome.showBrightnessBar, chrome.brightnessBarActivityTick) {
+        if (chrome.showBrightnessBar) {
             delay(3000)
-            showBrightnessBar = false
+            chrome.showBrightnessBar = false
         }
     }
 
-    // 3e.1 (point A5) — pendant la lecture TTS, le panneau unifié est
-    // remplacé par la barre pilule (voir plus bas) ; ce drapeau local
-    // rappelle le panneau complet par-dessus la barre le temps d'un appui,
-    // pour atteindre Sommaire/TT/etc. sans interrompre la lecture.
-    var showFullPanelOverlay by remember { mutableStateOf(false) }
-    // 3e.2 — repli de la barre pilule en bouton unique après 4s
-    // d'inactivité, réutilisant le délai d'ImmersiveReaderChrome
-    // (onAutoHide ci-dessous) : pas de second minuteur. isHudVisible
-    // reste vrai pendant le repli — seule la forme de son contenu change,
-    // ce n'est pas un masquage complet.
-    var isPillCollapsed by remember { mutableStateOf(false) }
     LaunchedEffect(state.isPlaying) {
-        if (!state.isPlaying) {
-            showFullPanelOverlay = false
-            isPillCollapsed = false
-        }
+        if (!state.isPlaying) chrome.onPlaybackStopped()
     }
-
-    // Ferme la barre de luminosité si elle est ouverte, sinon applique le
-    // basculement HUD habituel — un appui sur la zone de lecture pendant
-    // l'ajustement de luminosité doit fermer la barre, pas rouvrir le HUD
-    // par-dessus dans le même geste.
-    fun handleReadingAreaTap() {
-        if (showBrightnessBar) {
-            showBrightnessBar = false
-        } else if (state.isPlaying) {
-            // Pendant le TTS, la barre pilule remplace le panneau unifié
-            // (retiré du HUD standard) : un premier appui rappelle le
-            // panneau complet, un second referme tout, un troisième
-            // ramène la barre pilule — le même rythme à trois temps que le
-            // cycle HUD habituel, appliqué à un état de plus.
-            if (showFullPanelOverlay) {
-                showFullPanelOverlay = false
-                isHudVisible = false
-            } else if (isHudVisible) {
-                showFullPanelOverlay = true
-                isPillCollapsed = false
-            } else {
-                keepHudVisible()
-                isPillCollapsed = false
-            }
-        } else if (isHudVisible) {
-            isHudVisible = false
-        } else {
-            keepHudVisible()
-        }
-    }
-    // 3d.4 — remplace le cycle nextSleepTimerMinutes : le tap sur Veille
-    // ouvre désormais un panneau (puces + roue), au lieu de cycler
-    // silencieusement 15→30→45→60 sans rien afficher.
-    var showSleepTimerPanel by remember { mutableStateOf(false) }
 
     ImmersiveReaderChrome(
-        isHudVisible = isHudVisible,
-        hudActivityTick = hudActivityTick,
+        isHudVisible = chrome.isHudVisible,
+        hudActivityTick = chrome.hudActivityTick,
         immersive = isForeground,
-        onAutoHide = {
-            // 3e.2 — pendant le TTS (barre pilule affichée, pas l'overlay
-            // panneau complet), l'inactivité replie la barre au lieu de
-            // masquer tout le HUD : la lecture et le surlignage restent
-            // visibles en permanence via le bouton replié.
-            if (state.isPlaying && !showFullPanelOverlay) {
-                isPillCollapsed = true
-            } else {
-                isHudVisible = false
-            }
-        },
+        onAutoHide = { chrome.onHudAutoHide(state.isPlaying) },
     ) {
     // 3d.3 — applique la luminosité choisie à la fenêtre du lecteur
     // seulement, restaurée à la sortie (voir ReaderBrightnessEffect).
@@ -406,7 +311,7 @@ fun ReaderScreen(
     // transitoirement au balayage.
     SystemBarIconsEffect(ThemeColors.barSurface(state.resolvedTheme))
     WindowBackgroundColorEffect(
-        if (isHudVisible) {
+        if (chrome.isHudVisible) {
             ThemeColors.barSurface(state.resolvedTheme)
         } else {
             ThemeColors.background(state.resolvedTheme)
@@ -433,7 +338,7 @@ fun ReaderScreen(
             .clickable(
                 interactionSource = remember { MutableInteractionSource() },
                 indication = null,
-            ) { handleReadingAreaTap() },
+            ) { chrome.onReadingAreaTap(state.isPlaying) },
     ) {
         // A.3 — État d'erreur : affiché quand le parsing ou l'ouverture
         // échoue. Audit v1.0.0 (AUDIT_CONSOLIDATION_V1.md, B3) : deux
@@ -640,7 +545,7 @@ fun ReaderScreen(
         // Lot 14 — masquée dès le lancement TTS (lecture immersive) ; ne
         // revient que via l'overlay panneau complet (showFullPanelOverlay),
         // qui conserve l'accès au bouton retour pendant la lecture.
-        if (isHudVisible && (!state.isPlaying || showFullPanelOverlay)) {
+        if (chrome.isHudVisible && (!state.isPlaying || chrome.showFullPanelOverlay)) {
             // Bug réel trouvé sur appareil : déclarée avant la zone de
             // lecture (Box.fillMaxSize() plus bas dans ce même Box), la
             // topbar se retrouvait dessous dans l'ordre d'empilement de
@@ -1085,12 +990,9 @@ fun ReaderScreen(
                                                 bounds = bounds,
                                             )
                                         },
-                                        onClick = { handleReadingAreaTap() },
+                                        onClick = { chrome.onReadingAreaTap(state.isPlaying) },
                                         onAnnotationTapped = { annotation, bounds ->
-                                            if (bounds != null) {
-                                                tappedAnnotation = annotation
-                                                tappedAnnotationBounds = bounds
-                                            }
+                                            if (bounds != null) chrome.showAnnotationMenu(annotation, bounds)
                                         },
                                         isReadingRulerEnabled = state.isReadingRulerEnabled,
                                         onCurrentLineY = { y -> currentLineYDp = y },
@@ -1133,7 +1035,7 @@ fun ReaderScreen(
                         textColor = ThemeColors.text(state.resolvedTheme),
                         isReadingRulerEnabled = state.isReadingRulerEnabled,
                         contentPadding = readerMargin,
-                        onClick = { handleReadingAreaTap() },
+                        onClick = { chrome.onReadingAreaTap(state.isPlaying) },
                         onNextChapter = { viewModel.onIntent(ReaderIntent.NextChapter) },
                         onPreviousChapter = { viewModel.onIntent(ReaderIntent.PreviousChapter) },
                         hasPreviousChapter = state.hasPreviousChapter,
@@ -1232,7 +1134,7 @@ fun ReaderScreen(
                 .fillMaxWidth(),
         ) {
             Column(modifier = Modifier.fillMaxWidth()) {
-                if (isHudVisible) {
+                if (chrome.isHudVisible) {
                     // 3e.1 — pendant le TTS, la barre pilule remplace le panneau
                     // unifié (navigation par chapitre, retirée du panneau au lot
                     // 3b) ; le panneau complet ne revient que par l'overlay A5 ou
@@ -1242,7 +1144,7 @@ fun ReaderScreen(
                     // un PDF qui porte du texte l'affiche comme un EPUB, un
                     // PDF entierement scanne ne la voit jamais (isPlaying
                     // reste faux, playCurrentSentence n'a aucune phrase).
-                    if (state.isPlaying && !showFullPanelOverlay && state.supportsTts) {
+                    if (state.isPlaying && !chrome.showFullPanelOverlay && state.supportsTts) {
                         // 3e.2 — repli en bouton unique après 4s (isPillCollapsed,
                         // voir onAutoHide plus haut).
                         //
@@ -1267,12 +1169,12 @@ fun ReaderScreen(
                         // ferait perdre un des deux.
                         val fadeSpec = if (state.reduceMotion) tween<Float>(0) else Motion.tween<Float>()
                         val barAlpha by animateFloatAsState(
-                            targetValue = if (isPillCollapsed) 0f else 1f,
+                            targetValue = if (chrome.isPillCollapsed) 0f else 1f,
                             animationSpec = fadeSpec,
                             label = "TtsPillBarAlpha",
                         )
                         val fabAlpha by animateFloatAsState(
-                            targetValue = if (isPillCollapsed) 1f else 0f,
+                            targetValue = if (chrome.isPillCollapsed) 1f else 0f,
                             animationSpec = fadeSpec,
                             label = "TtsPillBarCollapsedAlpha",
                         )
@@ -1285,14 +1187,14 @@ fun ReaderScreen(
                                     reduceMotion = state.reduceMotion,
                                     hasPreviousChapter = state.hasPreviousChapter,
                                     hasNextChapter = state.hasNextChapter,
-                                    onPreviousChapter = { keepHudVisible(); viewModel.onIntent(ReaderIntent.PreviousChapter) },
-                                    onPreviousSentence = { keepHudVisible(); viewModel.onIntent(ReaderIntent.SkipToPreviousSentence) },
+                                    onPreviousChapter = { chrome.keepHudVisible(); viewModel.onIntent(ReaderIntent.PreviousChapter) },
+                                    onPreviousSentence = { chrome.keepHudVisible(); viewModel.onIntent(ReaderIntent.SkipToPreviousSentence) },
                                     onPlayPause = {
-                                        keepHudVisible()
+                                        chrome.keepHudVisible()
                                         togglePlayback()
                                     },
-                                    onNextSentence = { keepHudVisible(); viewModel.onIntent(ReaderIntent.SkipToNextSentence) },
-                                    onNextChapter = { keepHudVisible(); viewModel.onIntent(ReaderIntent.NextChapter) },
+                                    onNextSentence = { chrome.keepHudVisible(); viewModel.onIntent(ReaderIntent.SkipToNextSentence) },
+                                    onNextChapter = { chrome.keepHudVisible(); viewModel.onIntent(ReaderIntent.NextChapter) },
                                     // 3e.3 — balayage redéfini en pause (voir KDoc de
                                     // TtsPillBarCollapsed) : pas de keepHudVisible, le
                                     // passage à isPlaying=false referme déjà la barre
@@ -1305,10 +1207,7 @@ fun ReaderScreen(
                                     modifier = Modifier.align(Alignment.CenterEnd).graphicsLayer(alpha = fabAlpha),
                                     isAudioActive = state.isAudioActive,
                                     reduceMotion = state.reduceMotion,
-                                    onExpand = {
-                                        isPillCollapsed = false
-                                        keepHudVisible()
-                                    },
+                                    onExpand = { chrome.expandPill() },
                                     onSwipeDown = { viewModel.onIntent(ReaderIntent.Pause) },
                                 )
                             }
@@ -1319,22 +1218,22 @@ fun ReaderScreen(
                             sleepTimerActive = state.sleepTimer != null,
                             bookProgression = state.bookProgression,
                             onPlayPause = {
-                                keepHudVisible()
+                                chrome.keepHudVisible()
                                 togglePlayback()
                             },
-                            onSleepTimerClick = { keepHudVisible(); showSleepTimerPanel = true },
-                            onSearchClick = { keepHudVisible(); onSearchClick() },
-                            onBookmarksClick = { keepHudVisible(); viewModel.onIntent(ReaderIntent.ToggleBookmarkList) },
-                            onTocClick = { keepHudVisible(); viewModel.onIntent(ReaderIntent.ToggleToc) },
+                            onSleepTimerClick = { chrome.keepHudVisible(); chrome.showSleepTimerPanel = true },
+                            onSearchClick = { chrome.keepHudVisible(); onSearchClick() },
+                            onBookmarksClick = { chrome.keepHudVisible(); viewModel.onIntent(ReaderIntent.ToggleBookmarkList) },
+                            onTocClick = { chrome.keepHudVisible(); viewModel.onIntent(ReaderIntent.ToggleToc) },
                             onThemeCycle = {
-                                keepHudVisible()
+                                chrome.keepHudVisible()
                                 val overrides = (state.currentOverrides ?: ReadingOverrides())
                                     .copy(theme = nextReadingTheme(state.effectiveSettings.theme))
                                 viewModel.onIntent(ReaderIntent.SetOverrides(overrides))
                             },
-                            onAaClick = { keepHudVisible(); showSettingsPanel = true },
-                            onTtsClick = { keepHudVisible(); showTtsPanel = true },
-                            onReadingModeClick = { keepHudVisible(); viewModel.onIntent(ReaderIntent.ToggleReadingMode) },
+                            onAaClick = { chrome.keepHudVisible(); chrome.showSettingsPanel = true },
+                            onTtsClick = { chrome.keepHudVisible(); chrome.showTtsPanel = true },
+                            onReadingModeClick = { chrome.keepHudVisible(); viewModel.onIntent(ReaderIntent.ToggleReadingMode) },
                             // Indicateur du mode courant (lot HUD) : l'icône
                             // « Mode » doit refléter le mode ACTIF, pas un
                             // glyphe figé.
@@ -1349,9 +1248,7 @@ fun ReaderScreen(
                                 // Bug réel corrigé (vérification device, lot 3d) : masque le
                                 // HUD au lieu de le garder visible — la barre prend sa place
                                 // plutôt que de s'empiler dessous.
-                                isHudVisible = false
-                                showBrightnessBar = true
-                                brightnessBarActivityTick++
+                                chrome.openBrightnessBar()
                             },
                         )
                     }
@@ -1361,12 +1258,12 @@ fun ReaderScreen(
                 // pendant l'ajustement), pas un panneau séparé (UX_FLOW_DESIGN.md
                 // §Luminosité). S'auto-masque après 3s d'inactivité (voir
                 // LaunchedEffect ci-dessus), relancé à chaque ajustement.
-                if (showBrightnessBar) {
+                if (chrome.showBrightnessBar) {
                     ReaderBrightnessBar(
                         value = state.readerBrightness,
                         onValueChange = { value ->
                             viewModel.onIntent(ReaderIntent.SetReaderBrightness(value))
-                            brightnessBarActivityTick++
+                            chrome.onBrightnessAdjusted()
                         },
                     )
                 }
@@ -1424,7 +1321,7 @@ fun ReaderScreen(
         // redondantes) — seuls taille et interligne restent, avec un
         // aperçu du texte RÉELLEMENT en cours de lecture, pas un exemple
         // inventé.
-        if (showSettingsPanel) {
+        if (chrome.showSettingsPanel) {
             val previewSentences = state.currentChapter?.sentences.orEmpty()
             val previewText = previewSentences
                 .drop(state.currentSentenceIndex)
@@ -1465,12 +1362,12 @@ fun ReaderScreen(
                     autoScrollUserStopped = false
                     viewModel.onIntent(ReaderIntent.SetAutoScrollSpeed(speed))
                 },
-                onDismiss = { showSettingsPanel = false },
+                onDismiss = { chrome.showSettingsPanel = false },
             )
         }
 
         // B.3 — Panneau TTS in-reader
-        if (showTtsPanel) {
+        if (chrome.showTtsPanel) {
             val sentences = state.currentChapter?.sentences ?: emptyList()
             ReaderTtsPanel(
                 isPlaying = state.isPlaying,
@@ -1486,12 +1383,12 @@ fun ReaderScreen(
                 onSpeedChange = { speed -> viewModel.onIntent(ReaderIntent.SetTtsSpeed(speed)) },
                 onSelectVoiceProfile = { profileId -> viewModel.onIntent(ReaderIntent.SetActiveVoiceProfile(profileId)) },
                 onOpenPronunciationRules = onOpenPronunciationRules,
-                onDismiss = { showTtsPanel = false },
+                onDismiss = { chrome.showTtsPanel = false },
             )
         }
 
         // 3d.4/3d.5 — Panneau Minuteur (remplace le cycle sur l'icône Veille) + repos oculaire
-        if (showSleepTimerPanel) {
+        if (chrome.showSleepTimerPanel) {
             SleepTimerPanel(
                 remainingMs = state.sleepTimer?.remainingMs,
                 armedMinutes = state.sleepTimer?.let { (it.totalMs / 60_000L).toInt() },
@@ -1500,7 +1397,7 @@ fun ReaderScreen(
                 eyeRestReminderIntervalMinutes = state.eyeRestReminderIntervalMinutes,
                 onSetEyeRestReminderEnabled = { enabled -> viewModel.onIntent(ReaderIntent.SetEyeRestReminderEnabled(enabled)) },
                 onSetEyeRestReminderInterval = { minutes -> viewModel.onIntent(ReaderIntent.SetEyeRestReminderInterval(minutes)) },
-                onDismiss = { showSleepTimerPanel = false },
+                onDismiss = { chrome.showSleepTimerPanel = false },
                 showSleepTimer = state.supportsTts,
             )
         }
@@ -1569,9 +1466,9 @@ fun ReaderScreen(
                     },
                     onClose = { viewModel.onIntent(ReaderIntent.ToggleBookmarkList) },
                     onDeleteAnnotation = { annotation -> viewModel.onIntent(ReaderIntent.DeleteAnnotation(annotation.id)) },
-                    onEditAnnotationNote = { annotation -> editingAnnotation = annotation },
+                    onEditAnnotationNote = { annotation -> chrome.editingAnnotation = annotation },
                     onDeleteBookmark = { bookmark -> viewModel.onIntent(ReaderIntent.DeleteBookmark(bookmark.id)) },
-                    onEditBookmarkNote = { bookmark -> editingBookmark = bookmark },
+                    onEditBookmarkNote = { bookmark -> chrome.editingBookmark = bookmark },
                 )
             }
         }
@@ -1579,49 +1476,44 @@ fun ReaderScreen(
         // Lot 23, tâche 12 — menu contextuel in-situ, tap sur une
         // annotation déjà posée. `onEdit` réutilise `editingAnnotation`
         // (même dialogue que depuis BookmarkPanel, Lot 22 tâche 11).
-        val currentTappedAnnotation = tappedAnnotation
-        val currentTappedBounds = tappedAnnotationBounds
+        val currentTappedAnnotation = chrome.tappedAnnotation
+        val currentTappedBounds = chrome.tappedAnnotationBounds
         if (currentTappedAnnotation != null && currentTappedBounds != null) {
             AnnotationTapPopup(
                 boundsInWindow = currentTappedBounds,
                 onEdit = {
-                    editingAnnotation = currentTappedAnnotation
-                    tappedAnnotation = null
-                    tappedAnnotationBounds = null
+                    chrome.editingAnnotation = currentTappedAnnotation
+                    chrome.dismissAnnotationMenu()
                 },
                 onDelete = {
                     viewModel.onIntent(ReaderIntent.DeleteAnnotation(currentTappedAnnotation.id))
-                    tappedAnnotation = null
-                    tappedAnnotationBounds = null
+                    chrome.dismissAnnotationMenu()
                 },
-                onDismiss = {
-                    tappedAnnotation = null
-                    tappedAnnotationBounds = null
-                },
+                onDismiss = { chrome.dismissAnnotationMenu() },
             )
         }
 
-        if (editingAnnotation != null) {
+        if (chrome.editingAnnotation != null) {
             EditNoteDialog(
                 title = "Modifier la note",
-                initialNote = editingAnnotation?.content.orEmpty(),
+                initialNote = chrome.editingAnnotation?.content.orEmpty(),
                 onSave = { note ->
-                    viewModel.onIntent(ReaderIntent.UpdateAnnotationNote(editingAnnotation!!.id, note.trim().ifBlank { null }))
-                    editingAnnotation = null
+                    viewModel.onIntent(ReaderIntent.UpdateAnnotationNote(chrome.editingAnnotation!!.id, note.trim().ifBlank { null }))
+                    chrome.editingAnnotation = null
                 },
-                onDismiss = { editingAnnotation = null },
+                onDismiss = { chrome.editingAnnotation = null },
             )
         }
 
-        if (editingBookmark != null) {
+        if (chrome.editingBookmark != null) {
             EditNoteDialog(
                 title = "Modifier la note",
-                initialNote = editingBookmark?.note.orEmpty(),
+                initialNote = chrome.editingBookmark?.note.orEmpty(),
                 onSave = { note ->
-                    viewModel.onIntent(ReaderIntent.EditBookmarkNote(editingBookmark!!.id, note))
-                    editingBookmark = null
+                    viewModel.onIntent(ReaderIntent.EditBookmarkNote(chrome.editingBookmark!!.id, note))
+                    chrome.editingBookmark = null
                 },
-                onDismiss = { editingBookmark = null },
+                onDismiss = { chrome.editingBookmark = null },
             )
         }
 
@@ -1630,15 +1522,15 @@ fun ReaderScreen(
         // depuis le Snackbar ci-dessus, jamais imposée au geste de créer un
         // signet. Fermer (« Plus tard », tap hors champ) laisse le signet
         // sans note ; la note vide est enregistrée comme `null`.
-        if (showBookmarkNoteDialog && state.pendingBookmarkNoteId != null) {
+        if (chrome.showBookmarkNoteDialog && state.pendingBookmarkNoteId != null) {
             BookmarkNoteDialog(
                 onSave = { note ->
                     viewModel.onIntent(ReaderIntent.SaveBookmarkNote(note))
-                    showBookmarkNoteDialog = false
+                    chrome.showBookmarkNoteDialog = false
                 },
                 onDismiss = {
                     viewModel.onIntent(ReaderIntent.DismissBookmarkNotePrompt)
-                    showBookmarkNoteDialog = false
+                    chrome.showBookmarkNoteDialog = false
                 },
             )
         }
