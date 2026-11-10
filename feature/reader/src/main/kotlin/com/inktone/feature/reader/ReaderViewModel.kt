@@ -147,19 +147,7 @@ class ReaderViewModel @Inject constructor(
         // dans LibraryViewModel).
         viewModelScope.launch {
             preferencesRepository.observe().collect { preferences ->
-                _state.value = _state.value.copy(
-                    isReadingRulerEnabled = preferences.readingRulerEnabled,
-                    lineHeightMultiplier = preferences.lineHeightMultiplier,
-                    readerMarginStep = preferences.readerMarginStep,
-                    isTextJustified = preferences.textJustified,
-                    keepScreenOn = preferences.keepScreenOn,
-                    readerBrightness = preferences.readerBrightness,
-                    eyeRestReminderEnabled = preferences.eyeRestReminderEnabled,
-                    eyeRestReminderIntervalMinutes = preferences.eyeRestReminderIntervalMinutes,
-                    reduceMotion = preferences.reduceMotion,
-                    autoScrollSpeed = preferences.autoScrollSpeed,
-                    recentAnnotationColors = preferences.recentAnnotationColors,
-                )
+                _state.value = _state.value.withGlobalPreferences(preferences)
             }
         }
 
@@ -714,10 +702,6 @@ class ReaderViewModel @Inject constructor(
                         currentOverrides = restored?.overrides,
                         activeVoiceProfile = activeVoiceProfile,
                         availableVoiceProfiles = availableVoiceProfiles,
-                        lineHeightMultiplier = prefs.lineHeightMultiplier,
-                        readerMarginStep = prefs.readerMarginStep,
-                        isTextJustified = prefs.textJustified,
-                        keepScreenOn = prefs.keepScreenOn,
                         // Lot 12, tache 12.9 — jamais reporte avant ce lot.
                         publicationFormat = publication.format,
                         pageOffsetY = restored?.locator?.pageOffsetY ?: 0f,
@@ -726,7 +710,7 @@ class ReaderViewModel @Inject constructor(
                         epubResourceResolver = if (publication.format == PublicationFormat.EPUB) {
                             this@ReaderViewModel.epubResourceResolver
                         } else null,
-                    )
+                    ).withGlobalPreferences(prefs)
                     // P1 — alimente les métadonnées de la notification média
                     // (titre/auteur), source unique : jamais rechargées depuis
                     // un repository dans le service.
@@ -1924,6 +1908,31 @@ class ReaderViewModel @Inject constructor(
             )
         }
     }
+
+    /**
+     * SEULE correspondance préférences globales → état du Lecteur, appliquée
+     * à l'observation des préférences ET à l'ouverture d'un livre.
+     *
+     * Bug réel trouvé sur appareil : `openPublication` reconstruisait l'état
+     * avec sa propre liste, qui ne reprenait que 4 des 11 préférences. Les
+     * autres (réduction des animations, réglette, luminosité, défilement
+     * automatique, repos oculaire, couleurs récentes) revenaient à leur
+     * valeur par défaut jusqu'à la prochaine modification d'une préférence.
+     * Une préférence ajoutée ici vaut pour les deux chemins.
+     */
+    private fun ReaderUiState.withGlobalPreferences(preferences: UserPreferences): ReaderUiState = copy(
+        isReadingRulerEnabled = preferences.readingRulerEnabled,
+        lineHeightMultiplier = preferences.lineHeightMultiplier,
+        readerMarginStep = preferences.readerMarginStep,
+        isTextJustified = preferences.textJustified,
+        keepScreenOn = preferences.keepScreenOn,
+        readerBrightness = preferences.readerBrightness,
+        eyeRestReminderEnabled = preferences.eyeRestReminderEnabled,
+        eyeRestReminderIntervalMinutes = preferences.eyeRestReminderIntervalMinutes,
+        reduceMotion = preferences.reduceMotion,
+        autoScrollSpeed = preferences.autoScrollSpeed,
+        recentAnnotationColors = preferences.recentAnnotationColors,
+    )
 
     companion object {
         /** Intervalle de checkpoint : 5 minutes. */

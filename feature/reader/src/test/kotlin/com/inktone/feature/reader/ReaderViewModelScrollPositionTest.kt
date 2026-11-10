@@ -100,6 +100,7 @@ class ReaderViewModelScrollPositionTest {
         readingStateRepository: FakeReadingStateRepository,
         publicationRepository: FakePublicationRepository,
         parser: FakePublicationParser = defaultParser(),
+        preferences: UserPreferences = UserPreferences(eyeRestReminderEnabled = false),
     ): ReaderViewModel {
         // 3d.5 — le rappel de repos oculaire est activé par défaut et se
         // reprogramme indéfiniment (voir ReaderViewModel.resumeFromEyeRestReminder) :
@@ -112,7 +113,7 @@ class ReaderViewModelScrollPositionTest {
         // Sessions, `startCheckpointTimer`) est lui aussi auto-récurrent
         // et démarre inconditionnellement à l'ouverture d'une publication.
         val preferencesRepository = FakePreferencesRepository()
-        preferencesRepository.update(UserPreferences(eyeRestReminderEnabled = false))
+        preferencesRepository.update(preferences)
         val bookmarkRepository = FakeBookmarkRepository()
         val annotationRepository = FakeAnnotationRepository()
         return ReaderViewModel(
@@ -294,6 +295,60 @@ class ReaderViewModelScrollPositionTest {
 
         viewModel.cancelCheckpointTimerForTest()
         dispatcher.scheduler.runCurrent()
+    }
+
+    /**
+     * Bug réel trouvé sur appareil : `openPublication` remplaçait tout l'état
+     * par un `ReaderUiState` neuf qui ne reprenait qu'une partie des
+     * préférences globales. Les autres revenaient à leur valeur par défaut
+     * jusqu'à la prochaine modification d'une préférence — « Réduire les
+     * animations » activé restait ainsi sans effet dans le Lecteur.
+     */
+    @Test
+    fun ouvrir_un_livre_conserve_toutes_les_preferences_globales() = runTest {
+        val publicationRepository = FakePublicationRepository()
+        publicationRepository.insert(
+            Publication(
+                id = "pub-1", title = "Test", format = PublicationFormat.EPUB,
+                fileUri = "content://x", fileHash = "hash", fileSize = 10, chapterCount = 1,
+                importDate = 0L,
+            ),
+        )
+        val preferences = UserPreferences(
+            eyeRestReminderEnabled = false,
+            eyeRestReminderIntervalMinutes = 45,
+            reduceMotion = true,
+            readingRulerEnabled = true,
+            readerBrightness = 0.4f,
+            autoScrollSpeed = 2,
+            lineHeightMultiplier = 1.8f,
+            readerMarginStep = 2,
+            textJustified = true,
+            keepScreenOn = true,
+        )
+        val viewModel = buildViewModel(FakeReadingStateRepository(), publicationRepository, preferences = preferences)
+        dispatcher.scheduler.runCurrent()
+
+        viewModel.onIntent(ReaderIntent.OpenPublication("pub-1"))
+        dispatcher.scheduler.runCurrent()
+
+        // Minuterie de checkpoint auto-récurrente : annulée AVANT les
+        // assertions, sinon un échec laisserait `runTest` vider indéfiniment
+        // sa file de délais au lieu de rapporter l'échec.
+        val state = viewModel.state.value
+        viewModel.cancelCheckpointTimerForTest()
+        dispatcher.scheduler.runCurrent()
+        assertEquals("Titre", "Test", state.title) // la publication est bien ouverte
+        assertEquals(true, state.reduceMotion)
+        assertEquals(true, state.isReadingRulerEnabled)
+        assertEquals(0.4f, state.readerBrightness)
+        assertEquals(2, state.autoScrollSpeed)
+        assertEquals(false, state.eyeRestReminderEnabled)
+        assertEquals(45, state.eyeRestReminderIntervalMinutes)
+        assertEquals(1.8f, state.lineHeightMultiplier)
+        assertEquals(2, state.readerMarginStep)
+        assertEquals(true, state.isTextJustified)
+        assertEquals(true, state.keepScreenOn)
     }
 
     // ───── Lot 21, tâche 9 — auto-scroll visuel (vitesse persistée) ─────
