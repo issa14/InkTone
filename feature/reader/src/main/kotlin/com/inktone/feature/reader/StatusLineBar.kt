@@ -2,11 +2,15 @@ package com.inktone.feature.reader
 
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.WindowInsets
+import androidx.compose.foundation.layout.WindowInsetsSides
+import androidx.compose.foundation.layout.displayCutout
 import androidx.compose.foundation.layout.Row
-import androidx.compose.foundation.layout.displayCutoutPadding
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.navigationBarsPadding
+import androidx.compose.foundation.layout.only
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.windowInsetsPadding
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
@@ -60,7 +64,11 @@ fun StatusLineBar(
             .fillMaxWidth()
             .background(backgroundColor)
             .navigationBarsPadding()
-            .displayCutoutPadding()
+            // Côtés uniquement (encoche en paysage). `displayCutoutPadding()`
+            // appliquait aussi l'encoche du HAUT de l'écran à cette barre
+            // posée en BAS : ~44 px de vide au-dessus du texte, soit une
+            // bande deux fois trop haute.
+            .windowInsetsPadding(WindowInsets.displayCutout.only(WindowInsetsSides.Horizontal))
             .padding(horizontal = 16.dp, vertical = 6.dp),
         horizontalArrangement = Arrangement.SpaceBetween,
         verticalAlignment = Alignment.CenterVertically,
