@@ -143,4 +143,38 @@ class ChapterPaginationStateTest {
     fun `chapitre vide est complete`() {
         assertTrue(isMeasurementComplete(measuredSentences = 0, totalSentences = 0))
     }
+
+    /**
+     * Le nombre de phrases mesurables est mémorisé par instance de chapitre
+     * (il coûtait ~5 ms par paragraphe franchi) : quand la coquille vide d'un
+     * chapitre est remplacée par son contenu — nouvelle instance —, il doit
+     * être recompté, jamais servi depuis la coquille.
+     */
+    @Test
+    fun `le comptage memorise est refait quand le contenu du chapitre arrive`() {
+        val loaded = com.inktone.domain.model.Chapter(
+            index = 0, href = "c.xhtml", title = null,
+            content = com.inktone.domain.model.ChapterContent.Rich(
+                blocks = listOf(
+                    com.inktone.domain.model.BookBlock.ParagraphBlock(
+                        richText = com.inktone.domain.model.StyledText.plain("Une phrase."),
+                        globalOffsetRange = 0 until 11,
+                    ),
+                ),
+            ),
+        )
+        val shell = loaded.copy(content = com.inktone.domain.model.ChapterContent.Rich(blocks = emptyList()))
+        val state = ChapterPaginationState(VirtualPaginationEngine(), TextStyle.Default)
+        state.measurement = ChapterMeasurement(
+            annotatedString = androidx.compose.ui.text.AnnotatedString(""),
+            lines = emptyList(),
+            sentenceStartOffsets = emptyList(),
+        )
+
+        assertTrue("coquille vide : rien à mesurer", state.isMeasurementComplete(shell))
+        assertFalse(
+            "contenu arrivé : la mesure vide ne le couvre pas",
+            state.isMeasurementComplete(loaded),
+        )
+    }
 }

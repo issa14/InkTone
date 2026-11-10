@@ -1363,7 +1363,13 @@ fun ReaderScreen(
                             pageInChapter = pageIndexInChapter + 1,
                             pageCountInChapter = if (complete) pagination.pageCount(chapter.index) else 0,
                             showPageCounter = complete,
-                            bookProgression = live.bookProgression,
+                            // Arrondie à la précision AFFICHÉE (dixième de
+                            // pourcent, même arrondi que `formatProgressionFr`) :
+                            // la valeur brute change à chaque paragraphe, la
+                            // valeur affichée bien plus rarement — la ligne de
+                            // statut ne se recompose plus que lorsqu'un chiffre
+                            // visible change.
+                            bookProgression = (live.bookProgression * 1000).roundToInt() / 1000f,
                         )
                     }) { values ->
                         StatusLineBar(

@@ -102,8 +102,27 @@ class ChapterPaginationState internal constructor(
     fun isMeasurementComplete(chapter: Chapter?): Boolean =
         isMeasurementComplete(
             measuredSentences = measurement?.sentenceStartOffsets?.size ?: 0,
-            totalSentences = measurableOffsetCount(chapter),
+            totalSentences = measurableOffsetCountOf(chapter),
         )
+
+    // Dernier chapitre compté, comparé par IDENTITÉ : son contenu est
+    // immuable, un nouveau contenu arrive toujours dans une nouvelle
+    // instance. `measurableOffsetCount` parcourt toutes les phrases et blocs
+    // du chapitre ; appelé tel quel à chaque paragraphe franchi (ligne de
+    // statut), il coûtait ~5 ms par paragraphe sur V2206 (trace Perfetto).
+    // Cache simple, hors snapshot : valeur entièrement déterminée par
+    // l'instance, lue et écrite sur le thread principal seulement.
+    private var countedChapter: Chapter? = null
+    private var countedOffsets = 0
+
+    private fun measurableOffsetCountOf(chapter: Chapter?): Int {
+        if (chapter == null) return measurableOffsetCount(null)
+        if (chapter !== countedChapter) {
+            countedOffsets = measurableOffsetCount(chapter)
+            countedChapter = chapter
+        }
+        return countedOffsets
+    }
 }
 
 /**
