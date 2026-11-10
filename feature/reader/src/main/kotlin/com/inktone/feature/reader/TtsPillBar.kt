@@ -1,11 +1,5 @@
 package com.inktone.feature.reader
 
-import androidx.compose.animation.core.LinearEasing
-import androidx.compose.animation.core.RepeatMode
-import androidx.compose.animation.core.animateFloat
-import androidx.compose.animation.core.infiniteRepeatable
-import androidx.compose.animation.core.rememberInfiniteTransition
-import androidx.compose.animation.core.tween
 import androidx.compose.foundation.background
 import androidx.compose.foundation.gestures.detectVerticalDragGestures
 import androidx.compose.foundation.layout.Arrangement
@@ -24,7 +18,6 @@ import androidx.compose.material3.IconButtonDefaults
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Surface
 import androidx.compose.runtime.Composable
-import androidx.compose.runtime.getValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
@@ -60,7 +53,6 @@ import com.inktone.core.designsystem.InkToneShapes
 fun TtsPillBar(
     isPlaying: Boolean,
     isAudioActive: Boolean,
-    reduceMotion: Boolean,
     hasPreviousChapter: Boolean,
     hasNextChapter: Boolean,
     onPreviousChapter: () -> Unit,
@@ -147,7 +139,7 @@ fun TtsPillBar(
                 onClick = onNextChapter,
             )
             Box(Modifier.padding(start = 4.dp), contentAlignment = Alignment.Center) {
-                TtsSoundWave(isActive = isAudioActive, reduceMotion = reduceMotion, tint = accentColor)
+                TtsSoundWave(isActive = isAudioActive, tint = accentColor)
             }
         }
     }
@@ -174,7 +166,6 @@ fun TtsPillBar(
 @Composable
 fun TtsPillBarCollapsed(
     isAudioActive: Boolean,
-    reduceMotion: Boolean,
     onExpand: () -> Unit,
     onSwipeDown: () -> Unit,
     modifier: Modifier = Modifier,
@@ -216,7 +207,6 @@ fun TtsPillBarCollapsed(
         ) {
             TtsSoundWave(
                 isActive = isAudioActive,
-                reduceMotion = reduceMotion,
                 tint = MaterialTheme.colorScheme.surface,
                 barCount = 2,
             )
@@ -227,47 +217,33 @@ fun TtsPillBarCollapsed(
 /**
  * Tâche 3e.3 — indicateur d'onde sonore. Reflète [isActive]
  * (`ReaderUiState.isAudioActive`, distinct de l'état Play/Pause du
- * bouton), jamais une animation permanente : à l'arrêt ou pendant un
- * blanc de synthèse, aucune transition infinie n'est même composée, les
- * barres restent figées à leur hauteur basse. Purement décoratif — pas
- * de `contentDescription`, l'état Lire/Pause du bouton central porte
- * déjà l'information pour TalkBack (même principe que le retrait des
- * annonces redondantes en B.7).
+ * bouton) : barres hautes quand la voix parle, basses pendant une pause ou
+ * un blanc de synthèse. Purement décoratif — pas de `contentDescription`,
+ * l'état Lire/Pause du bouton central porte déjà l'information pour
+ * TalkBack (même principe que le retrait des annonces redondantes en B.7).
+ *
+ * **Volontairement FIGÉ, jamais animé.** L'onde animée en boucle forçait le
+ * redessin de TOUT l'écran à chaque image (≈ 62 images/s) tant que la voix
+ * parlait, écran allumé — mesuré sur V2206, build non debuggable, 30 s de
+ * lecture : ≈ 23 s de processeur pour l'app, contre ≈ 2,8 s une fois
+ * l'onde figée (−88 %), RenderThread ≈ 11 s → 0,6 s. Une animation même
+ * allégée (lue au dessin) garderait ce redessin continu. Le changement de
+ * hauteur entre parole et silence suffit à signaler la lecture.
  */
 @Composable
 private fun TtsSoundWave(
     isActive: Boolean,
-    reduceMotion: Boolean,
     tint: Color,
     modifier: Modifier = Modifier,
     barCount: Int = 3,
 ) {
-    val fractions: List<Float> = if (isActive && !reduceMotion) {
-        val infiniteTransition = rememberInfiniteTransition(label = "TtsSoundWave")
-        List(barCount) { index ->
-            val animated by infiniteTransition.animateFloat(
-                initialValue = 0.3f,
-                targetValue = 1f,
-                animationSpec = infiniteRepeatable(
-                    animation = tween(durationMillis = 450, delayMillis = index * 120, easing = LinearEasing),
-                    repeatMode = RepeatMode.Reverse,
-                ),
-                label = "TtsSoundWaveBar$index",
-            )
-            animated
-        }
-    } else {
-        // Figé : actif + reduceMotion → hauteur haute lisible sans
-        // mouvement ; inactif (pause ou blanc de synthèse) → hauteur basse.
-        List(barCount) { if (isActive) 1f else 0.25f }
-    }
-
+    val fraction = if (isActive) 1f else 0.25f
     Row(
         modifier = modifier.clearAndSetSemantics {},
         verticalAlignment = Alignment.Bottom,
         horizontalArrangement = Arrangement.spacedBy(2.dp),
     ) {
-        fractions.forEach { fraction ->
+        repeat(barCount) {
             Box(
                 Modifier
                     .width(3.dp)

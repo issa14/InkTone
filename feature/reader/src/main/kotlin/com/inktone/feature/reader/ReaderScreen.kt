@@ -1229,7 +1229,6 @@ fun ReaderScreen(
                                         modifier = Modifier.align(Alignment.Center).graphicsLayer(alpha = barAlpha),
                                         isPlaying = state.isPlaying,
                                         isAudioActive = live,
-                                        reduceMotion = state.reduceMotion,
                                         hasPreviousChapter = state.hasPreviousChapter,
                                         hasNextChapter = state.hasNextChapter,
                                         onPreviousChapter = { chrome.keepHudVisible(); viewModel.onIntent(ReaderIntent.PreviousChapter) },
@@ -1253,7 +1252,6 @@ fun ReaderScreen(
                                     TtsPillBarCollapsed(
                                         modifier = Modifier.align(Alignment.CenterEnd).graphicsLayer(alpha = fabAlpha),
                                         isAudioActive = live,
-                                        reduceMotion = state.reduceMotion,
                                         onExpand = { chrome.expandPill() },
                                         onSwipeDown = { viewModel.onIntent(ReaderIntent.Pause) },
                                     )

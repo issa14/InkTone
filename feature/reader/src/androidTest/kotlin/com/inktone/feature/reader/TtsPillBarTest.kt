@@ -32,7 +32,6 @@ class TtsPillBarTest {
             TtsPillBar(
                 isPlaying = false,
                 isAudioActive = false,
-                reduceMotion = false,
                 hasPreviousChapter = true,
                 hasNextChapter = true,
                 onPreviousChapter = { clicked += "ChapitrePrecedent" },
@@ -63,7 +62,6 @@ class TtsPillBarTest {
             TtsPillBar(
                 isPlaying = true,
                 isAudioActive = true,
-                reduceMotion = false,
                 hasPreviousChapter = true,
                 hasNextChapter = true,
                 onPreviousChapter = {},
@@ -87,7 +85,6 @@ class TtsPillBarTest {
             TtsPillBar(
                 isPlaying = false,
                 isAudioActive = false,
-                reduceMotion = false,
                 hasPreviousChapter = false,
                 hasNextChapter = false,
                 onPreviousChapter = { clicked += "ChapitrePrecedent" },
@@ -116,7 +113,6 @@ class TtsPillBarTest {
             TtsPillBar(
                 isPlaying = true,
                 isAudioActive = true,
-                reduceMotion = false,
                 hasPreviousChapter = true,
                 hasNextChapter = true,
                 onPreviousChapter = {},
@@ -139,7 +135,6 @@ class TtsPillBarTest {
         composeTestRule.setContent {
             TtsPillBarCollapsed(
                 isAudioActive = false,
-                reduceMotion = false,
                 onExpand = { expanded = true },
                 onSwipeDown = {},
             )
@@ -157,7 +152,6 @@ class TtsPillBarTest {
         composeTestRule.setContent {
             TtsPillBarCollapsed(
                 isAudioActive = true,
-                reduceMotion = false,
                 onExpand = { expanded = true },
                 onSwipeDown = { swipeCount++ },
             )
