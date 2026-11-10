@@ -188,7 +188,10 @@ fun paginationStyleKeyFrom(
 fun rememberChapterPaginationState(
     chapter: Chapter?,
     nextChapter: Chapter?,
-    currentSentenceIndex: Int,
+    // Lecture différée : la phrase courante change à chaque paragraphe
+    // franchi ; n'est lue qu'au lancement d'une mesure (ancrage du préfixe
+    // à mesurer en priorité), jamais pendant la composition de l'appelant.
+    currentSentenceIndex: () -> Int,
     fontSizeSp: Int,
     lineHeightSp: Int,
     viewportWidthPx: Int,
@@ -291,7 +294,7 @@ fun rememberChapterPaginationState(
         if (chapter == null || contentWidthPx <= 0) return@LaunchedEffect
         val sentences = chapter.sentences
         val totalSentenceCount = sentences.size
-        val targetSentenceIndex = currentSentenceIndexAtOpen.value
+        val targetSentenceIndex = currentSentenceIndexAtOpen.value()
 
         // Première page : préfixe borné, coût indépendant de la longueur
         // du chapitre. Mesurée en arrière-plan comme le reste : la KDoc

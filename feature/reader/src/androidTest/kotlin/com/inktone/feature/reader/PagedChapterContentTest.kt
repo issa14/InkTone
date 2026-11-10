@@ -95,7 +95,7 @@ class PagedChapterContentTest {
             val pagination = rememberChapterPaginationState(
                 chapter = chapter,
                 nextChapter = null,
-                currentSentenceIndex = currentSentenceIndex,
+                currentSentenceIndex = { currentSentenceIndex },
                 fontSizeSp = fontSizeSp,
                 lineHeightSp = fontSizeSp,
                 viewportWidthPx = areaSize.width,

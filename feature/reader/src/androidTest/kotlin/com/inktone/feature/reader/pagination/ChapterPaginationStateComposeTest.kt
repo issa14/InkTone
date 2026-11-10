@@ -67,7 +67,7 @@ class ChapterPaginationStateComposeTest {
                 val paginationA = rememberChapterPaginationState(
                     chapter = chapter,
                     nextChapter = null,
-                    currentSentenceIndex = 0,
+                    currentSentenceIndex = { 0 },
                     fontSizeSp = 20,
                     lineHeightSp = 20,
                     viewportWidthPx = 900,
@@ -80,7 +80,7 @@ class ChapterPaginationStateComposeTest {
                 val paginationB = rememberChapterPaginationState(
                     chapter = chapter,
                     nextChapter = null,
-                    currentSentenceIndex = 0,
+                    currentSentenceIndex = { 0 },
                     fontSizeSp = 20,
                     lineHeightSp = 20,
                     viewportWidthPx = 900,
@@ -116,7 +116,7 @@ class ChapterPaginationStateComposeTest {
                 pagination = rememberChapterPaginationState(
                     chapter = chapter,
                     nextChapter = null,
-                    currentSentenceIndex = 0,
+                    currentSentenceIndex = { 0 },
                     fontSizeSp = 20,
                     lineHeightSp = 20,
                     viewportWidthPx = 900,

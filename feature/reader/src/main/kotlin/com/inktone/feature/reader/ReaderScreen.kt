@@ -15,6 +15,7 @@ import com.inktone.feature.reader.transition.ChapterTransitionIndicator
 import com.inktone.feature.reader.transition.ChapterTransitionMath
 import com.inktone.feature.reader.transition.ChapterTransitionState
 import kotlinx.coroutines.flow.collect
+import kotlinx.coroutines.flow.collectLatest
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.isActive
 import kotlinx.coroutines.withTimeoutOrNull
@@ -203,7 +204,23 @@ fun ReaderScreen(
     onOpenSettings: () -> Unit = {},
     isForeground: Boolean = true,
 ) {
-    val state by viewModel.state.collectAsStateWithLifecycle()
+    // État du ViewModel, gardé en `State` : les champs VIVANTS (phrase
+    // courante, minuteur, audio actif, compte à rebours, décalage PDF) n'y
+    // sont lus qu'aux endroits précis qui les affichent ou y réagissent —
+    // effets en `snapshotFlow`, `WithLiveValue` —, jamais dans le corps de
+    // l'écran.
+    val uiState = viewModel.state.collectAsStateWithLifecycle()
+    // Vue STRUCTURELLE de ce même état : ne change pas quand seul un champ
+    // vivant change (voir `ReaderUiState.isStructurallyEquivalentTo`). C'est
+    // elle que lit tout le corps de l'écran : un paragraphe franchi, une
+    // phrase lue ou un tic du minuteur ne le recomposent plus (mesuré : 60 %
+    // des images > 32 ms du défilement venaient de ces recompositions).
+    //
+    // Ses champs vivants sont donc PÉRIMÉS par construction : ne jamais y
+    // lire `currentSentenceIndex`, `bookProgression`, `sleepTimer`,
+    // `isAudioActive`, `eyeRestReminderCountdownS`, `pageOffsetY` ni
+    // `isCurrentPageBookmarked` — passer par `uiState.value`.
+    val state by remember(uiState) { derivedStateOf(ReaderStructuralPolicy) { uiState.value } }
     // §3.3 — le surlignage mot-à-mot est collecté séparément : sa cadence
     // (un mot prononcé, 3 à 5 fois/s) ne recompose plus le corps de l'écran.
     // Gardé en `State` et jamais lu ici : seuls le dessin des blocs et des
@@ -283,6 +300,9 @@ fun ReaderScreen(
     // 3d.3 — applique la luminosité choisie à la fenêtre du lecteur
     // seulement, restaurée à la sortie (voir ReaderBrightnessEffect).
     val haptics = rememberAppHaptics()
+    // Armé ou non : change rarement, contrairement au temps restant (une
+    // valeur par seconde), lu seulement par le panneau du minuteur.
+    val isSleepTimerArmed by remember(uiState) { derivedStateOf { uiState.value.sleepTimer != null } }
     // Effets de FENÊTRE ci-dessous : appelés seulement tant que le Lecteur
     // est au premier plan (voir [isForeground]). Leur sortie de composition
     // déclenche leur `onDispose` — restauration immédiate, au début de la
@@ -400,21 +420,30 @@ fun ReaderScreen(
         // signet, restauration) qui doit, elle, repositionner la liste.
         var lastManuallyEmittedSentenceIndex by remember { mutableStateOf<Int?>(null) }
         var previousChapterIndexForAnchor by remember { mutableStateOf<Int?>(null) }
-        LaunchedEffect(state.currentChapterIndex, state.currentSentenceIndex, state.currentChapter?.sentences?.size) {
+        // Déclencheurs COLLECTÉS (`snapshotFlow`), jamais lus en clés
+        // d'effet : une clé se lit pendant la composition et recomposait
+        // tout l'écran à chaque phrase. `collectLatest` conserve la sémantique
+        // de relance d'un effet (le traitement précédent est annulé).
+        LaunchedEffect(scrollState) {
+            snapshotFlow {
+                val live = uiState.value
+                Triple(live.currentChapterIndex, live.currentSentenceIndex, live.currentChapter?.sentences?.size)
+            }.collectLatest { (chapterIndex, sentenceIndex, _) ->
+            val live = uiState.value
             // L'auto-scroll TTS (effet suivant, `animateScrollToItem`) est
             // seul responsable pendant la lecture — ne pas le contredire ici.
-            if (state.isPlaying) return@LaunchedEffect
+            if (live.isPlaying) return@collectLatest
 
-            val chapterChanged = state.currentChapterIndex != previousChapterIndexForAnchor
-            previousChapterIndexForAnchor = state.currentChapterIndex
+            val chapterChanged = chapterIndex != previousChapterIndexForAnchor
+            previousChapterIndexForAnchor = chapterIndex
 
-            if (!chapterChanged && state.currentSentenceIndex == lastManuallyEmittedSentenceIndex) {
+            if (!chapterChanged && sentenceIndex == lastManuallyEmittedSentenceIndex) {
                 lastManuallyEmittedSentenceIndex = null
-                return@LaunchedEffect
+                return@collectLatest
             }
 
-            val targetBlock = state.currentChapter?.sentences
-                ?.getOrNull(state.currentSentenceIndex)?.blockIndex
+            val targetBlock = live.currentChapter?.sentences
+                ?.getOrNull(sentenceIndex)?.blockIndex
                 ?.takeIf { it >= 0 }
             if (targetBlock == null) {
                 // Contenu du chapitre pas encore chargé (Rich vide) : sur un
@@ -424,13 +453,14 @@ fun ReaderScreen(
                 // asynchrone dans le MÊME chapitre, ne rien faire : ne pas
                 // ramener une liste déjà positionnée en haut.
                 if (chapterChanged) scrollState.scrollToItem(0)
-                return@LaunchedEffect
+                return@collectLatest
             }
             isProgrammaticScroll = true
             try {
                 scrollState.scrollToItem(targetBlock)
             } finally {
                 isProgrammaticScroll = false
+            }
             }
         }
 
@@ -441,16 +471,19 @@ fun ReaderScreen(
         // paragraphe porteur de la phrase — grain suffisant, et au passage
         // plus correct que l'ancien calcul qui passait un Y LOCAL au
         // paragraphe comme s'il était absolu au chapitre.
-        LaunchedEffect(state.currentSentenceIndex) {
-            if (!state.isPlaying) return@LaunchedEffect
-            val targetBlock = state.currentChapter?.sentences
-                ?.getOrNull(state.currentSentenceIndex)?.blockIndex
-                ?.takeIf { it >= 0 } ?: return@LaunchedEffect
-            isProgrammaticScroll = true
-            try {
-                scrollState.animateScrollToItem(targetBlock)
-            } finally {
-                isProgrammaticScroll = false
+        LaunchedEffect(scrollState) {
+            snapshotFlow { uiState.value.currentSentenceIndex }.collectLatest { sentenceIndex ->
+                val live = uiState.value
+                if (!live.isPlaying) return@collectLatest
+                val targetBlock = live.currentChapter?.sentences
+                    ?.getOrNull(sentenceIndex)?.blockIndex
+                    ?.takeIf { it >= 0 } ?: return@collectLatest
+                isProgrammaticScroll = true
+                try {
+                    scrollState.animateScrollToItem(targetBlock)
+                } finally {
+                    isProgrammaticScroll = false
+                }
             }
         }
 
@@ -467,7 +500,7 @@ fun ReaderScreen(
                 }
             }
         }
-        val topmostVisibleSentenceIndex by remember(state.currentChapter) {
+        val topmostVisibleSentenceIndex = remember(state.currentChapter) {
             derivedStateOf {
                 if (isProgrammaticScroll) return@derivedStateOf null
                 val firstVisibleBlock = scrollState.layoutInfo.visibleItemsInfo
@@ -481,12 +514,18 @@ fun ReaderScreen(
         // ; un défilement manuel silencieux n'était jamais reflété, ni
         // persisté. Ignoré si `null` (aucune phrase encore mesurée) ou hors
         // mode SCROLL (le pager pilote sa propre remontée en mode PAGED).
-        LaunchedEffect(topmostVisibleSentenceIndex, state.readingMode) {
-            val index = topmostVisibleSentenceIndex
-            if (index != null && state.readingMode == ReadingMode.SCROLL) {
-                lastManuallyEmittedSentenceIndex = index
-                viewModel.onIntent(ReaderIntent.UpdateScrollPosition(index))
-            }
+        //
+        // Collecté, jamais lu en clé : le premier paragraphe visible change à
+        // chaque paragraphe franchi, et sa lecture en clé d'effet recomposait
+        // tout l'écran à ce rythme (cause mesurée, en plus de l'état).
+        LaunchedEffect(topmostVisibleSentenceIndex) {
+            snapshotFlow { topmostVisibleSentenceIndex.value to uiState.value.readingMode }
+                .collect { (index, readingMode) ->
+                    if (index != null && readingMode == ReadingMode.SCROLL) {
+                        lastManuallyEmittedSentenceIndex = index
+                        viewModel.onIntent(ReaderIntent.UpdateScrollPosition(index))
+                    }
+                }
         }
 
         // 3b.4bis — bug réel trouvé sur appareil : le compteur de la
@@ -620,7 +659,7 @@ fun ReaderScreen(
         val pagination = rememberChapterPaginationState(
             chapter = if (isPdf) null else state.currentChapter,
             nextChapter = if (isPdf) null else state.chapters.getOrNull(state.currentChapterIndex + 1),
-            currentSentenceIndex = state.currentSentenceIndex,
+            currentSentenceIndex = { uiState.value.currentSentenceIndex },
             fontSizeSp = state.effectiveSettings.fontSize,
             lineHeightSp = lineHeightSp,
             viewportWidthPx = readingAreaSize.width,
@@ -845,9 +884,12 @@ fun ReaderScreen(
                     // du mot TTS actif, dérivé de Chapter.sentences —
                     // aligné avec ChapterTextMeasurer depuis la correction
                     // du séparateur de bloc (voir ChapterTextMeasurer.kt).
-                    val currentSentenceStart = rememberUpdatedState(
-                        chapter?.sentences?.getOrNull(state.currentSentenceIndex)?.startOffset,
-                    )
+                    val currentSentenceStart = remember(uiState) {
+                        derivedStateOf {
+                            val live = uiState.value
+                            live.currentChapter?.sentences?.getOrNull(live.currentSentenceIndex)?.startOffset
+                        }
+                    }
                     // Lues en phase de dessin (drawWithContent dans
                     // BookBlockItem), jamais en paramètre direct — un mot
                     // prononcé n'invalide donc que le dessin, jamais la
@@ -1024,46 +1066,48 @@ fun ReaderScreen(
                     }
                 }
                 ReadingMode.PAGED -> {
-                    PagedChapterContent(
-                        chapter = state.currentChapter,
-                        pagination = pagination,
-                        currentSentenceIndex = state.currentSentenceIndex,
-                        highlightedWordRange = highlightedWordRangeState,
-                        annotations = state.annotations,
-                        currentChapterIndex = state.currentChapterIndex,
-                        chapterCount = state.chapters.size,
-                        textColor = ThemeColors.text(state.resolvedTheme),
-                        isReadingRulerEnabled = state.isReadingRulerEnabled,
-                        contentPadding = readerMargin,
-                        onClick = { chrome.onReadingAreaTap(state.isPlaying) },
-                        onNextChapter = { viewModel.onIntent(ReaderIntent.NextChapter) },
-                        onPreviousChapter = { viewModel.onIntent(ReaderIntent.PreviousChapter) },
-                        hasPreviousChapter = state.hasPreviousChapter,
-                        hasNextChapter = state.hasNextChapter,
-                        reduceMotion = state.reduceMotion,
-                        surfaceColor = ThemeColors.barSurface(state.resolvedTheme),
-                        isChapterReady = { index ->
-                            val c = state.chapters.getOrNull(index)
-                            c != null && (c.content as? ChapterContent.Rich)?.blocks?.isNotEmpty() == true
-                        },
-                        onCurrentLineY = { y -> currentLineYDp = y },
-                        onPageChanged = { pageIndex -> pagedLivePageIndex = pageIndex },
-                        onManualPageChange = { sentenceIndex ->
-                            viewModel.onIntent(ReaderIntent.UpdateScrollPosition(sentenceIndex))
-                        },
-                        freeSelectedRange = freeSelectedRange,
-                        onFreeSelectionChanged = { anchor, focus ->
-                            viewModel.onIntent(ReaderIntent.SetFreeSelection(anchor, focus))
-                        },
-                        onFreeSelectionCleared = { viewModel.onIntent(ReaderIntent.ClearFreeSelection) },
-                        onFreeSelectionBoundsInWindow = { ownerKey, bounds ->
-                            pagedFreeSelectionBounds = resolveSelectionPopupBounds(
-                                current = pagedFreeSelectionBounds,
-                                ownerKey = ownerKey,
-                                bounds = bounds,
-                            )
-                        },
-                    )
+                    WithLiveValue({ uiState.value.currentSentenceIndex }) { live ->
+                        PagedChapterContent(
+                            chapter = state.currentChapter,
+                            pagination = pagination,
+                            currentSentenceIndex = live,
+                            highlightedWordRange = highlightedWordRangeState,
+                            annotations = state.annotations,
+                            currentChapterIndex = state.currentChapterIndex,
+                            chapterCount = state.chapters.size,
+                            textColor = ThemeColors.text(state.resolvedTheme),
+                            isReadingRulerEnabled = state.isReadingRulerEnabled,
+                            contentPadding = readerMargin,
+                            onClick = { chrome.onReadingAreaTap(state.isPlaying) },
+                            onNextChapter = { viewModel.onIntent(ReaderIntent.NextChapter) },
+                            onPreviousChapter = { viewModel.onIntent(ReaderIntent.PreviousChapter) },
+                            hasPreviousChapter = state.hasPreviousChapter,
+                            hasNextChapter = state.hasNextChapter,
+                            reduceMotion = state.reduceMotion,
+                            surfaceColor = ThemeColors.barSurface(state.resolvedTheme),
+                            isChapterReady = { index ->
+                                val c = state.chapters.getOrNull(index)
+                                c != null && (c.content as? ChapterContent.Rich)?.blocks?.isNotEmpty() == true
+                            },
+                            onCurrentLineY = { y -> currentLineYDp = y },
+                            onPageChanged = { pageIndex -> pagedLivePageIndex = pageIndex },
+                            onManualPageChange = { sentenceIndex ->
+                                viewModel.onIntent(ReaderIntent.UpdateScrollPosition(sentenceIndex))
+                            },
+                            freeSelectedRange = freeSelectedRange,
+                            onFreeSelectionChanged = { anchor, focus ->
+                                viewModel.onIntent(ReaderIntent.SetFreeSelection(anchor, focus))
+                            },
+                            onFreeSelectionCleared = { viewModel.onIntent(ReaderIntent.ClearFreeSelection) },
+                            onFreeSelectionBoundsInWindow = { ownerKey, bounds ->
+                                pagedFreeSelectionBounds = resolveSelectionPopupBounds(
+                                    current = pagedFreeSelectionBounds,
+                                    ownerKey = ownerKey,
+                                    bounds = bounds,
+                                )
+                            },
+                        )
+                    }
                 }
                 }
             }
@@ -1180,77 +1224,83 @@ fun ReaderScreen(
                         )
                         Box(modifier = Modifier.fillMaxWidth()) {
                             if (barAlpha > 0f) {
-                                TtsPillBar(
-                                    modifier = Modifier.align(Alignment.Center).graphicsLayer(alpha = barAlpha),
-                                    isPlaying = state.isPlaying,
-                                    isAudioActive = state.isAudioActive,
-                                    reduceMotion = state.reduceMotion,
-                                    hasPreviousChapter = state.hasPreviousChapter,
-                                    hasNextChapter = state.hasNextChapter,
-                                    onPreviousChapter = { chrome.keepHudVisible(); viewModel.onIntent(ReaderIntent.PreviousChapter) },
-                                    onPreviousSentence = { chrome.keepHudVisible(); viewModel.onIntent(ReaderIntent.SkipToPreviousSentence) },
-                                    onPlayPause = {
-                                        chrome.keepHudVisible()
-                                        togglePlayback()
-                                    },
-                                    onNextSentence = { chrome.keepHudVisible(); viewModel.onIntent(ReaderIntent.SkipToNextSentence) },
-                                    onNextChapter = { chrome.keepHudVisible(); viewModel.onIntent(ReaderIntent.NextChapter) },
-                                    // 3e.3 — balayage redéfini en pause (voir KDoc de
-                                    // TtsPillBarCollapsed) : pas de keepHudVisible, le
-                                    // passage à isPlaying=false referme déjà la barre
-                                    // et fait revenir le panneau unifié.
-                                    onSwipeDown = { viewModel.onIntent(ReaderIntent.Pause) },
-                                )
+                                WithLiveValue({ uiState.value.isAudioActive }) { live ->
+                                    TtsPillBar(
+                                        modifier = Modifier.align(Alignment.Center).graphicsLayer(alpha = barAlpha),
+                                        isPlaying = state.isPlaying,
+                                        isAudioActive = live,
+                                        reduceMotion = state.reduceMotion,
+                                        hasPreviousChapter = state.hasPreviousChapter,
+                                        hasNextChapter = state.hasNextChapter,
+                                        onPreviousChapter = { chrome.keepHudVisible(); viewModel.onIntent(ReaderIntent.PreviousChapter) },
+                                        onPreviousSentence = { chrome.keepHudVisible(); viewModel.onIntent(ReaderIntent.SkipToPreviousSentence) },
+                                        onPlayPause = {
+                                            chrome.keepHudVisible()
+                                            togglePlayback()
+                                        },
+                                        onNextSentence = { chrome.keepHudVisible(); viewModel.onIntent(ReaderIntent.SkipToNextSentence) },
+                                        onNextChapter = { chrome.keepHudVisible(); viewModel.onIntent(ReaderIntent.NextChapter) },
+                                        // 3e.3 — balayage redéfini en pause (voir KDoc de
+                                        // TtsPillBarCollapsed) : pas de keepHudVisible, le
+                                        // passage à isPlaying=false referme déjà la barre
+                                        // et fait revenir le panneau unifié.
+                                        onSwipeDown = { viewModel.onIntent(ReaderIntent.Pause) },
+                                    )
+                                }
                             }
                             if (fabAlpha > 0f) {
-                                TtsPillBarCollapsed(
-                                    modifier = Modifier.align(Alignment.CenterEnd).graphicsLayer(alpha = fabAlpha),
-                                    isAudioActive = state.isAudioActive,
-                                    reduceMotion = state.reduceMotion,
-                                    onExpand = { chrome.expandPill() },
-                                    onSwipeDown = { viewModel.onIntent(ReaderIntent.Pause) },
-                                )
+                                WithLiveValue({ uiState.value.isAudioActive }) { live ->
+                                    TtsPillBarCollapsed(
+                                        modifier = Modifier.align(Alignment.CenterEnd).graphicsLayer(alpha = fabAlpha),
+                                        isAudioActive = live,
+                                        reduceMotion = state.reduceMotion,
+                                        onExpand = { chrome.expandPill() },
+                                        onSwipeDown = { viewModel.onIntent(ReaderIntent.Pause) },
+                                    )
+                                }
                             }
                         }
                     } else {
-                        UnifiedControlPanel(
-                            isPlaying = state.isPlaying,
-                            sleepTimerActive = state.sleepTimer != null,
-                            bookProgression = state.bookProgression,
-                            onPlayPause = {
-                                chrome.keepHudVisible()
-                                togglePlayback()
-                            },
-                            onSleepTimerClick = { chrome.keepHudVisible(); chrome.showSleepTimerPanel = true },
-                            onSearchClick = { chrome.keepHudVisible(); onSearchClick() },
-                            onBookmarksClick = { chrome.keepHudVisible(); viewModel.onIntent(ReaderIntent.ToggleBookmarkList) },
-                            onTocClick = { chrome.keepHudVisible(); viewModel.onIntent(ReaderIntent.ToggleToc) },
-                            onThemeCycle = {
-                                chrome.keepHudVisible()
-                                val overrides = (state.currentOverrides ?: ReadingOverrides())
-                                    .copy(theme = nextReadingTheme(state.effectiveSettings.theme))
-                                viewModel.onIntent(ReaderIntent.SetOverrides(overrides))
-                            },
-                            onAaClick = { chrome.keepHudVisible(); chrome.showSettingsPanel = true },
-                            onTtsClick = { chrome.keepHudVisible(); chrome.showTtsPanel = true },
-                            onReadingModeClick = { chrome.keepHudVisible(); viewModel.onIntent(ReaderIntent.ToggleReadingMode) },
-                            // Indicateur du mode courant (lot HUD) : l'icône
-                            // « Mode » doit refléter le mode ACTIF, pas un
-                            // glyphe figé.
-                            readingMode = state.readingMode,
-                            showTtsControls = state.supportsTts,
-                            showReadingModeToggle = !isPdf,
-                            // Audit v1.0.0 (M6) : pas de sommaire pour PDF/TXT.
-                            showToc = state.publicationFormat == PublicationFormat.EPUB,
-                            surfaceColor = ThemeColors.barSurface(state.resolvedTheme),
-                            accentColor = ThemeColors.accent(state.resolvedTheme),
-                            onBrightnessClick = {
-                                // Bug réel corrigé (vérification device, lot 3d) : masque le
-                                // HUD au lieu de le garder visible — la barre prend sa place
-                                // plutôt que de s'empiler dessous.
-                                chrome.openBrightnessBar()
-                            },
-                        )
+                        WithLiveValue({ uiState.value.bookProgression }) { live ->
+                            UnifiedControlPanel(
+                                isPlaying = state.isPlaying,
+                                sleepTimerActive = isSleepTimerArmed,
+                                bookProgression = live,
+                                onPlayPause = {
+                                    chrome.keepHudVisible()
+                                    togglePlayback()
+                                },
+                                onSleepTimerClick = { chrome.keepHudVisible(); chrome.showSleepTimerPanel = true },
+                                onSearchClick = { chrome.keepHudVisible(); onSearchClick() },
+                                onBookmarksClick = { chrome.keepHudVisible(); viewModel.onIntent(ReaderIntent.ToggleBookmarkList) },
+                                onTocClick = { chrome.keepHudVisible(); viewModel.onIntent(ReaderIntent.ToggleToc) },
+                                onThemeCycle = {
+                                    chrome.keepHudVisible()
+                                    val overrides = (state.currentOverrides ?: ReadingOverrides())
+                                        .copy(theme = nextReadingTheme(state.effectiveSettings.theme))
+                                    viewModel.onIntent(ReaderIntent.SetOverrides(overrides))
+                                },
+                                onAaClick = { chrome.keepHudVisible(); chrome.showSettingsPanel = true },
+                                onTtsClick = { chrome.keepHudVisible(); chrome.showTtsPanel = true },
+                                onReadingModeClick = { chrome.keepHudVisible(); viewModel.onIntent(ReaderIntent.ToggleReadingMode) },
+                                // Indicateur du mode courant (lot HUD) : l'icône
+                                // « Mode » doit refléter le mode ACTIF, pas un
+                                // glyphe figé.
+                                readingMode = state.readingMode,
+                                showTtsControls = state.supportsTts,
+                                showReadingModeToggle = !isPdf,
+                                // Audit v1.0.0 (M6) : pas de sommaire pour PDF/TXT.
+                                showToc = state.publicationFormat == PublicationFormat.EPUB,
+                                surfaceColor = ThemeColors.barSurface(state.resolvedTheme),
+                                accentColor = ThemeColors.accent(state.resolvedTheme),
+                                onBrightnessClick = {
+                                    // Bug réel corrigé (vérification device, lot 3d) : masque le
+                                    // HUD au lieu de le garder visible — la barre prend sa place
+                                    // plutôt que de s'empiler dessous.
+                                    chrome.openBrightnessBar()
+                                },
+                            )
+                        }
                     }
                 }
 
@@ -1293,25 +1343,39 @@ fun ReaderScreen(
                     // (« Chapitre 12 (54/54) » alors que le chapitre
                     // continue). Sans compteur, seule la ligne « Chapitre N »
                     // est affichée (voir StatusLineBar.chapterCounterText).
-                    val complete = pagination.isMeasurementComplete(chapter)
-                    val pageCountInChapter = if (complete) pagination.pageCount(chapter.index) else 0
-                    val pageIndexInChapter = if (complete) {
-                        when (state.readingMode) {
-                            ReadingMode.PAGED -> pagedLivePageIndex
-                            ReadingMode.SCROLL -> pagination.pageIndexAt(chapter.index, state.currentSentenceIndex)
+                    //
+                    // Valeurs vivantes (page courante, progression) calculées
+                    // dans `WithLiveValue` : seule la ligne de statut se
+                    // recompose quand elles changent, jamais l'écran.
+                    val readingMode = state.readingMode
+                    WithLiveValue({
+                        val live = uiState.value
+                        val complete = pagination.isMeasurementComplete(chapter)
+                        val pageIndexInChapter = if (complete) {
+                            when (readingMode) {
+                                ReadingMode.PAGED -> pagedLivePageIndex
+                                ReadingMode.SCROLL -> pagination.pageIndexAt(chapter.index, live.currentSentenceIndex)
+                            }
+                        } else {
+                            0
                         }
-                    } else {
-                        0
+                        StatusLineValues(
+                            pageInChapter = pageIndexInChapter + 1,
+                            pageCountInChapter = if (complete) pagination.pageCount(chapter.index) else 0,
+                            showPageCounter = complete,
+                            bookProgression = live.bookProgression,
+                        )
+                    }) { values ->
+                        StatusLineBar(
+                            chapterNumber = state.currentChapterIndex + 1,
+                            pageInChapter = values.pageInChapter,
+                            pageCountInChapter = values.pageCountInChapter,
+                            bookProgression = values.bookProgression,
+                            showPageCounter = values.showPageCounter,
+                            contentColor = ThemeColors.barContent(state.resolvedTheme),
+                            backgroundColor = ThemeColors.barSurface(state.resolvedTheme),
+                        )
                     }
-                    StatusLineBar(
-                        chapterNumber = state.currentChapterIndex + 1,
-                        pageInChapter = pageIndexInChapter + 1,
-                        pageCountInChapter = pageCountInChapter,
-                        bookProgression = state.bookProgression,
-                        showPageCounter = complete,
-                        contentColor = ThemeColors.barContent(state.resolvedTheme),
-                        backgroundColor = ThemeColors.barSurface(state.resolvedTheme),
-                    )
                 }
             }
         }
@@ -1324,7 +1388,7 @@ fun ReaderScreen(
         if (chrome.showSettingsPanel) {
             val previewSentences = state.currentChapter?.sentences.orEmpty()
             val previewText = previewSentences
-                .drop(state.currentSentenceIndex)
+                .drop(uiState.value.currentSentenceIndex)
                 .ifEmpty { previewSentences }
                 .take(3)
                 .joinToString(" ") { it.text }
@@ -1371,7 +1435,7 @@ fun ReaderScreen(
             val sentences = state.currentChapter?.sentences ?: emptyList()
             ReaderTtsPanel(
                 isPlaying = state.isPlaying,
-                currentSentenceIndex = state.currentSentenceIndex,
+                currentSentenceIndex = uiState.value.currentSentenceIndex,
                 totalSentences = sentences.size,
                 activeVoiceProfile = state.activeVoiceProfile,
                 availableVoiceProfiles = state.availableVoiceProfiles,
@@ -1389,17 +1453,19 @@ fun ReaderScreen(
 
         // 3d.4/3d.5 — Panneau Minuteur (remplace le cycle sur l'icône Veille) + repos oculaire
         if (chrome.showSleepTimerPanel) {
-            SleepTimerPanel(
-                remainingMs = state.sleepTimer?.remainingMs,
-                armedMinutes = state.sleepTimer?.let { (it.totalMs / 60_000L).toInt() },
-                onSetSleepTimer = { minutes -> viewModel.onIntent(ReaderIntent.SetSleepTimer(minutes)) },
-                eyeRestReminderEnabled = state.eyeRestReminderEnabled,
-                eyeRestReminderIntervalMinutes = state.eyeRestReminderIntervalMinutes,
-                onSetEyeRestReminderEnabled = { enabled -> viewModel.onIntent(ReaderIntent.SetEyeRestReminderEnabled(enabled)) },
-                onSetEyeRestReminderInterval = { minutes -> viewModel.onIntent(ReaderIntent.SetEyeRestReminderInterval(minutes)) },
-                onDismiss = { chrome.showSleepTimerPanel = false },
-                showSleepTimer = state.supportsTts,
-            )
+            WithLiveValue({ uiState.value.sleepTimer }) { live ->
+                SleepTimerPanel(
+                    remainingMs = live?.remainingMs,
+                    armedMinutes = live?.let { (it.totalMs / 60_000L).toInt() },
+                    onSetSleepTimer = { minutes -> viewModel.onIntent(ReaderIntent.SetSleepTimer(minutes)) },
+                    eyeRestReminderEnabled = state.eyeRestReminderEnabled,
+                    eyeRestReminderIntervalMinutes = state.eyeRestReminderIntervalMinutes,
+                    onSetEyeRestReminderEnabled = { enabled -> viewModel.onIntent(ReaderIntent.SetEyeRestReminderEnabled(enabled)) },
+                    onSetEyeRestReminderInterval = { minutes -> viewModel.onIntent(ReaderIntent.SetEyeRestReminderInterval(minutes)) },
+                    onDismiss = { chrome.showSleepTimerPanel = false },
+                    showSleepTimer = state.supportsTts,
+                )
+            }
         }
 
         // 3d.5 — popup de rappel de repos oculaire, indépendant du HUD :
@@ -1407,11 +1473,13 @@ fun ReaderScreen(
         // faux (contrairement aux panneaux ci-dessus, ouverts par une
         // action HUD explicite).
         if (state.isEyeRestReminderVisible) {
-            EyeRestReminderDialog(
-                countdownSeconds = state.eyeRestReminderCountdownS,
-                onResume = { viewModel.onIntent(ReaderIntent.ResumeFromEyeRestReminder) },
-                onSnooze = { viewModel.onIntent(ReaderIntent.SnoozeEyeRestReminder) },
-            )
+            WithLiveValue({ uiState.value.eyeRestReminderCountdownS }) { live ->
+                EyeRestReminderDialog(
+                    countdownSeconds = live,
+                    onResume = { viewModel.onIntent(ReaderIntent.ResumeFromEyeRestReminder) },
+                    onSnooze = { viewModel.onIntent(ReaderIntent.SnoozeEyeRestReminder) },
+                )
+            }
         }
 
         // 3c.2 — Sommaire en bottom sheet : superposé, ne démonte plus le
@@ -1455,7 +1523,7 @@ fun ReaderScreen(
                 BookmarkPanel(
                     bookmarks = state.bookmarks,
                     annotations = state.annotations,
-                    isCurrentPageBookmarked = state.isCurrentPageBookmarked,
+                    isCurrentPageBookmarked = uiState.value.isCurrentPageBookmarked,
                     onBookmarkClick = { bookmark -> viewModel.onIntent(ReaderIntent.NavigateToLocator(bookmark.locator)) },
                     onAnnotationClick = { annotation -> viewModel.onIntent(ReaderIntent.NavigateToLocator(annotation.startLocator)) },
                     onToggleBookmark = {
@@ -1733,3 +1801,24 @@ private fun BookmarkNoteDialog(
     )
 }
 
+
+/**
+ * Frontière de recomposition pour une valeur VIVANTE (voir
+ * `ReaderLiveFields.kt`) : [read] est évalué dans un `derivedStateOf` propre
+ * à ce composable, donc seule SA portée se recompose quand la valeur lue
+ * change — jamais l'appelant, qui ne la lit pas. [content] reçoit la valeur.
+ */
+@Composable
+private fun <T> WithLiveValue(read: () -> T, content: @Composable (T) -> Unit) {
+    val latestRead = rememberUpdatedState(read)
+    val value by remember { derivedStateOf { latestRead.value() } }
+    content(value)
+}
+
+/** Valeurs vivantes de la ligne de statut (page courante, progression). */
+private data class StatusLineValues(
+    val pageInChapter: Int,
+    val pageCountInChapter: Int,
+    val showPageCounter: Boolean,
+    val bookProgression: Float,
+)
