@@ -18,6 +18,7 @@ import com.inktone.domain.service.ChapterParser
 import com.inktone.domain.service.FileStorageService
 import com.inktone.domain.service.ImportSessionStore
 import com.inktone.domain.service.PublicationParser
+import com.inktone.domain.service.PreAnalysisBuilder
 import com.inktone.domain.service.PreAnalysisStore
 import com.inktone.domain.service.SearchService
 import com.inktone.domain.service.SyncOperationTracker
@@ -50,6 +51,7 @@ import com.inktone.domain.usecase.UpdateCatalogUseCase
 import com.inktone.domain.usecase.GetVoiceProfilesUseCase
 import com.inktone.domain.usecase.ImportPublicationUseCase
 import com.inktone.domain.usecase.ObserveSyncUiStateUseCase
+import com.inktone.domain.usecase.RefreshStalePreAnalysesUseCase
 import com.inktone.domain.usecase.RegenerateCoversUseCase
 import com.inktone.domain.usecase.ResolvePositionConflictUseCase
 import com.inktone.domain.usecase.SynchronizeNowUseCase
@@ -137,6 +139,15 @@ object UseCaseModule {
         preAnalysisStore: PreAnalysisStore,
     ): ImportPublicationUseCase =
         ImportPublicationUseCase(publicationParser, publicationRepository, fileStorageService, searchService, chapterParser, preAnalysisStore)
+
+    @Provides
+    fun provideRefreshStalePreAnalysesUseCase(
+        publicationRepository: PublicationRepository,
+        publicationParser: PublicationParser,
+        preAnalysisBuilder: PreAnalysisBuilder,
+        preAnalysisStore: PreAnalysisStore,
+    ): RefreshStalePreAnalysesUseCase =
+        RefreshStalePreAnalysesUseCase(publicationRepository, publicationParser, preAnalysisBuilder, preAnalysisStore)
 
     @Provides
     fun provideExportLibraryUseCase(

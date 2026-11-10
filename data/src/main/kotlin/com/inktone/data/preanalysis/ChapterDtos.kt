@@ -24,12 +24,8 @@ internal data class PreAnalysisHeader(
     val formatVersion: Int,
     val parserVersion: Int,
     val fileHash: String,
-)
-
-@Serializable
-internal data class PreAnalysisFile(
-    val header: PreAnalysisHeader,
-    val chapters: List<ChapterDto>,
+    /** Hrefs des chapitres, dans l'ordre : le rang donne le fichier du chapitre. */
+    val chapterHrefs: List<String> = emptyList(),
 )
 
 @Serializable

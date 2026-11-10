@@ -110,6 +110,15 @@ class ReadiumPublicationRegistry @Inject constructor(
             EpubZipAccess.readEntryBytes(context, fileUri, entryHref, ignoreCase = true)
         }
 
+    /**
+     * Ouvre une instance NON partagée — absente du cache, jamais rendue par
+     * [getOrOpen] —, que l'appelant doit refermer lui-même. Réservée au
+     * travail hors session de lecture (régénération de la pré-analyse) :
+     * fermer l'instance partagée couperait un Lecteur ouvert sur ce livre.
+     */
+    suspend fun openDetached(fileUri: String): Publication =
+        withContext(Dispatchers.IO) { openPublication(fileUri) }
+
     private suspend fun openPublication(fileUri: String): Publication {
         val url = if (fileUri.contains("://")) {
             Uri.parse(fileUri).toAbsoluteUrl()

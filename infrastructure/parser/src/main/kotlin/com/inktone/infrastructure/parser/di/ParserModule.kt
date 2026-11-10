@@ -1,10 +1,12 @@
 package com.inktone.infrastructure.parser.di
 
 import com.inktone.domain.service.ChapterParser
+import com.inktone.domain.service.PreAnalysisBuilder
 import com.inktone.domain.service.EpubResourceResolver
 import com.inktone.domain.service.FixedPageRenderer
 import com.inktone.domain.service.PublicationParser
 import com.inktone.infrastructure.parser.CompositePublicationParser
+import com.inktone.infrastructure.parser.EpubChapterParser
 import com.inktone.infrastructure.parser.CompositeChapterParser
 import com.inktone.infrastructure.parser.JsoupChapterParser
 import com.inktone.infrastructure.parser.PdfPageRendererImpl
@@ -39,6 +41,12 @@ abstract class ParserModule {
     @Binds
     @Singleton
     abstract fun bindChapterParser(impl: CompositeChapterParser): ChapterParser
+
+    // Même instance singleton que celle qu'utilise CompositeChapterParser :
+    // `onPreAnalysisRewritten` doit vider LA mémoïsation que lit le Lecteur.
+    @Binds
+    @Singleton
+    abstract fun bindPreAnalysisBuilder(impl: EpubChapterParser): PreAnalysisBuilder
 
     @Binds
     @Singleton

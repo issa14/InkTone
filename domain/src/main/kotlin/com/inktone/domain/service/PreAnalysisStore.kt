@@ -14,6 +14,15 @@ import com.inktone.domain.model.Chapter
  * évolution du parseur, là où un fichier se régénère en incrémentant un
  * numéro de version.
  *
+ * ## Régénération
+ *
+ * Une pré-analyse absente ou périmée (évolution du parseur, échec à
+ * l'import) n'est PAS régénérée par l'import, qui n'a lieu qu'une fois :
+ * c'est le rôle de `RefreshStalePreAnalysesUseCase`, planifié en tâche de
+ * fond via [PreAnalysisScheduler]. Sans lui, incrémenter la version du
+ * parseur rendait la pré-analyse inutilisable pour TOUS les livres déjà
+ * importés, définitivement (cas réel du passage à la version 2).
+ *
  * Le cache est **versionné** (version du format + version du parseur) et
  * **clé par le `fileHash`** déjà calculé à l'import : il n'est jamais
  * servi pour une source différente, ni après une évolution du format ou du
@@ -41,13 +50,25 @@ interface PreAnalysisStore {
     suspend fun save(publicationId: String, fileHash: String, chapters: List<Chapter>)
 
     /**
-     * Relit la pré-analyse persistée d'une publication.
+     * Relit la pré-analyse persistée d'UN chapitre — jamais celle du livre
+     * entier : la pré-analyse d'un gros livre atteint plusieurs dizaines de
+     * Mo (25 Mo, 181 chapitres, pour L'Arcane des Épées), dont la lecture
+     * complète prenait ~10 s sur V2206 pour n'afficher qu'un chapitre.
      *
-     * @return Les chapitres persistés, ou `null` si le cache est absent,
-     *   corrompu, ou périmé (version du format/parseur différente, ou
-     *   [fileHash] divergent de celui enregistré à l'écriture).
+     * @return Le chapitre persisté, ou `null` si la pré-analyse est absente,
+     *   corrompue, périmée (version du format/parseur différente, ou
+     *   [fileHash] divergent de celui enregistré à l'écriture), ou si elle
+     *   ne contient pas [chapterHref].
      */
-    suspend fun load(publicationId: String, fileHash: String): List<Chapter>?
+    suspend fun loadChapter(publicationId: String, fileHash: String, chapterHref: String): Chapter?
+
+    /**
+     * Vrai si une pré-analyse VALIDE existe pour [publicationId] — mêmes
+     * critères que [loadChapter] (version du format, version du parseur,
+     * [fileHash]) ; seul l'en-tête est lu. Sert à décider d'une
+     * régénération.
+     */
+    suspend fun isFresh(publicationId: String, fileHash: String): Boolean
 
     /** Supprime la pré-analyse d'une publication (purge à sa suppression). */
     suspend fun delete(publicationId: String)

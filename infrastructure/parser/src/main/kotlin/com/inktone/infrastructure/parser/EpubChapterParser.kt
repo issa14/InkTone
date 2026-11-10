@@ -4,8 +4,11 @@ import com.inktone.domain.model.Chapter
 import com.inktone.domain.repository.PublicationRepository
 import com.inktone.domain.service.ChapterParser
 import com.inktone.domain.service.PreAnalysisStore
+import com.inktone.domain.service.PreAnalysisScheduler
+import com.inktone.domain.service.PreAnalysisBuilder
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.asCoroutineDispatcher
 import kotlinx.coroutines.launch
@@ -58,15 +61,22 @@ class EpubChapterParser @Inject constructor(
     private val jsoupParser: JsoupChapterParser,
     private val preAnalysisStore: PreAnalysisStore,
     private val publicationRepository: PublicationRepository,
-) : ChapterParser {
+    // Valeur par défaut (aucune planification) pour les tests instrumentés
+    // qui construisent ce parseur directement ; Hilt injecte la vraie.
+    private val preAnalysisScheduler: PreAnalysisScheduler = PreAnalysisScheduler {},
+) : ChapterParser, PreAnalysisBuilder {
 
     // ---- Pré-analyse persistée (Lot 22, Palier A) ----
 
-    // Mémoïsation du chargement du fichier de pré-analyse par publication.
-    // `emptyList()` sert de sentinelle « absent/périmé » (une publication
-    // a toujours au moins un chapitre), jamais de chapitre réel. Vidée par
-    // [invalidate].
-    private val persistedChapters = ConcurrentHashMap<String, List<Chapter>>()
+    // La pré-analyse est lue chapitre par chapitre (jamais le livre entier,
+    // voir PreAnalysisStore.loadChapter). Seuls sont mémorisés, par
+    // publication : le hash de la source (une requête Room de moins par
+    // chapitre), et le constat « pré-analyse absente ou périmée » — pour ne
+    // pas relire l'en-tête ni replanifier la régénération à chaque
+    // chapitre. Vidés par [invalidate] ; le constat aussi par
+    // [onPreAnalysisRewritten].
+    private val fileHashes = ConcurrentHashMap<String, String>()
+    private val stalePreAnalyses = ConcurrentHashMap.newKeySet<String>()
 
     // ---- Cache LRU par octets ----
 
@@ -89,6 +99,8 @@ class EpubChapterParser @Inject constructor(
     }.asCoroutineDispatcher()
 
     private val semaphore = Semaphore(2)
+
+    private val analysisDispatcher = Dispatchers.Default.limitedParallelism(1)
 
     // ---- API publique (ChapterParser) ----
 
@@ -185,6 +197,15 @@ class EpubChapterParser @Inject constructor(
             // parseChapter() est le chemin qui surface l'erreur pour de
             // vrai quand l'utilisateur navigue effectivement vers ce
             // chapitre.
+            // La pré-analyse persistée sert aussi le préchargement : sans
+            // elle, chaque ouverture de livre refaisait le parsing Jsoup
+            // complet des chapitres voisins, en concurrence CPU avec le
+            // chapitre affiché.
+            persistedChapterOrNull(publicationId, chapterHref, fragment = null)?.let { persisted ->
+                cache.put(cacheKey, persisted)
+                return@withPermit
+            }
+
             val chapter = try {
                 val publication = registry.getOrOpen(publicationId)
                 val link = resolveChapterLink(publication, chapterHref)
@@ -208,25 +229,60 @@ class EpubChapterParser @Inject constructor(
         }
     }
 
+    // ---- Régénération de la pré-analyse (PreAnalysisBuilder) ----
+
+    /**
+     * Ouverture DÉTACHÉE de l'archive, refermée à la fin : jamais celle du
+     * [registry] partagée avec une session de lecture (voir
+     * [PreAnalysisBuilder]), jamais le cache LRU des chapitres.
+     *
+     * Un seul thread : c'est un travail de fond, qui ne doit pas disputer
+     * le processeur (ni les deux threads de [parserDispatcher]) au chapitre
+     * que l'utilisateur est en train d'ouvrir.
+     */
+    override suspend fun analyzeAll(fileUri: String, chapterHrefs: List<String>): List<Chapter> =
+        withContext(analysisDispatcher) {
+            val publication = registry.openDetached(fileUri)
+            try {
+                chapterHrefs.map { chapterHref ->
+                    val link = resolveChapterLink(publication, chapterHref)
+                    val chapterIndex = publication.readingOrder.indexOf(link).coerceAtLeast(0)
+                    imageChapterOrNull(link, chapterHref, chapterIndex) ?: jsoupParser.parse(
+                        inputStream = openResourceStream(publication, link, chapterHref),
+                        baseUrl = chapterHref,
+                        chapterIndex = chapterIndex,
+                        chapterHref = chapterHref,
+                    )
+                }
+            } finally {
+                publication.close()
+            }
+        }
+
+    /** Oublie le constat « pré-analyse absente ou périmée » : relue au prochain chapitre. */
+    override fun onPreAnalysisRewritten(publicationId: String) {
+        stalePreAnalyses -= publicationId
+    }
+
     override fun invalidate(publicationId: String) {
         // Supprimer toutes les entrées du cache pour cette publication
         val prefix = "$publicationId:"
         cache.snapshot().keys.filter { it.startsWith(prefix) }.forEach { cache.remove(it) }
 
-        // Libère aussi la pré-analyse mémoïsée (le fichier disque, lui,
-        // survit : [invalidate] ne purge que la mémoire, pas le cache
-        // persistant — la purge disque relève de la suppression de la
-        // publication, pas de la fermeture du lecteur).
-        persistedChapters.remove(publicationId)
+        // Oublie aussi ce qui est mémorisé sur la pré-analyse (le fichier
+        // disque, lui, survit : [invalidate] ne purge que la mémoire — la
+        // purge disque relève de la suppression de la publication, pas de la
+        // fermeture du lecteur).
+        fileHashes.remove(publicationId)
+        stalePreAnalyses -= publicationId
 
         registry.release(publicationId)
     }
 
     /**
      * Sert le chapitre [chapterHref] depuis la pré-analyse persistée, ou
-     * `null` si elle est absente, périmée (hash/version divergents) ou si
-     * un fragment est demandé. Le fichier est chargé une seule fois par
-     * publication (mémoïsé), jamais re-lu à chaque chapitre.
+     * `null` si elle est absente, périmée (hash/version divergents), si
+     * elle ne contient pas ce chapitre, ou si un fragment est demandé.
      */
     private suspend fun persistedChapterOrNull(
         publicationId: String,
@@ -234,13 +290,21 @@ class EpubChapterParser @Inject constructor(
         fragment: String?,
     ): Chapter? {
         if (fragment != null) return null
-        val fileHash = publicationRepository.getById(publicationId)?.fileHash ?: return null
-        var chapters = persistedChapters[publicationId]
-        if (chapters == null) {
-            chapters = preAnalysisStore.load(publicationId, fileHash) ?: emptyList()
-            persistedChapters[publicationId] = chapters
+        if (publicationId in stalePreAnalyses) return null
+        val fileHash = fileHashes[publicationId]
+            ?: publicationRepository.getById(publicationId)?.fileHash?.also { fileHashes[publicationId] = it }
+            ?: return null
+        preAnalysisStore.loadChapter(publicationId, fileHash, chapterHref)?.let { return it }
+        // Chapitre introuvable : soit la pré-analyse entière est absente ou
+        // périmée — ce livre retomberait alors sur Jsoup à CHAQUE chapitre,
+        // d'où la régénération demandée ici, au moment même où le manque
+        // coûte (idempotent) —, soit elle est valide mais ne contient pas
+        // ce href, et seul ce chapitre passe par Jsoup.
+        if (!preAnalysisStore.isFresh(publicationId, fileHash)) {
+            stalePreAnalyses += publicationId
+            preAnalysisScheduler.scheduleRefresh()
         }
-        return chapters.firstOrNull { it.href == chapterHref }
+        return null
     }
 
     // ---- Interne ----

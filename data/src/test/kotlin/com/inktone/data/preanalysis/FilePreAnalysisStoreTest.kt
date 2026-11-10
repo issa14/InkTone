@@ -9,7 +9,9 @@ import com.inktone.domain.model.SpanStyles
 import com.inktone.domain.model.StyledText
 import kotlinx.coroutines.test.runTest
 import org.junit.Assert.assertEquals
+import org.junit.Assert.assertFalse
 import org.junit.Assert.assertNull
+import org.junit.Assert.assertTrue
 import org.junit.Test
 import java.io.File
 
@@ -56,18 +58,20 @@ class FilePreAnalysisStoreTest {
         )
 
         store.save("pub-1", "hash-abc", chapters)
-        val loaded = store.load("pub-1", "hash-abc")
+        val first = requireNotNull(store.loadChapter("pub-1", "hash-abc", "chap1.xhtml"))
+        val second = requireNotNull(store.loadChapter("pub-1", "hash-abc", "chap2.xhtml"))
 
-        requireNotNull(loaded)
-        assertEquals(2, loaded.size)
-        assertEquals("chap1.xhtml", loaded[0].href)
-        assertEquals("chap2.xhtml", loaded[1].href)
+        assertEquals("chap1.xhtml", first.href)
+        assertEquals("chap2.xhtml", second.href)
         // Le contenu riche et les phrases survivent au round-trip.
-        val blocks = (loaded[0].content as ChapterContent.Rich).blocks
+        val blocks = (first.content as ChapterContent.Rich).blocks
         assertEquals("Bonjour monde.", (blocks[0] as BookBlock.ParagraphBlock).richText.plainText)
         assertEquals(SpanStyles.STRONG, (blocks[0] as BookBlock.ParagraphBlock).richText.spans[0].styles)
-        assertEquals(1, loaded[0].sentences.size)
-        assertEquals("Bonjour monde.", loaded[0].sentences[0].text)
+        assertEquals(1, first.sentences.size)
+        assertEquals("Bonjour monde.", first.sentences[0].text)
+        assertEquals("Deuxieme chapitre.", second.sentences[0].text)
+        // Un href absent d'une pré-analyse valide : null, jamais une erreur.
+        assertNull(store.loadChapter("pub-1", "hash-abc", "absent.xhtml"))
     }
 
     @Test
@@ -75,20 +79,55 @@ class FilePreAnalysisStoreTest {
         val store = tempStore()
         store.save("pub-1", "hash-original", listOf(chapter(0, "chap1.xhtml", "Texte")))
 
-        assertNull(store.load("pub-1", "hash-different"))
+        assertNull(store.loadChapter("pub-1", "hash-different", "chap1.xhtml"))
     }
 
     @Test
     fun `un fichier absent ou corrompu retourne null`() = runTest {
         val store = tempStore()
-        assertNull(store.load("pub-absent", "hash"))
+        assertNull(store.loadChapter("pub-absent", "hash", "chap1.xhtml"))
 
-        // Fichier corrompu : load doit retourner null, jamais lever.
+        // En-tête corrompu : null, jamais une exception.
+        val dir = File.createTempFile("preanalysis", "test").apply { delete() }
+        dir.mkdirs()
+        val pubDir = File(dir, "preanalysis/pub-1").apply { mkdirs() }
+        File(pubDir, "header.json").writeText("{ pas du json valide")
+        assertNull(FilePreAnalysisStore(dir).loadChapter("pub-1", "hash", "chap1.xhtml"))
+        assertFalse(FilePreAnalysisStore(dir).isFresh("pub-1", "hash"))
+    }
+
+    @Test
+    fun `isFresh suit les memes criteres que load sans relire les chapitres`() = runTest {
+        val store = tempStore()
+        assertFalse("absent", store.isFresh("pub-1", "hash-abc"))
+
+        store.save("pub-1", "hash-abc", listOf(chapter(0, "chap1.xhtml", "Texte")))
+
+        assertTrue(store.isFresh("pub-1", "hash-abc"))
+        assertFalse("hash divergent", store.isFresh("pub-1", "hash-autre"))
+    }
+
+    /**
+     * Cas réel trouvé sur appareil : les fichiers plats des anciens formats
+     * (`<id>.prea`) doivent être jugés périmés — donc régénérés —, jamais
+     * servis ni levés en exception, puis supprimés à la réécriture.
+     */
+    @Test
+    fun `un fichier d'ancien format est perime puis remplace`() = runTest {
         val dir = File.createTempFile("preanalysis", "test").apply { delete() }
         dir.mkdirs()
         val base = File(dir, "preanalysis").apply { mkdirs() }
-        File(base, "pub-1.prea").writeText("{ pas du json valide")
-        assertNull(FilePreAnalysisStore(dir).load("pub-1", "hash"))
+        File(base, "pub-1.prea").writeText(
+            """{"header":{"formatVersion":1,"parserVersion":2,"fileHash":"hash-abc"},"chapters":[]}""",
+        )
+        val store = FilePreAnalysisStore(dir)
+
+        assertFalse(store.isFresh("pub-1", "hash-abc"))
+        assertNull(store.loadChapter("pub-1", "hash-abc", "chap1.xhtml"))
+
+        store.save("pub-1", "hash-abc", listOf(chapter(0, "chap1.xhtml", "Texte")))
+        assertTrue(store.isFresh("pub-1", "hash-abc"))
+        assertFalse("l'ancien fichier plat doit être supprimé", File(base, "pub-1.prea").exists())
     }
 
     @Test
@@ -98,6 +137,7 @@ class FilePreAnalysisStoreTest {
 
         store.delete("pub-1")
 
-        assertNull(store.load("pub-1", "hash-abc"))
+        assertNull(store.loadChapter("pub-1", "hash-abc", "chap1.xhtml"))
+        assertFalse(store.isFresh("pub-1", "hash-abc"))
     }
 }

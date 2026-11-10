@@ -11,17 +11,23 @@ import com.inktone.domain.service.PreAnalysisStore
 class FakePreAnalysisStore : PreAnalysisStore {
 
     private val storage = mutableMapOf<String, List<Chapter>>()
+    private val hashes = mutableMapOf<String, String>()
     val deleted = mutableListOf<String>()
 
     override suspend fun save(publicationId: String, fileHash: String, chapters: List<Chapter>) {
         storage[publicationId] = chapters
+        hashes[publicationId] = fileHash
     }
 
-    override suspend fun load(publicationId: String, fileHash: String): List<Chapter>? =
-        storage[publicationId]
+    override suspend fun loadChapter(publicationId: String, fileHash: String, chapterHref: String): Chapter? =
+        storage[publicationId]?.takeIf { hashes[publicationId] == fileHash }?.firstOrNull { it.href == chapterHref }
+
+    override suspend fun isFresh(publicationId: String, fileHash: String): Boolean =
+        storage.containsKey(publicationId) && hashes[publicationId] == fileHash
 
     override suspend fun delete(publicationId: String) {
         storage.remove(publicationId)
+        hashes.remove(publicationId)
         deleted += publicationId
     }
 

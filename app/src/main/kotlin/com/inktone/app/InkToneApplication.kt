@@ -6,6 +6,7 @@ import androidx.work.Configuration
 import com.inktone.infrastructure.crashreporting.CrashReportingConsentObserver
 import com.inktone.infrastructure.media.PlaybackServiceLauncher
 import com.inktone.infrastructure.parser.CoverStorageMigration
+import com.inktone.infrastructure.worker.PreAnalysisRefreshOnStartup
 import com.inktone.infrastructure.worker.SyncScheduleObserver
 import dagger.hilt.android.HiltAndroidApp
 import kotlinx.coroutines.CoroutineScope
@@ -51,6 +52,11 @@ class InkToneApplication : Application(), Configuration.Provider {
     // domain que `app` n'a pas le droit de connaître (Blueprint §12.4).
     @Inject lateinit var coverStorageMigration: CoverStorageMigration
 
+    // Régénère en tâche de fond les pré-analyses absentes ou périmées (par
+    // exemple après une évolution du parseur). Idempotent et sans effet
+    // quand tout est à jour : seuls les en-têtes des fichiers sont lus.
+    @Inject lateinit var preAnalysisRefreshOnStartup: PreAnalysisRefreshOnStartup
+
     override val workManagerConfiguration: Configuration
         get() = Configuration.Builder().setWorkerFactory(workerFactory).build()
 
@@ -69,5 +75,6 @@ class InkToneApplication : Application(), Configuration.Provider {
         syncScheduleObserver.start(CoroutineScope(SupervisorJob() + Dispatchers.Default))
         playbackServiceLauncher.start(CoroutineScope(SupervisorJob() + Dispatchers.Default))
         coverStorageMigration.start(CoroutineScope(SupervisorJob() + Dispatchers.Default))
+        preAnalysisRefreshOnStartup.start()
     }
 }
