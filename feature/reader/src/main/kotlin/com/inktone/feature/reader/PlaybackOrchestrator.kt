@@ -368,6 +368,10 @@ class PlaybackOrchestrator @Inject constructor(
 
     /** Suspend la lecture sans vider la file ni perdre la position. */
     override fun pause() {
+        if (_state.value == PlaybackStatus.Buffering) {
+            pauseDiscardingPipeline()
+            return
+        }
         stateLock.lock()
         try {
             if (_state.value != PlaybackStatus.Playing) return
@@ -381,6 +385,11 @@ class PlaybackOrchestrator @Inject constructor(
 
     /** Reprend la lecture après [pause]. */
     override fun resume() {
+        if (_state.value == PlaybackStatus.Paused && resumeFromCurrentSentence) {
+            resumeFromCurrentSentence = false
+            restart()
+            return
+        }
         stateLock.lock()
         try {
             if (_state.value != PlaybackStatus.Paused) return
@@ -400,6 +409,7 @@ class PlaybackOrchestrator @Inject constructor(
         try {
             pausedNanosTotal = 0L
             pausedSinceNanos = 0L
+            resumeFromCurrentSentence = false
             playGeneration.incrementAndGet()
             playbackJob?.cancel()
             playbackJob = null
@@ -617,12 +627,9 @@ class PlaybackOrchestrator @Inject constructor(
         when (_state.value) {
             PlaybackStatus.Playing -> pause()
             PlaybackStatus.Paused -> resume()
-            // Buffering : rien d'audible encore, « pause » = annuler la
-            // synthèse en cours (retour Idle, sans reprise possible).
-            // Cet `Idle` ne déclenche plus d'auto-avance : la fin de chapitre
-            // a désormais son signal propre ([chapterCompleted]), émis par le
-            // seul chemin qui la constate réellement.
-            PlaybackStatus.Buffering -> stop()
+            // Buffering : une vraie pause, reprise à la phrase courante
+            // (audit UX D46 — un arrêt faisait disparaître le mini-lecteur).
+            PlaybackStatus.Buffering -> pause()
             PlaybackStatus.Idle -> restart()
             is PlaybackStatus.Error -> restart()
         }
@@ -641,6 +648,9 @@ class PlaybackOrchestrator @Inject constructor(
             play(ctx.sentences, ctx.voiceProfile, newIndex, ctx.publicationId, ctx.chapterIndex, ctx.resourceHref)
         } else {
             publishPosition(chapterIndex = ctx.chapterIndex, sentenceIndex = newIndex)
+            // En pause, la file audio porte encore l'ancienne phrase : la
+            // reprise doit repartir de la nouvelle (audit UX D46).
+            if (_state.value == PlaybackStatus.Paused) pauseDiscardingPipeline()
         }
     }
 
@@ -1036,6 +1046,34 @@ class PlaybackOrchestrator @Inject constructor(
             _currentWordRange.value = null
             _positionValid.value = false
             _state.value = PlaybackStatus.Error("La voix ne répond plus : narration arrêtée.")
+        } finally {
+            stateLock.unlock()
+        }
+    }
+
+    // Vrai quand la pause a abandonné la file audio : la reprise relance à la
+    // phrase courante au lieu de reprendre le lecteur.
+    @Volatile private var resumeFromCurrentSentence = false
+
+    /**
+     * Pause sans file audio réutilisable — pendant l'attente de synthèse, ou
+     * après un saut de phrase en pause. La session reste engagée (Paused) :
+     * notification et mini-lecteur restent, la reprise relance la narration
+     * à la phrase courante.
+     */
+    private fun pauseDiscardingPipeline() {
+        stateLock.lock()
+        try {
+            playGeneration.incrementAndGet()
+            playbackJob?.cancel()
+            playbackJob = null
+            wordTrackingJob?.cancel()
+            wordTrackingJob = null
+            audioPlayer.stop()
+            _currentWordRange.value = null
+            _positionValid.value = false
+            resumeFromCurrentSentence = true
+            _state.value = PlaybackStatus.Paused
         } finally {
             stateLock.unlock()
         }

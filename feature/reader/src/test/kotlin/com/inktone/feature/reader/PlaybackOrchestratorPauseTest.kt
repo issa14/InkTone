@@ -54,11 +54,102 @@ class PlaybackOrchestratorPauseTest {
             kotlinx.coroutines.flow.emptyFlow()
     }
 
+    /** Synthèse qui ne se termine jamais : la session reste en Buffering. */
+    private class HangingTtsEngine : com.inktone.domain.service.TtsEngine {
+        override val id = TtsEngineId.ANDROID_NATIVE
+        override val capabilities = com.inktone.domain.service.TtsCapabilities(
+            offline = true, wordTimestamps = false, sentenceTimestamps = false, languages = listOf("fr-FR"),
+            streamingSynthesis = false, speedControl = false, pitchControl = false, modelSizeMb = 0, license = "test",
+        )
+
+        override suspend fun synthesize(sentence: Sentence, voiceProfile: VoiceProfile): com.inktone.domain.service.AudioSegment =
+            kotlinx.coroutines.awaitCancellation()
+
+        override fun observePlaybackEvents(): kotlinx.coroutines.flow.Flow<com.inktone.domain.service.PlaybackEvent> =
+            kotlinx.coroutines.flow.emptyFlow()
+    }
+
+    private fun orchestrator(engine: com.inktone.domain.service.TtsEngine, audioPlayer: FakeAudioPlayer = FakeAudioPlayer()) =
+        PlaybackOrchestrator(
+            ttsEngine = engine,
+            audioPlayer = audioPlayer,
+            updateReadingState = UpdateReadingStateUseCase(FakeReadingStateRepository()),
+            getReadingState = GetReadingStateUseCase(FakeReadingStateRepository()),
+            chapterParser = com.inktone.core.testing.fake.FakeChapterParser(),
+            publicationRepository = FakePublicationRepository(),
+            publicationParser = FakePublicationParser(),
+            preferencesRepository = FakePreferencesRepository(),
+            voiceProfileRepository = FakeVoiceProfileRepository(),
+            ttsSegmentCache = FakeTtsSegmentCache(),
+            pronunciationRuleRepository = FakePronunciationRuleRepository(),
+        )
+
+    private val profile = VoiceProfile(id = "vp", engine = TtsEngineId.ANDROID_NATIVE, voice = "v", language = "fr-FR")
+
+    private fun PlaybackOrchestrator.playThree() = play(
+        sentences = listOf(sentence(0, "Un."), sentence(1, "Deux."), sentence(2, "Trois.")),
+        voiceProfile = profile,
+        startFrom = 0,
+        publicationId = "pub",
+        chapterIndex = 0,
+        resourceHref = "ch0.xhtml",
+    )
+
+    /**
+     * Bug réel corrigé (audit UX D46) : pendant l'attente de synthèse, Pause
+     * arrêtait la session (mini-lecteur retiré, aucune reprise possible), et
+     * la pause de la notification ne faisait rien.
+     */
+    @Test
+    fun une_pause_pendant_la_synthese_suspend_la_session_et_la_reprise_relance() = runBlocking<Unit> {
+        val orchestrator = orchestrator(HangingTtsEngine())
+        try {
+            orchestrator.playThree()
+            assertEquals(PlaybackOrchestrator.PlaybackStatus.Buffering, orchestrator.state.value)
+
+            orchestrator.togglePlayPause()
+
+            assertEquals(PlaybackOrchestrator.PlaybackStatus.Paused, orchestrator.state.value)
+            assertTrue("la session reste engagée", orchestrator.isSessionEngaged())
+
+            orchestrator.togglePlayPause()
+            assertEquals("la reprise relance la synthèse", PlaybackOrchestrator.PlaybackStatus.Buffering, orchestrator.state.value)
+        } finally {
+            orchestrator.stop()
+        }
+    }
+
+    /**
+     * Bug réel corrigé (audit UX D46) : un saut de phrase en pause déplaçait
+     * la position sans déplacer le son ; la reprise continuait l'ancienne
+     * phrase.
+     */
+    @Test
+    fun un_saut_de_phrase_en_pause_fait_reprendre_a_la_nouvelle_phrase() = runBlocking<Unit> {
+        val audioPlayer = FakeAudioPlayer()
+        val orchestrator = orchestrator(TimedTtsEngine(durationMs = 300), audioPlayer)
+        try {
+            orchestrator.playThree()
+            withTimeout(5_000) { orchestrator.state.first { it == PlaybackOrchestrator.PlaybackStatus.Playing } }
+            orchestrator.pause()
+
+            orchestrator.skip(+1)
+            orchestrator.resume()
+
+            assertEquals(1, orchestrator.narrationPosition.value.sentenceIndex)
+            val afterPause = audioPlayer.events.dropWhile { it != "pause" }
+            assertTrue("le lecteur n'a pas repris l'ancienne file : $afterPause", "resume" !in afterPause)
+            withTimeout(5_000) { orchestrator.state.first { it == PlaybackOrchestrator.PlaybackStatus.Playing } }
+        } finally {
+            orchestrator.stop()
+        }
+    }
+
     private fun sentence(index: Int, text: String) =
         Sentence(index = index, text = text, startOffset = index * 10, endOffset = index * 10 + text.length)
 
     @Test
-    fun apres_une_pause_la_phrase_suivante_attend_la_fin_reelle_de_la_phrase_en_cours() = runBlocking {
+    fun apres_une_pause_la_phrase_suivante_attend_la_fin_reelle_de_la_phrase_en_cours() = runBlocking<Unit> {
         val orchestrator = PlaybackOrchestrator(
             ttsEngine = TimedTtsEngine(durationMs = 300),
             audioPlayer = FakeAudioPlayer(),

@@ -375,7 +375,7 @@ class PlaybackOrchestratorTest {
     @Test
     fun unePauseDemandeePendantLaSyntheseNemetPasDeFinDeChapitre() = runBlocking {
         // Synthèse lente : l'état reste `Buffering`, où `togglePlayPause`
-        // annule la synthèse (retour `Idle`) faute d'audio à suspendre.
+        // met en pause (audit UX D46 : une vraie pause, plus un arrêt).
         val tts = FakeTtsEngine(segmentDurationMs = 50, synthesisDelayMs = 2_000)
         val player = FakeAudioPlayer()
         val orchestrator = PlaybackOrchestrator(tts, player, UpdateReadingStateUseCase(FakeReadingStateRepository()), GetReadingStateUseCase(FakeReadingStateRepository()), FakeChapterParser(), FakePublicationRepository(), FakePublicationParser(), FakePreferencesRepository(), FakeVoiceProfileRepository(), FakeTtsSegmentCache(), FakePronunciationRuleRepository())
@@ -393,10 +393,11 @@ class PlaybackOrchestratorTest {
         orchestrator.play(listOf(sentence(0, "Une.", 0), sentence(1, "Deux.", 5)), profile, 0, "pub1", 0, "ch.xhtml")
         awaitUntil { orchestrator.state.value == PlaybackOrchestrator.PlaybackStatus.Buffering }
         orchestrator.togglePlayPause()
-        awaitUntil { orchestrator.state.value == PlaybackOrchestrator.PlaybackStatus.Idle }
+        awaitUntil { orchestrator.state.value == PlaybackOrchestrator.PlaybackStatus.Paused }
 
         Thread.sleep(200)
         assertEquals("aucune fin de chapitre : l'utilisateur a mis en pause", 0, completions.get())
+        orchestrator.stop()
         collector.cancel()
     }
 
