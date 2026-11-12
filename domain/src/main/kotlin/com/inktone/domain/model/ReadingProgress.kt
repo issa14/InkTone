@@ -77,3 +77,17 @@ fun Publication.progressionAt(locator: Locator): Float? = when (format) {
     PublicationFormat.PDF -> fixedPageProgression(locator.chapterIndex, locator.pageOffsetY ?: 0f, chapterCount)
     PublicationFormat.EPUB, PublicationFormat.TXT -> chapterLengths?.progressionAt(locator)
 }
+
+/**
+ * Temps de lecture restant estimé pour un livre : le temps déjà passé dessus,
+ * rapporté à sa progression ([progression] 0..1). `null` sans progression
+ * connue ni temps passé — aucune estimation plutôt qu'un chiffre inventé.
+ *
+ * Le rythme réel de CE livre est contenu dans son temps cumulé : une moyenne
+ * tous livres confondus n'y ajouterait que du bruit.
+ */
+fun estimatedRemainingReadingMs(timeSpentMs: Long, progression: Float?): Long? {
+    if (progression == null || progression <= 0f || timeSpentMs <= 0L) return null
+    val remaining = (timeSpentMs / progression).toLong() - timeSpentMs
+    return remaining.takeIf { it > 0 }
+}

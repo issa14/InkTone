@@ -2,6 +2,7 @@ package com.inktone.feature.statistics
 
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
+import com.inktone.domain.model.estimatedRemainingReadingMs
 import com.inktone.domain.model.DailyReadingStats
 import com.inktone.domain.repository.PreferencesRepository
 import com.inktone.domain.service.ExportFormat
@@ -175,11 +176,9 @@ class StatisticsViewModel @Inject constructor(
      * ajouterait que du bruit.
      */
     private fun CurrentBookState.withRemainingTime(): CurrentBookState {
-        val progress = progressPercent ?: return this
-        if (progress <= 0f || totalBookTimeMs <= 0L) return this
-        val estimatedTotalMs = (totalBookTimeMs / progress).toLong()
-        val remainingMs = estimatedTotalMs - totalBookTimeMs
-        return copy(remainingTimeFormatted = if (remainingMs > 0) formatDuration(remainingMs) else null)
+        if ((progressPercent ?: 0f) <= 0f || totalBookTimeMs <= 0L) return this
+        val remainingMs = estimatedRemainingReadingMs(totalBookTimeMs, progressPercent)
+        return copy(remainingTimeFormatted = remainingMs?.let(::formatDuration))
     }
 
     // ───── Export ─────

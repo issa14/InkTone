@@ -6,6 +6,9 @@ import androidx.lifecycle.viewModelScope
 import com.inktone.domain.model.ReadingSession
 import com.inktone.domain.repository.PublicationRepository
 import com.inktone.domain.repository.ReadingSessionRepository
+import com.inktone.domain.repository.ReadingStateRepository
+import com.inktone.domain.model.estimatedRemainingReadingMs
+import com.inktone.domain.model.progressionAt
 import dagger.hilt.android.lifecycle.HiltViewModel
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.flow.SharingStarted
@@ -92,6 +95,7 @@ class BookStatisticsViewModel @Inject constructor(
     savedStateHandle: SavedStateHandle,
     private val readingSessionRepository: ReadingSessionRepository,
     private val publicationRepository: PublicationRepository,
+    private val readingStateRepository: ReadingStateRepository,
 ) : ViewModel() {
 
     private val bookId: String = savedStateHandle.get<String>("bookId") ?: ""
@@ -108,11 +112,14 @@ class BookStatisticsViewModel @Inject constructor(
 
         // KPIs
         val wpm = computeWpm(sessions)
-        val remainingFormatted = if (wpm > 0 && (publication?.chapterCount ?: 0) > 0) {
-            val estimatedWordsRemaining = publication!!.chapterCount * 3000L
-            val minutesRemaining = estimatedWordsRemaining / wpm
-            formatDuration(TimeUnit.MINUTES.toMillis(minutesRemaining))
-        } else "—"
+        // Audit UX D28 : l'estimation reposait sur « chapitres × 3000 mots »,
+        // indépendante de la position — elle ne diminuait jamais en lisant.
+        // Même calcul que l'écran principal des statistiques.
+        val progression = publication?.let { pub ->
+            readingStateRepository.get(pub.id)?.locator?.let(pub::progressionAt)
+        }
+        val remainingFormatted = estimatedRemainingReadingMs(sessions.sumOf { it.durationMs }, progression)
+            ?.let(::formatDuration) ?: "—"
 
         // Historique — DateTimeFormatter (thread-safe, API 26+)
         val dateFmt = DateTimeFormatter.ofPattern("d MMMM yyyy", Locale.FRENCH)
