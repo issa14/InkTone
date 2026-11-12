@@ -35,6 +35,7 @@ class WorkManagerImportProgressObserver @Inject constructor(
                     current = running.progress.getInt(ImportWorker.KEY_PROGRESS_CURRENT, 0),
                     total = running.progress.getInt(ImportWorker.KEY_PROGRESS_TOTAL, 0),
                     hasQueuedChunks = hasQueued,
+                    isRunning = true,
                 )
             }
         }

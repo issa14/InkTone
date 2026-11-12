@@ -74,6 +74,8 @@ class LibraryViewModelTest {
         defaultDispatcher: CoroutineDispatcher = dispatcher,
         playbackSession: FakePlaybackSession = FakePlaybackSession(),
         readingStateRepository: FakeReadingStateRepository = FakeReadingStateRepository(),
+        importResultsStore: FakeImportResultsStore = FakeImportResultsStore(),
+        importSessionStore: ImportSessionStore = ImportSessionStore(),
     ): LibraryViewModel = LibraryViewModel(
         publicationRepository,
         readingStateRepository,
@@ -81,8 +83,8 @@ class LibraryViewModelTest {
         TogglePinUseCase(publicationRepository),
         DeletePublicationUseCase(publicationRepository, FakePreAnalysisStore(), FakeTtsSegmentCache(), FakeRenderedPageCache(), FakePlaybackSession(), FakeSearchService()),
         importProgressObserver,
-        FakeImportResultsStore(),
-        ImportSessionStore(),
+        importResultsStore,
+        importSessionStore,
         preferencesRepository,
         SynchronizeNowUseCase(syncNowService),
         syncAccountRepository,
@@ -186,6 +188,36 @@ class LibraryViewModelTest {
         dispatcher.scheduler.advanceUntilIdle()
 
         assertEquals(ImportProgress(current = 3, total = 10, hasQueuedChunks = true), viewModel.state.value.importProgress)
+    }
+
+    /**
+     * Bug réel corrigé (audit UX D53) : un fichier importé seul pouvait ne
+     * produire ni progression ni résumé — la progression n'était publiée
+     * qu'après le fichier, et la fin d'import se détectait sur une valeur
+     * déjà écrasée.
+     */
+    @Test
+    fun `un import d un seul fichier affiche un resume a la fin meme sans progression publiee`() = runTest {
+        val importProgressObserver = FakeImportProgressObserver()
+        val resultsStore = FakeImportResultsStore()
+        val sessionStore = ImportSessionStore().apply { setSessionId("session-1") }
+        val viewModel = viewModel(
+            importProgressObserver = importProgressObserver,
+            importResultsStore = resultsStore,
+            importSessionStore = sessionStore,
+        )
+        dispatcher.scheduler.advanceUntilIdle()
+
+        // Le lot tourne, aucune progression publiée encore.
+        importProgressObserver.emit(ImportProgress(isRunning = true))
+        dispatcher.scheduler.advanceUntilIdle()
+        assertTrue("la bannière s'affiche dès le début", viewModel.state.value.importProgress.isActive)
+
+        resultsStore.recordResult("session-1", "livre.epub", com.inktone.domain.usecase.ImportResult.Duplicate("pub-1"))
+        importProgressObserver.emit(ImportProgress())
+        dispatcher.scheduler.advanceUntilIdle()
+
+        assertEquals(1, viewModel.state.value.importResults.size)
     }
 
     @Test

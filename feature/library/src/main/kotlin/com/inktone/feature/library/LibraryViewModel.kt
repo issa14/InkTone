@@ -94,19 +94,16 @@ class LibraryViewModel @Inject constructor(
         // filtre ne doit jamais interrompre l'observation de la
         // progression d'import, les deux sont sans rapport.
         viewModelScope.launch {
-            var previousTotal = 0
             importProgressObserver.observe().collect { progress ->
+                // Fin d'import : un import était engagé, plus aucun ne l'est.
+                // Lu AVANT d'écraser l'état — audit UX D53 : l'ancienne
+                // condition relisait la valeur qu'elle venait d'écrire, et un
+                // fichier importé seul pouvait ne produire aucun résumé.
+                val wasActive = _state.value.importProgress.isActive
                 _state.value = _state.value.copy(importProgress = progress)
-
-                // Lot 5 — détection de fin d'import : quand le total
-                // passe de >0 à 0 et qu'aucun lot n'est en attente,
-                // l'import est terminé — charger les résultats.
-                val wasActive = previousTotal > 0 || _state.value.importProgress.hasQueuedChunks
-                val isDone = progress.total == 0 && !progress.hasQueuedChunks
-                if (wasActive && isDone) {
+                if (wasActive && !progress.isActive) {
                     loadImportResults()
                 }
-                previousTotal = progress.total
             }
         }
         // Lot 6 — la disposition est persistée pour que le préréglage

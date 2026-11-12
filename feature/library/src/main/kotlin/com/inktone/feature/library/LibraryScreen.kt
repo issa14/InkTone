@@ -244,7 +244,7 @@ fun LibraryScreen(
                     onDismiss = { viewModel.onIntent(LibraryIntent.DismissError) },
                 )
                 state.displayedPublications.isEmpty() -> EmptyState(
-                    hasActiveImport = state.importProgress.total > 0 || state.importProgress.hasQueuedChunks,
+                    hasActiveImport = state.importProgress.isActive,
                     onImportClick = onImportClick,
                     searchQuery = state.searchQuery,
                     isFiltered = state.activeFilter != FilterMode.ALL || state.selectedFormats.isNotEmpty(),
@@ -1118,7 +1118,7 @@ private fun FilterMode.label() = when (this) {
  */
 @Composable
 private fun ImportProgressBanner(progress: ImportProgress) {
-    if (progress.total == 0 && !progress.hasQueuedChunks) return
+    if (!progress.isActive) return
 
     Column(Modifier.fillMaxWidth().padding(horizontal = 8.dp, vertical = 4.dp)) {
         if (progress.total > 0) {
@@ -1129,7 +1129,7 @@ private fun ImportProgressBanner(progress: ImportProgress) {
             Text("Import en cours · ${progress.current}/${progress.total}")
         } else {
             LinearProgressIndicator(modifier = Modifier.fillMaxWidth())
-            Text("Import en attente…")
+            Text(if (progress.isRunning) "Import en cours…" else "Import en attente…")
         }
     }
 }

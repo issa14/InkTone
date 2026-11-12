@@ -64,6 +64,10 @@ class ImportWorker @AssistedInject constructor(
         val failureCount = AtomicInteger(0)
         val completedCount = AtomicInteger(0)
 
+        // Progression publiée dès le départ, pas seulement après le premier
+        // fichier terminé (audit UX D53).
+        setProgress(Data.Builder().putInt(KEY_PROGRESS_CURRENT, 0).putInt(KEY_PROGRESS_TOTAL, uris.size).build())
+
         val semaphore = Semaphore(permits = MAX_CONCURRENT_IMPORTS)
         uris.map { uri ->
             async {

@@ -29,4 +29,13 @@ data class ImportProgress(
     val current: Int = 0,
     val total: Int = 0,
     val hasQueuedChunks: Boolean = false,
-)
+    /**
+     * Un lot est en cours de traitement, même avant la première progression
+     * publiée (audit UX D53 : un fichier importé seul ne donnait aucun signe
+     * pendant son traitement, ni parfois de résumé à la fin).
+     */
+    val isRunning: Boolean = false,
+) {
+    /** Un import est engagé : en cours ou en attente. */
+    val isActive: Boolean get() = isRunning || total > 0 || hasQueuedChunks
+}
