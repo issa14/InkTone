@@ -26,6 +26,7 @@ import androidx.compose.foundation.selection.toggleable
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
+import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Checkbox
 import androidx.compose.material3.ElevatedCard
@@ -500,6 +501,26 @@ internal fun SettingsContent(
         // remplace que dans les Réglages.
         var showRuleDialog by remember { mutableStateOf(false) }
         var editingRule by remember { mutableStateOf<PronunciationRule?>(null) }
+        // Audit UX C7 : la corbeille, voisine de l'interrupteur, supprimait
+        // la règle en un tap ; elle demande désormais confirmation.
+        var ruleToDelete by remember { mutableStateOf<PronunciationRule?>(null) }
+        ruleToDelete?.let { rule ->
+            AlertDialog(
+                onDismissRequest = { ruleToDelete = null },
+                title = { Text("Supprimer cette règle ?") },
+                text = { Text("« ${rule.originalText} » → « ${rule.replacementText} »") },
+                confirmButton = {
+                    TextButton(
+                        onClick = {
+                            ruleToDelete = null
+                            onIntent(SettingsIntent.DeletePronunciationRule(rule.id))
+                        },
+                        colors = ButtonDefaults.textButtonColors(contentColor = MaterialTheme.colorScheme.error),
+                    ) { Text("Supprimer") }
+                },
+                dismissButton = { TextButton(onClick = { ruleToDelete = null }) { Text("Annuler") } },
+            )
+        }
 
         PronunciationCard(
             rules = pronunciationRules,
@@ -518,7 +539,7 @@ internal fun SettingsContent(
                         rule = rule,
                         onClick = { editingRule = rule; showRuleDialog = true },
                         onToggle = { onIntent(SettingsIntent.TogglePronunciationRule(rule)) },
-                        onDelete = { onIntent(SettingsIntent.DeletePronunciationRule(rule.id)) },
+                        onDelete = { ruleToDelete = rule },
                     )
                     if (index != pronunciationRules.lastIndex) {
                         HorizontalDivider(modifier = Modifier.padding(horizontal = 20.dp))
