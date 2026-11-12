@@ -13,6 +13,7 @@ import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.test.runTest
 import org.junit.After
 import org.junit.Assert.assertNull
+import org.junit.Assert.assertEquals
 import org.junit.Assert.assertTrue
 import org.junit.Before
 import org.junit.Test
@@ -63,7 +64,7 @@ class CascadeDeleteTest {
      * est présente dans le code.
      */
     @Test
-    fun supprimer_une_publication_vide_annotations_et_sessions_de_lecture() = runTest {
+    fun supprimer_une_publication_vide_ses_annotations_mais_garde_son_historique_de_lecture() = runTest {
         val pubId = "pub-2"
         db.publicationDao().insert(
             PublicationEntity(
@@ -92,6 +93,7 @@ class CascadeDeleteTest {
         db.publicationDao().delete(pubId)
 
         assertTrue(db.annotationDao().observeForPublication(pubId).first().isEmpty())
-        assertTrue(db.readingSessionDao().getAllForPublication(pubId).isEmpty())
+        // Audit UX D27 : le temps de lecture survit au retrait du livre.
+        assertEquals(1, db.readingSessionDao().getAllForPublication(pubId).size)
     }
 }

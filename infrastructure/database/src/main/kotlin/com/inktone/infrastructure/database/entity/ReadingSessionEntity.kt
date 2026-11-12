@@ -1,7 +1,6 @@
 package com.inktone.infrastructure.database.entity
 
 import androidx.room.Entity
-import androidx.room.ForeignKey
 import androidx.room.Index
 import androidx.room.PrimaryKey
 
@@ -14,12 +13,12 @@ import androidx.room.PrimaryKey
  * mais n'est plus alimenté par le nouveau code — les projections
  * DAO calculent le total à la volée (`visualDurationMs + ttsDurationMs`).
  */
+// Aucune clé étrangère vers `publications` (MIGRATION_33_34, audit UX D27) :
+// supprimer un livre effaçait en cascade tout son temps de lecture, et
+// totaux, historique et série reculaient rétroactivement. L'historique de
+// lecture survit au retrait du livre.
 @Entity(
     tableName = "reading_sessions",
-    foreignKeys = [ForeignKey(
-        entity = PublicationEntity::class, parentColumns = ["id"],
-        childColumns = ["publicationId"], onDelete = ForeignKey.CASCADE,
-    )],
     indices = [Index("publicationId"), Index("startedAt")],
 )
 data class ReadingSessionEntity(

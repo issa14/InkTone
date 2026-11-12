@@ -534,3 +534,30 @@ val MIGRATION_32_33 = object : Migration(32, 33) {
         db.execSQL("ALTER TABLE publications ADD COLUMN chapterLengths TEXT DEFAULT NULL")
     }
 }
+
+/**
+ * Retire la clé étrangère `reading_sessions.publicationId → publications`
+ * (audit UX D27) : supprimer un livre effaçait en cascade son temps de
+ * lecture. SQLite ne sait pas retirer une contrainte : la table est recréée
+ * à l'identique sans elle, données et index conservés.
+ */
+val MIGRATION_33_34 = object : Migration(33, 34) {
+    override fun migrate(db: SupportSQLiteDatabase) {
+        db.execSQL(
+            "CREATE TABLE IF NOT EXISTS `reading_sessions_new` (`id` TEXT NOT NULL, `publicationId` TEXT NOT NULL, " +
+                "`startedAt` INTEGER NOT NULL, `endedAt` INTEGER, `mode` TEXT NOT NULL, `sentencesRead` INTEGER NOT NULL, " +
+                "`durationMs` INTEGER NOT NULL, `wordsRead` INTEGER NOT NULL, `visualDurationMs` INTEGER NOT NULL, " +
+                "`ttsDurationMs` INTEGER NOT NULL, PRIMARY KEY(`id`))",
+        )
+        db.execSQL(
+            "INSERT INTO `reading_sessions_new` (`id`, `publicationId`, `startedAt`, `endedAt`, `mode`, `sentencesRead`, " +
+                "`durationMs`, `wordsRead`, `visualDurationMs`, `ttsDurationMs`) SELECT `id`, `publicationId`, `startedAt`, " +
+                "`endedAt`, `mode`, `sentencesRead`, `durationMs`, `wordsRead`, `visualDurationMs`, `ttsDurationMs` " +
+                "FROM `reading_sessions`",
+        )
+        db.execSQL("DROP TABLE `reading_sessions`")
+        db.execSQL("ALTER TABLE `reading_sessions_new` RENAME TO `reading_sessions`")
+        db.execSQL("CREATE INDEX IF NOT EXISTS `index_reading_sessions_publicationId` ON `reading_sessions` (`publicationId`)")
+        db.execSQL("CREATE INDEX IF NOT EXISTS `index_reading_sessions_startedAt` ON `reading_sessions` (`startedAt`)")
+    }
+}

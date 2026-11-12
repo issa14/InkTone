@@ -70,9 +70,10 @@ interface ReadingSessionDao {
     // ───── Livre en cours (Section 3) — dernière publication lue ─────
 
     @Query("""
-        SELECT publicationId 
-        FROM reading_sessions 
-        ORDER BY endedAt DESC 
+        SELECT publicationId
+        FROM reading_sessions
+        WHERE publicationId IN (SELECT id FROM publications)
+        ORDER BY endedAt DESC
         LIMIT 1
     """)
     suspend fun getLastReadPublicationId(): String?

@@ -42,7 +42,7 @@ import com.inktone.infrastructure.database.entity.VoiceProfileEntity
         CatalogEntity::class,
     ],
     views = [LibraryItemView::class],
-    version = 33, // Longueurs de chapitres pour la progression (MIGRATION_32_33)
+    version = 34, // Historique de lecture conservé au retrait d'un livre (MIGRATION_33_34)
     exportSchema = true, // condition du harnais de migration — Tâche 2.4
 )
 @TypeConverters(StringListConverter::class)
