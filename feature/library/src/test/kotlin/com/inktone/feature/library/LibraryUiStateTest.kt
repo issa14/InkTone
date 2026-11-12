@@ -166,4 +166,23 @@ class LibraryUiStateTest {
         assertEquals(listOf("Étoiles", "Zodiaque"), state.availableSeries)
         assertEquals(listOf("Aventure", "Érotisme", "Zen"), state.availableTags)
     }
+
+    /** Décision de l'auteur (audit UX) : au-delà du titre et de l'auteur, sans le texte des livres. */
+    @Test
+    fun recherche_porte_sur_serie_tags_editeur_et_description() {
+        val publications = listOf(
+            publication("1", "A", "X", importDate = 0L).copy(seriesName = "Fondation"),
+            publication("2", "B", "X", importDate = 0L).copy(subjects = listOf("Uchronie")),
+            publication("3", "C", "X", importDate = 0L).copy(publisher = "Gallimard"),
+            publication("4", "D", "X", importDate = 0L).copy(description = "<p>Une <i>baleine</i> blanche.</p>"),
+        )
+        fun found(query: String) = LibraryUiState(publications = publications, searchQuery = query)
+            .withDerivedFields().displayedPublications.map { it.id }
+
+        assertEquals(listOf("1"), found("fondation"))
+        assertEquals(listOf("2"), found("uchronie"))
+        assertEquals(listOf("3"), found("gallimard"))
+        assertEquals(listOf("4"), found("baleine"))
+        assertEquals("les balises HTML ne sont pas cherchées", emptyList<String>(), found("<i>"))
+    }
 }

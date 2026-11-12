@@ -106,10 +106,7 @@ internal fun List<Publication>.filterAndSort(
         // Insensible aux accents comme à la casse : « eleve » trouve
         // « Élève », « emile » trouve « Émile Zola ».
         val needle = searchQuery.foldedForSearch()
-        filter { publication ->
-            publication.title.foldedForSearch().contains(needle) ||
-                publication.authors.any { it.foldedForSearch().contains(needle) }
-        }
+        filter { it.matchesSearch(needle) }
     }
     val filtered = if (selectedFormats.isEmpty()) {
         searched
@@ -170,6 +167,17 @@ internal fun LibraryUiState.withDerivedFields(): LibraryUiState = copy(
  */
 private fun frenchCollator(): Collator =
     Collator.getInstance(Locale.FRENCH).apply { strength = Collator.SECONDARY }
+
+private val HTML_TAG = Regex("<[^>]*>")
+
+/**
+ * Titre, auteurs, série, tags, éditeur et description (décision de
+ * l'auteur, audit UX) — jamais le texte des livres, réservé à la recherche
+ * plein texte. Les balises de la description ne sont pas cherchées.
+ */
+private fun Publication.matchesSearch(needle: String): Boolean =
+    (sequenceOf(title, seriesName, publisher, description?.replace(HTML_TAG, " ")) + authors.asSequence() + subjects.asSequence())
+        .any { it != null && it.foldedForSearch().contains(needle) }
 
 /** Forme de comparaison pour la recherche : minuscules, sans accents. */
 private val combiningMarks = Regex("\\p{Mn}+")

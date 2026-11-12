@@ -490,7 +490,7 @@ internal fun LibraryTopBar(
                     value = searchQuery,
                     onValueChange = onSearchQueryChange,
                     modifier = Modifier.fillMaxWidth().focusRequester(searchFocusRequester),
-                    placeholder = { Text("Rechercher titre ou auteur") },
+                    placeholder = { Text("Titre, auteur, série, tag…") },
                     singleLine = true,
                 )
             },

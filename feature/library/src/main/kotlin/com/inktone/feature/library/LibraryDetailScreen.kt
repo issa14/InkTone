@@ -87,7 +87,7 @@ fun LibraryDetailScreen(
                             value = state.searchQuery,
                             onValueChange = { viewModel.onIntent(LibraryDetailIntent.SetSearchQuery(it)) },
                             modifier = Modifier.fillMaxWidth().focusRequester(searchFocusRequester),
-                            placeholder = { Text("Rechercher titre ou auteur") },
+                            placeholder = { Text("Titre, auteur, série, tag…") },
                             singleLine = true,
                         )
                     },
