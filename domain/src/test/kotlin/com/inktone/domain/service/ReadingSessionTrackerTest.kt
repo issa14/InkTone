@@ -107,4 +107,41 @@ class ReadingSessionTrackerTest {
             snapshot.words,
         )
     }
+
+    /**
+     * Bug réel corrigé (audit UX D25) : un livre laissé ouvert écran allumé
+     * comptait tout ce temps comme de la lecture.
+     */
+    @Test
+    fun la_lecture_visuelle_cesse_de_compter_apres_cinq_minutes_sans_geste() {
+        val clock = TestClock()
+        val tracker = ReadingSessionTracker("pub", clock)
+
+        clock.nowMs += 3 * 3_600_000L // trois heures sans aucun geste
+
+        assertEquals(5 * 60_000L, tracker.snapshot().visualMs)
+    }
+
+    @Test
+    fun un_geste_relance_le_decompte_visuel_sans_compter_l_inactivite_precedente() {
+        val clock = TestClock()
+        val tracker = ReadingSessionTracker("pub", clock)
+        clock.nowMs += 60 * 60_000L // une heure d'inactivité : 5 min comptées
+        tracker.noteActivity()
+
+        clock.nowMs += 2 * 60_000L // deux minutes de lecture active
+
+        assertEquals(7 * 60_000L, tracker.snapshot().visualMs)
+    }
+
+    @Test
+    fun l_ecoute_compte_meme_sans_aucun_geste() {
+        val clock = TestClock()
+        val tracker = ReadingSessionTracker("pub", clock)
+        tracker.switchMode(ReadingMode.AUDIO)
+
+        clock.nowMs += 3_600_000L
+
+        assertEquals(3_600_000L, tracker.snapshot().ttsMs)
+    }
 }

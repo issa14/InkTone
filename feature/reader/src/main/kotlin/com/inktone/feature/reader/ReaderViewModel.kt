@@ -321,6 +321,9 @@ class ReaderViewModel @Inject constructor(
     private var flashClearJob: Job? = null
 
     fun onIntent(intent: ReaderIntent) {
+        // Tout intent vient d'un geste, sauf la fin de mesure d'un chapitre :
+        // le temps de lecture visuelle s'arrête après 5 min sans geste (D25).
+        if (intent !is ReaderIntent.ChapterLayoutCompleted) sessionTracker?.noteActivity()
         when (intent) {
             is ReaderIntent.OpenPublication -> {
                 val resourceHref = intent.targetResourceHref

@@ -56,6 +56,14 @@ data class TrackerSnapshot(
 class ReadingSessionTracker(
     val publicationId: String,
     private val clock: () -> Long = { System.currentTimeMillis() },
+    /**
+     * Audit UX D25 : en lecture visuelle, le temps ne s'accumule que jusqu'à
+     * ce délai après la dernière activité ([noteActivity]). Sans cela, un
+     * livre laissé ouvert écran allumé comptait des heures de « lecture ».
+     * L'écoute n'est pas concernée : écouter sans toucher l'écran est le cas
+     * nominal.
+     */
+    private val visualIdleTimeoutMs: Long = VISUAL_IDLE_TIMEOUT_MS,
 ) {
     /** Temps visuel cumulé (lecture manuelle, TTS inactif). */
     var visualDurationMs: Long = 0
@@ -78,6 +86,7 @@ class ReadingSessionTracker(
 
     private var mode: ReadingMode = ReadingMode.VISUAL
     private var lastResumeMs: Long = startTimestamp
+    private var lastActivityMs: Long = startTimestamp
     private var _isPaused: Boolean = false
 
     /** Durée totale cumulée (visuel + TTS). */
@@ -93,7 +102,14 @@ class ReadingSessionTracker(
         if (!_isPaused) return
         this.mode = mode
         lastResumeMs = clock()
+        lastActivityMs = lastResumeMs
         _isPaused = false
+    }
+
+    /** Geste de lecture (défilement, page, commande) : relance le décompte visuel. */
+    fun noteActivity() {
+        flush()
+        lastActivityMs = clock()
     }
 
     /** Flush les durées et marque comme pausé. Réservé à onCleared(). */
@@ -113,6 +129,7 @@ class ReadingSessionTracker(
         flush()
         mode = newMode
         lastResumeMs = clock()
+        lastActivityMs = lastResumeMs
     }
 
     /**
@@ -164,12 +181,22 @@ class ReadingSessionTracker(
 
     private fun flush() {
         if (_isPaused) return
-        val elapsed = clock() - lastResumeMs
-        if (elapsed <= 0) return
-        when (mode) {
-            ReadingMode.VISUAL -> visualDurationMs += elapsed
-            ReadingMode.AUDIO -> ttsDurationMs += elapsed
+        val now = clock()
+        val countedUntil = when (mode) {
+            ReadingMode.VISUAL -> minOf(now, lastActivityMs + visualIdleTimeoutMs)
+            ReadingMode.AUDIO -> now
         }
-        lastResumeMs = clock()
+        val elapsed = countedUntil - lastResumeMs
+        if (elapsed > 0) {
+            when (mode) {
+                ReadingMode.VISUAL -> visualDurationMs += elapsed
+                ReadingMode.AUDIO -> ttsDurationMs += elapsed
+            }
+        }
+        lastResumeMs = now
+    }
+
+    private companion object {
+        const val VISUAL_IDLE_TIMEOUT_MS = 5 * 60_000L
     }
 }
