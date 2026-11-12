@@ -6,6 +6,7 @@ import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.verticalScroll
@@ -27,9 +28,12 @@ import androidx.compose.ui.unit.dp
 import com.inktone.core.designsystem.AppIcon
 import com.inktone.core.designsystem.AppSymbol
 import com.inktone.domain.model.Publication
+import com.inktone.domain.model.cleanedAuthorsForDisplay
+import com.inktone.domain.model.cleanedForDisplay
 import com.inktone.domain.model.PublicationFormat
 import java.text.DateFormat
 import java.util.Date
+import java.util.Locale
 import kotlin.math.log10
 import kotlin.math.pow
 
@@ -145,14 +149,14 @@ fun BookDetailsSheet(publication: Publication, onDismiss: () -> Unit) {
                 .padding(bottom = 32.dp)
                 .verticalScroll(rememberScrollState()),
         ) {
-            Text(publication.title, style = MaterialTheme.typography.titleLarge)
+            Text(publication.title.cleanedForDisplay(), style = MaterialTheme.typography.titleLarge)
             if (!publication.subtitle.isNullOrBlank()) {
                 Text(publication.subtitle!!, style = MaterialTheme.typography.titleSmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
             }
-            Spacer(Modifier.width(8.dp))
-            if (publication.authors.isNotEmpty()) DetailRow("Auteurs", publication.authors.joinToString())
+            Spacer(Modifier.height(8.dp))
+            if (publication.authors.isNotEmpty()) DetailRow("Auteurs", publication.authors.cleanedAuthorsForDisplay())
             publication.publisher?.let { DetailRow("Éditeur", it) }
-            publication.language?.let { DetailRow("Langue", it) }
+            publication.language?.let { DetailRow("Langue", languageDisplayName(it)) }
             DetailRow("Format", publication.format.name)
             DetailRow("Taille", formatFileSize(publication.fileSize))
             // Lot 12, tâche 12.12 — libellé conditionnel selon le format :
@@ -170,7 +174,7 @@ fun BookDetailsSheet(publication: Publication, onDismiss: () -> Unit) {
             if (publication.subjects.isNotEmpty()) DetailRow("Sujets", publication.subjects.joinToString())
             DetailRow("Importé le", DateFormat.getDateInstance().format(Date(publication.importDate)))
             if (!publication.description.isNullOrBlank()) {
-                Spacer(Modifier.width(8.dp))
+                Spacer(Modifier.height(8.dp))
                 Text(
                     publication.description!!,
                     style = MaterialTheme.typography.bodyMedium,
@@ -192,6 +196,17 @@ private fun DetailRow(label: String, value: String) {
         )
         Text(value, style = MaterialTheme.typography.bodyMedium, textAlign = TextAlign.Start)
     }
+}
+
+/**
+ * Code de langue des métadonnées (« fr », « en-GB ») en nom lisible
+ * (« Français », « Anglais »). Un code que la plateforme ne connaît pas
+ * est affiché tel quel plutôt que perdu.
+ */
+private fun languageDisplayName(code: String): String {
+    val name = Locale.forLanguageTag(code).getDisplayLanguage(Locale.FRENCH)
+    return if (name.isBlank() || name.equals(code, ignoreCase = true)) code
+    else name.replaceFirstChar { it.titlecase(Locale.FRENCH) }
 }
 
 private fun formatFileSize(bytes: Long): String {
