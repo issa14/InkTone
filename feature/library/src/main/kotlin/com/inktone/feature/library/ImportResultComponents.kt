@@ -117,7 +117,12 @@ fun ImportResultDetail(
             colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceContainerHigh),
         ) {
             LazyColumn(modifier = Modifier.padding(8.dp)) {
-                items(results, key = { "${it.resultType}_${it.fileName}" }) { entry ->
+                // Pas de clé dérivée du contenu : deux fichiers de même nom et
+                // de même issue dans un lot (deux « livre.epub » de dossiers
+                // différents, tous deux en doublon) produisaient la même clé,
+                // et LazyColumn lève une exception sur une clé dupliquée. La
+                // liste est figée une fois affichée, la position suffit.
+                items(results) { entry ->
                     ImportResultRow(entry = entry, onOpenPublication = onOpenPublication)
                 }
             }

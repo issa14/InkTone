@@ -132,7 +132,12 @@ fun BookStatisticsScreen(
                             modifier = Modifier.padding(top = 8.dp),
                         )
                     }
-                    items(s.history, key = { "${it.dateFormatted}_${it.timeRange}" }) { item ->
+                    // Pas de clé dérivée de l'affichage : deux sessions du même
+                    // livre dans la même minute (fragments de 5 s, mise en
+                    // arrière-plan) donnaient la même date et la même plage
+                    // horaire, et LazyColumn lève une exception sur une clé
+                    // dupliquée. La liste ne change pas pendant l'affichage.
+                    items(s.history) { item ->
                         SessionHistoryRow(item)
                     }
                 }
