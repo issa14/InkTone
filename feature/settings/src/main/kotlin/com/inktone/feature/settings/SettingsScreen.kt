@@ -495,58 +495,8 @@ internal fun SettingsContent(
             )
         }
 
-        // ── Carte 6 : Prononciation (Palier B — inline) ───────────────────────
-        // Écran séparé (PronunciationRulesRoute) conservé pour le lien du
-        // panneau Voix du lecteur (ReaderTtsPanel) — cette carte ne le
-        // remplace que dans les Réglages.
-        var showRuleDialog by remember { mutableStateOf(false) }
-        var editingRule by remember { mutableStateOf<PronunciationRule?>(null) }
-        // Audit UX C7 : la corbeille, voisine de l'interrupteur, supprimait
-        // la règle en un tap ; elle demande désormais confirmation.
-        var ruleToDelete by remember { mutableStateOf<PronunciationRule?>(null) }
-        ruleToDelete?.let { rule ->
-            AlertDialog(
-                onDismissRequest = { ruleToDelete = null },
-                title = { Text("Supprimer cette règle ?") },
-                text = { Text("« ${rule.originalText} » → « ${rule.replacementText} »") },
-                confirmButton = {
-                    TextButton(
-                        onClick = {
-                            ruleToDelete = null
-                            onIntent(SettingsIntent.DeletePronunciationRule(rule.id))
-                        },
-                        colors = ButtonDefaults.textButtonColors(contentColor = MaterialTheme.colorScheme.error),
-                    ) { Text("Supprimer") }
-                },
-                dismissButton = { TextButton(onClick = { ruleToDelete = null }) { Text("Annuler") } },
-            )
-        }
-
-        PronunciationCard(
-            rules = pronunciationRules,
-            onAddClick = { editingRule = null; showRuleDialog = true },
-        ) {
-            if (pronunciationRules.isEmpty()) {
-                Text(
-                    "Aucune règle pour l'instant.",
-                    style = MaterialTheme.typography.bodyMedium,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant,
-                    modifier = Modifier.padding(horizontal = 20.dp, vertical = 12.dp),
-                )
-            } else {
-                pronunciationRules.forEachIndexed { index, rule ->
-                    PronunciationRuleRow(
-                        rule = rule,
-                        onClick = { editingRule = rule; showRuleDialog = true },
-                        onToggle = { onIntent(SettingsIntent.TogglePronunciationRule(rule)) },
-                        onDelete = { ruleToDelete = rule },
-                    )
-                    if (index != pronunciationRules.lastIndex) {
-                        HorizontalDivider(modifier = Modifier.padding(horizontal = 20.dp))
-                    }
-                }
-            }
-        }
+        // ── Carte 6 : Prononciation ──────────────────────────────────────────
+        PronunciationRulesSection(rules = pronunciationRules, onIntent = onIntent)
 
         // ── Carte 7 : À propos ─────────────────────────────────────────────────
         SectionGroup("À propos") {
@@ -637,16 +587,6 @@ internal fun SettingsContent(
                 destructive = true,
                 onConfirm = { showResetConfirm = false; onIntent(SettingsIntent.ResetPreferences) },
                 onDismiss = { showResetConfirm = false },
-            )
-        }
-        if (showRuleDialog) {
-            PronunciationRuleDialog(
-                editing = editingRule,
-                onSave = { original, replacement, isRegex ->
-                    onIntent(SettingsIntent.SavePronunciationRule(editingRule?.id, original, replacement, isRegex))
-                    showRuleDialog = false
-                },
-                onDismiss = { showRuleDialog = false },
             )
         }
         dataOperationResult?.let { result ->
@@ -1217,4 +1157,73 @@ private fun GoalPickerDialog(
         confirmButton = { TextButton(onClick = { onConfirm(value.toInt()) }) { Text("Valider") } },
         dismissButton = { TextButton(onClick = onDismiss) { Text("Annuler") } },
     )
+}
+
+/**
+ * Carte des règles de prononciation — liste, ajout, modification,
+ * suppression confirmée. Partagée par les Réglages et l'écran ouvert depuis
+ * le panneau Voix du Lecteur (audit UX B8 : ce dernier était une ébauche,
+ * titre en double, sans modification, suppression directe).
+ */
+@Composable
+internal fun PronunciationRulesSection(rules: List<PronunciationRule>, onIntent: (SettingsIntent) -> Unit) {
+    var showRuleDialog by remember { mutableStateOf(false) }
+    var editingRule by remember { mutableStateOf<PronunciationRule?>(null) }
+    // Audit UX C7 : la corbeille, voisine de l'interrupteur, supprimait
+    // la règle en un tap ; elle demande désormais confirmation.
+    var ruleToDelete by remember { mutableStateOf<PronunciationRule?>(null) }
+    ruleToDelete?.let { rule ->
+        AlertDialog(
+            onDismissRequest = { ruleToDelete = null },
+            title = { Text("Supprimer cette règle ?") },
+            text = { Text("« ${rule.originalText} » → « ${rule.replacementText} »") },
+            confirmButton = {
+                TextButton(
+                    onClick = {
+                        ruleToDelete = null
+                        onIntent(SettingsIntent.DeletePronunciationRule(rule.id))
+                    },
+                    colors = ButtonDefaults.textButtonColors(contentColor = MaterialTheme.colorScheme.error),
+                ) { Text("Supprimer") }
+            },
+            dismissButton = { TextButton(onClick = { ruleToDelete = null }) { Text("Annuler") } },
+        )
+    }
+
+    PronunciationCard(
+        rules = rules,
+        onAddClick = { editingRule = null; showRuleDialog = true },
+    ) {
+        if (rules.isEmpty()) {
+            Text(
+                "Aucune règle pour l'instant.",
+                style = MaterialTheme.typography.bodyMedium,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                modifier = Modifier.padding(horizontal = 20.dp, vertical = 12.dp),
+            )
+        } else {
+            rules.forEachIndexed { index, rule ->
+                PronunciationRuleRow(
+                    rule = rule,
+                    onClick = { editingRule = rule; showRuleDialog = true },
+                    onToggle = { onIntent(SettingsIntent.TogglePronunciationRule(rule)) },
+                    onDelete = { ruleToDelete = rule },
+                )
+                if (index != rules.lastIndex) {
+                    HorizontalDivider(modifier = Modifier.padding(horizontal = 20.dp))
+                }
+            }
+        }
+    }
+
+    if (showRuleDialog) {
+        PronunciationRuleDialog(
+            editing = editingRule,
+            onSave = { original, replacement, isRegex ->
+                onIntent(SettingsIntent.SavePronunciationRule(editingRule?.id, original, replacement, isRegex))
+                showRuleDialog = false
+            },
+            onDismiss = { showRuleDialog = false },
+        )
+    }
 }
