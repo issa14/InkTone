@@ -424,7 +424,6 @@ fun InkToneNavHost(navController: NavHostController = rememberNavController(), s
             ) { result -> syncAuthViewModel.onAuthorizationResult(result.data) }
 
             SyncConfigurationScreen(
-                onBack = navController::popBackStack,
                 onMenuClick = openDrawer,
                 onOpenLocalBackup = { navController.navigate(SettingsRoute) },
                 isGoogleAuthenticating = isAuthenticating,

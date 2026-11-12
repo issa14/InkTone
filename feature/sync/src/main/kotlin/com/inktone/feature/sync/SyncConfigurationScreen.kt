@@ -78,11 +78,8 @@ import com.inktone.domain.model.SyncUiState
 fun SyncConfigurationScreen(
     viewModel: SyncViewModel = hiltViewModel(),
     // Lot 18 — la flèche de retour cède la place au hamburger du drawer
-    // partagé ; [onBack] reste utilisé par le bouton « Enregistrer », qui
-    // quitte l'écran une fois la configuration validée (comportement
-    // inchangé, ce n'est pas l'icône de navigation).
+    // partagé.
     onMenuClick: () -> Unit = {},
-    onBack: () -> Unit = {},
     onOpenLocalBackup: () -> Unit = {},
     isGoogleAuthenticating: Boolean = false,
     isGoogleConfigured: Boolean = true,
@@ -116,14 +113,15 @@ fun SyncConfigurationScreen(
                         contentColor = MaterialTheme.colorScheme.onPrimary,
                         disabledContentColor = MaterialTheme.colorScheme.onPrimary.copy(alpha = 0.38f),
                     )
+                    // Rien n'est à enregistrer ici : une connexion prend effet
+                    // dès qu'elle réussit. L'ancien « Enregistrer » renvoyait à
+                    // la Bibliothèque, et s'affichait grisé avant toute
+                    // configuration. « Terminé » ramène au tableau de bord,
+                    // seulement quand on y est venu par « Gérer ».
                     if (showOperational) {
                         TextButton(onClick = { manualShowConfig = true }, colors = barButtonColors) { Text("Gérer") }
-                    } else {
-                        TextButton(
-                            onClick = { manualShowConfig = false; onBack() },
-                            enabled = isConfigured,
-                            colors = barButtonColors,
-                        ) { Text("Enregistrer") }
+                    } else if (isConfigured) {
+                        TextButton(onClick = { manualShowConfig = false }, colors = barButtonColors) { Text("Terminé") }
                     }
                 },
                 colors = TopAppBarDefaults.topAppBarColors(
