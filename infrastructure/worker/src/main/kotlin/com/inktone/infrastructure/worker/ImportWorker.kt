@@ -10,6 +10,7 @@ import androidx.work.WorkerParameters
 import com.inktone.domain.service.ImportResultsStore
 import com.inktone.domain.usecase.ImportPublicationUseCase
 import com.inktone.domain.usecase.ImportResult
+import kotlinx.coroutines.CancellationException
 import dagger.assisted.Assisted
 import dagger.assisted.AssistedInject
 import kotlinx.coroutines.Dispatchers
@@ -68,7 +69,20 @@ class ImportWorker @AssistedInject constructor(
             async {
                 semaphore.withPermit {
                     val fileName = resolveFileName(uri)
-                    val result = importPublication(uri)
+                    // ImportPublicationUseCase type les cas attendus (doublon,
+                    // DRM, fichier corrompu) sans lever d'exception — mais pas
+                    // l'imprévu (permission SAF révoquée, erreur Room). Une
+                    // exception ici faisait
+                    // échouer le travail entier : les fichiers suivants du lot
+                    // n'étaient jamais importés, les lots chaînés après lui
+                    // étaient annulés, et aucun ne figurait dans le résumé.
+                    val result = try {
+                        importPublication(uri)
+                    } catch (e: CancellationException) {
+                        throw e
+                    } catch (e: Exception) {
+                        ImportResult.Corrupted(e.message ?: "Erreur inattendue pendant l'import")
+                    }
 
                     // Persister le résultat par fichier (Palier A, Lot 5)
                     importResultsStore.recordResult(sessionId, fileName, result)
