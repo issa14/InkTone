@@ -113,4 +113,29 @@ class FallbackTtsEngineTest {
         assertEquals(1, fallback.callCount)
         assertEquals(TtsEngineId.SHERPA_ONNX, engine.id)
     }
+
+    /**
+     * Bug réel corrigé (audit UX D41) : la chaîne offline essayait toujours
+     * Sherpa-ONNX d'abord, quel que soit le moteur du profil. « Voix
+     * système » choisie, voix neuronale installée : c'est Sherpa qui lisait.
+     */
+    @Test
+    fun un_profil_voix_systeme_va_directement_au_palier_1() = runTest {
+        val primary = FakeTtsEngine(TtsEngineId.SHERPA_ONNX, capabilities(wordTimestamps = false))
+        val fallback = FakeTtsEngine(TtsEngineId.ANDROID_NATIVE, capabilities(wordTimestamps = true))
+        val engine = FallbackTtsEngine(primary, fallback)
+        val nativeProfile = voiceProfile.copy(engine = TtsEngineId.ANDROID_NATIVE)
+
+        engine.synthesize(sentence, nativeProfile)
+
+        assertEquals("le Palier 2 ne doit pas etre sollicite", 0, primary.callCount)
+        assertEquals(1, fallback.callCount)
+        assertEquals(TtsEngineId.ANDROID_NATIVE, engine.id)
+        assertTrue("capabilities du moteur reellement actif", engine.capabilities.wordTimestamps)
+
+        // Revenir à un profil Sherpa rend la main au Palier 2.
+        engine.synthesize(sentence, voiceProfile)
+        assertEquals(1, primary.callCount)
+        assertEquals(TtsEngineId.SHERPA_ONNX, engine.id)
+    }
 }

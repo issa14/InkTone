@@ -30,6 +30,11 @@ import javax.inject.Singleton
  * semblant") s'applique aussi à ce wrapper : après un repli,
  * `wordTimestamps` redevient vrai (le Palier 1 les fournit réellement),
  * pas figé sur la valeur du Palier 2.
+ *
+ * Un profil dont le moteur est la voix système (`ANDROID_NATIVE`) va
+ * directement au Palier 1, sans passer par le Palier 2 (audit UX D41) :
+ * avant, le choix « Voix système » n'était pas respecté dès que la voix
+ * neuronale était installée.
  */
 @Singleton
 class FallbackTtsEngine @Inject constructor(
@@ -40,13 +45,27 @@ class FallbackTtsEngine @Inject constructor(
     @Volatile
     private var fallenBack = false
 
+    // Dernière synthèse faite par le Palier 1 parce que le profil le
+    // demandait (voix système choisie), et non par repli.
+    @Volatile
+    private var nativeRequested = false
+
+    private val fallbackActive: Boolean
+        get() = fallenBack || nativeRequested
+
     override val id: TtsEngineId
-        get() = if (fallenBack) fallback.id else primary.id
+        get() = if (fallbackActive) fallback.id else primary.id
 
     override val capabilities: TtsCapabilities
-        get() = if (fallenBack) fallback.capabilities else primary.capabilities
+        get() = if (fallbackActive) fallback.capabilities else primary.capabilities
 
     override suspend fun synthesize(sentence: Sentence, voiceProfile: VoiceProfile): AudioSegment {
+        if (voiceProfile.engine == TtsEngineId.ANDROID_NATIVE) {
+            val segment = fallback.synthesize(sentence, voiceProfile)
+            nativeRequested = true
+            return segment
+        }
+        nativeRequested = false
         if (fallenBack) return fallback.synthesize(sentence, voiceProfile)
         return try {
             primary.synthesize(sentence, voiceProfile)
@@ -67,7 +86,7 @@ class FallbackTtsEngine @Inject constructor(
     }
 
     override fun observePlaybackEvents(): Flow<PlaybackEvent> =
-        if (fallenBack) fallback.observePlaybackEvents() else primary.observePlaybackEvents()
+        if (fallbackActive) fallback.observePlaybackEvents() else primary.observePlaybackEvents()
 
     /**
      * Lot 20 — préchauffe le Palier 2 (Sherpa charge ses modèles), no-op sinon.
