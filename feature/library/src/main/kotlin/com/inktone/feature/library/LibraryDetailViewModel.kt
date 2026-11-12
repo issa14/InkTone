@@ -16,6 +16,7 @@ import kotlinx.coroutines.channels.Channel
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
+import kotlinx.coroutines.flow.combine
 import kotlinx.coroutines.flow.receiveAsFlow
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
@@ -86,11 +87,20 @@ class LibraryDetailViewModel @Inject constructor(
             LibraryDetailCategory.TAG -> FilterMode.TAG
         }
         observeJob = viewModelScope.launch {
-            publicationRepository.observeFiltered(filterMode, value).collect { publications ->
+            // Positions observées, plus lues une seule fois : pour un tag, le
+            // flux des publications ne réémet pas quand seule une position
+            // change, et la progression restait celle de l'arrivée sur
+            // l'écran — au retour du Lecteur, le livre qu'on venait de lire
+            // affichait encore son ancien pourcentage. Même combinaison que
+            // LibraryViewModel.observePublications.
+            combine(
+                publicationRepository.observeFiltered(filterMode, value),
+                readingStateRepository.observeAll(),
+            ) { publications, readingStates -> publications to readingStates }.collect { (publications, readingStates) ->
                 // Audit v1.0.0 (AUDIT_CONSOLIDATION_V1.md, P5) — même fix
                 // que LibraryViewModel : boucle O(n) hors Main.
                 val progressMap = withContext(defaultDispatcher) {
-                    computeProgressMap(publications, readingStateRepository.getAll())
+                    computeProgressMap(publications, readingStates)
                 }
                 _state.value = _state.value.copy(
                     publications = publications,

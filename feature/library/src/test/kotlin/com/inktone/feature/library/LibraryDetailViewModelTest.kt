@@ -7,6 +7,8 @@ import com.inktone.core.testing.fake.FakeReadingStateRepository
 import com.inktone.core.testing.fake.FakeTtsSegmentCache
 import com.inktone.domain.model.Publication
 import com.inktone.domain.model.PublicationFormat
+import com.inktone.domain.model.ReadingState
+import com.inktone.domain.valueobject.Locator
 import com.inktone.domain.usecase.DeletePublicationUseCase
 import com.inktone.domain.usecase.ToggleFavoriteUseCase
 import com.inktone.domain.usecase.TogglePinUseCase
@@ -64,5 +66,29 @@ class LibraryDetailViewModelTest {
         dispatcher.scheduler.advanceUntilIdle()
 
         assertEquals(listOf("1"), viewModel.state.value.displayedPublications.map { it.id })
+    }
+
+    @Test
+    fun la_progression_suit_les_positions_enregistrees_apres_l_ouverture_de_l_ecran() = runTest {
+        // Avant le correctif, les positions n'étaient lues qu'à l'émission
+        // du flux des publications : pour un tag, revenir du Lecteur
+        // laissait l'ancien pourcentage. PDF : progression = page / pages,
+        // indépendante des longueurs de chapitres.
+        val repository = FakePublicationRepository()
+        repository.insert(
+            publication("1", subjects = listOf("Fantasy")).copy(format = PublicationFormat.PDF, chapterCount = 10),
+        )
+        val readingStates = FakeReadingStateRepository()
+        readingStates.save(ReadingState("1", Locator("page-4", chapterIndex = 4, charOffset = 0), lastReadAt = 0L))
+        val viewModel = LibraryDetailViewModel(repository, readingStates, ToggleFavoriteUseCase(repository), TogglePinUseCase(repository), DeletePublicationUseCase(repository, FakePreAnalysisStore(), FakeTtsSegmentCache(), FakeRenderedPageCache()), dispatcher)
+
+        viewModel.onIntent(LibraryDetailIntent.Load(LibraryDetailCategory.TAG, "Fantasy"))
+        dispatcher.scheduler.advanceUntilIdle()
+        assertEquals(40, viewModel.state.value.progressMap["1"])
+
+        readingStates.save(ReadingState("1", Locator("page-9", chapterIndex = 9, charOffset = 0), lastReadAt = 1L))
+        dispatcher.scheduler.advanceUntilIdle()
+
+        assertEquals(90, viewModel.state.value.progressMap["1"])
     }
 }
