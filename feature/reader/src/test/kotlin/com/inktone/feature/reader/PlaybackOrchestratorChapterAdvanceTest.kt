@@ -15,8 +15,12 @@ import com.inktone.domain.model.VoiceProfile
 import com.inktone.domain.service.ChapterParser
 import com.inktone.domain.usecase.GetReadingStateUseCase
 import com.inktone.domain.usecase.UpdateReadingStateUseCase
+import kotlinx.coroutines.CompletableDeferred
 import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.CoroutineStart
+import kotlinx.coroutines.Deferred
 import kotlinx.coroutines.Job
+import kotlinx.coroutines.async
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.runBlocking
@@ -40,7 +44,11 @@ class PlaybackOrchestratorChapterAdvanceTest {
     private class ProgrammedChapterParser(
         private val chapters: Map<String, List<Sentence>>,
     ) : ChapterParser {
-        var parsedHrefs = mutableListOf<String>()
+        // Écrite depuis les threads de l'ordonnanceur, lue par le test.
+        val parsedHrefs: MutableList<String> = java.util.Collections.synchronizedList(mutableListOf())
+
+        /** Complété à la première analyse : signal non conflaté, contrairement à `state`. */
+        val firstParse = CompletableDeferred<Unit>()
 
         override fun registerPublication(publicationId: String, fileUri: String) = Unit
 
@@ -50,6 +58,7 @@ class PlaybackOrchestratorChapterAdvanceTest {
             fragment: String?,
         ): Chapter {
             parsedHrefs += chapterHref
+            firstParse.complete(Unit)
             return Chapter(
                 // Index volontairement FAUX (toujours 0), comme le parseur réel
                 // sur les livres à couverture prépendue : l'ordonnanceur doit
@@ -109,6 +118,31 @@ class PlaybackOrchestratorChapterAdvanceTest {
 
         override fun observePlaybackEvents(): kotlinx.coroutines.flow.Flow<com.inktone.domain.service.PlaybackEvent> =
             kotlinx.coroutines.flow.emptyFlow()
+    }
+
+    /**
+     * S'abonne à `chapterCompleted` AVANT que la narration ne démarre.
+     * Ce flux ne rejoue rien : une fin de chapitre émise avant l'abonnement
+     * est perdue, et le test attendait alors jusqu'à son délai — la première
+     * phrase ne dure que 20 ms.
+     */
+    private fun CoroutineScope.awaitChapterCompleted(orchestrator: PlaybackOrchestrator): Deferred<Unit> =
+        async(start = CoroutineStart.UNDISPATCHED) { orchestrator.chapterCompleted.first() }
+
+    /**
+     * Attend la fin de narration qui suit l'analyse d'un chapitre vide.
+     *
+     * Jamais `state.first { Idle && parsedHrefs.isNotEmpty() }` : l'état passe
+     * par Idle (fin du chapitre courant), Buffering (analyse du suivant), puis
+     * Idle (chapitre vide). Un collecteur de StateFlow ne reçoit jamais deux
+     * valeurs égales de suite : s'il voit le premier Idle (rien d'analysé
+     * encore) et rate le Buffering, le second Idle ne lui parvient pas et le
+     * test attend jusqu'à son délai. Après l'analyse, l'état ne peut plus être
+     * le premier Idle : soit Buffering, soit déjà l'Idle final.
+     */
+    private suspend fun awaitNarrationEndAfterParse(orchestrator: PlaybackOrchestrator, parser: ProgrammedChapterParser) {
+        parser.firstParse.await()
+        orchestrator.state.first { it is PlaybackOrchestrator.PlaybackStatus.Idle }
     }
 
     private fun orchestrator(parser: ChapterParser) = PlaybackOrchestrator(
@@ -194,6 +228,8 @@ class PlaybackOrchestratorChapterAdvanceTest {
         val orchestrator = orchestrator(parser)
         // Aucun setNarrationProgram : comportement d'avant le palier.
 
+        val chapterCompleted = awaitChapterCompleted(orchestrator)
+
         orchestrator.play(
             sentences = listOf(sentence(0, "Fin du premier.", 0)),
             voiceProfile = profile,
@@ -203,7 +239,7 @@ class PlaybackOrchestratorChapterAdvanceTest {
             resourceHref = "ch0.xhtml",
         )
 
-        withTimeout(5_000) { orchestrator.chapterCompleted.first() }
+        withTimeout(5_000) { chapterCompleted.await() }
 
         assertEquals(emptyList<String>(), parser.parsedHrefs)
         assertEquals(0, orchestrator.currentChapterIndex.value)
@@ -215,6 +251,8 @@ class PlaybackOrchestratorChapterAdvanceTest {
         val orchestrator = orchestrator(parser)
         orchestrator.setNarrationProgram("pub1", listOf("ch0.xhtml"))
 
+        val chapterCompleted = awaitChapterCompleted(orchestrator)
+
         orchestrator.play(
             sentences = listOf(sentence(0, "Fin du livre.", 0)),
             voiceProfile = profile,
@@ -224,7 +262,7 @@ class PlaybackOrchestratorChapterAdvanceTest {
             resourceHref = "ch0.xhtml",
         )
 
-        withTimeout(5_000) { orchestrator.chapterCompleted.first() }
+        withTimeout(5_000) { chapterCompleted.await() }
 
         assertEquals(emptyList<String>(), parser.parsedHrefs)
         assertEquals(0, orchestrator.currentChapterIndex.value)
@@ -250,10 +288,7 @@ class PlaybackOrchestratorChapterAdvanceTest {
             resourceHref = "ch0.xhtml",
         )
 
-        withTimeout(5_000) { orchestrator.chapterCompleted.first() }
-        withTimeout(5_000) {
-            orchestrator.state.first { it is PlaybackOrchestrator.PlaybackStatus.Idle && parser.parsedHrefs.isNotEmpty() }
-        }
+        withTimeout(5_000) { awaitNarrationEndAfterParse(orchestrator, parser) }
 
         assertEquals(listOf("ch1.xhtml"), parser.parsedHrefs)
         assertEquals(0, orchestrator.currentChapterIndex.value)
@@ -317,9 +352,7 @@ class PlaybackOrchestratorChapterAdvanceTest {
             resourceHref = "ch0.xhtml",
         )
 
-        withTimeout(5_000) {
-            orchestrator.state.first { it is PlaybackOrchestrator.PlaybackStatus.Idle && parser.parsedHrefs.isNotEmpty() }
-        }
+        withTimeout(5_000) { awaitNarrationEndAfterParse(orchestrator, parser) }
 
         assertEquals("ch2 ne doit jamais etre parse", listOf("ch1.xhtml"), parser.parsedHrefs)
         assertEquals(0, orchestrator.currentChapterIndex.value)
