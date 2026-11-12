@@ -74,13 +74,19 @@ class ReaderViewModelNarrationOwnershipTest {
     fun tearDown() { Dispatchers.resetMain() }
 
     private class HangingTtsEngine : TtsEngine {
+        /** Vitesse de chaque synthèse demandée, dans l'ordre. */
+        val requestedSpeeds: MutableList<Float> = java.util.Collections.synchronizedList(mutableListOf())
+
         override val id = TtsEngineId.ANDROID_NATIVE
         override val capabilities = TtsCapabilities(
             offline = true, wordTimestamps = false, sentenceTimestamps = false, languages = listOf("fr"),
             streamingSynthesis = false, speedControl = true, pitchControl = false, modelSizeMb = 0, license = "test",
         )
 
-        override suspend fun synthesize(sentence: Sentence, voiceProfile: VoiceProfile): AudioSegment = awaitCancellation()
+        override suspend fun synthesize(sentence: Sentence, voiceProfile: VoiceProfile): AudioSegment {
+            requestedSpeeds += voiceProfile.speed
+            awaitCancellation()
+        }
 
         override fun observePlaybackEvents(): Flow<PlaybackEvent> = emptyFlow()
     }
@@ -115,8 +121,10 @@ class ReaderViewModelNarrationOwnershipTest {
         override fun invalidate(publicationId: String) = Unit
     }
 
+    private val ttsEngine = HangingTtsEngine()
+
     private val orchestrator = PlaybackOrchestrator(
-        HangingTtsEngine(), FakeAudioPlayer(), UpdateReadingStateUseCase(FakeReadingStateRepository()),
+        ttsEngine, FakeAudioPlayer(), UpdateReadingStateUseCase(FakeReadingStateRepository()),
         GetReadingStateUseCase(FakeReadingStateRepository()), FakeChapterParser(), FakePublicationRepository(),
         FakePublicationParser(), FakePreferencesRepository(), FakeVoiceProfileRepository(), FakeTtsSegmentCache(),
         FakePronunciationRuleRepository(),
@@ -228,6 +236,38 @@ class ReaderViewModelNarrationOwnershipTest {
             assertEquals("B reste à sa propre position", 0, viewModel.state.value.currentChapterIndex)
         } finally {
             cleanUp(viewModel)
+        }
+    }
+
+    /**
+     * Bug réel corrigé (audit UX A6) : la vitesse changée pendant la narration
+     * était enregistrée mais pas appliquée — l'ordonnanceur gardait le profil
+     * du lancement jusqu'à une pause et une reprise.
+     */
+    @Test
+    fun changer_la_vitesse_pendant_la_narration_l_applique_aussitot() = runTest {
+        val viewModel = openBook("pub")
+        try {
+            viewModel.onIntent(ReaderIntent.PlayCurrentSentence)
+            dispatcher.scheduler.runCurrent()
+            awaitRealTime { ttsEngine.requestedSpeeds.isNotEmpty() }
+
+            viewModel.onIntent(ReaderIntent.SetTtsSpeed(2.0f))
+            dispatcher.scheduler.runCurrent()
+
+            awaitRealTime { 2.0f in ttsEngine.requestedSpeeds }
+        } finally {
+            cleanUp(viewModel)
+        }
+    }
+
+    /** La synthèse tourne sur un vrai dispatcher : attente en temps réel, bornée. */
+    private fun awaitRealTime(condition: () -> Boolean) {
+        val deadline = System.currentTimeMillis() + 5_000
+        while (!condition()) {
+            check(System.currentTimeMillis() < deadline) { "condition non atteinte en 5 s" }
+            dispatcher.scheduler.runCurrent()
+            Thread.sleep(20)
         }
     }
 }

@@ -28,6 +28,7 @@ import androidx.compose.material3.TextButton
 import androidx.compose.material3.rememberModalBottomSheetState
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableFloatStateOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
@@ -75,6 +76,9 @@ fun ReaderTtsPanel(
     val sheetState = rememberModalBottomSheetState(skipPartiallyExpanded = true)
     var showVoicePicker by remember { mutableStateOf(false) }
     val speed = activeVoiceProfile?.speed ?: 1.0f
+    // Valeur suivie pendant le geste, transmise à la fin seulement : la
+    // narration en cours est relancée à chaque changement (audit UX A6).
+    var speedDraft by remember(speed) { mutableFloatStateOf(speed) }
 
     ModalBottomSheet(onDismissRequest = onDismiss, sheetState = sheetState) {
         Column(
@@ -150,9 +154,10 @@ fun ReaderTtsPanel(
             // domaine à faire ici.
             InkToneSlider(
                 label = "Vitesse",
-                value = speed,
+                value = speedDraft,
                 range = 0.5f..3.0f,
-                onValueChange = onSpeedChange,
+                onValueChange = { speedDraft = it },
+                onValueChangeFinished = { onSpeedChange(speedDraft) },
                 minIcon = AppSymbol.SlowMotionVideo,
                 maxIcon = AppSymbol.FastForward,
                 steps = 9,

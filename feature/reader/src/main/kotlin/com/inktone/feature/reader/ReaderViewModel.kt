@@ -1670,7 +1670,20 @@ class ReaderViewModel @Inject constructor(
                 preferencesRepository.update(prefs.copy(activeVoiceProfileId = updated.id))
             }
             _state.value = _state.value.copy(activeVoiceProfile = updated)
+            restartNarrationWithNewProfile()
         }
+    }
+
+    /**
+     * Audit UX A6 : l'ordonnanceur garde le profil reçu au lancement. Un
+     * changement de vitesse ou de voix pendant la narration ne s'entendait
+     * qu'après une pause et une reprise : la narration est relancée à la
+     * phrase en cours, avec le profil enregistré.
+     */
+    private fun restartNarrationWithNewProfile() {
+        if (!_state.value.isPlaying) return
+        pausePlayback()
+        playCurrentSentence()
     }
 
     /** 3d.1 — change le profil vocal actif (préférence globale, panneau Voix). */
@@ -1679,6 +1692,7 @@ class ReaderViewModel @Inject constructor(
             val prefs = preferencesRepository.get()
             preferencesRepository.update(prefs.copy(activeVoiceProfileId = profileId))
             _state.value = _state.value.copy(activeVoiceProfile = voiceProfileRepository.getById(profileId))
+            restartNarrationWithNewProfile()
         }
     }
 
