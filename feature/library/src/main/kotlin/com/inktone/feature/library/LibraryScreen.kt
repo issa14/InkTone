@@ -218,9 +218,11 @@ fun LibraryScreen(
                     onDetailsClick = { viewModel.onIntent(LibraryIntent.OpenImportDetails) },
                     onDismiss = { viewModel.onIntent(LibraryIntent.DismissImportResults) },
                 )
-            } else if (state.importResults.isEmpty()) {
-                ImportProgressBanner(state.importProgress)
             }
+            // Affichée même quand le résumé d'un import précédent n'a pas été
+            // fermé : un nouvel import lancé entre-temps progressait sans
+            // aucun signe à l'écran. Se masque d'elle-même hors import.
+            ImportProgressBanner(state.importProgress)
 
             // Lot 5 — détail des résultats d'import
             if (state.showImportDetails && state.importResults.isNotEmpty()) {

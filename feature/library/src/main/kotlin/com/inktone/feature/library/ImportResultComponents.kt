@@ -41,6 +41,7 @@ fun ImportResultSummary(
     onDetailsClick: () -> Unit,
     onDismiss: () -> Unit,
     modifier: Modifier = Modifier,
+    showDetailsButton: Boolean = true,
 ) {
     val successCount = results.count { it.resultType == "success" }
     val duplicateCount = results.count { it.resultType == "duplicate" }
@@ -73,8 +74,10 @@ fun ImportResultSummary(
 
             Spacer(Modifier.width(8.dp))
 
-            TextButton(onClick = onDetailsClick) {
-                Text("Détails")
+            if (showDetailsButton) {
+                TextButton(onClick = onDetailsClick) {
+                    Text("Détails")
+                }
             }
 
             TextButton(onClick = onDismiss) {
@@ -104,10 +107,13 @@ fun ImportResultDetail(
 ) {
     Column(modifier = modifier.fillMaxWidth().padding(horizontal = 8.dp, vertical = 4.dp)) {
         // Résumé en-tête
+        // En-tête de la vue détaillée : le bouton « Détails » y restait
+        // affiché et ne faisait rien.
         ImportResultSummary(
             results = results,
-            onDetailsClick = {}, // déjà dans les détails
+            onDetailsClick = {},
             onDismiss = onDismiss,
+            showDetailsButton = false,
         )
 
         Spacer(Modifier.height(4.dp))

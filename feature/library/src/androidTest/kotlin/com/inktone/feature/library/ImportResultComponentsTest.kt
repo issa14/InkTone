@@ -91,6 +91,22 @@ class ImportResultComponentsTest {
     }
 
     @Test
+    fun la_vue_detaillee_ne_propose_plus_de_bouton_details_inerte() {
+        // Dans la vue détaillée, l'en-tête reprenait le résumé avec un
+        // bouton « Détails » qui ne faisait rien.
+        composeTestRule.setContent {
+            ImportResultDetail(
+                results = listOf(entry("mon-livre.epub", "corrupted", message = "Echec de lecture")),
+                onOpenPublication = {},
+                onDismiss = {},
+            )
+        }
+
+        composeTestRule.onNodeWithText("Détails").assertDoesNotExist()
+        composeTestRule.onNodeWithText("OK").assertExists()
+    }
+
+    @Test
     fun chaque_ligne_du_detail_porte_un_nom_de_fichier_reel() {
         composeTestRule.setContent {
             ImportResultDetail(
