@@ -18,7 +18,7 @@ import org.junit.Test
 private class FakeTtsEngine(
     override val id: TtsEngineId,
     override val capabilities: TtsCapabilities,
-    private val shouldFail: Boolean = false,
+    var shouldFail: Boolean = false,
 ) : TtsEngine {
     var callCount = 0
         private set
@@ -90,5 +90,27 @@ class FallbackTtsEngineTest {
 
         assertEquals("le Palier 2 ne doit pas etre retente une fois le repli declenche", 1, primary.callCount)
         assertEquals(2, fallback.callCount)
+    }
+
+    @Test
+    fun le_prechauffage_suivant_retente_le_palier_2_une_fois_le_modele_disponible() = runTest {
+        // Cas réel : narration lancée avant le téléchargement de la voix
+        // neuronale (modèle absent → échec → repli), puis téléchargement,
+        // puis ouverture d'un livre (préchauffage). Avant le correctif, le
+        // repli durait jusqu'au redémarrage de l'application.
+        val primary = FakeTtsEngine(TtsEngineId.SHERPA_ONNX, capabilities(wordTimestamps = false), shouldFail = true)
+        val fallback = FakeTtsEngine(TtsEngineId.ANDROID_NATIVE, capabilities(wordTimestamps = true))
+        val engine = FallbackTtsEngine(primary, fallback)
+
+        engine.synthesize(sentence, voiceProfile)
+        assertEquals(TtsEngineId.ANDROID_NATIVE, engine.id)
+
+        primary.shouldFail = false
+        engine.warmUp()
+        engine.synthesize(sentence, voiceProfile)
+
+        assertEquals(2, primary.callCount)
+        assertEquals(1, fallback.callCount)
+        assertEquals(TtsEngineId.SHERPA_ONNX, engine.id)
     }
 }

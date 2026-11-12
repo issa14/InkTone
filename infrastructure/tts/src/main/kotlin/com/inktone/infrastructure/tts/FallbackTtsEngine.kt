@@ -21,7 +21,7 @@ import javax.inject.Singleton
  * natif), bascule vers `AndroidNativeTtsEngine` plutôt que de crasher ou
  * d'interrompre la lecture (Blueprint §8.12, jamais d'interruption
  * brutale). Une fois un échec observé, reste sur le Palier 1 pour les
- * phrases suivantes de la même instance — cohérent avec la « détection
+ * phrases suivantes, jusqu'au prochain [warmUp] — cohérent avec la « détection
  * au runtime » déjà actée par ADR-021 : inutile de retenter le Palier 2
  * phrase par phrase si le device/modèle ne le supporte pas.
  *
@@ -69,8 +69,19 @@ class FallbackTtsEngine @Inject constructor(
     override fun observePlaybackEvents(): Flow<PlaybackEvent> =
         if (fallenBack) fallback.observePlaybackEvents() else primary.observePlaybackEvents()
 
-    /** Lot 20 — préchauffe le Palier 2 (Sherpa charge ses modèles), no-op sinon. */
+    /**
+     * Lot 20 — préchauffe le Palier 2 (Sherpa charge ses modèles), no-op sinon.
+     *
+     * Rouvre aussi la porte du Palier 2. Appelé à chaque ouverture d'un livre
+     * et à chaque narration lancée hors du Lecteur : le repli reste valable
+     * pour toute la lecture en cours (jamais retenté phrase par phrase), mais
+     * ne dure plus toute la vie du processus. Sans cela, un repli provoqué par
+     * le modèle encore absent survivait à son téléchargement : la voix
+     * système continuait de lire alors que les Réglages annonçaient
+     * Sherpa-ONNX, jusqu'au redémarrage de l'application.
+     */
     override fun warmUp() {
+        fallenBack = false
         primary.warmUp()
         fallback.warmUp()
     }
