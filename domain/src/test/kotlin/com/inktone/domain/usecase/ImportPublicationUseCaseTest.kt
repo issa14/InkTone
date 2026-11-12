@@ -26,6 +26,41 @@ class ImportPublicationUseCaseTest {
      * ce qui permet au Lecteur et à la Bibliothèque d'afficher une
      * progression juste sans avoir chargé le livre entier.
      */
+    /**
+     * Bug réel corrigé (audit UX D2) : l'index de recherche reprenait
+     * l'index du parseur, qui ignore la couverture ajoutée en tête ; un
+     * résultat désignait alors le chapitre précédent. [FakeChapterParser]
+     * renvoie toujours l'index 0, comme ce défaut.
+     */
+    @Test
+    fun `l'index de recherche numerote les chapitres dans l'ordre de lecture`() = runTest {
+        val searchService = FakeSearchService()
+        val shells = listOf("cover.xhtml", "ch1.xhtml", "ch2.xhtml").map { href ->
+            Chapter(index = 0, href = href, title = null, content = ChapterContent.Rich(emptyList()))
+        }
+        val importPublication = ImportPublicationUseCase(
+            publicationParser = FakePublicationParser(
+                result = ParseResult.Success(
+                    documentModel = DocumentModel(chapters = shells, tableOfContents = emptyList(), resources = emptyList()),
+                    isDrmProtected = false,
+                    metadata = PublicationMetadata(title = "Titre"),
+                ),
+            ),
+            publicationRepository = FakePublicationRepository(),
+            fileStorageService = FakeFileStorageService(),
+            searchService = searchService,
+            chapterParser = FakeChapterParser(),
+            preAnalysisStore = FakePreAnalysisStore(),
+        )
+
+        importPublication("content://fake/livre.epub")
+
+        assertEquals(
+            listOf(0 to "cover.xhtml", 1 to "ch1.xhtml", 2 to "ch2.xhtml"),
+            searchService.indexedChapters,
+        )
+    }
+
     @Test
     fun `l'import pose les longueurs de tous les chapitres`() = runTest {
         val publicationRepository = FakePublicationRepository()

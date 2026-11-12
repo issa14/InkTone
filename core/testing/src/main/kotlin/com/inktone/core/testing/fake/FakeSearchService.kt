@@ -7,6 +7,9 @@ import com.inktone.domain.service.SearchService
 
 class FakeSearchService : SearchService {
     val indexedDocuments = mutableMapOf<String, DocumentModel>()
+
+    /** Chapitres indexés phrase par phrase : (index de chapitre, href), dans l'ordre d'appel. */
+    val indexedChapters = mutableListOf<Pair<Int, String>>()
     var nextSearchResult: List<SearchResult> = emptyList()
 
     override suspend fun search(query: String, publicationId: String?): List<SearchResult> = nextSearchResult
@@ -21,6 +24,6 @@ class FakeSearchService : SearchService {
         resourceHref: String,
         sentences: List<Sentence>,
     ) {
-        // No-op dans le fake — les tests de recherche utilisent indexPublication
+        indexedChapters += chapterIndex to resourceHref
     }
 }

@@ -120,10 +120,13 @@ class ImportPublicationUseCase(
                 // persistée (jamais un second accès ZIP : on réutilise le
                 // Chapter déjà produit par ChapterParser, décision 1).
                 val parsedChapters = mutableListOf<Chapter>()
-                documentModel.chapters.forEach { shell ->
-                    val chapter = chapterParser.parseChapter(publication.id, shell.href)
+                documentModel.chapters.forEachIndexed { position, shell ->
+                    // L'index renvoyé par le parseur ignore la couverture
+                    // ajoutée en tête (audit UX D2) : la position dans l'ordre
+                    // de lecture, celle du Lecteur, fait foi.
+                    val chapter = chapterParser.parseChapter(publication.id, shell.href).copy(index = position)
                     parsedChapters += chapter
-                    searchService.indexSentences(publication.id, chapter.index, chapter.href, chapter.sentences)
+                    searchService.indexSentences(publication.id, position, chapter.href, chapter.sentences)
                 }
                 // Le PDF est géré par son propre chemin page-à-page
                 // (Palier C) : la pré-analyse de chapitres/sentences ne
