@@ -101,7 +101,10 @@ class ReaderViewModelNavigateToLocatorTest {
         override fun invalidate(publicationId: String) = Unit
     }
 
-    private suspend fun openBook(readingStateRepository: FakeReadingStateRepository): ReaderViewModel {
+    private suspend fun openBook(
+        readingStateRepository: FakeReadingStateRepository,
+        openIntent: ReaderIntent.OpenPublication = ReaderIntent.OpenPublication("pub"),
+    ): ReaderViewModel {
         val preferencesRepository = FakePreferencesRepository()
         preferencesRepository.update(UserPreferences(eyeRestReminderEnabled = false))
         val publicationRepository = FakePublicationRepository()
@@ -149,7 +152,7 @@ class ReaderViewModelNavigateToLocatorTest {
                 FakeReadingSessionRepository(),
             ),
         )
-        viewModel.onIntent(ReaderIntent.OpenPublication("pub"))
+        viewModel.onIntent(openIntent)
         dispatcher.scheduler.runCurrent()
         return viewModel
     }
@@ -196,6 +199,33 @@ class ReaderViewModelNavigateToLocatorTest {
 
             assertEquals(2, viewModel.state.value.currentChapterIndex)
             assertEquals("ch2.xhtml", viewModel.state.value.currentChapter?.href)
+        } finally {
+            stopTimers(viewModel)
+        }
+    }
+
+    /**
+     * Bug réel corrigé (audit UX A4) : la route relance l'ouverture à chaque
+     * retour d'un sous-écran. Le livre ouvert depuis un signet revenait alors
+     * à ce signet, même après avoir lu plus loin.
+     */
+    @Test
+    fun relancer_l_ouverture_du_livre_deja_ouvert_ne_ramene_pas_a_la_cible() = runTest {
+        val readingStateRepository = FakeReadingStateRepository()
+        val openFromBookmark = ReaderIntent.OpenPublication(
+            publicationId = "pub", targetResourceHref = "ch1.xhtml", targetChapterIndex = 1, targetCharOffset = 0,
+        )
+        val viewModel = openBook(readingStateRepository, openFromBookmark)
+        try {
+            assertEquals(1, viewModel.state.value.currentChapterIndex)
+            viewModel.onIntent(ReaderIntent.NavigateToLocator(Locator(resourceHref = "ch2.xhtml", chapterIndex = 2, charOffset = 25)))
+            dispatcher.scheduler.runCurrent()
+
+            viewModel.onIntent(openFromBookmark)
+            dispatcher.scheduler.runCurrent()
+
+            assertEquals(2, viewModel.state.value.currentChapterIndex)
+            assertEquals(1, viewModel.state.value.currentSentenceIndex)
         } finally {
             stopTimers(viewModel)
         }

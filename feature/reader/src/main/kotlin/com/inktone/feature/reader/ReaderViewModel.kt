@@ -650,6 +650,12 @@ class ReaderViewModel @Inject constructor(
      * ne sont pas encore reflétés dans `ReaderUiState` — Tâche 4.8.
      */
     private fun openPublication(publicationId: String, targetLocator: Locator? = null, flashOnArrival: Boolean = false, autoStartTts: Boolean = false) {
+        // Audit UX A4 : la route relance cette ouverture à chaque retour d'un
+        // sous-écran (Réglages, Recherche). Rouvrir relisait le fichier,
+        // ramenait à la cible de la route (signet, résultat) même après avoir
+        // lu plus loin, et empilait des collecteurs. Déjà ouvert sans erreur :
+        // rien à faire.
+        if (currentPublicationId == publicationId && _state.value.errorMessage == null) return
         // Lot 20 — préchauffe le moteur TTS (chargement des modèles ONNX
         // hors du premier tap de lecture) : dans un process neuf, l'init
         // froide (~10-20 s sur V2206) dépassait le timeout de synthèse de
