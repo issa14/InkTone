@@ -112,7 +112,6 @@ import com.inktone.domain.model.Bookmark
 import com.inktone.domain.model.Chapter
 import com.inktone.domain.model.ChapterContent
 import com.inktone.domain.model.PublicationFormat
-import com.inktone.domain.model.ReadingOverrides
 import com.inktone.domain.model.ReadingTheme
 import com.inktone.domain.model.Sentence
 import com.inktone.feature.reader.pagination.rememberChapterPaginationState
@@ -1322,9 +1321,7 @@ fun ReaderScreen(
                                 onTocClick = { chrome.keepHudVisible(); viewModel.onIntent(ReaderIntent.ToggleToc) },
                                 onThemeCycle = {
                                     chrome.keepHudVisible()
-                                    val overrides = (state.currentOverrides ?: ReadingOverrides())
-                                        .copy(theme = nextReadingTheme(state.effectiveSettings.theme))
-                                    viewModel.onIntent(ReaderIntent.SetOverrides(overrides))
+                                    viewModel.onIntent(ReaderIntent.SetReadingTheme(nextReadingTheme(state.effectiveSettings.theme)))
                                 },
                                 onAaClick = { chrome.keepHudVisible(); chrome.showSettingsPanel = true },
                                 onTtsClick = { chrome.keepHudVisible(); chrome.showTtsPanel = true },
@@ -1450,10 +1447,9 @@ fun ReaderScreen(
                 previewText = previewText,
                 previewTextColor = ThemeColors.text(state.resolvedTheme),
                 previewBackgroundColor = ThemeColors.background(state.resolvedTheme),
-                onFontSizeChange = { size ->
-                    val overrides = (state.currentOverrides ?: ReadingOverrides()).copy(fontSize = size)
-                    viewModel.onIntent(ReaderIntent.SetOverrides(overrides))
-                },
+                onFontSizeChange = { size -> viewModel.onIntent(ReaderIntent.SetFontSize(size)) },
+                isBookSpecific = state.currentOverrides != null,
+                onBookSpecificChange = { enabled -> viewModel.onIntent(ReaderIntent.SetBookSpecificSettings(enabled)) },
                 onLineHeightChange = { multiplier -> viewModel.onIntent(ReaderIntent.SetLineHeight(multiplier)) },
                 currentMarginStep = state.readerMarginStep,
                 isTextJustified = state.isTextJustified,

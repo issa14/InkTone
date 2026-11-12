@@ -386,6 +386,9 @@ class ReaderViewModel @Inject constructor(
             is ReaderIntent.NavigateToLocator -> navigateToLocator(intent.locator)
             is ReaderIntent.ChapterLayoutCompleted -> onChapterLayoutCompleted(intent.chapterIndex)
             is ReaderIntent.SetOverrides -> setOverrides(intent.overrides)
+            is ReaderIntent.SetFontSize -> setFontSize(intent.fontSize)
+            is ReaderIntent.SetReadingTheme -> setReadingTheme(intent.themeId)
+            is ReaderIntent.SetBookSpecificSettings -> setBookSpecificSettings(intent.enabled)
             is ReaderIntent.SetSleepTimer -> setSleepTimer(intent.minutes)
             is ReaderIntent.SkipToPreviousSentence -> skipSentence(-1)
             is ReaderIntent.SkipToNextSentence -> skipSentence(1)
@@ -578,6 +581,48 @@ class ReaderViewModel @Inject constructor(
             val effectiveSettings = EffectiveReadingSettings.resolve(overrides, preferencesRepository.get())
             _state.value = _state.value.copy(
                 currentOverrides = overrides,
+                effectiveSettings = effectiveSettings,
+                resolvedTheme = themeRepository.getById(effectiveSettings.theme) ?: ReadingTheme.DEFAULT,
+            )
+        }
+    }
+
+    /**
+     * Audit UX A8 — taille et thème sont globaux par défaut. Ils ne vont dans
+     * la surcharge du livre que si l'utilisateur l'a demandé (« Pour ce livre
+     * uniquement », [setBookSpecificSettings]) : avant, le Lecteur écrivait
+     * toujours une surcharge invisible, et chaque nouveau livre repartait des
+     * valeurs par défaut.
+     */
+    private fun setFontSize(fontSize: Int) {
+        val overrides = _state.value.currentOverrides
+        if (overrides != null) setOverrides(overrides.copy(fontSize = fontSize))
+        else updateGlobalReadingSettings { it.copy(fontSize = fontSize) }
+    }
+
+    /** Même règle que [setFontSize]. */
+    private fun setReadingTheme(themeId: String) {
+        val overrides = _state.value.currentOverrides
+        if (overrides != null) setOverrides(overrides.copy(theme = themeId))
+        else updateGlobalReadingSettings { it.copy(theme = themeId) }
+    }
+
+    /**
+     * Activer fige la taille et le thème affichés dans la surcharge du livre ;
+     * désactiver l'efface, et le livre suit de nouveau les réglages généraux.
+     */
+    private fun setBookSpecificSettings(enabled: Boolean) {
+        val effective = _state.value.effectiveSettings
+        setOverrides(if (enabled) ReadingOverrides(theme = effective.theme, fontSize = effective.fontSize) else null)
+    }
+
+    /** Écrit un réglage global de lecture et recalcule les réglages effectifs. */
+    private fun updateGlobalReadingSettings(update: (UserPreferences) -> UserPreferences) {
+        viewModelScope.launch {
+            val preferences = update(preferencesRepository.get())
+            preferencesRepository.update(preferences)
+            val effectiveSettings = EffectiveReadingSettings.resolve(_state.value.currentOverrides, preferences)
+            _state.value = _state.value.copy(
                 effectiveSettings = effectiveSettings,
                 resolvedTheme = themeRepository.getById(effectiveSettings.theme) ?: ReadingTheme.DEFAULT,
             )

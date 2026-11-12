@@ -29,6 +29,7 @@ import kotlinx.coroutines.test.runTest
 import kotlinx.coroutines.test.setMain
 import org.junit.After
 import org.junit.Assert.assertEquals
+import org.junit.Assert.assertNull
 import org.junit.Before
 import org.junit.Test
 import com.inktone.core.testing.fake.FakeChapterParser
@@ -131,6 +132,142 @@ class ReaderViewModelOverrideTest {
         // Casse le timer de checkpoint (auto-récurrent) comme le ferait
         // onCleared() sur un vrai ViewModel détruit — sinon le drain
         // implicite de fin de runTest boucle indéfiniment.
+        viewModel.cancelCheckpointTimerForTest()
+        dispatcher.scheduler.runCurrent()
+    }
+
+    private fun buildViewModel(
+        preferencesRepository: FakePreferencesRepository,
+        readingStateRepository: FakeReadingStateRepository,
+        publicationRepository: FakePublicationRepository,
+    ): ReaderViewModel {
+        val bookmarkRepository = FakeBookmarkRepository()
+        val annotationRepository = FakeAnnotationRepository()
+        return ReaderViewModel(
+            ttsEngine = FakeTtsEngine(),
+            playbackOrchestrator = PlaybackOrchestrator(FakeTtsEngine(), FakeAudioPlayer(), UpdateReadingStateUseCase(readingStateRepository), GetReadingStateUseCase(readingStateRepository), FakeChapterParser(), FakePublicationRepository(), FakePublicationParser(), FakePreferencesRepository(), FakeVoiceProfileRepository(), FakeTtsSegmentCache(), FakePronunciationRuleRepository()),
+            publicationParser = FakePublicationParser(),
+            updateReadingState = UpdateReadingStateUseCase(readingStateRepository),
+            getReadingState = GetReadingStateUseCase(readingStateRepository),
+            publicationRepository = publicationRepository,
+            preferencesRepository = preferencesRepository,
+            annotationRepository = annotationRepository,
+            addAnnotation = AddAnnotationUseCase(annotationRepository),
+            bookmarkRepository = bookmarkRepository,
+            createBookmark = CreateBookmarkUseCase(bookmarkRepository),
+            deleteBookmark = DeleteBookmarkUseCase(bookmarkRepository),
+            voiceProfileRepository = com.inktone.core.testing.fake.FakeVoiceProfileRepository(),
+            getVoiceProfiles = com.inktone.domain.usecase.GetVoiceProfilesUseCase(com.inktone.core.testing.fake.FakeVoiceProfileRepository()),
+            readingSessionRepository = com.inktone.core.testing.fake.FakeReadingSessionRepository(),
+            themeRepository = FakeThemeRepository(),
+            fixedPageRenderer = com.inktone.core.testing.fake.FakeFixedPageRenderer(),
+            renderedPageCache = com.inktone.core.testing.fake.FakeRenderedPageCache(),
+            chapterParser = FakeChapterParser(),
+            epubResourceResolver = FakeEpubResourceResolver(),
+            narrationSessionContinuation = NarrationSessionContinuation(
+                PlaybackOrchestrator(FakeTtsEngine(), FakeAudioPlayer(), UpdateReadingStateUseCase(FakeReadingStateRepository()), GetReadingStateUseCase(FakeReadingStateRepository()), FakeChapterParser(), FakePublicationRepository(), FakePublicationParser(), FakePreferencesRepository(), FakeVoiceProfileRepository(), FakeTtsSegmentCache(), FakePronunciationRuleRepository()),
+                FakeReadingSessionRepository(),
+            ),
+        )
+    }
+
+    private suspend fun FakePublicationRepository.insertBook(id: String) = insert(
+        Publication(
+            id = id, title = "Test", format = PublicationFormat.EPUB,
+            fileUri = "content://$id", fileHash = "hash-$id", fileSize = 10, chapterCount = 1,
+            importDate = 0L,
+        ),
+    )
+
+    /**
+     * Bug réel corrigé (audit UX A8) : le curseur de taille du Lecteur
+     * écrivait toujours une surcharge du livre ; chaque nouveau livre
+     * repartait en 18 sp.
+     */
+    @Test
+    fun sans_reglage_propre_au_livre_la_taille_choisie_vaut_pour_les_autres_livres() = runTest {
+        val preferencesRepository = FakePreferencesRepository()
+        preferencesRepository.update(UserPreferences(fontSize = 18))
+        val readingStateRepository = FakeReadingStateRepository()
+        val publicationRepository = FakePublicationRepository()
+        publicationRepository.insertBook("livre-a")
+        publicationRepository.insertBook("livre-b")
+
+        val first = buildViewModel(preferencesRepository, readingStateRepository, publicationRepository)
+        first.onIntent(ReaderIntent.OpenPublication("livre-a"))
+        dispatcher.scheduler.runCurrent()
+        first.onIntent(ReaderIntent.SetFontSize(22))
+        dispatcher.scheduler.runCurrent()
+
+        assertEquals(22, first.state.value.effectiveSettings.fontSize)
+        assertEquals("réglage général", 22, preferencesRepository.get().fontSize)
+        assertNull("aucune surcharge implicite", readingStateRepository.get("livre-a")?.overrides)
+
+        val second = buildViewModel(preferencesRepository, readingStateRepository, publicationRepository)
+        second.onIntent(ReaderIntent.OpenPublication("livre-b"))
+        dispatcher.scheduler.runCurrent()
+        assertEquals(22, second.state.value.effectiveSettings.fontSize)
+
+        first.cancelCheckpointTimerForTest()
+        second.cancelCheckpointTimerForTest()
+        dispatcher.scheduler.runCurrent()
+    }
+
+    @Test
+    fun pour_ce_livre_uniquement_fige_taille_et_theme_sans_toucher_aux_reglages_generaux() = runTest {
+        val preferencesRepository = FakePreferencesRepository()
+        preferencesRepository.update(UserPreferences(fontSize = 18, theme = ReadingTheme.PAPIER_CLAIR.id))
+        val readingStateRepository = FakeReadingStateRepository()
+        val publicationRepository = FakePublicationRepository()
+        publicationRepository.insertBook("livre-a")
+
+        val viewModel = buildViewModel(preferencesRepository, readingStateRepository, publicationRepository)
+        viewModel.onIntent(ReaderIntent.OpenPublication("livre-a"))
+        dispatcher.scheduler.runCurrent()
+
+        viewModel.onIntent(ReaderIntent.SetBookSpecificSettings(true))
+        dispatcher.scheduler.runCurrent()
+        assertEquals(
+            "les valeurs affichées sont figées pour ce livre",
+            ReadingOverrides(theme = ReadingTheme.PAPIER_CLAIR.id, fontSize = 18),
+            readingStateRepository.get("livre-a")?.overrides,
+        )
+
+        viewModel.onIntent(ReaderIntent.SetFontSize(26))
+        dispatcher.scheduler.runCurrent()
+        viewModel.onIntent(ReaderIntent.SetReadingTheme(ReadingTheme.OBSIDIENNE.id))
+        dispatcher.scheduler.runCurrent()
+
+        assertEquals(26, viewModel.state.value.effectiveSettings.fontSize)
+        assertEquals(ReadingTheme.OBSIDIENNE, viewModel.state.value.resolvedTheme)
+        assertEquals("réglages généraux intacts", 18, preferencesRepository.get().fontSize)
+        assertEquals(ReadingTheme.PAPIER_CLAIR.id, preferencesRepository.get().theme)
+
+        viewModel.cancelCheckpointTimerForTest()
+        dispatcher.scheduler.runCurrent()
+    }
+
+    @Test
+    fun desactiver_pour_ce_livre_uniquement_revient_aux_reglages_generaux() = runTest {
+        val preferencesRepository = FakePreferencesRepository()
+        preferencesRepository.update(UserPreferences(fontSize = 20, theme = ReadingTheme.PAPIER_CLAIR.id))
+        val readingStateRepository = FakeReadingStateRepository()
+        val publicationRepository = FakePublicationRepository()
+        publicationRepository.insertBook("livre-a")
+
+        val viewModel = buildViewModel(preferencesRepository, readingStateRepository, publicationRepository)
+        viewModel.onIntent(ReaderIntent.OpenPublication("livre-a"))
+        dispatcher.scheduler.runCurrent()
+        viewModel.onIntent(ReaderIntent.SetOverrides(ReadingOverrides(theme = ReadingTheme.OBSIDIENNE.id, fontSize = 28)))
+        dispatcher.scheduler.runCurrent()
+
+        viewModel.onIntent(ReaderIntent.SetBookSpecificSettings(false))
+        dispatcher.scheduler.runCurrent()
+
+        assertNull(readingStateRepository.get("livre-a")?.overrides)
+        assertEquals(20, viewModel.state.value.effectiveSettings.fontSize)
+        assertEquals(ReadingTheme.PAPIER_CLAIR, viewModel.state.value.resolvedTheme)
+
         viewModel.cancelCheckpointTimerForTest()
         dispatcher.scheduler.runCurrent()
     }

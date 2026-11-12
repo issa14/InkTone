@@ -431,6 +431,8 @@ Couleurs : Sépia reprend `#F4ECD8` (déjà choisi Tâche 4.7, pas réinventé).
 
 Petit bottomsheet, **aperçu du texte en direct** au-dessus (le vrai texte du livre) pour voir l'effet sans fermer le panneau. Deux réglages en **sliders continus** (pas de paliers fixes) : ligne 1 taille du texte (repères A/A petit-grand), ligne 2 interligne (repères ≡/≡ serré-large).
 
+**Portée des réglages (audit UX A8, 2026-11-12) :** taille du texte et thème (icône Thème du panneau, Galerie) sont **globaux par défaut** — ils valent pour tous les livres. Un interrupteur **« Pour ce livre uniquement »**, sous l'aperçu, les fige pour le livre ouvert (`ReadingState.overrides`) ; le désactiver efface cette surcharge et le livre suit de nouveau les réglages généraux. Auparavant, la taille et le thème réglés dans le Lecteur créaient toujours une surcharge invisible et irréversible.
+
 ### Minuteur — deux fonctions distinctes sous une seule icône
 
 **Section 1 — Minuteur de lecture audio (sommeil TTS) :** 3 durées fixes en chips (15/30/45 min) + « Personnalisé » qui ouvre une **roue de temps** (deux colonnes heures/minutes, pas de 15 min).

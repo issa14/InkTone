@@ -412,6 +412,23 @@ sealed interface ReaderIntent {
     data class SetOverrides(val overrides: ReadingOverrides?) : ReaderIntent
 
     /**
+     * Taille du texte choisie dans le Lecteur. Écrite dans les réglages
+     * globaux, sauf si ce livre a ses propres réglages (audit UX A8).
+     */
+    data class SetFontSize(val fontSize: Int) : ReaderIntent
+
+    /** Thème choisi dans le Lecteur — même règle que [SetFontSize]. */
+    data class SetReadingTheme(val themeId: String) : ReaderIntent
+
+    /**
+     * « Pour ce livre uniquement ». Activé : la taille et le thème affichés
+     * sont figés pour ce livre, et les réglages suivants n'y changent que
+     * lui. Désactivé : la surcharge est effacée, le livre suit de nouveau
+     * les réglages généraux.
+     */
+    data class SetBookSpecificSettings(val enabled: Boolean) : ReaderIntent
+
+    /**
      * Tache 9bis.3.3 — `minutes = null` desactive le minuteur en cours.
      * A expiration, met en Pause (fondu sonore non implemente, voir
      * `SleepTimerState.fadeOutEnabled`).

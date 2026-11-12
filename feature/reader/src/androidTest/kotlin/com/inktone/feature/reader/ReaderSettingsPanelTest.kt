@@ -8,6 +8,7 @@ import androidx.compose.ui.test.assertIsDisplayed
 import androidx.compose.ui.test.junit4.createComposeRule
 import androidx.compose.ui.test.onNodeWithText
 import androidx.compose.ui.test.performClick
+import androidx.compose.ui.test.performScrollTo
 import com.inktone.domain.model.FontFamily
 import org.junit.Assert.assertEquals
 import org.junit.Rule
@@ -151,7 +152,8 @@ class ReaderSettingsPanelTest {
         // Valeur courante (autoScrollSpeed = 2 → « Moyenne ») affichée.
         composeTestRule.onNodeWithText("Moyenne").assertExists()
         // Les autres options sont derrière le menu déroulant : on l'ouvre.
-        composeTestRule.onNodeWithText("Vitesse").performClick()
+        // Le panneau défile ; le menu est en bas, hors de la zone visible.
+        composeTestRule.onNodeWithText("Vitesse").performScrollTo().performClick()
         composeTestRule.onNodeWithText("Désactivé").assertExists()
         composeTestRule.onNodeWithText("Lente").assertExists()
         composeTestRule.onNodeWithText("Rapide").assertExists()
@@ -190,7 +192,7 @@ class ReaderSettingsPanelTest {
         // Valeur courante (DEFAULT → « Système ») affichée.
         composeTestRule.onNodeWithText("Système").assertExists()
         // Les autres options sont derrière le menu déroulant : on l'ouvre.
-        composeTestRule.onNodeWithText("Police").performClick()
+        composeTestRule.onNodeWithText("Police").performScrollTo().performClick()
         composeTestRule.onNodeWithText("Serif").assertExists()
         composeTestRule.onNodeWithText("Sans-serif").assertExists()
         composeTestRule.onNodeWithText("Dyslexie").assertExists()
@@ -225,8 +227,47 @@ class ReaderSettingsPanelTest {
             )
         }
 
-        composeTestRule.onNodeWithText("Police").performClick()
+        composeTestRule.onNodeWithText("Police").performScrollTo().performClick()
         composeTestRule.onNodeWithText("Empattée FR").performClick()
         assertEquals(FontFamily.SOURCE_SERIF, chosen)
+    }
+
+    /**
+     * Audit UX A8 : la taille et le thème réglés dans le Lecteur créaient une
+     * surcharge du livre invisible et irréversible. L'interrupteur la rend
+     * explicite et réversible.
+     */
+    @Test
+    fun l_interrupteur_pour_ce_livre_uniquement_declenche_le_callback() {
+        var bookSpecific: Boolean? = null
+        composeTestRule.setContent {
+            ReaderSettingsPanel(
+                currentFontSize = 18,
+                currentLineHeightMultiplier = 1.4f,
+                previewText = "Extrait.",
+                previewTextColor = Color.Black,
+                previewBackgroundColor = Color.White,
+                onFontSizeChange = {},
+                onLineHeightChange = {},
+                currentMarginStep = 1,
+                isTextJustified = false,
+                keepScreenOn = false,
+                autoScrollSpeed = 0,
+                reduceMotion = false,
+                isScrollMode = true,
+                onMarginStepChange = {},
+                onTextJustifiedChange = {},
+                onKeepScreenOnChange = {},
+                onAutoScrollSpeedChange = {},
+                isBookSpecific = false,
+                onBookSpecificChange = { bookSpecific = it },
+                onDismiss = {},
+            )
+        }
+
+        composeTestRule.onNodeWithText("Taille et thème s'appliquent à tous les livres.").assertExists()
+        composeTestRule.onNodeWithText("Pour ce livre uniquement").performClick()
+
+        assertEquals(true, bookSpecific)
     }
 }

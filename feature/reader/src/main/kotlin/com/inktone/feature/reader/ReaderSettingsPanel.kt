@@ -87,6 +87,9 @@ fun ReaderSettingsPanel(
     onKeepScreenOnChange: (Boolean) -> Unit,
     onAutoScrollSpeedChange: (Int) -> Unit,
     onFontFamilyChange: (DomainFontFamily) -> Unit = {},
+    // Audit UX A8 — taille et thème propres à ce livre, ou réglages généraux.
+    isBookSpecific: Boolean = false,
+    onBookSpecificChange: (Boolean) -> Unit = {},
     onDismiss: () -> Unit,
 ) {
     val sheetState = rememberModalBottomSheetState(skipPartiallyExpanded = true)
@@ -131,7 +134,20 @@ fun ReaderSettingsPanel(
                 maxLines = 5,
             )
 
-            Spacer(Modifier.height(24.dp))
+            Spacer(Modifier.height(16.dp))
+
+            SettingSwitchRow(
+                label = "Pour ce livre uniquement",
+                supporting = if (isBookSpecific) {
+                    "Taille et thème propres à ce livre. Désactiver pour revenir aux réglages généraux."
+                } else {
+                    "Taille et thème s'appliquent à tous les livres."
+                },
+                checked = isBookSpecific,
+                onCheckedChange = onBookSpecificChange,
+            )
+
+            Spacer(Modifier.height(16.dp))
 
             // ── Taille du texte — curseur continu (3d.2 : plus de paliers) ──
             // `onValueChangeFinished` conservé : appliquer chaque valeur
