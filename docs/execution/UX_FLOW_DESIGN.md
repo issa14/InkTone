@@ -445,6 +445,8 @@ Petit bottomsheet, **aperçu du texte en direct** au-dessus (le vrai texte du li
 
 Bottomsheet : sélecteur de voix (parmi celles disponibles pour le moteur déjà choisi dans les Réglages généraux — affiche le nom réel de la voix, ex. « ff_siwis · Kokoro · Français », validée par écoute 8/10 en Phase 5, pas un nom inventé), puis deux sliders horizontaux (Volume, Vitesse en ×, ex. « 1,0× »).
 
+**Écart (décision D74, audit UX, 2026-11-12) :** plus de sélecteur de voix dans ce panneau — il listait des enregistrements de profil, pas les voix des moteurs. Le panneau affiche la voix active et renvoie aux Réglages pour la changer ; il garde la vitesse.
+
 **Recoupement notable avec l'existant :** ce panneau reprend presque exactement ce que `PlayerScreen` (Phase 5) fait déjà (vitesse, sélecteur de voix) — probablement moins de travail d'implémentation que prévu, réutilisation plutôt que construction neuve.
 
 **Ajout signalé après coup par Issa, absent du legacy à cet endroit précis** (le legacy le mettait dans les réglages généraux, jugé trop loin d'accès) : un lien « Ajouter une règle de prononciation » en bas du panneau Haut-parleur. Ouvre un **formulaire rapide uniquement** (mot à corriger + remplacement, sans afficher la liste des règles existantes) — la gestion complète de la liste reste dans les Réglages généraux. Se raccorde directement à la fonctionnalité déjà entièrement construite en Tâche 8.3 (`PronunciationRuleRepository`, `PronunciationRuleApplier`) — nouveau point d'entrée, pas de logique à reconstruire.

@@ -1493,14 +1493,16 @@ fun ReaderScreen(
                 currentSentenceIndex = uiState.value.currentSentenceIndex,
                 totalSentences = sentences.size,
                 activeVoiceProfile = state.activeVoiceProfile,
-                availableVoiceProfiles = state.availableVoiceProfiles,
                 onPlayPause = {
                     togglePlayback()
                 },
                 onPreviousSentence = { viewModel.onIntent(ReaderIntent.SkipToPreviousSentence) },
                 onNextSentence = { viewModel.onIntent(ReaderIntent.SkipToNextSentence) },
                 onSpeedChange = { speed -> viewModel.onIntent(ReaderIntent.SetTtsSpeed(speed)) },
-                onSelectVoiceProfile = { profileId -> viewModel.onIntent(ReaderIntent.SetActiveVoiceProfile(profileId)) },
+                onOpenVoiceSettings = {
+                    chrome.showTtsPanel = false
+                    onOpenSettings()
+                },
                 onOpenPronunciationRules = onOpenPronunciationRules,
                 onDismiss = { chrome.showTtsPanel = false },
             )

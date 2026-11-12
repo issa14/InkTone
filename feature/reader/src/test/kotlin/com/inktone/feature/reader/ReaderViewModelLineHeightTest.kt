@@ -78,7 +78,6 @@ class ReaderViewModelLineHeightTest {
             createBookmark = CreateBookmarkUseCase(bookmarkRepository),
             deleteBookmark = DeleteBookmarkUseCase(bookmarkRepository),
             voiceProfileRepository = voiceProfileRepository,
-            getVoiceProfiles = GetVoiceProfilesUseCase(voiceProfileRepository),
             readingSessionRepository = FakeReadingSessionRepository(),
             themeRepository = FakeThemeRepository(),
             fixedPageRenderer = com.inktone.core.testing.fake.FakeFixedPageRenderer(),

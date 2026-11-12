@@ -76,7 +76,6 @@ class ReaderViewModelVoiceSpeedTest {
             createBookmark = CreateBookmarkUseCase(bookmarkRepository),
             deleteBookmark = DeleteBookmarkUseCase(bookmarkRepository),
             voiceProfileRepository = voiceProfileRepository,
-            getVoiceProfiles = GetVoiceProfilesUseCase(voiceProfileRepository),
             readingSessionRepository = FakeReadingSessionRepository(),
             themeRepository = com.inktone.core.testing.fake.FakeThemeRepository(),
             fixedPageRenderer = com.inktone.core.testing.fake.FakeFixedPageRenderer(),
@@ -175,37 +174,6 @@ class ReaderViewModelVoiceSpeedTest {
         // indéfiniment.
         viewModel.cancelCheckpointTimerForTest()
         reopened.cancelCheckpointTimerForTest()
-        dispatcher.scheduler.runCurrent()
-    }
-
-    @Test
-    fun selectionner_une_voix_met_a_jour_le_profil_actif_et_les_preferences() = runTest {
-        // 3d.5 — le rappel de repos oculaire (activé par défaut, recurrent)
-        // rendrait dispatcher.scheduler.advanceUntilIdle() non terminant ;
-        // ce test ne porte pas sur le repos oculaire, on le désactive. Même
-        // raison pour runCurrent() plutôt qu'advanceUntilIdle() ci-dessous :
-        // le timer de checkpoint de session démarre lui aussi
-        // inconditionnellement à l'ouverture d'une publication.
-        val preferencesRepository = FakePreferencesRepository()
-        preferencesRepository.update(UserPreferences(eyeRestReminderEnabled = false))
-        val voiceProfileRepository = FakeVoiceProfileRepository()
-        val otherProfile = VoiceProfile(id = "vp-other", engine = TtsEngineId.SHERPA_ONNX, voice = "jessica", language = "fr-FR")
-        voiceProfileRepository.save(otherProfile)
-        val publicationRepository = FakePublicationRepository()
-        val publicationId = "pub-speed-3"
-        insertTestPublication(publicationRepository, publicationId)
-
-        val viewModel = buildViewModel(preferencesRepository, voiceProfileRepository, publicationRepository)
-        viewModel.onIntent(ReaderIntent.OpenPublication(publicationId))
-        dispatcher.scheduler.runCurrent()
-
-        viewModel.onIntent(ReaderIntent.SetActiveVoiceProfile(otherProfile.id))
-        dispatcher.scheduler.runCurrent()
-
-        assertEquals(otherProfile, viewModel.state.value.activeVoiceProfile)
-        assertEquals(otherProfile.id, preferencesRepository.get().activeVoiceProfileId)
-
-        viewModel.cancelCheckpointTimerForTest()
         dispatcher.scheduler.runCurrent()
     }
 }

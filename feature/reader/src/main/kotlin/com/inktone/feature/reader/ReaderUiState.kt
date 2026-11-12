@@ -107,7 +107,6 @@ data class ReaderUiState(
     // vitesse affichée et le nom de voix, jamais recalculé localement dans
     // ReaderTtsPanel.
     val activeVoiceProfile: VoiceProfile? = null,
-    val availableVoiceProfiles: List<VoiceProfile> = emptyList(),
     // 3d.2 — réglage global (UserPreferences.lineHeightMultiplier), observé
     // en continu comme isReadingRulerEnabled : pas de surcharge par
     // publication, voir doc du lot 3d.
@@ -503,8 +502,6 @@ sealed interface ReaderIntent {
      */
     data class SetTtsSpeed(val speed: Float) : ReaderIntent
 
-    /** 3d.1 — change le profil vocal actif (préférence globale). */
-    data class SetActiveVoiceProfile(val profileId: String) : ReaderIntent
 
     /** 3d.2 — réglage global d'interligne, voir `ReaderUiState.lineHeightMultiplier`. */
     data class SetLineHeight(val multiplier: Float) : ReaderIntent

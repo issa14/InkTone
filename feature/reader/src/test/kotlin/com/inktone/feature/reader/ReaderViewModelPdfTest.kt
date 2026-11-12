@@ -147,7 +147,6 @@ class ReaderViewModelPdfTest {
             createBookmark = CreateBookmarkUseCase(bookmarkRepository),
             deleteBookmark = DeleteBookmarkUseCase(bookmarkRepository),
             voiceProfileRepository = FakeVoiceProfileRepository(),
-            getVoiceProfiles = GetVoiceProfilesUseCase(FakeVoiceProfileRepository()),
             readingSessionRepository = FakeReadingSessionRepository(),
             themeRepository = com.inktone.core.testing.fake.FakeThemeRepository(),
             // FakeFixedPageRenderer() par defaut renvoie Failed("non

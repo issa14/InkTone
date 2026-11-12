@@ -109,7 +109,6 @@ class ReaderViewModelChapterEvictionTest {
             createBookmark = CreateBookmarkUseCase(FakeBookmarkRepository()),
             deleteBookmark = DeleteBookmarkUseCase(FakeBookmarkRepository()),
             voiceProfileRepository = FakeVoiceProfileRepository(),
-            getVoiceProfiles = GetVoiceProfilesUseCase(FakeVoiceProfileRepository()),
             readingSessionRepository = FakeReadingSessionRepository(),
             themeRepository = FakeThemeRepository(),
             fixedPageRenderer = com.inktone.core.testing.fake.FakeFixedPageRenderer(),

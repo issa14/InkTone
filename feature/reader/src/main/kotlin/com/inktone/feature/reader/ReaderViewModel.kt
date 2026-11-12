@@ -52,7 +52,6 @@ import com.inktone.domain.usecase.DeleteBookmarkUseCase
 import com.inktone.domain.usecase.UpdateAnnotationUseCase
 import com.inktone.domain.usecase.UpdateBookmarkNoteUseCase
 import com.inktone.domain.usecase.GetReadingStateUseCase
-import com.inktone.domain.usecase.GetVoiceProfilesUseCase
 import com.inktone.domain.usecase.UpdateReadingStateUseCase
 import com.inktone.domain.valueobject.Locator
 import com.inktone.feature.reader.di.ApplicationScope
@@ -88,7 +87,6 @@ class ReaderViewModel @Inject constructor(
     private val publicationRepository: PublicationRepository,
     private val preferencesRepository: PreferencesRepository,
     private val voiceProfileRepository: VoiceProfileRepository,
-    private val getVoiceProfiles: GetVoiceProfilesUseCase,
     private val annotationRepository: AnnotationRepository,
     private val addAnnotation: AddAnnotationUseCase,
     // Lot 22, tâche 11 — édition de note et suppression depuis
@@ -418,7 +416,6 @@ class ReaderViewModel @Inject constructor(
             is ReaderIntent.SkipToNextSentence -> skipSentence(1)
             is ReaderIntent.UpdateScrollPosition -> updateScrollPosition(intent.sentenceIndex)
             is ReaderIntent.SetTtsSpeed -> setTtsSpeed(intent.speed)
-            is ReaderIntent.SetActiveVoiceProfile -> setActiveVoiceProfile(intent.profileId)
             is ReaderIntent.SetLineHeight -> setLineHeight(intent.multiplier)
             is ReaderIntent.SetReaderMarginStep -> setReaderMarginStep(intent.step)
             is ReaderIntent.SetTextJustified -> setTextJustified(intent.justified)
@@ -757,7 +754,6 @@ class ReaderViewModel @Inject constructor(
                     // ───── Fin Lot Sessions ─────
 
                     val activeVoiceProfile = resolveVoiceProfile(prefs)
-                    val availableVoiceProfiles = getVoiceProfiles()
                     _state.value = ReaderUiState(
                         // 3b.3 — barre du haut (ReaderTopBar) : source
                         // unique, jamais rechargé depuis un repository
@@ -779,7 +775,6 @@ class ReaderViewModel @Inject constructor(
                         readingMode = if (prefs.readingMode == "PAGED") ReadingMode.PAGED else ReadingMode.SCROLL,
                         currentOverrides = restored?.overrides,
                         activeVoiceProfile = activeVoiceProfile,
-                        availableVoiceProfiles = availableVoiceProfiles,
                         // Lot 12, tache 12.9 — jamais reporte avant ce lot.
                         publicationFormat = publication.format,
                         pageOffsetY = restored?.locator?.pageOffsetY ?: 0f,
@@ -1693,15 +1688,6 @@ class ReaderViewModel @Inject constructor(
         playCurrentSentence()
     }
 
-    /** 3d.1 — change le profil vocal actif (préférence globale, panneau Voix). */
-    private fun setActiveVoiceProfile(profileId: String) {
-        viewModelScope.launch {
-            val prefs = preferencesRepository.get()
-            preferencesRepository.update(prefs.copy(activeVoiceProfileId = profileId))
-            _state.value = _state.value.copy(activeVoiceProfile = voiceProfileRepository.getById(profileId))
-            restartNarrationWithNewProfile()
-        }
-    }
 
     /** 3d.2 — réglage global d'interligne, voir `ReaderUiState.lineHeightMultiplier`. */
     private fun setLineHeight(multiplier: Float) {

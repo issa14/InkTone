@@ -110,7 +110,6 @@ class ReaderViewModelFreeSelectionTest {
             createBookmark = CreateBookmarkUseCase(bookmarkRepository),
             deleteBookmark = DeleteBookmarkUseCase(bookmarkRepository),
             voiceProfileRepository = FakeVoiceProfileRepository(),
-            getVoiceProfiles = GetVoiceProfilesUseCase(FakeVoiceProfileRepository()),
             readingSessionRepository = FakeReadingSessionRepository(),
             themeRepository = FakeThemeRepository(),
             fixedPageRenderer = com.inktone.core.testing.fake.FakeFixedPageRenderer(),

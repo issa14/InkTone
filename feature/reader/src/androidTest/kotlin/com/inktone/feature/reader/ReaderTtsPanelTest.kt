@@ -5,6 +5,7 @@ import androidx.compose.ui.test.hasText
 import androidx.compose.ui.test.junit4.createComposeRule
 import androidx.compose.ui.test.onNodeWithContentDescription
 import androidx.compose.ui.test.onNodeWithText
+import androidx.compose.ui.test.performClick
 import com.inktone.domain.model.TtsEngineId
 import com.inktone.domain.model.VoiceProfile
 import org.junit.Rule
@@ -33,12 +34,11 @@ class ReaderTtsPanelTest {
                 currentSentenceIndex = 0,
                 totalSentences = 10,
                 activeVoiceProfile = activeProfile,
-                availableVoiceProfiles = listOf(activeProfile),
                 onPlayPause = {},
                 onPreviousSentence = {},
                 onNextSentence = {},
                 onSpeedChange = {},
-                onSelectVoiceProfile = {},
+                onOpenVoiceSettings = {},
                 onOpenPronunciationRules = {},
                 onDismiss = {},
             )
@@ -55,12 +55,11 @@ class ReaderTtsPanelTest {
                 currentSentenceIndex = 0,
                 totalSentences = 10,
                 activeVoiceProfile = activeProfile,
-                availableVoiceProfiles = listOf(activeProfile),
                 onPlayPause = {},
                 onPreviousSentence = {},
                 onNextSentence = {},
                 onSpeedChange = {},
-                onSelectVoiceProfile = {},
+                onOpenVoiceSettings = {},
                 onOpenPronunciationRules = {},
                 onDismiss = {},
             )
@@ -80,12 +79,11 @@ class ReaderTtsPanelTest {
                 currentSentenceIndex = 0,
                 totalSentences = 10,
                 activeVoiceProfile = activeProfile,
-                availableVoiceProfiles = listOf(activeProfile),
                 onPlayPause = {},
                 onPreviousSentence = {},
                 onNextSentence = {},
                 onSpeedChange = {},
-                onSelectVoiceProfile = {},
+                onOpenVoiceSettings = {},
                 onOpenPronunciationRules = {},
                 onDismiss = {},
             )
@@ -93,5 +91,30 @@ class ReaderTtsPanelTest {
 
         // Format cible UX_FLOW_DESIGN.md §Haut-parleur : "Jessica (FR) · UPMC · Français"
         composeTestRule.onNodeWithText("Jessica (FR) · UPMC · Français").assertIsDisplayed()
+    }
+
+    @Test
+    fun le_lien_vers_les_reglages_remplace_le_choix_de_profils() {
+        // Décision D74 : la voix se choisit dans les Réglages ; le panneau ne
+        // liste plus des enregistrements de profil.
+        var opened = false
+        composeTestRule.setContent {
+            ReaderTtsPanel(
+                isPlaying = false,
+                currentSentenceIndex = 0,
+                totalSentences = 10,
+                activeVoiceProfile = activeProfile,
+                onPlayPause = {},
+                onPreviousSentence = {},
+                onNextSentence = {},
+                onSpeedChange = {},
+                onOpenVoiceSettings = { opened = true },
+                onOpenPronunciationRules = {},
+                onDismiss = {},
+            )
+        }
+
+        composeTestRule.onNodeWithText("Changer de voix dans les Réglages").performClick()
+        org.junit.Assert.assertTrue(opened)
     }
 }

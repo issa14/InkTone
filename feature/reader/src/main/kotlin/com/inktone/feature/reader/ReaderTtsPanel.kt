@@ -65,17 +65,15 @@ fun ReaderTtsPanel(
     currentSentenceIndex: Int,
     totalSentences: Int,
     activeVoiceProfile: VoiceProfile?,
-    availableVoiceProfiles: List<VoiceProfile>,
     onPlayPause: () -> Unit,
     onPreviousSentence: () -> Unit,
     onNextSentence: () -> Unit,
     onSpeedChange: (Float) -> Unit,
-    onSelectVoiceProfile: (String) -> Unit,
+    onOpenVoiceSettings: () -> Unit,
     onOpenPronunciationRules: () -> Unit,
     onDismiss: () -> Unit,
 ) {
     val sheetState = rememberModalBottomSheetState(skipPartiallyExpanded = true)
-    var showVoicePicker by remember { mutableStateOf(false) }
     val speed = activeVoiceProfile?.speed ?: 1.0f
     // Valeur suivie pendant le geste, transmise à la fin seulement : la
     // narration en cours est relancée à chaque changement (audit UX A6).
@@ -136,14 +134,13 @@ fun ReaderTtsPanel(
 
             Spacer(Modifier.height(20.dp))
 
-            // ── Voix ──
+            // ── Voix — choisie dans les Réglages (décision D74) : ce bouton
+            // listait des enregistrements de profil, pas les voix des moteurs.
             Text("Voix", style = MaterialTheme.typography.labelLarge)
             Spacer(Modifier.height(4.dp))
-            OutlinedButton(
-                onClick = { showVoicePicker = true },
-                modifier = Modifier.fillMaxWidth(),
-            ) {
-                Text(activeVoiceProfile?.let(::voiceDisplayName) ?: "Voix par défaut")
+            Text(activeVoiceProfile?.let(::voiceDisplayName) ?: "Voix par défaut", style = MaterialTheme.typography.bodyLarge)
+            TextButton(onClick = onOpenVoiceSettings) {
+                Text("Changer de voix dans les Réglages")
             }
 
             Spacer(Modifier.height(20.dp))
@@ -175,57 +172,8 @@ fun ReaderTtsPanel(
         }
     }
 
-    if (showVoicePicker) {
-        VoiceProfilePickerDialog(
-            profiles = availableVoiceProfiles,
-            activeProfileId = activeVoiceProfile?.id,
-            onSelect = { profileId ->
-                onSelectVoiceProfile(profileId)
-                showVoicePicker = false
-            },
-            onDismiss = { showVoicePicker = false },
-        )
-    }
 }
 
-@Composable
-private fun VoiceProfilePickerDialog(
-    profiles: List<VoiceProfile>,
-    activeProfileId: String?,
-    onSelect: (String) -> Unit,
-    onDismiss: () -> Unit,
-) {
-    AlertDialog(
-        onDismissRequest = onDismiss,
-        title = { Text("Choisir une voix") },
-        text = {
-            if (profiles.isEmpty()) {
-                Text("Aucune autre voix disponible pour le moteur sélectionné dans les Réglages.")
-            } else {
-                Column {
-                    profiles.forEach { profile ->
-                        Row(
-                            modifier = Modifier
-                                .fillMaxWidth()
-                                .padding(vertical = 4.dp),
-                            verticalAlignment = Alignment.CenterVertically,
-                        ) {
-                            RadioButton(
-                                selected = profile.id == activeProfileId,
-                                onClick = { onSelect(profile.id) },
-                            )
-                            Spacer(Modifier.width(8.dp))
-                            Text(voiceDisplayName(profile))
-                        }
-                    }
-                }
-            }
-        },
-        confirmButton = {
-            TextButton(onClick = onDismiss) { Text("Fermer") }
-        },
-    )
-}
 
 /**
  * 3d.1 — format cible `voix · moteur · langue` (UX_FLOW_DESIGN.md
