@@ -242,6 +242,11 @@ fun LibraryScreen(
                     hasActiveImport = state.importProgress.total > 0 || state.importProgress.hasQueuedChunks,
                     onImportClick = onImportClick,
                     searchQuery = state.searchQuery,
+                    isFiltered = state.activeFilter != FilterMode.ALL || state.selectedFormats.isNotEmpty(),
+                    onShowAllBooks = {
+                        viewModel.onIntent(LibraryIntent.ChangeFilter(FilterMode.ALL))
+                        viewModel.onIntent(LibraryIntent.ClearFileFormats)
+                    },
                 )
                 else -> {
                     // Carte « Reprendre la lecture » fixe au-dessus de la liste :
@@ -1138,7 +1143,13 @@ private fun ImportProgressBanner(progress: ImportProgress) {
  * propre à ce seul écran.
  */
 @Composable
-private fun EmptyState(hasActiveImport: Boolean, onImportClick: () -> Unit, searchQuery: String = "") {
+private fun EmptyState(
+    hasActiveImport: Boolean,
+    onImportClick: () -> Unit,
+    searchQuery: String = "",
+    isFiltered: Boolean = false,
+    onShowAllBooks: () -> Unit = {},
+) {
     Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
         Column(horizontalAlignment = Alignment.CenterHorizontally) {
             // Audit v1.0.0 (AUDIT_CONSOLIDATION_V1.md, M1) : une recherche
@@ -1147,6 +1158,9 @@ private fun EmptyState(hasActiveImport: Boolean, onImportClick: () -> Unit, sear
             // votre premier livre » alors que la bibliothèque était pleine,
             // avec un CTA d'import trompeur.
             val isSearchNoResult = searchQuery.isNotBlank() && !hasActiveImport
+            // Même faute pour un filtre (Favoris, Non lus, format…) : la
+            // bibliothèque n'est pas vide, le filtre n'a rien retenu.
+            val isFilterNoResult = isFiltered && !hasActiveImport && !isSearchNoResult
             AppIcon(
                 AppSymbol.LibraryShelf,
                 contentDescription = null, // décoratif : le texte juste dessous porte le sens
@@ -1158,6 +1172,7 @@ private fun EmptyState(hasActiveImport: Boolean, onImportClick: () -> Unit, sear
                 when {
                     hasActiveImport -> "Import en cours…"
                     isSearchNoResult -> "Aucun résultat"
+                    isFilterNoResult -> "Aucun livre dans ce filtre"
                     else -> "Votre bibliothèque est vide"
                 },
                 style = MaterialTheme.typography.titleMedium,
@@ -1167,6 +1182,7 @@ private fun EmptyState(hasActiveImport: Boolean, onImportClick: () -> Unit, sear
                 when {
                     hasActiveImport -> "Vos livres apparaîtront ici une fois l'import terminé."
                     isSearchNoResult -> "Aucun livre ne correspond à « $searchQuery »."
+                    isFilterNoResult -> "Aucun livre de votre bibliothèque ne correspond au filtre choisi."
                     else -> "Importez votre premier livre pour commencer à lire et écouter avec InkTone."
                 },
                 style = MaterialTheme.typography.bodyMedium,
@@ -1174,7 +1190,11 @@ private fun EmptyState(hasActiveImport: Boolean, onImportClick: () -> Unit, sear
                 textAlign = TextAlign.Center,
                 modifier = Modifier.padding(horizontal = 32.dp, vertical = 8.dp),
             )
-            if (!hasActiveImport && !isSearchNoResult) {
+            if (isFilterNoResult) {
+                Button(onClick = onShowAllBooks, modifier = Modifier.padding(top = 16.dp)) {
+                    Text("Afficher tous les livres")
+                }
+            } else if (!hasActiveImport && !isSearchNoResult) {
                 Button(onClick = onImportClick, modifier = Modifier.padding(top = 16.dp)) {
                     Text("Importer votre premier livre")
                 }
