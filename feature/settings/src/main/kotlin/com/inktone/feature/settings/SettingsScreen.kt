@@ -1033,6 +1033,8 @@ private fun PronunciationRuleDialog(
     var originalText by remember { mutableStateOf(editing?.originalText ?: "") }
     var replacementText by remember { mutableStateOf(editing?.replacementText ?: "") }
     var isRegex by remember { mutableStateOf(editing?.isRegex ?: false) }
+    val problem = PronunciationRule.problemOf(originalText, replacementText, isRegex)
+    val problemMessage = problem?.message()
 
     AlertDialog(
         onDismissRequest = onDismiss,
@@ -1063,12 +1065,15 @@ private fun PronunciationRuleDialog(
                     Spacer(Modifier.width(8.dp))
                     Text("Expression régulière (Regex)")
                 }
+                if (problemMessage != null) {
+                    Text(problemMessage, style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.error)
+                }
             }
         },
         confirmButton = {
             TextButton(
                 onClick = { onSave(originalText, replacementText, isRegex) },
-                enabled = originalText.isNotBlank(),
+                enabled = problem == null,
             ) { Text("Enregistrer") }
         },
         dismissButton = { TextButton(onClick = onDismiss) { Text("Annuler") } },

@@ -8,6 +8,7 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.material3.Button
+import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Switch
 import androidx.compose.material3.Text
@@ -52,7 +53,13 @@ fun PronunciationRulesScreen(viewModel: PronunciationRulesViewModel = hiltViewMo
                 onCheckedChange = { viewModel.onIntent(PronunciationRulesIntent.SetEditingIsRegex(it)) },
             )
         }
-        Button(onClick = { viewModel.onIntent(PronunciationRulesIntent.Save) }) {
+        state.editingProblem?.message()?.let { message ->
+            Text(message, style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.error)
+        }
+        Button(
+            onClick = { viewModel.onIntent(PronunciationRulesIntent.Save) },
+            enabled = state.editingProblem == null,
+        ) {
             Text("Ajouter")
         }
 

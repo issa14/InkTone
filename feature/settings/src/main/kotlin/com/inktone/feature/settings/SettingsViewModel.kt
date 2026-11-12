@@ -318,7 +318,10 @@ class SettingsViewModel @Inject constructor(
      * silencieusement réactivé une règle désactivée par l'utilisateur.
      */
     private suspend fun savePronunciationRule(intent: SettingsIntent.SavePronunciationRule) {
-        if (intent.originalText.isBlank()) return
+        // Une règle inapplicable (motif mal formé, groupe absent…) serait
+        // ignorée en silence à chaque synthèse : refusée ici, signalée par le
+        // dialogue de saisie qui applique la même vérification.
+        if (PronunciationRule.problemOf(intent.originalText, intent.replacementText, intent.isRegex) != null) return
         val existing = intent.id?.let { id -> _state.value.pronunciationRules.find { it.id == id } }
         pronunciationRuleRepository.save(
             PronunciationRule(

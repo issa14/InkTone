@@ -38,7 +38,7 @@ class PronunciationRulesViewModel @Inject constructor(
                 _state.value = _state.value.copy(editingIsRegex = intent.isRegex)
             is PronunciationRulesIntent.Save -> {
                 val current = _state.value
-                if (current.editingOriginalText.isBlank()) return
+                if (current.editingProblem != null) return
                 viewModelScope.launch {
                     ruleRepository.save(
                         PronunciationRule(

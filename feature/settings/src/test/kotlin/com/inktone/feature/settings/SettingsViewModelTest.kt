@@ -332,6 +332,21 @@ class SettingsViewModelTest {
     }
 
     @Test
+    fun `une regle regex inapplicable n est pas enregistree`() = runTest {
+        // Avant : enregistrée, affichée active, ignorée en silence à chaque
+        // synthèse (PronunciationRuleApplier rattrape l'exception).
+        val ruleRepository = FakePronunciationRuleRepository()
+        val vm = viewModel(pronunciationRuleRepository = ruleRepository)
+        dispatcher.scheduler.advanceUntilIdle()
+
+        vm.onIntent(SettingsIntent.SavePronunciationRule(id = null, originalText = "[Dr", replacementText = "Docteur", isRegex = true))
+        vm.onIntent(SettingsIntent.SavePronunciationRule(id = null, originalText = "Dr", replacementText = "$1", isRegex = true))
+        dispatcher.scheduler.advanceUntilIdle()
+
+        assertTrue(vm.state.value.pronunciationRules.isEmpty())
+    }
+
+    @Test
     fun `editer une regle preserve son etat isEnabled existant`() = runTest {
         val ruleRepository = FakePronunciationRuleRepository()
         ruleRepository.save(
