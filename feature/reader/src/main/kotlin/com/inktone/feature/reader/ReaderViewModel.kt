@@ -2069,8 +2069,8 @@ class ReaderViewModel @Inject constructor(
      *   [persistPosition]).
      */
     private fun persistFragment(publicationId: String, snapshot: TrackerSnapshot, scope: CoroutineScope = viewModelScope) {
-        val fragmentStart = lastFragmentSavedMs
         val fragmentEnd = System.currentTimeMillis()
+        val fragmentStart = snapshot.startedAt(endMs = fragmentEnd, previousEndMs = lastFragmentSavedMs)
         lastFragmentSavedMs = fragmentEnd
         scope.launch(Dispatchers.IO) {
             readingSessionRepository.insert(

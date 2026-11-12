@@ -149,8 +149,9 @@ class NarrationSessionContinuation @Inject constructor(
     }
 
     private fun persistFragment(publicationId: String, snapshot: TrackerSnapshot) {
-        val fragmentStart = lastFragmentSavedMs
-        lastFragmentSavedMs = System.currentTimeMillis()
+        val fragmentEnd = System.currentTimeMillis()
+        val fragmentStart = snapshot.startedAt(endMs = fragmentEnd, previousEndMs = lastFragmentSavedMs)
+        lastFragmentSavedMs = fragmentEnd
         scope.launch {
             readingSessionRepository.insert(
                 ReadingSession(

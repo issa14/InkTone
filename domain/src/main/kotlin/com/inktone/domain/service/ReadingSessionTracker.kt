@@ -17,6 +17,18 @@ data class TrackerSnapshot(
 ) {
     /** Durée totale de l'instantané — le seuil de persistance porte sur elle. */
     val totalMs: Long get() = visualMs + ttsMs
+
+    /**
+     * Début réel d'un fragment qui se termine à [endMs] : sa durée active
+     * remontée depuis la fin, jamais avant la fin du fragment précédent
+     * ([previousEndMs]).
+     *
+     * Audit UX D26 : le début était la fin du fragment précédent. Après une
+     * mise en arrière-plan (une nuit, Lecteur resté ouvert), les premières
+     * minutes du lendemain étaient datées de la veille au soir — or jour,
+     * série, objectif quotidien et créneau horaire se calculent sur ce début.
+     */
+    fun startedAt(endMs: Long, previousEndMs: Long): Long = maxOf(previousEndMs, endMs - totalMs)
 }
 
 /**
