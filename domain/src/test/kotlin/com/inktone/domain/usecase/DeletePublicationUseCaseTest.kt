@@ -1,5 +1,6 @@
 package com.inktone.domain.usecase
 
+import com.inktone.core.testing.fake.FakePlaybackSession
 import com.inktone.core.testing.fake.FakePreAnalysisStore
 import com.inktone.core.testing.fake.FakePublicationRepository
 import com.inktone.core.testing.fake.FakeRenderedPageCache
@@ -8,6 +9,8 @@ import com.inktone.domain.model.Publication
 import com.inktone.domain.model.PublicationFormat
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.test.runTest
+import com.inktone.domain.service.PlaybackMetadata
+import com.inktone.domain.service.PlaybackSessionState
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertTrue
 import org.junit.Test
@@ -33,12 +36,50 @@ class DeletePublicationUseCaseTest {
         )
         publicationRepository.insert(publication)
 
-        val useCase = DeletePublicationUseCase(publicationRepository, preAnalysisStore, ttsSegmentCache, renderedPageCache)
+        val useCase = DeletePublicationUseCase(publicationRepository, preAnalysisStore, ttsSegmentCache, renderedPageCache, FakePlaybackSession())
         useCase("pub-1")
 
         assertTrue(publicationRepository.observeAll().first().isEmpty())
         assertEquals(listOf("pub-1"), preAnalysisStore.deleted)
         assertEquals(listOf("pub-1"), ttsSegmentCache.deletedPublications)
         assertEquals(listOf("pub-1"), renderedPageCache.deletedPublications)
+    }
+
+    private suspend fun useCaseWithBook(playbackSession: FakePlaybackSession): DeletePublicationUseCase {
+        val publicationRepository = FakePublicationRepository()
+        publicationRepository.insert(
+            Publication(
+                id = "pub-1", title = "Titre", format = PublicationFormat.EPUB,
+                fileUri = "content://fake/pub-1", fileHash = "hash-1", fileSize = 100L,
+                chapterCount = 1, importDate = 0L,
+            ),
+        )
+        return DeletePublicationUseCase(publicationRepository, FakePreAnalysisStore(), FakeTtsSegmentCache(), FakeRenderedPageCache(), playbackSession)
+    }
+
+    /**
+     * Bug réel corrigé (audit UX A12) : supprimer le livre en cours de
+     * narration laissait la voix lire un livre retiré.
+     */
+    @Test
+    fun `supprimer le livre narre arrete la narration`() = runTest {
+        val playbackSession = FakePlaybackSession()
+        playbackSession.sessionStateFlow.value = PlaybackSessionState.PLAYING
+        playbackSession.metadataFlow.value = PlaybackMetadata(publicationId = "pub-1")
+
+        useCaseWithBook(playbackSession)("pub-1")
+
+        assertEquals(1, playbackSession.stopCount)
+    }
+
+    @Test
+    fun `supprimer un autre livre ne touche pas a la narration`() = runTest {
+        val playbackSession = FakePlaybackSession()
+        playbackSession.sessionStateFlow.value = PlaybackSessionState.PLAYING
+        playbackSession.metadataFlow.value = PlaybackMetadata(publicationId = "autre-livre")
+
+        useCaseWithBook(playbackSession)("pub-1")
+
+        assertEquals(0, playbackSession.stopCount)
     }
 }

@@ -53,6 +53,11 @@ class FakePlaybackSession : PlaybackSession {
     override fun pause() = Unit
     override fun resume() = Unit
     override fun skip(delta: Int) = Unit
-    override fun stop() = Unit
+    var stopCount = 0
+        private set
+
+    override fun stop() {
+        stopCount++
+    }
     override fun setSleepTimer(minutes: Int?) = Unit
 }

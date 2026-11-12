@@ -19,6 +19,7 @@ import com.inktone.domain.service.FileStorageService
 import com.inktone.domain.service.ImportSessionStore
 import com.inktone.domain.service.PublicationParser
 import com.inktone.domain.service.PreAnalysisBuilder
+import com.inktone.domain.service.PlaybackSession
 import com.inktone.domain.service.PreAnalysisStore
 import com.inktone.domain.service.SearchService
 import com.inktone.domain.service.SyncOperationTracker
@@ -180,7 +181,8 @@ object UseCaseModule {
         preAnalysisStore: PreAnalysisStore,
         ttsSegmentCache: TtsSegmentCache,
         renderedPageCache: RenderedPageCache,
-    ): DeletePublicationUseCase = DeletePublicationUseCase(publicationRepository, preAnalysisStore, ttsSegmentCache, renderedPageCache)
+        playbackSession: PlaybackSession,
+    ): DeletePublicationUseCase = DeletePublicationUseCase(publicationRepository, preAnalysisStore, ttsSegmentCache, renderedPageCache, playbackSession)
 
     @Provides
     fun provideRegenerateCoversUseCase(

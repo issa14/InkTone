@@ -78,7 +78,7 @@ class LibraryViewModelTest {
         readingStateRepository,
         ToggleFavoriteUseCase(publicationRepository),
         TogglePinUseCase(publicationRepository),
-        DeletePublicationUseCase(publicationRepository, FakePreAnalysisStore(), FakeTtsSegmentCache(), FakeRenderedPageCache()),
+        DeletePublicationUseCase(publicationRepository, FakePreAnalysisStore(), FakeTtsSegmentCache(), FakeRenderedPageCache(), FakePlaybackSession()),
         importProgressObserver,
         FakeImportResultsStore(),
         ImportSessionStore(),

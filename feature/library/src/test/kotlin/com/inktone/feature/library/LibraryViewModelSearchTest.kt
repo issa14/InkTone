@@ -63,7 +63,7 @@ class LibraryViewModelSearchTest {
         FakeReadingStateRepository(),
         ToggleFavoriteUseCase(publicationRepository),
         TogglePinUseCase(publicationRepository),
-        DeletePublicationUseCase(publicationRepository, FakePreAnalysisStore(), FakeTtsSegmentCache(), FakeRenderedPageCache()),
+        DeletePublicationUseCase(publicationRepository, FakePreAnalysisStore(), FakeTtsSegmentCache(), FakeRenderedPageCache(), FakePlaybackSession()),
         FakeImportProgressObserver(),
         FakeImportResultsStore(),
         ImportSessionStore(),

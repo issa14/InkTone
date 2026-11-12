@@ -4,6 +4,8 @@ import com.inktone.domain.repository.PublicationRepository
 import com.inktone.domain.service.PreAnalysisStore
 import com.inktone.domain.service.RenderedPageCache
 import com.inktone.domain.service.TtsSegmentCache
+import com.inktone.domain.service.PlaybackSession
+import com.inktone.domain.service.PlaybackSessionState
 
 /**
  * Lot 2b.2 — retrait irréversible d'une publication (UX §Bibliothèque
@@ -22,8 +24,17 @@ class DeletePublicationUseCase(
     private val preAnalysisStore: PreAnalysisStore,
     private val ttsSegmentCache: TtsSegmentCache,
     private val renderedPageCache: RenderedPageCache,
+    private val playbackSession: PlaybackSession,
 ) {
     suspend operator fun invoke(publicationId: String) {
+        // Audit UX A12 : supprimer le livre en cours de narration laissait la
+        // voix lire et le mini-lecteur afficher un livre retiré, et
+        // l'ordonnanceur tentait d'écrire une position pour un livre absent.
+        if (playbackSession.sessionState.value != PlaybackSessionState.IDLE &&
+            playbackSession.metadata.value.publicationId == publicationId
+        ) {
+            playbackSession.stop()
+        }
         publicationRepository.delete(publicationId)
         preAnalysisStore.delete(publicationId)
         ttsSegmentCache.deletePublication(publicationId)
