@@ -194,9 +194,12 @@ class ReaderViewModel @Inject constructor(
                         _state.value = _state.value.copy(isAudioActive = false, isPlaying = false)
                     is PlaybackOrchestrator.PlaybackStatus.Error -> {
                         _highlightedWordRange.value = null
+                        // Message passager : un échec de la voix ne doit pas
+                        // remplacer la page par l'écran d'erreur d'ouverture,
+                        // dont « Réessayer » rouvre le livre (audit UX D40).
                         _state.value = _state.value.copy(
                             isPlaying = false, isAudioActive = false,
-                            errorMessage = status.message,
+                            narrationError = status.message,
                         )
                     }
                 }
@@ -402,6 +405,7 @@ class ReaderViewModel @Inject constructor(
             is ReaderIntent.SetFontSize -> setFontSize(intent.fontSize)
             is ReaderIntent.SetReadingTheme -> setReadingTheme(intent.themeId)
             is ReaderIntent.SetBookSpecificSettings -> setBookSpecificSettings(intent.enabled)
+            ReaderIntent.DismissNarrationError -> _state.value = _state.value.copy(narrationError = null)
             is ReaderIntent.SetSleepTimer -> setSleepTimer(intent.minutes)
             is ReaderIntent.SkipToPreviousSentence -> skipSentence(-1)
             is ReaderIntent.SkipToNextSentence -> skipSentence(1)

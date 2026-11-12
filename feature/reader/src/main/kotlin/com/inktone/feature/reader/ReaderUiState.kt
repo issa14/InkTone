@@ -97,6 +97,9 @@ data class ReaderUiState(
     // A.3 — Message d'erreur surfacé quand le parsing ou l'ouverture
     // échoue. null = pas d'erreur, l'écran affiche le contenu normal.
     val errorMessage: String? = null,
+    // Échec de la narration (moteur en panne) : message passager, la page
+    // reste affichée — contrairement à errorMessage, qui remplace l'écran.
+    val narrationError: String? = null,
     // B.1 — Mode de lecture actif (scroll vertical ou paginé horizontal).
     val readingMode: ReadingMode = ReadingMode.SCROLL,
     // 3d.1 — profil vocal actif résolu (même repli que playCurrentSentence,
@@ -427,6 +430,9 @@ sealed interface ReaderIntent {
      * les réglages généraux.
      */
     data class SetBookSpecificSettings(val enabled: Boolean) : ReaderIntent
+
+    /** Le message d'échec de la narration a été affiché. */
+    data object DismissNarrationError : ReaderIntent
 
     /**
      * Tache 9bis.3.3 — `minutes = null` desactive le minuteur en cours.

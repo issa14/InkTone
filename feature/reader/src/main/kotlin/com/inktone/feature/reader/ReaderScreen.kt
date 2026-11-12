@@ -278,6 +278,13 @@ fun ReaderScreen(
         }
     }
 
+    // Audit UX D40 — échec de la narration : message passager, la page reste.
+    LaunchedEffect(state.narrationError) {
+        val message = state.narrationError ?: return@LaunchedEffect
+        snackbarHostState.showSnackbar(message)
+        viewModel.onIntent(ReaderIntent.DismissNarrationError)
+    }
+
     // 3d.3 — auto-masquage de la barre de luminosité, relancé à chaque
     // ajustement (voir ReaderChromeState.showBrightnessBar).
     LaunchedEffect(chrome.showBrightnessBar, chrome.brightnessBarActivityTick) {

@@ -357,6 +357,7 @@ class PlaybackOrchestrator @Inject constructor(
         if (sentences.isEmpty()) return
         session = SessionContext(sentences, voiceProfile, publicationId, chapterIndex, resourceHref)
         stop()
+        consecutiveSynthesisFailures.set(0)
         val generation = playGeneration.incrementAndGet()
         publishPosition(chapterIndex = chapterIndex, sentenceIndex = startFrom)
         _state.value = PlaybackStatus.Buffering
@@ -772,14 +773,17 @@ class PlaybackOrchestrator @Inject constructor(
             s
         } catch (e: TimeoutCancellationException) {
             Log.w(TAG, "Synthèse en timeout, phrase sautée : ${sentence.describeForLog()}")
+            onSynthesisFailure()
             silence(TIMEOUT_SILENCE_MS, audioPlayer.sampleRate)
         } catch (e: CancellationException) {
             throw e
         } catch (e: Exception) {
             // Sans trace, une phrase sautée en lecture était indiagnostiquable.
             Log.w(TAG, "Synthèse en échec, phrase sautée : ${sentence.describeForLog()} — $e")
+            onSynthesisFailure()
             silence(TIMEOUT_SILENCE_MS, audioPlayer.sampleRate)
         }
+        if (synthesized) consecutiveSynthesisFailures.set(0)
         // Seule une synthèse RÉUSSIE est cachée — jamais un silence de
         // secours (le rejouer serait du faux texte).
         if (synthesized) ttsSegmentCache.put(publicationId, key, fresh)
@@ -1014,6 +1018,29 @@ class PlaybackOrchestrator @Inject constructor(
     @Volatile private var pausedNanosTotal = 0L
     @Volatile private var pausedSinceNanos = 0L
 
+    // Audit UX D40 : une phrase en échec est sautée (silence court), mais un
+    // moteur en panne continue faisait « lire » le livre en silence — la
+    // position avançait, les mots étaient crédités, sans son ni message.
+    private val consecutiveSynthesisFailures = java.util.concurrent.atomic.AtomicInteger(0)
+
+    private fun onSynthesisFailure() {
+        if (consecutiveSynthesisFailures.incrementAndGet() < MAX_CONSECUTIVE_SYNTHESIS_FAILURES) return
+        stateLock.lock()
+        try {
+            playGeneration.incrementAndGet()
+            playbackJob?.cancel()
+            playbackJob = null
+            wordTrackingJob?.cancel()
+            wordTrackingJob = null
+            audioPlayer.stop()
+            _currentWordRange.value = null
+            _positionValid.value = false
+            _state.value = PlaybackStatus.Error("La voix ne répond plus : narration arrêtée.")
+        } finally {
+            stateLock.unlock()
+        }
+    }
+
     private fun pausedNanos(): Long {
         val since = pausedSinceNanos
         return pausedNanosTotal + if (since != 0L) System.nanoTime() - since else 0L
@@ -1145,6 +1172,7 @@ class PlaybackOrchestrator @Inject constructor(
         const val SYNTHESIS_TIMEOUT_MS = 20_000L
         /** Silence injecté après une synthèse en échec. */
         const val TIMEOUT_SILENCE_MS = 50L
+        const val MAX_CONSECUTIVE_SYNTHESIS_FAILURES = 3
         const val PACE_STEP_MS = 50L
         // AUDIT_REACTIVITE_UX §5.3 — plancher (position invalide, en pause,
         // ou échéance déjà dépassée de moins de ce délai) et plafond (un mot
