@@ -283,11 +283,14 @@ class ReaderViewModel @Inject constructor(
     // 3d.5 — rappel de repos oculaire : eyeRestReminderJob porte le délai
     // jusqu'à l'échéance (relancé à chaque reprise, jamais deux en
     // parallèle) ; eyeRestCountdownJob porte le
-    // compte à rebours de 60s du popup une fois affiché ;
-    // wasPlayingBeforeEyeRest mémorise s'il faut reprendre le TTS.
+    // compte à rebours de 60s du popup une fois affiché.
     private var eyeRestReminderJob: Job? = null
     private var eyeRestCountdownJob: Job? = null
-    private var wasPlayingBeforeEyeRest: Boolean = false
+
+    // Écran Lecteur visible (ON_START … ON_STOP, voir onAppForeground /
+    // onAppBackground). Le rappel de repos oculaire ne s'affiche qu'écran
+    // visible : un rappel pour les yeux n'a pas de sens écran éteint.
+    private var isInForeground: Boolean = true
 
     // Lot 15 (Tâche 4.1) — job du surlignage mot-à-mot courant, remplacé à
     // chaque nouvelle phrase (mécanique delay() sur les wordTimestamps,
@@ -1632,14 +1635,24 @@ class ReaderViewModel @Inject constructor(
     }
 
     /**
-     * 3d.5 — à l'échéance : coupe le TTS s'il est actif (jamais
-     * silencieusement — le popup visible EST l'avertissement, voir doc du
-     * lot 3d tâche 3d.5 et consignation 3d.7 sur le comportement audio
-     * retenu), affiche le popup, démarre le compte à rebours de 60s.
+     * 3d.5 — à l'échéance : affiche le popup et démarre le compte à rebours
+     * de 60s.
+     *
+     * Audit UX A5 : le rappel ne coupe JAMAIS la narration. Avant, il mettait
+     * le TTS en pause une minute toutes les heures, y compris téléphone
+     * verrouillé, où l'utilisateur n'entendait qu'un silence sans rien voir.
+     * Pendant une écoute, ou écran non visible, le rappel est simplement
+     * reporté d'un intervalle complet : il vise la lecture des yeux, pas
+     * l'écoute.
      */
     private fun triggerEyeRestReminder() {
-        wasPlayingBeforeEyeRest = _state.value.isPlaying
-        if (wasPlayingBeforeEyeRest) pausePlayback()
+        if (_state.value.isPlaying || !isInForeground) {
+            viewModelScope.launch {
+                val prefs = preferencesRepository.get()
+                if (prefs.eyeRestReminderEnabled) scheduleEyeRestReminder(prefs.eyeRestReminderIntervalMinutes)
+            }
+            return
+        }
         _state.value = _state.value.copy(
             isEyeRestReminderVisible = true,
             eyeRestReminderCountdownS = EYE_REST_REMINDER_COUNTDOWN_S,
@@ -1653,8 +1666,7 @@ class ReaderViewModel @Inject constructor(
                 )
             }
             // Countdown écoulé sans action explicite : équivalent à
-            // "Reprendre" — l'audio ne doit jamais rester coupé
-            // indéfiniment sans action de l'utilisateur.
+            // "Reprendre" (le popup se referme, l'intervalle repart).
             resumeFromEyeRestReminder()
         }
     }
@@ -1663,7 +1675,6 @@ class ReaderViewModel @Inject constructor(
     private fun resumeFromEyeRestReminder() {
         eyeRestCountdownJob?.cancel()
         _state.value = _state.value.copy(isEyeRestReminderVisible = false)
-        if (wasPlayingBeforeEyeRest) playCurrentSentence()
         viewModelScope.launch {
             val prefs = preferencesRepository.get()
             if (prefs.eyeRestReminderEnabled) scheduleEyeRestReminder(prefs.eyeRestReminderIntervalMinutes)
@@ -1796,6 +1807,7 @@ class ReaderViewModel @Inject constructor(
      * pas être comptabilisé comme du temps de lecture.
      */
     fun onAppBackground() {
+        isInForeground = false
         saveCurrentFragment()
         // P1 (plan polissage Pareto) — ne pauser le tracker que si aucune
         // écoute TTS n'est active : le temps écoulé écran éteint pendant la
@@ -1811,6 +1823,7 @@ class ReaderViewModel @Inject constructor(
      * dans le mode dicté par l'état TTS courant.
      */
     fun onAppForeground() {
+        isInForeground = true
         val tracker = sessionTracker ?: return
         val mode = if (_state.value.isPlaying) DomainReadingMode.AUDIO else DomainReadingMode.VISUAL
         tracker.resume(mode)
@@ -1827,6 +1840,18 @@ class ReaderViewModel @Inject constructor(
     @VisibleForTesting
     internal fun cancelCheckpointTimerForTest() {
         checkpointJob?.cancel()
+    }
+
+    /**
+     * Déclenche l'échéance du rappel de repos oculaire sans attendre son
+     * délai. Pendant une narration, avancer l'horloge virtuelle laisserait
+     * l'ordonnanceur (Dispatchers.IO, hors du planificateur de test) finir
+     * ou non sa phrase : l'état `isPlaying` au moment de l'échéance ne
+     * serait pas déterministe.
+     */
+    @VisibleForTesting
+    internal fun triggerEyeRestReminderForTest() {
+        triggerEyeRestReminder()
     }
 
     /**

@@ -48,7 +48,10 @@ data class UserPreferences(
     // null = valeur système, sinon 0.01..1.0.
     val readerBrightness: Float? = null,
     // 3d.5 — rappel de repos oculaire, indépendant du minuteur de sommeil TTS.
-    val eyeRestReminderEnabled: Boolean = true,
+    // Désactivé par défaut (opt-in, décision A5 de l'audit UX) : une
+    // interruption non demandée gêne la lecture immersive. Les installations
+    // existantes gardent la valeur qu'elles ont enregistrée.
+    val eyeRestReminderEnabled: Boolean = false,
     val eyeRestReminderIntervalMinutes: Int = 60,
     // Lot 6 — disposition de la bibliothèque ("LIST", "GRID_COVERS" ou
     // "GRID_DETAILED"), persistée pour que le préréglage d'accessibilité

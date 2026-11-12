@@ -24,7 +24,7 @@ data class UserPreferencesEntity(
     val useSystemFontScale: Boolean = false, // D.3
     val lineHeightMultiplier: Float = 1.4f, // 3d.2
     val readerBrightness: Float? = null, // 3d.3
-    val eyeRestReminderEnabled: Boolean = true, // 3d.5
+    val eyeRestReminderEnabled: Boolean = false, // 3d.5, opt-in (audit UX A5)
     val eyeRestReminderIntervalMinutes: Int = 60, // 3d.5
     val appTheme: String = "SYSTEM", // Lot 6 — thème système de l'app
     val libraryLayoutMode: String = "GRID_DETAILED", // Lot 6 — disposition biblio, pilotée par le préréglage d'accessibilité
