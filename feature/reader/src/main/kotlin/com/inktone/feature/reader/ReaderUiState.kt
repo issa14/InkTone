@@ -400,6 +400,13 @@ sealed interface ReaderIntent {
     data class NavigateToLocator(val locator: Locator) : ReaderIntent
 
     /**
+     * Résultat choisi dans une recherche lancée depuis ce Lecteur : la
+     * recherche se referme et ce Lecteur s'y déplace, sans en empiler un
+     * second (audit UX A3). Types primitifs : `app` ne dépend pas du domaine.
+     */
+    data class GoToSearchResult(val resourceHref: String, val chapterIndex: Int, val charOffset: Int) : ReaderIntent
+
+    /**
      * Lot 4, tâche 4.7 — envoyé par `ReaderScreen` quand la mise en page du
      * chapitre [chapterIndex] est confirmée complète (voir
      * `ChapterPaginationState.measurement`). Ne déclenche le flash que si

@@ -12,7 +12,13 @@ class FakeSearchService : SearchService {
     val indexedChapters = mutableListOf<Pair<Int, String>>()
     var nextSearchResult: List<SearchResult> = emptyList()
 
-    override suspend fun search(query: String, publicationId: String?): List<SearchResult> = nextSearchResult
+    /** Livre demandé à chaque recherche (`null` = toute la bibliothèque), dans l'ordre. */
+    val searchedPublicationIds = mutableListOf<String?>()
+
+    override suspend fun search(query: String, publicationId: String?): List<SearchResult> {
+        searchedPublicationIds += publicationId
+        return nextSearchResult
+    }
 
     override suspend fun indexPublication(publicationId: String, documentModel: DocumentModel) {
         indexedDocuments[publicationId] = documentModel

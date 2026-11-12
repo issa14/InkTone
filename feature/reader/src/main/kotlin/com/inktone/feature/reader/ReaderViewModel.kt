@@ -400,6 +400,10 @@ class ReaderViewModel @Inject constructor(
             is ReaderIntent.DeleteAnnotation -> viewModelScope.launch { deleteAnnotation(intent.id) }
             is ReaderIntent.UpdateAnnotationNote -> updateAnnotationNote(intent.id, intent.content)
             is ReaderIntent.NavigateToLocator -> navigateToLocator(intent.locator)
+            is ReaderIntent.GoToSearchResult -> navigateToLocator(
+                Locator(resourceHref = intent.resourceHref, chapterIndex = intent.chapterIndex, charOffset = intent.charOffset),
+                flashOnArrival = true,
+            )
             is ReaderIntent.ChapterLayoutCompleted -> onChapterLayoutCompleted(intent.chapterIndex)
             is ReaderIntent.SetOverrides -> setOverrides(intent.overrides)
             is ReaderIntent.SetFontSize -> setFontSize(intent.fontSize)

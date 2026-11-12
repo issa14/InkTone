@@ -7,6 +7,10 @@ data class SearchUiState(
     val query: String = "",
     val results: List<SearchResult> = emptyList(),
     val isSearching: Boolean = false,
+    /** Recherche limitée au livre ouvert dans le Lecteur. */
+    val isBookScoped: Boolean = false,
+    /** Titre du livre de chaque résultat, pour une recherche dans toute la bibliothèque. */
+    val bookTitles: Map<String, String> = emptyMap(),
 )
 
 sealed interface SearchIntent {

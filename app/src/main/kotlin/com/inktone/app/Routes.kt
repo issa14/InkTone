@@ -38,8 +38,12 @@ object OnboardingRoute
 @Serializable
 object RecentsRoute
 
+/**
+ * Recherche plein texte. [publicationId] : livre ouvert dans le Lecteur, la
+ * recherche y est limitée ; `null` : toute la bibliothèque (audit UX A3).
+ */
 @Serializable
-object SearchRoute
+data class SearchRoute(val publicationId: String? = null)
 
 @Serializable
 object SettingsRoute

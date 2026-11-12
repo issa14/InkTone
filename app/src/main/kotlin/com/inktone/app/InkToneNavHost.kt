@@ -265,6 +265,7 @@ fun InkToneNavHost(navController: NavHostController = rememberNavController(), s
                 // Lot 19 — « Synchroniser avec le cloud » non configuré
                 // bascule vers l'écran de configuration de la sync.
                 onOpenSync = { navigateToDrawerDestination(SyncRoute) },
+                onOpenTextSearch = { navController.navigate(SearchRoute()) },
             )
             // Lot 11, tâche 11.10 — présenté à la prochaine ouverture de
             // l'app (Bibliothèque = première destination réelle après
@@ -293,9 +294,25 @@ fun InkToneNavHost(navController: NavHostController = rememberNavController(), s
                     ),
                 )
             }
+            // Résultat choisi dans une recherche limitée à ce livre : déposé
+            // ici par la recherche, qui se referme (audit UX A3).
+            val searchTarget by entry.savedStateHandle
+                .getStateFlow<String?>(SEARCH_TARGET_KEY, null)
+                .collectAsStateWithLifecycle()
+            LaunchedEffect(searchTarget) {
+                val target = searchTarget?.split('|', limit = 3) ?: return@LaunchedEffect
+                entry.savedStateHandle[SEARCH_TARGET_KEY] = null
+                readerViewModel.onIntent(
+                    ReaderIntent.GoToSearchResult(
+                        resourceHref = target[2],
+                        chapterIndex = target[0].toInt(),
+                        charOffset = target[1].toInt(),
+                    ),
+                )
+            }
             ReaderScreen(
                 viewModel = readerViewModel,
-                onSearchClick = { navController.navigate(SearchRoute) },
+                onSearchClick = { navController.navigate(SearchRoute(publicationId = route.publicationId)) },
                 onBack = { navController.popBackStack() },
                 onOpenPronunciationRules = { navController.navigate(PronunciationRulesRoute) },
                 onOpenSettings = { navController.navigate(SettingsRoute) },
@@ -309,10 +326,22 @@ fun InkToneNavHost(navController: NavHostController = rememberNavController(), s
                 isForeground = transition.targetState == EnterExitState.Visible,
             )
         }
-        composable<SearchRoute> {
-            BackScaffold(title = "Rechercher", onBack = navController::popBackStack) {
+        composable<SearchRoute> { entry ->
+            val route = entry.toRoute<SearchRoute>()
+            BackScaffold(
+                title = if (route.publicationId != null) "Rechercher dans ce livre" else "Rechercher dans les livres",
+                onBack = navController::popBackStack,
+            ) {
                 SearchScreen(
                     onNavigateToReader = { publicationId, resourceHref, chapterIndex, charOffset ->
+                        val reader = navController.previousBackStackEntry
+                        if (route.publicationId == publicationId && reader != null) {
+                            // Recherche lancée depuis ce livre : on revient à
+                            // son Lecteur au lieu d'en empiler un second.
+                            reader.savedStateHandle[SEARCH_TARGET_KEY] = "$chapterIndex|$charOffset|$resourceHref"
+                            navController.popBackStack()
+                            return@SearchScreen
+                        }
                         navController.navigate(
                             ReaderRoute(
                                 publicationId = publicationId,
@@ -612,3 +641,5 @@ private fun BackScaffold(title: String, onBack: () -> Unit, content: @Composable
     }
 }
 
+/** Cible de recherche transmise au Lecteur : « chapitre|offset|href ». */
+private const val SEARCH_TARGET_KEY = "searchTarget"

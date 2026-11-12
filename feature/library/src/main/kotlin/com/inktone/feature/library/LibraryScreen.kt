@@ -119,6 +119,8 @@ fun LibraryScreen(
     // Lot 19 — « Synchroniser avec le cloud » non configuré bascule vers
     // l'écran de configuration de la sync (UX §Bottom sheet 3-points).
     onOpenSync: () -> Unit = {},
+    // Audit UX A3 — recherche dans le texte de tous les livres.
+    onOpenTextSearch: () -> Unit = {},
 ) {
     val state by viewModel.state.collectAsStateWithLifecycle()
     val snackbarHostState = remember { SnackbarHostState() }
@@ -199,6 +201,7 @@ fun LibraryScreen(
                 onNavigateToTagDetail = onNavigateToTagDetail,
                 // Lot 19 — actions du menu 3-points
                 onOpenRandomBook = { viewModel.onIntent(LibraryIntent.OpenRandomBook) },
+                onOpenTextSearch = onOpenTextSearch,
                 onSyncNow = { viewModel.onIntent(LibraryIntent.SyncNow) },
                 onResetCovers = { viewModel.onIntent(LibraryIntent.ResetCovers) },
                 onRegenerateCovers = { viewModel.onIntent(LibraryIntent.RegenerateCovers) },
@@ -450,6 +453,7 @@ internal fun LibraryTopBar(
     onNavigateToTagDetail: (String) -> Unit = {},
     // Lot 19 — actions du menu 3-points
     onOpenRandomBook: () -> Unit = {},
+    onOpenTextSearch: () -> Unit = {},
     onSyncNow: () -> Unit = {},
     onResetCovers: () -> Unit = {},
     onRegenerateCovers: () -> Unit = {},
@@ -608,6 +612,7 @@ internal fun LibraryTopBar(
                     modifier = Modifier.padding(horizontal = 24.dp, vertical = 8.dp),
                     color = MaterialTheme.colorScheme.primary)
                 ActionSheetItem("Importer", AppSymbol.Data) { showActionsSheet = false; onImportClick() }
+                ActionSheetItem("Rechercher dans le texte des livres", AppSymbol.Search) { showActionsSheet = false; onOpenTextSearch() }
                 ActionSheetItem("Couverture par défaut", AppSymbol.CoverOnly) {
                     showActionsSheet = false
                     showResetCoversConfirm = true

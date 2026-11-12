@@ -71,7 +71,7 @@ fun SearchScreen(
             value = state.query,
             onValueChange = { viewModel.onIntent(SearchIntent.QueryChanged(it)) },
             placeholder = { Text("Rechercher...") },
-            label = { Text("Rechercher dans vos livres") },
+            label = { Text(if (state.isBookScoped) "Rechercher dans ce livre" else "Rechercher dans vos livres") },
             trailingIcon = {
                 if (state.query.isNotEmpty()) {
                     IconButton(onClick = { viewModel.onIntent(SearchIntent.QueryChanged("")) }) {
@@ -107,6 +107,7 @@ fun SearchScreen(
             items(state.results, key = { "${it.publicationId}:${it.locator.chapterIndex}:${it.locator.charOffset}" }) { result ->
                 SearchResultItem(
                     result = result,
+                    bookTitle = state.bookTitles[result.publicationId],
                     query = state.query,
                     onClick = { viewModel.onIntent(SearchIntent.NavigateToResult(result)) },
                 )
@@ -119,16 +120,22 @@ fun SearchScreen(
  * D.6 — Snippet avec surlignage du terme recherché.
  */
 @Composable
-private fun SearchResultItem(result: SearchResult, query: String, onClick: () -> Unit) {
-    Text(
-        text = highlightSnippet(result.snippet, query),
+private fun SearchResultItem(result: SearchResult, bookTitle: String?, query: String, onClick: () -> Unit) {
+    Column(
         modifier = Modifier
             .fillMaxWidth()
             .clickable(onClick = onClick)
             .padding(vertical = 8.dp),
-        color = MaterialTheme.colorScheme.onSurface,
-        style = MaterialTheme.typography.bodyMedium,
-    )
+    ) {
+        if (!bookTitle.isNullOrBlank()) {
+            Text(bookTitle, style = MaterialTheme.typography.labelMedium, color = MaterialTheme.colorScheme.primary)
+        }
+        Text(
+            text = highlightSnippet(result.snippet, query),
+            color = MaterialTheme.colorScheme.onSurface,
+            style = MaterialTheme.typography.bodyMedium,
+        )
+    }
 }
 
 /**
