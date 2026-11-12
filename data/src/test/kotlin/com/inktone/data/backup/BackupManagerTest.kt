@@ -165,6 +165,78 @@ class BackupManagerTest {
     }
 
     @Test
+    fun restaurer_sur_l_installation_d_origine_ne_reinsere_rien_de_ce_qui_existe_deja() = runTest {
+        // Seul cas où les identifiants de livre concordent : la sauvegarde
+        // revient sur l'installation qui l'a produite. Room refuse un
+        // identifiant déjà présent (stratégie ABORT, exception non
+        // rattrapée : plantage de l'application). Les faux dépôts, eux,
+        // ajoutent sans contrôle — un doublon dans la liste trahit donc
+        // la même tentative de réinsertion.
+        val fileStorageService = InMemoryFileStorageService()
+        val bookmarkRepository = FakeBookmarkRepository()
+        val annotationRepository = FakeAnnotationRepository()
+        val readingSessionRepository = FakeReadingSessionRepository()
+        val publicationRepository = FakePublicationRepository()
+
+        publicationRepository.insert(
+            Publication(
+                id = "pub-1", title = "Existe", format = PublicationFormat.EPUB,
+                fileUri = "content://x", fileHash = "hash", fileSize = 10, chapterCount = 1, importDate = 0L,
+            ),
+        )
+        bookmarkRepository.insert(
+            com.inktone.domain.model.Bookmark(
+                id = "b1", publicationId = "pub-1",
+                locator = Locator(resourceHref = "ch1.xhtml", chapterIndex = 0, charOffset = 0),
+                createdAt = 0L,
+            ),
+        )
+        annotationRepository.insert(
+            Annotation(
+                id = "a1", publicationId = "pub-1",
+                startLocator = Locator(resourceHref = "ch1.xhtml", chapterIndex = 0, charOffset = 0),
+                endLocator = Locator(resourceHref = "ch1.xhtml", chapterIndex = 0, charOffset = 10),
+                color = AnnotationColor.YELLOW, content = "une note", excerpt = "un extrait",
+                createdAt = 0L, updatedAt = 0L,
+            ),
+        )
+        readingSessionRepository.insert(
+            com.inktone.domain.model.ReadingSession(
+                id = "s1", publicationId = "pub-1", startedAt = 0L, endedAt = 60_000L,
+                mode = com.inktone.domain.model.ReadingMode.VISUAL, visualDurationMs = 60_000L,
+            ),
+        )
+
+        val manager = backupManager(
+            fileStorageService,
+            bookmarkRepository = bookmarkRepository,
+            readingSessionRepository = readingSessionRepository,
+            publicationRepository = publicationRepository,
+            annotationRepository = annotationRepository,
+        )
+        assertTrue(manager.exportTo("backup://same-device", appVersion = "1.0", password = "secret-1234"))
+
+        // Une note créée APRÈS la sauvegarde doit survivre à la restauration.
+        bookmarkRepository.insert(
+            com.inktone.domain.model.Bookmark(
+                id = "b2", publicationId = "pub-1",
+                locator = Locator(resourceHref = "ch1.xhtml", chapterIndex = 0, charOffset = 5),
+                createdAt = 1L,
+            ),
+        )
+
+        val result = manager.importFrom("backup://same-device", "secret-1234")
+
+        assertTrue(result is ImportBackupResult.Success)
+        result as ImportBackupResult.Success
+        assertEquals(0, result.restored)
+        assertEquals(0, result.skippedOrphans)
+        assertEquals(listOf("b1", "b2"), bookmarkRepository.observeAll().first().map { it.id })
+        assertEquals(listOf("a1"), annotationRepository.getAll().map { it.id })
+        assertEquals(listOf("s1"), readingSessionRepository.getAll().map { it.id })
+    }
+
+    @Test
     fun import_avec_un_mauvais_mot_de_passe_echoue_sans_rien_ecraser() = runTest {
         val fileStorageService = InMemoryFileStorageService()
         val publicationRepository = FakePublicationRepository()

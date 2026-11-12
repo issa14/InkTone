@@ -121,7 +121,20 @@ class BackupManager @Inject constructor(
         // contrainte FK aurait fait planter tout l'import sur un seul
         // signet orphelin. Ici : verification explicite, comptage
         // separe, jamais un crash sur une donnee partiellement obsolete.
+        //
+        // Même principe pour les identifiants déjà présents : signets,
+        // annotations et sessions sont insérés avec la stratégie ABORT de
+        // Room, qui lève une exception sur un identifiant existant.
+        // Restaurer une sauvegarde sur l'installation qui l'a produite (seul
+        // cas où les identifiants de livre concordent) faisait donc planter
+        // l'application. Ce qui existe déjà est conservé, jamais réinséré —
+        // même règle que la fusion de synchronisation (SyncNowManager).
+        val existingBookmarkIds = bookmarkRepository.observeAll().first().mapTo(HashSet()) { it.id }
+        val existingAnnotationIds = annotationRepository.getAll().mapTo(HashSet()) { it.id }
+        val existingSessionIds = readingSessionRepository.getAll().mapTo(HashSet()) { it.id }
+
         payload.bookmarks.forEach { backup ->
+            if (backup.id in existingBookmarkIds) return@forEach
             if (publicationRepository.getById(backup.publicationId) != null) {
                 bookmarkRepository.insert(backup.toDomain())
                 restored++
@@ -146,6 +159,7 @@ class BackupManager @Inject constructor(
             }
         }
         payload.readingSessions.forEach { backup ->
+            if (backup.id in existingSessionIds) return@forEach
             if (publicationRepository.getById(backup.publicationId) != null) {
                 readingSessionRepository.insert(backup.toDomain())
                 restored++
@@ -154,6 +168,7 @@ class BackupManager @Inject constructor(
             }
         }
         payload.annotations.forEach { backup ->
+            if (backup.id in existingAnnotationIds) return@forEach
             if (publicationRepository.getById(backup.publicationId) != null) {
                 annotationRepository.insert(backup.toDomain())
                 restored++
