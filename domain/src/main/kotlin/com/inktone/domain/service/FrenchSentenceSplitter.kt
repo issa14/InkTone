@@ -53,10 +53,19 @@ import java.util.Locale
 object FrenchSentenceSplitter {
 
     /** Abréviations françaises dont le point final n'est PAS une fin de phrase. */
-    private val abbreviations: Set<String> = hashSetOf(
+    // Titres : toujours suivis d'un nom, jamais une fin de phrase.
+    private val titles: Set<String> = hashSetOf(
         "M", "MM", "Mme", "Mmes", "Mlle", "Mlles",
         "Dr", "Pr", "Me", "Sr", "Ste",
         "Mr", "Mrs", "Ms",
+    )
+
+    // Abréviations qui sont aussi des mots courants en fin de phrase (« en
+    // mai. », « etc. ») : fusionnées seulement si la suite commence par un
+    // chiffre ou une minuscule (« p. 45 », « vol. 3 », « etc. et »). Audit UX
+    // D70 : elles fusionnaient toujours, d'où des unités de narration et de
+    // saut de phrase bien plus longues que la phrase réelle.
+    private val contextualAbbreviations: Set<String> = hashSetOf(
         "etc", "cf", "vs", "env", "approx",
         "janv", "févr", "mars", "avr", "mai", "juin", "juil", "août",
         "sept", "oct", "nov", "déc",
@@ -131,7 +140,7 @@ object FrenchSentenceSplitter {
             val segStart = segments[i].first
             var segEnd = segments[i].second
             var next = i + 1
-            while (next < segments.size && endsWithAbbreviation(text, segStart, segEnd)) {
+            while (next < segments.size && endsWithAbbreviation(text, segStart, segEnd, segments[next].first)) {
                 segEnd = segments[next].second
                 next++
             }
@@ -145,7 +154,7 @@ object FrenchSentenceSplitter {
      * Vérifie si le segment [start, end[ se termine par une abréviation
      * connue (mot suivi d'un point).
      */
-    private fun endsWithAbbreviation(text: String, start: Int, end: Int): Boolean {
+    private fun endsWithAbbreviation(text: String, start: Int, end: Int, nextStart: Int): Boolean {
         if (end <= start) return false
         val segment = text.substring(start, end).trimEnd()
         // Dernier "mot" avant un point final éventuel — toute espace
@@ -156,6 +165,10 @@ object FrenchSentenceSplitter {
         // deux formats précisément.
         val lastWord = segment.takeLastWhile { !it.isWhitespace() }
             .trimEnd('.', ')', '»', '"', '\'')
-        return lastWord.isNotEmpty() && lastWord in abbreviations
+        if (lastWord.isEmpty()) return false
+        if (lastWord in titles) return true
+        if (lastWord !in contextualAbbreviations) return false
+        val nextChar = text.drop(nextStart).firstOrNull { !it.isWhitespace() } ?: return false
+        return nextChar.isDigit() || nextChar.isLowerCase()
     }
 }

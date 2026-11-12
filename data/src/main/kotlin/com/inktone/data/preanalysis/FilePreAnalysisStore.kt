@@ -129,7 +129,10 @@ class FilePreAnalysisStore @Inject constructor(
         /** Version du format de sérialisation — incrémenter à tout changement de schéma. */
         const val FORMAT_VERSION = 3
 
-        /** Version de la sortie du parseur — incrémenter à toute évolution du parsing. */
-        const val PARSER_VERSION = 2
+        /**
+         * Version de la sortie du parseur — incrémenter à toute évolution du parsing.
+         * 3 : découpage en phrases revu (audit UX D70), texte et offsets inchangés.
+         */
+        const val PARSER_VERSION = 3
     }
 }

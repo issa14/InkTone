@@ -29,10 +29,37 @@ class FrenchSentenceSplitterTest {
         )
     }
 
+    /**
+     * Audit UX D70 : « etc. » suivi d'une majuscule termine la phrase (son
+     * point vaut point final) ; suivi d'une minuscule, la phrase continue.
+     */
     @Test
-    fun ne_decoupe_pas_apres_etc() {
-        val sentences = FrenchSentenceSplitter.split("Il apporta livres, cahiers, etc. Puis il sortit.")
-        assertEquals(listOf("Il apporta livres, cahiers, etc. Puis il sortit."), sentences.map { it.first })
+    fun etc_termine_la_phrase_devant_une_majuscule_mais_pas_devant_une_minuscule() {
+        assertEquals(
+            listOf("Il apporta livres, cahiers, etc.", "Puis il sortit."),
+            FrenchSentenceSplitter.split("Il apporta livres, cahiers, etc. Puis il sortit.").map { it.first },
+        )
+        assertEquals(
+            listOf("Il apporta livres, cahiers, etc. et repartit."),
+            FrenchSentenceSplitter.split("Il apporta livres, cahiers, etc. et repartit.").map { it.first },
+        )
+    }
+
+    /** Audit UX D70 : un mois en fin de phrase ne fusionne plus avec la suivante. */
+    @Test
+    fun un_mois_en_fin_de_phrase_termine_la_phrase() {
+        assertEquals(
+            listOf("Il partit en mai.", "Le lendemain, il revint."),
+            FrenchSentenceSplitter.split("Il partit en mai. Le lendemain, il revint.").map { it.first },
+        )
+    }
+
+    @Test
+    fun une_abreviation_suivie_d_un_nombre_ne_coupe_pas_la_phrase() {
+        assertEquals(
+            listOf("Voir t. 2, p. 45 pour le détail."),
+            FrenchSentenceSplitter.split("Voir t. 2, p. 45 pour le détail.").map { it.first },
+        )
     }
 
     @Test
