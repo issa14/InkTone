@@ -16,6 +16,7 @@ import com.inktone.domain.repository.PronunciationRuleRepository
 import com.inktone.domain.repository.VoiceProfileRepository
 import com.inktone.domain.service.AudioPlayer
 import com.inktone.domain.service.PlayerState
+import com.inktone.domain.service.TtsCapabilityCatalog
 import com.inktone.domain.service.TtsEngine
 import com.inktone.domain.service.VoiceModelDownloadService
 import com.inktone.domain.usecase.ApplyAccessibilityPresetUseCase
@@ -70,9 +71,16 @@ class SettingsViewModel @Inject constructor(
     // implémentations (Blueprint §12.4).
     private val ttsEngine: TtsEngine,
     private val audioPlayer: AudioPlayer,
+    private val ttsCapabilityCatalog: TtsCapabilityCatalog,
 ) : ViewModel() {
 
-    private val _state = MutableStateFlow(SettingsUiState())
+    private val _state = MutableStateFlow(
+        SettingsUiState(
+            pitchEngines = TtsEngineId.entries
+                .filter { ttsCapabilityCatalog.capabilitiesOf(it)?.pitchControl == true }
+                .toSet(),
+        ),
+    )
     private var voiceDownloadJob: Job? = null
     private var previewJob: Job? = null
     val state: StateFlow<SettingsUiState> = _state.asStateFlow()
@@ -162,8 +170,9 @@ class SettingsViewModel @Inject constructor(
                 // Audit v1.0.0 (B1) — « Écouter un extrait » ré-implémenté :
                 // bascule lecture/arrêt d'une phrase d'exemple.
                 is SettingsIntent.PlayPreview -> togglePreview()
-                // Lot 6 — vitesse : même cible VoiceProfile que setTtsSpeed() dans ReaderViewModel
+                // Lot 6 — vitesse et intonation : même cible VoiceProfile que setTtsSpeed() dans ReaderViewModel
                 is SettingsIntent.SetVoiceSpeed -> updateActiveVoiceProfile(current) { it.copy(speed = intent.speed) }
+                is SettingsIntent.SetVoicePitch -> updateActiveVoiceProfile(current) { it.copy(pitch = intent.pitch) }
                 // Lot 6 — présets réversibles (désapplication vers les valeurs par défaut)
                 is SettingsIntent.SetDarkModePreset -> applyDarkModePreset(intent.enabled, current)
                 is SettingsIntent.SetAccessibilityPreset -> applyAccessibilityPresetToggle(intent.enabled, current)
@@ -329,7 +338,7 @@ class SettingsViewModel @Inject constructor(
     }
 
     /**
-     * Lot 6 — met à jour le profil vocal actif (vitesse, voix).
+     * Lot 6 — met à jour le profil vocal actif (vitesse, intonation, voix).
      * Si aucun profil n'est actif, crée un profil de base "vp-settings-default"
      * et l'active. Même cible que setTtsSpeed() dans ReaderViewModel : un seul
      * champ dans la base, pas un second emplacement.

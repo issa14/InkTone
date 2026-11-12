@@ -31,6 +31,15 @@ class EdgeTtsClientCompanionTest {
     }
 
     @Test
+    fun buildSsml_applique_la_hauteur_relative() {
+        // Avant l'audit UX (A16), la hauteur était figée à "+0Hz" quel que
+        // soit le profil.
+        assertTrue(EdgeTtsClient.buildSsml("x", "fr-FR-VivienneNeural", 1.0f).contains("pitch=\"+0%\""))
+        assertTrue(EdgeTtsClient.buildSsml("x", "fr-FR-VivienneNeural", 1.0f, pitch = 1.2f).contains("pitch=\"+20%\""))
+        assertTrue(EdgeTtsClient.buildSsml("x", "fr-FR-VivienneNeural", 1.0f, pitch = 0.8f).contains("pitch=\"-20%\""))
+    }
+
+    @Test
     fun isNetworkError_classe_par_type_pas_par_message() {
         assertTrue(EdgeTtsClient.isNetworkError(UnknownHostException("dns")))
         assertTrue(EdgeTtsClient.isNetworkError(SocketTimeoutException("t")))

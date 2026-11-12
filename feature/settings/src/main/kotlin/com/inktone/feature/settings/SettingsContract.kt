@@ -29,6 +29,9 @@ data class SettingsUiState(
     // éventuel (jamais un échec silencieux).
     val isPreviewing: Boolean = false,
     val previewError: String? = null,
+    // Moteurs qui appliquent réellement l'intonation (TtsCapabilities
+    // .pitchControl) : le curseur ne s'affiche que pour eux.
+    val pitchEngines: Set<TtsEngineId> = emptySet(),
 )
 
 /**
@@ -71,6 +74,9 @@ sealed interface SettingsIntent {
     data class SetActiveVoiceProfile(val profileId: String?) : SettingsIntent
     // Lot 6 — vitesse d'élocution — écrit dans VoiceProfile.speed (même cible que le panneau lecteur)
     data class SetVoiceSpeed(val speed: Float) : SettingsIntent
+    // Intonation — écrit dans VoiceProfile.pitch ; proposée seulement pour un
+    // moteur qui l'applique (SettingsUiState.pitchEngines).
+    data class SetVoicePitch(val pitch: Float) : SettingsIntent
     // Lot 6 — thème système de l'app (distinct du thème de lecture ReadingTheme)
     data class SetAppTheme(val appTheme: AppTheme) : SettingsIntent
     // Lot 6 — objectif quotidien (10–120 min)

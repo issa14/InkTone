@@ -504,7 +504,7 @@ Deux cartes-boutons **empilées verticalement** (pas côte à côte), chacune av
 Titre de carte en majuscules discrètes en en-tête. Contenu, dans l'ordre de la spec :
 - **Moteur de synthèse** et **Voix active** : lignes sélecteurs (libellé à gauche, valeur courante + chevron à droite), ouvrent chacune un dialogue de sélection au clic.
 - **Vitesse d'élocution** (0,5x–2,0x), **Gain audio** (1,0x–4,0x), **Intonation/Pitch** (0,5x–1,5x) : trois curseurs, chacun avec libellé + valeur courante affichée au-dessus de la piste, et bornes min/max affichées sous la piste.
-  **Écart (audit UX, 2026-11-12) :** seule la vitesse reste. **Gain audio** est retiré (A15) : la valeur n'était appliquée par aucun moteur ni lecteur, et un gain au-delà de 1,0× demande une amplification PCM avec limiteur, à concevoir à part. **Intonation** est retirée (A16, décision D74) : aucun moteur n'applique la hauteur ; elle ne reviendra que pour un moteur qui l'applique, selon `TtsCapabilities.pitchControl`.
+  **Écart (audit UX, 2026-11-12) :** **Gain audio** est retiré (A15) : la valeur n'était appliquée par aucun moteur ni lecteur, et un gain au-delà de 1,0× demande une amplification PCM avec limiteur, à concevoir à part. **Intonation** n'est affichée que pour un moteur qui l'applique réellement, selon `TtsCapabilities.pitchControl` (A16, D74) : voix système (`TextToSpeech.setPitch`) et Edge (hauteur relative SSML). Pas pour Sherpa-ONNX, dont le modèle VITS ne règle que la durée.
 - **Écouter un extrait** : bouton plein largeur en bas de carte, icône + libellé.
 
 > **Note de consolidation (audit v1.0.0, `AUDIT_CONSOLIDATION_V1.md` B1)** :

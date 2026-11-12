@@ -46,7 +46,7 @@ class EdgeTtsEngine @Inject constructor(
         languages = listOf("fr"),
         streamingSynthesis = false, // synthèse phrase par phrase, pas de flux
         speedControl = true,        // taux SSML
-        pitchControl = false,       // le client v1 fige pitch="+0Hz" (legacy)
+        pitchControl = true,        // hauteur relative SSML (EdgeTtsClient.buildSsml)
         modelSizeMb = 0,            // aucun modèle local
         license = "Microsoft (API non officielle, edge-tts)",
     )
@@ -57,6 +57,7 @@ class EdgeTtsEngine @Inject constructor(
             text = appliedText.substitutedText,
             voiceName = voiceProfile.voice,
             speed = voiceProfile.speed,
+            pitch = voiceProfile.pitch,
         )
         val decoded = mp3Decoder.decode(result.mp3Bytes, context.cacheDir)
         val wordTimestamps = mapEdgeWordBoundaries(result.wordBoundaries, appliedText)

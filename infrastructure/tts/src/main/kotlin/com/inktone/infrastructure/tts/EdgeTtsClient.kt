@@ -25,6 +25,7 @@ import java.security.MessageDigest
 import java.util.UUID
 import javax.inject.Inject
 import javax.inject.Singleton
+import kotlin.math.roundToInt
 
 /**
  * Frontière de mot renvoyée par Edge TTS via les trames `Path:audio.metadata`
@@ -126,8 +127,11 @@ class EdgeTtsClient @Inject constructor(
             return digest.take(16).joinToString("") { "%02x".format(it) }.uppercase()
         }
 
-        /** SSML avec échappement XML et taux de vitesse dérivé de `speed`. */
-        fun buildSsml(text: String, voiceName: String, speed: Float): String {
+        /**
+         * SSML avec échappement XML ; vitesse et hauteur relatives dérivées
+         * de `speed` et `pitch` (1.0 = valeur normale de la voix).
+         */
+        fun buildSsml(text: String, voiceName: String, speed: Float, pitch: Float = 1.0f): String {
             val escaped = text
                 .replace("&", "&amp;")
                 .replace("<", "&lt;")
@@ -136,9 +140,11 @@ class EdgeTtsClient @Inject constructor(
                 .replace("'", "&apos;")
             val ratePercent = ((speed - 1.0f) * 100).toInt()
             val rateStr = if (ratePercent >= 0) "+$ratePercent%" else "$ratePercent%"
+            val pitchPercent = ((pitch - 1.0f) * 100).roundToInt()
+            val pitchStr = if (pitchPercent >= 0) "+$pitchPercent%" else "$pitchPercent%"
             return "<speak version=\"1.0\" xmlns=\"http://www.w3.org/2001/10/synthesis\" " +
                 "xmlns:mstts=\"http://www.w3.org/2001/mstts\" xml:lang=\"fr-FR\">" +
-                "<voice name=\"$voiceName\"><prosody rate=\"$rateStr\" pitch=\"+0Hz\">" +
+                "<voice name=\"$voiceName\"><prosody rate=\"$rateStr\" pitch=\"$pitchStr\">" +
                 "$escaped</prosody></voice></speak>"
         }
 
@@ -168,8 +174,8 @@ class EdgeTtsClient @Inject constructor(
      * @param voiceName une des voix de [VOICES] ; toute autre valeur retombe
      *   sur [DEFAULT_VOICE] (jamais une voix invalide envoyée au serveur).
      */
-    suspend fun synthesize(text: String, voiceName: String, speed: Float): EdgeTtsResult =
-        synthesizeAt(WS_BASE, text, voiceName, speed)
+    suspend fun synthesize(text: String, voiceName: String, speed: Float, pitch: Float = 1.0f): EdgeTtsResult =
+        synthesizeAt(WS_BASE, text, voiceName, speed, pitch)
 
     /** Surcharge interne (base URL configurable) — utilisée par les tests MockWebServer. */
     internal suspend fun synthesizeAt(
@@ -177,9 +183,10 @@ class EdgeTtsClient @Inject constructor(
         text: String,
         voiceName: String,
         speed: Float,
+        pitch: Float = 1.0f,
     ): EdgeTtsResult = withContext(Dispatchers.IO) {
         val voice = resolveVoice(voiceName)
-        val ssml = buildSsml(text, voice, speed.coerceIn(0.5f, 2.0f))
+        val ssml = buildSsml(text, voice, speed.coerceIn(0.5f, 2.0f), pitch.coerceIn(0.5f, 1.5f))
 
         var lastException: Exception? = null
         for (attempt in 0 until MAX_RETRIES) {

@@ -3,6 +3,7 @@ package com.inktone.feature.settings
 import androidx.test.core.app.ApplicationProvider
 import com.inktone.core.testing.fake.FakePreferencesRepository
 import com.inktone.core.testing.fake.FakePronunciationRuleRepository
+import com.inktone.core.testing.fake.FakeTtsCapabilityCatalog
 import com.inktone.core.testing.fake.FakeTtsEngine
 import com.inktone.core.testing.fake.FakeVoiceModelDownloadService
 import com.inktone.core.testing.fake.FakeVoiceProfileRepository
@@ -13,6 +14,7 @@ import com.inktone.domain.model.ReadingTheme
 import com.inktone.domain.model.TtsEngineId
 import com.inktone.domain.model.VoiceProfile
 import com.inktone.domain.service.AudioPlayer
+import com.inktone.domain.service.TtsCapabilityCatalog
 import com.inktone.domain.service.AudioSegment
 import com.inktone.domain.service.PlaybackPosition
 import com.inktone.domain.service.PlayerState
@@ -70,6 +72,7 @@ class SettingsViewModelTest {
         voiceModelDownloadService: VoiceModelDownloadService = FakeVoiceModelDownloadService(),
         ttsEngine: TtsEngine = FakeTtsEngine(),
         audioPlayer: AudioPlayer = FakeAudioPlayer(),
+        ttsCapabilityCatalog: TtsCapabilityCatalog = FakeTtsCapabilityCatalog(),
     ) = SettingsViewModel(
         preferencesRepository,
         ApplyAccessibilityPresetUseCase(preferencesRepository),
@@ -86,7 +89,30 @@ class SettingsViewModelTest {
         dispatcher,
         ttsEngine,
         audioPlayer,
+        ttsCapabilityCatalog,
     )
+
+    @Test
+    fun `l intonation n est proposee que pour les moteurs qui l appliquent`() = runTest {
+        // Audit UX A16 : le curseur s'affichait quel que soit le moteur.
+        val vm = viewModel(ttsCapabilityCatalog = FakeTtsCapabilityCatalog(setOf(TtsEngineId.EDGE_TTS)))
+
+        assertEquals(setOf(TtsEngineId.EDGE_TTS), vm.state.value.pitchEngines)
+    }
+
+    @Test
+    fun `l intonation reglee est enregistree dans le profil vocal actif`() = runTest {
+        val preferencesRepository = FakePreferencesRepository()
+        val voiceProfileRepository = FakeVoiceProfileRepository()
+        val vm = viewModel(preferencesRepository = preferencesRepository, voiceProfileRepository = voiceProfileRepository)
+        dispatcher.scheduler.advanceUntilIdle()
+
+        vm.onIntent(SettingsIntent.SetVoicePitch(1.3f))
+        dispatcher.scheduler.advanceUntilIdle()
+
+        val activeId = preferencesRepository.get().activeVoiceProfileId
+        assertEquals(1.3f, voiceProfileRepository.getById(activeId!!)!!.pitch)
+    }
 
     @Test
     fun `le preset Mode sombre applique le theme systeme et le theme de lecture`() = runTest {

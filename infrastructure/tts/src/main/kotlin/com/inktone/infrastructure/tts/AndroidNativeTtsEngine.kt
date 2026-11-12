@@ -62,9 +62,7 @@ class AndroidNativeTtsEngine @Inject constructor(
         languages = listOf("fr"),
         streamingSynthesis = false,
         speedControl = true,
-        // Faux tant que synthesize() n'appelle pas TextToSpeech.setPitch :
-        // un moteur ne fait jamais semblant (audit UX A16, D43).
-        pitchControl = false,
+        pitchControl = true, // TextToSpeech.setPitch, appliqué dans synthesize()
         modelSizeMb = 0,
         license = "Système Android (moteur OS installé)",
     )
@@ -162,6 +160,8 @@ class AndroidNativeTtsEngine @Inject constructor(
                 putFloat(TextToSpeech.Engine.KEY_PARAM_VOLUME, voiceProfile.volume)
             }
             engine.setSpeechRate(voiceProfile.speed)
+            // 1.0 = hauteur normale du moteur (même échelle que VoiceProfile.pitch).
+            engine.setPitch(voiceProfile.pitch)
             engine.synthesizeToFile(appliedText.substitutedText, bundle, outputFile, utteranceId)
         }
     }
