@@ -371,6 +371,7 @@ class PlaybackOrchestrator @Inject constructor(
         try {
             if (_state.value != PlaybackStatus.Playing) return
             _state.value = PlaybackStatus.Paused
+            pausedSinceNanos = System.nanoTime()
             audioPlayer.pause()
         } finally {
             stateLock.unlock()
@@ -383,6 +384,9 @@ class PlaybackOrchestrator @Inject constructor(
         try {
             if (_state.value != PlaybackStatus.Paused) return
             _state.value = PlaybackStatus.Playing
+            val since = pausedSinceNanos
+            if (since != 0L) pausedNanosTotal += System.nanoTime() - since
+            pausedSinceNanos = 0L
             audioPlayer.resume()
         } finally {
             stateLock.unlock()
@@ -393,6 +397,8 @@ class PlaybackOrchestrator @Inject constructor(
     override fun stop() {
         stateLock.lock()
         try {
+            pausedNanosTotal = 0L
+            pausedSinceNanos = 0L
             playGeneration.incrementAndGet()
             playbackJob?.cancel()
             playbackJob = null
@@ -817,16 +823,21 @@ class PlaybackOrchestrator @Inject constructor(
             audioPlayer.enqueue(silence(silenceMs, segment.sampleRate))
 
             if (first) {
+                // Remis à zéro AVANT de passer à Playing : une pause n'est
+                // possible qu'à partir de cet état, elle ne peut donc plus
+                // être effacée par cette remise à zéro.
+                pausedNanosTotal = 0L
+                pausedSinceNanos = 0L
+                playStartNanos = System.nanoTime()
                 audioPlayer.play()
                 _state.value = PlaybackStatus.Playing
-                playStartNanos = System.nanoTime()
                 advanceTo(generation, index, publicationId, chapterIndex, resourceHref, sentence, segment.wordTimestamps, voiceProfile, rulesHash)
                 first = false
             } else {
                 // Pace jusqu'au début ABSOLU de cette phrase (cumul des durées),
                 // pas un délai relatif : le temps passé à attendre la synthèse
                 // de cette phrase ne doit pas décaler le surlignage.
-                val elapsedMs = (System.nanoTime() - playStartNanos) / 1_000_000L
+                val elapsedMs = (System.nanoTime() - playStartNanos - pausedNanos()) / 1_000_000L
                 val waitMs = nextPhraseStartMs - elapsedMs
                 if (waitMs > 0) pace(generation, waitMs)
                 // Le pace ci-dessus s'achève quand l'audio de la phrase
@@ -842,7 +853,7 @@ class PlaybackOrchestrator @Inject constructor(
 
         if (isCurrent(generation)) {
             if (!first) {
-                val elapsedMs = (System.nanoTime() - playStartNanos) / 1_000_000L
+                val elapsedMs = (System.nanoTime() - playStartNanos - pausedNanos()) / 1_000_000L
                 val waitMs = nextPhraseStartMs - elapsedMs
                 if (waitMs > 0) pace(generation, waitMs)
                 // Dernière phrase du chapitre : aucune transition ne viendra
@@ -995,6 +1006,18 @@ class PlaybackOrchestrator @Inject constructor(
             .sortedBy { it.id }
             .joinToString("|") { "${it.originalText}\u0000${it.replacementText}\u0000${it.isRegex}" }
             .let(::sha256Hex)
+
+    // Audit UX D39 : temps passé en pause depuis le début de la lecture en
+    // cours, retiré du temps écoulé. Sans cela, l'horloge murale continuait
+    // pendant la pause et les phrases suivantes étaient « avancées » sans
+    // attendre au retour, devant le son.
+    @Volatile private var pausedNanosTotal = 0L
+    @Volatile private var pausedSinceNanos = 0L
+
+    private fun pausedNanos(): Long {
+        val since = pausedSinceNanos
+        return pausedNanosTotal + if (since != 0L) System.nanoTime() - since else 0L
+    }
 
     /**
      * Attend [durationMs] par pas courts, en suspendant pendant une pause et
