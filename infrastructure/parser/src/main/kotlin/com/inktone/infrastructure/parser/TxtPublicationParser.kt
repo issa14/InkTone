@@ -51,16 +51,25 @@ class TxtPublicationParser @Inject constructor(
         if (text.isBlank()) return ParseResult.Corrupted("Fichier TXT vide")
 
         val trimmedText = text.trim()
-        // blockIndex = 0 : le chapitre unique produit toujours exactement
-        // un BookBlock.ParagraphBlock (ci-dessous) — jamais le défaut -1,
-        // sinon l'auto-scroll TTS (ReaderScreen) ne trouve jamais son bloc.
-        // Les offsets (startOffset/endOffset) sont réels, dans l'espace du
-        // trimmedText, garantis par FrenchSentenceSplitter (contrat
-        // d'offsets stables : substring == phrase).
-        // Correctif Lot 21 — le paramètre déstructuré masquait le `text`
-        // brut (non trimé) déclaré plus haut ; renommé pour lever l'ombre.
-        val sentences = FrenchSentenceSplitter.split(trimmedText).mapIndexed { index, (sentenceText, startOffset, endOffset) ->
-            Sentence(index = index, text = sentenceText, startOffset = startOffset, endOffset = endOffset, blockIndex = 0)
+        // Audit UX D21 : un paragraphe par bloc, plus le livre entier en un
+        // seul — en défilement, la position se déduit du premier bloc visible,
+        // qui restait toujours le bloc 0 : ni progression ni reprise ne
+        // suivaient la lecture. Le texte et ses offsets sont inchangés
+        // (positions, signets et index déjà enregistrés restent valables) ;
+        // les phrases sont découpées paragraphe par paragraphe, jamais à
+        // cheval sur deux blocs.
+        val paragraphs = paragraphRanges(trimmedText)
+        var sentenceIndex = 0
+        val sentences = paragraphs.flatMapIndexed { blockIndex, range ->
+            FrenchSentenceSplitter.split(trimmedText.substring(range)).map { (sentenceText, start, end) ->
+                Sentence(
+                    index = sentenceIndex++,
+                    text = sentenceText,
+                    startOffset = range.first + start,
+                    endOffset = range.first + end,
+                    blockIndex = blockIndex,
+                )
+            }
         }
 
         val fileName = fileStorageService.getFileName(fileUri) ?: fileUri.substringAfterLast('/')
@@ -70,12 +79,12 @@ class TxtPublicationParser @Inject constructor(
             href = fileName,
             title = null,
             content = ChapterContent.Rich(
-                blocks = listOf(
+                blocks = paragraphs.map { range ->
                     BookBlock.ParagraphBlock(
-                        richText = StyledText.plain(trimmedText),
-                        globalOffsetRange = 0 until trimmedText.length,
-                    ),
-                ),
+                        richText = StyledText.plain(trimmedText.substring(range)),
+                        globalOffsetRange = range,
+                    )
+                },
             ),
             sentences = sentences,
         )
@@ -87,4 +96,31 @@ class TxtPublicationParser @Inject constructor(
             metadata = PublicationMetadata(title = titleWithoutExtension),
         )
     }
+}
+
+private val BLANK_LINE = Regex("\\r?\\n[ \\t\\r]*\\n")
+private val LINE_BREAK = Regex("\\r?\\n")
+
+/**
+ * Plages des paragraphes de [text] : séparés par une ligne vide, ou par un
+ * simple retour à la ligne si le texte n'en contient aucune (un paragraphe
+ * par ligne). Blancs de bord exclus, paragraphes vides ignorés.
+ */
+internal fun paragraphRanges(text: String): List<IntRange> {
+    val separator = if (BLANK_LINE.containsMatchIn(text)) BLANK_LINE else LINE_BREAK
+    val ranges = mutableListOf<IntRange>()
+    var start = 0
+    fun addTrimmed(from: Int, to: Int) {
+        var first = from
+        var end = to
+        while (first < end && text[first].isWhitespace()) first++
+        while (end > first && text[end - 1].isWhitespace()) end--
+        if (first < end) ranges += first until end
+    }
+    for (match in separator.findAll(text)) {
+        addTrimmed(start, match.range.first)
+        start = match.range.last + 1
+    }
+    addTrimmed(start, text.length)
+    return ranges
 }

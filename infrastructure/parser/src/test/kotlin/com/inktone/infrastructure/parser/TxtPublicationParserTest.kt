@@ -103,4 +103,35 @@ class TxtPublicationParserTest {
         val result = parser.parse("/chemin/qui/n/existe/pas.txt")
         assertTrue(result is ParseResult.Corrupted)
     }
+
+    /**
+     * Bug réel corrigé (audit UX D21) : le TXT entier formait un seul bloc ;
+     * en défilement, ni la progression ni la reprise ne suivaient la lecture.
+     */
+    @Test
+    fun chaque_paragraphe_forme_un_bloc_et_ses_phrases_y_appartiennent() = runTest {
+        val text = "Premier paragraphe. Deux phrases.\n\nSecond paragraphe sans point\n\nTroisième."
+        val file = File.createTempFile("test", ".txt").apply {
+            writeText(text)
+            deleteOnExit()
+        }
+        val result = parser.parse(file.absolutePath)
+        check(result is ParseResult.Success)
+        val chapter = result.documentModel.chapters.single()
+        val blocks = (chapter.content as com.inktone.domain.model.ChapterContent.Rich).blocks
+            .filterIsInstance<com.inktone.domain.model.BookBlock.ParagraphBlock>()
+
+        assertEquals(3, blocks.size)
+        assertEquals(listOf(0, 0, 1, 2), chapter.sentences.map { it.blockIndex })
+        chapter.sentences.forEach { sentence ->
+            assertEquals("offsets inchangés", sentence.text, text.substring(sentence.startOffset, sentence.endOffset))
+            val block = blocks[sentence.blockIndex]
+            assertEquals(true, sentence.startOffset in block.globalOffsetRange)
+        }
+    }
+
+    @Test
+    fun sans_ligne_vide_chaque_ligne_est_un_paragraphe() {
+        assertEquals(listOf(0 until 3, 4 until 8), paragraphRanges("Une\nDeux"))
+    }
 }
