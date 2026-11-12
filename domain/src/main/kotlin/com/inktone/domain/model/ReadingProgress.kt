@@ -1,6 +1,7 @@
 package com.inktone.domain.model
 
 import com.inktone.domain.valueobject.Locator
+import kotlin.math.roundToInt
 
 /**
  * Longueur de chaque chapitre d'une publication reflowable (EPUB/TXT), dans
@@ -64,6 +65,9 @@ data class ChapterLengths(val values: List<Int>) {
  */
 fun fixedPageProgression(pageIndex: Int, pageOffsetY: Float, pageCount: Int): Float? {
     if (pageCount <= 0) return null
+    // La dernière page atteinte, c'est le livre lu : 9/10 affichait 90 %
+    // (audit UX A19).
+    if (pageIndex >= pageCount - 1) return 1f
     return ((pageIndex + pageOffsetY.coerceIn(0f, 1f)) / pageCount).coerceIn(0f, 1f)
 }
 
@@ -111,3 +115,12 @@ fun Publication.isFinishedAt(locator: Locator): Boolean = when (format) {
     PublicationFormat.PDF -> chapterCount > 0 && locator.chapterIndex >= chapterCount - 1
     else -> (progressionAt(locator) ?: 0f) >= FINISHED_PROGRESSION
 }
+
+/**
+ * Pourcentage affiché d'une progression, le même partout : Lecteur,
+ * Bibliothèque, Récents, Statistiques (audit UX A19 — trois arrondis
+ * différents affichaient 12,6 %, 13 % et 12 % pour la même position). Arrondi
+ * à l'unité ; un livre terminé ([FINISHED_PROGRESSION]) affiche 100.
+ */
+fun progressionPercent(progression: Float): Int =
+    if (progression >= FINISHED_PROGRESSION) 100 else (progression * 100).roundToInt().coerceIn(0, 100)

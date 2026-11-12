@@ -7,19 +7,20 @@ import org.junit.Test
 class StatusLineBarTest {
 
     @Test
-    fun `formatProgressionFr une decimale et virgule francaise`() {
-        assertEquals("34,7%", formatProgressionFr(0.347f))
-        assertEquals("0,0%", formatProgressionFr(0f))
-        assertEquals("100,0%", formatProgressionFr(1f))
+    fun `formatProgressionFr suit le pourcentage partage avec la Bibliotheque`() {
+        // Audit UX A19 : une décimale ici, l'entier ailleurs — trois arrondis
+        // pour une même position.
+        assertEquals("35%", formatProgressionFr(0.347f))
+        assertEquals("0%", formatProgressionFr(0f))
+        assertEquals("un livre terminé affiche 100 %", "100%", formatProgressionFr(0.985f))
+        assertEquals("100%", formatProgressionFr(1f))
     }
 
     @Test
-    fun `formatProgressionFr jamais de point ni deux decimales`() {
+    fun `formatProgressionFr affiche un entier sans separateur decimal`() {
         val result = formatProgressionFr(0.347f)
         assertEquals(false, result.contains("."))
-        // Une seule decimale : exactement un chiffre apres la virgule.
-        val afterComma = result.substringAfter(',').substringBefore('%')
-        assertEquals(1, afterComma.length)
+        assertEquals(false, result.contains(","))
     }
 
     @Test

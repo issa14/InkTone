@@ -90,6 +90,7 @@ class LibraryDetailViewModelTest {
         readingStates.save(ReadingState("1", Locator("page-9", chapterIndex = 9, charOffset = 0), lastReadAt = 1L))
         dispatcher.scheduler.advanceUntilIdle()
 
-        assertEquals(90, viewModel.state.value.progressMap["1"])
+        // Dernière page d'un PDF de 10 : le livre est lu (audit UX A19).
+        assertEquals(100, viewModel.state.value.progressMap["1"])
     }
 }

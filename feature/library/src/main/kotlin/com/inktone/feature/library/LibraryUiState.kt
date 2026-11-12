@@ -46,6 +46,8 @@ data class LibraryUiState(
     val importProgress: ImportProgress = ImportProgress(),
     val errorMessage: String? = null,
     val progressMap: Map<String, Int> = emptyMap(),
+    /** Livres entamés, que leur progression soit connue ou non ([startedPublicationIds]). */
+    val startedPublicationIds: Set<String> = emptySet(),
     // Lot 5 — résultats d'import consultables après la fin du worker
     val importResults: List<ImportResultEntry> = emptyList(),
     val showImportDetails: Boolean = false,

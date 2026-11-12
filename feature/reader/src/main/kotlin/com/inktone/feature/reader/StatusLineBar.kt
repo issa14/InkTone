@@ -1,5 +1,6 @@
 package com.inktone.feature.reader
 
+import com.inktone.domain.model.progressionPercent
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.WindowInsets
@@ -32,7 +33,6 @@ import androidx.lifecycle.LifecycleEventObserver
 import kotlinx.coroutines.delay
 import java.text.SimpleDateFormat
 import java.util.Locale
-import kotlin.math.roundToInt
 
 /**
  * Ligne de statut persistante (Tâche 3b.4) — hors HUD, visible en
@@ -148,10 +148,5 @@ private fun formatClock24h(epochMillis: Long): String = clockFormatter.format(ep
  */
 internal fun alignedDelayToNextMinuteMillis(nowMillis: Long): Long = 60_000 - nowMillis % 60_000
 
-/** Une décimale, virgule française — jamais `34.7%` (point), jamais `34,70%` (deux décimales). */
-internal fun formatProgressionFr(progression: Float): String {
-    val tenthsOfPercent = (progression * 1000).roundToInt().coerceAtLeast(0)
-    val whole = tenthsOfPercent / 10
-    val decimal = tenthsOfPercent % 10
-    return "$whole,$decimal%"
-}
+/** Même pourcentage que la Bibliothèque et les statistiques ([progressionPercent], audit UX A19). */
+internal fun formatProgressionFr(progression: Float): String = "${progressionPercent(progression)}%"

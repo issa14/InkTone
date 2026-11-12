@@ -3,7 +3,7 @@ package com.inktone.feature.library
 import com.inktone.domain.model.Publication
 import com.inktone.domain.model.ReadingState
 import com.inktone.domain.model.progressionAt
-import kotlin.math.roundToInt
+import com.inktone.domain.model.progressionPercent
 
 /**
  * Pourcentage de lecture (0..100) de chaque livre ENTAMÉ dont la progression
@@ -28,7 +28,7 @@ internal fun computeProgressMap(publications: List<Publication>, readingStates: 
         for (publication in publications) {
             val state = stateMap[publication.id] ?: continue
             val progression = publication.progressionAt(state.locator) ?: continue
-            put(publication.id, (progression * 100).roundToInt().coerceIn(1, 100))
+            put(publication.id, progressionPercent(progression).coerceAtLeast(1))
         }
     }
 }

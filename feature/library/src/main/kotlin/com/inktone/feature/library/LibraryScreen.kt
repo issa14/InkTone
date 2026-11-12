@@ -260,7 +260,7 @@ fun LibraryScreen(
                     state.resumeReadingPublication?.let { resume ->
                         ResumeReadingCard(
                             publication = resume,
-                            progressPercent = state.progressMap[resume.id] ?: 0,
+                            progressPercent = state.progressMap[resume.id], // inconnue : aucun chiffre plutôt que « 0% » (audit UX A19)
                             onClick = { viewModel.onIntent(LibraryIntent.OpenPublication(resume.id)) },
                             isNarrating = state.isResumeNarrationPlaying,
                             onTogglePlayback = { viewModel.onIntent(LibraryIntent.ToggleResumeNarration(resume.id)) },
@@ -720,6 +720,7 @@ private fun LibraryContent(
                         modifier = Modifier.padding(8.dp),
                         showTitle = false,
                         progressPercent = state.progressMap[publication.id] ?: 0,
+                        isStarted = publication.id in state.startedPublicationIds,
                         onTogglePin = { onTogglePin(publication.id, !publication.isPinned) },
                         onDelete = { onDelete(publication.id) },
                     )
@@ -738,6 +739,7 @@ private fun LibraryContent(
                         onClick = { onOpen(publication.id) },
                         onToggleFavorite = { onToggleFavorite(publication.id, !publication.isFavorite) },
                         progressPercent = state.progressMap[publication.id] ?: 0,
+                        isStarted = publication.id in state.startedPublicationIds,
                         onTogglePin = { onTogglePin(publication.id, !publication.isPinned) },
                         onDelete = { onDelete(publication.id) },
                         modifier = Modifier.padding(8.dp),
@@ -790,6 +792,7 @@ private fun BookGridCell(
     onClick: () -> Unit,
     onToggleFavorite: () -> Unit,
     progressPercent: Int,
+    isStarted: Boolean,
     onTogglePin: () -> Unit,
     onDelete: () -> Unit,
     modifier: Modifier = Modifier,
@@ -801,6 +804,7 @@ private fun BookGridCell(
             onToggleFavorite = onToggleFavorite,
             showTitle = false,
             progressPercent = progressPercent,
+            isStarted = isStarted,
             onTogglePin = onTogglePin,
             onDelete = onDelete,
         )
@@ -960,7 +964,7 @@ internal fun PublicationListRow(
 @Composable
 private fun ResumeReadingCard(
     publication: Publication,
-    progressPercent: Int,
+    progressPercent: Int?,
     onClick: () -> Unit,
     isNarrating: Boolean,
     onTogglePlayback: () -> Unit,
@@ -999,6 +1003,8 @@ private fun ResumeReadingCard(
                     publication = publication,
                     onClick = {},
                     onToggleFavorite = {},
+                    progressPercent = progressPercent ?: 0,
+                    isStarted = true,
                     showTitle = false,
                     showOverlays = false,
                 )
@@ -1044,8 +1050,8 @@ private fun ResumeReadingCard(
                     )
                 }
 
-                // Barre de progression
-                Row(
+                // Barre de progression — absente si la progression est inconnue
+                if (progressPercent != null) Row(
                     verticalAlignment = Alignment.CenterVertically,
                     modifier = Modifier.fillMaxWidth()
                 ) {

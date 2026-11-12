@@ -66,6 +66,7 @@ import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.hilt.navigation.compose.hiltViewModel
 import coil.compose.SubcomposeAsyncImage
 import coil.request.ImageRequest
+import com.inktone.domain.model.progressionPercent
 import com.inktone.domain.model.cleanedForDisplay
 import com.inktone.core.designsystem.AppIcon
 import com.inktone.core.designsystem.AppSymbol
@@ -666,7 +667,7 @@ private fun Section3CurrentBook(book: com.inktone.domain.usecase.CurrentBookStat
                     val remaining = book.remainingTimeFormatted
                     val remainingLabel = if (remaining != null) "encore ≈ $remaining estimées" else "—"
                     Text(
-                        if (progress != null) "${(progress * 100).toInt()}% · $remainingLabel" else remainingLabel,
+                        if (progress != null) "${progressionPercent(progress)}% · $remainingLabel" else remainingLabel,
                         style = MaterialTheme.typography.bodySmall,
                         color = MaterialTheme.colorScheme.onSurfaceVariant,
                     )

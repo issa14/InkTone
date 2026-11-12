@@ -320,6 +320,7 @@ class LibraryViewModel @Inject constructor(
                         _state.value.copy(
                             publications = publications,
                             progressMap = progressMap,
+                            startedPublicationIds = startedPublicationIds(readingStates),
                             isLoading = false,
                         ).withDerivedFields()
                     }

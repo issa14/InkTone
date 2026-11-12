@@ -71,6 +71,9 @@ fun BookCover(
     onToggleFavorite: () -> Unit,
     modifier: Modifier = Modifier,
     progressPercent: Int = 0,
+    // Livre entamé : sa progression peut être inconnue (longueurs de
+    // chapitres pas encore calculées) sans qu'il soit « non commencé ».
+    isStarted: Boolean = progressPercent > 0,
     showTitle: Boolean = true,
     showOverlays: Boolean = true,
     onTogglePin: () -> Unit = {},
@@ -99,7 +102,13 @@ fun BookCover(
     val a11yLabel = buildString {
         append(publication.title)
         append(", ")
-        append(if (progressPercent > 0) "$progressPercent% lu" else "Non commencé")
+        append(
+            when {
+                progressPercent > 0 -> "$progressPercent% lu"
+                isStarted -> "Commencé"
+                else -> "Non commencé"
+            },
+        )
         if (publication.isPinned) append(", épinglé")
     }
 
@@ -137,7 +146,9 @@ fun BookCover(
         }
 
         // Badge de progression — coin inférieur droit
-        if (progressPercent > 0) {
+        // Sans surimpressions (miniature de la carte « Reprendre », qui affiche
+        // déjà sa barre), pas de badge non plus.
+        if (showOverlays && progressPercent > 0) {
             Box(
                 modifier = Modifier
                     .align(Alignment.BottomEnd)
