@@ -1,5 +1,6 @@
 package com.inktone.feature.library
 
+import com.inktone.core.testing.fake.FakeSearchService
 import com.inktone.core.testing.fake.FakePlaybackSession
 import com.inktone.core.testing.fake.FakePublicationRepository
 import com.inktone.core.testing.fake.FakePreAnalysisStore
@@ -60,7 +61,7 @@ class RecentsViewModelTest {
         RecentsViewModel(
             publicationRepository, readingStateRepository,
             ToggleFavoriteUseCase(publicationRepository), TogglePinUseCase(publicationRepository),
-            DeletePublicationUseCase(publicationRepository, FakePreAnalysisStore(), FakeTtsSegmentCache(), FakeRenderedPageCache(), FakePlaybackSession()),
+            DeletePublicationUseCase(publicationRepository, FakePreAnalysisStore(), FakeTtsSegmentCache(), FakeRenderedPageCache(), FakePlaybackSession(), FakeSearchService()),
             // Audit v1.0.0 (P5) : même StandardTestDispatcher que setMain.
             dispatcher,
         )

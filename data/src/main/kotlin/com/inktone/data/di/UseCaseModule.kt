@@ -182,7 +182,8 @@ object UseCaseModule {
         ttsSegmentCache: TtsSegmentCache,
         renderedPageCache: RenderedPageCache,
         playbackSession: PlaybackSession,
-    ): DeletePublicationUseCase = DeletePublicationUseCase(publicationRepository, preAnalysisStore, ttsSegmentCache, renderedPageCache, playbackSession)
+        searchService: SearchService,
+    ): DeletePublicationUseCase = DeletePublicationUseCase(publicationRepository, preAnalysisStore, ttsSegmentCache, renderedPageCache, playbackSession, searchService)
 
     @Provides
     fun provideRegenerateCoversUseCase(

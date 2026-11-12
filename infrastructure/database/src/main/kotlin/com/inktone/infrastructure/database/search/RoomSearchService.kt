@@ -39,6 +39,10 @@ class RoomSearchService @Inject constructor(
         return rows.map { it.toSearchResult() }
     }
 
+    override suspend fun deletePublication(publicationId: String) {
+        sentenceFtsDao.deleteForPublication(publicationId)
+    }
+
     override suspend fun indexPublication(publicationId: String, documentModel: DocumentModel) {
         val entities = documentModel.chapters.flatMap { chapter ->
             chapter.sentences.map { sentence ->

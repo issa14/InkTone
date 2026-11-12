@@ -54,6 +54,7 @@ private class InMemoryPublicationRepository : PublicationRepository {
 }
 
 private class NoOpSearchService : SearchService {
+    override suspend fun deletePublication(publicationId: String) = Unit
     override suspend fun search(query: String, publicationId: String?) = emptyList<com.inktone.domain.service.SearchResult>()
     override suspend fun indexPublication(publicationId: String, documentModel: DocumentModel) = Unit
     override suspend fun indexSentences(

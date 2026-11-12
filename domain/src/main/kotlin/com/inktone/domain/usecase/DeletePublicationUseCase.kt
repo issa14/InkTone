@@ -6,6 +6,7 @@ import com.inktone.domain.service.RenderedPageCache
 import com.inktone.domain.service.TtsSegmentCache
 import com.inktone.domain.service.PlaybackSession
 import com.inktone.domain.service.PlaybackSessionState
+import com.inktone.domain.service.SearchService
 
 /**
  * Lot 2b.2 — retrait irréversible d'une publication (UX §Bibliothèque
@@ -25,6 +26,7 @@ class DeletePublicationUseCase(
     private val ttsSegmentCache: TtsSegmentCache,
     private val renderedPageCache: RenderedPageCache,
     private val playbackSession: PlaybackSession,
+    private val searchService: SearchService,
 ) {
     suspend operator fun invoke(publicationId: String) {
         // Audit UX A12 : supprimer le livre en cours de narration laissait la
@@ -39,5 +41,8 @@ class DeletePublicationUseCase(
         preAnalysisStore.delete(publicationId)
         ttsSegmentCache.deletePublication(publicationId)
         renderedPageCache.deletePublication(publicationId)
+        // Audit UX D10 : les phrases d'un livre retiré restaient dans l'index
+        // de recherche (seule la requête les écartait).
+        searchService.deletePublication(publicationId)
     }
 }

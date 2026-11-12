@@ -1,5 +1,6 @@
 package com.inktone.domain.usecase
 
+import com.inktone.core.testing.fake.FakeSearchService
 import com.inktone.core.testing.fake.FakePlaybackSession
 import com.inktone.core.testing.fake.FakePreAnalysisStore
 import com.inktone.core.testing.fake.FakePublicationRepository
@@ -29,6 +30,7 @@ class DeletePublicationUseCaseTest {
         val preAnalysisStore = FakePreAnalysisStore()
         val ttsSegmentCache = FakeTtsSegmentCache()
         val renderedPageCache = FakeRenderedPageCache()
+        val searchService = FakeSearchService()
         val publication = Publication(
             id = "pub-1", title = "Titre", format = PublicationFormat.EPUB,
             fileUri = "content://fake/pub-1", fileHash = "hash-1", fileSize = 100L,
@@ -36,13 +38,15 @@ class DeletePublicationUseCaseTest {
         )
         publicationRepository.insert(publication)
 
-        val useCase = DeletePublicationUseCase(publicationRepository, preAnalysisStore, ttsSegmentCache, renderedPageCache, FakePlaybackSession())
+        val useCase = DeletePublicationUseCase(publicationRepository, preAnalysisStore, ttsSegmentCache, renderedPageCache, FakePlaybackSession(), searchService)
         useCase("pub-1")
 
         assertTrue(publicationRepository.observeAll().first().isEmpty())
         assertEquals(listOf("pub-1"), preAnalysisStore.deleted)
         assertEquals(listOf("pub-1"), ttsSegmentCache.deletedPublications)
         assertEquals(listOf("pub-1"), renderedPageCache.deletedPublications)
+        // Audit UX D10 : ses phrases quittent aussi l'index de recherche.
+        assertEquals(listOf("pub-1"), searchService.deletedPublications)
     }
 
     private suspend fun useCaseWithBook(playbackSession: FakePlaybackSession): DeletePublicationUseCase {
@@ -54,7 +58,7 @@ class DeletePublicationUseCaseTest {
                 chapterCount = 1, importDate = 0L,
             ),
         )
-        return DeletePublicationUseCase(publicationRepository, FakePreAnalysisStore(), FakeTtsSegmentCache(), FakeRenderedPageCache(), playbackSession)
+        return DeletePublicationUseCase(publicationRepository, FakePreAnalysisStore(), FakeTtsSegmentCache(), FakeRenderedPageCache(), playbackSession, FakeSearchService())
     }
 
     /**

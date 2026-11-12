@@ -20,6 +20,13 @@ class FakeSearchService : SearchService {
         return nextSearchResult
     }
 
+    /** Publications retirées de l'index, dans l'ordre. */
+    val deletedPublications = mutableListOf<String>()
+
+    override suspend fun deletePublication(publicationId: String) {
+        deletedPublications += publicationId
+    }
+
     override suspend fun indexPublication(publicationId: String, documentModel: DocumentModel) {
         indexedDocuments[publicationId] = documentModel
     }

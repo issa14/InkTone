@@ -10,6 +10,9 @@ interface SentenceFtsDao {
     @Insert
     suspend fun insertAll(entities: List<SentenceFtsEntity>)
 
+    @Query("DELETE FROM sentence_fts WHERE publicationId = :publicationId")
+    suspend fun deleteForPublication(publicationId: String)
+
     /**
      * `text MATCH` et non `sentence_fts MATCH` : une correspondance sur la
      * TABLE porte sur toutes ses colonnes, y compris l'identifiant du livre,

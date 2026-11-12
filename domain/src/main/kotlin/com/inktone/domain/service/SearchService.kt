@@ -8,6 +8,9 @@ import com.inktone.domain.valueobject.Locator
 interface SearchService {
     suspend fun search(query: String, publicationId: String? = null): List<SearchResult>
 
+    /** Retire de l'index toutes les phrases d'une publication (sa suppression). */
+    suspend fun deletePublication(publicationId: String)
+
     /**
      * Peuple l'index à partir d'un [DocumentModel] déjà extrait (Tâche
      * 7.3.2 — à l'import, pas de second passage de parsing). Appelé par

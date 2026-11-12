@@ -1,5 +1,6 @@
 package com.inktone.feature.library
 
+import com.inktone.core.testing.fake.FakeSearchService
 import com.inktone.core.testing.fake.FakeImportProgressObserver
 import com.inktone.core.testing.fake.FakeImportResultsStore
 import com.inktone.core.testing.fake.FakePreferencesRepository
@@ -78,7 +79,7 @@ class LibraryViewModelTest {
         readingStateRepository,
         ToggleFavoriteUseCase(publicationRepository),
         TogglePinUseCase(publicationRepository),
-        DeletePublicationUseCase(publicationRepository, FakePreAnalysisStore(), FakeTtsSegmentCache(), FakeRenderedPageCache(), FakePlaybackSession()),
+        DeletePublicationUseCase(publicationRepository, FakePreAnalysisStore(), FakeTtsSegmentCache(), FakeRenderedPageCache(), FakePlaybackSession(), FakeSearchService()),
         importProgressObserver,
         FakeImportResultsStore(),
         ImportSessionStore(),
