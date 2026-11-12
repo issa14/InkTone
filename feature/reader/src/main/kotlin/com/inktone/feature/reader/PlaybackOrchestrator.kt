@@ -826,7 +826,7 @@ class PlaybackOrchestrator @Inject constructor(
         for (segment in channel) {
             if (!isCurrent(generation)) return
             val sentence = sentences.getOrNull(index)
-            val silenceMs = silenceDurationFor(sentence?.text ?: "")
+            val silenceMs = silenceDurationFor(sentence, sentences.getOrNull(index + 1))
             val phraseDurationMs = segment.durationMs + silenceMs
             // Position jouée au début de l'audio de cette phrase (cumul des
             // durées précédentes) — repère du surlignage mot par position.
@@ -1163,13 +1163,17 @@ class PlaybackOrchestrator @Inject constructor(
         )
     }
 
-    private fun silenceDurationFor(text: String): Long {
-        val trimmed = text.trimEnd()
+    internal fun silenceDurationFor(sentence: Sentence?, next: Sentence?): Long {
+        // Audit UX D47 : la fin de paragraphe se lisait sur un « \n » final,
+        // testé APRÈS trimEnd() — jamais vrai, la pause de paragraphe n'était
+        // jamais appliquée. Elle se lit sur le changement de bloc.
+        if (sentence != null && next != null && sentence.blockIndex >= 0 && next.blockIndex != sentence.blockIndex) {
+            return SILENCE_PARAGRAPH_MS
+        }
+        val trimmed = sentence?.text?.trimEnd().orEmpty()
         if (trimmed.isEmpty()) return SILENCE_SENTENCE_MS
         return when (trimmed.last()) {
             ',', ';' -> SILENCE_COMMA_MS
-            '.', '!', '?', '\u2026' -> SILENCE_SENTENCE_MS
-            '\n' -> SILENCE_PARAGRAPH_MS
             else -> SILENCE_SENTENCE_MS
         }
     }

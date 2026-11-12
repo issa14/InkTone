@@ -193,4 +193,18 @@ class PlaybackOrchestratorPauseTest {
             orchestrator.stop()
         }
     }
+
+    /**
+     * Bug réel corrigé (audit UX D47) : la pause plus longue entre deux
+     * paragraphes n'était jamais appliquée.
+     */
+    @Test
+    fun la_pause_de_paragraphe_s_applique_au_changement_de_bloc() {
+        val orchestrator = orchestrator(TimedTtsEngine(durationMs = 10))
+        val first = Sentence(index = 0, text = "Fin du paragraphe.", startOffset = 0, endOffset = 18, blockIndex = 0)
+        val sameBlock = Sentence(index = 1, text = "Suite.", startOffset = 19, endOffset = 25, blockIndex = 0)
+        val nextBlock = Sentence(index = 1, text = "Nouveau.", startOffset = 19, endOffset = 27, blockIndex = 1)
+
+        assertTrue(orchestrator.silenceDurationFor(first, nextBlock) > orchestrator.silenceDurationFor(first, sameBlock))
+    }
 }
