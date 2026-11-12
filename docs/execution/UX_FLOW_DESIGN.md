@@ -525,6 +525,7 @@ Une carte avec deux sous-sections séparées par un petit libellé interne en ma
 
 - **Apparence** : ligne sélecteur **Thème** (valeur courante + chevron, dialogue à 3 options Système/Clair/Sombre) ; ligne toggle **Couleurs dynamiques**, avec description courte en dessous précisant la condition Android 12+.
 - **Accessibilité** : ligne toggle **Réduire les animations** ; ligne toggle **Police adaptée au système**, avec description courte précisant que ça ignore la taille interne de l'app.
+  **Écart (audit UX A2, 2026-11-12) :** l'interrupteur est retiré, car sa valeur n'était lue nulle part. Les textes suivent déjà l'échelle de police du système ; ignorer la taille interne de l'app reste à concevoir si le besoin est confirmé. La ligne **Langue de l'interface**, ajoutée hors maquette, est retirée elle aussi (A1) : aucune traduction n'existe.
 
 Les toggles ici sont de vrais interrupteurs d'état (ON/OFF réel du réglage) — à distinguer du toggle « action groupée » de la carte Présets rapides.
 

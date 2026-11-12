@@ -342,12 +342,9 @@ internal fun SettingsContent(
                 checked = preferences.reduceMotion,
                 onCheckedChange = { onIntent(SettingsIntent.SetReduceMotion(it)) },
             )
-            // D.3 — respecter le fontScale système Android au lieu du fontSize interne
-            ToggleSetting(
-                label = "Police adaptée au système",
-                checked = preferences.useSystemFontScale,
-                onCheckedChange = { onIntent(SettingsIntent.SetUseSystemFontScale(it)) },
-            )
+            // Audit UX A2 — interrupteur « Police adaptée au système » retiré :
+            // la valeur n'était lue nulle part. Tous les textes (interface et
+            // lecture, en sp) suivent déjà l'échelle de police du système.
 
             HorizontalDivider(modifier = Modifier.padding(horizontal = 20.dp))
 
