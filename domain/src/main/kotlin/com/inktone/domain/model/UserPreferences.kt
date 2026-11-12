@@ -143,6 +143,34 @@ data class UserPreferences(
         }
     }
 
+    /**
+     * Valeurs par défaut de tous les RÉGLAGES, en conservant ce qui n'en est
+     * pas — « Réinitialiser les paramètres » (écran Réglages).
+     *
+     * Cette ligne de préférences porte aussi de l'état : le parcours déjà
+     * effectué (onboarding vu, voix déjà proposée), l'identité de l'appareil,
+     * le compte de synchronisation et ses options (configurés depuis l'écran
+     * Synchronisation, pas depuis Réglages), et l'historique des couleurs
+     * d'annotation. Les remettre à zéro renvoyait l'utilisateur à l'écran
+     * de bienvenue, déconnectait la synchronisation et donnait à l'appareil
+     * une nouvelle identité — rien de ce qu'annonce le dialogue de
+     * confirmation.
+     */
+    fun withSettingsReset(): UserPreferences = UserPreferences(
+        hasSeenOnboarding = hasSeenOnboarding,
+        hasPromptedVoiceDownload = hasPromptedVoiceDownload,
+        deviceId = deviceId,
+        deviceDisplayName = deviceDisplayName,
+        syncProvider = syncProvider,
+        syncAccountLabel = syncAccountLabel,
+        syncLinkedAt = syncLinkedAt,
+        syncLastSyncAt = syncLastSyncAt,
+        syncLastAutoSyncFailed = syncLastAutoSyncFailed,
+        syncAutoEnabled = syncAutoEnabled,
+        syncWifiOnly = syncWifiOnly,
+        recentAnnotationColors = recentAnnotationColors,
+    )
+
     companion object {
         /** Crans de marge latérale : 0 étroite, 1 normale, 2 large. */
         val MARGIN_STEP_RANGE = 0..2

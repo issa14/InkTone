@@ -189,7 +189,7 @@ class SettingsViewModel @Inject constructor(
                 // Lot 6, Palier B — carte Données
                 is SettingsIntent.RefreshCacheSize -> refreshCacheSize()
                 is SettingsIntent.ClearCache -> clearCache()
-                is SettingsIntent.ResetPreferences -> preferencesRepository.update(UserPreferences())
+                is SettingsIntent.ResetPreferences -> preferencesRepository.update(current.withSettingsReset())
 
                 // Lot 6, Palier B — carte Prononciation inline
                 is SettingsIntent.SavePronunciationRule -> savePronunciationRule(intent)

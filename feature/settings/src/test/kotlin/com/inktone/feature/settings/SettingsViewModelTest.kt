@@ -272,6 +272,50 @@ class SettingsViewModelTest {
     }
 
     @Test
+    fun `reinitialiser les parametres conserve le parcours l identite de l appareil et la synchronisation`() = runTest {
+        // Avant le correctif, la réinitialisation écrivait `UserPreferences()`
+        // entier : retour à l'onboarding (hasSeenOnboarding pilote la
+        // destination de départ), nouvelle identité d'appareil et compte de
+        // synchronisation effacé.
+        val preferencesRepository = FakePreferencesRepository()
+        preferencesRepository.update(
+            preferencesRepository.get().copy(
+                hasSeenOnboarding = true,
+                hasPromptedVoiceDownload = true,
+                deviceId = "device-1",
+                deviceDisplayName = "Téléphone d'Issa",
+                syncProvider = "GOOGLE_DRIVE",
+                syncAccountLabel = "compte",
+                syncLinkedAt = 1_000L,
+                syncLastSyncAt = 2_000L,
+                syncAutoEnabled = true,
+                syncWifiOnly = true,
+                recentAnnotationColors = listOf(com.inktone.domain.model.AnnotationColor.GREEN),
+                dailyGoalMinutes = 90,
+            ),
+        )
+        val vm = viewModel(preferencesRepository)
+        dispatcher.scheduler.advanceUntilIdle()
+
+        vm.onIntent(SettingsIntent.ResetPreferences)
+        dispatcher.scheduler.advanceUntilIdle()
+
+        val prefs = preferencesRepository.get()
+        assertEquals(30, prefs.dailyGoalMinutes)
+        assertTrue(prefs.hasSeenOnboarding)
+        assertTrue(prefs.hasPromptedVoiceDownload)
+        assertEquals("device-1", prefs.deviceId)
+        assertEquals("Téléphone d'Issa", prefs.deviceDisplayName)
+        assertEquals("GOOGLE_DRIVE", prefs.syncProvider)
+        assertEquals("compte", prefs.syncAccountLabel)
+        assertEquals(1_000L, prefs.syncLinkedAt)
+        assertEquals(2_000L, prefs.syncLastSyncAt)
+        assertTrue(prefs.syncAutoEnabled)
+        assertTrue(prefs.syncWifiOnly)
+        assertEquals(listOf(com.inktone.domain.model.AnnotationColor.GREEN), prefs.recentAnnotationColors)
+    }
+
+    @Test
     fun `ajouter une regle de prononciation l ajoute a l etat`() = runTest {
         val ruleRepository = FakePronunciationRuleRepository()
         val vm = viewModel(pronunciationRuleRepository = ruleRepository)
