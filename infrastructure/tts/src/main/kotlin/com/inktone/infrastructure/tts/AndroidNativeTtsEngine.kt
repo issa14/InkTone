@@ -62,7 +62,9 @@ class AndroidNativeTtsEngine @Inject constructor(
         languages = listOf("fr"),
         streamingSynthesis = false,
         speedControl = true,
-        pitchControl = true,
+        // Faux tant que synthesize() n'appelle pas TextToSpeech.setPitch :
+        // un moteur ne fait jamais semblant (audit UX A16, D43).
+        pitchControl = false,
         modelSizeMb = 0,
         license = "Système Android (moteur OS installé)",
     )

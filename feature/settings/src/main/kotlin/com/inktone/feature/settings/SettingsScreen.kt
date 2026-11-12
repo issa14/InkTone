@@ -210,7 +210,6 @@ internal fun SettingsContent(
         val activeVoiceProfile = voiceProfiles.find { it.id == preferences.activeVoiceProfileId }
         val activeVoiceName = activeVoiceProfile?.voice?.let(::voiceLabel) ?: "Voix par défaut"
         val activeSpeed = activeVoiceProfile?.speed ?: 1.0f
-        val activePitch = activeVoiceProfile?.pitch ?: 1.0f
 
         SectionGroup("Lecture") {
             SettingRow(
@@ -257,18 +256,11 @@ internal fun SettingsContent(
             // Audit UX A15 — curseur « Gain audio » retiré : aucun moteur ni
             // lecteur audio ne lisait `audioGain`. Un gain au-delà de 1,0×
             // demande une amplification PCM avec limiteur, à concevoir à part.
-            // Lot 6 — Intonation : VoiceProfile.pitch.
-            // Signalé : non vérifié que pitch atteint le moteur Sherpa-ONNX — à confirmer sur device (A4).
-            InkToneSlider(
-                modifier = Modifier.padding(horizontal = 20.dp, vertical = 12.dp),
-                label = "Intonation (pitch)",
-                value = activePitch,
-                range = 0.5f..1.5f,
-                minIcon = AppSymbol.KeyboardArrowDown,
-                maxIcon = AppSymbol.KeyboardArrowUp,
-                displayFormatter = { "%.1f×".format(it) },
-                onValueChange = { onIntent(SettingsIntent.SetVoicePitch(it)) },
-            )
+            // Audit UX A16 et décision D74 — curseur « Intonation » retiré :
+            // aucun moteur n'applique VoiceProfile.pitch (Sherpa-ONNX et Edge
+            // ne le déclarent pas, la voix système n'appelait jamais
+            // setPitch). Il ne reviendra que pour un moteur qui l'applique,
+            // affiché selon TtsCapabilities.pitchControl.
             // Lot 6 — Écouter un extrait. Audit v1.0.0 (AUDIT_CONSOLIDATION_V1.md,
             // B1) : RÉ-IMPLÉMENTÉ — le bouton avait été retiré (l'intent était
             // un no-op) puis recâblé sur une vraie synthèse + lecture

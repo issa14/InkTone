@@ -71,8 +71,6 @@ sealed interface SettingsIntent {
     data class SetActiveVoiceProfile(val profileId: String?) : SettingsIntent
     // Lot 6 — vitesse d'élocution — écrit dans VoiceProfile.speed (même cible que le panneau lecteur)
     data class SetVoiceSpeed(val speed: Float) : SettingsIntent
-    // Lot 6 — intonation/pitch — écrit dans VoiceProfile.pitch
-    data class SetVoicePitch(val pitch: Float) : SettingsIntent
     // Lot 6 — thème système de l'app (distinct du thème de lecture ReadingTheme)
     data class SetAppTheme(val appTheme: AppTheme) : SettingsIntent
     // Lot 6 — objectif quotidien (10–120 min)

@@ -162,9 +162,8 @@ class SettingsViewModel @Inject constructor(
                 // Audit v1.0.0 (B1) — « Écouter un extrait » ré-implémenté :
                 // bascule lecture/arrêt d'une phrase d'exemple.
                 is SettingsIntent.PlayPreview -> togglePreview()
-                // Lot 6 — vitesse et pitch : même cible VoiceProfile que setTtsSpeed() dans ReaderViewModel
+                // Lot 6 — vitesse : même cible VoiceProfile que setTtsSpeed() dans ReaderViewModel
                 is SettingsIntent.SetVoiceSpeed -> updateActiveVoiceProfile(current) { it.copy(speed = intent.speed) }
-                is SettingsIntent.SetVoicePitch -> updateActiveVoiceProfile(current) { it.copy(pitch = intent.pitch) }
                 // Lot 6 — présets réversibles (désapplication vers les valeurs par défaut)
                 is SettingsIntent.SetDarkModePreset -> applyDarkModePreset(intent.enabled, current)
                 is SettingsIntent.SetAccessibilityPreset -> applyAccessibilityPresetToggle(intent.enabled, current)
@@ -330,7 +329,7 @@ class SettingsViewModel @Inject constructor(
     }
 
     /**
-     * Lot 6 — met à jour VoiceProfile.speed ou .pitch pour le profil actif.
+     * Lot 6 — met à jour le profil vocal actif (vitesse, voix).
      * Si aucun profil n'est actif, crée un profil de base "vp-settings-default"
      * et l'active. Même cible que setTtsSpeed() dans ReaderViewModel : un seul
      * champ dans la base, pas un second emplacement.
