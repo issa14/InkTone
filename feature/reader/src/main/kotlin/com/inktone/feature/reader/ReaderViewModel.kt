@@ -1095,9 +1095,37 @@ class ReaderViewModel @Inject constructor(
      * toujours à l'index 0.
      */
     private fun navigateToLocator(locator: Locator, flashOnArrival: Boolean = false) {
+        val targetIndex = resolveChapterIndex(locator) ?: return
+        // Audit UX A14 : un chapitre pas encore lu n'est qu'une coquille sans
+        // phrases ni blocs (un chapitre évincé garde ses phrases, plus ses
+        // blocs). Il faut le charger avant de résoudre la phrase, sinon on
+        // affiche une page vide au début du chapitre.
+        val loadJob = loadChapterContentIfNeeded(targetIndex)
+        if (loadJob == null) {
+            applyNavigation(locator, targetIndex, flashOnArrival)
+        } else {
+            viewModelScope.launch {
+                loadJob.join()
+                applyNavigation(locator, targetIndex, flashOnArrival)
+            }
+        }
+    }
+
+    /**
+     * Chapitre désigné par [locator] : son `resourceHref` fait foi, l'index
+     * n'est qu'un repli. L'index de recherche plein texte est écrit à
+     * l'import sans le décalage de la couverture ajoutée en tête (audit UX
+     * D2, D3) : un résultat ouvrait le chapitre précédent.
+     */
+    private fun resolveChapterIndex(locator: Locator): Int? {
         val chapters = _state.value.chapters
-        if (locator.chapterIndex !in chapters.indices) return
-        val sentences = chapters[locator.chapterIndex].sentences
+        if (chapters.getOrNull(locator.chapterIndex)?.href == locator.resourceHref) return locator.chapterIndex
+        val byHref = chapters.indexOfFirst { it.href == locator.resourceHref }
+        return if (byHref >= 0) byHref else locator.chapterIndex.takeIf { it in chapters.indices }
+    }
+
+    private fun applyNavigation(locator: Locator, targetIndex: Int, flashOnArrival: Boolean) {
+        val sentences = _state.value.chapters.getOrNull(targetIndex)?.sentences ?: return
         val sentenceIndex = sentences.indexOfFirst { locator.charOffset in it.startOffset..it.endOffset }.coerceAtLeast(0)
 
         // Bug réel trouvé à l'audit, même famille que Pause avant
@@ -1114,13 +1142,13 @@ class ReaderViewModel @Inject constructor(
 
         _highlightedWordRange.value = null
         _state.value = _state.value.copy(
-            currentChapterIndex = locator.chapterIndex, currentSentenceIndex = sentenceIndex,
+            currentChapterIndex = targetIndex, currentSentenceIndex = sentenceIndex,
             isTocVisible = false, isBookmarkListVisible = false,
         )
-        persistPosition(chapterIndex = locator.chapterIndex, sentenceIndex = sentenceIndex)
-        preloadAdjacentChapters(locator.chapterIndex)
+        persistPosition(chapterIndex = targetIndex, sentenceIndex = sentenceIndex)
+        preloadAdjacentChapters(targetIndex)
         if (wasPlaying) playCurrentSentence()
-        if (flashOnArrival) armPendingHighlight(PendingHighlightTarget(locator.chapterIndex, sentenceIndex))
+        if (flashOnArrival) armPendingHighlight(PendingHighlightTarget(targetIndex, sentenceIndex))
     }
 
     /**
