@@ -418,14 +418,14 @@ internal fun SettingsContent(
             ActionRow(
                 icon = AppSymbol.Upload,
                 title = "Exporter les données",
-                subtitle = "Signets, règles de prononciation, progression et statistiques",
+                subtitle = "Signets, notes, surlignages, positions, statistiques, règles de prononciation et thèmes — sans les livres",
                 onClick = onExportData,
             )
             // Avertissement préalable — l'import écrase la configuration courante.
             ActionRow(
                 icon = AppSymbol.Download,
                 title = "Importer une sauvegarde",
-                subtitle = "Remplace les données actuelles par celles du fichier sélectionné",
+                subtitle = "Complète les données actuelles avec celles du fichier sélectionné",
                 onClick = { showImportWarning = true },
             )
 
@@ -581,9 +581,15 @@ internal fun SettingsContent(
         if (showImportWarning) {
             ConfirmDialog(
                 title = "Importer une sauvegarde",
-                message = "L'import remplace les signets, règles de prononciation, positions de " +
-                    "lecture et statistiques actuels par le contenu du fichier sélectionné. " +
-                    "Cette action est irréversible.",
+                // Décrit ce que fait réellement BackupManager.importFrom : il
+                // n'efface rien. Signets, notes, surlignages et statistiques
+                // absents sont ajoutés, ceux déjà présents conservés ; les
+                // positions, règles et thèmes du fichier écrasent les leurs.
+                message = "L'import ajoute les signets, notes, surlignages et statistiques absents de " +
+                    "l'appareil, et remplace les positions de lecture, règles de prononciation et " +
+                    "thèmes personnalisés présents dans le fichier. Les positions remplacées ne " +
+                    "peuvent pas être récupérées. Les éléments liés à un livre absent de la " +
+                    "bibliothèque sont ignorés.",
                 confirmLabel = "Importer",
                 onConfirm = { showImportWarning = false; onImportData() },
                 onDismiss = { showImportWarning = false },
