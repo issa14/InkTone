@@ -599,7 +599,7 @@ V2206 ; « Test JVM » un test automatisé qui échoue sans la correction ;
 | B12 | Bouton « Détails » inerte retiré ; progression d'import toujours visible | `8481a7aa` | Instrumenté |
 | D69 | Couleurs dynamiques masquées avant Android 12 ; valeur initiale alignée | `69eb77a3` | Lecture |
 | C1 | Accents rétablis | `7fce12a5` | Lecture |
-| C5 | Choix de voix : toute la ligne cliquable | non committé | Invérifiable tant que la liste ne montre qu'une voix (D74) |
+| C5 | Choix de voix : toute la ligne cliquable | — | Sans objet : la liste de voix du Lecteur est retirée (D74, `b039cd47`) |
 
 `BookmarkPanelTest` : les deux tests de balayage d'onglet
 (`un_swipe_horizontal_change_l_onglet_affiche`,
@@ -607,7 +607,80 @@ V2206 ; « Test JVM » un test automatisé qui échoue sans la correction ;
 `03b6a336`, avant toute correction : défaut préexistant, à traiter à part.
 
 **Limites déclarées :**
-- **D10** : les phrases d'un livre supprimé restent dans l'index (seule la requête les écarte). Les purger demande de modifier `DeletePublicationUseCase`.
+- **D10** : levée par `20fefd8d` (voir §10.1).
 - **D71** : une installation déjà tronquée avant ce correctif reste tenue pour bonne (seule l'existence des fichiers est vérifiée) ; seules les installations futures sont protégées.
 - **B10** : si Android détruit l'application pendant le choix de l'emplacement, le mot de passe (jamais persisté, à dessein) est perdu et le fichier choisi reste vide.
 - **D66** : la recherche de « Marque-pages et notes » reste sensible aux accents (requête SQL `LIKE` ; la rendre insensible demande une colonne normalisée, donc une migration).
+
+### 10.1 Suite des corrections (branches empilées)
+
+État au 2026-11-12, fin de session. Les branches s'empilent dans cet ordre,
+aucune n'est intégrée dans `main` :
+`fix/progression-lecture` (poussée) → `audit-lot-rapide` (poussée) →
+`audit-reglages-lecture` (poussée) → `audit-navigation-locator` (**non
+poussée**) → `audit-narration` (**non poussée**, branche courante).
+Avant de pousser les deux dernières : `./gradlew build` complet vert sur `HEAD`.
+
+| Constat | Correction | Commit | Vérification |
+|---|---|---|---|
+| A5 | Rappel de repos oculaire désactivé par défaut, ne coupe plus la narration | `01ce2447` | Appareil |
+| A1, A2, A15 | Réglages sans effet retirés : langue de l'interface, police système, gain audio | `e0680309`, `b1b74afc`, `7c45a584` | Appareil |
+| A16, D43 | Curseur d'intonation retiré, puis rétabli pour la voix système et Edge qui l'appliquent (`TtsCapabilityCatalog`) | `557317d2`, `970eb1c3` | Appareil |
+| D41 | Choix de la voix système respecté quand la voix neuronale est installée | `cb25aa75` | Appareil |
+| — | Deux courses d'attente supprimées dans `PlaybackOrchestratorChapterAdvanceTest` | `b9d8fac5` | Test JVM |
+| A8 | Taille et thème globaux par défaut, surcharge par livre explicite et réversible | `14ef4e9e` | Appareil |
+| A14, D3 | Chapitre cible chargé et retrouvé par son href avant de s'y placer | `5d0ffb0a` | Appareil |
+| D2 | Chapitres numérotés par leur position dans l'ordre de lecture à l'import | `ceb2ff90` | Tests JVM |
+| A4 | Plus de réouverture du livre à chaque retour vers le Lecteur | `ae1996b2` | Test JVM |
+| D35, D36 | Narration en cours laissée intacte à l'ouverture d'un livre ; le Lecteur ignore la narration d'un autre livre | `de8f1682` | Tests JVM — **appareil en attente** |
+| D39 | Temps de pause retiré de l'horloge de narration | `b2097f7b` | Tests JVM — **appareil en attente** |
+| D40 | Trois échecs de synthèse consécutifs arrêtent la narration, message en snackbar | `0a37b881` | Tests JVM |
+| D46 | Pause effective pendant la synthèse et après un saut de phrase | `db18752b` | Tests JVM — **appareil en attente** |
+| A6 | Vitesse et voix changées appliquées aussitôt pendant la narration | `4eddefe9` | Tests JVM — **appareil en attente** |
+| A12 | Supprimer un livre arrête sa narration | `7365321e` | Test JVM — **appareil en attente** (livre de test, suppression irréversible) |
+| A3 | Recherche du Lecteur limitée au livre ouvert, retour au même Lecteur ; recherche globale dans le menu de la Bibliothèque | `a9de9c4e` | Appareil (piloté par adb) |
+| Recherche Bibliothèque | Étendue aux séries, tags, éditeur et description | `804ba788` | Tests JVM |
+| D26 | Chaque fragment de lecture daté de son propre début | `a811b2a4` | Test JVM |
+| D28 | Temps restant calculé sur la progression réelle | `b8948caa` | Tests JVM |
+| D27 | Temps de lecture conservé pour un livre retiré (`MIGRATION_33_34`) | `8bc3f4a3` | Instrumenté (47 tests, migration comprise) |
+| D25 | Lecture visuelle non comptée après cinq minutes sans geste | `07fb053f` | Tests JVM |
+| B2, D31 | « Terminé » et « En cours » fondés sur la progression affichée (seuil 0,98, dernière page PDF) | `13d4edb2` | Appareil |
+| A19 (reste) | Même pourcentage partout, 100 % compris ; « Commencé » sous 1 % | `85517349` | Appareil |
+| A7 | Voix neuronale téléchargée par WorkManager en service de premier plan | `14287c8a` | Compilation + tests JVM — **appareil en attente** (voix déjà installée sur le V2206) |
+| D10 | Phrases d'un livre supprimé purgées de l'index | `20fefd8d` | Test JVM ; aucun test instrumenté |
+| D21 | Livre TXT découpé en paragraphes | `5fc78df4` | Tests JVM — **appareil en attente** |
+| D53 | Import d'un seul fichier visible du début au résumé | `48eec69e` | Tests JVM — **appareil en attente** |
+| D47 | Pause plus longue entre deux paragraphes narrés | `bc41222b` | Test JVM |
+| D70 | Abréviation en fin de phrase : plus de fusion de deux phrases (`PARSER_VERSION` 3) | `5eec1462` | Tests JVM |
+| B9 | Bornes de vitesse, hauteur et intervalle communes aux Réglages et au Lecteur | `67703f34` | Tests JVM |
+| D74, C5 | Panneau Voix du Lecteur : lien « Changer de voix dans les Réglages » à la place de la liste | `b039cd47` | Compilation — **`ReaderTtsPanelTest` à exécuter sur appareil** |
+| D73 | Une seule définition du profil vocal par défaut (`VoiceProfile.defaultFor`) | `2ad8b5f7` | Tests JVM |
+| C7 | Suppression d'une règle de prononciation confirmée | `fd502e3e` | Tests JVM |
+| B8 | Même éditeur de prononciation depuis le Lecteur et les Réglages | `4d9e8a44` | Tests JVM — **appareil en attente** |
+
+**Vérifications sur appareil en attente** (à faire avant de pousser
+`audit-narration`) :
+- **D35** : lancer la narration depuis la carte Reprendre, revenir à la Bibliothèque, toucher le mini-lecteur : la voix continue, le Lecteur s'ouvre sur la phrase lue.
+- **D36** : narration du livre A, ouvrir un livre B : notification et mini-lecteur restent sur A ; fermer B : A continue.
+- **D39** : pause d'environ 30 s depuis la notification, reprise : le surlignage suit le son, la réouverture reprend à la phrase entendue.
+- **D46** : voix lente ou Edge, Pause pendant l'attente : le mini-lecteur reste, Play relance ; en pause, sauter une phrase puis Play : la nouvelle phrase est lue.
+- **A6** : vitesse de 1,0× à 2,0× pendant la narration : la phrase suivante est plus rapide sans geste supplémentaire.
+- **A12** (livre de test) : narrer ce livre puis le retirer : la voix s'arrête, le mini-lecteur disparaît.
+- **A7** (voix absente seulement) : lancer le téléchargement, quitter les Réglages : la notification reste et le téléchargement aboutit.
+- **D21** (livre TXT) : défiler, fermer, rouvrir : reprise et pourcentage suivent la lecture.
+- **D53** : importer un seul fichier déjà présent : bannière « Import en cours… » puis résumé « doublon ».
+- **B8** : panneau Voix du Lecteur, « Ajouter une règle de prononciation » : même carte qu'aux Réglages, suppression confirmée.
+- **D74** : lien vers les Réglages dans le panneau Voix ; exécuter `ReaderTtsPanelTest` (`connectedDebugAndroidTest`).
+
+**Changement de comportement à connaître (D73)** : sans profil vocal
+enregistré, la voix par défaut suit désormais le moteur des préférences
+(Sherpa-ONNX par défaut), et non plus la voix système.
+
+**Reste à traiter**, par priorité :
+- **Lot A (identité des livres), exclu de cette session** : D57, D58, D61, et le conflit de position (`PositionConflict`) laissé en dehors d'A19.
+- **P1** : D18 (décalage vertical de page PDF à persister : migration et test sur appareil), D48 (images en mode paginé), D55 (copie des livres dans le stockage privé : ADR à écrire d'abord).
+- **Après implémentation d'ADR-027** (contexte textuel du `Locator`) : D12 à D17.
+- **D1** : décidé (pas de couverture ajoutée) ; demande la migration de l'index de chapitre (positions, signets, longueurs).
+- **P2/P3 restants** : D4, D5, D8, D11, D16, D19, D20, D22, D23, D24, D29, D32, D33, D34, D37, D38, D43 (clé de cache), D44, D45, D50, D51, D52, D56, D62, D63, D64, D65, D66 (recherche des notes), D67, D68, D75, D76, A11, A17, B3 à B6, B15 à B18, C3, C9 à C14.
+- **A7 (complément)** : le défilement automatique vers la carte de la voix n'est pas fait.
+- `scripts/audition-edge-voices.sh` : non suivi, sort à décider.
