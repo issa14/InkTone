@@ -8,6 +8,9 @@ import com.inktone.domain.service.ImportProgress
 import com.inktone.domain.service.ImportResultEntry
 import com.inktone.domain.service.SyncOperationResult
 import com.inktone.domain.usecase.CoverRegenerationResult
+import java.text.Collator
+import java.text.Normalizer
+import java.util.Locale
 
 /**
  * Tache 9bis.4 — tri et recherche titre/auteur en derive du `publications`
@@ -100,9 +103,12 @@ internal fun List<Publication>.filterAndSort(
     val searched = if (searchQuery.isBlank()) {
         this
     } else {
+        // Insensible aux accents comme à la casse : « eleve » trouve
+        // « Élève », « emile » trouve « Émile Zola ».
+        val needle = searchQuery.foldedForSearch()
         filter { publication ->
-            publication.title.contains(searchQuery, ignoreCase = true) ||
-                publication.authors.any { it.contains(searchQuery, ignoreCase = true) }
+            publication.title.foldedForSearch().contains(needle) ||
+                publication.authors.any { it.foldedForSearch().contains(needle) }
         }
     }
     val filtered = if (selectedFormats.isEmpty()) {
@@ -111,18 +117,26 @@ internal fun List<Publication>.filterAndSort(
         searched.filter { it.format in selectedFormats }
     }
     val sorted = when (sortOrder) {
-        // §3.5 — clés de tri précalculées : `sortedBy { it.title.lowercase() }`
-        // réévalue le sélecteur (donc alloue une String) à CHAQUE comparaison,
-        // soit O(n log n) allocations. Ici la clé est calculée une fois par
+        // §3.5 — clés de tri précalculées : la clé est calculée une fois par
         // élément (O(n)), puis le tri compare la clé déjà en cache.
-        LibrarySortOrder.TITLE -> filtered
-            .map { it to it.title.lowercase() }
-            .sortedBy { it.second }
-            .map { it.first }
-        LibrarySortOrder.AUTHOR -> filtered
-            .map { it to it.authors.firstOrNull()?.lowercase() }
-            .sortedWith(compareBy(nullsLast()) { it.second })
-            .map { it.first }
+        //
+        // Ordre alphabétique français (collation), plus l'ordre binaire des
+        // caractères : celui-ci rangeait « Émile » et « À rebours » après
+        // « Zola », toute lettre accentuée venant après le z.
+        LibrarySortOrder.TITLE -> {
+            val collator = frenchCollator()
+            filtered
+                .map { it to collator.getCollationKey(it.title) }
+                .sortedBy { it.second }
+                .map { it.first }
+        }
+        LibrarySortOrder.AUTHOR -> {
+            val collator = frenchCollator()
+            filtered
+                .map { it to it.authors.firstOrNull()?.let(collator::getCollationKey) }
+                .sortedWith(compareBy(nullsLast()) { it.second })
+                .map { it.first }
+        }
         LibrarySortOrder.RECENTLY_ADDED -> filtered.sortedByDescending { it.importDate }
         LibrarySortOrder.RECENTLY_OPENED -> filtered.sortedByDescending { it.lastOpened ?: 0L }
     }
@@ -139,14 +153,29 @@ internal fun List<Publication>.filterAndSort(
  * après le debounce de la recherche), jamais dans la composition.
  */
 internal fun LibraryUiState.withDerivedFields(): LibraryUiState = copy(
-    availableTags = publications.flatMap { it.subjects }.distinct().sorted(),
-    availableSeries = publications.mapNotNull { it.seriesName }.distinct().sorted(),
-    availableAuthors = publications.flatMap { it.authors }.distinct().sorted(),
+    availableTags = publications.flatMap { it.subjects }.distinct().sortedWith(frenchCollator()),
+    availableSeries = publications.mapNotNull { it.seriesName }.distinct().sortedWith(frenchCollator()),
+    availableAuthors = publications.flatMap { it.authors }.distinct().sortedWith(frenchCollator()),
     seriesCounts = publications.mapNotNull { it.seriesName }.groupingBy { it }.eachCount(),
     tagCounts = publications.flatMap { it.subjects }.groupingBy { it }.eachCount(),
     resumeReadingPublication = publications.resumePublication(),
     displayedPublications = publications.filterAndSort(searchQuery, selectedFormats, sortOrder),
 )
+
+/**
+ * Collation française : lettres accentuées à leur place alphabétique, casse
+ * ignorée (force SECONDARY — l'accent ne départage que deux mots identiques
+ * par ailleurs). Une instance par appel : `Collator` n'est pas garanti
+ * thread-safe, et ces dérivations tournent sur le dispatcher de calcul.
+ */
+private fun frenchCollator(): Collator =
+    Collator.getInstance(Locale.FRENCH).apply { strength = Collator.SECONDARY }
+
+/** Forme de comparaison pour la recherche : minuscules, sans accents. */
+private val combiningMarks = Regex("\\p{Mn}+")
+
+private fun String.foldedForSearch(): String =
+    combiningMarks.replace(Normalizer.normalize(this, Normalizer.Form.NFD), "").lowercase(Locale.FRENCH)
 
 /** Lot 2a.1 — « Récents » et « Récemment lus » fusionnés en RECENTLY_OPENED (decision actee, un seul `lastOpened` dans le domaine). */
 enum class LibrarySortOrder { RECENTLY_ADDED, TITLE, AUTHOR, RECENTLY_OPENED }

@@ -106,4 +106,64 @@ class LibraryUiStateTest {
 
         assertEquals(listOf("2", "1", "3"), state.displayedPublications.map { it.id })
     }
+
+    @Test
+    fun tri_par_titre_range_les_lettres_accentuees_a_leur_place_alphabetique() {
+        // Ordre binaire d'avant : « À rebours » et « Émaux et camées »
+        // passaient après « Zadig », toute lettre accentuée venant après z.
+        val state = LibraryUiState(
+            publications = listOf(
+                publication("1", "Zadig", "X", importDate = 0L),
+                publication("2", "Émaux et camées", "X", importDate = 0L),
+                publication("3", "À rebours", "X", importDate = 0L),
+                publication("4", "Bel-Ami", "X", importDate = 0L),
+            ),
+            sortOrder = LibrarySortOrder.TITLE,
+        ).withDerivedFields()
+
+        assertEquals(listOf("3", "4", "2", "1"), state.displayedPublications.map { it.id })
+    }
+
+    @Test
+    fun tri_par_auteur_range_les_lettres_accentuees_a_leur_place_alphabetique() {
+        val state = LibraryUiState(
+            publications = listOf(
+                publication("1", "A", "Zola", importDate = 0L),
+                publication("2", "B", "Éluard", importDate = 0L),
+                publication("3", "C", "Balzac", importDate = 0L),
+            ),
+            sortOrder = LibrarySortOrder.AUTHOR,
+        ).withDerivedFields()
+
+        assertEquals(listOf("3", "2", "1"), state.displayedPublications.map { it.id })
+    }
+
+    @Test
+    fun recherche_insensible_aux_accents() {
+        val state = LibraryUiState(
+            publications = listOf(
+                publication("1", "L'Élève", "X", importDate = 0L),
+                publication("2", "Germinal", "Émile Zola", importDate = 0L),
+                publication("3", "Autre", "Y", importDate = 0L),
+            ),
+            searchQuery = "ele",
+        ).withDerivedFields()
+
+        assertEquals(listOf("1"), state.displayedPublications.map { it.id })
+        val byAuthor = state.copy(searchQuery = "emile").withDerivedFields()
+        assertEquals(listOf("2"), byAuthor.displayedPublications.map { it.id })
+    }
+
+    @Test
+    fun series_et_tags_du_menu_suivent_l_ordre_alphabetique_francais() {
+        val state = LibraryUiState(
+            publications = listOf(
+                publication("1", "A", "X", importDate = 0L).copy(seriesName = "Zodiaque", subjects = listOf("Érotisme", "Aventure")),
+                publication("2", "B", "X", importDate = 0L).copy(seriesName = "Étoiles", subjects = listOf("Zen")),
+            ),
+        ).withDerivedFields()
+
+        assertEquals(listOf("Étoiles", "Zodiaque"), state.availableSeries)
+        assertEquals(listOf("Aventure", "Érotisme", "Zen"), state.availableTags)
+    }
 }
