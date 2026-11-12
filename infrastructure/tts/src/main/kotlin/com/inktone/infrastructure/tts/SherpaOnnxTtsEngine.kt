@@ -163,8 +163,18 @@ class SherpaOnnxTtsEngine @Inject constructor(
      */
     override fun warmUp() {
         if (!modelPaths.isReady) return
-        tts
-        ctcForcedAligner.warmUp()
+        // Préchauffage = optimisation, jamais une condition : un modèle
+        // présent mais illisible (fichier tronqué, version incompatible) fait
+        // lever l'initialisation. Elle remontait dans la coroutine du Lecteur
+        // (`viewModelScope.launch`), sans gestionnaire. L'échec réel sera
+        // signalé à la première synthèse, où le repli vers la voix système
+        // le prend en charge (FallbackTtsEngine).
+        try {
+            tts
+            ctcForcedAligner.warmUp()
+        } catch (e: Exception) {
+            Log.w(TAG, "Prechauffage impossible, modele illisible : ${e.message}", e)
+        }
     }
 
     override fun observePlaybackEvents(): Flow<PlaybackEvent> = callbackFlow { awaitClose { } }

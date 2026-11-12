@@ -52,9 +52,16 @@ class VoiceModelDownloader @Inject constructor(@ApplicationContext private val c
         targetFile.parentFile?.mkdirs()
 
         try {
-            val connection = java.net.URL(url).openConnection()
+            val connection = java.net.URL(url).openConnection().apply {
+                // Sans délai, un réseau qui se fige (ascenseur, Wi-Fi captif)
+                // laissait la progression immobile indéfiniment, sans erreur
+                // ni possibilité de relancer autrement qu'en annulant.
+                connectTimeout = CONNECT_TIMEOUT_MS
+                readTimeout = READ_TIMEOUT_MS
+            }
             val totalBytes = connection.contentLengthLong
             var downloaded = 0L
+            var lastReported = 0L
             connection.getInputStream().use { input ->
                 targetFile.outputStream().use { output ->
                     val buffer = ByteArray(8192)
@@ -62,14 +69,25 @@ class VoiceModelDownloader @Inject constructor(@ApplicationContext private val c
                     while (read >= 0) {
                         output.write(buffer, 0, read)
                         downloaded += read
-                        emit(DownloadProgress.InProgress(downloaded, totalBytes))
+                        // Une émission tous les 8 Ko faisait plus de vingt mille
+                        // mises à jour d'état (et autant de recompositions de
+                        // l'écran Réglages) pour 183 Mo. Une tous les 256 Ko
+                        // suffit à une progression fluide.
+                        if (downloaded - lastReported >= PROGRESS_STEP_BYTES) {
+                            lastReported = downloaded
+                            emit(DownloadProgress.InProgress(downloaded, totalBytes))
+                        }
                         read = input.read(buffer)
                     }
                 }
             }
+            if (downloaded != lastReported) emit(DownloadProgress.InProgress(downloaded, totalBytes))
         } catch (e: java.io.IOException) {
             targetFile.delete()
-            emit(DownloadProgress.Failed(e.message ?: "Echec de telechargement"))
+            // Message destiné à l'écran Réglages : celui de l'exception est
+            // technique et en anglais (« Read timed out », « Unable to
+            // resolve host »).
+            emit(DownloadProgress.Failed("Téléchargement interrompu — vérifiez la connexion et réessayez."))
             return@flow
         }
 
@@ -84,6 +102,12 @@ class VoiceModelDownloader @Inject constructor(@ApplicationContext private val c
     }.flowOn(Dispatchers.IO)
 
     private fun verifyHash(file: File, expectedSha256: String) = computeHash(file) == expectedSha256
+
+    private companion object {
+        const val CONNECT_TIMEOUT_MS = 15_000
+        const val READ_TIMEOUT_MS = 30_000
+        const val PROGRESS_STEP_BYTES = 256L * 1024
+    }
 
     private fun computeHash(file: File): String {
         val digest = MessageDigest.getInstance("SHA-256")

@@ -90,7 +90,40 @@ object TarBz2Extractor {
         return extracted
     }
 
+    /**
+     * Extrait vers [targetDir] sans jamais y laisser une installation
+     * partielle : extraction dans un répertoire voisin, puis bascule par
+     * renommage une fois l'archive entièrement écrite.
+     *
+     * Les modèles sont réputés installés dès que leurs fichiers EXISTENT
+     * (`SherpaOnnxModelPaths.isReady`). Extraire directement dans
+     * [targetDir] laissait donc, si l'application était tuée pendant
+     * l'extraction, un modèle tronqué tenu pour bon : « Voix neuronale
+     * installée » affiché, plus aucun bouton pour la retélécharger, et un
+     * fichier incomplet chargé à chaque narration.
+     *
+     * Un ancien contenu de [targetDir] n'est remplacé qu'après la réussite
+     * de l'extraction ; en cas d'échec, il reste en place et le répertoire
+     * temporaire est supprimé.
+     */
+    fun extractAtomically(archiveFile: File, targetDir: File, stripRoot: Boolean = true) {
+        val parent = targetDir.absoluteFile.parentFile
+            ?: throw TarBz2ExtractionException("Répertoire cible sans parent : $targetDir")
+        val staging = File(parent, targetDir.name + STAGING_SUFFIX)
+        staging.deleteRecursively()
+        try {
+            extract(archiveFile, staging, stripRoot)
+            targetDir.deleteRecursively()
+            if (!staging.renameTo(targetDir)) {
+                throw TarBz2ExtractionException("Installation du modèle impossible : $targetDir")
+            }
+        } finally {
+            staging.deleteRecursively()
+        }
+    }
+
     private const val BUFFER_SIZE = 8192
+    private const val STAGING_SUFFIX = ".installation"
 }
 
 class TarBz2ExtractionException(message: String) : RuntimeException(message)

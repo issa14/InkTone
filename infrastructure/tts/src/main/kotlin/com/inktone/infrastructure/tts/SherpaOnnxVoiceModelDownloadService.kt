@@ -125,7 +125,7 @@ class SherpaOnnxVoiceModelDownloadService @Inject constructor(
                     // par le téléchargeur) — extraction + suppression.
                     val extracted = try {
                         withContext(Dispatchers.IO) {
-                            TarBz2Extractor.extract(progress.modelFile, targetDir, stripRoot = true)
+                            TarBz2Extractor.extractAtomically(progress.modelFile, targetDir, stripRoot = true)
                             progress.modelFile.delete()
                             true
                         }

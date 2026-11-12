@@ -116,4 +116,62 @@ class TarBz2ExtractorTest {
             target.deleteRecursively()
         }
     }
+
+    @Test
+    fun `l installation atomique remplace un ancien contenu et ne laisse aucun repertoire temporaire`() {
+        val archive = File.createTempFile("model", ".tar.bz2")
+        val parent = File.createTempFile("parent", "").also { it.delete(); it.mkdirs() }
+        val target = File(parent, "vits-piper-fr_FR-upmc-medium")
+        try {
+            // Reste d'une installation précédente interrompue.
+            target.mkdirs()
+            File(target, "fr_FR-upmc-medium.onnx").writeBytes(ByteArray(3))
+            File(target, "obsolete.txt").writeText("x")
+            writeTarBz2(archive, mapOf("fr_FR-upmc-medium.onnx" to ByteArray(64) { 1 }, "tokens.txt" to "tok".toByteArray()))
+
+            TarBz2Extractor.extractAtomically(archive, target)
+
+            assertEquals(64L, File(target, "fr_FR-upmc-medium.onnx").length())
+            assertTrue(File(target, "tokens.txt").exists())
+            assertFalse("l'ancien contenu ne survit pas à la nouvelle installation", File(target, "obsolete.txt").exists())
+            assertEquals(listOf(target.name), parent.list()!!.toList())
+        } finally {
+            archive.delete()
+            parent.deleteRecursively()
+        }
+    }
+
+    @Test
+    fun `une archive tronquee ne laisse aucun modele partiel dans le repertoire cible`() {
+        // Équivalent testable d'une extraction interrompue : avant, les
+        // fichiers déjà écrits restaient dans le répertoire cible, et le
+        // modèle passait pour installé (seule leur existence est vérifiée).
+        val archive = File.createTempFile("model", ".tar.bz2")
+        val parent = File.createTempFile("parent", "").also { it.delete(); it.mkdirs() }
+        val target = File(parent, "vits-piper-fr_FR-upmc-medium")
+        try {
+            writeTarBz2(
+                archive,
+                mapOf(
+                    "tokens.txt" to "tok".toByteArray(),
+                    "fr_FR-upmc-medium.onnx" to ByteArray(200_000) { (it % 251).toByte() },
+                ),
+            )
+            val bytes = archive.readBytes()
+            archive.writeBytes(bytes.copyOf(bytes.size / 2))
+
+            try {
+                TarBz2Extractor.extractAtomically(archive, target)
+                fail("une archive tronquée doit échouer")
+            } catch (expected: Exception) {
+                // Échec attendu : seul compte l'état du disque ensuite.
+            }
+
+            assertFalse(target.exists())
+            assertTrue("aucun répertoire temporaire ne doit subsister", parent.list()!!.isEmpty())
+        } finally {
+            archive.delete()
+            parent.deleteRecursively()
+        }
+    }
 }
