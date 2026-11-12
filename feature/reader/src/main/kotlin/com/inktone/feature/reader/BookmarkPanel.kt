@@ -26,6 +26,7 @@ import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.pager.HorizontalPager
 import androidx.compose.foundation.pager.rememberPagerState
 import androidx.compose.material3.Button
+import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
@@ -35,8 +36,10 @@ import androidx.compose.material3.Surface
 import androidx.compose.material3.Tab
 import androidx.compose.material3.TabRow
 import androidx.compose.material3.Text
+import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
@@ -103,6 +106,26 @@ fun BookmarkPanel(
     val coroutineScope = rememberCoroutineScope()
     val notes = remember(annotations) { annotations.filter { !it.content.isNullOrBlank() } }
     val highlights = remember(annotations) { annotations.sortedByDescending { it.createdAt } }
+
+    // Suppression confirmée, comme dans la vue globale « Marque-pages et
+    // notes » : la corbeille est voisine du crayon, et une note rédigée
+    // partait sur un seul tap mal placé, sans retour possible.
+    var pendingDeletion by remember { mutableStateOf<PendingDeletion?>(null) }
+    pendingDeletion?.let { pending ->
+        DeleteItemDialog(
+            label = pending.label,
+            onConfirm = {
+                pendingDeletion = null
+                when (pending) {
+                    is PendingDeletion.OfAnnotation -> onDeleteAnnotation(pending.annotation)
+                    is PendingDeletion.OfBookmark -> onDeleteBookmark(pending.bookmark)
+                }
+            },
+            onDismiss = { pendingDeletion = null },
+        )
+    }
+    val requestAnnotationDeletion: (Annotation) -> Unit = { pendingDeletion = PendingDeletion.OfAnnotation(it) }
+    val requestBookmarkDeletion: (Bookmark) -> Unit = { pendingDeletion = PendingDeletion.OfBookmark(it) }
 
     Box(modifier = Modifier.fillMaxSize()) {
         // Scrim : le reste de l'écran de lecture reste visible en dessous,
@@ -181,9 +204,9 @@ fun BookmarkPanel(
                     // `*Tab`.
                     HorizontalPager(state = pagerState, modifier = Modifier.weight(1f)) { page ->
                         when (BookmarkPanelTab.entries[page]) {
-                            BookmarkPanelTab.NOTES -> NotesTab(notes, onAnnotationClick, onDeleteAnnotation, onEditAnnotationNote)
-                            BookmarkPanelTab.HIGHLIGHTS -> HighlightsTab(highlights, onAnnotationClick, onDeleteAnnotation)
-                            BookmarkPanelTab.BOOKMARKS -> BookmarksTab(bookmarks, onBookmarkClick, onDeleteBookmark, onEditBookmarkNote)
+                            BookmarkPanelTab.NOTES -> NotesTab(notes, onAnnotationClick, requestAnnotationDeletion, onEditAnnotationNote)
+                            BookmarkPanelTab.HIGHLIGHTS -> HighlightsTab(highlights, onAnnotationClick, requestAnnotationDeletion)
+                            BookmarkPanelTab.BOOKMARKS -> BookmarksTab(bookmarks, onBookmarkClick, requestBookmarkDeletion, onEditBookmarkNote)
                         }
                     }
 
@@ -382,6 +405,36 @@ private fun BookmarksTab(
             }
         }
     }
+}
+
+private sealed interface PendingDeletion {
+    val label: String
+
+    data class OfAnnotation(val annotation: Annotation) : PendingDeletion {
+        override val label: String
+            get() = if (annotation.content.isNullOrBlank()) "ce surlignage" else "cette note"
+    }
+
+    data class OfBookmark(val bookmark: Bookmark) : PendingDeletion {
+        override val label: String get() = "ce marque-page"
+    }
+}
+
+/** Même texte que la vue globale (`LibraryItemsScreen.DeleteLibraryItemDialog`). */
+@Composable
+internal fun DeleteItemDialog(label: String, onConfirm: () -> Unit, onDismiss: () -> Unit) {
+    AlertDialog(
+        onDismissRequest = onDismiss,
+        title = { Text("Supprimer $label ?") },
+        text = { Text("Cette action est irréversible.") },
+        confirmButton = {
+            TextButton(
+                onClick = onConfirm,
+                colors = ButtonDefaults.textButtonColors(contentColor = MaterialTheme.colorScheme.error),
+            ) { Text("Supprimer") }
+        },
+        dismissButton = { TextButton(onClick = onDismiss) { Text("Annuler") } },
+    )
 }
 
 @Composable

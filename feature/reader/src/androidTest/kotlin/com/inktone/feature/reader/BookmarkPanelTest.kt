@@ -227,6 +227,10 @@ class BookmarkPanelTest {
         }
 
         composeTestRule.onNodeWithContentDescription("Supprimer la note").performClick()
+        // Suppression confirmée : rien n'est supprimé avant la validation.
+        assertEquals(null, deletedId)
+        composeTestRule.onNodeWithText("Supprimer cette note ?").assertExists()
+        composeTestRule.onNodeWithText("Supprimer").performClick()
         assertEquals("note-1", deletedId)
     }
 
@@ -274,6 +278,9 @@ class BookmarkPanelTest {
 
         composeTestRule.onNodeWithText("Surlignages").performClick()
         composeTestRule.onNodeWithContentDescription("Supprimer le surlignage").performClick()
+        assertEquals(null, deletedId)
+        composeTestRule.onNodeWithText("Supprimer ce surlignage ?").assertExists()
+        composeTestRule.onNodeWithText("Supprimer").performClick()
         assertEquals("highlight-1", deletedId)
     }
 
@@ -298,6 +305,9 @@ class BookmarkPanelTest {
 
         composeTestRule.onNodeWithText("Signets").performClick()
         composeTestRule.onNodeWithContentDescription("Supprimer le marque-page").performClick()
+        assertEquals(null, deletedId)
+        composeTestRule.onNodeWithText("Supprimer ce marque-page ?").assertExists()
+        composeTestRule.onNodeWithText("Supprimer").performClick()
         assertEquals("bookmark-1", deletedId)
     }
 
@@ -323,5 +333,31 @@ class BookmarkPanelTest {
         composeTestRule.onNodeWithText("Signets").performClick()
         composeTestRule.onNodeWithContentDescription("Modifier la note").performClick()
         assertEquals("bookmark-1", editedId)
+    }
+
+    @Test
+    fun annuler_la_confirmation_ne_supprime_rien() {
+        var deletedId: String? = null
+        composeTestRule.setContent {
+            BookmarkPanel(
+                bookmarks = emptyList(),
+                annotations = listOf(highlightWithNote()),
+                isCurrentPageBookmarked = false,
+                onBookmarkClick = {},
+                onAnnotationClick = {},
+                onToggleBookmark = {},
+                onClose = {},
+                onDeleteAnnotation = { deletedId = it.id },
+                onEditAnnotationNote = {},
+                onDeleteBookmark = {},
+                onEditBookmarkNote = {},
+            )
+        }
+
+        composeTestRule.onNodeWithContentDescription("Supprimer la note").performClick()
+        composeTestRule.onNodeWithText("Annuler").performClick()
+
+        assertEquals(null, deletedId)
+        composeTestRule.onNodeWithText("Supprimer cette note ?").assertDoesNotExist()
     }
 }

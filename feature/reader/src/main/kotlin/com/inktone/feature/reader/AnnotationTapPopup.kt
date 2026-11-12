@@ -3,12 +3,17 @@ package com.inktone.feature.reader
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
+import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.geometry.Rect
 import androidx.compose.ui.unit.IntOffset
@@ -40,6 +45,10 @@ fun AnnotationTapPopup(
     onDismiss: () -> Unit,
 ) {
     val positionProvider = remember(boundsInWindow) { NearBoundsPositionProvider(boundsInWindow, marginPx = 24) }
+    // Suppression en deux temps, dans le menu lui-même : un tap sur
+    // « Supprimer » effaçait l'annotation et sa note sans retour possible,
+    // là où la vue globale « Marque-pages et notes » demande confirmation.
+    var confirmingDeletion by remember(boundsInWindow) { mutableStateOf(false) }
 
     Popup(
         popupPositionProvider = positionProvider,
@@ -51,14 +60,27 @@ fun AnnotationTapPopup(
             color = MaterialTheme.colorScheme.surfaceContainerHigh,
             shadowElevation = 6.dp,
         ) {
-            Row(modifier = Modifier.padding(4.dp)) {
-                TextButton(onClick = onEdit) {
-                    AppIcon(AppSymbol.Edit, contentDescription = null, modifier = Modifier.padding(end = 4.dp))
-                    Text("Modifier")
-                }
-                TextButton(onClick = onDelete) {
-                    AppIcon(AppSymbol.Delete, contentDescription = null, modifier = Modifier.padding(end = 4.dp))
-                    Text("Supprimer")
+            Row(modifier = Modifier.padding(4.dp), verticalAlignment = Alignment.CenterVertically) {
+                if (confirmingDeletion) {
+                    Text(
+                        "Supprimer ?",
+                        style = MaterialTheme.typography.bodyMedium,
+                        modifier = Modifier.padding(horizontal = 12.dp),
+                    )
+                    TextButton(onClick = { confirmingDeletion = false }) { Text("Annuler") }
+                    TextButton(
+                        onClick = onDelete,
+                        colors = ButtonDefaults.textButtonColors(contentColor = MaterialTheme.colorScheme.error),
+                    ) { Text("Supprimer") }
+                } else {
+                    TextButton(onClick = onEdit) {
+                        AppIcon(AppSymbol.Edit, contentDescription = null, modifier = Modifier.padding(end = 4.dp))
+                        Text("Modifier")
+                    }
+                    TextButton(onClick = { confirmingDeletion = true }) {
+                        AppIcon(AppSymbol.Delete, contentDescription = null, modifier = Modifier.padding(end = 4.dp))
+                        Text("Supprimer")
+                    }
                 }
             }
         }
