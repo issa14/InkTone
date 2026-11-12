@@ -336,18 +336,29 @@ fun InkToneNavHost(navController: NavHostController = rememberNavController(), s
             // meme pattern que ImportPickerButton) restent donc ici, dans app.
             val backupViewModel: BackupViewModel = hiltViewModel()
             val dataOperationResult by backupViewModel.lastResult.collectAsStateWithLifecycle()
-            // Lot 11, tâche 11.1 — le fichier est désormais chiffré E2EE ;
-            // un mot de passe est demandé après le choix de
-            // l'emplacement/du fichier. Reste ici (tâche 11.6) : la carte
+            // Lot 11, tâche 11.1 — le fichier est désormais chiffré E2EE.
+            // Export : le mot de passe est demandé AVANT le choix de
+            // l'emplacement. Le sélecteur `CreateDocument` crée le fichier
+            // dès sa validation ; demandé après, un mot de passe annulé
+            // laissait un fichier de sauvegarde vide de 0 octet à
+            // l'emplacement choisi. Import : après le choix du fichier, rien
+            // n'est créé. Reste ici (tâche 11.6) : la carte
             // « Fichier local » de l'écran Configuration Sync pointe vers
             // cet écran plutôt que de dupliquer le mot de passe/l'export
             // /import une seconde fois — un seul chemin, pas deux qui
             // divergeraient.
-            var pendingExportUri by remember { mutableStateOf<android.net.Uri?>(null) }
+            var isExportPasswordDialogVisible by remember { mutableStateOf(false) }
+            // Jamais persisté (pas de rememberSaveable) : un mot de passe ne
+            // doit pas finir dans l'état sauvegardé de l'activité.
+            var pendingExportPassword by remember { mutableStateOf<String?>(null) }
             var pendingImportUri by remember { mutableStateOf<android.net.Uri?>(null) }
             val exportLauncher = rememberLauncherForActivityResult(
                 ActivityResultContracts.CreateDocument("application/octet-stream"),
-            ) { uri -> pendingExportUri = uri }
+            ) { uri ->
+                val password = pendingExportPassword
+                pendingExportPassword = null
+                if (uri != null && password != null) backupViewModel.exportTo(uri.toString(), password)
+            }
             val importBackupLauncher = rememberLauncherForActivityResult(
                 ActivityResultContracts.OpenDocument(),
             ) { uri -> pendingImportUri = uri }
@@ -358,24 +369,23 @@ fun InkToneNavHost(navController: NavHostController = rememberNavController(), s
                 modelsFolderInfo = backupViewModel.modelsFolderInfo,
                 dataOperationResult = dataOperationResult,
                 onDismissDataOperationResult = backupViewModel::dismissResult,
-                onExportData = {
-                    exportLauncher.launch("inktone-backup-${java.time.LocalDate.now()}.rfbackup")
-                },
+                onExportData = { isExportPasswordDialogVisible = true },
                 onImportData = {
                     importBackupLauncher.launch(arrayOf("application/octet-stream", "application/json", "*/*"))
                 },
             )
 
-            pendingExportUri?.let { uri ->
+            if (isExportPasswordDialogVisible) {
                 BackupPasswordDialog(
                     title = "Mot de passe de la sauvegarde",
-                    confirmLabel = "Exporter",
+                    confirmLabel = "Choisir l'emplacement",
                     showLossWarning = true,
                     onConfirm = { password ->
-                        backupViewModel.exportTo(uri.toString(), password)
-                        pendingExportUri = null
+                        isExportPasswordDialogVisible = false
+                        pendingExportPassword = password
+                        exportLauncher.launch("inktone-backup-${java.time.LocalDate.now()}.rfbackup")
                     },
-                    onDismiss = { pendingExportUri = null },
+                    onDismiss = { isExportPasswordDialogVisible = false },
                 )
             }
             pendingImportUri?.let { uri ->
