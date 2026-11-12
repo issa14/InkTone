@@ -424,6 +424,14 @@ class PlaybackOrchestrator @Inject constructor(
         PlaybackStatus.Idle, is PlaybackStatus.Error -> false
     }
 
+    /**
+     * Livre de la session engagée ([isSessionEngaged]), `null` sinon. Un
+     * Lecteur ouvert sur un autre livre doit ignorer cette narration (audit
+     * UX D36).
+     */
+    val narratedPublicationId: String?
+        get() = if (isSessionEngaged()) session?.publicationId else null
+
     // ── Minuteur de sommeil (P2-b, écart 4 de P1) ──────────────────────
 
     private val _sleepTimer = MutableStateFlow<SleepTimerState?>(null)

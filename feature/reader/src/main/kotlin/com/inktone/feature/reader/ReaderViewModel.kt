@@ -15,6 +15,7 @@ import com.inktone.domain.model.EffectiveReadingSettings
 import com.inktone.domain.model.PublicationFormat
 import com.inktone.domain.model.ReadingMode as DomainReadingMode
 import com.inktone.domain.model.ReadingOverrides
+import com.inktone.domain.service.PlaybackMetadata
 import com.inktone.domain.model.ReadingSession
 import com.inktone.domain.model.ReadingState
 import com.inktone.domain.model.cleanedAuthorsForDisplay
@@ -156,6 +157,14 @@ class ReaderViewModel @Inject constructor(
         // lecture était engagée) déclenche l'auto-avance.
         viewModelScope.launch {
             playbackOrchestrator.state.collect { status ->
+                // Audit UX D36 : la narration d'un autre livre ne concerne pas
+                // ce Lecteur, qui ne doit ni se dire « en lecture » ni afficher
+                // son erreur.
+                if (narratesAnotherBook()) {
+                    _highlightedWordRange.value = null
+                    _state.value = _state.value.copy(isPlaying = false, isAudioActive = false)
+                    return@collect
+                }
                 when (status) {
                     PlaybackOrchestrator.PlaybackStatus.Idle -> {
                         // P1 — plus d'auto-avance déduite ici : `Idle` signifie
@@ -214,7 +223,7 @@ class ReaderViewModel @Inject constructor(
         // progression reculait puis bondissait à chaque fin de chapitre.
         viewModelScope.launch {
             playbackOrchestrator.narrationPosition.collect { position ->
-                if (!_state.value.isPlaying) return@collect
+                if (!_state.value.isPlaying || narratesAnotherBook()) return@collect
                 if (position.chapterIndex != _state.value.currentChapterIndex) {
                     syncDisplayToNarratedChapter(position.chapterIndex, position.sentenceIndex)
                 } else {
@@ -227,7 +236,7 @@ class ReaderViewModel @Inject constructor(
         // l'ordonnanceur (getTimestamp, repli delay() géré ci-dessous).
         viewModelScope.launch {
             playbackOrchestrator.currentWordRange.collect { range ->
-                if (_state.value.isPlaying) {
+                if (_state.value.isPlaying && !narratesAnotherBook()) {
                     _highlightedWordRange.value = range
                 }
             }
@@ -242,7 +251,7 @@ class ReaderViewModel @Inject constructor(
                 playbackOrchestrator.positionValid,
             ) { timestamps, valid -> timestamps to valid }
                 .collect { (timestamps, valid) ->
-                    if (!_state.value.isPlaying) return@collect
+                    if (!_state.value.isPlaying || narratesAnotherBook()) return@collect
                     if (!valid) {
                         startWordHighlight(timestamps)
                     } else {
@@ -258,12 +267,16 @@ class ReaderViewModel @Inject constructor(
         // deux ensemble.
         viewModelScope.launch {
             playbackOrchestrator.narratedSentenceWords.collect { words ->
-                sessionTracker?.addProgress(words)
+                if (!narratesAnotherBook()) sessionTracker?.addProgress(words)
             }
         }
     }
 
     internal var currentPublicationId: String? = null
+
+    // Titre, auteur et couverture du livre ouvert, posés sur la session de
+    // narration quand celle-ci démarre (voir applyNarrationMetadata).
+    private var narrationMetadata: PlaybackMetadata? = null
     /** Plan v4 — scope dédié aux préchargements, annulé indépendamment du chargement courant. */
     private var preloadScope: CoroutineScope? = null
     private val annotationSelectionHandler = AnnotationSelectionHandler()
@@ -768,12 +781,16 @@ class ReaderViewModel @Inject constructor(
                     // P1 — alimente les métadonnées de la notification média
                     // (titre/auteur), source unique : jamais rechargées depuis
                     // un repository dans le service.
-                    playbackOrchestrator.setMetadata(
+                    // Notification et mini-lecteur décrivent le livre NARRÉ : ne
+                    // pas les réécrire si un autre livre est en cours (D36). Ils
+                    // sont posés au lancement de la narration de celui-ci.
+                    narrationMetadata = PlaybackMetadata(
                         publicationId = publication.id,
                         title = publication.title.cleanedForDisplay(),
                         author = publication.authors.cleanedAuthorsForDisplay().ifBlank { null },
                         coverUri = publication.coverUri,
                     )
+                    if (!narratesAnotherBook()) applyNarrationMetadata()
                     // Plan v3, Palier 3.6 — initialiser le parsing lazy.
                     // Correctif : `registerPublication` était réservé à
                     // l'EPUB, alors que `CompositeChapterParser` l'enregistre
@@ -827,7 +844,15 @@ class ReaderViewModel @Inject constructor(
                     val effectiveLocator = targetLocator ?: restored?.locator
                     viewModelScope.launch {
                         chapterLoadJob?.join()
-                        if (effectiveLocator != null) navigateToLocator(effectiveLocator, flashOnArrival)
+                        if (targetLocator == null && narratesThisBook()) {
+                            // Audit UX D35 : livre ouvert pendant sa propre
+                            // narration (mini-lecteur, carte « Reprendre »).
+                            // Rejoindre la position enregistrée passait par
+                            // une navigation qui arrête la narration.
+                            joinOngoingNarration()
+                        } else if (effectiveLocator != null) {
+                            navigateToLocator(effectiveLocator, flashOnArrival)
+                        }
                         if (autoStartTts) {
                             playCurrentSentence()
                         }
@@ -1428,6 +1453,35 @@ class ReaderViewModel @Inject constructor(
      * passe la main. Le surlignage et l'auto-avance sont pilotés par l'état
      * de l'ordonnanceur (voir init).
      */
+    private fun narratesAnotherBook(): Boolean {
+        val narrated = playbackOrchestrator.narratedPublicationId
+        return narrated != null && narrated != currentPublicationId
+    }
+
+    private fun narratesThisBook(): Boolean {
+        val narrated = playbackOrchestrator.narratedPublicationId
+        return narrated != null && narrated == currentPublicationId
+    }
+
+    private fun applyNarrationMetadata() {
+        val metadata = narrationMetadata ?: return
+        playbackOrchestrator.setMetadata(metadata.publicationId, metadata.title, metadata.author, metadata.coverUri)
+    }
+
+    /** Affiche la position et l'état de la narration en cours de ce livre, sans l'interrompre. */
+    private fun joinOngoingNarration() {
+        val position = playbackOrchestrator.narrationPosition.value
+        syncDisplayToNarratedChapter(position.chapterIndex, position.sentenceIndex)
+        val status = playbackOrchestrator.state.value
+        val playing = status == PlaybackOrchestrator.PlaybackStatus.Playing ||
+            status == PlaybackOrchestrator.PlaybackStatus.Buffering
+        _state.value = _state.value.copy(
+            isPlaying = playing,
+            isAudioActive = status == PlaybackOrchestrator.PlaybackStatus.Playing,
+        )
+        if (playing) sessionTracker?.switchMode(DomainReadingMode.AUDIO)
+    }
+
     private fun playCurrentSentence() {
         // ADR-017 volet 2 — sur un PDF, la page courante peut ne porter aucun
         // texte (planche scannee, illustration pleine page). Depuis le
@@ -1466,6 +1520,7 @@ class ReaderViewModel @Inject constructor(
         sessionTracker?.switchMode(DomainReadingMode.AUDIO)
         // ───── Fin Lot Sessions ─────
 
+        applyNarrationMetadata()
         _state.value = _state.value.copy(isPlaying = true, isAudioActive = false)
         val startFrom = _state.value.currentSentenceIndex
 
@@ -1832,8 +1887,11 @@ class ReaderViewModel @Inject constructor(
         }
 
         super.onCleared()
-        val sessionEngaged = playbackOrchestrator.isSessionEngaged()
-        if (!sessionEngaged) playbackOrchestrator.stop()
+        // Seule la narration de CE livre se poursuit sans l'écran ; celle d'un
+        // autre livre n'est ni arrêtée ni rattachée à ce livre (audit UX D36).
+        val anyNarration = playbackOrchestrator.isSessionEngaged()
+        val sessionEngaged = narratesThisBook()
+        if (!anyNarration) playbackOrchestrator.stop()
         scrollPersistJob?.cancel()
         eyeRestReminderJob?.cancel()
         eyeRestCountdownJob?.cancel()
@@ -1872,7 +1930,9 @@ class ReaderViewModel @Inject constructor(
         } else {
             currentPublicationId?.let { chapterParser.invalidate(it) }
             epubResourceResolver.close()
-            playbackOrchestrator.clearNarrationProgram()
+            // Le programme appartient au livre narré : jamais effacé par
+            // la fermeture du Lecteur d'un autre livre.
+            if (!anyNarration) playbackOrchestrator.clearNarrationProgram()
         }
     }
 
