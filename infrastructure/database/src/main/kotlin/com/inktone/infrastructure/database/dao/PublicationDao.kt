@@ -33,8 +33,6 @@ interface PublicationDao {
             (:mode != 'FAVORITES' OR p.isFavorite = 1)
             AND (:mode != 'SERIES' OR p.seriesName = :value)
             AND (:mode != 'UNREAD' OR rs.publicationId IS NULL)
-            AND (:mode != 'IN_PROGRESS' OR (rs.publicationId IS NOT NULL AND rs.chapterIndex < p.chapterCount - 1))
-            AND (:mode != 'READ' OR (rs.publicationId IS NOT NULL AND rs.chapterIndex >= p.chapterCount - 1))
         ORDER BY p.lastOpened DESC
         """,
     )
@@ -100,8 +98,6 @@ interface PublicationDao {
             (:mode != 'FAVORITES' OR p.isFavorite = 1)
             AND (:mode != 'SERIES' OR p.seriesName = :value)
             AND (:mode != 'UNREAD' OR rs.publicationId IS NULL)
-            AND (:mode != 'IN_PROGRESS' OR (rs.publicationId IS NOT NULL AND rs.chapterIndex < p.chapterCount - 1))
-            AND (:mode != 'READ' OR (rs.publicationId IS NOT NULL AND rs.chapterIndex >= p.chapterCount - 1))
         """
     )
     suspend fun countFiltered(mode: String, value: String? = null): Int

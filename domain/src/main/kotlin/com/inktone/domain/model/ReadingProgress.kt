@@ -91,3 +91,23 @@ fun estimatedRemainingReadingMs(timeSpentMs: Long, progression: Float?): Long? {
     val remaining = (timeSpentMs / progression).toLong() - timeSpentMs
     return remaining.takeIf { it > 0 }
 }
+
+/**
+ * Progression à partir de laquelle un livre reflowable est « terminé » : la
+ * progression se mesure au DÉBUT de la phrase courante, un livre lu jusqu'au
+ * bout n'atteint donc jamais tout à fait 1.
+ */
+const val FINISHED_PROGRESSION = 0.98f
+
+/**
+ * Seule définition de « livre terminé » (filtres « Terminé » / « En cours »,
+ * « Livres finis » des statistiques). Audit UX B2, D31 : ces filtres
+ * comparaient l'index de chapitre au dernier chapitre — un livre à un seul
+ * chapitre était terminé dès son ouverture, un livre entamé dans un long
+ * dernier chapitre aussi. PDF : la dernière page atteinte. Progression
+ * inconnue : jamais terminé.
+ */
+fun Publication.isFinishedAt(locator: Locator): Boolean = when (format) {
+    PublicationFormat.PDF -> chapterCount > 0 && locator.chapterIndex >= chapterCount - 1
+    else -> (progressionAt(locator) ?: 0f) >= FINISHED_PROGRESSION
+}

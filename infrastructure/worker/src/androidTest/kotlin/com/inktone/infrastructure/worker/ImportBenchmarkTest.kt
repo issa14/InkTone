@@ -93,7 +93,7 @@ class ImportBenchmarkTest {
 
         val importPublication = ImportPublicationUseCase(
             publicationParser = ReadiumPublicationParser(context, CoverStorage(context)),
-            publicationRepository = RoomPublicationRepository(db.publicationDao()),
+            publicationRepository = RoomPublicationRepository(db.publicationDao(), db.readingStateDao()),
             fileStorageService = SafFileStorageService(context),
             // Tache 7.3 : indexation FTS reelle a l'import - le benchmark
             // doit refleter le cout ajoute, pas le contourner avec un fake.
@@ -101,7 +101,7 @@ class ImportBenchmarkTest {
             // Plan v3 : l'indexation EPUB passe par ChapterParser (parsing
             // paresseux, D2) - le vrai EpubChapterParser ici aussi, pour la
             // meme raison que RoomSearchService ci-dessus (mesurer le vrai cout).
-            chapterParser = EpubChapterParser(ReadiumPublicationRegistry(context), JsoupChapterParser(), FakePreAnalysisStore(), RoomPublicationRepository(db.publicationDao())),
+            chapterParser = EpubChapterParser(ReadiumPublicationRegistry(context), JsoupChapterParser(), FakePreAnalysisStore(), RoomPublicationRepository(db.publicationDao(), db.readingStateDao())),
             preAnalysisStore = FakePreAnalysisStore(),
         )
 
