@@ -5,8 +5,6 @@
     <!-- AudioPlaybackService (Tache 5.4) : lecture continue ecran eteint -->
     <uses-permission android:name="android.permission.FOREGROUND_SERVICE" />
     <uses-permission android:name="android.permission.FOREGROUND_SERVICE_MEDIA_PLAYBACK" />
-    <!-- Téléchargement de la voix neuronale en tâche de fond (audit UX A7). -->
-    <uses-permission android:name="android.permission.FOREGROUND_SERVICE_DATA_SYNC" />
 
     <!-- P1 (plan polissage Pareto) : notification media du TTS. Demandee a
          l'execution au premier demarrage d'une narration (pas au lancement de
@@ -76,13 +74,6 @@
              HiltWorkerFactory, seule capable de construire ImportWorker
              (@HiltWorker, dependances injectees). Sans ce retrait, les deux
              initialisations entrent en conflit au demarrage. -->
-        <!-- WorkManager au premier plan pour le téléchargement de la voix
-             neuronale (audit UX A7) : type de service obligatoire (cible API 34+). -->
-        <service
-            android:name="androidx.work.impl.foreground.SystemForegroundService"
-            android:foregroundServiceType="dataSync"
-            tools:node="merge" />
-
         <provider
             android:name="androidx.startup.InitializationProvider"
             android:authorities="${applicationId}.androidx-startup"
