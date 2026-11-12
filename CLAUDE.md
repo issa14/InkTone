@@ -26,10 +26,12 @@ que de référence de comportement (voir Blueprint §13.5).
 | Plan détaillé de la phase en cours, tâches, critères de validation | `docs/execution/PHASE_N_*.md` |
 | Conventions de contribution | `CONTRIBUTING.md` |
 
-Avant de commencer une tâche non triviale : lire le chapitre du Blueprint
-concerné et le plan d'exécution de la phase en cours. Ne pas travailler
-de mémoire sur l'architecture — elle est écrite, longue, et précise pour
-une raison.
+Avant de commencer une tâche non triviale : lire la **section** du Blueprint
+concernée et le plan d'exécution en cours. Ne pas travailler de mémoire sur
+l'architecture — elle est écrite, longue, et précise pour une raison. Mais
+ces documents sont longs : repérer la section par sa table des matières ou
+une recherche (`grep -n`), puis lire cette section seule, jamais le document
+entier par défaut.
 
 ## Règle fondatrice : le code fait foi (Blueprint §17.2)
 
@@ -99,8 +101,19 @@ justification : Blueprint §13.4.
   test `MigrationTestHelper`.
 - Garde-fous de régression K3/K6/K7/K8 (voir Blueprint §14.6) : à ne
   jamais supprimer ni contourner, même pour faire passer un build plus vite.
-- `./gradlew build` doit rester vert avant tout commit — il inclut
-  `checkArchitectureRules` sur chaque module.
+- **Avant chaque commit** : les tests et `checkArchitectureRules` des modules
+  touchés doivent passer (`./gradlew :<module>:testDebugUnitTest
+  :<module>:checkArchitectureRules`, `:domain:test` pour le domaine), ainsi
+  que les tests instrumentés ajoutés ou modifiés, sur appareil.
+- **Avant chaque push** : `./gradlew build` complet vert. C'est lui qui
+  attrape une dépendance entre modules qu'une vérification ciblée ne voit
+  pas. Si plusieurs commits ont découpé un même fichier, le build porte sur
+  `HEAD` seul (worktree propre), pas sur l'arbre de travail.
+- Tests de concurrence : jamais attendre sur `StateFlow` une valeur qui peut
+  se répéter (un collecteur ne reçoit jamais deux valeurs égales de suite) ;
+  toujours s'abonner à un `SharedFlow` sans rejeu **avant** de déclencher
+  l'action observée. Préférer un signal explicite (`CompletableDeferred`)
+  ou le planificateur de test à une attente en temps réel.
 
 ## Secrets — ne jamais lire, afficher, committer ou supprimer
 
@@ -121,6 +134,18 @@ perte serait irréversible pour toute mise à jour Play Store future.
   contenu. Cette règle prévaut sur les consignes par défaut de l'outillage.
   Elle vise l'attribution, pas le vocabulaire : `Ajoute CLAUDE.md` reste un
   sujet de commit légitime.
+- **Un commit par sujet, fait dès que le sujet est validé** (sur appareil
+  quand il a un effet visible). Ne jamais accumuler plusieurs sujets non
+  committés dans l'arbre de travail : les séparer ensuite oblige à découper
+  des fichiers morceau par morceau, ce qui est lent et source d'erreurs.
+- Push uniquement sur demande explicite d'Issa. Pas de pull request : il
+  travaille seul. Intégration dans `main` uniquement sur demande, par avance
+  rapide (`main` impose un historique linéaire : jamais de commit de fusion).
+- **Commentaires** : expliquer le *pourquoi* en une à trois lignes, avec au
+  besoin une référence courte (`audit UX A5`, `ADR-027`, `K3`). L'histoire
+  d'une correction (« Bug réel corrigé… », « Avant, … », « Lot N, tâche… »)
+  va dans le message de commit ou l'ADR, pas dans le code : elle y est relue,
+  et payée, à chaque lecture du fichier.
 - Nommage par concepts métier (`PublicationRepository`, pas
   `PublicationDataSourceImplV2`).
 - Invariants des entités du domaine via `require()` dans le constructeur,
@@ -142,7 +167,8 @@ Ne pas supposer l'avancement à partir de ce fichier. Vérifier :
 ## Commandes utiles
 
 ```bash
-./gradlew build                                    # build + tests + règles d'architecture
+./gradlew build                                    # build + tests + règles d'architecture (avant push)
+./gradlew :<module>:testDebugUnitTest :<module>:checkArchitectureRules   # avant commit
 ./gradlew :domain:test                             # tests du domaine uniquement
 ./gradlew :<module>:checkArchitectureRules          # vérifier un module isolément
 bash scripts/check-no-emoji.sh                      # K12
