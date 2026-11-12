@@ -6,10 +6,11 @@ package com.inktone.infrastructure.database.projection
  *
  * [dayOfWeek] : 0 = Dimanche … 6 = Samedi (convention SQLite strftime('%w')).
  * [hourOfDay] : 0–23 (convention SQLite strftime('%H')).
- * [interactionCount] : nombre de sessions démarrées dans ce créneau.
+ * [durationMs] : temps de lecture (visuelle + écoute) des sessions
+ *   démarrées dans ce créneau.
  */
 data class HeatmapProjection(
     val dayOfWeek: Int,
     val hourOfDay: Int,
-    val interactionCount: Int,
+    val durationMs: Long,
 )

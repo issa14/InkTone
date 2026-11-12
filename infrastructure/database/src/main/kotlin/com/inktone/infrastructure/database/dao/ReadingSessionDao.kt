@@ -51,7 +51,7 @@ interface ReadingSessionDao {
         SELECT 
             cast(strftime('%w', startedAt / 1000, 'unixepoch', 'localtime') as INTEGER) as dayOfWeek,
             cast(strftime('%H', startedAt / 1000, 'unixepoch', 'localtime') as INTEGER) as hourOfDay,
-            COUNT(*) as interactionCount
+            SUM(visualDurationMs + ttsDurationMs) as durationMs
         FROM reading_sessions
         WHERE startedAt >= :sinceTimestamp
         GROUP BY dayOfWeek, hourOfDay

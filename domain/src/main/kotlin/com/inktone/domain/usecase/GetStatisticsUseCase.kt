@@ -148,7 +148,8 @@ class GetStatisticsUseCase(
     /**
      * Regroupe les points de heatmap bruts (0-23h) dans les 5 créneaux
      * de la cible d'écran (6h, 10h, 14h, 18h, 22h) et normalise
-     * l'intensité par créneau sur 0.0–1.0.
+     * l'intensité sur 0.0–1.0, une seule échelle pour toute la grille
+     * (temps de lecture rapporté au créneau le plus lu).
      *
      * Les heures 0–3 sont rattachées au créneau 22h du jour précédent
      * (la nuit de lundi 2h appartient conceptuellement à la soirée de
@@ -161,54 +162,48 @@ class GetStatisticsUseCase(
         data class SlotKey(val dayOfWeek: Int, val slotIndex: Int)
 
         // Regrouper les heures brutes dans les créneaux les plus proches
-        val slotCounts = mutableMapOf<SlotKey, Int>()
+        val slotDurations = mutableMapOf<SlotKey, Long>()
         for (point in raw) {
             val (slotIndex, adjustedDay) = slotFor(point.hourOfDay, point.dayOfWeek)
             val key = SlotKey(adjustedDay, slotIndex)
-            slotCounts[key] = (slotCounts[key] ?: 0) + point.interactionCount
+            slotDurations[key] = (slotDurations[key] ?: 0L) + point.durationMs
         }
 
-        // Normaliser : chaque créneau (même slotIndex) a son propre max
-        val maxBySlot = mutableMapOf<Int, Int>()
-        for ((key, count) in slotCounts) {
-            maxBySlot[key.slotIndex] = maxOf(maxBySlot[key.slotIndex] ?: 0, count)
-        }
-
-        return slotCounts.map { (key, count) ->
-            val max = maxBySlot[key.slotIndex] ?: 1
+        // Une seule échelle pour toute la grille, comme l'annonce sa légende
+        // (« Inactif » → « Très actif »). L'ancienne normalisation par
+        // créneau horaire ramenait chaque ligne à son propre maximum : cinq
+        // minutes un matin s'affichaient aussi « très actif » que trois
+        // heures un soir.
+        val max = slotDurations.values.maxOrNull()?.takeIf { it > 0L } ?: return emptyList()
+        return slotDurations.map { (key, duration) ->
             HeatmapSlot(
                 slotIndex = key.slotIndex,
                 dayOfWeek = key.dayOfWeek,
-                intensity = (count.toFloat() / max).coerceIn(0f, 1f),
+                intensity = (duration.toFloat() / max).coerceIn(0f, 1f),
             )
         }
     }
 
     /**
-     * Détermine le créneau le plus actif (label « Pic : XXh »), sur les
-     * comptes bruts agrégés sur tous les jours — jamais sur
-     * `HeatmapSlot.intensity`, qui est normalisée *par créneau*
-     * (`computeHeatmapSlots` ci-dessus : chaque créneau a son propre
-     * maximum ramené à 1.0, par choix assumé pour la couleur de la
-     * grille). Dès qu'il y a de l'activité dans plus d'un créneau
-     * horaire, plusieurs créneaux atteignent 1.0 chacun sur leur propre
-     * échelle : un `maxByOrNull` sur l'intensité départagerait alors une
-     * égalité arbitrairement, dans un ordre qui dépend en plus de
-     * l'ordre de retour de `GROUP BY` (non garanti par SQLite en
-     * l'absence d'`ORDER BY`). Ici, égalité départagée par le créneau le
-     * plus tôt dans la journée — déterministe, reproductible.
+     * Détermine le créneau le plus actif (label « Pic : XXh »), sur le
+     * temps de lecture brut agrégé sur tous les jours de la semaine —
+     * jamais sur `HeatmapSlot.intensity`, qui porte sur une case (un jour
+     * × un créneau), pas sur un créneau toutes journées confondues.
+     * Égalité départagée par le créneau le plus tôt dans la journée —
+     * déterministe, indépendant de l'ordre de retour de `GROUP BY` (non
+     * garanti par SQLite en l'absence d'`ORDER BY`).
      */
     internal fun computePeakSlotIndex(raw: List<HeatmapPoint>): Int? {
         if (raw.isEmpty()) return null
 
-        val totalsBySlot = IntArray(HEATMAP_SLOT_COUNT)
+        val totalsBySlot = LongArray(HEATMAP_SLOT_COUNT)
         for (point in raw) {
             val (slotIndex, _) = slotFor(point.hourOfDay, point.dayOfWeek)
-            totalsBySlot[slotIndex] += point.interactionCount
+            totalsBySlot[slotIndex] += point.durationMs
         }
 
         val maxTotal = totalsBySlot.max()
-        if (maxTotal == 0) return null
+        if (maxTotal == 0L) return null
         return totalsBySlot.indexOfFirst { it == maxTotal }
     }
 

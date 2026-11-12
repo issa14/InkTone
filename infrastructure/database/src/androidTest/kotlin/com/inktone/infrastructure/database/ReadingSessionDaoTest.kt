@@ -179,16 +179,17 @@ class ReadingSessionDaoTest {
         insertPublication("pub-1")
         val base = 1700000000000L
 
-        // Deux sessions à la même heure → comptées comme 2 interactions
+        // Deux sessions à la même heure → leurs durées s'additionnent
+        // (temps de lecture, plus un nombre de fragments).
         db.readingSessionDao().insert(
-            ReadingSessionEntity("s1", "pub-1", base, base + 100, "VISUAL", 0, 0),
+            ReadingSessionEntity("s1", "pub-1", base, base + 100, "VISUAL", 0, 0, visualDurationMs = 100),
         )
         db.readingSessionDao().insert(
-            ReadingSessionEntity("s2", "pub-1", base + 60000, base + 70000, "AUDIO", 0, 0),
+            ReadingSessionEntity("s2", "pub-1", base + 60000, base + 70000, "AUDIO", 0, 0, ttsDurationMs = 10_000),
         )
 
         val points = db.readingSessionDao().getHeatmapStatsSince(base)
         assertEquals(1, points.size)
-        assertEquals(2, points.first().interactionCount)
+        assertEquals(10_100L, points.first().durationMs)
     }
 }

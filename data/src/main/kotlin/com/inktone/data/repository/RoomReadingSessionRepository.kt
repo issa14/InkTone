@@ -32,7 +32,7 @@ class RoomReadingSessionRepository @Inject constructor(
 
     override suspend fun getHeatmapStatsSince(sinceTimestamp: Long): List<HeatmapPoint> =
         dao.getHeatmapStatsSince(sinceTimestamp).map {
-            HeatmapPoint(it.dayOfWeek, it.hourOfDay, it.interactionCount)
+            HeatmapPoint(it.dayOfWeek, it.hourOfDay, it.durationMs)
         }
 
     override suspend fun getDistinctReadingDays(): List<String> = dao.getDistinctReadingDays()

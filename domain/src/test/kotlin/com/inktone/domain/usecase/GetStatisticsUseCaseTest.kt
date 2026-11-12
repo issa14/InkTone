@@ -172,10 +172,10 @@ class GetStatisticsUseCaseTest {
 
         // 4 points sur des heures non ambiguës
         val raw = listOf(
-            HeatmapPoint(dayOfWeek = 1, hourOfDay = 7, interactionCount = 2),  // → 6h
-            HeatmapPoint(dayOfWeek = 1, hourOfDay = 13, interactionCount = 5), // → 14h
-            HeatmapPoint(dayOfWeek = 1, hourOfDay = 21, interactionCount = 3), // → 22h
-            HeatmapPoint(dayOfWeek = 1, hourOfDay = 9, interactionCount = 1),  // → 10h
+            HeatmapPoint(dayOfWeek = 1, hourOfDay = 7, durationMs = 2L),  // → 6h
+            HeatmapPoint(dayOfWeek = 1, hourOfDay = 13, durationMs = 5L), // → 14h
+            HeatmapPoint(dayOfWeek = 1, hourOfDay = 21, durationMs = 3L), // → 22h
+            HeatmapPoint(dayOfWeek = 1, hourOfDay = 9, durationMs = 1L),  // → 10h
         )
         val slots = useCase.computeHeatmapSlots(raw)
 
@@ -193,11 +193,28 @@ class GetStatisticsUseCaseTest {
     }
 
     @Test
+    fun heatmap_une_seule_echelle_pour_toute_la_grille() = runTest {
+        // Avant le correctif, chaque créneau horaire était ramené à son
+        // propre maximum : 5 minutes un lundi matin s'affichaient aussi
+        // « très actif » (1.0) que 3 heures un lundi soir.
+        val useCase = GetStatisticsUseCase(FakeReadingSessionRepository(), FakePublicationRepository())
+        val raw = listOf(
+            HeatmapPoint(dayOfWeek = 1, hourOfDay = 7, durationMs = 5 * 60_000L),        // → 6h
+            HeatmapPoint(dayOfWeek = 1, hourOfDay = 21, durationMs = 3 * 60 * 60_000L),  // → 22h
+        )
+
+        val slots = useCase.computeHeatmapSlots(raw)
+
+        assertEquals(1f, slots.first { it.slotIndex == 4 }.intensity)
+        assertEquals(5f / 180f, slots.first { it.slotIndex == 0 }.intensity, 0.0001f)
+    }
+
+    @Test
     fun heatmap_midnight_0_a_3_remonte_sur_22h_jour_precedent() = runTest {
         val useCase = GetStatisticsUseCase(FakeReadingSessionRepository(), FakePublicationRepository())
 
         // Mardi (dayOfWeek=2) à 2h du matin → lundi (1) soir, slot 22h
-        val raw = listOf(HeatmapPoint(dayOfWeek = 2, hourOfDay = 2, interactionCount = 1))
+        val raw = listOf(HeatmapPoint(dayOfWeek = 2, hourOfDay = 2, durationMs = 1L))
         val slots = useCase.computeHeatmapSlots(raw)
 
         assertEquals(1, slots.size)
@@ -211,15 +228,13 @@ class GetStatisticsUseCaseTest {
         val useCase = GetStatisticsUseCase(FakeReadingSessionRepository(), FakePublicationRepository())
 
         // Meme jeu de donnees que heatmap_slot_regroupe_les_heures_brutes_en_5_creneaux :
-        // un seul jour de donnees par creneau, donc les 4 creneaux ont chacun une
-        // intensite normalisee de 1.0 (chacun est son propre max). Avant le fix,
-        // maxByOrNull sur l'intensite ne pouvait pas departager cette egalite de
-        // maniere fiable. Ici, 14h (5 interactions) doit gagner sur les comptes bruts.
+        // le pic se lit sur le temps brut agrege par creneau, toutes journees
+        // confondues. Ici, 14h (5 unites de temps) doit gagner.
         val raw = listOf(
-            HeatmapPoint(dayOfWeek = 1, hourOfDay = 7, interactionCount = 2),  // → 6h
-            HeatmapPoint(dayOfWeek = 1, hourOfDay = 13, interactionCount = 5), // → 14h (le plus actif)
-            HeatmapPoint(dayOfWeek = 1, hourOfDay = 21, interactionCount = 3), // → 22h
-            HeatmapPoint(dayOfWeek = 1, hourOfDay = 9, interactionCount = 1),  // → 10h
+            HeatmapPoint(dayOfWeek = 1, hourOfDay = 7, durationMs = 2L),  // → 6h
+            HeatmapPoint(dayOfWeek = 1, hourOfDay = 13, durationMs = 5L), // → 14h (le plus actif)
+            HeatmapPoint(dayOfWeek = 1, hourOfDay = 21, durationMs = 3L), // → 22h
+            HeatmapPoint(dayOfWeek = 1, hourOfDay = 9, durationMs = 1L),  // → 10h
         )
 
         assertEquals(2, useCase.computePeakSlotIndex(raw)) // slotIndex 2 = 14h
@@ -232,8 +247,8 @@ class GetStatisticsUseCaseTest {
         // 6h (slot 0) et 18h (slot 3) ont exactement le meme total agrege (3) :
         // le departage doit etre deterministe, pas dependant d'un ordre SQL non garanti.
         val raw = listOf(
-            HeatmapPoint(dayOfWeek = 1, hourOfDay = 6, interactionCount = 3),  // → 6h
-            HeatmapPoint(dayOfWeek = 2, hourOfDay = 18, interactionCount = 3), // → 18h
+            HeatmapPoint(dayOfWeek = 1, hourOfDay = 6, durationMs = 3L),  // → 6h
+            HeatmapPoint(dayOfWeek = 2, hourOfDay = 18, durationMs = 3L), // → 18h
         )
 
         assertEquals(0, useCase.computePeakSlotIndex(raw)) // 6h retenu, le plus tot
