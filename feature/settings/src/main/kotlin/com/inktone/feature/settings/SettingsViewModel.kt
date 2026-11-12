@@ -149,8 +149,6 @@ class SettingsViewModel @Inject constructor(
                     preferencesRepository.update(current.copy(readingRulerEnabled = intent.enabled))
                 is SettingsIntent.SetActiveVoiceProfile ->
                     preferencesRepository.update(current.copy(activeVoiceProfileId = intent.profileId))
-                is SettingsIntent.SetAudioGain ->
-                    preferencesRepository.update(current.copy(audioGain = intent.gain))
                 // Lot 6 — thème système (ne touche pas ReadingTheme)
                 is SettingsIntent.SetAppTheme ->
                     preferencesRepository.update(current.copy(appTheme = intent.appTheme))

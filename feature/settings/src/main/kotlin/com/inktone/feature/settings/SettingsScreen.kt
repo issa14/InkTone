@@ -254,16 +254,9 @@ internal fun SettingsContent(
                 displayFormatter = { "%.1f×".format(it) },
                 onValueChange = { onIntent(SettingsIntent.SetVoiceSpeed(it)) },
             )
-            InkToneSlider(
-                modifier = Modifier.padding(horizontal = 20.dp, vertical = 12.dp),
-                label = "Gain audio",
-                value = preferences.audioGain,
-                range = 1.0f..4.0f,
-                minIcon = AppSymbol.VolumeDown,
-                maxIcon = AppSymbol.Speaking,
-                displayFormatter = { "%.1f×".format(it) },
-                onValueChange = { onIntent(SettingsIntent.SetAudioGain(it)) },
-            )
+            // Audit UX A15 — curseur « Gain audio » retiré : aucun moteur ni
+            // lecteur audio ne lisait `audioGain`. Un gain au-delà de 1,0×
+            // demande une amplification PCM avec limiteur, à concevoir à part.
             // Lot 6 — Intonation : VoiceProfile.pitch.
             // Signalé : non vérifié que pitch atteint le moteur Sherpa-ONNX — à confirmer sur device (A4).
             InkToneSlider(

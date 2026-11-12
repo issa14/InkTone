@@ -69,8 +69,6 @@ sealed interface SettingsIntent {
     data class SetReadingRulerEnabled(val enabled: Boolean) : SettingsIntent
     // A.5 — selection du profil vocal actif
     data class SetActiveVoiceProfile(val profileId: String?) : SettingsIntent
-    // D.3 — gain audio (1.0× à 4.0×)
-    data class SetAudioGain(val gain: Float) : SettingsIntent
     // Lot 6 — vitesse d'élocution — écrit dans VoiceProfile.speed (même cible que le panneau lecteur)
     data class SetVoiceSpeed(val speed: Float) : SettingsIntent
     // Lot 6 — intonation/pitch — écrit dans VoiceProfile.pitch
