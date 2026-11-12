@@ -140,7 +140,6 @@ class SettingsViewModel @Inject constructor(
                 is SettingsIntent.SetDefaultTtsEngine -> setDefaultTtsEngine(current, intent.engine)
                 is SettingsIntent.SetActiveVoiceProfileVoice ->
                     updateActiveVoiceProfile(current) { it.copy(voice = intent.voice) }
-                is SettingsIntent.SetLanguage -> preferencesRepository.update(current.copy(language = intent.language))
                 is SettingsIntent.SetCrashReportingEnabled ->
                     preferencesRepository.update(current.copy(crashReportingEnabled = intent.enabled))
                 is SettingsIntent.SetReduceMotion -> preferencesRepository.update(current.copy(reduceMotion = intent.enabled))

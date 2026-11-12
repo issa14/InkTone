@@ -351,16 +351,11 @@ internal fun SettingsContent(
 
             HorizontalDivider(modifier = Modifier.padding(horizontal = 20.dp))
 
-            // ─ Langue et confidentialité ─
-            // Rattachées ici comme ajouts assumés (pas de place dans la cible stricte des 6 cartes).
-            // Signalé dans UX_FLOW_DESIGN.md § Réglages.
-            SettingRow(
-                label = "Langue de l'interface",
-                value = if (preferences.language == "fr") "Français" else "English",
-                onClick = {
-                    onIntent(SettingsIntent.SetLanguage(if (preferences.language == "fr") "en" else "fr"))
-                },
-            )
+            // ─ Confidentialité ─
+            // Audit UX A1 — ligne « Langue de l'interface » retirée : aucune
+            // traduction n'existe (libellés français en dur), et la valeur
+            // choisie devenait la langue des profils vocaux créés ensuite.
+            // Elle reviendra avec l'internationalisation.
             // Lot 10, Tâche 10.5 — formulation honnête exigée par ADR-014
             // (« avec une explication honnête de son contenu »). Seul
             // point de consentement restant depuis le retrait de l'étape

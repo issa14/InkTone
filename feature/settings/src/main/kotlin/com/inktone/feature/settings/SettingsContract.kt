@@ -63,7 +63,6 @@ sealed interface SettingsIntent {
     data class SetFontFamily(val fontFamily: FontFamily) : SettingsIntent
     data class SetDefaultTtsEngine(val engine: TtsEngineId) : SettingsIntent
     data class SetActiveVoiceProfileVoice(val voice: String) : SettingsIntent
-    data class SetLanguage(val language: String) : SettingsIntent
     data class SetCrashReportingEnabled(val enabled: Boolean) : SettingsIntent
     data class SetReduceMotion(val enabled: Boolean) : SettingsIntent
     data class SetDynamicColorEnabled(val enabled: Boolean) : SettingsIntent
