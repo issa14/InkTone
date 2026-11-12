@@ -597,7 +597,7 @@ class PlaybackOrchestrator @Inject constructor(
             val prefs = preferencesRepository.get()
             val voiceProfile = prefs.activeVoiceProfileId
                 ?.let { voiceProfileRepository.getById(it) }
-                ?: DEFAULT_NARRATION_VOICE_PROFILE
+                ?: VoiceProfile.defaultFor(prefs)
 
             setMetadata(
                 publicationId = publication.id,
@@ -1245,10 +1245,6 @@ class PlaybackOrchestrator @Inject constructor(
  * quand `UserPreferences.activeVoiceProfileId` est nul — même profil que le
  * repli du Lecteur (`ReaderViewModel.resolveVoiceProfile`).
  */
-private val DEFAULT_NARRATION_VOICE_PROFILE = VoiceProfile(
-    id = "vp-native-fr", engine = TtsEngineId.ANDROID_NATIVE,
-    voice = "fr-fr-default", language = "fr-FR",
-)
 
 /** Position narrée, chapitre et phrase indissociables (voir [PlaybackOrchestrator.narrationPosition]). */
 data class NarrationPosition(val chapterIndex: Int, val sentenceIndex: Int)

@@ -34,5 +34,21 @@ data class VoiceProfile(
          */
         val SPEED_RANGE = 0.5f..2.0f
         val PITCH_RANGE = 0.5f..1.5f
+
+        const val DEFAULT_ID = "vp-default"
+
+        /**
+         * Profil utilisé tant qu'aucun n'est enregistré : le moteur des
+         * préférences — celui qu'affichent les Réglages — avec sa voix par
+         * défaut. Seule définition (audit UX D73 : le Lecteur et la narration
+         * sans écran retombaient sur la voix système, les Réglages créaient
+         * un autre profil avec le moteur des préférences).
+         */
+        fun defaultFor(preferences: UserPreferences): VoiceProfile = VoiceProfile(
+            id = DEFAULT_ID,
+            engine = preferences.defaultTtsEngine,
+            voice = defaultVoiceFor(preferences.defaultTtsEngine),
+            language = "fr-FR",
+        )
     }
 }

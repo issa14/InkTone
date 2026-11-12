@@ -661,7 +661,7 @@ class ReaderViewModel @Inject constructor(
     private suspend fun resolveVoiceProfile(prefs: UserPreferences): VoiceProfile =
         prefs.activeVoiceProfileId
             ?.let { voiceProfileRepository.getById(it) }
-            ?: DEFAULT_VOICE_PROFILE
+            ?: VoiceProfile.defaultFor(prefs)
 
     /**
      * Ouvre une publication déjà importée : récupère son `fileUri` via
@@ -2140,7 +2140,3 @@ private fun String.truncateWithEllipsis(maxLength: Int): String =
     if (length <= maxLength) this else take((maxLength - 1).coerceAtLeast(0)) + "…"
 
 /** A.5 — repli quand `UserPreferences.activeVoiceProfileId` est `null`. */
-private val DEFAULT_VOICE_PROFILE = VoiceProfile(
-    id = "vp-native-fr", engine = TtsEngineId.ANDROID_NATIVE,
-    voice = "fr-fr-default", language = "fr-FR",
-)

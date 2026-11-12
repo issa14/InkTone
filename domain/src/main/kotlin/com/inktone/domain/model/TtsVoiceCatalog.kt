@@ -39,3 +39,6 @@ fun voiceLabel(voice: String): String = when (voice) {
     "fr-fr-default" -> "Voix système"
     else -> voice
 }
+
+/** Voix proposée par défaut pour [engine] : la première de son catalogue. */
+fun defaultVoiceFor(engine: TtsEngineId): String = availableVoicesFor(engine).firstOrNull() ?: "default"

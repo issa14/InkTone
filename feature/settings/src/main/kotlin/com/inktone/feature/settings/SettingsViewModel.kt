@@ -11,6 +11,7 @@ import com.inktone.domain.model.Sentence
 import com.inktone.domain.model.TtsEngineId
 import com.inktone.domain.model.UserPreferences
 import com.inktone.domain.model.VoiceProfile
+import com.inktone.domain.model.defaultVoiceFor
 import com.inktone.domain.repository.PreferencesRepository
 import com.inktone.domain.repository.PronunciationRuleRepository
 import com.inktone.domain.repository.VoiceProfileRepository
@@ -339,8 +340,8 @@ class SettingsViewModel @Inject constructor(
 
     /**
      * Lot 6 — met à jour le profil vocal actif (vitesse, intonation, voix).
-     * Si aucun profil n'est actif, crée un profil de base "vp-settings-default"
-     * et l'active. Même cible que setTtsSpeed() dans ReaderViewModel : un seul
+     * Si aucun profil n'est actif, part du profil par défaut du domaine
+     * (VoiceProfile.defaultFor) et l'enregistre. Même cible que setTtsSpeed() dans ReaderViewModel : un seul
      * champ dans la base, pas un second emplacement.
      */
     private suspend fun updateActiveVoiceProfile(
@@ -348,12 +349,7 @@ class SettingsViewModel @Inject constructor(
         update: (VoiceProfile) -> VoiceProfile,
     ) {
         val existingProfile = prefs.activeVoiceProfileId?.let { voiceProfileRepository.getById(it) }
-        val baseProfile = existingProfile ?: VoiceProfile(
-            id = "vp-settings-default",
-            engine = prefs.defaultTtsEngine,
-            voice = "default",
-            language = prefs.language,
-        )
+        val baseProfile = existingProfile ?: VoiceProfile.defaultFor(prefs)
         val updated = update(baseProfile)
         voiceProfileRepository.save(updated)
         if (prefs.activeVoiceProfileId != updated.id) {
@@ -378,14 +374,6 @@ class SettingsViewModel @Inject constructor(
         }
     }
 
-    /** Voix par défaut de chaque moteur — aligné sur les moteurs réels (Palier 1/2/Edge). */
-    private fun defaultVoiceFor(engine: TtsEngineId): String = when (engine) {
-        // Lot 20 — Sherpa = upmc-medium, voix par défaut jessica (sid 0, comme le legacy).
-        TtsEngineId.SHERPA_ONNX -> "jessica"
-        TtsEngineId.ANDROID_NATIVE -> "fr-fr-default"
-        TtsEngineId.EDGE_TTS -> "fr-FR-VivienneMultilingualNeural"
-        TtsEngineId.PIPER -> "default"
-    }
 
     /**
      * Lot 6/9 — Préset Mode sombre.
