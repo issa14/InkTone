@@ -41,6 +41,9 @@ import androidx.compose.material3.rememberSwipeToDismissBoxState
 import androidx.compose.material3.TopAppBarDefaults
 import androidx.activity.compose.BackHandler
 import androidx.compose.runtime.Composable
+import androidx.compose.ui.semantics.CustomAccessibilityAction
+import androidx.compose.ui.semantics.customActions
+import androidx.compose.ui.semantics.semantics
 import androidx.compose.runtime.LaunchedEffect
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.compose.runtime.getValue
@@ -348,7 +351,15 @@ private fun LibraryItemRow(
                 .combinedClickable(
                     onClick = onClick,
                     onLongClick = { haptics.tick(); onTogglePin() },
-                ),
+                )
+                // Épingler (appui long) et supprimer (balayage) n'avaient
+                // aucun équivalent pour TalkBack : deux actions nommées.
+                .semantics {
+                    customActions = listOf(
+                        CustomAccessibilityAction(if (item.isPinned) "Détacher" else "Épingler") { onTogglePin(); true },
+                        CustomAccessibilityAction("Supprimer") { onRequestDelete(); true },
+                    )
+                },
             shape = cardShape,
             colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceVariant),
         ) {

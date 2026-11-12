@@ -96,7 +96,12 @@ fun BookCover(
     }
 
     // E.2 — contentDescription global pour TalkBack
-    val a11yLabel = "${publication.title}, ${if (progressPercent > 0) "$progressPercent% lu" else "Non commencé"}"
+    val a11yLabel = buildString {
+        append(publication.title)
+        append(", ")
+        append(if (progressPercent > 0) "$progressPercent% lu" else "Non commencé")
+        if (publication.isPinned) append(", épinglé")
+    }
 
     // Aucune transition partagée couverture ↔ Lecteur (retirée) : la
     // couverture et l'écran de lecture ne sont pas le même contenu, le
@@ -173,6 +178,28 @@ fun BookCover(
             ) {
                 AppIcon(AppSymbol.MoreActions,  contentDescription = "Actions sur « ${publication.title} »", tint = Color.White)
             }
+        }
+
+        // Témoin d'épinglage — coin supérieur gauche. Un livre épinglé
+        // remonte en tête quel que soit le tri ; sans témoin, rien
+        // n'expliquait pourquoi il échappait à l'ordre choisi.
+        if (showOverlays && publication.isPinned) {
+            AppIcon(
+                symbol = AppSymbol.Pin,
+                contentDescription = null, // porté par le libellé global de la couverture
+                selected = true,
+                tint = Color.White,
+                modifier = Modifier
+                    .align(Alignment.TopStart)
+                    .padding(6.dp)
+                    .size(20.dp)
+                    .shadow(
+                        elevation = 6.dp,
+                        shape = CircleShape,
+                        clip = false,
+                        spotColor = Color.Black.copy(alpha = 0.7f),
+                    ),
+            )
         }
 
         // Badge favori — coin supérieur droit, visible et plein UNIQUEMENT
