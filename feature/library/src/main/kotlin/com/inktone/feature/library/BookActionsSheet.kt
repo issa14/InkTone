@@ -20,7 +20,10 @@ import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.material3.rememberModalBottomSheetState
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.remember
 import androidx.compose.ui.Alignment
+import androidx.compose.ui.text.AnnotatedString
+import androidx.compose.ui.text.fromHtml
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.text.style.TextAlign
@@ -175,8 +178,9 @@ fun BookDetailsSheet(publication: Publication, onDismiss: () -> Unit) {
             DetailRow("Importé le", DateFormat.getDateInstance().format(Date(publication.importDate)))
             if (!publication.description.isNullOrBlank()) {
                 Spacer(Modifier.height(8.dp))
+                val description = publication.description!!
                 Text(
-                    publication.description!!,
+                    remember(description) { descriptionForDisplay(description) },
                     style = MaterialTheme.typography.bodyMedium,
                     color = MaterialTheme.colorScheme.onSurfaceVariant,
                 )
@@ -196,6 +200,27 @@ private fun DetailRow(label: String, value: String) {
         )
         Text(value, style = MaterialTheme.typography.bodyMedium, textAlign = TextAlign.Start)
     }
+}
+
+private val HTML_TAG = Regex("""<\s*/?\s*[A-Za-z][^>]*>""")
+
+/**
+ * Description des métadonnées (`dc:description`) prête à l'affichage.
+ *
+ * Beaucoup d'éditeurs y placent du XHTML (`<div>`, `<p>`, `<br/>`,
+ * entités), que la fiche affichait tel quel. Le HTML est interprété ici, à
+ * l'affichage, comme les autres nettoyages de métadonnées
+ * (`MetadataDisplay.kt`) : la valeur d'origine reste intacte en base, et la
+ * règle s'applique aux livres déjà importés. Un texte sans balise n'est pas
+ * converti : l'interprétation HTML fusionnerait ses retours à la ligne.
+ */
+internal fun descriptionForDisplay(raw: String): AnnotatedString {
+    if (!HTML_TAG.containsMatchIn(raw)) return AnnotatedString(raw.trim())
+    val parsed = AnnotatedString.fromHtml(raw)
+    val start = parsed.indexOfFirst { !it.isWhitespace() }
+    if (start < 0) return AnnotatedString("")
+    val end = parsed.indexOfLast { !it.isWhitespace() } + 1
+    return parsed.subSequence(start, end)
 }
 
 /**
