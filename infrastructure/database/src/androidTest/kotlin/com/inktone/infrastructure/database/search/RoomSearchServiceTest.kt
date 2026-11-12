@@ -5,9 +5,11 @@ import androidx.room.Room
 import androidx.test.core.app.ApplicationProvider
 import androidx.test.ext.junit.runners.AndroidJUnit4
 import com.inktone.infrastructure.database.InkToneDatabase
+import com.inktone.infrastructure.database.entity.PublicationEntity
 import com.inktone.infrastructure.database.entity.SentenceFtsEntity
 import kotlinx.coroutines.test.runTest
 import org.junit.After
+import org.junit.Assert.assertEquals
 import org.junit.Assert.assertTrue
 import org.junit.Before
 import org.junit.Test
@@ -42,12 +44,16 @@ class RoomSearchServiceTest {
         ).build()
         searchService = RoomSearchService(db.sentenceFtsDao())
 
+        // Les résultats ne portent que sur les livres présents dans la
+        // bibliothèque : le corpus doit donc avoir ses livres en base.
+        (0 until PUBLICATION_COUNT).forEach { insertPublication("pub-$it") }
+
         // Corpus synthetique de volume - plusieurs publications, texte
         // varie pour ne pas biaiser FTS4 vers un cas trivial (une seule
         // phrase repetee).
         val entities = (0 until SENTENCE_COUNT).map { index ->
             SentenceFtsEntity(
-                publicationId = "pub-${index % 20}",
+                publicationId = "pub-${index % PUBLICATION_COUNT}",
                 chapterIndex = index % 10,
                 resourceHref = "chapter${index % 10}.xhtml",
                 charOffset = index,
@@ -88,7 +94,75 @@ class RoomSearchServiceTest {
         }
     }
 
+    @Test
+    fun la_recherche_ne_porte_que_sur_le_texte_pas_sur_les_chemins_ni_les_identifiants() = runTest {
+        // « chapter » et « xhtml » n'apparaissent que dans resourceHref,
+        // « pub » que dans publicationId. Avant le correctif (MATCH sur la
+        // table entière), ces trois recherches remontaient tout le corpus.
+        assertTrue(searchService.search("chapter").isEmpty())
+        assertTrue(searchService.search("xhtml").isEmpty())
+        assertTrue(searchService.search("pub").isEmpty())
+    }
+
+    @Test
+    fun les_phrases_d_un_livre_retire_de_la_bibliotheque_ne_sont_plus_proposees() = runTest {
+        db.publicationDao().delete("pub-3")
+
+        val results = searchService.search("imaginaire")
+
+        assertTrue(results.isNotEmpty())
+        assertTrue(results.none { it.publicationId == "pub-3" })
+        assertTrue(searchService.search("imaginaire", publicationId = "pub-3").isEmpty())
+    }
+
+    @Test
+    fun les_resultats_sont_bornes() = runTest {
+        // Le terme figure dans les 5000 phrases du corpus.
+        assertEquals(200, searchService.search("imaginaire").size)
+    }
+
+    @Test
+    fun les_resultats_d_un_livre_suivent_l_ordre_de_lecture() = runTest {
+        val results = searchService.search("imaginaire", publicationId = "pub-5")
+
+        val positions = results.map { it.locator.chapterIndex to it.locator.charOffset }
+        assertEquals(positions.sortedWith(compareBy({ it.first }, { it.second })), positions)
+        // Tri numérique et non textuel : dans ce corpus, pub-5 porte les
+        // offsets 5, 25, 45… 105 — un tri textuel placerait 105 avant 25.
+        assertEquals(listOf(5, 25, 45, 65, 85, 105), positions.take(6).map { it.second })
+    }
+
+    @Test
+    fun le_dernier_mot_tape_est_cherche_comme_debut_de_mot() = runTest {
+        // « imagin » n'est pas un mot du corpus : sans recherche par début
+        // de mot, rien ne s'affiche tant que le mot n'est pas complet.
+        assertTrue(searchService.search("imagin").isNotEmpty())
+        assertTrue(searchService.search("roman imagin").isNotEmpty())
+        // Les mots qui précèdent le dernier restent exacts.
+        assertTrue(searchService.search("rom imaginaire").isEmpty())
+    }
+
+    @Test
+    fun une_requete_terminee_par_une_ponctuation_ne_leve_pas_d_exception() = runTest {
+        listOf("imaginaire.", "test,", "roman !", "«", "*", "\"").forEach { query ->
+            searchService.search(query)
+        }
+    }
+
+    private suspend fun insertPublication(id: String) {
+        db.publicationDao().insert(
+            PublicationEntity(
+                id = id, title = "Titre", subtitle = null, authors = emptyList(),
+                publisher = null, language = null, description = null, coverUri = null,
+                format = "EPUB", fileUri = "content://x/$id", fileHash = "h-$id", fileSize = 1L,
+                chapterCount = 10, seriesName = null, seriesIndex = null, isFavorite = false,
+                subjects = emptyList(), isDrmProtected = false, importDate = 0L, lastOpened = null,
+            ),
+        )
+    }
+
     private companion object {
         const val SENTENCE_COUNT = 5000
+        const val PUBLICATION_COUNT = 20
     }
 }

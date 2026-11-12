@@ -32,9 +32,9 @@ class RoomSearchService @Inject constructor(
         if (sanitized.isBlank()) return emptyList()
 
         val rows = if (publicationId != null) {
-            sentenceFtsDao.searchInPublication(sanitized, publicationId)
+            sentenceFtsDao.searchInPublication(sanitized, publicationId, MAX_RESULTS)
         } else {
-            sentenceFtsDao.searchAll(sanitized)
+            sentenceFtsDao.searchAll(sanitized, MAX_RESULTS)
         }
         return rows.map { it.toSearchResult() }
     }
@@ -72,10 +72,21 @@ class RoomSearchService @Inject constructor(
         if (entities.isNotEmpty()) sentenceFtsDao.insertAll(entities)
     }
 
+    /**
+     * Le dernier mot est cherché comme début de mot (`*` en fin de phrase
+     * FTS4) : « recher » trouve « recherche » pendant la frappe, au lieu de
+     * ne rien afficher tant que le mot n'est pas complet. Les mots qui
+     * précèdent restent exacts.
+     */
     private fun sanitizeFtsQuery(query: String): String {
         val trimmed = query.trim()
         if (trimmed.isEmpty()) return ""
-        return "\"${trimmed.replace("\"", "\"\"")}\""
+        return "\"${trimmed.replace("\"", "\"\"")}*\""
+    }
+
+    private companion object {
+        /** Borne d'affichage : au-delà, la requête doit être précisée. */
+        const val MAX_RESULTS = 200
     }
 
     private fun SentenceFtsEntity.toSearchResult() = SearchResult(
