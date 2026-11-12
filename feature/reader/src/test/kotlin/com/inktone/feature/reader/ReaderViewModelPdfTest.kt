@@ -351,16 +351,16 @@ class ReaderViewModelPdfTest {
         )
 
         val expectedProgression = (4f + 0.5f) / 10f
-        assertEquals(expectedProgression, state.bookProgression, 0.001f)
+        assertEquals(expectedProgression, state.bookProgression!!, 0.001f)
     }
 
     @Test
-    fun bookProgression_pdf_vide_retourne_zero() {
+    fun bookProgression_pdf_vide_est_inconnue() {
         val state = ReaderUiState(
             publicationFormat = PublicationFormat.PDF,
             chapters = emptyList(),
         )
-        assertEquals(0f, state.bookProgression, 0.001f)
+        assertEquals(null, state.bookProgression)
     }
 
     // ──────────────────────────────────────────────────────────────

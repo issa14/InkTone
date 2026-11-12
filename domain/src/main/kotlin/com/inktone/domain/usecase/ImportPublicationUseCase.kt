@@ -3,6 +3,7 @@ package com.inktone.domain.usecase
 import com.inktone.domain.model.Publication
 import com.inktone.domain.model.PublicationFormat
 import com.inktone.domain.model.Chapter
+import com.inktone.domain.model.ChapterLengths
 import com.inktone.domain.repository.PublicationRepository
 import com.inktone.domain.service.ChapterParser
 import com.inktone.domain.service.FileStorageService
@@ -129,10 +130,16 @@ class ImportPublicationUseCase(
                 // concerne que l'EPUB reflowable.
                 if (publication.format == PublicationFormat.EPUB) {
                     preAnalysisStore.save(publication.id, hash, parsedChapters)
+                    // Progression : longueurs du livre ENTIER, tirées des
+                    // chapitres déjà parsés ci-dessus (aucun accès ZIP de
+                    // plus, K2), dans l'ordre de lecture des coquilles.
+                    publicationRepository.setChapterLengths(publication.id, ChapterLengths.of(parsedChapters))
                 }
                 chapterParser.invalidate(publication.id)
             } else {
                 searchService.indexPublication(publication.id, documentModel)
+                // TXT : chapitres peuplés d'emblée par son parseur.
+                publicationRepository.setChapterLengths(publication.id, ChapterLengths.of(documentModel.chapters))
             }
         } catch (e: CancellationException) {
             throw e

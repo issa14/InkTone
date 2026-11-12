@@ -74,7 +74,8 @@ data class CurrentBookState(
     val id: String,
     val title: String,
     val coverUri: String?,
-    val progressPercent: Float,
+    /** Progression 0..1 (`Publication.progressionAt`), `null` si inconnue. */
+    val progressPercent: Float?,
     val totalBookTimeMs: Long = 0,
     val remainingTimeFormatted: String?,
 )

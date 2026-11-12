@@ -1283,6 +1283,46 @@ class DatabaseMigrationTest {
         v32.close()
     }
 
+    // Longueurs de chapitres (MIGRATION_32_33) : colonne ajoutée à NULL pour
+    // un livre existant (progression inconnue jusqu'au rattrapage), toutes
+    // les autres colonnes intactes, et la colonne accepte ensuite un CSV.
+    @Test
+    fun migration_32_vers_33_ajoute_chapterLengths_a_null_et_conserve_la_publication() {
+        val v32 = helper.createDatabase(TEST_DB_NAME, 32)
+        v32.execSQL(
+            """
+            INSERT INTO publications (id, title, authors, format, fileUri, fileHash, fileSize, chapterCount, subjects, isFavorite, isPinned, isDrmProtected, importDate, lastOpened)
+            VALUES ('pub-1', 'Titre', '', 'EPUB', 'content://pub-1', 'hash1', 1000, 3, '', 1, 0, 0, 500, 900)
+            """.trimIndent(),
+        )
+        v32.close()
+
+        val v33 = helper.runMigrationsAndValidate(
+            TEST_DB_NAME, 33, true,
+            MIGRATION_1_2, MIGRATION_2_3, MIGRATION_3_4, MIGRATION_4_5, MIGRATION_5_6, MIGRATION_6_7,
+            MIGRATION_7_8, MIGRATION_8_9, MIGRATION_9_10, MIGRATION_10_11, MIGRATION_11_12, MIGRATION_12_13,
+            MIGRATION_13_14, MIGRATION_14_15, MIGRATION_15_16, MIGRATION_16_17, MIGRATION_17_18, MIGRATION_18_19,
+            MIGRATION_19_20, MIGRATION_20_21, MIGRATION_21_22, MIGRATION_22_23, MIGRATION_23_24, MIGRATION_24_25,
+            MIGRATION_25_26, MIGRATION_26_27, MIGRATION_27_28, MIGRATION_28_29, MIGRATION_29_30, MIGRATION_30_31,
+            MIGRATION_31_32, MIGRATION_32_33,
+        )
+
+        v33.query("SELECT chapterLengths, title, chapterCount, isFavorite, lastOpened FROM publications WHERE id = 'pub-1'").use { cursor ->
+            assertEquals(true, cursor.moveToFirst())
+            assertEquals(true, cursor.isNull(0))
+            assertEquals("Titre", cursor.getString(1))
+            assertEquals(3, cursor.getInt(2))
+            assertEquals(1, cursor.getInt(3))
+            assertEquals(900L, cursor.getLong(4))
+        }
+        v33.execSQL("UPDATE publications SET chapterLengths = '0,1520,8840' WHERE id = 'pub-1'")
+        v33.query("SELECT chapterLengths FROM publications WHERE id = 'pub-1'").use { cursor ->
+            assertEquals(true, cursor.moveToFirst())
+            assertEquals("0,1520,8840", cursor.getString(0))
+        }
+        v33.close()
+    }
+
     companion object {
         private const val TEST_DB_NAME = "migration-test"
     }

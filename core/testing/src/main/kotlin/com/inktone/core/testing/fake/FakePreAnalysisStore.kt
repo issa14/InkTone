@@ -1,6 +1,7 @@
 package com.inktone.core.testing.fake
 
 import com.inktone.domain.model.Chapter
+import com.inktone.domain.model.ChapterLengths
 import com.inktone.domain.service.PreAnalysisStore
 
 /**
@@ -24,6 +25,9 @@ class FakePreAnalysisStore : PreAnalysisStore {
 
     override suspend fun isFresh(publicationId: String, fileHash: String): Boolean =
         storage.containsKey(publicationId) && hashes[publicationId] == fileHash
+
+    override suspend fun chapterLengths(publicationId: String, fileHash: String): ChapterLengths? =
+        storage[publicationId]?.takeIf { hashes[publicationId] == fileHash }?.let(ChapterLengths::of)
 
     override suspend fun delete(publicationId: String) {
         storage.remove(publicationId)

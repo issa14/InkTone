@@ -519,3 +519,18 @@ val MIGRATION_31_32 = object : Migration(31, 32) {
         )
     }
 }
+
+/**
+ * Progression de lecture : longueur de chaque chapitre, calculée sur le
+ * livre entier (`ChapterLengths`). Colonne nullable SANS valeur reconstruite
+ * ici : la longueur dépend de l'analyse du texte des chapitres, que seule la
+ * couche parseur sait produire — les livres déjà importés restent à NULL
+ * (progression « inconnue », jamais un chiffre faux) jusqu'à leur rattrapage
+ * en tâche de fond par `BackfillChapterLengthsUseCase`. Aucune autre colonne
+ * ni table ne change.
+ */
+val MIGRATION_32_33 = object : Migration(32, 33) {
+    override fun migrate(db: SupportSQLiteDatabase) {
+        db.execSQL("ALTER TABLE publications ADD COLUMN chapterLengths TEXT DEFAULT NULL")
+    }
+}

@@ -6,6 +6,7 @@ import androidx.work.CoroutineWorker
 import androidx.work.WorkManager
 import androidx.work.WorkerParameters
 import androidx.work.workDataOf
+import com.inktone.domain.usecase.BackfillChapterLengthsUseCase
 import com.inktone.domain.usecase.RefreshStalePreAnalysesUseCase
 import dagger.assisted.Assisted
 import dagger.assisted.AssistedInject
@@ -28,6 +29,7 @@ class PreAnalysisRefreshWorker @AssistedInject constructor(
     @Assisted context: Context,
     @Assisted params: WorkerParameters,
     private val refreshStalePreAnalyses: RefreshStalePreAnalysesUseCase,
+    private val backfillChapterLengths: BackfillChapterLengthsUseCase,
     private val workManager: WorkManager,
 ) : CoroutineWorker(context, params) {
 
@@ -39,11 +41,16 @@ class PreAnalysisRefreshWorker @AssistedInject constructor(
         if (importInProgress) return Result.retry()
 
         val outcome = refreshStalePreAnalyses()
+        // APRÈS la régénération : les longueurs de chapitres d'un EPUB se
+        // lisent dans sa pré-analyse, qui vient peut-être d'être réécrite.
+        val lengths = backfillChapterLengths()
         return Result.success(
             workDataOf(
                 KEY_REFRESHED to outcome.refreshed,
                 KEY_ALREADY_FRESH to outcome.alreadyFresh,
                 KEY_FAILED to outcome.failed,
+                KEY_LENGTHS_FILLED to lengths.filled,
+                KEY_LENGTHS_FAILED to lengths.failed,
             ),
         )
     }
@@ -53,5 +60,7 @@ class PreAnalysisRefreshWorker @AssistedInject constructor(
         const val KEY_REFRESHED = "refreshed"
         const val KEY_ALREADY_FRESH = "already_fresh"
         const val KEY_FAILED = "failed"
+        const val KEY_LENGTHS_FILLED = "lengths_filled"
+        const val KEY_LENGTHS_FAILED = "lengths_failed"
     }
 }

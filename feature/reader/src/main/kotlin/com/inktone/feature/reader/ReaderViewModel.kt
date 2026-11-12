@@ -689,10 +689,12 @@ class ReaderViewModel @Inject constructor(
                         title = publication.title.cleanedForDisplay(),
                         author = publication.authors.cleanedAuthorsForDisplay().ifBlank { null },
                         chapters = result.documentModel.chapters,
-                        // §3.4 — précalcule les cumuls de caractères une fois
-                        // à l'ouverture (invalide ensuite au chargement de
-                        // chapitre) pour que bookProgression reste O(1).
-                        chapterCharPrefix = computeChapterCharPrefix(result.documentModel.chapters),
+                        // Longueurs du livre ENTIER, calculées à l'import —
+                        // jamais déduites des seuls chapitres chargés. Écartées
+                        // si la structure lue diverge de celle enregistrée :
+                        // mieux vaut aucun pourcentage qu'un pourcentage décalé.
+                        chapterLengths = publication.chapterLengths
+                            ?.takeIf { it.values.size == result.documentModel.chapters.size },
                         tableOfContents = result.documentModel.tableOfContents,
                         currentChapterIndex = restored?.locator?.chapterIndex ?: 0,
                         effectiveSettings = effectiveSettings,
@@ -1191,12 +1193,7 @@ class ReaderViewModel @Inject constructor(
             // ne matchent jamais, la couleur ne s'affiche donc jamais.
             // Seule source de vérité désormais : la position dans `chapters`.
             chapters[chapterIndex] = richChapter.copy(index = chapterIndex)
-            _state.value = _state.value.copy(
-                chapters = chapters,
-                // §3.4 — le contenu de ce chapitre vient d'être chargé : le
-                // cumul de caractères change, on invalide le tableau préfixe.
-                chapterCharPrefix = computeChapterCharPrefix(chapters),
-            )
+            _state.value = _state.value.copy(chapters = chapters)
         }
     }
 
@@ -1242,8 +1239,8 @@ class ReaderViewModel @Inject constructor(
      * reproduit depuis SON cache (coût d'un hit LRU, pas un re-parsing).
      *
      * `chapter.sentences` n'est volontairement PAS touché : léger comparé
-     * aux blocs riches, et la progression (§3.4, `chapterCharPrefix`) en
-     * dépend pour tout chapitre déjà visité, même hors fenêtre.
+     * aux blocs riches, et toujours lu (TTS, surlignage) pour tout chapitre
+     * déjà visité, même hors fenêtre.
      */
     private fun evictChapterContentOutsideWindow(centerIndex: Int) {
         val window = (centerIndex - 1)..(centerIndex + 2)

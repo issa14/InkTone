@@ -1,5 +1,6 @@
 package com.inktone.core.testing.fake
 
+import com.inktone.domain.model.ChapterLengths
 import com.inktone.domain.model.FilterMode
 import com.inktone.domain.model.Publication
 import com.inktone.domain.repository.PublicationRepository
@@ -73,6 +74,10 @@ class FakePublicationRepository : PublicationRepository {
 
     override suspend fun setCoverUri(id: String, coverUri: String?) {
         state.value = state.value.map { if (it.id == id) it.copy(coverUri = coverUri) else it }
+    }
+
+    override suspend fun setChapterLengths(id: String, chapterLengths: ChapterLengths) {
+        state.value = state.value.map { if (it.id == id) it.copy(chapterLengths = chapterLengths) else it }
     }
 
     override suspend fun resetAllCoversToDefault() {

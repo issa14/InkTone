@@ -51,12 +51,14 @@ class RecentsViewModel @Inject constructor(
             publicationRepository.observeFiltered(FilterMode.ALL).collect { publications ->
                 // Audit v1.0.0 (AUDIT_CONSOLIDATION_V1.md, P5) — même fix
                 // que LibraryViewModel : boucle O(n) hors Main.
+                val readingStates = readingStateRepository.getAll()
                 val progressMap = withContext(defaultDispatcher) {
-                    computeProgressMap(publications, readingStateRepository.getAll())
+                    computeProgressMap(publications, readingStates)
                 }
                 _state.value = _state.value.copy(
                     publications = publications,
                     progressMap = progressMap,
+                    startedPublicationIds = startedPublicationIds(readingStates),
                     isLoading = false,
                 )
             }

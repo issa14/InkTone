@@ -42,7 +42,7 @@ import com.inktone.infrastructure.database.entity.VoiceProfileEntity
         CatalogEntity::class,
     ],
     views = [LibraryItemView::class],
-    version = 32, // Voix Edge Vivienne renommée vers son nom officiel (MIGRATION_31_32)
+    version = 33, // Longueurs de chapitres pour la progression (MIGRATION_32_33)
     exportSchema = true, // condition du harnais de migration — Tâche 2.4
 )
 @TypeConverters(StringListConverter::class)

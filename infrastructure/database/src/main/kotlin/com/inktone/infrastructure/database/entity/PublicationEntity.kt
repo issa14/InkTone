@@ -26,6 +26,9 @@ data class PublicationEntity(
     val fileSize: Long,
     val chapterCount: Int,
     val pageCount: Int? = null,
+    // Longueur de chaque chapitre, CSV d'entiers dans l'ordre de lecture
+    // (MIGRATION_32_33). NULL = pas encore calculée, ou PDF.
+    val chapterLengths: String? = null,
     val seriesName: String?,
     val seriesIndex: Float?,
     val isFavorite: Boolean,

@@ -16,6 +16,12 @@ enum class PublicationFormat { EPUB, TXT, PDF }
  * recherche générique — les deux coïncident numériquement pour un PDF
  * (page = chapitre, `PdfPublicationParser`) mais portent des intentions
  * différentes, jamais fusionnés en un champ générique ambigu.
+ *
+ * `chapterLengths` — longueur de chaque chapitre (EPUB/TXT), base de la
+ * progression ([progressionAt]). `null` tant qu'elle n'est pas calculée
+ * (livre importé avant son existence, en attente de
+ * `BackfillChapterLengthsUseCase`) ou pour un PDF, dont la progression se
+ * compte en pages.
  */
 data class Publication(
     val id: String,
@@ -32,6 +38,7 @@ data class Publication(
     val fileSize: Long,
     val chapterCount: Int,
     val pageCount: Int? = null,
+    val chapterLengths: ChapterLengths? = null,
     val seriesName: String? = null,
     val seriesIndex: Float? = null,
     val isFavorite: Boolean = false,
@@ -45,6 +52,9 @@ data class Publication(
         require(title.isNotBlank()) { "title ne peut pas être vide" }
         require(chapterCount >= 0) { "chapterCount doit être positif ou nul" }
         require(pageCount == null || pageCount > 0) { "pageCount doit être strictement positif si renseigné" }
+        require(chapterLengths == null || chapterLengths.values.size == chapterCount) {
+            "chapterLengths doit compter exactement chapterCount chapitres"
+        }
         require(fileSize >= 0) { "fileSize doit être positif ou nul" }
         require(fileHash.isNotBlank()) { "fileHash ne peut pas être vide (détection de doublons K-issue)" }
     }

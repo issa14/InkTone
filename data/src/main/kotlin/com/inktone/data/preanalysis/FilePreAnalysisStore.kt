@@ -1,6 +1,7 @@
 package com.inktone.data.preanalysis
 
 import com.inktone.domain.model.Chapter
+import com.inktone.domain.model.ChapterLengths
 import com.inktone.domain.service.PreAnalysisStore
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
@@ -83,6 +84,20 @@ class FilePreAnalysisStore @Inject constructor(
     override suspend fun isFresh(publicationId: String, fileHash: String): Boolean = withContext(Dispatchers.IO) {
         runCatching { readHeader(publicationId)?.isValidFor(fileHash) == true }.getOrDefault(false)
     }
+
+    override suspend fun chapterLengths(publicationId: String, fileHash: String): ChapterLengths? =
+        withContext(Dispatchers.IO) {
+            runCatching {
+                val header = readHeader(publicationId)?.takeIf { it.isValidFor(fileHash) } ?: return@runCatching null
+                val dir = dirFor(publicationId)
+                val lengths = header.chapterHrefs.indices.map { index ->
+                    val chapter = json.decodeFromString(ChapterDto.serializer(), File(dir, chapterFileName(index)).readText()).toDomain()
+                    // Un chapitre décodé puis aussitôt relâché : jamais le livre entier en mémoire.
+                    ChapterLengths.of(listOf(chapter)).values.single()
+                }
+                ChapterLengths(lengths)
+            }.getOrNull()
+        }
 
     override suspend fun delete(publicationId: String) {
         withContext(Dispatchers.IO) {

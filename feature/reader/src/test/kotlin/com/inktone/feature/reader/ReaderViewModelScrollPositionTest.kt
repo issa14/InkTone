@@ -12,6 +12,7 @@ import com.inktone.core.testing.fake.FakeReadingStateRepository
 import com.inktone.core.testing.fake.FakeTtsEngine
 import com.inktone.core.testing.fake.FakeVoiceProfileRepository
 import com.inktone.domain.model.Chapter
+import com.inktone.domain.model.ChapterLengths
 import com.inktone.domain.model.ChapterContent
 import com.inktone.domain.model.DocumentModel
 import com.inktone.domain.model.BookBlock
@@ -153,6 +154,8 @@ class ReaderViewModelScrollPositionTest {
                 id = "pub-1", title = "Test", format = PublicationFormat.EPUB,
                 fileUri = "content://x", fileHash = "hash", fileSize = 10, chapterCount = 1,
                 importDate = 0L,
+                // Longueurs posées à l'import : base de la progression.
+                chapterLengths = ChapterLengths.of(listOf(threeSentenceChapter())),
             ),
         )
         val viewModel = buildViewModel(readingStateRepository, publicationRepository)
@@ -160,7 +163,7 @@ class ReaderViewModelScrollPositionTest {
         dispatcher.scheduler.runCurrent()
 
         assertEquals(0, viewModel.state.value.currentSentenceIndex)
-        val progressionBefore = viewModel.state.value.bookProgression
+        val progressionBefore = viewModel.state.value.bookProgression!!
 
         viewModel.onIntent(ReaderIntent.UpdateScrollPosition(2))
 
@@ -168,7 +171,7 @@ class ReaderViewModelScrollPositionTest {
         // (test 1 du lot : le pourcentage derive de la meme valeur que le
         // compteur de page, jamais un second calcul en retard).
         assertEquals(2, viewModel.state.value.currentSentenceIndex)
-        assertEquals(true, viewModel.state.value.bookProgression > progressionBefore)
+        assertEquals(true, viewModel.state.value.bookProgression!! > progressionBefore)
 
         // Casse le timer de checkpoint (auto-récurrent) comme le ferait
         // onCleared() sur un vrai ViewModel détruit — sinon le drain

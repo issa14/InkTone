@@ -1,5 +1,6 @@
 package com.inktone.domain.usecase
 
+import com.inktone.domain.model.ChapterLengths
 import com.inktone.domain.model.PublicationFormat
 import com.inktone.domain.repository.PublicationRepository
 import com.inktone.domain.service.ParseResult
@@ -50,6 +51,12 @@ class RefreshStalePreAnalysesUseCase(
                 }
                 val chapters = preAnalysisBuilder.analyzeAll(publication.fileUri, shells.map { it.href })
                 preAnalysisStore.save(publication.id, publication.fileHash, chapters)
+                // Un parseur qui évolue peut déplacer les offsets des phrases :
+                // les longueurs de chapitres (progression) suivent la même
+                // analyse que celle que le Lecteur relira.
+                if (chapters.size == publication.chapterCount) {
+                    publicationRepository.setChapterLengths(publication.id, ChapterLengths.of(chapters))
+                }
                 preAnalysisBuilder.onPreAnalysisRewritten(publication.id)
                 refreshed++
             } catch (e: CancellationException) {

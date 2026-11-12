@@ -5,6 +5,7 @@ import com.inktone.core.testing.fake.FakePreAnalysisStore
 import com.inktone.core.testing.fake.FakeRenderedPageCache
 import com.inktone.core.testing.fake.FakeReadingStateRepository
 import com.inktone.core.testing.fake.FakeTtsSegmentCache
+import com.inktone.domain.model.ChapterLengths
 import com.inktone.domain.model.Publication
 import com.inktone.domain.model.PublicationFormat
 import com.inktone.domain.model.ReadingState
@@ -37,15 +38,20 @@ class RecentsViewModelTest {
     @After
     fun tearDown() { Dispatchers.resetMain() }
 
-    private fun publication(id: String, chapterCount: Int = 10, lastOpened: Long? = null) = Publication(
+    private fun publication(
+        id: String,
+        chapterCount: Int = 10,
+        lastOpened: Long? = null,
+        chapterLengths: ChapterLengths? = ChapterLengths(List(chapterCount) { 100 }),
+    ) = Publication(
         id = id, title = "Titre $id", format = PublicationFormat.EPUB,
         fileUri = "content://fake/$id", fileHash = "hash-$id", fileSize = 100L,
-        chapterCount = chapterCount, importDate = 0L, lastOpened = lastOpened,
+        chapterCount = chapterCount, chapterLengths = chapterLengths, importDate = 0L, lastOpened = lastOpened,
     )
 
-    private fun readingState(publicationId: String, chapterIndex: Int) = ReadingState(
+    private fun readingState(publicationId: String, chapterIndex: Int, charOffset: Int = 0) = ReadingState(
         publicationId = publicationId,
-        locator = Locator(resourceHref = "chap$chapterIndex.xhtml", chapterIndex = chapterIndex, charOffset = 0),
+        locator = Locator(resourceHref = "chap$chapterIndex.xhtml", chapterIndex = chapterIndex, charOffset = charOffset),
         lastReadAt = 0L,
     )
 
@@ -108,13 +114,45 @@ class RecentsViewModelTest {
         assertTrue(displayed.all { it.lastOpened!! >= 5L })
     }
 
+    /**
+     * Bug réel corrigé : l'ancien seuil « ≥ 1 % » (calculé au numéro de
+     * chapitre) excluait tout livre encore dans son premier chapitre.
+     */
+    @Test
+    fun un_livre_entame_dans_son_premier_chapitre_apparait_avec_au_moins_1_pourcent() = runTest {
+        val publicationRepository = FakePublicationRepository()
+        val readingStateRepository = FakeReadingStateRepository()
+        publicationRepository.insert(publication("debut", lastOpened = 1_000L))
+        readingStateRepository.save(readingState("debut", chapterIndex = 0, charOffset = 0))
+
+        val vm = viewModel(publicationRepository, readingStateRepository)
+        dispatcher.scheduler.advanceUntilIdle()
+
+        assertEquals(listOf("debut"), vm.state.value.displayedPublications.map { it.id })
+        assertEquals(1, vm.state.value.progressMap["debut"])
+    }
+
+    @Test
+    fun un_livre_entame_a_progression_inconnue_apparait_sans_badge() = runTest {
+        val publicationRepository = FakePublicationRepository()
+        val readingStateRepository = FakeReadingStateRepository()
+        publicationRepository.insert(publication("ancien-import", lastOpened = 1_000L, chapterLengths = null))
+        readingStateRepository.save(readingState("ancien-import", chapterIndex = 4))
+
+        val vm = viewModel(publicationRepository, readingStateRepository)
+        dispatcher.scheduler.advanceUntilIdle()
+
+        assertEquals(listOf("ancien-import"), vm.state.value.displayedPublications.map { it.id })
+        assertEquals("aucun chiffre plutôt qu'un chiffre faux", null, vm.state.value.progressMap["ancien-import"])
+    }
+
     @Test
     fun un_livre_termine_a_100_pourcent_reste_affiche() = runTest {
         val publicationRepository = FakePublicationRepository()
         val readingStateRepository = FakeReadingStateRepository()
         publicationRepository.insert(publication("termine", chapterCount = 10, lastOpened = 1_000L))
-        // chapterIndex au dernier chapitre (divisor = chapterCount - 1 = 9) => 100%.
-        readingStateRepository.save(readingState("termine", chapterIndex = 9))
+        // Fin du dernier chapitre (10 chapitres de 100 caractères) => 100%.
+        readingStateRepository.save(readingState("termine", chapterIndex = 9, charOffset = 100))
 
         val vm = viewModel(publicationRepository, readingStateRepository)
         dispatcher.scheduler.advanceUntilIdle()

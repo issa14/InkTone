@@ -1,5 +1,6 @@
 package com.inktone.domain.repository
 
+import com.inktone.domain.model.ChapterLengths
 import com.inktone.domain.model.FilterMode
 import com.inktone.domain.model.Publication
 import kotlinx.coroutines.flow.Flow
@@ -28,6 +29,13 @@ interface PublicationRepository {
      * nulle = chemin local de l'image extraite.
      */
     suspend fun setCoverUri(id: String, coverUri: String?)
+
+    /**
+     * Pose les longueurs de chapitres d'une publication (base de sa
+     * progression, voir [com.inktone.domain.model.ChapterLengths]) —
+     * écrites après l'insertion, une fois le livre entier analysé.
+     */
+    suspend fun setChapterLengths(id: String, chapterLengths: ChapterLengths)
 
     /** Remet TOUTES les couvertures à la valeur par défaut (`null`). */
     suspend fun resetAllCoversToDefault()

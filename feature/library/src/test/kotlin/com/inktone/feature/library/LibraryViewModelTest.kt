@@ -12,6 +12,7 @@ import com.inktone.core.testing.fake.FakeReadingStateRepository
 import com.inktone.core.testing.fake.FakeTtsSegmentCache
 import com.inktone.core.testing.fake.FakeSyncAccountRepository
 import com.inktone.core.testing.fake.FakeSyncNowService
+import com.inktone.domain.model.ChapterLengths
 import com.inktone.domain.model.Publication
 import com.inktone.domain.model.FilterMode
 import com.inktone.domain.model.ReadingState
@@ -106,14 +107,16 @@ class LibraryViewModelTest {
     @Test
     fun `la progression se met a jour sans repasser par le shimmer`() = runTest {
         val repository = FakePublicationRepository()
-        repository.insert(publication("pub-1").copy(chapterCount = 11))
+        repository.insert(
+            publication("pub-1").copy(chapterCount = 11, chapterLengths = ChapterLengths(List(11) { 100 })),
+        )
         val readingStates = FakeReadingStateRepository()
         val viewModel = viewModel(
             publicationRepository = repository,
             readingStateRepository = readingStates,
         )
         dispatcher.scheduler.advanceUntilIdle()
-        assertEquals(0, viewModel.state.value.progressMap["pub-1"])
+        assertEquals("jamais ouvert : aucun badge", null, viewModel.state.value.progressMap["pub-1"])
 
         // Une position enregistrée pendant une narration en arrière-plan, sans
         // que l'utilisateur ne touche à cet écran.
@@ -128,7 +131,8 @@ class LibraryViewModelTest {
 
         assertEquals(
             "la progression dérive d'un flux Room, elle n'attend pas un retour sur l'écran",
-            50,
+            // Début du chapitre 5 sur 11 chapitres de 100 caractères : 500/1100.
+            45,
             viewModel.state.value.progressMap["pub-1"],
         )
         assertEquals(

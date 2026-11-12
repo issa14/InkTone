@@ -52,6 +52,7 @@ import com.inktone.domain.usecase.GetVoiceProfilesUseCase
 import com.inktone.domain.usecase.ImportPublicationUseCase
 import com.inktone.domain.usecase.ObserveSyncUiStateUseCase
 import com.inktone.domain.usecase.RefreshStalePreAnalysesUseCase
+import com.inktone.domain.usecase.BackfillChapterLengthsUseCase
 import com.inktone.domain.usecase.RegenerateCoversUseCase
 import com.inktone.domain.usecase.ResolvePositionConflictUseCase
 import com.inktone.domain.usecase.SynchronizeNowUseCase
@@ -148,6 +149,14 @@ object UseCaseModule {
         preAnalysisStore: PreAnalysisStore,
     ): RefreshStalePreAnalysesUseCase =
         RefreshStalePreAnalysesUseCase(publicationRepository, publicationParser, preAnalysisBuilder, preAnalysisStore)
+
+    @Provides
+    fun provideBackfillChapterLengthsUseCase(
+        publicationRepository: PublicationRepository,
+        publicationParser: PublicationParser,
+        preAnalysisStore: PreAnalysisStore,
+    ): BackfillChapterLengthsUseCase =
+        BackfillChapterLengthsUseCase(publicationRepository, publicationParser, preAnalysisStore)
 
     @Provides
     fun provideExportLibraryUseCase(

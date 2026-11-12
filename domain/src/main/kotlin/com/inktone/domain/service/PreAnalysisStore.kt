@@ -1,6 +1,7 @@
 package com.inktone.domain.service
 
 import com.inktone.domain.model.Chapter
+import com.inktone.domain.model.ChapterLengths
 
 /**
  * Stockage persistant de la pré-analyse des chapitres d'une publication
@@ -69,6 +70,16 @@ interface PreAnalysisStore {
      * régénération.
      */
     suspend fun isFresh(publicationId: String, fileHash: String): Boolean
+
+    /**
+     * Longueurs des chapitres de la pré-analyse VALIDE de [publicationId]
+     * (mêmes critères que [loadChapter]), dans l'ordre où ils ont été
+     * enregistrés — même résultat que `ChapterLengths.of` appliqué à la liste
+     * passée à [save], mais lue un chapitre à la fois : jamais le livre
+     * entier en mémoire. `null` si la pré-analyse est absente, périmée ou
+     * incomplète.
+     */
+    suspend fun chapterLengths(publicationId: String, fileHash: String): ChapterLengths?
 
     /** Supprime la pré-analyse d'une publication (purge à sa suppression). */
     suspend fun delete(publicationId: String)

@@ -78,6 +78,10 @@ interface PublicationDao {
     @Query("UPDATE publications SET lastOpened = :lastOpened WHERE id = :id")
     suspend fun setLastOpened(id: String, lastOpened: Long)
 
+    /** Longueurs de chapitres, CSV d'entiers (voir `PublicationEntity.chapterLengths`). */
+    @Query("UPDATE publications SET chapterLengths = :chapterLengths WHERE id = :id")
+    suspend fun setChapterLengths(id: String, chapterLengths: String)
+
     // ───── Lot 19 : couvertures ─────
 
     @Query("UPDATE publications SET coverUri = :coverUri WHERE id = :id")

@@ -1367,7 +1367,7 @@ fun ReaderScreen(
                             // valeur affichée bien plus rarement — la ligne de
                             // statut ne se recompose plus que lorsqu'un chiffre
                             // visible change.
-                            bookProgression = (live.bookProgression * 1000).roundToInt() / 1000f,
+                            bookProgression = live.bookProgression?.let { (it * 1000).roundToInt() / 1000f },
                         )
                     }) { values ->
                         StatusLineBar(
@@ -1824,5 +1824,5 @@ private data class StatusLineValues(
     val pageInChapter: Int,
     val pageCountInChapter: Int,
     val showPageCounter: Boolean,
-    val bookProgression: Float,
+    val bookProgression: Float?,
 )

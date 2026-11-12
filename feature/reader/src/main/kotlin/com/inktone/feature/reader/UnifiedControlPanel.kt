@@ -49,7 +49,7 @@ import com.inktone.core.designsystem.InkToneShapes
 fun UnifiedControlPanel(
     isPlaying: Boolean,
     sleepTimerActive: Boolean,
-    bookProgression: Float,
+    bookProgression: Float?,
     onPlayPause: () -> Unit,
     onSleepTimerClick: () -> Unit,
     onSearchClick: () -> Unit,
@@ -98,9 +98,12 @@ fun UnifiedControlPanel(
             modifier = Modifier.fillMaxWidth().padding(horizontal = 20.dp, vertical = 12.dp),
             horizontalAlignment = Alignment.CenterHorizontally,
         ) {
-            BookProgressBar(progression = bookProgression)
-
-            Spacer(Modifier.height(12.dp))
+            // Progression inconnue (longueurs pas encore calculées) : pas de
+            // barre plutôt qu'une barre fausse.
+            if (bookProgression != null) {
+                BookProgressBar(progression = bookProgression)
+                Spacer(Modifier.height(12.dp))
+            }
 
             // Bug réel trouvé sur appareil (lot 3b) : Arrangement.SpaceEvenly
             // répartit l'espace ENTRE les bords des enfants, pas par largeur

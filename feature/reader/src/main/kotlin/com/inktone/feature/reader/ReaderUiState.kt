@@ -5,6 +5,7 @@ import com.inktone.domain.model.AnnotationColor
 import com.inktone.domain.model.AnnotationKind
 import com.inktone.domain.model.Bookmark
 import com.inktone.domain.model.Chapter
+import com.inktone.domain.model.ChapterLengths
 import com.inktone.domain.model.EffectiveReadingSettings
 import com.inktone.domain.model.FontFamily
 import com.inktone.domain.model.PublicationFormat
@@ -13,6 +14,7 @@ import com.inktone.domain.model.ReadingTheme
 import com.inktone.domain.model.SleepTimerState
 import com.inktone.domain.model.TableOfContentsEntry
 import com.inktone.domain.model.UserPreferences
+import com.inktone.domain.model.fixedPageProgression
 import com.inktone.domain.model.VoiceProfile
 import com.inktone.domain.service.EpubResourceResolver
 import com.inktone.domain.valueobject.Locator
@@ -29,11 +31,12 @@ data class ReaderUiState(
     val author: String? = null,
     val chapters: List<Chapter> = emptyList(),
     val currentChapterIndex: Int = 0,
-    // §3.4 — cumuls de caractères par chapitre (préfixe) + total, calculés
-    // une fois par publication puis invalidés au chargement d'un chapitre :
-    // `bookProgression` devient O(1) au lieu de re-parcourir tous les chapitres.
-    // prefix[i] = caractères des chapitres [0..i-1], prefix.last() = total.
-    val chapterCharPrefix: List<Int> = emptyList(),
+    // Longueurs de TOUS les chapitres du livre (`Publication.chapterLengths`,
+    // calculées à l'import), base de `bookProgression`. `null` = inconnues
+    // (livre en attente de rattrapage) : aucune progression affichée.
+    // Remplace l'ancien cumul des seuls chapitres CHARGÉS en mémoire, qui
+    // affichait la progression dans le chapitre comme celle du livre.
+    val chapterLengths: ChapterLengths? = null,
     val tableOfContents: List<TableOfContentsEntry> = emptyList(),
     val currentSentenceIndex: Int = 0,
     val isPlaying: Boolean = false,
@@ -210,40 +213,32 @@ data class ReaderUiState(
         get() = publicationFormat != PublicationFormat.PDF || chapters.any { it.sentences.isNotEmpty() }
 
     /**
-     * Tache 9bis.3.2 — progression du LIVRE ENTIER (`Locator.computeProgression`,
-     * ecrite en Tache 1.1, jamais branchee avant cette tache), pas la
-     * progression par chapitre du legacy. §3.4 : le cumul et le total de
-     * caracteres sont desormais precalculés (tableau préfixe
-     * `chapterCharPrefix`, invalidé au chargement d'un chapitre) — plus de
-     * parcours de tous les chapitres à chaque accès, coût devenu O(1).
+     * Tache 9bis.3.2 — progression du LIVRE ENTIER, pas du chapitre.
+     * Calculée sur [chapterLengths] (tous les chapitres, connus dès
+     * l'import) : l'ancien dénominateur ne comptait que les chapitres
+     * CHARGÉS, si bien qu'un livre rouvert au milieu du chapitre 10
+     * affichait ≈ 50 %. `null` = inconnue — l'interface n'affiche alors
+     * aucun pourcentage, jamais une estimation.
      */
-    val bookProgression: Float
+    val bookProgression: Float?
         get() {
-            // Lot 12, tache 12.9 — branche dediee au format PDF : page =
-            // chapitre (Palier 1), pageOffsetY remplace le role de
-            // currentSentenceIndex. N'affecte pas Locator.computeProgression,
-            // qui reste le chemin EPUB/TXT inchange ci-dessous (decision
-            // actee du plan).
+            // Lot 12, tache 12.9 — PDF : page = chapitre, pageOffsetY
+            // remplace le role de currentSentenceIndex.
             if (publicationFormat == PublicationFormat.PDF) {
-                if (chapters.isEmpty()) return 0f
-                return ((currentChapterIndex + pageOffsetY) / chapters.size).coerceIn(0f, 1f)
+                return fixedPageProgression(currentChapterIndex, pageOffsetY, chapters.size)
             }
-            val chapter = currentChapter ?: return 0f
+            val chapter = currentChapter ?: return null
             val sentence = chapter.sentences.getOrNull(currentSentenceIndex)
+            // Indexé par POSITION (currentChapterIndex), comme les longueurs
+            // — jamais par `chapter.index`, qui peut en diverger.
             val locator = Locator(
                 resourceHref = chapter.href,
-                chapterIndex = chapter.index,
+                chapterIndex = currentChapterIndex,
                 charOffset = sentence?.startOffset ?: 0,
             )
-            // §3.4 — O(1) : cumul et total viennent du tableau préfixe
-            // précalculé (`computeChapterCharPrefix`, invalidé au chargement
-            // d'un chapitre), plus re-parcourus à chaque accès. Défaut de
-            // justesse adjacent (le dénominateur grandit au fil du chargement
-            // paresseux) : hors périmètre perf, à corriger séparément par une
-            // longueur connue à l'import.
-            val totalCharsBeforeChapter = chapterCharPrefix.getOrNull(currentChapterIndex) ?: 0
-            val totalCharsInPublication = chapterCharPrefix.lastOrNull() ?: 0
-            return Locator.computeProgression(locator, totalCharsBeforeChapter, totalCharsInPublication)
+            // Même calcul que la Bibliothèque (`Publication.progressionAt`) :
+            // O(1), cumul précalculé dans ChapterLengths.
+            return chapterLengths?.progressionAt(locator)
         }
 
     /** Plage de caractères (bornes inclusives, offsets absolus au chapitre) de la sélection libre en cours, ou `null`. */
@@ -297,18 +292,6 @@ const val EYE_REST_REMINDER_COUNTDOWN_S = 60
  */
 data class PendingHighlightTarget(val chapterIndex: Int, val sentenceIndex: Int)
 
-/**
- * §3.4 — cumuls de caractères par chapitre, sous forme de tableau préfixe :
- * `result[i]` = somme des longueurs de phrase des chapitres [0..i-1], et
- * `result.last()` = total de la publication (chapitres déjà parsés).
- */
-internal fun computeChapterCharPrefix(chapters: List<Chapter>): List<Int> {
-    val prefix = IntArray(chapters.size + 1)
-    for (i in chapters.indices) {
-        prefix[i + 1] = prefix[i] + chapters[i].sentences.sumOf { it.text.length }
-    }
-    return prefix.toList()
-}
 
 sealed interface ReaderIntent {
     /**

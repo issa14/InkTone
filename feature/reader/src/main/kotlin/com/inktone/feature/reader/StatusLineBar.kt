@@ -51,7 +51,7 @@ fun StatusLineBar(
     chapterNumber: Int,
     pageInChapter: Int,
     pageCountInChapter: Int,
-    bookProgression: Float,
+    bookProgression: Float?,
     modifier: Modifier = Modifier,
     showPageCounter: Boolean = true,
     contentColor: Color = MaterialTheme.colorScheme.onSurface,
@@ -79,7 +79,8 @@ fun StatusLineBar(
             style = MaterialTheme.typography.labelSmall,
             color = contentColor,
         )
-        Text(formatProgressionFr(bookProgression), style = MaterialTheme.typography.labelSmall, color = contentColor)
+        // Progression inconnue : emplacement vide, jamais un chiffre estimé.
+        Text(bookProgression?.let(::formatProgressionFr).orEmpty(), style = MaterialTheme.typography.labelSmall, color = contentColor)
     }
 }
 

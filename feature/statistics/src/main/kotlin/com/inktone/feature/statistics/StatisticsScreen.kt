@@ -653,16 +653,20 @@ private fun Section3CurrentBook(book: com.inktone.domain.usecase.CurrentBookStat
                 Column(Modifier.weight(1f)) {
                     Text(book.title.cleanedForDisplay(), style = MaterialTheme.typography.titleSmall, maxLines = 1)
                     Spacer(Modifier.height(6.dp))
-                    LinearProgressIndicator(
-                        progress = { book.progressPercent },
-                        modifier = Modifier.fillMaxWidth().height(6.dp).clip(RoundedCornerShape(3.dp)),
-                    )
-                    Spacer(Modifier.height(6.dp))
-                    val progressPct = (book.progressPercent * 100).toInt()
+                    // Progression inconnue (longueurs de chapitres pas encore
+                    // calculées) : ni barre ni pourcentage, jamais un chiffre faux.
+                    val progress = book.progressPercent
+                    if (progress != null) {
+                        LinearProgressIndicator(
+                            progress = { progress },
+                            modifier = Modifier.fillMaxWidth().height(6.dp).clip(RoundedCornerShape(3.dp)),
+                        )
+                        Spacer(Modifier.height(6.dp))
+                    }
                     val remaining = book.remainingTimeFormatted
                     val remainingLabel = if (remaining != null) "encore ≈ $remaining estimées" else "—"
                     Text(
-                        "${progressPct}% · $remainingLabel",
+                        if (progress != null) "${(progress * 100).toInt()}% · $remainingLabel" else remainingLabel,
                         style = MaterialTheme.typography.bodySmall,
                         color = MaterialTheme.colorScheme.onSurfaceVariant,
                     )

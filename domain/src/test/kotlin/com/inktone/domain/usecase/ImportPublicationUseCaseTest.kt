@@ -6,6 +6,11 @@ import com.inktone.core.testing.fake.FakePreAnalysisStore
 import com.inktone.core.testing.fake.FakePublicationParser
 import com.inktone.core.testing.fake.FakePublicationRepository
 import com.inktone.core.testing.fake.FakeSearchService
+import com.inktone.domain.model.Chapter
+import com.inktone.domain.model.ChapterContent
+import com.inktone.domain.model.DocumentModel
+import com.inktone.domain.service.ParseResult
+import com.inktone.domain.service.PublicationMetadata
 import kotlinx.coroutines.async
 import kotlinx.coroutines.awaitAll
 import kotlinx.coroutines.flow.first
@@ -14,6 +19,40 @@ import org.junit.Assert.assertEquals
 import org.junit.Test
 
 class ImportPublicationUseCaseTest {
+
+    /**
+     * Progression : les longueurs de TOUS les chapitres sont posées dès
+     * l'import, à partir des chapitres déjà parsés pour l'indexation — c'est
+     * ce qui permet au Lecteur et à la Bibliothèque d'afficher une
+     * progression juste sans avoir chargé le livre entier.
+     */
+    @Test
+    fun `l'import pose les longueurs de tous les chapitres`() = runTest {
+        val publicationRepository = FakePublicationRepository()
+        val shells = listOf("cover.xhtml", "ch1.xhtml", "ch2.xhtml").map { href ->
+            Chapter(index = 0, href = href, title = null, content = ChapterContent.Rich(emptyList()))
+        }
+        val importPublication = ImportPublicationUseCase(
+            publicationParser = FakePublicationParser(
+                result = ParseResult.Success(
+                    documentModel = DocumentModel(chapters = shells, tableOfContents = emptyList(), resources = emptyList()),
+                    isDrmProtected = false,
+                    metadata = PublicationMetadata(title = "Titre"),
+                ),
+            ),
+            publicationRepository = publicationRepository,
+            fileStorageService = FakeFileStorageService(),
+            searchService = FakeSearchService(),
+            chapterParser = FakeChapterParser(),
+            preAnalysisStore = FakePreAnalysisStore(),
+        )
+
+        val result = importPublication("content://fake/livre.epub")
+
+        check(result is ImportResult.Success)
+        val stored = publicationRepository.getById(result.publication.id)
+        assertEquals("une longueur par chapitre, couverture comprise", 3, stored?.chapterLengths?.values?.size)
+    }
 
     @Test
     fun `importer deux fois le meme fichier ne cree pas de doublon`() = runTest {

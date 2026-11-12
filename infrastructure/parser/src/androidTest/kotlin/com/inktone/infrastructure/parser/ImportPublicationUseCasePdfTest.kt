@@ -47,6 +47,9 @@ private class InMemoryPublicationRepository : PublicationRepository {
     override suspend fun setLastOpened(id: String, lastOpened: Long) = Unit
     override suspend fun setCoverUri(id: String, coverUri: String?) = Unit
     override suspend fun resetAllCoversToDefault() = Unit
+    override suspend fun setChapterLengths(id: String, chapterLengths: com.inktone.domain.model.ChapterLengths) {
+        state.value = state.value.map { if (it.id == id) it.copy(chapterLengths = chapterLengths) else it }
+    }
     override suspend fun countFiltered(mode: FilterMode): Int = state.value.size
 }
 

@@ -175,8 +175,9 @@ class StatisticsViewModel @Inject constructor(
      * ajouterait que du bruit.
      */
     private fun CurrentBookState.withRemainingTime(): CurrentBookState {
-        if (progressPercent <= 0f || totalBookTimeMs <= 0L) return this
-        val estimatedTotalMs = (totalBookTimeMs / progressPercent).toLong()
+        val progress = progressPercent ?: return this
+        if (progress <= 0f || totalBookTimeMs <= 0L) return this
+        val estimatedTotalMs = (totalBookTimeMs / progress).toLong()
         val remainingMs = estimatedTotalMs - totalBookTimeMs
         return copy(remainingTimeFormatted = if (remainingMs > 0) formatDuration(remainingMs) else null)
     }

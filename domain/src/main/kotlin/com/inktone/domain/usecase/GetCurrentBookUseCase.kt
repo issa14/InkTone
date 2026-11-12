@@ -1,5 +1,6 @@
 package com.inktone.domain.usecase
 
+import com.inktone.domain.model.progressionAt
 import com.inktone.domain.repository.PublicationRepository
 import com.inktone.domain.repository.ReadingSessionRepository
 import com.inktone.domain.repository.ReadingStateRepository
@@ -33,9 +34,13 @@ class GetCurrentBookUseCase(
         }
         val readingState = readingStateRepository.get(publicationId)
 
-        val progressPercent = if (readingState != null && publication.chapterCount > 0) {
-            ((readingState.locator.chapterIndex.toFloat() + 1f) / publication.chapterCount).coerceIn(0f, 1f)
-        } else 0f
+        // Même calcul que le Lecteur et la Bibliothèque — plus l'ancien
+        // `(chapterIndex + 1) / chapterCount`, qui comptait un chapitre
+        // entamé comme lu (100 % dès l'ouverture d'un livre à un chapitre).
+        val progressPercent = when (readingState) {
+            null -> 0f
+            else -> publication.progressionAt(readingState.locator)
+        }
 
         val sessions = readingSessionRepository.getByPublicationId(publicationId)
         val totalBookTimeMs = sessions.sumOf { it.durationMs }

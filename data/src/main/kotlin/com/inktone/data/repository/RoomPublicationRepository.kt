@@ -1,7 +1,9 @@
 package com.inktone.data.repository
 
 import com.inktone.data.mapper.toDomain
+import com.inktone.data.mapper.toColumn
 import com.inktone.data.mapper.toEntity
+import com.inktone.domain.model.ChapterLengths
 import com.inktone.domain.model.FilterMode
 import com.inktone.domain.model.Publication
 import com.inktone.domain.repository.PublicationRepository
@@ -35,6 +37,8 @@ class RoomPublicationRepository @Inject constructor(
     override suspend fun setPinned(id: String, isPinned: Boolean) = dao.setPinned(id, isPinned)
     override suspend fun setLastOpened(id: String, lastOpened: Long) = dao.setLastOpened(id, lastOpened)
     override suspend fun setCoverUri(id: String, coverUri: String?) = dao.setCoverUri(id, coverUri)
+    override suspend fun setChapterLengths(id: String, chapterLengths: ChapterLengths) =
+        dao.setChapterLengths(id, chapterLengths.toColumn())
     override suspend fun resetAllCoversToDefault() = dao.resetAllCovers()
 
     // ───── Audit fix : COUNT pour le dashboard ─────
