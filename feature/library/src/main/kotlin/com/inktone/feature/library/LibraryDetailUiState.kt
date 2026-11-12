@@ -25,6 +25,8 @@ data class LibraryDetailUiState(
     val publications: List<Publication> = emptyList(),
     val isLoading: Boolean = true,
     val searchQuery: String = "",
+    /** Barre de recherche ouverte — même raison que [LibraryUiState.isSearchActive]. */
+    val isSearchActive: Boolean = false,
     val sortOrder: LibrarySortOrder = LibrarySortOrder.RECENTLY_ADDED,
     val selectedFormats: Set<PublicationFormat> = emptySet(),
     val progressMap: Map<String, Int> = emptyMap(),
@@ -40,6 +42,9 @@ sealed interface LibraryDetailIntent {
     data class TogglePin(val publicationId: String, val isPinned: Boolean) : LibraryDetailIntent
     data class DeletePublication(val publicationId: String) : LibraryDetailIntent
     data class SetSearchQuery(val query: String) : LibraryDetailIntent
+
+    /** Ouvre la barre de recherche ; la fermer efface aussi la requête. */
+    data class SetSearchActive(val active: Boolean) : LibraryDetailIntent
     data class SetSortOrder(val order: LibrarySortOrder) : LibraryDetailIntent
     data class ToggleFileFormat(val format: PublicationFormat) : LibraryDetailIntent
     data object ClearFileFormats : LibraryDetailIntent

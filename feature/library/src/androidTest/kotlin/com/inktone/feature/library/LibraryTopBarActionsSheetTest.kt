@@ -32,6 +32,8 @@ class LibraryTopBarActionsSheetTest {
                     onMenuClick = {},
                     searchQuery = "",
                     onSearchQueryChange = {},
+                    isSearchActive = false,
+                    onSearchActiveChange = {},
                     sortOrder = LibrarySortOrder.RECENTLY_ADDED,
                     onSortOrderChange = {},
                     layoutMode = LibraryLayoutMode.GRID_COVERS,

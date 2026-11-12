@@ -28,6 +28,14 @@ data class LibraryUiState(
     val activeFilter: FilterMode = FilterMode.ALL,
     val filterValue: String? = null,
     val searchQuery: String = "",
+    /**
+     * Barre de recherche ouverte. Dans l'état de l'écran, pas dans un
+     * `remember` du composable : la requête vit ici et survit à la
+     * navigation et à la rotation, la barre devait donc survivre avec elle.
+     * Avant, au retour du Lecteur, la barre redevenait « Bibliothèque » alors
+     * que la grille restait filtrée sur la requête, sans rien qui l'indique.
+     */
+    val isSearchActive: Boolean = false,
     val sortOrder: LibrarySortOrder = LibrarySortOrder.RECENTLY_ADDED,
     val layoutMode: LibraryLayoutMode = LibraryLayoutMode.GRID_DETAILED,
     val selectedFormats: Set<PublicationFormat> = emptySet(),
@@ -174,6 +182,9 @@ sealed interface LibraryIntent {
     data class DeletePublication(val publicationId: String) : LibraryIntent
     data class ChangeFilter(val filter: FilterMode, val value: String? = null) : LibraryIntent
     data class SetSearchQuery(val query: String) : LibraryIntent
+
+    /** Ouvre la barre de recherche ; la fermer efface aussi la requête. */
+    data class SetSearchActive(val active: Boolean) : LibraryIntent
     data class SetSortOrder(val order: LibrarySortOrder) : LibraryIntent
     data class SetLayoutMode(val mode: LibraryLayoutMode) : LibraryIntent
     data class ToggleFileFormat(val format: PublicationFormat) : LibraryIntent

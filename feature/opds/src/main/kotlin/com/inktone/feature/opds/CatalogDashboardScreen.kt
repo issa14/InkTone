@@ -40,6 +40,8 @@ import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
+import androidx.compose.ui.focus.FocusRequester
+import androidx.compose.ui.focus.focusRequester
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.text.font.FontWeight
@@ -184,6 +186,9 @@ fun CatalogDashboardScreen(
     }
 
     if (showSearch) {
+        // Clavier ouvert à l'ouverture du dialogue : il ne sert qu'à saisir.
+        val searchFocusRequester = remember { FocusRequester() }
+        LaunchedEffect(Unit) { searchFocusRequester.requestFocus() }
         AlertDialog(
             onDismissRequest = { showSearch = false },
             title = { Text("Rechercher") },
@@ -193,7 +198,7 @@ fun CatalogDashboardScreen(
                     onValueChange = { searchQuery = it },
                     singleLine = true,
                     label = { Text("Titre, auteur…") },
-                    modifier = Modifier.fillMaxWidth(),
+                    modifier = Modifier.fillMaxWidth().focusRequester(searchFocusRequester),
                 )
             },
             confirmButton = {

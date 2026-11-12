@@ -158,6 +158,16 @@ class LibraryViewModel @Inject constructor(
                     _state.value = _state.value.withDerivedFields()
                 }
             }
+            is LibraryIntent.SetSearchActive -> {
+                if (intent.active) {
+                    _state.value = _state.value.copy(isSearchActive = true)
+                } else {
+                    // Fermer la recherche rend toute la bibliothèque tout de
+                    // suite, sans attendre le délai de frappe.
+                    searchDebounceJob?.cancel()
+                    _state.value = _state.value.copy(isSearchActive = false, searchQuery = "").withDerivedFields()
+                }
+            }
             is LibraryIntent.SetSortOrder -> _state.value = _state.value.copy(sortOrder = intent.order).withDerivedFields()
             is LibraryIntent.SetLayoutMode -> {
                 _state.value = _state.value.copy(layoutMode = intent.mode)

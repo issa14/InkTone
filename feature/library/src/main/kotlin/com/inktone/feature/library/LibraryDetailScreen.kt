@@ -18,6 +18,7 @@ import androidx.compose.material3.Text
 import androidx.compose.material3.TextField
 import androidx.compose.material3.TopAppBar
 import androidx.compose.material3.TopAppBarDefaults
+import androidx.activity.compose.BackHandler
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
@@ -25,6 +26,8 @@ import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
+import androidx.compose.ui.focus.FocusRequester
+import androidx.compose.ui.focus.focusRequester
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.text.font.FontWeight
@@ -64,27 +67,32 @@ fun LibraryDetailScreen(
         }
     }
 
-    var isSearchActive by remember { mutableStateOf(false) }
     var showFilterDialog by remember { mutableStateOf(false) }
+
+    // Le retour système ferme la recherche avant de quitter l'écran.
+    BackHandler(enabled = state.isSearchActive) {
+        viewModel.onIntent(LibraryDetailIntent.SetSearchActive(false))
+    }
 
     Scaffold(
         topBar = {
-            if (isSearchActive) {
+            if (state.isSearchActive) {
+                val searchFocusRequester = remember { FocusRequester() }
+                LaunchedEffect(Unit) {
+                    if (state.searchQuery.isEmpty()) searchFocusRequester.requestFocus()
+                }
                 TopAppBar(
                     title = {
                         TextField(
                             value = state.searchQuery,
                             onValueChange = { viewModel.onIntent(LibraryDetailIntent.SetSearchQuery(it)) },
-                            modifier = Modifier.fillMaxWidth(),
+                            modifier = Modifier.fillMaxWidth().focusRequester(searchFocusRequester),
                             placeholder = { Text("Rechercher titre ou auteur") },
                             singleLine = true,
                         )
                     },
                     navigationIcon = {
-                        IconButton(onClick = {
-                            isSearchActive = false
-                            viewModel.onIntent(LibraryDetailIntent.SetSearchQuery(""))
-                        }) {
+                        IconButton(onClick = { viewModel.onIntent(LibraryDetailIntent.SetSearchActive(false)) }) {
                             AppIcon(AppSymbol.Back, contentDescription = "Fermer")
                         }
                     },
@@ -120,7 +128,7 @@ fun LibraryDetailScreen(
                         }
                     },
                     actions = {
-                        IconButton(onClick = { isSearchActive = true }) {
+                        IconButton(onClick = { viewModel.onIntent(LibraryDetailIntent.SetSearchActive(true)) }) {
                             AppIcon(AppSymbol.Search, contentDescription = "Rechercher")
                         }
                         IconButton(onClick = { showFilterDialog = true }) {

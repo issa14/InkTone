@@ -63,6 +63,10 @@ class LibraryDetailViewModel @Inject constructor(
                 deletePublication(intent.publicationId)
             }
             is LibraryDetailIntent.SetSearchQuery -> _state.value = _state.value.copy(searchQuery = intent.query)
+            is LibraryDetailIntent.SetSearchActive -> _state.value = _state.value.copy(
+                isSearchActive = intent.active,
+                searchQuery = if (intent.active) _state.value.searchQuery else "",
+            )
             is LibraryDetailIntent.SetSortOrder -> _state.value = _state.value.copy(sortOrder = intent.order)
             is LibraryDetailIntent.ToggleFileFormat -> _state.value = _state.value.copy(
                 selectedFormats = _state.value.selectedFormats.let {

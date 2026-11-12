@@ -39,6 +39,7 @@ import androidx.compose.material3.TextField
 import androidx.compose.material3.TopAppBar
 import androidx.compose.material3.rememberSwipeToDismissBoxState
 import androidx.compose.material3.TopAppBarDefaults
+import androidx.activity.compose.BackHandler
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
@@ -46,6 +47,8 @@ import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
+import androidx.compose.ui.focus.FocusRequester
+import androidx.compose.ui.focus.focusRequester
 import androidx.compose.runtime.snapshotFlow
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -92,15 +95,24 @@ fun LibraryItemsScreen(
         }
     }
 
+    // Le retour système ferme la recherche au lieu de quitter l'écran.
+    BackHandler(enabled = state.isSearchExpanded) {
+        viewModel.onIntent(LibraryItemsIntent.ToggleSearchExpanded)
+    }
+
     Scaffold(
         topBar = {
             TopAppBar(
                 title = {
                     if (state.isSearchExpanded) {
+                        val searchFocusRequester = remember { FocusRequester() }
+                        LaunchedEffect(Unit) {
+                            if (state.searchQuery.isEmpty()) searchFocusRequester.requestFocus()
+                        }
                         TextField(
                             value = state.searchQuery,
                             onValueChange = { viewModel.onIntent(LibraryItemsIntent.SetSearchQuery(it)) },
-                            modifier = Modifier.fillMaxWidth(),
+                            modifier = Modifier.fillMaxWidth().focusRequester(searchFocusRequester),
                             placeholder = { Text("Rechercher un extrait, une note, un titre") },
                             singleLine = true,
                         )
@@ -115,7 +127,12 @@ fun LibraryItemsScreen(
                 },
                 actions = {
                     IconButton(onClick = { viewModel.onIntent(LibraryItemsIntent.ToggleSearchExpanded) }) {
-                        AppIcon(AppSymbol.Search,  contentDescription = if (state.isSearchExpanded) "Fermer la recherche" else "Rechercher")
+                        // L'icône dit ce que fait le bouton : fermer quand la
+                        // recherche est ouverte (seul le libellé changeait).
+                        AppIcon(
+                            if (state.isSearchExpanded) AppSymbol.Close else AppSymbol.Search,
+                            contentDescription = if (state.isSearchExpanded) "Fermer la recherche" else "Rechercher",
+                        )
                     }
                     SortMenuButton(
                         sortOrder = state.sortOrder,

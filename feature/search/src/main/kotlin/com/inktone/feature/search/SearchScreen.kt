@@ -20,6 +20,9 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.remember
+import androidx.compose.ui.focus.FocusRequester
+import androidx.compose.ui.focus.focusRequester
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.text.AnnotatedString
@@ -54,6 +57,14 @@ fun SearchScreen(
         }
     }
 
+    // Clavier ouvert à l'arrivée : l'écran n'a pas d'autre usage que la
+    // saisie. Pas au retour d'un résultat (requête déjà tapée) : le clavier
+    // recouvrirait la liste qu'on vient de quitter.
+    val focusRequester = remember { FocusRequester() }
+    LaunchedEffect(Unit) {
+        if (state.query.isEmpty()) focusRequester.requestFocus()
+    }
+
     Column(Modifier.fillMaxSize().padding(16.dp)) {
         // D.6 / E.2 — champ de recherche avec bouton effacer et label accessible
         TextField(
@@ -68,7 +79,7 @@ fun SearchScreen(
                     }
                 }
             },
-            modifier = Modifier.fillMaxWidth(),
+            modifier = Modifier.fillMaxWidth().focusRequester(focusRequester),
             singleLine = true,
         )
 

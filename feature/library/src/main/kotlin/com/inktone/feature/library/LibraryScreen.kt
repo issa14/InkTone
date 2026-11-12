@@ -54,6 +54,9 @@ import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
+import androidx.activity.compose.BackHandler
+import androidx.compose.ui.focus.FocusRequester
+import androidx.compose.ui.focus.focusRequester
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
@@ -156,6 +159,11 @@ fun LibraryScreen(
         }
     }
 
+    // Le retour système ferme la recherche au lieu de quitter l'application.
+    BackHandler(enabled = state.isSearchActive) {
+        viewModel.onIntent(LibraryIntent.SetSearchActive(false))
+    }
+
     Scaffold(
         snackbarHost = { SnackbarHost(snackbarHostState) },
         floatingActionButton = {
@@ -169,6 +177,8 @@ fun LibraryScreen(
             LibraryTopBar(
                 searchQuery = state.searchQuery,
                 onSearchQueryChange = { viewModel.onIntent(LibraryIntent.SetSearchQuery(it)) },
+                isSearchActive = state.isSearchActive,
+                onSearchActiveChange = { viewModel.onIntent(LibraryIntent.SetSearchActive(it)) },
                 sortOrder = state.sortOrder,
                 onSortOrderChange = { viewModel.onIntent(LibraryIntent.SetSortOrder(it)) },
                 layoutMode = state.layoutMode,
@@ -410,6 +420,8 @@ internal fun LibraryTopBar(
     onMenuClick: () -> Unit,
     searchQuery: String,
     onSearchQueryChange: (String) -> Unit,
+    isSearchActive: Boolean,
+    onSearchActiveChange: (Boolean) -> Unit,
     sortOrder: LibrarySortOrder,
     onSortOrderChange: (LibrarySortOrder) -> Unit,
     layoutMode: LibraryLayoutMode,
@@ -437,7 +449,6 @@ internal fun LibraryTopBar(
     isRegeneratingCovers: Boolean = false,
     coverRegeneration: CoverRegenerationProgress? = null,
 ) {
-    var isSearchActive by remember { mutableStateOf(false) }
     var showFilterDialog by remember { mutableStateOf(false) }
     var showActionsSheet by remember { mutableStateOf(false) }
     var showNavPopup by remember { mutableStateOf(false) }
@@ -454,22 +465,26 @@ internal fun LibraryTopBar(
     }
 
     if (isSearchActive) {
+        // Clavier ouvert à l'ouverture de la recherche, pas quand la barre
+        // réapparaît avec une requête déjà tapée (retour du Lecteur) : le
+        // clavier recouvrirait les résultats.
+        val searchFocusRequester = remember { FocusRequester() }
+        LaunchedEffect(Unit) {
+            if (searchQuery.isEmpty()) searchFocusRequester.requestFocus()
+        }
         // État recherche : SearchBar pleine largeur qui remplace la TopBar
         TopAppBar(
             title = {
                 TextField(
                     value = searchQuery,
                     onValueChange = onSearchQueryChange,
-                    modifier = Modifier.fillMaxWidth(),
+                    modifier = Modifier.fillMaxWidth().focusRequester(searchFocusRequester),
                     placeholder = { Text("Rechercher titre ou auteur") },
                     singleLine = true,
                 )
             },
             navigationIcon = {
-                IconButton(onClick = {
-                    isSearchActive = false
-                    onSearchQueryChange("")
-                }) {
+                IconButton(onClick = { onSearchActiveChange(false) }) {
                     AppIcon(AppSymbol.Back, contentDescription = "Fermer")
                 }
             },
@@ -539,7 +554,7 @@ internal fun LibraryTopBar(
                 }
             },
             actions = {
-                IconButton(onClick = { isSearchActive = true }) {
+                IconButton(onClick = { onSearchActiveChange(true) }) {
                     AppIcon(AppSymbol.Search, contentDescription = "Rechercher")
                 }
                 IconButton(onClick = { showFilterDialog = true }) {
