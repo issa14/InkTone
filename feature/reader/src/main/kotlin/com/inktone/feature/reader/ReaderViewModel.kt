@@ -202,15 +202,24 @@ class ReaderViewModel @Inject constructor(
             }
         }
 
-        // P2-b — l'écran SUIT le chapitre narré, il ne le pilote plus.
-        // L'auto-avance vit désormais dans l'ordonnanceur (seul capable de
-        // continuer quand cet écran est détruit) ; ici on se contente de
-        // recaler l'affichage sur le chapitre qu'il a décidé de jouer.
+        // P2-b — l'écran SUIT la position narrée, il ne la pilote plus.
+        // L'auto-avance vit dans l'ordonnanceur (seul capable de continuer
+        // quand cet écran est détruit) ; ici on recale l'affichage sur ce
+        // qu'il joue. Lecture seule hors narration : la navigation manuelle
+        // reste propriétaire de la position (K3, chemins jamais simultanés).
+        //
+        // UN SEUL collecteur, sur la position atomique (chapitre + phrase) :
+        // deux collecteurs séparés appliquaient la phrase 0 du nouveau
+        // chapitre à l'ANCIEN chapitre avant de changer de chapitre — la
+        // progression reculait puis bondissait à chaque fin de chapitre.
         viewModelScope.launch {
-            playbackOrchestrator.currentChapterIndex.collect { chapterIndex ->
+            playbackOrchestrator.narrationPosition.collect { position ->
                 if (!_state.value.isPlaying) return@collect
-                if (chapterIndex == _state.value.currentChapterIndex) return@collect
-                syncDisplayToNarratedChapter(chapterIndex)
+                if (position.chapterIndex != _state.value.currentChapterIndex) {
+                    syncDisplayToNarratedChapter(position.chapterIndex, position.sentenceIndex)
+                } else {
+                    _state.value = _state.value.copy(currentSentenceIndex = position.sentenceIndex)
+                }
             }
         }
 
@@ -240,17 +249,6 @@ class ReaderViewModel @Inject constructor(
                         highlightJob?.cancel()
                     }
                 }
-        }
-
-        // Lot 15 (Tâche 4.1) — `currentSentenceIndex` suit l'ordonnanceur
-        // pendant la lecture ; hors lecture, la navigation manuelle reste
-        // propriétaire de cet index (K3, chemins jamais simultanés).
-        viewModelScope.launch {
-            playbackOrchestrator.currentSentenceIndex.collect { index ->
-                if (_state.value.isPlaying) {
-                    _state.value = _state.value.copy(currentSentenceIndex = index)
-                }
-            }
         }
 
         // Chantier statistiques V1 — les mots prononcés alimentent le tracker
@@ -1468,12 +1466,12 @@ class ReaderViewModel @Inject constructor(
      * position — pendant la narration, l'ordonnanceur en est le seul écrivain
      * (K3, chemins TTS et manuel jamais simultanés).
      */
-    private fun syncDisplayToNarratedChapter(targetIndex: Int) {
+    private fun syncDisplayToNarratedChapter(targetIndex: Int, sentenceIndex: Int) {
         if (targetIndex !in _state.value.chapters.indices) return
         _highlightedWordRange.value = null
         _state.value = _state.value.copy(
             currentChapterIndex = targetIndex,
-            currentSentenceIndex = 0,
+            currentSentenceIndex = sentenceIndex,
         )
         loadChapterContentIfNeeded(targetIndex)
         preloadAdjacentChapters(targetIndex)

@@ -18,6 +18,7 @@ import com.inktone.domain.usecase.UpdateReadingStateUseCase
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.flow.first
+import kotlinx.coroutines.launch
 import kotlinx.coroutines.runBlocking
 import kotlinx.coroutines.withTimeout
 import org.junit.Assert.assertEquals
@@ -123,6 +124,44 @@ class PlaybackOrchestratorChapterAdvanceTest {
             ttsSegmentCache = FakeTtsSegmentCache(),
             pronunciationRuleRepository = FakePronunciationRuleRepository(),
     )
+
+    /**
+     * Bug réel corrigé (progression qui recule puis bondit à chaque fin de
+     * chapitre) : chapitre et phrase étaient publiés sur deux flux distincts.
+     * La position atomique ne doit JAMAIS reculer pendant une narration
+     * continue — en particulier, jamais « ancien chapitre, phrase 0 ».
+     */
+    @Test
+    fun laPositionNarreeNeReculeJamaisAuPassageDeChapitre() = runBlocking {
+        val parser = ProgrammedChapterParser(
+            mapOf("ch1.xhtml" to listOf(sentence(0, "Chapitre deux.", 0))),
+        )
+        val orchestrator = orchestrator(parser)
+        orchestrator.setNarrationProgram("pub1", listOf("ch0.xhtml", "ch1.xhtml"))
+        val observed = java.util.Collections.synchronizedList(mutableListOf<NarrationPosition>())
+        val recorder = launch(kotlinx.coroutines.Dispatchers.Unconfined) {
+            orchestrator.narrationPosition.collect { observed += it }
+        }
+
+        orchestrator.play(
+            sentences = listOf(sentence(0, "Premier.", 0), sentence(1, "Second.", 9)),
+            voiceProfile = profile,
+            startFrom = 1,
+            publicationId = "pub1",
+            chapterIndex = 0,
+            resourceHref = "ch0.xhtml",
+        )
+        withTimeout(5_000) { orchestrator.narrationPosition.first { it.chapterIndex == 1 } }
+        recorder.cancel()
+
+        val ordered = observed.drop(1) // valeur initiale du StateFlow, avant toute lecture
+        ordered.zipWithNext().forEach { (before, after) ->
+            val recule = after.chapterIndex < before.chapterIndex ||
+                (after.chapterIndex == before.chapterIndex && after.sentenceIndex < before.sentenceIndex)
+            assertEquals("recul observé : $before -> $after (séquence $ordered)", false, recule)
+        }
+        assertEquals(NarrationPosition(chapterIndex = 1, sentenceIndex = 0), orchestrator.narrationPosition.value)
+    }
 
     @Test
     fun enchaineLeChapitreSuivantSansAucunCollaborateurDeLecran() = runBlocking {

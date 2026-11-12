@@ -172,6 +172,28 @@ class PlaybackOrchestrator @Inject constructor(
     val currentChapterIndex: StateFlow<Int> = _currentChapterIndex.asStateFlow()
 
     /**
+     * Position narrée — chapitre ET phrase — publiée d'UN SEUL bloc. C'est le
+     * flux que l'écran Lecteur doit suivre, jamais les deux flux séparés
+     * ci-dessus.
+     *
+     * Bug réel corrigé : au passage d'un chapitre, [play] publiait la phrase 0
+     * PUIS le nouveau chapitre sur deux flux distincts, que le Lecteur
+     * collectait dans deux coroutines distinctes. Entre les deux, son état
+     * valait « ancien chapitre, phrase 0 » : la progression reculait au début
+     * du chapitre qui venait de finir, puis bondissait au suivant (et le
+     * mode paginé revenait une image sur la page 1 de l'ancien chapitre).
+     */
+    private val _narrationPosition = MutableStateFlow(NarrationPosition(chapterIndex = 0, sentenceIndex = 0))
+    val narrationPosition: StateFlow<NarrationPosition> = _narrationPosition.asStateFlow()
+
+    /** Seul point d'écriture de la position narrée : les trois flux restent toujours cohérents. */
+    private fun publishPosition(chapterIndex: Int, sentenceIndex: Int) {
+        _narrationPosition.value = NarrationPosition(chapterIndex, sentenceIndex)
+        _currentChapterIndex.value = chapterIndex
+        _currentSentenceIndex.value = sentenceIndex
+    }
+
+    /**
      * Mots des phrases **effectivement prononcées jusqu'au bout**, émis une
      * phrase à la fois (Chantier statistiques V1).
      *
@@ -336,8 +358,7 @@ class PlaybackOrchestrator @Inject constructor(
         session = SessionContext(sentences, voiceProfile, publicationId, chapterIndex, resourceHref)
         stop()
         val generation = playGeneration.incrementAndGet()
-        _currentSentenceIndex.value = startFrom
-        _currentChapterIndex.value = chapterIndex
+        publishPosition(chapterIndex = chapterIndex, sentenceIndex = startFrom)
         _state.value = PlaybackStatus.Buffering
         playbackJob = scope.launch {
             run(generation, sentences, voiceProfile, startFrom, publicationId, chapterIndex, resourceHref)
@@ -604,7 +625,7 @@ class PlaybackOrchestrator @Inject constructor(
         if (wasPlaying) {
             play(ctx.sentences, ctx.voiceProfile, newIndex, ctx.publicationId, ctx.chapterIndex, ctx.resourceHref)
         } else {
-            _currentSentenceIndex.value = newIndex
+            publishPosition(chapterIndex = ctx.chapterIndex, sentenceIndex = newIndex)
         }
     }
 
@@ -922,7 +943,7 @@ class PlaybackOrchestrator @Inject constructor(
         rulesHash: String,
     ) {
         if (!isCurrent(generation)) return
-        _currentSentenceIndex.value = index
+        publishPosition(chapterIndex = chapterIndex, sentenceIndex = index)
         _currentWordTimestamps.value = wordTimestamps
         if (publicationId.isNotEmpty() && sentence != null) {
             // Bug réel trouvé au diagnostic (même famille que ReaderViewModel
@@ -1127,3 +1148,6 @@ private val DEFAULT_NARRATION_VOICE_PROFILE = VoiceProfile(
     id = "vp-native-fr", engine = TtsEngineId.ANDROID_NATIVE,
     voice = "fr-fr-default", language = "fr-FR",
 )
+
+/** Position narrée, chapitre et phrase indissociables (voir [PlaybackOrchestrator.narrationPosition]). */
+data class NarrationPosition(val chapterIndex: Int, val sentenceIndex: Int)
