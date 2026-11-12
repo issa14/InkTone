@@ -1,4 +1,6 @@
 package com.inktone.feature.settings
+
+import android.os.Build
 import com.inktone.core.designsystem.AppIcon
 import com.inktone.core.designsystem.AppSymbol
 import com.inktone.core.designsystem.InkToneSlider
@@ -321,11 +323,16 @@ internal fun SettingsContent(
             // Tâche 9bis.1.2/9bis.5 — consommé par AppThemeViewModel (module app, MainActivity),
             // pas par SettingsViewModel lui-même : InkToneTheme s'applique avant tout hiltViewModel()
             // scope à une destination de navigation.
-            ToggleSetting(
-                label = "Couleurs dynamiques (Material You)",
-                checked = preferences.dynamicColorEnabled,
-                onCheckedChange = { onIntent(SettingsIntent.SetDynamicColorEnabled(it)) },
-            )
+            // Les couleurs dynamiques n'existent qu'à partir d'Android 12
+            // (InkToneTheme les ignore en dessous) : l'interrupteur n'y
+            // aurait aucun effet.
+            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) {
+                ToggleSetting(
+                    label = "Couleurs dynamiques (Material You)",
+                    checked = preferences.dynamicColorEnabled,
+                    onCheckedChange = { onIntent(SettingsIntent.SetDynamicColorEnabled(it)) },
+                )
+            }
 
             HorizontalDivider(modifier = Modifier.padding(horizontal = 20.dp))
 

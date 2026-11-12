@@ -27,7 +27,9 @@ class AppThemeViewModel @Inject constructor(
 ) : ViewModel() {
     val useDynamicColor: StateFlow<Boolean> = preferencesRepository.observe()
         .map { it.dynamicColorEnabled }
-        .stateIn(viewModelScope, SharingStarted.Eagerly, true)
+        // Valeur initiale = celle d'une nouvelle installation
+        // (UserPreferences.dynamicColorEnabled = false), pas l'inverse.
+        .stateIn(viewModelScope, SharingStarted.Eagerly, false)
 
     /**
      * Lot 6 — thème système Système/Clair/Sombre, exposé à MainActivity en
