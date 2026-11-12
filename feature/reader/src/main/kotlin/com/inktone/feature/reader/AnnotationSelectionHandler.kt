@@ -72,19 +72,32 @@ private fun List<BookBlock>.findBlockIndex(charOffset: Int): Int? {
 /**
  * Palier 3f.1 — substring exacte `[startOffset, endOffsetExclusive)` d'un
  * chapitre reconstruite à partir des offsets de ses [Sentence], pour
- * l'excerpt/le texte copié d'une sélection libre qui travaille en offsets
- * de caractère plutôt qu'en index de phrase entière. Les espaces entre
- * phrases (hors texte de chaque `Sentence`) ne sont pas restitués — sans
- * incidence, ceci ne sert qu'à un aperçu tronqué, jamais à une réécriture.
+ * l'excerpt d'une annotation ET le texte copié ou partagé d'une sélection
+ * libre, qui travaillent en offsets de caractère plutôt qu'en index de
+ * phrase entière.
+ *
+ * Le blanc entre deux phrases n'appartient au texte d'aucune [Sentence] :
+ * il est restitué par un séparateur — espace dans un même paragraphe, saut
+ * de ligne entre deux paragraphes ([Sentence.blockIndex] différent). Sans
+ * lui, le texte copié collait les phrases (« monde.Ceci ») et fondait les
+ * paragraphes en un seul. Deux phrases contiguës dans le texte (aucun blanc
+ * entre elles) restent collées : rien n'y est inventé.
  */
 internal fun sliceChapterText(sentences: List<Sentence>, startOffset: Int, endOffsetExclusive: Int): String {
     val builder = StringBuilder()
+    var previous: Sentence? = null
     for (sentence in sentences) {
         if (sentence.endOffset <= startOffset) continue
         if (sentence.startOffset >= endOffsetExclusive) break
         val localStart = (startOffset - sentence.startOffset).coerceAtLeast(0)
         val localEnd = (endOffsetExclusive - sentence.startOffset).coerceAtMost(sentence.text.length)
-        if (localStart < localEnd) builder.append(sentence.text, localStart, localEnd)
+        if (localStart >= localEnd) continue
+        val before = previous
+        if (before != null && builder.isNotEmpty() && sentence.startOffset > before.endOffset) {
+            builder.append(if (sentence.blockIndex != before.blockIndex) '\n' else ' ')
+        }
+        builder.append(sentence.text, localStart, localEnd)
+        previous = sentence
     }
     return builder.toString()
 }

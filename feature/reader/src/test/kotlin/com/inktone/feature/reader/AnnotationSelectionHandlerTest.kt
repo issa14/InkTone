@@ -92,14 +92,41 @@ class AnnotationSelectionHandlerTest {
     }
 
     @Test
-    fun `sliceChapterText traverse plusieurs phrases sans planter sur le vide inter-phrase`() {
+    fun `sliceChapterText restitue l espace entre deux phrases d un meme paragraphe`() {
+        // Le texte copié ou partagé collait les phrases : « monde.Ceci ».
         val s0 = sentences[0]
         val s1 = sentences[1]
         val tail = s0.text.takeLast(6) // "monde."
         val head = s1.text.take(4) // "Ceci"
         val start = s0.startOffset + (s0.text.length - tail.length)
         val end = s1.startOffset + head.length
-        assertEquals(tail + head, sliceChapterText(sentences, start, end))
+        assertEquals("monde. Ceci", sliceChapterText(sentences, start, end))
+    }
+
+    @Test
+    fun `sliceChapterText restitue un saut de ligne entre deux paragraphes`() {
+        val paragraphs = listOf(
+            Sentence(0, "Fin du premier.", startOffset = 0, endOffset = 15, blockIndex = 0),
+            Sentence(1, "Début du second.", startOffset = 16, endOffset = 32, blockIndex = 1),
+        )
+        assertEquals("Fin du premier.\nDébut du second.", sliceChapterText(paragraphs, 0, 32))
+    }
+
+    @Test
+    fun `sliceChapterText n invente aucun blanc entre deux phrases contigues`() {
+        val contiguous = listOf(
+            Sentence(0, "« Oui.", startOffset = 0, endOffset = 6, blockIndex = 0),
+            Sentence(1, "» Bien.", startOffset = 6, endOffset = 13, blockIndex = 0),
+        )
+        assertEquals("« Oui.» Bien.", sliceChapterText(contiguous, 0, 13))
+    }
+
+    @Test
+    fun `sliceChapterText n ajoute pas de separateur quand la selection commence dans le blanc`() {
+        // Sélection qui démarre sur le blanc entre deux phrases : rien à
+        // séparer, le premier caractère copié est celui de la phrase.
+        val s1 = sentences[1]
+        assertEquals("Ceci", sliceChapterText(sentences, s1.startOffset - 1, s1.startOffset + 4))
     }
 
     @Test
