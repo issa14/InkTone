@@ -109,6 +109,7 @@ import com.inktone.core.designsystem.SystemBarIconsEffect
 import com.inktone.domain.model.Annotation
 import com.inktone.domain.model.AnnotationColor
 import com.inktone.domain.model.Bookmark
+import com.inktone.domain.model.Chapter
 import com.inktone.domain.model.ChapterContent
 import com.inktone.domain.model.PublicationFormat
 import com.inktone.domain.model.ReadingOverrides
@@ -420,6 +421,21 @@ fun ReaderScreen(
         // signet, restauration) qui doit, elle, repositionner la liste.
         var lastManuallyEmittedSentenceIndex by remember { mutableStateOf<Int?>(null) }
         var previousChapterIndexForAnchor by remember { mutableStateOf<Int?>(null) }
+        // Chapitre (instance, contenu compris) sur lequel la liste a été
+        // ANCRÉE par l'effet ci-dessous. Tant qu'il diffère du chapitre
+        // affiché, la liste montre une position qui n'est pas encore la
+        // bonne, et `topmostVisibleSentenceIndex` ne remonte rien.
+        //
+        // Bug réel corrigé (progression qui avance puis recule) : au
+        // changement de chapitre ou à l'arrivée de son contenu, la liste
+        // gardait l'INDEX de paragraphe de l'état précédent (un LazyList qui
+        // ne retrouve pas la clé conserve l'index), ou était encore en haut
+        // alors que la cible était plus loin. La première mesure remontait
+        // donc la phrase de CE paragraphe-là — trop loin (la progression
+        // bondissait) ou trop tôt — puis l'ancrage repositionnait la liste et
+        // la progression revenait. Pire : cette fausse position pouvait
+        // être persistée, ou écraser la cible d'un signet.
+        var anchoredChapter by remember { mutableStateOf<ChapterAnchorKey?>(null) }
         // Déclencheurs COLLECTÉS (`snapshotFlow`), jamais lus en clés
         // d'effet : une clé se lit pendant la composition et recomposait
         // tout l'écran à chaque phrase. `collectLatest` conserve la sémantique
@@ -427,18 +443,28 @@ fun ReaderScreen(
         LaunchedEffect(scrollState) {
             snapshotFlow {
                 val live = uiState.value
-                Triple(live.currentChapterIndex, live.currentSentenceIndex, live.currentChapter?.sentences?.size)
+                // Clé de contenu (pas seulement `sentences.size`) : un chapitre
+                // évincé puis rechargé garde ses phrases mais retrouve ses
+                // blocs — la liste change, il faut ré-ancrer.
+                Triple(live.currentChapterIndex, live.currentSentenceIndex, ChapterAnchorKey.of(live.currentChapter))
             }.collectLatest { (chapterIndex, sentenceIndex, _) ->
             val live = uiState.value
             // L'auto-scroll TTS (effet suivant, `animateScrollToItem`) est
             // seul responsable pendant la lecture — ne pas le contredire ici.
-            if (live.isPlaying) return@collectLatest
+            // La remontée manuelle est de toute façon ignorée pendant le TTS
+            // (K3) : la porte peut rester ouverte.
+            if (live.isPlaying) {
+                anchoredChapter = ChapterAnchorKey.of(live.currentChapter)
+                return@collectLatest
+            }
 
             val chapterChanged = chapterIndex != previousChapterIndexForAnchor
             previousChapterIndexForAnchor = chapterIndex
 
             if (!chapterChanged && sentenceIndex == lastManuallyEmittedSentenceIndex) {
+                // Écho de notre propre défilement : la liste est déjà là.
                 lastManuallyEmittedSentenceIndex = null
+                anchoredChapter = ChapterAnchorKey.of(live.currentChapter)
                 return@collectLatest
             }
 
@@ -453,11 +479,17 @@ fun ReaderScreen(
                 // asynchrone dans le MÊME chapitre, ne rien faire : ne pas
                 // ramener une liste déjà positionnée en haut.
                 if (chapterChanged) scrollState.scrollToItem(0)
+                // Phrases présentes mais aucune cible exploitable (index hors
+                // bornes, phrase sans bloc) : la liste est en haut, position
+                // honnête — ouvrir la porte, sinon le défilement manuel de ce
+                // chapitre ne serait plus jamais remonté.
+                if (live.currentChapter?.sentences?.isNotEmpty() == true) anchoredChapter = ChapterAnchorKey.of(live.currentChapter)
                 return@collectLatest
             }
             isProgrammaticScroll = true
             try {
                 scrollState.scrollToItem(targetBlock)
+                anchoredChapter = ChapterAnchorKey.of(live.currentChapter)
             } finally {
                 isProgrammaticScroll = false
             }
@@ -500,12 +532,25 @@ fun ReaderScreen(
                 }
             }
         }
+        val currentAnchorKey = ChapterAnchorKey.of(state.currentChapter)
         val topmostVisibleSentenceIndex = remember(state.currentChapter) {
             derivedStateOf {
                 if (isProgrammaticScroll) return@derivedStateOf null
+                // Liste pas encore ancrée sur CE chapitre : sa position
+                // visible n'est pas celle du lecteur, ne rien remonter.
+                if (anchoredChapter != currentAnchorKey) return@derivedStateOf null
                 val firstVisibleBlock = scrollState.layoutInfo.visibleItemsInfo
                     .firstOrNull()?.index ?: return@derivedStateOf null
-                firstSentenceIndexByBlock[firstVisibleBlock]
+                // Le paragraphe en tête est déjà celui de la phrase courante
+                // (après un ancrage, une pause du TTS, un signet en milieu de
+                // paragraphe) : la position ne change pas. Remonter la
+                // PREMIÈRE phrase du paragraphe ramenait le lecteur quelques
+                // phrases en arrière — la progression reculait sans geste.
+                val live = uiState.value
+                val currentBlock = live.currentChapter?.sentences
+                    ?.getOrNull(live.currentSentenceIndex)?.blockIndex
+                if (currentBlock == firstVisibleBlock) live.currentSentenceIndex
+                else firstSentenceIndexByBlock[firstVisibleBlock]
             }
         }
 
@@ -521,7 +566,10 @@ fun ReaderScreen(
         LaunchedEffect(topmostVisibleSentenceIndex) {
             snapshotFlow { topmostVisibleSentenceIndex.value to uiState.value.readingMode }
                 .collect { (index, readingMode) ->
-                    if (index != null && readingMode == ReadingMode.SCROLL) {
+                    // Rien à remonter si la position ne change pas — et surtout
+                    // ne pas armer la garde anti-écho pour un écho qui ne
+                    // viendra jamais (elle avalerait la navigation suivante).
+                    if (index != null && readingMode == ReadingMode.SCROLL && index != uiState.value.currentSentenceIndex) {
                         lastManuallyEmittedSentenceIndex = index
                         viewModel.onIntent(ReaderIntent.UpdateScrollPosition(index))
                     }
@@ -1826,3 +1874,21 @@ private data class StatusLineValues(
     val showPageCounter: Boolean,
     val bookProgression: Float?,
 )
+
+/**
+ * Identité du CONTENU affiché d'un chapitre pour l'ancrage du mode
+ * défilement : même chapitre, mêmes blocs, mêmes phrases. Comparaison en
+ * O(1), là où l'égalité de [Chapter] (data class) comparerait tous ses blocs
+ * à chaque image de défilement.
+ */
+private data class ChapterAnchorKey(val href: String, val blockCount: Int, val sentenceCount: Int) {
+    companion object {
+        fun of(chapter: Chapter?): ChapterAnchorKey? = chapter?.let {
+            ChapterAnchorKey(
+                href = it.href,
+                blockCount = (it.content as? ChapterContent.Rich)?.blocks?.size ?: 0,
+                sentenceCount = it.sentences.size,
+            )
+        }
+    }
+}
