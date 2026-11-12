@@ -1,5 +1,6 @@
 package com.inktone.feature.reader
 
+import com.inktone.domain.model.UserPreferences
 import com.inktone.core.designsystem.AppIcon
 import com.inktone.core.designsystem.AppSymbol
 import androidx.compose.foundation.ExperimentalFoundationApi
@@ -138,11 +139,20 @@ fun SleepTimerPanel(
                 Spacer(Modifier.height(4.dp))
                 Row(verticalAlignment = Alignment.CenterVertically) {
                     IconButton(
-                        onClick = { onSetEyeRestReminderInterval((eyeRestReminderIntervalMinutes - 15).coerceAtLeast(15)) },
+                        onClick = {
+                            onSetEyeRestReminderInterval(
+                                (eyeRestReminderIntervalMinutes - UserPreferences.EYE_REST_INTERVAL_STEP).coerceIn(UserPreferences.EYE_REST_INTERVAL_RANGE),
+                            )
+                        },
                     ) { AppIcon(AppSymbol.Remove, contentDescription = "Diminuer l'intervalle") }
                     Text(formatEyeRestInterval(eyeRestReminderIntervalMinutes), style = MaterialTheme.typography.bodyLarge)
                     IconButton(
-                        onClick = { onSetEyeRestReminderInterval(eyeRestReminderIntervalMinutes + 15) },
+                        // Même plafond qu'aux Réglages (audit UX B9 : aucun ici).
+                        onClick = {
+                            onSetEyeRestReminderInterval(
+                                (eyeRestReminderIntervalMinutes + UserPreferences.EYE_REST_INTERVAL_STEP).coerceIn(UserPreferences.EYE_REST_INTERVAL_RANGE),
+                            )
+                        },
                     ) { AppIcon(AppSymbol.Add, contentDescription = "Augmenter l'intervalle") }
                 }
             }

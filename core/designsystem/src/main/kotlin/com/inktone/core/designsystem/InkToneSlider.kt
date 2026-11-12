@@ -168,3 +168,13 @@ private val THUMB_DIAMETER = 20.dp
 
 /** Cible tactile minimale, indépendante de la taille du pouce visible. */
 private val TOUCH_TARGET = 48.dp
+
+/**
+ * Multiplicateur lisible (« 1,0× », « 0,75× ») : deux décimales seulement
+ * quand la valeur en a besoin — un cran de 0,25 s'affichait arrondi (0,75 →
+ * « 0,8× », audit UX B9).
+ */
+fun formatMultiplier(value: Float): String {
+    val hundredths = kotlin.math.round(value * 100).toInt()
+    return if (hundredths % 10 == 0) "%.1f×".format(value) else "%.2f×".format(value)
+}

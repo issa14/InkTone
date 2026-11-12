@@ -1,6 +1,7 @@
 package com.inktone.feature.settings
 
 import android.os.Build
+import com.inktone.core.designsystem.formatMultiplier
 import com.inktone.core.designsystem.AppIcon
 import com.inktone.core.designsystem.AppSymbol
 import com.inktone.core.designsystem.InkToneSlider
@@ -252,11 +253,11 @@ internal fun SettingsContent(
             InkToneSlider(
                 modifier = Modifier.padding(horizontal = 20.dp, vertical = 12.dp),
                 label = "Vitesse d'élocution",
-                value = activeSpeed,
-                range = 0.5f..2.0f,
+                value = activeSpeed.coerceIn(VoiceProfile.SPEED_RANGE),
+                range = VoiceProfile.SPEED_RANGE,
                 minIcon = AppSymbol.SlowMotionVideo,
                 maxIcon = AppSymbol.FastForward,
-                displayFormatter = { "%.1f×".format(it) },
+                displayFormatter = ::formatMultiplier,
                 onValueChange = { onIntent(SettingsIntent.SetVoiceSpeed(it)) },
             )
             // Audit UX A15 — curseur « Gain audio » retiré : aucun moteur ni
@@ -269,11 +270,11 @@ internal fun SettingsContent(
                 InkToneSlider(
                     modifier = Modifier.padding(horizontal = 20.dp, vertical = 12.dp),
                     label = "Intonation",
-                    value = activePitch,
-                    range = 0.5f..1.5f,
+                    value = activePitch.coerceIn(VoiceProfile.PITCH_RANGE),
+                    range = VoiceProfile.PITCH_RANGE,
                     minIcon = AppSymbol.KeyboardArrowDown,
                     maxIcon = AppSymbol.KeyboardArrowUp,
-                    displayFormatter = { "%.1f×".format(it) },
+                    displayFormatter = ::formatMultiplier,
                     onValueChange = { onIntent(SettingsIntent.SetVoicePitch(it)) },
                 )
             }
@@ -486,7 +487,7 @@ internal fun SettingsContent(
                 label = "Intervalle de pause",
                 value = preferences.eyeRestReminderIntervalMinutes,
                 step = 15,
-                range = 15..120,
+                range = UserPreferences.EYE_REST_INTERVAL_RANGE,
                 enabled = preferences.eyeRestReminderEnabled,
                 displayFormatter = { "$it min" },
                 onValueChange = { onIntent(SettingsIntent.SetEyeRestReminderIntervalMinutes(it)) },

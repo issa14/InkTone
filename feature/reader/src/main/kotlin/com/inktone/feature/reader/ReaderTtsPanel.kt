@@ -1,5 +1,6 @@
 package com.inktone.feature.reader
 
+import com.inktone.core.designsystem.formatMultiplier
 import com.inktone.core.designsystem.AppIcon
 import com.inktone.core.designsystem.AppSymbol
 import androidx.compose.foundation.layout.Arrangement
@@ -154,14 +155,14 @@ fun ReaderTtsPanel(
             // domaine à faire ici.
             InkToneSlider(
                 label = "Vitesse",
-                value = speedDraft,
-                range = 0.5f..3.0f,
+                value = speedDraft.coerceIn(VoiceProfile.SPEED_RANGE),
+                range = VoiceProfile.SPEED_RANGE,
                 onValueChange = { speedDraft = it },
                 onValueChangeFinished = { onSpeedChange(speedDraft) },
                 minIcon = AppSymbol.SlowMotionVideo,
                 maxIcon = AppSymbol.FastForward,
-                steps = 9,
-                displayFormatter = { "%.1f×".format(it) },
+                steps = 5, // crans de 0,25
+                displayFormatter = ::formatMultiplier,
             )
 
             Spacer(Modifier.height(12.dp))

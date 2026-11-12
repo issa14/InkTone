@@ -185,6 +185,10 @@ data class UserPreferences(
 
         /** Crans de vitesse d'auto-scroll : 0 désactivé, 1 lente, 2 moyenne, 3 rapide. */
         val AUTO_SCROLL_SPEED_RANGE = 0..3
+
+        /** Intervalle du rappel de repos oculaire, le même aux Réglages et au Lecteur (audit UX B9). */
+        val EYE_REST_INTERVAL_RANGE = 15..120
+        const val EYE_REST_INTERVAL_STEP = 15
     }
 }
 
