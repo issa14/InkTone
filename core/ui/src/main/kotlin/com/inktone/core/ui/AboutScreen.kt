@@ -68,7 +68,7 @@ private const val SUPPORT_EMAIL = "issadotnet@gmail.com"
 @Composable
 fun AboutScreen(
     versionName: String = "0.1.0",
-    ttsEngineLabel: String = "Non determine",
+    ttsEngineLabel: String = "Non déterminé",
 ) {
     val context = LocalContext.current
     val clipboardManager = LocalClipboardManager.current
@@ -114,7 +114,7 @@ fun AboutScreen(
                     "d'écoute fluide et accessible, directement sur votre appareil. La lecture " +
                     "et la synthèse vocale fonctionnent hors ligne ; les services en ligne " +
                     "(synchronisation, catalogues OPDS, voix cloud) restent optionnels et " +
-                    "desactives par defaut.",
+                    "désactivés par défaut.",
             )
 
             Spacer(Modifier.height(16.dp))
@@ -191,7 +191,7 @@ private fun EngagementsGrid() {
     ) {
         EngagementPillar(
             icon = AppSymbol.Device,
-            title = "Local par defaut",
+            title = "Local par défaut",
             subtitle = "Inférence CPU",
             modifier = Modifier.weight(1f),
         )
@@ -336,7 +336,7 @@ private fun ArchitectureAccordion() {
                     // Attribution obligatoire : le modele d'alignement force est sous
                     // CC-BY-4.0, qui impose de crediter l'auteur dans l'application
                     // distribuee, pas seulement dans le depot (THIRD_PARTY_NOTICES.md).
-                    LicenseRow("NeMo FastConformer CTC, NVIDIA (alignement mot a mot)", "CC-BY-4.0", Color(0xFF6A1B9A))
+                    LicenseRow("NeMo FastConformer CTC, NVIDIA (alignement mot à mot)", "CC-BY-4.0", Color(0xFF6A1B9A))
                     LicenseRow("ONNX Runtime (inférence)", "MIT", Color(0xFF1565C0))
                     LicenseRow("Jetpack Compose, Room, Hilt, Media3, WorkManager", "Apache-2.0", Color(0xFF2E7D32))
                     LicenseRow("Polices Literata, Work Sans, OpenDyslexic, Source Serif 4", "SIL Open Font License 1.1", Color(0xFFE65100))

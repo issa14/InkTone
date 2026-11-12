@@ -453,7 +453,7 @@ fun InkToneNavHost(navController: NavHostController = rememberNavController(), s
             }
         }
         composable<PronunciationRulesRoute> {
-            BackScaffold(title = "Regles de prononciation", onBack = navController::popBackStack) {
+            BackScaffold(title = "Règles de prononciation", onBack = navController::popBackStack) {
                 PronunciationRulesScreen()
             }
         }
@@ -492,7 +492,7 @@ fun InkToneNavHost(navController: NavHostController = rememberNavController(), s
         composable<AboutRoute> {
             val aboutViewModel: AboutViewModel = hiltViewModel()
             val ttsEngineLabel by aboutViewModel.ttsEngineLabel.collectAsStateWithLifecycle()
-            BackScaffold(title = "A propos", onBack = navController::popBackStack) {
+            BackScaffold(title = "À propos", onBack = navController::popBackStack) {
                 AboutScreen(
                     versionName = BuildConfig.VERSION_NAME,
                     ttsEngineLabel = ttsEngineLabel,

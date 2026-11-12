@@ -29,7 +29,7 @@ fun PronunciationRulesScreen(viewModel: PronunciationRulesViewModel = hiltViewMo
     val state by viewModel.state.collectAsStateWithLifecycle()
 
     Column(modifier = Modifier.padding(16.dp)) {
-        Text("Regles de prononciation")
+        Text("Règles de prononciation")
 
         OutlinedTextField(
             value = state.editingOriginalText,
