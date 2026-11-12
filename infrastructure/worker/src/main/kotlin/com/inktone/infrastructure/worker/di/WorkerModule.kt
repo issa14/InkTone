@@ -11,6 +11,8 @@ import com.inktone.infrastructure.worker.WorkManagerImportProgressObserver
 import com.inktone.infrastructure.worker.WorkManagerImportScheduler
 import com.inktone.infrastructure.worker.WorkManagerOpdsDownloadScheduler
 import com.inktone.infrastructure.worker.WorkManagerPreAnalysisScheduler
+import com.inktone.infrastructure.worker.WorkManagerVoiceModelDownloadScheduler
+import com.inktone.domain.service.VoiceModelDownloadScheduler
 import com.inktone.infrastructure.worker.WorkManagerSyncScheduler
 import dagger.Binds
 import dagger.Module
@@ -50,4 +52,8 @@ abstract class ImportSchedulerModule {
     @Binds
     @Singleton
     abstract fun bindPreAnalysisScheduler(impl: WorkManagerPreAnalysisScheduler): PreAnalysisScheduler
+
+    @Binds
+    @Singleton
+    abstract fun bindVoiceModelDownloadScheduler(impl: WorkManagerVoiceModelDownloadScheduler): VoiceModelDownloadScheduler
 }

@@ -4,6 +4,7 @@ import androidx.test.core.app.ApplicationProvider
 import com.inktone.core.testing.fake.FakePreferencesRepository
 import com.inktone.core.testing.fake.FakePronunciationRuleRepository
 import com.inktone.core.testing.fake.FakeTtsCapabilityCatalog
+import com.inktone.core.testing.fake.FakeVoiceModelDownloadScheduler
 import com.inktone.core.testing.fake.FakeTtsEngine
 import com.inktone.core.testing.fake.FakeVoiceModelDownloadService
 import com.inktone.core.testing.fake.FakeVoiceProfileRepository
@@ -73,6 +74,7 @@ class SettingsViewModelTest {
         ttsEngine: TtsEngine = FakeTtsEngine(),
         audioPlayer: AudioPlayer = FakeAudioPlayer(),
         ttsCapabilityCatalog: TtsCapabilityCatalog = FakeTtsCapabilityCatalog(),
+        voiceModelDownloadScheduler: FakeVoiceModelDownloadScheduler = FakeVoiceModelDownloadScheduler(),
     ) = SettingsViewModel(
         preferencesRepository,
         ApplyAccessibilityPresetUseCase(preferencesRepository),
@@ -90,6 +92,7 @@ class SettingsViewModelTest {
         ttsEngine,
         audioPlayer,
         ttsCapabilityCatalog,
+        voiceModelDownloadScheduler,
     )
 
     @Test
@@ -452,51 +455,44 @@ class SettingsViewModelTest {
     // ───── Lot 10, Tâche 10.3 — point de besoin réel du téléchargement de voix ─────
 
     @Test
-    fun `StartVoiceDownload reflete la progression jusqu a la fin`() = runTest {
-        val downloadService = FakeVoiceModelDownloadService(
-            listOf(
-                com.inktone.domain.service.VoiceDownloadProgress.InProgress(50, 100),
-                com.inktone.domain.service.VoiceDownloadProgress.Complete,
-            ),
-            installed = false,
+    fun `StartVoiceDownload confie le telechargement a la tache de fond et reflete sa progression`() = runTest {
+        // Audit UX A7 : le téléchargement ne vit plus dans cet écran, il
+        // survit à sa fermeture ; l'écran ne fait que lancer et suivre.
+        val scheduler = FakeVoiceModelDownloadScheduler()
+        val vm = viewModel(
+            voiceModelDownloadService = FakeVoiceModelDownloadService(emptyList(), installed = false),
+            voiceModelDownloadScheduler = scheduler,
         )
-        val vm = viewModel(voiceModelDownloadService = downloadService)
         dispatcher.scheduler.advanceUntilIdle()
         assertEquals(null, vm.state.value.voiceDownloadProgress)
 
         vm.onIntent(SettingsIntent.StartVoiceDownload)
         dispatcher.scheduler.advanceUntilIdle()
+        assertEquals(1, scheduler.startCount)
 
+        scheduler.progressFlow.value = com.inktone.domain.service.VoiceDownloadProgress.InProgress(50, 100)
+        dispatcher.scheduler.advanceUntilIdle()
+        assertEquals(com.inktone.domain.service.VoiceDownloadProgress.InProgress(50, 100), vm.state.value.voiceDownloadProgress)
+
+        scheduler.progressFlow.value = com.inktone.domain.service.VoiceDownloadProgress.Complete
+        dispatcher.scheduler.advanceUntilIdle()
         assertEquals(com.inktone.domain.service.VoiceDownloadProgress.Complete, vm.state.value.voiceDownloadProgress)
     }
 
     @Test
-    fun `CancelVoiceDownload interrompt le telechargement en cours et efface la progression`() = runTest {
-        // Flow qui ne termine jamais seul (suspend indefiniment apres le
-        // premier evenement) : seule une annulation explicite peut
-        // l'arreter -- prouve que CancelVoiceDownload annule reellement
-        // la coroutine, pas seulement qu'elle ignore les evenements
-        // suivants d'un flow deja termine.
-        val neverEndingDownload = object : com.inktone.domain.service.VoiceModelDownloadService {
-            override fun downloadDefaultVoiceModel() = kotlinx.coroutines.flow.flow {
-                emit(com.inktone.domain.service.VoiceDownloadProgress.InProgress(50, 100))
-                kotlinx.coroutines.awaitCancellation()
-            }
-            override fun isDefaultVoiceInstalled(): Boolean = false
-        }
-        val vm = viewModel(voiceModelDownloadService = neverEndingDownload)
-        dispatcher.scheduler.advanceUntilIdle()
-
-        vm.onIntent(SettingsIntent.StartVoiceDownload)
-        dispatcher.scheduler.advanceUntilIdle()
-        assertEquals(
-            com.inktone.domain.service.VoiceDownloadProgress.InProgress(50, 100),
-            vm.state.value.voiceDownloadProgress,
+    fun `CancelVoiceDownload annule la tache de fond et efface la progression`() = runTest {
+        val scheduler = FakeVoiceModelDownloadScheduler()
+        val vm = viewModel(
+            voiceModelDownloadService = FakeVoiceModelDownloadService(emptyList(), installed = false),
+            voiceModelDownloadScheduler = scheduler,
         )
+        scheduler.progressFlow.value = com.inktone.domain.service.VoiceDownloadProgress.InProgress(50, 100)
+        dispatcher.scheduler.advanceUntilIdle()
 
         vm.onIntent(SettingsIntent.CancelVoiceDownload)
         dispatcher.scheduler.advanceUntilIdle()
 
+        assertEquals(1, scheduler.cancelCount)
         assertEquals(null, vm.state.value.voiceDownloadProgress)
     }
 

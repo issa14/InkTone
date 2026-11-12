@@ -18,6 +18,7 @@ import com.inktone.domain.service.AudioPlayer
 import com.inktone.domain.service.PlayerState
 import com.inktone.domain.service.TtsCapabilityCatalog
 import com.inktone.domain.service.TtsEngine
+import com.inktone.domain.service.VoiceModelDownloadScheduler
 import com.inktone.domain.service.VoiceModelDownloadService
 import com.inktone.domain.usecase.ApplyAccessibilityPresetUseCase
 import com.inktone.domain.usecase.GetVoiceProfilesUseCase
@@ -72,6 +73,7 @@ class SettingsViewModel @Inject constructor(
     private val ttsEngine: TtsEngine,
     private val audioPlayer: AudioPlayer,
     private val ttsCapabilityCatalog: TtsCapabilityCatalog,
+    private val voiceModelDownloadScheduler: VoiceModelDownloadScheduler,
 ) : ViewModel() {
 
     private val _state = MutableStateFlow(
@@ -81,7 +83,6 @@ class SettingsViewModel @Inject constructor(
                 .toSet(),
         ),
     )
-    private var voiceDownloadJob: Job? = null
     private var previewJob: Job? = null
     val state: StateFlow<SettingsUiState> = _state.asStateFlow()
 
@@ -112,6 +113,13 @@ class SettingsViewModel @Inject constructor(
             _state.value = _state.value.copy(
                 voiceDownloadProgress = com.inktone.domain.service.VoiceDownloadProgress.Complete,
             )
+        }
+        // Audit UX A7 : le téléchargement tourne en tâche de fond, hors de cet
+        // écran ; sa progression se retrouve en revenant aux Réglages.
+        viewModelScope.launch {
+            voiceModelDownloadScheduler.progress.collect { progress ->
+                if (progress != null) _state.value = _state.value.copy(voiceDownloadProgress = progress)
+            }
         }
         // Audit v1.0.0 (B1) — fin naturelle de l'extrait (file vidée) ou
         // arrêt explicite : isPreviewing repasse à false. Aucune minuterie
@@ -203,22 +211,14 @@ class SettingsViewModel @Inject constructor(
         }
     }
 
-    // Job dédié plutôt que la coroutine de onIntent() : doit survivre au
-    //-delà de l'appel courant et être annulable individuellement (retour
-    // Issa, vérification device — un téléchargement doit pouvoir être
-    // interrompu, pas seulement lancé).
+    // Audit UX A7 : le téléchargement mourait avec cet écran (viewModelScope) ;
+    // il est confié à une tâche de fond, annulable depuis la même carte.
     private fun startVoiceDownload() {
-        voiceDownloadJob?.cancel()
-        voiceDownloadJob = viewModelScope.launch {
-            voiceModelDownloadService.downloadDefaultVoiceModel().collect { progress ->
-                _state.value = _state.value.copy(voiceDownloadProgress = progress)
-            }
-        }
+        voiceModelDownloadScheduler.start()
     }
 
     private fun cancelVoiceDownload() {
-        voiceDownloadJob?.cancel()
-        voiceDownloadJob = null
+        voiceModelDownloadScheduler.cancel()
         _state.value = _state.value.copy(voiceDownloadProgress = null)
     }
 
