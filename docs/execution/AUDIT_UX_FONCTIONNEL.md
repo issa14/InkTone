@@ -632,12 +632,12 @@ Avant de pousser les deux dernières : `./gradlew build` complet vert sur `HEAD`
 | A14, D3 | Chapitre cible chargé et retrouvé par son href avant de s'y placer | `5d0ffb0a` | Appareil |
 | D2 | Chapitres numérotés par leur position dans l'ordre de lecture à l'import | `ceb2ff90` | Tests JVM |
 | A4 | Plus de réouverture du livre à chaque retour vers le Lecteur | `ae1996b2` | Test JVM |
-| D35, D36 | Narration en cours laissée intacte à l'ouverture d'un livre ; le Lecteur ignore la narration d'un autre livre | `de8f1682` | Tests JVM — **appareil en attente** |
-| D39 | Temps de pause retiré de l'horloge de narration | `b2097f7b` | Tests JVM — **appareil en attente** |
+| D35, D36 | Narration en cours laissée intacte à l'ouverture d'un livre ; le Lecteur ignore la narration d'un autre livre | `de8f1682`, `52681ced` | Appareil + tests JVM |
+| D39 | Temps de pause retiré de l'horloge de narration | `b2097f7b` | Appareil + tests JVM |
 | D40 | Trois échecs de synthèse consécutifs arrêtent la narration, message en snackbar | `0a37b881` | Tests JVM |
-| D46 | Pause effective pendant la synthèse et après un saut de phrase | `db18752b` | Tests JVM — **appareil en attente** |
-| A6 | Vitesse et voix changées appliquées aussitôt pendant la narration | `4eddefe9` | Tests JVM — **appareil en attente** |
-| A12 | Supprimer un livre arrête sa narration | `7365321e` | Test JVM — **appareil en attente** (livre de test, suppression irréversible) |
+| D46 | Pause effective pendant la synthèse et après un saut de phrase | `db18752b` | Appareil + tests JVM |
+| A6 | Vitesse et voix changées appliquées aussitôt pendant la narration | `4eddefe9` | Appareil + tests JVM |
+| A12 | Supprimer un livre arrête sa narration | `7365321e` | Appareil + test JVM |
 | A3 | Recherche du Lecteur limitée au livre ouvert, retour au même Lecteur ; recherche globale dans le menu de la Bibliothèque | `a9de9c4e` | Appareil (piloté par adb) |
 | Recherche Bibliothèque | Étendue aux séries, tags, éditeur et description | `804ba788` | Tests JVM |
 | D26 | Chaque fragment de lecture daté de son propre début | `a811b2a4` | Test JVM |
@@ -648,29 +648,32 @@ Avant de pousser les deux dernières : `./gradlew build` complet vert sur `HEAD`
 | A19 (reste) | Même pourcentage partout, 100 % compris ; « Commencé » sous 1 % | `85517349` | Appareil |
 | A7 | Voix neuronale téléchargée par WorkManager en service de premier plan | `14287c8a` | Compilation + tests JVM — **appareil en attente** (voix déjà installée sur le V2206) |
 | D10 | Phrases d'un livre supprimé purgées de l'index | `20fefd8d` | Test JVM ; aucun test instrumenté |
-| D21 | Livre TXT découpé en paragraphes | `5fc78df4` | Tests JVM — **appareil en attente** |
-| D53 | Import d'un seul fichier visible du début au résumé | `48eec69e` | Tests JVM — **appareil en attente** |
+| D21 | Livre TXT découpé en paragraphes | `5fc78df4` | Appareil + tests JVM |
+| D53 | Import d'un seul fichier visible du début au résumé | `48eec69e` | Appareil + tests JVM |
 | D47 | Pause plus longue entre deux paragraphes narrés | `bc41222b` | Test JVM |
 | D70 | Abréviation en fin de phrase : plus de fusion de deux phrases (`PARSER_VERSION` 3) | `5eec1462` | Tests JVM |
 | B9 | Bornes de vitesse, hauteur et intervalle communes aux Réglages et au Lecteur | `67703f34` | Tests JVM |
-| D74, C5 | Panneau Voix du Lecteur : lien « Changer de voix dans les Réglages » à la place de la liste | `b039cd47` | Compilation — **`ReaderTtsPanelTest` à exécuter sur appareil** |
+| D74, C5 | Panneau Voix du Lecteur : lien « Changer de voix dans les Réglages » à la place de la liste | `b039cd47` | Appareil — **`ReaderTtsPanelTest` à exécuter** |
 | D73 | Une seule définition du profil vocal par défaut (`VoiceProfile.defaultFor`) | `2ad8b5f7` | Tests JVM |
 | C7 | Suppression d'une règle de prononciation confirmée | `fd502e3e` | Tests JVM |
-| B8 | Même éditeur de prononciation depuis le Lecteur et les Réglages | `4d9e8a44` | Tests JVM — **appareil en attente** |
+| B8 | Même éditeur de prononciation depuis le Lecteur et les Réglages | `4d9e8a44` | Appareil + tests JVM |
 
-**Vérifications sur appareil en attente** (à faire avant de pousser
-`audit-narration`) :
-- **D35** : lancer la narration depuis la carte Reprendre, revenir à la Bibliothèque, toucher le mini-lecteur : la voix continue, le Lecteur s'ouvre sur la phrase lue.
-- **D36** : narration du livre A, ouvrir un livre B : notification et mini-lecteur restent sur A ; fermer B : A continue.
-- **D39** : pause d'environ 30 s depuis la notification, reprise : le surlignage suit le son, la réouverture reprend à la phrase entendue.
-- **D46** : voix lente ou Edge, Pause pendant l'attente : le mini-lecteur reste, Play relance ; en pause, sauter une phrase puis Play : la nouvelle phrase est lue.
-- **A6** : vitesse de 1,0× à 2,0× pendant la narration : la phrase suivante est plus rapide sans geste supplémentaire.
-- **A12** (livre de test) : narrer ce livre puis le retirer : la voix s'arrête, le mini-lecteur disparaît.
+**Vérifications sur appareil (2026-11-15, V2206).** D35, D36, D39, D46, A6,
+A12, D21, D53, B8 et D74 vérifiées. Deux défauts trouvés et corrigés
+(`52681ced`, deux tests JVM qui échouent sans le correctif) :
+- **D36** : B rejoignait sa position enregistrée par une navigation qui passe par `pausePlayback()`, et celle-ci arrêtait la narration de A. Le Lecteur n'arrête plus que sa propre narration.
+- **D36, lancement de B** : l'arrêt de A publie `Idle` avant le `Buffering` de B ; le bouton de B restait sur Play pendant la synthèse et chaque appui relançait la préparation. `Buffering` compte désormais comme lecture engagée.
+
+Observation non reproduite (D35, premier essai) : pause 3 s après le retour à
+la Bibliothèque, reprise 2 s plus tard, puis environ 14 s de silence le temps
+qu'Edge resynthétise la phrase. Rien ne vient de la fermeture du Lecteur ;
+profil d'une perte passagère du focus audio suivie de la reprise automatique.
+Le second essai, tracé, n'a montré ni pause ni arrêt.
+
+**Restent à faire avant de pousser `audit-narration`** :
 - **A7** (voix absente seulement) : lancer le téléchargement, quitter les Réglages : la notification reste et le téléchargement aboutit.
-- **D21** (livre TXT) : défiler, fermer, rouvrir : reprise et pourcentage suivent la lecture.
-- **D53** : importer un seul fichier déjà présent : bannière « Import en cours… » puis résumé « doublon ».
-- **B8** : panneau Voix du Lecteur, « Ajouter une règle de prononciation » : même carte qu'aux Réglages, suppression confirmée.
-- **D74** : lien vers les Réglages dans le panneau Voix ; exécuter `ReaderTtsPanelTest` (`connectedDebugAndroidTest`).
+- **D74** : exécuter `ReaderTtsPanelTest` (`connectedDebugAndroidTest`).
+- Aucun test ne vérifie que l'intent `Pause` du Lecteur est traité : sa branche peut disparaître du `when` sans erreur de compilation ni de test.
 
 **Changement de comportement à connaître (D73)** : sans profil vocal
 enregistré, la voix par défaut suit désormais le moteur des préférences
