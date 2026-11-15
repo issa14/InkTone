@@ -478,15 +478,15 @@ class PlaybackOrchestrator @Inject constructor(
         }
         val totalMs = minutes * 60_000L
         _sleepTimer.value = SleepTimerState(remainingMs = totalMs, totalMs = totalMs)
+        // Décompte sur l'horloge : retrancher un pas fixe à chaque `delay`
+        // allongeait la durée réelle de tout retard de réveil (audit UX D37).
+        val deadlineNanos = System.nanoTime() + totalMs * 1_000_000L
         sleepTimerJob = scope.launch {
             var remaining = totalMs
             while (remaining > 0) {
                 delay(SLEEP_TIMER_TICK_MS)
-                remaining -= SLEEP_TIMER_TICK_MS
-                _sleepTimer.value = SleepTimerState(
-                    remainingMs = remaining.coerceAtLeast(0),
-                    totalMs = totalMs,
-                )
+                remaining = ((deadlineNanos - System.nanoTime()) / 1_000_000L).coerceIn(0L, totalMs)
+                _sleepTimer.value = SleepTimerState(remainingMs = remaining, totalMs = totalMs)
             }
             _sleepTimer.value = null
             stop()

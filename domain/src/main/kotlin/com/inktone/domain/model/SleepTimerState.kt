@@ -17,7 +17,9 @@ data class SleepTimerState(
      * entamé — la puce « 30 min » se désélectionnerait au bout d'une seconde.
      */
     val totalMs: Long = remainingMs,
-    val fadeOutEnabled: Boolean = true,
+    // Faux : aucun fondu n'existe, le minuteur coupe net (audit UX D37) ; un
+    // modèle qui annonce un fondu inexistant ferait semblant.
+    val fadeOutEnabled: Boolean = false,
 ) {
     init {
         require(remainingMs >= 0) { "remainingMs doit être positif ou nul" }
