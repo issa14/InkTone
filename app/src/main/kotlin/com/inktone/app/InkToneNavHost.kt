@@ -254,10 +254,6 @@ fun InkToneNavHost(navController: NavHostController = rememberNavController(), s
                 onNavigateToReader = { publicationId, autoStartTts ->
                     navController.navigate(ReaderRoute(publicationId, autoStartTts = autoStartTts))
                 },
-                // `LibraryEffect.NavigateToStats` (carte de statistiques de
-                // la Bibliothèque) vise la même destination que l'item de
-                // drawer : même navigation plate, pas une poussée.
-                onOpenStats = { navigateToDrawerDestination(StatisticsRoute) },
                 onMenuClick = openDrawer,
                 onNavigateToSeriesDetail = { series -> navController.navigate(LibraryDetailRoute("series", series)) },
                 onNavigateToTagDetail = { tag -> navController.navigate(LibraryDetailRoute("tag", tag)) },

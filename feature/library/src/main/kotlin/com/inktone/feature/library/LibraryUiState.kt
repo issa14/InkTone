@@ -72,7 +72,6 @@ data class LibraryUiState(
     // `computeProgressMap` déjà déplacé sur `defaultDispatcher`.
     val availableTags: List<String> = emptyList(),
     val availableSeries: List<String> = emptyList(),
-    val availableAuthors: List<String> = emptyList(),
     val seriesCounts: Map<String, Int> = emptyMap(),
     val tagCounts: Map<String, Int> = emptyMap(),
     /**
@@ -154,7 +153,6 @@ internal fun List<Publication>.filterAndSort(
 internal fun LibraryUiState.withDerivedFields(): LibraryUiState = copy(
     availableTags = publications.flatMap { it.subjects }.distinct().sortedWith(frenchCollator()),
     availableSeries = publications.mapNotNull { it.seriesName }.distinct().sortedWith(frenchCollator()),
-    availableAuthors = publications.flatMap { it.authors }.distinct().sortedWith(frenchCollator()),
     seriesCounts = publications.mapNotNull { it.seriesName }.groupingBy { it }.eachCount(),
     tagCounts = publications.flatMap { it.subjects }.groupingBy { it }.eachCount(),
     resumeReadingPublication = publications.resumePublication(),
@@ -246,7 +244,6 @@ sealed interface LibraryIntent {
  */
 sealed interface LibraryEffect {
     data class NavigateToReader(val publicationId: String, val autoStartTts: Boolean = false) : LibraryEffect
-    data object NavigateToStats : LibraryEffect
     // Lot 19 — « Synchroniser avec le cloud » non configuré : bascule
     // vers l'écran de configuration, jamais un bouton désactivé.
     data object NavigateToSync : LibraryEffect

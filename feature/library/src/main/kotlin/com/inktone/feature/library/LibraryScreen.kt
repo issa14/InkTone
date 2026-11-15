@@ -91,10 +91,7 @@ import kotlinx.coroutines.launch
  * Remplace la grille nue de la Tache 6.6.
  *
  * `onNavigateToReader` : câblé par l'appelant (`InkToneNavHost`, Tâche
- * 9bis.2). `floatingActionButton` (Tâche 6.2bis) : point d'intégration de
- * l'import (`feature/import`, slot plutôt qu'une dépendance directe,
- * `feature/library` n'ayant pas le droit de dépendre d'un autre module
- * `feature`, Blueprint §12.4).
+ * 9bis.2).
  *
  * Transition de contenu partagee (couverture -> Reader, `SharedTransitionLayout`)
  * volontairement PAS implementee ici : necessiterait de faire passer un
@@ -108,9 +105,6 @@ import kotlinx.coroutines.launch
 fun LibraryScreen(
     onNavigateToReader: (publicationId: String, autoStartTts: Boolean) -> Unit,
     viewModel: LibraryViewModel = hiltViewModel(),
-    floatingActionButton: @Composable () -> Unit = {},
-    floatingAudioButton: @Composable () -> Unit = {},
-    onOpenStats: () -> Unit = {},
     onImportClick: () -> Unit = {},
     // Lot 18 — le drawer est hoisté dans InkToneNavHost (partagé par les
     // 6 destinations principales) : cet écran ne porte plus que le bouton
@@ -138,7 +132,6 @@ fun LibraryScreen(
         viewModel.effects.collect { effect ->
             when (effect) {
                 is LibraryEffect.NavigateToReader -> onNavigateToReader(effect.publicationId, effect.autoStartTts)
-                is LibraryEffect.NavigateToStats -> onOpenStats()
                 is LibraryEffect.NavigateToSync -> onOpenSync()
                 is LibraryEffect.CoversRegenerated -> {
                     val succeeded = effect.result.processed - effect.result.failed
@@ -172,13 +165,6 @@ fun LibraryScreen(
 
     Scaffold(
         snackbarHost = { SnackbarHost(snackbarHostState) },
-        floatingActionButton = {
-            Row(verticalAlignment = Alignment.Bottom) {
-                floatingAudioButton()
-                Spacer(Modifier.width(12.dp))
-                floatingActionButton()
-            }
-        },
         topBar = {
             LibraryTopBar(
                 searchQuery = state.searchQuery,
