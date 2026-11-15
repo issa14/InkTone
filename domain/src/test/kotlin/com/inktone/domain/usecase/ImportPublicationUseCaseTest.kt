@@ -141,4 +141,55 @@ class ImportPublicationUseCaseTest {
         assertEquals(1, results.count { it is ImportResult.Duplicate })
         assertEquals(1, publicationRepository.observeAll().first().size)
     }
+
+    /**
+     * Audit UX D56 : un chapitre illisible interrompait l'indexation, la
+     * pré-analyse et le calcul des longueurs pour tout le livre.
+     */
+    @Test
+    fun `un chapitre illisible n'interrompt pas l'import du reste du livre`() = runTest {
+        val searchService = FakeSearchService()
+        val publicationRepository = FakePublicationRepository()
+        val preAnalysisStore = FakePreAnalysisStore()
+        val shells = listOf("ch1.xhtml", "casse.xhtml", "ch3.xhtml").map { href ->
+            Chapter(index = 0, href = href, title = null, content = ChapterContent.Rich(emptyList()))
+        }
+        val parser = object : com.inktone.domain.service.ChapterParser {
+            override fun registerPublication(publicationId: String, fileUri: String) = Unit
+            override suspend fun parseChapter(publicationId: String, chapterHref: String, fragment: String?): Chapter {
+                if (chapterHref == "casse.xhtml") error("chapitre illisible")
+                return Chapter(
+                    index = 0, href = chapterHref, title = null, content = ChapterContent.Rich(emptyList()),
+                    sentences = listOf(com.inktone.domain.model.Sentence(0, "Une phrase.", 0, 11)),
+                )
+            }
+            override fun preload(publicationId: String, chapterHref: String, scope: kotlinx.coroutines.CoroutineScope) =
+                kotlinx.coroutines.Job().apply { complete() }
+            override fun invalidate(publicationId: String) = Unit
+        }
+        val importPublication = ImportPublicationUseCase(
+            publicationParser = FakePublicationParser(
+                result = ParseResult.Success(
+                    documentModel = DocumentModel(chapters = shells, tableOfContents = emptyList(), resources = emptyList()),
+                    isDrmProtected = false,
+                    metadata = PublicationMetadata(title = "Titre"),
+                ),
+            ),
+            publicationRepository = publicationRepository,
+            fileStorageService = FakeFileStorageService(),
+            searchService = searchService,
+            chapterParser = parser,
+            preAnalysisStore = preAnalysisStore,
+        )
+
+        val publication = (importPublication("content://fake/livre.epub") as ImportResult.Success).publication
+
+        // Le chapitre après le chapitre cassé est indexé, à sa position.
+        assertEquals(listOf(0 to "ch1.xhtml", 2 to "ch3.xhtml"), searchService.indexedChapters)
+        // Pré-analyse sans le chapitre cassé, que le Lecteur retentera.
+        assertEquals(listOf("ch1.xhtml", "ch3.xhtml"), preAnalysisStore.savedChapters(publication.id)?.map { it.href })
+        // Longueurs alignées sur les positions : 0 pour le chapitre cassé.
+        val lengths = publicationRepository.getById(publication.id)?.chapterLengths
+        assertEquals(listOf(11, 0, 11), lengths?.values)
+    }
 }

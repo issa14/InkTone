@@ -153,13 +153,37 @@ class ImportPublicationUseCase(
                 // persistée (jamais un second accès ZIP : on réutilise le
                 // Chapter déjà produit par ChapterParser, décision 1).
                 val parsedChapters = mutableListOf<Chapter>()
+                // Longueurs à la position de chaque chapitre : un chapitre
+                // illisible compte pour 0 plutôt que de décaler les suivants.
+                val lengthChapters = mutableListOf<Chapter>()
                 documentModel.chapters.forEachIndexed { position, shell ->
-                    // L'index renvoyé par le parseur ignore la couverture
-                    // ajoutée en tête (audit UX D2) : la position dans l'ordre
-                    // de lecture, celle du Lecteur, fait foi.
-                    val chapter = chapterParser.parseChapter(publication.id, shell.href).copy(index = position)
+                    // Un chapitre illisible n'interrompt plus l'indexation, la
+                    // pré-analyse ni les longueurs du reste du livre (audit UX
+                    // D56) : le Lecteur tolère ce chapitre, l'import aussi. Il
+                    // reste hors de la pré-analyse, que le Lecteur retente.
+                    val chapter = try {
+                        // L'index renvoyé par le parseur ignore la couverture
+                        // ajoutée en tête (audit UX D2) : la position dans
+                        // l'ordre de lecture, celle du Lecteur, fait foi.
+                        chapterParser.parseChapter(publication.id, shell.href).copy(index = position)
+                    } catch (e: CancellationException) {
+                        throw e
+                    } catch (e: Exception) {
+                        null
+                    }
+                    if (chapter == null) {
+                        lengthChapters += shell.copy(index = position)
+                        return@forEachIndexed
+                    }
                     parsedChapters += chapter
-                    searchService.indexSentences(publication.id, position, chapter.href, chapter.sentences)
+                    lengthChapters += chapter
+                    try {
+                        searchService.indexSentences(publication.id, position, chapter.href, chapter.sentences)
+                    } catch (e: CancellationException) {
+                        throw e
+                    } catch (e: Exception) {
+                        // Ce chapitre seul manque à l'index.
+                    }
                 }
                 // Le PDF est géré par son propre chemin page-à-page
                 // (Palier C) : la pré-analyse de chapitres/sentences ne
@@ -169,7 +193,7 @@ class ImportPublicationUseCase(
                     // Progression : longueurs du livre ENTIER, tirées des
                     // chapitres déjà parsés ci-dessus (aucun accès ZIP de
                     // plus, K2), dans l'ordre de lecture des coquilles.
-                    publicationRepository.setChapterLengths(publication.id, ChapterLengths.of(parsedChapters))
+                    publicationRepository.setChapterLengths(publication.id, ChapterLengths.of(lengthChapters))
                 }
                 chapterParser.invalidate(publication.id)
             } else {
