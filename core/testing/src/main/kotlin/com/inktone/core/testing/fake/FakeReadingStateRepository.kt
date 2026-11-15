@@ -19,7 +19,11 @@ class FakeReadingStateRepository : ReadingStateRepository {
     override suspend fun getAll(): List<ReadingState> = state.value.values.toList()
 
     override suspend fun save(state: ReadingState) {
-        this.state.value = this.state.value + (state.publicationId to state)
+        // Le contexte d'un Locator est hors égalité : une position identique à son
+        // contexte près ne ferait pas émettre le StateFlow.
+        val updated = this.state.value + (state.publicationId to state)
+        this.state.value = emptyMap()
+        this.state.value = updated
     }
 
     override suspend fun delete(publicationId: String) {

@@ -18,6 +18,13 @@ class FakeBookmarkRepository : BookmarkRepository {
         state.value = state.value + bookmark
     }
 
+    override suspend fun update(bookmark: Bookmark) {
+        // Voir FakeAnnotationRepository.update : le contexte d'un Locator est hors égalité.
+        val updated = state.value.map { if (it.id == bookmark.id) bookmark else it }
+        state.value = emptyList()
+        state.value = updated
+    }
+
     override suspend fun delete(id: String) {
         state.value = state.value.filterNot { it.id == id }
     }

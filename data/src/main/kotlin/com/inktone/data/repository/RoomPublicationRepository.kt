@@ -52,6 +52,8 @@ class RoomPublicationRepository @Inject constructor(
     override suspend fun setCoverUri(id: String, coverUri: String?) = dao.setCoverUri(id, coverUri)
 
     override suspend fun setFileUri(id: String, fileUri: String) = dao.setFileUri(id, fileUri)
+
+    override suspend fun setLocatorAnchorVersion(id: String, version: Int) = dao.setLocatorAnchorVersion(id, version)
     override suspend fun setChapterLengths(id: String, chapterLengths: ChapterLengths) =
         dao.setChapterLengths(id, chapterLengths.toColumn())
     override suspend fun resetAllCoversToDefault() = dao.resetAllCovers()

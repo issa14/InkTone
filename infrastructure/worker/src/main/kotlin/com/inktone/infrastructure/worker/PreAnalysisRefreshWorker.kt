@@ -8,6 +8,7 @@ import androidx.work.WorkerParameters
 import androidx.work.workDataOf
 import com.inktone.domain.usecase.BackfillChapterLengthsUseCase
 import com.inktone.domain.usecase.CopyLibraryToPrivateStorageUseCase
+import com.inktone.domain.usecase.ReanchorLocatorsUseCase
 import com.inktone.domain.usecase.RefreshStalePreAnalysesUseCase
 import dagger.assisted.Assisted
 import dagger.assisted.AssistedInject
@@ -32,6 +33,7 @@ class PreAnalysisRefreshWorker @AssistedInject constructor(
     private val copyLibraryToPrivateStorage: CopyLibraryToPrivateStorageUseCase,
     private val refreshStalePreAnalyses: RefreshStalePreAnalysesUseCase,
     private val backfillChapterLengths: BackfillChapterLengthsUseCase,
+    private val reanchorLocators: ReanchorLocatorsUseCase,
     private val workManager: WorkManager,
 ) : CoroutineWorker(context, params) {
 
@@ -49,6 +51,8 @@ class PreAnalysisRefreshWorker @AssistedInject constructor(
         // APRÈS la régénération : les longueurs de chapitres d'un EPUB se
         // lisent dans sa pré-analyse, qui vient peut-être d'être réécrite.
         val lengths = backfillChapterLengths()
+        // Après la régénération : les positions sont ancrées sur le texte à jour (ADR-027).
+        val anchors = reanchorLocators()
         return Result.success(
             workDataOf(
                 KEY_REFRESHED to outcome.refreshed,
@@ -56,6 +60,8 @@ class PreAnalysisRefreshWorker @AssistedInject constructor(
                 KEY_FAILED to outcome.failed,
                 KEY_LENGTHS_FILLED to lengths.filled,
                 KEY_LENGTHS_FAILED to lengths.failed,
+                KEY_REANCHORED to anchors.reanchored,
+                KEY_NOT_REANCHORED to anchors.notReanchored,
                 KEY_COPIED to copies.copied,
                 KEY_COPY_FAILED to copies.failed,
             ),
@@ -69,6 +75,8 @@ class PreAnalysisRefreshWorker @AssistedInject constructor(
         const val KEY_FAILED = "failed"
         const val KEY_LENGTHS_FILLED = "lengths_filled"
         const val KEY_LENGTHS_FAILED = "lengths_failed"
+        const val KEY_REANCHORED = "reanchored"
+        const val KEY_NOT_REANCHORED = "not_reanchored"
         const val KEY_COPIED = "copied"
         const val KEY_COPY_FAILED = "copy_failed"
     }

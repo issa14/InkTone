@@ -9,6 +9,9 @@ interface BookmarkRepository {
     /** Necessaire pour BackupManager (Tache 8.5) — aucune methode globale n'existait avant. */
     fun observeAll(): Flow<List<Bookmark>>
     suspend fun insert(bookmark: Bookmark)
+
+    /** Remplace le signet de même identifiant (ré-ancrage de sa position, ADR-027). */
+    suspend fun update(bookmark: Bookmark)
     suspend fun delete(id: String)
 
     /** Lot 4, tâche 4.3 — même patron que Publication.isPinned. */

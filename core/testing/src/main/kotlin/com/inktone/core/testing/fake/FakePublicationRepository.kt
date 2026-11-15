@@ -76,6 +76,10 @@ class FakePublicationRepository : PublicationRepository {
         state.value = state.value.map { if (it.id == id) it.copy(coverUri = coverUri) else it }
     }
 
+    override suspend fun setLocatorAnchorVersion(id: String, version: Int) {
+        state.value = state.value.map { if (it.id == id) it.copy(locatorAnchorVersion = version) else it }
+    }
+
     override suspend fun setFileUri(id: String, fileUri: String) {
         state.value = state.value.map { if (it.id == id) it.copy(fileUri = fileUri) else it }
     }

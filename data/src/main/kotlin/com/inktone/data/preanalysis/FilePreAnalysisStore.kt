@@ -123,7 +123,7 @@ class FilePreAnalysisStore @Inject constructor(
 
     private fun chapterFileName(index: Int): String = "$index.json"
 
-    private companion object {
+    companion object {
         const val HEADER_FILE = "header.json"
 
         /** Version du format de sérialisation — incrémenter à tout changement de schéma. */

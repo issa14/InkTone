@@ -85,6 +85,9 @@ interface PublicationDao {
     @Query("UPDATE publications SET coverUri = :coverUri WHERE id = :id")
     suspend fun setCoverUri(id: String, coverUri: String?)
 
+    @Query("UPDATE publications SET locatorAnchorVersion = :version WHERE id = :id")
+    suspend fun setLocatorAnchorVersion(id: String, version: Int)
+
     @Query("UPDATE publications SET fileUri = :fileUri WHERE id = :id")
     suspend fun setFileUri(id: String, fileUri: String)
 

@@ -17,6 +17,9 @@ interface BookmarkDao {
     @Insert
     suspend fun insert(entity: BookmarkEntity)
 
+    @androidx.room.Update
+    suspend fun update(entity: BookmarkEntity)
+
     @Query("DELETE FROM bookmarks WHERE id = :id")
     suspend fun delete(id: String)
 

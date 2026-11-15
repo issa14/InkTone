@@ -75,6 +75,7 @@ import dagger.hilt.android.qualifiers.ApplicationContext
 import dagger.hilt.components.SingletonComponent
 import java.time.Clock
 import javax.inject.Singleton
+import com.inktone.domain.usecase.ReanchorLocatorsUseCase
 
 /**
  * Fournit les Use Cases du domaine a constructeur simple (Tache 1.8 :
@@ -166,6 +167,18 @@ object UseCaseModule {
         preAnalysisStore: PreAnalysisStore,
     ): BackfillChapterLengthsUseCase =
         BackfillChapterLengthsUseCase(publicationRepository, publicationParser, preAnalysisStore)
+
+    @Provides
+    fun provideReanchorLocatorsUseCase(
+        publicationRepository: PublicationRepository,
+        preAnalysisStore: PreAnalysisStore,
+        readingStateRepository: ReadingStateRepository,
+        bookmarkRepository: BookmarkRepository,
+        annotationRepository: AnnotationRepository,
+    ): ReanchorLocatorsUseCase = ReanchorLocatorsUseCase(
+        publicationRepository, preAnalysisStore, readingStateRepository, bookmarkRepository, annotationRepository,
+        currentParserVersion = com.inktone.data.preanalysis.FilePreAnalysisStore.PARSER_VERSION,
+    )
 
     @Provides
     fun provideExportLibraryUseCase(

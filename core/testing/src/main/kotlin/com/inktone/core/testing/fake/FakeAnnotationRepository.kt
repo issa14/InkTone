@@ -17,7 +17,11 @@ class FakeAnnotationRepository : AnnotationRepository {
     }
 
     override suspend fun update(annotation: Annotation) {
-        state.value = state.value.map { if (it.id == annotation.id) annotation else it }
+        // Remplacement explicite : deux listes « égales » (le contexte d'un Locator est
+        // hors égalité) ne font pas émettre un StateFlow.
+        val updated = state.value.map { if (it.id == annotation.id) annotation else it }
+        state.value = emptyList()
+        state.value = updated
     }
 
     override suspend fun delete(id: String) {

@@ -13,6 +13,7 @@ import com.inktone.domain.model.ReadingState
 import com.inktone.domain.model.ReadingTheme
 import com.inktone.domain.model.toHex
 import com.inktone.domain.valueobject.Locator
+import com.inktone.domain.valueobject.LocatorText
 import kotlinx.serialization.Serializable
 
 /**
@@ -58,6 +59,10 @@ data class LocatorBackup(
     val chapterIndex: Int,
     val paragraphIndex: Int? = null,
     val charOffset: Int,
+    // Contexte textuel de la position (ADR-027) : une position venue d'un autre appareil
+    // reste ré-ancrable. Absent des sauvegardes antérieures.
+    val textBefore: String? = null,
+    val textAfter: String? = null,
 )
 
 @Serializable
@@ -132,8 +137,12 @@ data class ReadingSessionBackup(
     val durationMs: Long = 0,
 )
 
-fun Locator.toBackup(): LocatorBackup = LocatorBackup(resourceHref, chapterIndex, paragraphIndex, charOffset)
-fun LocatorBackup.toDomain(): Locator = Locator(resourceHref, chapterIndex, paragraphIndex, charOffset)
+fun Locator.toBackup(): LocatorBackup =
+    LocatorBackup(resourceHref, chapterIndex, paragraphIndex, charOffset, text?.before, text?.after)
+fun LocatorBackup.toDomain(): Locator = Locator(
+    resourceHref, chapterIndex, paragraphIndex, charOffset,
+    text = if (textBefore != null && textAfter != null) LocatorText(textBefore, textAfter) else null,
+)
 
 fun Bookmark.toBackup(): BookmarkBackup = BookmarkBackup(id, publicationId, locator.toBackup(), title, note, createdAt)
 fun BookmarkBackup.toDomain(): Bookmark = Bookmark(id, publicationId, locator.toDomain(), title, note, createdAt = createdAt)
