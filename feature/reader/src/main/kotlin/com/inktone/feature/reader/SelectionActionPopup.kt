@@ -191,19 +191,30 @@ fun SelectionActionPopup(
                 // COLOR_PICKER : aucun retour à ACTIONS ni fermeture ici,
                 // seule une fermeture externe (tap hors sélection) y met
                 // fin (voir KDoc de tête).
-                SelectionPopupMode.COLOR_PICKER -> AnnotationColorPicker(
-                    selected = pendingColor,
-                    onApply = { color ->
-                        pendingColor = color
-                        onHighlight(color, pendingKind)
-                    },
-                    recentColors = recentColors,
-                    selectedKind = pendingKind,
-                    onSelectKind = { kind ->
-                        pendingKind = kind
-                        onHighlight(pendingColor, kind)
-                    },
-                )
+                SelectionPopupMode.COLOR_PICKER -> Column {
+                    AnnotationColorPicker(
+                        selected = pendingColor,
+                        onApply = { color ->
+                            pendingColor = color
+                            onHighlight(color, pendingKind)
+                        },
+                        recentColors = recentColors,
+                        selectedKind = pendingKind,
+                        onSelectKind = { kind ->
+                            pendingKind = kind
+                            onHighlight(pendingColor, kind)
+                        },
+                    )
+                    // Le sélecteur ne se fermait qu'en touchant ailleurs et ne
+                    // permettait pas de revenir à « Note » (audit UX D52).
+                    Row(modifier = Modifier.padding(horizontal = 4.dp)) {
+                        TextButton(onClick = { mode = SelectionPopupMode.ACTIONS }) {
+                            AppIcon(AppSymbol.Back, contentDescription = null, modifier = Modifier.padding(end = 4.dp))
+                            Text("Retour")
+                        }
+                        TextButton(onClick = onDismiss) { Text("Terminé") }
+                    }
+                }
 
                 // Lot 21, tâche 7 — « Partager » (ACTION_SEND) : texte
                 // sélectionné + contexte titre/auteur/chapitre. Le popup
