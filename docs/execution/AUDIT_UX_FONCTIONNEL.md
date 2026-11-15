@@ -679,11 +679,30 @@ Le second essai, tracé, n'a montré ni pause ni arrêt.
 enregistré, la voix par défaut suit désormais le moteur des préférences
 (Sherpa-ONNX par défaut), et non plus la voix système.
 
+### 10.2 Derniers P1 (branche `audit-p1-restants`)
+
+État au 2026-11-15. Branche empilée sur `audit-narration`, non poussée.
+« Appareil (adb) » : vérifié sur le V2206 en pilotant l'application par adb,
+pas encore par Issa.
+
+| Constat | Correction | Commit | Vérification |
+|---|---|---|---|
+| D18 | Défilement dans la page PDF enregistré (`MIGRATION_34_35`) et remis à zéro au changement de page | `a4fca966` | Instrumenté (migration) + test JVM + appareil (adb) sans zoom — **zoom à vérifier par Issa** |
+| D48 | Images en mode paginé : une page par image, intercalée à sa place ; titres mis en forme | `69a0ae42` | Tests JVM + appareil (adb) : couvertures et pages de titre affichées — **illustration au milieu d'un chapitre et titre `<h1>` non vus sur appareil** |
+| D55, D63 | Livre copié dans le stockage de l'application (ADR-028) ; fichier supprimé avec le livre ; rattrapage des anciens imports | `f76d8e3b` | Tests JVM + instrumenté + appareil (adb) : 488 livres copiés et rouverts — **import d'un nouveau fichier à vérifier par Issa** |
+| D57, D58 | Livres appariés par l'empreinte de leur fichier en synchronisation et en restauration | `00254c51` | Tests JVM — pas d'appareil (second appareil ou réinstallation nécessaire) |
+
+**Vérifications sur appareil en attente (Issa)** :
+- **D18** : PDF, zoomer et faire défiler une page, fermer, rouvrir : même pourcentage dans le Lecteur et la Bibliothèque ; changer de page après un zoom : le pourcentage suit la nouvelle page.
+- **D48** : mode paginé, EPUB illustré : l'illustration a sa page, entre le texte qui la précède et celui qui la suit ; un titre de section est plus grand et en gras.
+- **D55** : importer un nouveau livre, supprimer ou déplacer le fichier d'origine : le livre s'ouvre toujours ; supprimer un livre téléchargé depuis un catalogue : il quitte le stockage.
+
+**Instabilité constatée** : `ReaderViewModelBackgroundTrackerTest.onAppBackground_pendant_ecoute_tts_laisse_le_tracker_actif` a échoué une fois dans la suite complète (« Dispatchers.Main is used concurrently with setting it », dans `resetMain`), puis passé trois fois seul et dans la suite complète suivante. Non qualifiée plus avant.
+
 **Reste à traiter**, par priorité :
-- **Lot A (identité des livres), exclu de cette session** : D57, D58, D61, et le conflit de position (`PositionConflict`) laissé en dehors d'A19.
-- **P1** : D18 (décalage vertical de page PDF à persister : migration et test sur appareil), D48 (images en mode paginé), D55 (copie des livres dans le stockage privé : ADR à écrire d'abord).
+- **Lot A (suite)** : D61 (suppressions et modifications non propagées, P2) et le conflit de position laissé en dehors d'A19.
 - **Après implémentation d'ADR-027** (contexte textuel du `Locator`) : D12 à D17.
 - **D1** : décidé (pas de couverture ajoutée) ; demande la migration de l'index de chapitre (positions, signets, longueurs).
-- **P2/P3 restants** : D4, D5, D8, D11, D16, D19, D20, D22, D23, D24, D29, D32, D33, D34, D37, D38, D43 (clé de cache), D44, D45, D50, D51, D52, D56, D62, D63, D64, D65, D66 (recherche des notes), D67, D68, D75, D76, A11, A17, B3 à B6, B15 à B18, C3, C9 à C14.
+- **P2/P3 restants** : D4, D5, D8, D11, D16, D19, D20, D22, D23, D24, D29, D32, D33, D34, D37, D38, D43 (clé de cache), D44, D45, D50, D51, D52, D56, D62, D64, D65, D66 (recherche des notes), D67, D68, D75, D76, A11, A17, B3 à B6, B15 à B18, C3, C9 à C14 ; séparateurs absents du mode paginé (reste de D48).
 - **A7 (complément)** : le défilement automatique vers la carte de la voix n'est pas fait.
 - `scripts/audition-edge-voices.sh` : non suivi, sort à décider.
