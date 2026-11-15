@@ -87,6 +87,13 @@ class SafFileStorageService @Inject constructor(
         Unit
     }
 
+    /** Vrai si [path] désigne un fichier du répertoire des couvertures de l'application. */
+    private fun isOwnedCover(path: String): Boolean {
+        val covers = File(context.filesDir, COVERS_DIR).canonicalFile
+        val file = runCatching { File(path).canonicalFile }.getOrNull() ?: return false
+        return file.parentFile == covers
+    }
+
     /** Vrai si l'URI est servie par un provider de l'app (FileProvider app-scopé). */
     override fun isAppOwned(uri: String): Boolean {
         val authority = Uri.parse(uri).authority ?: return false
@@ -115,6 +122,12 @@ class SafFileStorageService @Inject constructor(
         }
 
     override suspend fun deleteOwnedFile(uri: String) = withContext(Dispatchers.IO) {
+        // Une couverture est un chemin de fichier du répertoire `covers` de
+        // l'application, jamais une URI de FileProvider (audit UX D68).
+        if (isOwnedCover(uri)) {
+            runCatching { File(uri).delete() }
+            return@withContext
+        }
         if (!isAppOwned(uri)) return@withContext
         // FileProvider.delete supprime le fichier qu'il sert.
         runCatching { resolver.delete(Uri.parse(uri), null, null) }
@@ -132,5 +145,8 @@ class SafFileStorageService @Inject constructor(
     private companion object {
         /** Doit correspondre au `files-path` « library » de `file_paths.xml`. */
         const val LIBRARY_DIR = "library"
+
+        /** Doit correspondre à `CoverStorage` (infrastructure/parser). */
+        const val COVERS_DIR = "covers"
     }
 }

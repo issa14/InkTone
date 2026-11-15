@@ -48,6 +48,10 @@ interface FileStorageService {
     /** Vrai si [uri] désigne un fichier de l'application (copie de bibliothèque, téléchargement OPDS). */
     fun isAppOwned(uri: String): Boolean
 
-    /** Supprime le fichier [uri] s'il appartient à l'application ; sans effet sinon (ADR-028, D63). */
+    /**
+     * Supprime le fichier [uri] s'il appartient à l'application (copie de
+     * bibliothèque, téléchargement OPDS, couverture extraite) ; sans effet sinon
+     * (ADR-028, audit UX D63 et D68).
+     */
     suspend fun deleteOwnedFile(uri: String)
 }

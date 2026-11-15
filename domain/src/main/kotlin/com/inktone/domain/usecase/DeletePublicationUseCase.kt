@@ -8,6 +8,7 @@ import com.inktone.domain.service.TtsSegmentCache
 import com.inktone.domain.service.PlaybackSession
 import com.inktone.domain.service.PlaybackSessionState
 import com.inktone.domain.service.SearchService
+import kotlinx.coroutines.flow.first
 
 /**
  * Lot 2b.2 — retrait irréversible d'une publication (UX §Bibliothèque
@@ -39,8 +40,15 @@ class DeletePublicationUseCase(
         ) {
             playbackSession.stop()
         }
-        val fileUri = publicationRepository.getById(publicationId)?.fileUri
+        val publication = publicationRepository.getById(publicationId)
+        val fileUri = publication?.fileUri
+        // Le nom d'une couverture dérive d'un hachage 32 bits de l'URI : deux livres
+        // peuvent, rarement, en partager le fichier, qu'on ne supprime alors pas.
+        val coverUri = publication?.coverUri?.takeIf { cover ->
+            publicationRepository.observeAll().first().none { it.id != publicationId && it.coverUri == cover }
+        }
         publicationRepository.delete(publicationId)
+        coverUri?.let { fileStorageService.deleteOwnedFile(it) }
         // Copie privée ou téléchargement OPDS : le fichier appartient au livre
         // (ADR-028, audit UX D63). Le fichier d'origine d'un ancien import
         // reste à l'utilisateur.

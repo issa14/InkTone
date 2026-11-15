@@ -118,4 +118,21 @@ class SafFileStorageServiceTest {
         assertEquals(false, File(context.filesDir, "library/absent.epub").exists())
         assertEquals(emptyList<String>(), File(context.filesDir, "library").list()!!.filter { it.endsWith(".part") })
     }
+
+    /** Audit UX D68 : seule une couverture du répertoire de l'application est supprimée. */
+    @Test
+    fun supprime_une_couverture_de_l_application_et_jamais_un_autre_fichier() = runTest {
+        val covers = File(context.filesDir, "covers").apply { mkdirs() }
+        val cover = File(covers, "test-d68.jpg").apply { writeText("x") }
+        val other = tempFile("a garder")
+
+        service.deleteOwnedFile(other.absolutePath)
+        service.deleteOwnedFile("/etc/hosts")
+        service.deleteOwnedFile(File(covers, "../test-d68-traversal.txt").path)
+        assertEquals(true, other.exists())
+
+        service.deleteOwnedFile(cover.absolutePath)
+        assertEquals(false, cover.exists())
+        other.delete()
+    }
 }

@@ -119,4 +119,22 @@ class LibraryPrivateCopyTest {
         id = id, title = "Titre $id", format = format, fileUri = fileUri, fileHash = "hash-$id",
         fileSize = 10L, chapterCount = 1, importDate = 0L,
     )
+
+    /** Audit UX D68 : les fichiers de couverture n'étaient pas supprimés avec le livre. */
+    @Test
+    fun `supprimer un livre supprime sa couverture, sauf si un autre livre la partage`() = runTest {
+        val cover = "${FakeFileStorageService.APP_PREFIX}covers/123.jpg"
+        repository.insert(publication("seul", fileUri = "content://picker/a.epub").copy(coverUri = cover))
+        repository.insert(publication("partage-1", fileUri = "content://picker/b.epub").copy(coverUri = "${FakeFileStorageService.APP_PREFIX}covers/9.jpg"))
+        repository.insert(publication("partage-2", fileUri = "content://picker/c.epub").copy(coverUri = "${FakeFileStorageService.APP_PREFIX}covers/9.jpg"))
+        val delete = DeletePublicationUseCase(
+            repository, FakePreAnalysisStore(), FakeTtsSegmentCache(), FakeRenderedPageCache(),
+            FakePlaybackSession(), FakeSearchService(), storage,
+        )
+
+        delete("seul")
+        delete("partage-1")
+
+        assertEquals(listOf(cover), storage.deletedUris)
+    }
 }
