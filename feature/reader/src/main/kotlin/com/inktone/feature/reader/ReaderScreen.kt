@@ -885,8 +885,8 @@ fun ReaderScreen(
                         val chapter = state.chapters.getOrNull(pageIndex)
                         val hasText = chapter?.sentences?.isNotEmpty() == true
                         if (hasText) {
-                            val bgHex = state.resolvedTheme.backgroundColorHex
-                            bgHex == "#000000" || state.resolvedTheme.id == "sepia_vintage"
+                            isDarkBackground(state.resolvedTheme.backgroundColorHex) ||
+                                state.resolvedTheme.id == "sepia_vintage"
                         } else {
                             state.forcePdfInversion
                         }
@@ -1487,6 +1487,9 @@ fun ReaderScreen(
                 onMarginStepChange = { step -> viewModel.onIntent(ReaderIntent.SetReaderMarginStep(step)) },
                 onTextJustifiedChange = { justified -> viewModel.onIntent(ReaderIntent.SetTextJustified(justified)) },
                 onKeepScreenOnChange = { enabled -> viewModel.onIntent(ReaderIntent.SetKeepScreenOn(enabled)) },
+                showPdfInversion = isPdf,
+                forcePdfInversion = state.forcePdfInversion,
+                onForcePdfInversionChange = { viewModel.onIntent(ReaderIntent.ToggleForcePdfInversion) },
                 onFontFamilyChange = { family -> viewModel.onIntent(ReaderIntent.SetFontFamily(family)) },
                 onAutoScrollSpeedChange = { speed ->
                     // Reclique sur le même cran après un arrêt au toucher :

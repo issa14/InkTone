@@ -90,6 +90,11 @@ fun ReaderSettingsPanel(
     // Audit UX A8 — taille et thème propres à ce livre, ou réglages généraux.
     isBookSpecific: Boolean = false,
     onBookSpecificChange: (Boolean) -> Unit = {},
+    // Audit UX B6 — inversion des pages scannées d'un PDF, qu'aucun écran ne
+    // proposait : un PDF scanné restait blanc en thème sombre.
+    showPdfInversion: Boolean = false,
+    forcePdfInversion: Boolean = false,
+    onForcePdfInversionChange: (Boolean) -> Unit = {},
     onDismiss: () -> Unit,
 ) {
     val sheetState = rememberModalBottomSheetState(skipPartiallyExpanded = true)
@@ -228,6 +233,16 @@ fun ReaderSettingsPanel(
                 checked = keepScreenOn,
                 onCheckedChange = onKeepScreenOnChange,
             )
+
+            if (showPdfInversion) {
+                Spacer(Modifier.height(8.dp))
+                SettingSwitchRow(
+                    label = "Inverser les pages scannées",
+                    supporting = "Pour lire un PDF scanné en thème sombre",
+                    checked = forcePdfInversion,
+                    onCheckedChange = onForcePdfInversionChange,
+                )
+            }
 
             Spacer(Modifier.height(20.dp))
 
