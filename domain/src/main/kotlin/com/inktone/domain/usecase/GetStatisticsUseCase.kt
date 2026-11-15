@@ -2,6 +2,7 @@ package com.inktone.domain.usecase
 
 import com.inktone.domain.model.FilterMode
 import com.inktone.domain.model.HeatmapPoint
+import com.inktone.domain.repository.PreferencesRepository
 import com.inktone.domain.repository.PublicationRepository
 import com.inktone.domain.repository.ReadingSessionRepository
 import kotlinx.coroutines.Dispatchers
@@ -61,6 +62,12 @@ class GetStatisticsUseCase(
      * narration en cours ne les faisait pas évoluer (audit UX D34).
      */
     private val refreshIntervalMs: Long? = null,
+    /**
+     * Si fourni, un jour ne compte dans la série que si le temps lu atteint
+     * l'objectif quotidien. Sans lui, tout jour portant une session compte : la
+     * série se gagnait en cinq secondes d'écran (audit UX D32).
+     */
+    private val preferencesRepository: PreferencesRepository? = null,
 ) {
     /** Retourne un Flow pour intégration directe dans `combine()` — pas de `flow { emit() }` wrapper dans le ViewModel. */
     operator fun invoke(): Flow<StatisticsResult> = flow {
@@ -88,7 +95,14 @@ class GetStatisticsUseCase(
             val dailyStats = dailyStatsDeferred.await()
             val heatmapRaw = heatmapDeferred.await()
 
-            val streakDays = distinctDays.mapNotNull { parseDateToEpochDay(it) }
+            val streakDays = preferencesRepository
+                ?.let { prefs ->
+                    val goalMs = prefs.get().dailyGoalMinutes * 60_000L
+                    readingSessionRepository.getDailyStatsSince(0L)
+                        .filter { it.visualMs + it.ttsMs >= goalMs }
+                        .mapNotNull { parseDateToEpochDay(it.date) }
+                }
+                ?: distinctDays.mapNotNull { parseDateToEpochDay(it) }
             val today = LocalDate.now(clock).toEpochDay()
             val streak = computeStreak(streakDays, today)
             val maxStreak = computeMaxStreak(streakDays)

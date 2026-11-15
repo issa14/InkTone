@@ -284,4 +284,28 @@ class GetStatisticsUseCaseTest {
         assertEquals(0L, results[0].totalVisualMs)
         assertEquals(1000L, results[1].totalVisualMs)
     }
+
+    /** Audit UX D32 : la série se gagnait en cinq secondes d'écran. */
+    @Test
+    fun la_serie_ne_compte_que_les_jours_ou_l_objectif_est_atteint() = runTest {
+        val today = LocalDate.of(2026, 8, 10)
+        val clock = Clock.fixed(today.atTime(9, 0).atZone(zone).toInstant(), zone)
+        val now = clock.millis()
+        val day = TimeUnit.DAYS.toMillis(1)
+        val sessions = FakeReadingSessionRepository()
+        fun session(id: String, startedAt: Long, visualMs: Long) = ReadingSession(
+            id = id, publicationId = "p", startedAt = startedAt, endedAt = startedAt + visualMs,
+            mode = ReadingMode.VISUAL, visualDurationMs = visualMs,
+        )
+        sessions.insert(session("a", now, 31 * 60_000L))            // aujourd'hui : objectif atteint
+        sessions.insert(session("b", now - day, 5_000L))            // hier : cinq secondes seulement
+        val preferences = com.inktone.core.testing.fake.FakePreferencesRepository()
+        preferences.update { it.copy(dailyGoalMinutes = 30) }
+
+        val withGoal = GetStatisticsUseCase(sessions, FakePublicationRepository(), clock, preferencesRepository = preferences)().first()
+        val withoutGoal = GetStatisticsUseCase(sessions, FakePublicationRepository(), clock)().first()
+
+        assertEquals(1, withGoal.currentStreakDays)
+        assertEquals(2, withoutGoal.currentStreakDays)
+    }
 }

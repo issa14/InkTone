@@ -257,7 +257,11 @@ object UseCaseModule {
         readingSessionRepository: ReadingSessionRepository,
         publicationRepository: PublicationRepository,
         clock: Clock,
-    ): GetStatisticsUseCase = GetStatisticsUseCase(readingSessionRepository, publicationRepository, clock, refreshIntervalMs = STATISTICS_REFRESH_MS)
+        preferencesRepository: PreferencesRepository,
+    ): GetStatisticsUseCase = GetStatisticsUseCase(
+        readingSessionRepository, publicationRepository, clock,
+        refreshIntervalMs = STATISTICS_REFRESH_MS, preferencesRepository = preferencesRepository,
+    )
 
     @Provides
     fun provideGetCurrentBookUseCase(
