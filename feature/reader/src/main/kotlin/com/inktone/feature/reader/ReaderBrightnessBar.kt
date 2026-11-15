@@ -86,6 +86,7 @@ fun ReaderBrightnessBar(value: Float?, onValueChange: (Float?) -> Unit, onAdjust
     // faisait une lecture et une écriture en base, et recomposait tout l'écran.
     var live by remember(value) { mutableStateOf(value) }
     val view = LocalView.current
+    val systemBrightness = remember(view) { readSystemBrightness(view) }
     LaunchedEffect(live) {
         applyWindowBrightness(view, live)
         if (live != value) {
@@ -123,7 +124,8 @@ fun ReaderBrightnessBar(value: Float?, onValueChange: (Float?) -> Unit, onAdjust
             // largeur se trouve sans regarder, et le chiffre exact n'apprend
             // rien au lecteur, seul le résultat à l'écran compte.
             InkToneLevelBar(
-                value = live ?: MIN_BRIGHTNESS,
+                // En mode « Auto », la barre montre la luminosité réelle du système plutôt que d'être vide.
+                value = live ?: systemBrightness,
                 // Le plancher est conservé : à zéro l'écran serait noir, et
                 // l'utilisateur n'aurait plus de quoi viser pour remonter.
                 onValueChange = { live = it.coerceAtLeast(MIN_BRIGHTNESS); onAdjusting() },
@@ -139,6 +141,12 @@ fun ReaderBrightnessBar(value: Float?, onValueChange: (Float?) -> Unit, onAdjust
         }
     }
 }
+
+/** Luminosité courante du système (0 à 1), lecture seule, sans permission ; repli à mi-course. */
+private fun readSystemBrightness(view: View): Float =
+    runCatching {
+        android.provider.Settings.System.getInt(view.context.contentResolver, android.provider.Settings.System.SCREEN_BRIGHTNESS) / 255f
+    }.getOrDefault(0.5f).coerceIn(MIN_BRIGHTNESS, 1f)
 
 /** Délai sans geste avant d'écrire la luminosité en base. */
 private const val BRIGHTNESS_PERSIST_DELAY_MS = 250L
