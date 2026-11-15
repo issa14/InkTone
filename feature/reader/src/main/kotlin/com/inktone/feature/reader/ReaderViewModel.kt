@@ -771,7 +771,11 @@ class ReaderViewModel @Inject constructor(
                         chapterLengths = publication.chapterLengths
                             ?.takeIf { it.values.size == result.documentModel.chapters.size },
                         tableOfContents = result.documentModel.tableOfContents,
-                        currentChapterIndex = restored?.locator?.chapterIndex ?: 0,
+                        // Borné : une position enregistrée au-delà de la structure
+                        // lue (synchro, parseur différent) laissait aucun chapitre
+                        // courant, donc une page vide sans message (D19).
+                        currentChapterIndex = (restored?.locator?.chapterIndex ?: 0)
+                            .coerceIn(0, (result.documentModel.chapters.size - 1).coerceAtLeast(0)),
                         effectiveSettings = effectiveSettings,
                         resolvedTheme = resolvedTheme,
                         // B.1 — restaure le mode de lecture persisté

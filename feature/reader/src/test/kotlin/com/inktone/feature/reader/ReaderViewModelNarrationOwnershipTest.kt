@@ -287,6 +287,24 @@ class ReaderViewModelNarrationOwnershipTest {
     }
 
     /**
+     * Audit UX D19 : une position enregistrée au-delà de la structure lue
+     * laissait aucun chapitre courant, donc une page vide sans message.
+     */
+    @Test
+    fun une_position_enregistree_hors_bornes_ouvre_le_dernier_chapitre() = runTest {
+        val viewModel = openBook(
+            "livre",
+            savedPosition = Locator(resourceHref = "inconnu.xhtml", chapterIndex = 99, charOffset = 0),
+        )
+        try {
+            assertEquals(hrefs.lastIndex, viewModel.state.value.currentChapterIndex)
+            assertTrue(viewModel.state.value.currentChapter != null)
+        } finally {
+            cleanUp(viewModel)
+        }
+    }
+
+    /**
      * Bug réel corrigé (audit UX A6) : la vitesse changée pendant la narration
      * était enregistrée mais pas appliquée — l'ordonnanceur gardait le profil
      * du lancement jusqu'à une pause et une reprise.
