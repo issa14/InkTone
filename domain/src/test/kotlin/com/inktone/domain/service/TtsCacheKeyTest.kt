@@ -42,7 +42,7 @@ class TtsCacheKeyTest {
     }
 
     @Test
-    fun `modifier un profil en place invalide la cle - moteur, voix, vitesse, hauteur`() {
+    fun `modifier un profil en place invalide la cle - moteur, voix, vitesse`() {
         val base = VoiceProfile(
             id = "vp-settings-default", engine = TtsEngineId.ANDROID_NATIVE,
             voice = "fr-fr-default", language = "fr",
@@ -54,6 +54,7 @@ class TtsCacheKeyTest {
         assertNotEquals(k, key(base.copy(engine = TtsEngineId.EDGE_TTS)))
         assertNotEquals(k, key(base.copy(voice = "autre")))
         assertNotEquals(k, key(base.copy(speed = 1.5f)))
-        assertNotEquals(k, key(base.copy(pitch = 0.8f)))
+        // Aucun moteur n'applique la hauteur : elle ne doit pas invalider le cache.
+        assertEquals(k, key(base.copy(pitch = 0.8f)))
     }
 }
