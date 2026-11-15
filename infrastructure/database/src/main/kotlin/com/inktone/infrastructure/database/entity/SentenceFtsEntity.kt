@@ -2,7 +2,6 @@ package com.inktone.infrastructure.database.entity
 
 import androidx.room.Entity
 import androidx.room.Fts4
-import androidx.room.FtsOptions
 
 /**
  * Index FTS4 sur le texte des phrases (Blueprint §6.9, Tâche 7.3). Une
@@ -10,11 +9,8 @@ import androidx.room.FtsOptions
  * un extrait précis autour du terme trouvé et un `Locator` exact vers le
  * résultat (`chapterIndex` + `charOffset` de la `Sentence`, pas juste
  * « quelque part dans ce chapitre »).
- *
- * Tokeniseur `unicode61` : casse et diacritiques ignorés, « eleve » trouve « Élève »
- * (audit UX D8). Le tokeniseur par défaut ne repliait que l'ASCII.
  */
-@Fts4(tokenizer = FtsOptions.TOKENIZER_UNICODE61)
+@Fts4
 @Entity(tableName = "sentence_fts")
 data class SentenceFtsEntity(
     val publicationId: String,

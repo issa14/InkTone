@@ -1524,30 +1524,6 @@ class DatabaseMigrationTest {
         v38.close()
     }
 
-    @Test
-    fun migration_38_vers_39_recree_l_index_de_recherche_insensible_aux_accents() {
-        val v38 = helper.createDatabase(TEST_DB_NAME, 38)
-        v38.execSQL("INSERT INTO sentence_fts (publicationId, chapterIndex, resourceHref, charOffset, text) VALUES ('p', 0, 'c.xhtml', 0, 'Élève')")
-        v38.close()
-
-        val v39 = helper.runMigrationsAndValidate(
-            TEST_DB_NAME, 39, true,
-            MIGRATION_1_2, MIGRATION_2_3, MIGRATION_3_4, MIGRATION_4_5, MIGRATION_5_6, MIGRATION_6_7,
-            MIGRATION_7_8, MIGRATION_8_9, MIGRATION_9_10, MIGRATION_10_11, MIGRATION_11_12, MIGRATION_12_13,
-            MIGRATION_13_14, MIGRATION_14_15, MIGRATION_15_16, MIGRATION_16_17, MIGRATION_17_18, MIGRATION_18_19,
-            MIGRATION_19_20, MIGRATION_20_21, MIGRATION_21_22, MIGRATION_22_23, MIGRATION_23_24, MIGRATION_24_25,
-            MIGRATION_25_26, MIGRATION_26_27, MIGRATION_27_28, MIGRATION_28_29, MIGRATION_29_30, MIGRATION_30_31,
-            MIGRATION_31_32, MIGRATION_32_33, MIGRATION_33_34, MIGRATION_34_35, MIGRATION_35_36, MIGRATION_36_37,
-            MIGRATION_37_38, MIGRATION_38_39,
-        )
-
-        // L'ancien index est vidé (le texte source n'est pas en base) ; le nouveau replie les accents.
-        v39.query("SELECT count(*) FROM sentence_fts").use { it.moveToFirst(); assertEquals(0, it.getInt(0)) }
-        v39.execSQL("INSERT INTO sentence_fts (publicationId, chapterIndex, resourceHref, charOffset, text) VALUES ('p', 0, 'c.xhtml', 0, 'Élève')")
-        v39.query("SELECT count(*) FROM sentence_fts WHERE text MATCH 'eleve'").use { it.moveToFirst(); assertEquals(1, it.getInt(0)) }
-        v39.close()
-    }
-
     companion object {
         private const val TEST_DB_NAME = "migration-test"
     }
