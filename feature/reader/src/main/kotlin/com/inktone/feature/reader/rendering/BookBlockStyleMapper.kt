@@ -135,8 +135,10 @@ object BookBlockStyleMapper {
                     append(plainText.substring(lastEnd, span.start))
                 }
                 val spanStyle = spanStyleFor(span.styles)
-                withStyle(spanStyle) {
-                    append(plainText.substring(span.start, span.end))
+                appendLinkable(span.href.takeIf { SpanStyles.REFERENCE in span.styles }) {
+                    withStyle(spanStyle) {
+                        append(plainText.substring(span.start, span.end))
+                    }
                 }
                 lastEnd = span.end
             }

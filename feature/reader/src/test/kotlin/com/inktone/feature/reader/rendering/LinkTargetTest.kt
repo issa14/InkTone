@@ -1,0 +1,38 @@
+package com.inktone.feature.reader.rendering
+
+import org.junit.Assert.assertEquals
+import org.junit.Test
+
+class LinkTargetTest {
+    private val chapters = listOf("OEBPS/Text/cover.xhtml", "OEBPS/Text/ch1.xhtml", "OEBPS/Text/notes.xhtml", "OEBPS/Text/Chapitre 2.xhtml")
+    private fun resolve(href: String, from: String = "OEBPS/Text/ch1.xhtml") = resolveLinkTarget(href, from, chapters)
+
+    @Test
+    fun une_note_de_bas_de_page_mene_au_chapitre_des_notes() {
+        assertEquals(LinkTarget.Chapter(2), resolve("notes.xhtml#n3"))
+    }
+
+    @Test
+    fun un_chemin_relatif_avec_point_point_est_resolu() {
+        assertEquals(LinkTarget.Chapter(0), resolve("../Text/cover.xhtml", from = "OEBPS/Text/ch1.xhtml"))
+    }
+
+    @Test
+    fun le_pourcentage_est_decode_des_deux_cotes() {
+        assertEquals(LinkTarget.Chapter(3), resolve("Chapitre%202.xhtml"))
+    }
+
+    @Test
+    fun une_adresse_exterieure_est_reconnue() {
+        assertEquals(LinkTarget.External("https://exemple.org/a"), resolve("https://exemple.org/a"))
+        assertEquals(LinkTarget.External("mailto:a@b.fr"), resolve("mailto:a@b.fr"))
+    }
+
+    @Test
+    fun un_fragment_seul_ou_un_chapitre_inconnu_ne_mene_nulle_part() {
+        assertEquals(LinkTarget.None, resolve("#haut"))
+        assertEquals(LinkTarget.None, resolve("absent.xhtml"))
+        assertEquals(LinkTarget.None, resolve("ftp://x/y"))
+        assertEquals(LinkTarget.None, resolve(""))
+    }
+}

@@ -379,6 +379,7 @@ private fun ParagraphBlockDisplay(
     onCurrentLineY: (Dp) -> Unit,
     modifier: Modifier = Modifier,
 ) {
+    val onLinkTapped = LocalLinkTapHandler.current
     var textLayoutResult by remember(blockOffsetRange) { mutableStateOf<TextLayoutResult?>(null) }
     var textCoordinates by remember(blockOffsetRange) { mutableStateOf<LayoutCoordinates?>(null) }
     val density = LocalDensity.current
@@ -427,6 +428,11 @@ private fun ParagraphBlockDisplay(
                             return@detectTapGestures
                         }
                         val globalOffset = blockOffsetRange.first + layout.getOffsetForPosition(position)
+                        val link = blockText.linkAt(layout.getOffsetForPosition(position))
+                        if (link != null) {
+                            onLinkTapped(link)
+                            return@detectTapGestures
+                        }
                         val tappedAnnotation = annotationAtOffset(annotations, chapterIndex, globalOffset)
                         if (tappedAnnotation != null) {
                             val absolute = maxOf(tappedAnnotation.startLocator.charOffset, blockOffsetRange.first)..
@@ -493,6 +499,7 @@ private fun ParagraphBlockField(
     onCurrentLineY: (Dp) -> Unit,
     modifier: Modifier = Modifier,
 ) {
+    val onLinkTapped = LocalLinkTapHandler.current
     var textLayoutResult by remember(blockOffsetRange) { mutableStateOf<TextLayoutResult?>(null) }
     var textCoordinates by remember(blockOffsetRange) { mutableStateOf<LayoutCoordinates?>(null) }
     val density = LocalDensity.current
@@ -615,8 +622,11 @@ private fun ParagraphBlockField(
                     // lieu de basculer le HUD (comportement inchangé
                     // ailleurs dans le texte).
                     val globalOffset = blockOffsetRange.first + newValue.selection.start
-                    val tappedAnnotation = annotationAtOffset(annotations, chapterIndex, globalOffset)
-                    if (tappedAnnotation != null) {
+                    val link = blockText.linkAt(newValue.selection.start)
+                    val tappedAnnotation = if (link != null) null else annotationAtOffset(annotations, chapterIndex, globalOffset)
+                    if (link != null) {
+                        onLinkTapped(link)
+                    } else if (tappedAnnotation != null) {
                         val absolute = maxOf(tappedAnnotation.startLocator.charOffset, blockOffsetRange.first)..
                             (minOf(tappedAnnotation.endLocator.charOffset, blockOffsetRange.last + 1) - 1)
                         val bounds = rangeBoundsInWindow(textLayoutResult, textCoordinates, blockOffsetRange, absolute)

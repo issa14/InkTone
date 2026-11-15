@@ -15,7 +15,9 @@ import com.inktone.domain.model.BookBlock
 import com.inktone.domain.model.Chapter
 import com.inktone.domain.model.ChapterContent
 import com.inktone.domain.model.Sentence
+import com.inktone.domain.model.SpanStyles
 import com.inktone.feature.reader.rendering.BookBlockStyleMapper
+import com.inktone.feature.reader.rendering.appendLinkable
 
 /**
  * Résultat de la mesure d'un chapitre — entier ou d'un préfixe borné
@@ -385,8 +387,10 @@ class ChapterTextMeasurer(private val textMeasurer: TextMeasurer) {
                         if (span.start > lastEnd) {
                             append(plainText.substring(lastEnd, span.start))
                         }
-                        withStyle(BookBlockStyleMapper.spanStyleFor(span.styles)) {
-                            append(plainText.substring(span.start, span.end))
+                        appendLinkable(span.href.takeIf { SpanStyles.REFERENCE in span.styles }) {
+                            withStyle(BookBlockStyleMapper.spanStyleFor(span.styles)) {
+                                append(plainText.substring(span.start, span.end))
+                            }
                         }
                         lastEnd = span.end
                     }

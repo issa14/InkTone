@@ -118,6 +118,9 @@ import com.inktone.feature.reader.pagination.rememberChapterPaginationState
 import coil.ImageLoader
 import coil.compose.LocalImageLoader
 import coil.memory.MemoryCache
+import com.inktone.feature.reader.rendering.LinkTarget
+import com.inktone.feature.reader.rendering.LocalLinkTapHandler
+import com.inktone.feature.reader.rendering.resolveLinkTarget
 import com.inktone.feature.reader.rendering.BookBlockItem
 import com.inktone.feature.reader.rendering.BookBlockStyleMapper
 import com.inktone.feature.reader.rendering.EpubImageFetcher
@@ -864,8 +867,21 @@ fun ReaderScreen(
             }
         }
 
+        // Tap sur un lien (audit UX D15) : renvoi interne vers le chapitre visé, adresse
+        // extérieure ouverte par le système. Un renvoi introuvable ne fait rien.
+        val uriHandler = androidx.compose.ui.platform.LocalUriHandler.current
+        val currentChapterHref = state.currentChapter?.href.orEmpty()
+        val chapterHrefs = state.chapters.map { it.href }
+        val onLinkTapped: (String) -> Unit = { href ->
+            when (val target = resolveLinkTarget(href, currentChapterHref, chapterHrefs)) {
+                is LinkTarget.Chapter -> viewModel.onIntent(ReaderIntent.JumpToChapter(target.index))
+                is LinkTarget.External -> runCatching { uriHandler.openUri(target.url) }
+                LinkTarget.None -> Unit
+            }
+        }
         CompositionLocalProvider(
             LocalImageLoader provides (epubImageLoader ?: LocalImageLoader.current),
+            LocalLinkTapHandler provides onLinkTapped,
         ) {
         Box(
             modifier = Modifier

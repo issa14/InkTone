@@ -66,6 +66,8 @@ import com.inktone.domain.model.AnnotationColor
 import com.inktone.domain.model.Chapter
 import com.inktone.feature.reader.pagination.ChapterPaginationState
 import com.inktone.feature.reader.rendering.EpubImageKey
+import com.inktone.feature.reader.rendering.LocalLinkTapHandler
+import com.inktone.feature.reader.rendering.linkAt
 import com.inktone.domain.model.BookBlock
 import coil.compose.AsyncImage
 import androidx.compose.foundation.gestures.detectTapGestures
@@ -614,6 +616,7 @@ private fun PageBlock(
     onFreeSelectionBoundsInWindow: (Rect?) -> Unit,
     onClick: () -> Unit,
 ) {
+    val onLinkTapped = LocalLinkTapHandler.current
     // Keyé sur `pageOffsetRange`, comme `selection`/`pendingShowJob`
     // ci-dessous : évite un `TextLayoutResult`/des coordonnées d'une
     // AUTRE page qui persisteraient transitoirement si Compose réutilise
@@ -824,7 +827,9 @@ private fun PageBlock(
                         onFreeSelectionCleared()
                         hidePopup()
                     }
-                    onClick()
+                    // Un tap sur un lien le suit ; ailleurs, il bascule le HUD (audit UX D15).
+                    val link = pageText.linkAt(newValue.selection.start)
+                    if (link != null) onLinkTapped(link) else onClick()
                 } else {
                     // Phase 2, phase « glissement » — mesuré sur appareil
                     // (V2206, Android 14) : `TextToolbar.hide()` n'est
