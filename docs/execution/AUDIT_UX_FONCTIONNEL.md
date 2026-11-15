@@ -743,6 +743,9 @@ Vérification : « Appareil (adb) » = pilotée par adb sur le V2206, pas encore
 | D52 (en partie) | « Retour » et « Terminé » dans le sélecteur de couleur de la sélection ; couleur d'une note non choisissable | `06d1092e` | Compilation |
 | D75 (suite) | Touches de volume pour tourner la page, en option (`MIGRATION_36_37`) | `244dcb67` | Appareil (adb) + migration instrumentée |
 | ADR-027, couches 1 à 3 | Contexte textuel du `Locator`, ré-ancrage pur, colonnes (`MIGRATION_37_38`), capture à la création | `10c1568c`, `bfd90307`, `ed33b7af` | Tests JVM + migration instrumentée |
+| ADR-027, couches 4 à 6 | Rattrapage et ré-ancrage (`ReanchorLocatorsUseCase`), transport par sauvegarde et synchronisation | `0e2b4f5e` | Tests JVM ; sur appareil : base en version 38, 479 livres à la version d'ancrage 3 |
+| D12 | `<br>` rendu en saut de ligne (`PARSER_VERSION` 4) | `071ec623` | Tests du parseur (44) + instrumentés (38) |
+| D14 | Espaces regroupés comme en HTML (`PARSER_VERSION` 5) | `8d6e8697` | Tests du parseur (44) + instrumentés (38) |
 
 **Vérifications sur appareil à faire par Issa** :
 - **B18** : mode défilement, auto-défilement jusqu'en fin de chapitre : il s'arrête.
@@ -757,7 +760,7 @@ Vérification : « Appareil (adb) » = pilotée par adb sur le V2206, pas encore
 **Reste à traiter** :
 - **Nécessitent une décision de conception** : B5 (sommaire précis, touche l'analyse EPUB), D65 (surlignage de phrase quand le mot est inconnu), 
 - **Lourds** : D8 (recherche insensible aux accents : changer le tokeniseur FTS impose de réindexer toute la bibliothèque, soit plusieurs minutes pour 1,7 Go), D61 (suppressions et modifications non propagées entre appareils : tombes horodatées), D11, D4.
-- **ADR-027 (D12 à D17)** : infrastructure complète (domaine, persistance, capture, rattrapage et ré-ancrage par `ReanchorLocatorsUseCase`, transport par sauvegarde et synchronisation). Restent D12 à D14 (extraction du texte : retours à la ligne, listes, espaces), D15 (liens), D16 (style CSS), D17 en tant que tel est couvert par ADR-027. À faire dans l'ordre : vérifier que le rattrapage a tourné sur l'appareil, puis incrémenter `PARSER_VERSION` avec le premier changement d'extraction.
+- **ADR-027 (D12 à D17)** : infrastructure complète (domaine, persistance, capture, rattrapage et ré-ancrage par `ReanchorLocatorsUseCase`, transport par sauvegarde et synchronisation). D12 et D14 faits (`PARSER_VERSION` 5). Restent D13 (listes, tableaux, citations aplatis), D15 (liens), D16 (style CSS). **Non vérifié sur appareil** : après installation du parseur v5, que la position d'Ubik (chapitre 18, page 8/22) retombe sur le même passage et que `publications.locatorAnchorVersion` vaut 5 ; l'appareil était débranché.
 - **D1** : décidé (pas de couverture ajoutée) ; demande la migration de l'index de chapitre (positions, signets, longueurs).
 - **Compléments** : B16 (barre vide en mode système), B17 (les autres panneaux n'ont pas été passés en revue un à un), C10 (fiche d'un livre OPDS), D24 (chargement en mémoire, plan du PDF), D29 (c, d, e), D43 (la clé de cache reste sensible à l'intonation), D44 (avertissement de langue), D66 (recherche des notes), D67 (mises à jour en deux temps des Réglages et préréglages), conflit de position laissé en dehors d'A19.
 - **P2/P3 non examinés** : D16, D45, D50, D62 ; D64 (le worker écrit tout en `.epub` : accepter les PDF demande de transmettre le type MIME jusqu'à lui) ; C3 (menu 3-points des couvertures, actions du HUD et de la barre TTS).
