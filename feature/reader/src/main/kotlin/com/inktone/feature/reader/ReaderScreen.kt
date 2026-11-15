@@ -181,10 +181,8 @@ import androidx.compose.foundation.lazy.LazyListLayoutInfo
  * Regroupé par `Paragraph` — frontière déjà utilisée pour les images EPUB
  * intercalées, et devenue depuis l'unité d'item du `LazyColumn`.
  *
- * **Limite connue, non résolue ici** : aucun défilement automatique vers
- * la phrase en cours de lecture TTS — la vue défile uniquement sur
- * changement de chapitre. Un chapitre long avec lecture TTS active peut
- * donc surligner un mot hors de l'écran visible.
+ * Pendant la lecture TTS, la vue suit la phrase lue (effet d'auto-défilement
+ * plus bas, qui cède à un geste manuel).
  *
  * [isForeground] — vrai tant que le Lecteur est la destination COURANTE de
  * la navigation. Il retombe à faux dès le début d'une transition sortante
