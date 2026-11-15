@@ -653,7 +653,7 @@ Avant de pousser les deux dernières : `./gradlew build` complet vert sur `HEAD`
 | D47 | Pause plus longue entre deux paragraphes narrés | `bc41222b` | Test JVM |
 | D70 | Abréviation en fin de phrase : plus de fusion de deux phrases (`PARSER_VERSION` 3) | `5eec1462` | Tests JVM |
 | B9 | Bornes de vitesse, hauteur et intervalle communes aux Réglages et au Lecteur | `67703f34` | Tests JVM |
-| D74, C5 | Panneau Voix du Lecteur : lien « Changer de voix dans les Réglages » à la place de la liste | `b039cd47` | Appareil — **`ReaderTtsPanelTest` à exécuter** |
+| D74, C5 | Panneau Voix du Lecteur : lien « Changer de voix dans les Réglages » à la place de la liste | `b039cd47` | Appareil + instrumenté (`ReaderTtsPanelTest`, 4 tests) |
 | D73 | Une seule définition du profil vocal par défaut (`VoiceProfile.defaultFor`) | `2ad8b5f7` | Tests JVM |
 | C7 | Suppression d'une règle de prononciation confirmée | `fd502e3e` | Tests JVM |
 | B8 | Même éditeur de prononciation depuis le Lecteur et les Réglages | `4d9e8a44` | Appareil + tests JVM |
@@ -672,7 +672,6 @@ Le second essai, tracé, n'a montré ni pause ni arrêt.
 
 **Restent à faire avant de pousser `audit-narration`** :
 - **A7** (voix absente seulement) : lancer le téléchargement, quitter les Réglages : la notification reste et le téléchargement aboutit.
-- **D74** : exécuter `ReaderTtsPanelTest` (`connectedDebugAndroidTest`).
 - Aucun test ne vérifie que l'intent `Pause` du Lecteur est traité : sa branche peut disparaître du `when` sans erreur de compilation ni de test.
 
 **Changement de comportement à connaître (D73)** : sans profil vocal
@@ -687,15 +686,12 @@ pas encore par Issa.
 
 | Constat | Correction | Commit | Vérification |
 |---|---|---|---|
-| D18 | Défilement dans la page PDF enregistré (`MIGRATION_34_35`) et remis à zéro au changement de page | `a4fca966` | Instrumenté (migration) + test JVM + appareil (adb) sans zoom — **zoom à vérifier par Issa** |
-| D48 | Images en mode paginé : une page par image, intercalée à sa place ; titres mis en forme | `69a0ae42` | Tests JVM + appareil (adb) : couvertures et pages de titre affichées — **illustration au milieu d'un chapitre et titre `<h1>` non vus sur appareil** |
-| D55, D63 | Livre copié dans le stockage de l'application (ADR-028) ; fichier supprimé avec le livre ; rattrapage des anciens imports | `f76d8e3b` | Tests JVM + instrumenté + appareil (adb) : 488 livres copiés et rouverts — **import d'un nouveau fichier à vérifier par Issa** |
+| D18 | Défilement dans la page PDF enregistré (`MIGRATION_34_35`) et remis à zéro au changement de page | `a4fca966` | Appareil + instrumenté (migration) + test JVM |
+| D48 | Images en mode paginé : une page par image, intercalée à sa place ; titres mis en forme | `69a0ae42` | Appareil + tests JVM |
+| D55, D63 | Livre copié dans le stockage de l'application (ADR-028) ; fichier supprimé avec le livre ; rattrapage des anciens imports | `f76d8e3b` | Appareil (488 livres copiés et rouverts, nouvel import) + instrumenté + tests JVM |
 | D57, D58 | Livres appariés par l'empreinte de leur fichier en synchronisation et en restauration | `00254c51` | Tests JVM — pas d'appareil (second appareil ou réinstallation nécessaire) |
 
-**Vérifications sur appareil en attente (Issa)** :
-- **D18** : PDF, zoomer et faire défiler une page, fermer, rouvrir : même pourcentage dans le Lecteur et la Bibliothèque ; changer de page après un zoom : le pourcentage suit la nouvelle page.
-- **D48** : mode paginé, EPUB illustré : l'illustration a sa page, entre le texte qui la précède et celui qui la suit ; un titre de section est plus grand et en gras.
-- **D55** : importer un nouveau livre, supprimer ou déplacer le fichier d'origine : le livre s'ouvre toujours ; supprimer un livre téléchargé depuis un catalogue : il quitte le stockage.
+Vérifications sur appareil faites par Issa le 2026-11-15 (D18 avec zoom, D48, D55 avec un nouvel import).
 
 **Instabilité constatée** : `ReaderViewModelBackgroundTrackerTest.onAppBackground_pendant_ecoute_tts_laisse_le_tracker_actif` a échoué une fois dans la suite complète (« Dispatchers.Main is used concurrently with setting it », dans `resetMain`), puis passé trois fois seul et dans la suite complète suivante. Non qualifiée plus avant.
 
