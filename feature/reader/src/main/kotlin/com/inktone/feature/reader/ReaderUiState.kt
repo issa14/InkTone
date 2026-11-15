@@ -261,20 +261,38 @@ data class ReaderUiState(
      * (voir `ReaderViewModel.persistPosition`).
      */
     val isCurrentPageBookmarked: Boolean
-        get() {
-            // Lot 12, tache 12.9, decision actee 21 — granularite page,
-            // pas phrase : un PDF n'a pas de « phrase courante » suivie en
-            // navigation manuelle.
-            if (publicationFormat == PublicationFormat.PDF) {
-                return bookmarks.any { it.locator.chapterIndex == currentChapterIndex }
-            }
-            val chapter = currentChapter ?: return false
-            val sentence = chapter.sentences.getOrNull(currentSentenceIndex) ?: return false
-            return bookmarks.any { bookmark ->
-                bookmark.locator.chapterIndex == chapter.index &&
-                    bookmark.locator.charOffset in sentence.startOffset until sentence.endOffset
-            }
+        get() = bookmarkOnCurrentPage(pageSentences = null) != null
+
+    fun isBookmarkedOnPage(pageSentences: IntRange?): Boolean = bookmarkOnCurrentPage(pageSentences) != null
+
+    /**
+     * Signet qui se trouve sur la page courante, `null` s'il n'y en a pas.
+     *
+     * [pageSentences] est la plage de phrases de la page virtuelle qui contient
+     * la phrase courante (celle que compte la ligne de statut). Sans elle, ou si
+     * elle ne contient pas la phrase courante, seule cette phrase compte. Un
+     * signet posé plus haut sur la même page restait méconnu après un défilement
+     * d'un paragraphe ou un changement de taille de texte : le bouton proposait
+     * d'en créer un second à quelques lignes (audit UX D51).
+     */
+    fun bookmarkOnCurrentPage(pageSentences: IntRange?): Bookmark? {
+        // Lot 12, tache 12.9, decision actee 21 — granularite page,
+        // pas phrase : un PDF n'a pas de « phrase courante » suivie en
+        // navigation manuelle.
+        if (publicationFormat == PublicationFormat.PDF) {
+            return bookmarks.firstOrNull { it.locator.chapterIndex == currentChapterIndex }
         }
+        val chapter = currentChapter ?: return null
+        val sentences = chapter.sentences
+        val current = sentences.getOrNull(currentSentenceIndex) ?: return null
+        val first = pageSentences?.takeIf { currentSentenceIndex in it }?.let { sentences.getOrNull(it.first) }
+        val last = pageSentences?.takeIf { currentSentenceIndex in it }?.let { sentences.getOrNull(it.last) }
+        val start = first?.startOffset ?: current.startOffset
+        val end = last?.endOffset ?: current.endOffset
+        return bookmarks.firstOrNull { bookmark ->
+            bookmark.locator.chapterIndex == chapter.index && bookmark.locator.charOffset in start until end
+        }
+    }
 
     // 3b.4 — le micro-indicateur ETA (B.6) est retiré : absent de la
     // cible, il occupait la même zone que StatusLineBar quand le HUD est
@@ -359,6 +377,13 @@ sealed interface ReaderIntent {
      * un, plutôt que d'en créer un doublon.
      */
     data object ToggleBookmarkAtCurrentPosition : ReaderIntent
+
+    /**
+     * Comme [ToggleBookmarkAtCurrentPosition], en reconnaissant un signet
+     * posé n'importe où sur la page affichée : [pageSentences] est la plage de
+     * phrases de la page virtuelle courante, connue de l'écran seul (audit UX D51).
+     */
+    data class ToggleBookmarkOnPage(val pageSentences: IntRange?) : ReaderIntent
     data object ToggleBookmarkList : ReaderIntent
     data class DeleteBookmark(val id: String) : ReaderIntent
 

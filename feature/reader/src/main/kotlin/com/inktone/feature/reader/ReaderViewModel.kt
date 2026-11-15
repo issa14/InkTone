@@ -391,7 +391,8 @@ class ReaderViewModel @Inject constructor(
                 freeSelectionAnchorOffset = null, freeSelectionFocusOffset = null, pendingAnnotationId = null,
             )
             is ReaderIntent.ConfirmAnnotation -> confirmAnnotation(intent.color, intent.kind, intent.content)
-            is ReaderIntent.ToggleBookmarkAtCurrentPosition -> toggleBookmarkAtCurrentPosition()
+            is ReaderIntent.ToggleBookmarkAtCurrentPosition -> toggleBookmarkAtCurrentPosition(pageSentences = null)
+            is ReaderIntent.ToggleBookmarkOnPage -> toggleBookmarkAtCurrentPosition(intent.pageSentences)
             is ReaderIntent.ToggleBookmarkList -> _state.value = _state.value.copy(
                 isBookmarkListVisible = !_state.value.isBookmarkListVisible,
             )
@@ -1029,7 +1030,7 @@ class ReaderViewModel @Inject constructor(
      * [playCurrentSentence] — une seule source pour « la position
      * courante », jamais un second calcul.
      */
-    private fun toggleBookmarkAtCurrentPosition() {
+    private fun toggleBookmarkAtCurrentPosition(pageSentences: IntRange?) {
         val publicationId = currentPublicationId ?: return
 
         // Lot 12, tache 12.9, decision actee 17 — meme Locator, memes Use
@@ -1071,10 +1072,7 @@ class ReaderViewModel @Inject constructor(
 
         val chapter = _state.value.currentChapter ?: return
         val sentence = chapter.sentences.getOrNull(_state.value.currentSentenceIndex) ?: return
-        val existing = _state.value.bookmarks.firstOrNull { bookmark ->
-            bookmark.locator.chapterIndex == chapter.index &&
-                bookmark.locator.charOffset in sentence.startOffset until sentence.endOffset
-        }
+        val existing = _state.value.bookmarkOnCurrentPage(pageSentences)
 
         viewModelScope.launch {
             if (existing != null) {
