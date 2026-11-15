@@ -1,5 +1,6 @@
 package com.inktone.feature.reader
 
+import com.inktone.domain.model.Sentence
 import com.inktone.domain.service.WordTimestamp
 
 /**
@@ -53,3 +54,10 @@ internal fun msUntilNextWordBoundary(
     }
     return 0L
 }
+
+/**
+ * Plage surlignée quand le moteur ne fournit aucun horodatage par mot : la phrase
+ * entière, offsets absolus du chapitre. `null` pour une phrase vide.
+ */
+internal fun sentenceHighlightRange(sentence: Sentence): IntRange? =
+    if (sentence.endOffset > sentence.startOffset) sentence.startOffset until sentence.endOffset else null

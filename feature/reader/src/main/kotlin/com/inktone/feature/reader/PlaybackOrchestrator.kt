@@ -864,7 +864,7 @@ class PlaybackOrchestrator @Inject constructor(
                 creditNarratedSentence(sentences.getOrNull(index - 1))
                 advanceTo(generation, index, publicationId, chapterIndex, resourceHref, sentence, segment.wordTimestamps, voiceProfile, rulesHash)
             }
-            launchWordTracking(generation, sentenceStartMs, segment.wordTimestamps)
+            launchWordTracking(generation, sentenceStartMs, segment.wordTimestamps, sentence)
             nextPhraseStartMs += phraseDurationMs
             index++
         }
@@ -1126,10 +1126,20 @@ class PlaybackOrchestrator @Inject constructor(
      * marge ([WORD_TRACKING_RESYNC_MARGIN_MS]) pour se recaler sur la
      * position réelle avant l'échéance plutôt qu'après.
      */
-    private fun launchWordTracking(generation: Long, sentenceStartMs: Long, wordTimestamps: List<WordTimestamp>) {
+    private fun launchWordTracking(
+        generation: Long,
+        sentenceStartMs: Long,
+        wordTimestamps: List<WordTimestamp>,
+        sentence: Sentence?,
+    ) {
         wordTrackingJob?.cancel()
         _currentWordRange.value = null
-        if (wordTimestamps.isEmpty()) return
+        if (wordTimestamps.isEmpty()) {
+            // Sans repères par mot, la phrase entière est surlignée : ses bornes sont
+            // connues, aucun mot n'est deviné (audit UX D65).
+            _currentWordRange.value = sentence?.let(::sentenceHighlightRange)
+            return
+        }
         val lastEndMs = sentenceStartMs + wordTimestamps.last().endMs
         wordTrackingJob = scope.launch {
             while (isCurrent(generation)) {

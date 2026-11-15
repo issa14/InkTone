@@ -1,5 +1,6 @@
 package com.inktone.feature.reader
 
+import com.inktone.domain.model.Sentence
 import com.inktone.domain.service.WordTimestamp
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertNull
@@ -92,5 +93,11 @@ class MsUntilNextWordBoundaryTest {
     @Test
     fun sansTimestamps_retourneZero() {
         assertEquals(0L, msUntilNextWordBoundary(playedMs = 100, sentenceStartMs = 0, wordTimestamps = emptyList()))
+    }
+
+    @Test
+    fun sansRepereParMot_laPhraseEntiereEstSurlignee() {
+        val sentence = Sentence(index = 3, text = "Il pleuvait.", startOffset = 40, endOffset = 52)
+        assertEquals(40 until 52, sentenceHighlightRange(sentence))
     }
 }

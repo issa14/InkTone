@@ -758,7 +758,7 @@ Vérification : « Appareil (adb) » = pilotée par adb sur le V2206, pas encore
 - **D56, D19** : couverts par des tests seulement.
 
 **Reste à traiter** :
-- **Nécessitent une décision de conception** : B5 (sommaire précis, touche l'analyse EPUB), D65 (surlignage de phrase quand le mot est inconnu), 
+- **Nécessitent une décision de conception** : B5 (sommaire précis, touche l'analyse EPUB), D65 (fait en affichage texte : la phrase entière est surlignée quand le moteur ne renvoie aucun repère par mot ; les pages PDF, rendues en image, ne peuvent rien surligner), 
 - **Lourds** : D8 (recherche insensible aux accents : changer le tokeniseur FTS impose de réindexer toute la bibliothèque, soit plusieurs minutes pour 1,7 Go), D61 (suppressions et modifications non propagées entre appareils : tombes horodatées), D11, D4.
 - **ADR-027 (D12 à D17)** : infrastructure complète (domaine, persistance, capture, rattrapage et ré-ancrage par `ReanchorLocatorsUseCase`, transport par sauvegarde et synchronisation). D12 et D14 faits (`PARSER_VERSION` 5). Restent D13 (listes, tableaux, citations aplatis), D15 (liens), D16 (style CSS). **Vérifié sur appareil (V2206, 2026-11-15)** : après installation du parseur v5, 479 livres sont à `locatorAnchorVersion` 5 (9 restent à 0 : 8 PDF et 1 livre) et la position d'Ubik porte le contexte « tué Wendy par rancune émotive. », le passage où la lecture s'était arrêtée.
 - **D1** : décidé (pas de couverture ajoutée) ; demande la migration de l'index de chapitre (positions, signets, longueurs).
