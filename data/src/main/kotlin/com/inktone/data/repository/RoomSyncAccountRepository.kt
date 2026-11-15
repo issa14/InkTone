@@ -24,36 +24,32 @@ class RoomSyncAccountRepository @Inject constructor(
     override suspend fun get(): SyncAccount? = preferencesRepository.get().toSyncAccount()
 
     override suspend fun save(account: SyncAccount) {
-        val current = preferencesRepository.get()
-        preferencesRepository.update(
-            current.copy(
+        preferencesRepository.update {
+            it.copy(
                 syncProvider = account.provider.name,
                 syncAccountLabel = account.accountLabel,
                 syncLinkedAt = account.linkedAt,
                 syncLastSyncAt = account.lastSyncAt,
                 syncLastAutoSyncFailed = account.lastAutoSyncFailed,
-            ),
-        )
+            )
+        }
     }
 
     override suspend fun clear() {
-        val current = preferencesRepository.get()
-        preferencesRepository.update(
-            current.copy(
+        preferencesRepository.update {
+            it.copy(
                 syncProvider = null, syncAccountLabel = null, syncLinkedAt = null,
                 syncLastSyncAt = null, syncLastAutoSyncFailed = false,
-            ),
-        )
+            )
+        }
     }
 
     override suspend fun markSyncSucceeded(at: Long) {
-        val current = preferencesRepository.get()
-        preferencesRepository.update(current.copy(syncLastSyncAt = at, syncLastAutoSyncFailed = false))
+        preferencesRepository.update { it.copy(syncLastSyncAt = at, syncLastAutoSyncFailed = false) }
     }
 
     override suspend fun markSyncFailed() {
-        val current = preferencesRepository.get()
-        preferencesRepository.update(current.copy(syncLastAutoSyncFailed = true))
+        preferencesRepository.update { it.copy(syncLastAutoSyncFailed = true) }
     }
 
     private fun com.inktone.domain.model.UserPreferences.toSyncAccount(): SyncAccount? {
