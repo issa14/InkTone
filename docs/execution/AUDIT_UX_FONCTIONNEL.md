@@ -719,6 +719,17 @@ Vérification : « Appareil (adb) » = pilotée par adb sur le V2206, pas encore
 | A17 (**P1**) et A11, second volet | Réglette placée sur la ligne lue, masquée hors narration, avec son interrupteur | `fbb580d2` | Appareil (adb) |
 | D29 (a, b) | Crédit de lecture visuelle borné par le temps ; remis à zéro après un saut | `11081688` | Tests JVM |
 | B4 (PDF) | « Aller à la page » à la place du sommaire absent ; la barre de progression reste passive | `c4630bc3` | Appareil (adb) + tests JVM |
+| D38 | Export des statistiques avec titres et mots lus ; partage par sélecteur, sans plantage sans application cible | `3542473e` | Compilation seulement |
+| D37 | Minuteur de sommeil décompté sur l'horloge ; indicateur de fondu inexistant retiré | `be6ee2ac` | Tests JVM existants |
+| D5 | Entrée de sommaire sans cible écartée au lieu de mener au premier chapitre | `5e7121cd` | Instrumenté (sommaire) |
+| D68 | Couverture supprimée avec le livre, sauf si partagée | `ff8f30d3` | Tests JVM + instrumenté |
+| C13 | Message pour un compte sans lecture dans les Statistiques | `c7a7b6e2` | Tests JVM |
+| C11 | Toucher de la version utile ; échec du mail signalé | `0cc562ee` | Compilation seulement |
+| C14 (en partie) | KDoc du Lecteur corrigé ; code mort non retiré | `18d8260c` | Compilation |
+| D67 | Mise à jour atomique des préférences (`update { }`) pour les réglages simples | `2e5c757a` | Tests JVM (échoue sans le verrou) |
+| D23 | Format détecté par le contenu sans extension | `df9c2141` | Tests JVM |
+| D20 | Écriture atomique de l'état de lecture | `ea07beb2` | Tests JVM (échoue sans le verrou) |
+| D34 | Statistiques recalculées toutes les 15 s tant que l'écran est affiché | `efd68d10` | Test JVM |
 
 **Vérifications sur appareil à faire par Issa** :
 - **B18** : mode défilement, auto-défilement jusqu'en fin de chapitre : il s'arrête.
@@ -735,7 +746,7 @@ Vérification : « Appareil (adb) » = pilotée par adb sur le V2206, pas encore
 - **Lourds** : D8 (recherche insensible aux accents : changer le tokeniseur FTS impose de réindexer toute la bibliothèque, soit plusieurs minutes pour 1,7 Go), D61 (suppressions et modifications non propagées entre appareils : tombes horodatées), D11, D4.
 - **Après implémentation d'ADR-027** (contexte textuel du `Locator`) : D12 à D17.
 - **D1** : décidé (pas de couverture ajoutée) ; demande la migration de l'index de chapitre (positions, signets, longueurs).
-- **Compléments** : D29 (c, d, e), D43 (la clé de cache reste sensible à l'intonation), D44 (avertissement de langue), D66 (recherche des notes), conflit de position laissé en dehors d'A19.
-- **P2/P3 non examinés** : D5, D16, D20, D23, D24, D32, D34, D37, D38, D45, D50, D52, D62, D64, D65, D67, D68, C3, C9 à C14.
+- **Compléments** : D29 (c, d, e), D43 (la clé de cache reste sensible à l'intonation), D44 (avertissement de langue), D66 (recherche des notes), D67 (mises à jour en deux temps des Réglages et préréglages), C14 (code mort), conflit de position laissé en dehors d'A19.
+- **P2/P3 non examinés** : D16, D24, D32 (décision), D45, D50, D52, D62, D64, C3, C9, C10, C12.
 - **A7 (complément)** : le défilement automatique vers la carte de la voix n'est pas fait.
 - `scripts/audition-edge-voices.sh` : non suivi, sort à décider.
