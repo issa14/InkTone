@@ -138,4 +138,28 @@ class FallbackTtsEngineTest {
         assertEquals(1, primary.callCount)
         assertEquals(TtsEngineId.SHERPA_ONNX, engine.id)
     }
+
+    // Audit UX D76 : une phrase de repli était rangée dans le cache sous la
+    // voix demandée, puis rejouée plus tard.
+    @Test
+    fun marque_le_segment_produit_par_le_repli() = runTest {
+        val primary = FakeTtsEngine(TtsEngineId.SHERPA_ONNX, capabilities(wordTimestamps = false), shouldFail = true)
+        val fallback = FakeTtsEngine(TtsEngineId.ANDROID_NATIVE, capabilities(wordTimestamps = true))
+        val engine = FallbackTtsEngine(primary, fallback)
+
+        assertEquals(TtsEngineId.ANDROID_NATIVE, engine.synthesize(sentence, voiceProfile).substitutedBy)
+        // Les phrases suivantes restent sur le repli : toujours marquées.
+        assertEquals(TtsEngineId.ANDROID_NATIVE, engine.synthesize(sentence, voiceProfile).substitutedBy)
+    }
+
+    @Test
+    fun ne_marque_pas_un_segment_produit_par_le_moteur_demande() = runTest {
+        val primary = FakeTtsEngine(TtsEngineId.SHERPA_ONNX, capabilities(wordTimestamps = false))
+        val fallback = FakeTtsEngine(TtsEngineId.ANDROID_NATIVE, capabilities(wordTimestamps = true))
+        val engine = FallbackTtsEngine(primary, fallback)
+        val nativeProfile = voiceProfile.copy(engine = TtsEngineId.ANDROID_NATIVE)
+
+        assertEquals(null, engine.synthesize(sentence, voiceProfile).substitutedBy)
+        assertEquals(null, engine.synthesize(sentence, nativeProfile).substitutedBy)
+    }
 }

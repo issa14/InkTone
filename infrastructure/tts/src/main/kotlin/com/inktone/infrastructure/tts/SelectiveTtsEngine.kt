@@ -55,7 +55,8 @@ class SelectiveTtsEngine @Inject constructor(
         if (!useEdge) {
             val segment = offlineEngine.synthesize(sentence, voiceProfile)
             edgeActive = false
-            return segment
+            // Edge demandée, offline utilisée : segment de repli (audit UX D76).
+            return if (voiceProfile.engine == TtsEngineId.EDGE_TTS) segment.asFallback(offlineEngine.id) else segment
         }
         return try {
             val segment = edgeEngine.synthesize(sentence, voiceProfile)
@@ -67,7 +68,7 @@ class SelectiveTtsEngine @Inject constructor(
                 edgeFailed = true
                 val segment = offlineEngine.synthesize(sentence, voiceProfile)
                 edgeActive = false
-                segment
+                segment.asFallback(offlineEngine.id)
             } else {
                 throw e
             }
@@ -81,6 +82,10 @@ class SelectiveTtsEngine @Inject constructor(
     override fun warmUp() {
         offlineEngine.warmUp()
     }
+
+    /** Garde le marquage d'un repli déjà posé par la chaîne offline, sinon marque [engine]. */
+    private fun AudioSegment.asFallback(engine: TtsEngineId): AudioSegment =
+        if (substitutedBy != null) this else substitutedBy(engine)
 
     private companion object {
         const val TAG = "SelectiveTtsEngine"

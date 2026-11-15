@@ -128,4 +128,28 @@ class SelectiveTtsEngineTest {
         assertEquals("Edge ne doit jamais être sélectionné implicitement", 0, edge.calls)
         assertEquals(1, offline.calls)
     }
+
+    // Audit UX D76 : un segment de repli ne doit pas passer pour de l'Edge.
+    @Test
+    fun marque_le_segment_offline_produit_a_la_place_d_edge() = runTest {
+        val edge = RecordingEngine(
+            TtsEngineId.EDGE_TTS, capabilities(TtsEngineId.EDGE_TTS), failWith = UnknownHostException("hors ligne"),
+        )
+        val offline = RecordingEngine(TtsEngineId.SHERPA_ONNX, capabilities(TtsEngineId.SHERPA_ONNX))
+        val engine = SelectiveTtsEngine(edge, offline)
+
+        assertEquals(TtsEngineId.SHERPA_ONNX, engine.synthesize(sentence, edgeProfile).substitutedBy)
+        // Edge reste écartée pour la session : les phrases suivantes aussi.
+        assertEquals(TtsEngineId.SHERPA_ONNX, engine.synthesize(sentence, edgeProfile).substitutedBy)
+    }
+
+    @Test
+    fun ne_marque_ni_un_segment_edge_ni_un_segment_offline_demande() = runTest {
+        val edge = RecordingEngine(TtsEngineId.EDGE_TTS, capabilities(TtsEngineId.EDGE_TTS))
+        val offline = RecordingEngine(TtsEngineId.SHERPA_ONNX, capabilities(TtsEngineId.SHERPA_ONNX))
+        val engine = SelectiveTtsEngine(edge, offline)
+
+        assertEquals(null, engine.synthesize(sentence, edgeProfile).substitutedBy)
+        assertEquals(null, engine.synthesize(sentence, sherpaProfile).substitutedBy)
+    }
 }

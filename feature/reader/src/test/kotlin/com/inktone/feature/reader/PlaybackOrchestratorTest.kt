@@ -486,6 +486,7 @@ class PlaybackOrchestratorTest {
         private val failSynthesisCount: Int? = null,
         private val synthesisDelayMs: Long = 0,
         private val delayBySentence: Map<Int, Long> = emptyMap(),
+        private val substitutedBy: TtsEngineId? = null,
     ) : TtsEngine {
         override val id = TtsEngineId.ANDROID_NATIVE
         override val capabilities = TtsCapabilities(
@@ -520,6 +521,7 @@ class PlaybackOrchestratorTest {
                 durationMs = segmentDurationMs,
                 wordTimestamps = emptyList(),
                 sampleRate = 22_050,
+                substitutedBy = substitutedBy,
             )
         }
 
@@ -537,5 +539,31 @@ class PlaybackOrchestratorTest {
         }
 
         override suspend fun delete(publicationId: String) = Unit
+    }
+
+    // ───── Cache audio : segments de repli (audit UX D76) ─────
+
+    @Test
+    fun unSegmentDeRepliNEstJamaisRangeDansLeCache() = runBlocking {
+        val cache = FakeTtsSegmentCache()
+        val tts = FakeTtsEngine(segmentDurationMs = 50, substitutedBy = TtsEngineId.ANDROID_NATIVE)
+        val orchestrator = PlaybackOrchestrator(tts, FakeAudioPlayer(), UpdateReadingStateUseCase(FakeReadingStateRepository()), GetReadingStateUseCase(FakeReadingStateRepository()), FakeChapterParser(), FakePublicationRepository(), FakePublicationParser(), FakePreferencesRepository(), FakeVoiceProfileRepository(), cache, FakePronunciationRuleRepository())
+
+        orchestrator.play(listOf(sentence(0, "Bonjour.", 0)), profile.copy(engine = TtsEngineId.SHERPA_ONNX), 0, "pub1", 1, "ch1.xhtml")
+        awaitUntil { orchestrator.state.value == PlaybackOrchestrator.PlaybackStatus.Idle }
+
+        assertTrue("aucun segment de repli en cache", cache.stored.isEmpty())
+    }
+
+    @Test
+    fun unSegmentDuMoteurDemandeEstRangeDansLeCache() = runBlocking {
+        val cache = FakeTtsSegmentCache()
+        val tts = FakeTtsEngine(segmentDurationMs = 50)
+        val orchestrator = PlaybackOrchestrator(tts, FakeAudioPlayer(), UpdateReadingStateUseCase(FakeReadingStateRepository()), GetReadingStateUseCase(FakeReadingStateRepository()), FakeChapterParser(), FakePublicationRepository(), FakePublicationParser(), FakePreferencesRepository(), FakeVoiceProfileRepository(), cache, FakePronunciationRuleRepository())
+
+        orchestrator.play(listOf(sentence(0, "Bonjour.", 0)), profile, 0, "pub1", 1, "ch1.xhtml")
+        awaitUntil { orchestrator.state.value == PlaybackOrchestrator.PlaybackStatus.Idle }
+
+        assertEquals(1, cache.stored.size)
     }
 }

@@ -795,8 +795,9 @@ class PlaybackOrchestrator @Inject constructor(
         }
         if (synthesized) consecutiveSynthesisFailures.set(0)
         // Seule une synthèse RÉUSSIE est cachée — jamais un silence de
-        // secours (le rejouer serait du faux texte).
-        if (synthesized) ttsSegmentCache.put(publicationId, key, fresh)
+        // secours (le rejouer serait du faux texte), ni un segment de repli :
+        // il serait rejoué plus tard sous la voix demandée (audit UX D76).
+        if (synthesized && fresh.substitutedBy == null) ttsSegmentCache.put(publicationId, key, fresh)
         return fresh
     }
 

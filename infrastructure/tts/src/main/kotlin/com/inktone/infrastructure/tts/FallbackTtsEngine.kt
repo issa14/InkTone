@@ -66,7 +66,7 @@ class FallbackTtsEngine @Inject constructor(
             return segment
         }
         nativeRequested = false
-        if (fallenBack) return fallback.synthesize(sentence, voiceProfile)
+        if (fallenBack) return fallback.synthesize(sentence, voiceProfile).substitutedBy(fallback.id)
         return try {
             primary.synthesize(sentence, voiceProfile)
         } catch (e: CancellationException) {
@@ -81,7 +81,7 @@ class FallbackTtsEngine @Inject constructor(
         } catch (e: Exception) {
             Log.w(TAG, "Palier 2 (Sherpa-ONNX) a echoue, repli vers le Palier 1 (Android natif): ${e.message}", e)
             fallenBack = true
-            fallback.synthesize(sentence, voiceProfile)
+            fallback.synthesize(sentence, voiceProfile).substitutedBy(fallback.id)
         }
     }
 

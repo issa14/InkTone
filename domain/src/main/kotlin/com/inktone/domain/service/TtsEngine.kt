@@ -20,10 +20,11 @@ interface TtsEngine {
      * (Lot 22, Palier B). Tout changement du pipeline de synthèse qui
      * modifie l'audio produit (prosodie, phonémisation, modèle) DOIT
      * incrémenter cette valeur : un cache périmé servirait un surlignage
-     * faux (ADR-021). Défaut `1` : les moteurs dont la sortie est stable
-     * n'ont rien à surcharger.
+     * faux (ADR-021). Défaut `2` : les moteurs dont la sortie est stable
+     * n'ont rien à surcharger. Passée de 1 à 2 pour purger les segments de
+     * repli que l'ancien cache rangeait sous la voix demandée (audit UX D76).
      */
-    val synthesisVersion: Int get() = 1
+    val synthesisVersion: Int get() = 2
 
     suspend fun synthesize(sentence: Sentence, voiceProfile: VoiceProfile): AudioSegment
 
@@ -63,7 +64,19 @@ class AudioSegment(
     val durationMs: Long,
     val wordTimestamps: List<WordTimestamp>,
     val sampleRate: Int,
+    /**
+     * Moteur qui a réellement synthétisé ce segment quand ce n'est pas celui du
+     * profil demandé (repli Edge vers l'offline, Sherpa-ONNX vers la voix
+     * système) ; `null` quand le moteur demandé a parlé. Un segment de repli ne
+     * doit jamais être rangé dans le cache sous l'identité de la voix demandée
+     * (audit UX D76). Hors de l'égalité : ce n'est pas du contenu audio.
+     */
+    val substitutedBy: TtsEngineId? = null,
 ) {
+    /** Ce segment, marqué comme produit par [engine] à la place du moteur demandé. */
+    fun substitutedBy(engine: TtsEngineId): AudioSegment =
+        AudioSegment(audioData, durationMs, wordTimestamps, sampleRate, substitutedBy = engine)
+
     override fun equals(other: Any?): Boolean {
         if (this === other) return true
         if (other !is AudioSegment) return false
