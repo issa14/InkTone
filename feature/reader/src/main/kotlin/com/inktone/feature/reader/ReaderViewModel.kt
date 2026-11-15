@@ -381,8 +381,7 @@ class ReaderViewModel @Inject constructor(
                 _state.value = _state.value.copy(readingMode = newMode)
                 // B.1 — persiste le mode de lecture
                 viewModelScope.launch {
-                    val current = preferencesRepository.get()
-                    preferencesRepository.update(current.copy(readingMode = newMode.name))
+                    preferencesRepository.update { it.copy(readingMode = newMode.name) }
                 }
             }
             is ReaderIntent.SetFreeSelection -> {
@@ -1041,8 +1040,7 @@ class ReaderViewModel @Inject constructor(
 
     /** Lot 22, tâche 12 — mémorise la couleur pour la proposer en tête du sélecteur au prochain surlignage. */
     private suspend fun rememberRecentAnnotationColor(color: AnnotationColor) {
-        val prefs = preferencesRepository.get()
-        preferencesRepository.update(prefs.copy(recentAnnotationColors = prefs.recentAnnotationColors.withRecentColor(color)))
+        preferencesRepository.update { it.copy(recentAnnotationColors = it.recentAnnotationColors.withRecentColor(color)) }
     }
 
     /** Tâche 7.2 — même principe que [observeAnnotations] : observation continue, pas un chargement figé. */
@@ -1735,8 +1733,7 @@ class ReaderViewModel @Inject constructor(
     /** 3d.2 — réglage global d'interligne, voir `ReaderUiState.lineHeightMultiplier`. */
     private fun setLineHeight(multiplier: Float) {
         viewModelScope.launch {
-            val current = preferencesRepository.get()
-            preferencesRepository.update(current.copy(lineHeightMultiplier = multiplier))
+            preferencesRepository.update { it.copy(lineHeightMultiplier = multiplier) }
         }
     }
 
@@ -1748,23 +1745,20 @@ class ReaderViewModel @Inject constructor(
     private fun setReaderMarginStep(step: Int) {
         val bounded = step.coerceIn(UserPreferences.MARGIN_STEP_RANGE)
         viewModelScope.launch {
-            val current = preferencesRepository.get()
-            preferencesRepository.update(current.copy(readerMarginStep = bounded))
+            preferencesRepository.update { it.copy(readerMarginStep = bounded) }
         }
     }
 
     private fun setReadingRulerEnabled(enabled: Boolean) {
         viewModelScope.launch {
-            val current = preferencesRepository.get()
-            preferencesRepository.update(current.copy(readingRulerEnabled = enabled))
+            preferencesRepository.update { it.copy(readingRulerEnabled = enabled) }
         }
     }
 
     /** P4 — justification du texte (césure comprise, jamais l'une sans l'autre). */
     private fun setTextJustified(justified: Boolean) {
         viewModelScope.launch {
-            val current = preferencesRepository.get()
-            preferencesRepository.update(current.copy(textJustified = justified))
+            preferencesRepository.update { it.copy(textJustified = justified) }
         }
     }
 
@@ -1779,8 +1773,7 @@ class ReaderViewModel @Inject constructor(
      */
     private fun setFontFamily(fontFamily: FontFamily) {
         viewModelScope.launch {
-            val current = preferencesRepository.get()
-            preferencesRepository.update(current.copy(fontFamily = fontFamily))
+            preferencesRepository.update { it.copy(fontFamily = fontFamily) }
             val overrides = _state.value.currentOverrides
             val effectiveSettings = EffectiveReadingSettings.resolve(overrides, preferencesRepository.get())
             _state.value = _state.value.copy(effectiveSettings = effectiveSettings)
@@ -1790,8 +1783,7 @@ class ReaderViewModel @Inject constructor(
     /** P4 — maintien de l'écran allumé, appliqué à la fenêtre par ReaderScreen. */
     private fun setKeepScreenOn(enabled: Boolean) {
         viewModelScope.launch {
-            val current = preferencesRepository.get()
-            preferencesRepository.update(current.copy(keepScreenOn = enabled))
+            preferencesRepository.update { it.copy(keepScreenOn = enabled) }
         }
     }
 
@@ -1803,16 +1795,14 @@ class ReaderViewModel @Inject constructor(
     private fun setAutoScrollSpeed(speed: Int) {
         val bounded = speed.coerceIn(UserPreferences.AUTO_SCROLL_SPEED_RANGE)
         viewModelScope.launch {
-            val current = preferencesRepository.get()
-            preferencesRepository.update(current.copy(autoScrollSpeed = bounded))
+            preferencesRepository.update { it.copy(autoScrollSpeed = bounded) }
         }
     }
 
     /** 3d.3 — réglage global de luminosité, voir `ReaderUiState.readerBrightness`. */
     private fun setReaderBrightness(value: Float?) {
         viewModelScope.launch {
-            val current = preferencesRepository.get()
-            preferencesRepository.update(current.copy(readerBrightness = value))
+            preferencesRepository.update { it.copy(readerBrightness = value) }
         }
     }
 
@@ -1886,8 +1876,8 @@ class ReaderViewModel @Inject constructor(
     /** 3d.5 — réglage global, voir `ReaderUiState.eyeRestReminderEnabled`. */
     private fun setEyeRestReminderEnabled(enabled: Boolean) {
         viewModelScope.launch {
+            preferencesRepository.update { it.copy(eyeRestReminderEnabled = enabled) }
             val prefs = preferencesRepository.get()
-            preferencesRepository.update(prefs.copy(eyeRestReminderEnabled = enabled))
             if (enabled) {
                 scheduleEyeRestReminder(prefs.eyeRestReminderIntervalMinutes)
             } else {
@@ -1899,9 +1889,8 @@ class ReaderViewModel @Inject constructor(
     /** 3d.5 — réglage global, voir `ReaderUiState.eyeRestReminderIntervalMinutes`. */
     private fun setEyeRestReminderInterval(minutes: Int) {
         viewModelScope.launch {
-            val prefs = preferencesRepository.get()
-            preferencesRepository.update(prefs.copy(eyeRestReminderIntervalMinutes = minutes))
-            if (prefs.eyeRestReminderEnabled) scheduleEyeRestReminder(minutes)
+            preferencesRepository.update { it.copy(eyeRestReminderIntervalMinutes = minutes) }
+            if (preferencesRepository.get().eyeRestReminderEnabled) scheduleEyeRestReminder(minutes)
         }
     }
 

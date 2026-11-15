@@ -41,8 +41,7 @@ class ThemeGalleryViewModel @Inject constructor(
     fun onIntent(intent: ThemeGalleryIntent) {
         when (intent) {
             is ThemeGalleryIntent.SelectTheme -> viewModelScope.launch {
-                val current = preferencesRepository.get()
-                preferencesRepository.update(current.copy(theme = intent.themeId))
+                preferencesRepository.update { it.copy(theme = intent.themeId) }
             }
             is ThemeGalleryIntent.StartPreview -> _state.value = _state.value.copy(previewThemeId = intent.themeId)
             is ThemeGalleryIntent.EndPreview -> _state.value = _state.value.copy(previewThemeId = null)

@@ -4,6 +4,7 @@ import com.inktone.domain.model.UserPreferences
 import com.inktone.domain.repository.PreferencesRepository
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.MutableStateFlow
+import kotlinx.coroutines.flow.update
 
 class FakePreferencesRepository : PreferencesRepository {
     private val state = MutableStateFlow(UserPreferences())
@@ -14,5 +15,9 @@ class FakePreferencesRepository : PreferencesRepository {
 
     override suspend fun update(preferences: UserPreferences) {
         state.value = preferences
+    }
+
+    override suspend fun update(transform: (UserPreferences) -> UserPreferences) {
+        state.update(transform)
     }
 }

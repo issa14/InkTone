@@ -92,8 +92,7 @@ class SyncViewModel @Inject constructor(
                 )
             }
             is SyncIntent.SetWifiOnly -> viewModelScope.launch {
-                val current = preferencesRepository.get()
-                preferencesRepository.update(current.copy(syncWifiOnly = intent.enabled))
+                preferencesRepository.update { it.copy(syncWifiOnly = intent.enabled) }
             }
             is SyncIntent.RemoveDevice -> viewModelScope.launch {
                 syncFleetRepository.removeDevice(intent.deviceId)

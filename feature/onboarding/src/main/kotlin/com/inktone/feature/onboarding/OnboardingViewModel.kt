@@ -36,8 +36,7 @@ class OnboardingViewModel @Inject constructor(
 
     private fun complete() {
         viewModelScope.launch {
-            val current = preferencesRepository.get()
-            preferencesRepository.update(current.copy(hasSeenOnboarding = true))
+            preferencesRepository.update { it.copy(hasSeenOnboarding = true) }
             _state.value = _state.value.copy(hasCompleted = true)
         }
     }
