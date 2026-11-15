@@ -245,14 +245,15 @@ class JsoupChapterParserTest {
         assertEquals(4, blocks.size)
 
         val avant = blocks[0] as BookBlock.ParagraphBlock
-        assertEquals("Voici la carte ", avant.richText.plainText)
+        // Blancs de bord retirés (audit UX D14).
+        assertEquals("Voici la carte", avant.richText.plainText)
 
         val img = blocks[1] as BookBlock.ImageBlock
         assertEquals("Images/carte.jpg", img.href)
         assertEquals("Carte", img.alt)
 
         val apres = blocks[2] as BookBlock.ParagraphBlock
-        assertEquals(" ci-dessous.", apres.richText.plainText)
+        assertEquals("ci-dessous.", apres.richText.plainText)
 
         // Continuité des offsets (pont TTS) : le séparateur '\n' (1 char)
         // est réservé entre le texte avant et le texte après.
@@ -595,8 +596,8 @@ class JsoupChapterParserTest {
 
         val block = richBlocks(chapter)[0] as BookBlock.ParagraphBlock
         assertTrue("aucun saut de ligne dur dans le texte", block.richText.plainText.none { it == '\n' || it == '\r' })
-        // Offsets inchangés (K3) : un caractère remplacé par un caractère.
-        assertEquals("Il marchait dans\nla rue sombre,\r\n  sans un mot.".length, block.richText.plainText.length)
+        // Espaces regroupées (audit UX D14) : le source indenté ne laisse pas de suites d'espaces.
+        assertEquals("Il marchait dans la rue sombre, sans un mot.", block.richText.plainText)
         assertEquals(1, chapter.sentences.size)
     }
 
@@ -607,6 +608,34 @@ class JsoupChapterParserTest {
 
         val text = (richBlocks(chapter)[0] as BookBlock.ParagraphBlock).richText.plainText
         assertTrue(text.contains('\n'))
+    }
+
+    // ---- Audit UX D14 : espaces ----
+
+    @Test
+    fun `un xhtml indente ne laisse ni suite d'espaces ni blanc de bord`() {
+        val html = """
+            <html><body>
+              <p>
+                 Texte   avec
+                 <em>  italique  </em>   et   fin.
+              </p>
+            </body></html>
+        """.trimIndent()
+        val chapter = parse(html)
+
+        val block = richBlocks(chapter)[0] as BookBlock.ParagraphBlock
+        assertEquals("Texte avec italique et fin.", block.richText.plainText)
+        // Les spans suivent le texte raccourci.
+        val span = block.richText.spans.single()
+        assertEquals("italique", block.richText.plainText.substring(span.start, span.end).trim())
+    }
+
+    @Test
+    fun `un pre garde ses espaces`() {
+        val html = "<html><body><pre>a   b\n  c</pre></body></html>"
+        val text = (richBlocks(parse(html))[0] as BookBlock.ParagraphBlock).richText.plainText
+        assertTrue(text.contains("a   b"))
     }
 
     // ---- Audit UX D12 : `<br>` ----

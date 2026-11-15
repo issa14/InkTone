@@ -452,6 +452,7 @@ class JsoupChapterParser {
         var runningOffset = startOffset
 
         fun flushText() {
+            trimTrailingWhitespace(textBuilder, rawSpans)
             val plainText = textBuilder.toString()
             if (plainText.isNotBlank()) {
                 blocks.add(
@@ -499,6 +500,7 @@ class JsoupChapterParser {
             collectTextAndSpans(node, SpanStyles.NONE, null, textBuilder, rawSpans)
         }
 
+        trimTrailingWhitespace(textBuilder, rawSpans)
         val plainText = textBuilder.toString()
         if (plainText.isEmpty()) return StyledText.plain("")
 
@@ -534,7 +536,11 @@ class JsoupChapterParser {
     ) {
         when (node) {
             is TextNode -> {
-                val text = node.wholeText.softWrapsToSpaces(preserve = node.isInsidePre())
+                val preserve = node.isInsidePre()
+                val wrapped = node.wholeText.softWrapsToSpaces(preserve = preserve)
+                // Espaces regroupées comme le fait le HTML : un XHTML indenté ne produit plus
+                // de suites d'espaces visibles (audit UX D14). `<pre>` garde les siennes.
+                val text = if (preserve) wrapped else wrapped.collapseSpaces(after = textBuilder.lastOrNull())
                 if (text.isNotEmpty()) {
                     val start = textBuilder.length
                     textBuilder.append(text)
@@ -781,6 +787,33 @@ class JsoupChapterParser {
             if (chars[i] == '\n' || chars[i] == '\r' || chars[i] == '\t' || chars[i] == '\u000C') chars[i] = ' '
         }
         return String(chars)
+    }
+
+    /**
+     * Regroupe les suites d'espaces en une seule, et retire celle qui suit déjà une
+     * espace ou un saut de ligne (ou ouvre le bloc), comme le HTML. Les espaces
+     * insécables ne sont pas touchées.
+     */
+    private fun String.collapseSpaces(after: Char?): String {
+        val out = StringBuilder(length)
+        var previous = after
+        for (c in this) {
+            if (c == ' ' && (previous == null || previous == ' ' || previous == '\n')) continue
+            out.append(c)
+            previous = c
+        }
+        return out.toString()
+    }
+
+    /** Retire les blancs de fin d'un bloc et recale les spans sur le texte raccourci. */
+    private fun trimTrailingWhitespace(textBuilder: StringBuilder, rawSpans: MutableList<RawSpan>) {
+        while (textBuilder.isNotEmpty() && (textBuilder.last() == ' ' || textBuilder.last() == '\n')) {
+            textBuilder.setLength(textBuilder.length - 1)
+        }
+        val length = textBuilder.length
+        val clipped = rawSpans.mapNotNull { if (it.start >= length) null else it.copy(end = minOf(it.end, length)) }
+        rawSpans.clear()
+        rawSpans.addAll(clipped)
     }
 
     private fun TextNode.isInsidePre(): Boolean {
