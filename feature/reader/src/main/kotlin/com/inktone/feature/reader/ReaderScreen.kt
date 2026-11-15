@@ -1643,7 +1643,9 @@ SelectionActionPopup(
             TableOfContentsSheet(
                 entries = state.tableOfContents,
                 currentChapterIndex = state.currentChapterIndex,
-                onEntryClick = { chapterIndex -> viewModel.onIntent(ReaderIntent.JumpToChapter(chapterIndex)) },
+                currentOffset = state.currentChapter?.sentences?.getOrNull(state.currentSentenceIndex)?.startOffset ?: 0,
+                anchors = state.currentChapter?.anchors.orEmpty(),
+                onEntryClick = { entry -> viewModel.onIntent(ReaderIntent.OpenTocEntry(entry.chapterIndex, entry.fragment)) },
                 onClose = { viewModel.onIntent(ReaderIntent.ToggleToc) },
             )
         }

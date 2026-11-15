@@ -58,13 +58,22 @@ private fun flattenWithDepth(entries: List<TableOfContentsEntry>, depth: Int = 0
 fun TableOfContentsSheet(
     entries: List<TableOfContentsEntry>,
     currentChapterIndex: Int,
-    onEntryClick: (chapterIndex: Int) -> Unit,
+    onEntryClick: (TableOfContentsEntry) -> Unit,
     onClose: () -> Unit,
+    currentOffset: Int = 0,
+    anchors: Map<String, Int> = emptyMap(),
 ) {
     val sheetState = rememberModalBottomSheetState(skipPartiallyExpanded = true)
 
     ModalBottomSheet(onDismissRequest = onClose, sheetState = sheetState) {
-        TableOfContentsSheetContent(entries = entries, currentChapterIndex = currentChapterIndex, onEntryClick = onEntryClick, onClose = onClose)
+        TableOfContentsSheetContent(
+            entries = entries,
+            currentChapterIndex = currentChapterIndex,
+            currentOffset = currentOffset,
+            anchors = anchors,
+            onEntryClick = onEntryClick,
+            onClose = onClose,
+        )
     }
 }
 
@@ -72,17 +81,21 @@ fun TableOfContentsSheet(
 private fun TableOfContentsSheetContent(
     entries: List<TableOfContentsEntry>,
     currentChapterIndex: Int,
-    onEntryClick: (chapterIndex: Int) -> Unit,
+    currentOffset: Int,
+    anchors: Map<String, Int>,
+    onEntryClick: (TableOfContentsEntry) -> Unit,
     onClose: () -> Unit,
 ) {
     val listState = rememberLazyListState()
     val flatEntries = remember(entries) { flattenWithDepth(entries) }
+    val currentFlatIndex = remember(flatEntries, currentChapterIndex, currentOffset, anchors) {
+        currentTocEntryIndex(flatEntries.map { it.entry }, currentChapterIndex, currentOffset, anchors)
+    }
 
     // Scroll vers le chapitre courant a l'ouverture — pas juste afficher
     // la liste depuis le debut a chaque fois (Blueprint §7.6).
-    LaunchedEffect(currentChapterIndex, flatEntries) {
-        val targetIndex = flatEntries.indexOfFirst { it.entry.chapterIndex == currentChapterIndex }
-        if (targetIndex >= 0) listState.scrollToItem(targetIndex)
+    LaunchedEffect(currentFlatIndex, flatEntries) {
+        currentFlatIndex?.let { listState.scrollToItem(it) }
     }
 
     Row(
@@ -103,8 +116,8 @@ private fun TableOfContentsSheetContent(
         // entrees de TOC pour 6 chapitres). La position dans la liste
         // aplatie, elle, est toujours unique - c'est la seule cle valide
         // ici, meme si plusieurs entrees ciblent le meme chapitre.
-        itemsIndexed(flatEntries, key = { index, _ -> index }) { _, flat ->
-            val isCurrent = flat.entry.chapterIndex == currentChapterIndex
+        itemsIndexed(flatEntries, key = { index, _ -> index }) { position, flat ->
+            val isCurrent = position == currentFlatIndex
             Text(
                 text = flat.entry.title,
                 fontWeight = if (isCurrent) FontWeight.Bold else FontWeight.Normal,
@@ -112,9 +125,32 @@ private fun TableOfContentsSheetContent(
                 modifier = Modifier
                     .fillMaxWidth()
                     .background(if (isCurrent) MaterialTheme.colorScheme.primaryContainer else MaterialTheme.colorScheme.surface)
-                    .clickable { onEntryClick(flat.entry.chapterIndex) }
+                    .clickable { onEntryClick(flat.entry) }
                     .padding(start = (16 + flat.depth * 16).dp, top = 16.dp, bottom = 16.dp, end = 16.dp),
             )
         }
     }
+}
+
+/**
+ * Rang, dans la liste aplatie, de l'entrée « en cours » (audit UX B5) : parmi les entrées du chapitre
+ * courant, la dernière dont l'ancre précède ou égale [currentOffset]. Une entrée sans fragment, ou dont
+ * l'ancre est inconnue, vaut le début du chapitre. Sans aucune ancre atteinte, la première entrée du
+ * chapitre. Null si le sommaire n'a aucune entrée pour ce chapitre.
+ */
+internal fun currentTocEntryIndex(
+    entries: List<TableOfContentsEntry>,
+    currentChapterIndex: Int,
+    currentOffset: Int,
+    anchors: Map<String, Int>,
+): Int? {
+    var first: Int? = null
+    var best: Int? = null
+    entries.forEachIndexed { position, entry ->
+        if (entry.chapterIndex != currentChapterIndex) return@forEachIndexed
+        if (first == null) first = position
+        val offset = entry.fragment?.let { anchors[it] } ?: 0
+        if (offset <= currentOffset) best = position
+    }
+    return best ?: first
 }

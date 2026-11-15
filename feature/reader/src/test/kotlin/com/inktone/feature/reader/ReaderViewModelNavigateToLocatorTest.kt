@@ -92,6 +92,7 @@ class ReaderViewModelNavigateToLocatorTest {
                     ),
                 ),
                 sentences = sentences,
+                anchors = mapOf("suite" to 21),
             )
         }
 
@@ -178,6 +179,39 @@ class ReaderViewModelNavigateToLocatorTest {
             val saved = readingStateRepository.get("pub")?.locator
             assertEquals("ch2.xhtml", saved?.resourceHref)
             assertEquals(21, saved?.charOffset)
+        } finally {
+            stopTimers(viewModel)
+        }
+    }
+
+    // Audit UX B5 : une entrée de sommaire avec fragment mène à son ancre.
+    @Test
+    fun une_entree_de_sommaire_avec_ancre_mene_a_la_phrase_de_l_ancre() = runTest {
+        val viewModel = openBook(FakeReadingStateRepository())
+        try {
+            viewModel.onIntent(ReaderIntent.OpenTocEntry(chapterIndex = 2, fragment = "suite"))
+            dispatcher.scheduler.runCurrent()
+
+            assertEquals(2, viewModel.state.value.currentChapterIndex)
+            assertEquals("la phrase qui porte l'ancre", 1, viewModel.state.value.currentSentenceIndex)
+        } finally {
+            stopTimers(viewModel)
+        }
+    }
+
+    @Test
+    fun une_ancre_inconnue_ou_absente_ouvre_le_debut_du_chapitre() = runTest {
+        val viewModel = openBook(FakeReadingStateRepository())
+        try {
+            viewModel.onIntent(ReaderIntent.OpenTocEntry(chapterIndex = 2, fragment = "introuvable"))
+            dispatcher.scheduler.runCurrent()
+            assertEquals(2, viewModel.state.value.currentChapterIndex)
+            assertEquals(0, viewModel.state.value.currentSentenceIndex)
+
+            viewModel.onIntent(ReaderIntent.OpenTocEntry(chapterIndex = 1, fragment = null))
+            dispatcher.scheduler.runCurrent()
+            assertEquals(1, viewModel.state.value.currentChapterIndex)
+            assertEquals(0, viewModel.state.value.currentSentenceIndex)
         } finally {
             stopTimers(viewModel)
         }

@@ -72,7 +72,7 @@ class TableOfContentsSheetTest {
             TableOfContentsSheet(
                 entries = nestedFixture(),
                 currentChapterIndex = 0,
-                onEntryClick = { clicked = it },
+                onEntryClick = { clicked = it.chapterIndex },
                 onClose = {},
             )
         }

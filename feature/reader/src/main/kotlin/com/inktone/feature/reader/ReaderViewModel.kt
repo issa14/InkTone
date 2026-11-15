@@ -360,6 +360,7 @@ class ReaderViewModel @Inject constructor(
             is ReaderIntent.NextChapter -> navigateToChapter(_state.value.currentChapterIndex + 1)
             is ReaderIntent.PreviousChapter -> navigateToChapter(_state.value.currentChapterIndex - 1)
             is ReaderIntent.JumpToChapter -> navigateToChapter(intent.chapterIndex)
+            is ReaderIntent.OpenTocEntry -> openTocEntry(intent.chapterIndex, intent.fragment)
             is ReaderIntent.OpenFootnote -> openFootnote(intent.path, intent.fragment)
             ReaderIntent.DismissFootnote -> _state.value = _state.value.copy(footnote = null)
             is ReaderIntent.ToggleToc -> _state.value = _state.value.copy(isTocVisible = !_state.value.isTocVisible)
@@ -1289,6 +1290,29 @@ class ReaderViewModel @Inject constructor(
             delay(FLASH_HIGHLIGHT_DURATION_MS)
             if (_state.value.currentSentenceIndex == target.sentenceIndex && !_state.value.isPlaying) {
                 _highlightedWordRange.value = null
+            }
+        }
+    }
+
+    /**
+     * Ouvre une entrée du sommaire (audit UX B5) : à son ancre quand le chapitre la connaît,
+     * sinon au début du chapitre comme avant (livre dont les ancres sont absentes, ou
+     * pré-analyse d'avant les ancres).
+     */
+    private fun openTocEntry(chapterIndex: Int, fragment: String?) {
+        if (fragment == null) {
+            navigateToChapter(chapterIndex)
+            return
+        }
+        val href = _state.value.chapters.getOrNull(chapterIndex)?.href ?: return
+        val loadJob = loadChapterContentIfNeeded(chapterIndex)
+        viewModelScope.launch {
+            loadJob?.join()
+            val offset = _state.value.chapters.getOrNull(chapterIndex)?.anchors?.get(fragment)
+            if (offset == null) {
+                navigateToChapter(chapterIndex)
+            } else {
+                navigateToLocator(Locator(resourceHref = href, chapterIndex = chapterIndex, charOffset = offset))
             }
         }
     }

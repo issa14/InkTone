@@ -341,6 +341,9 @@ sealed interface ReaderIntent {
     data object NextChapter : ReaderIntent
     data object PreviousChapter : ReaderIntent
     data class JumpToChapter(val chapterIndex: Int) : ReaderIntent
+
+    /** Entrée du sommaire : le chapitre, puis son ancre [fragment] si elle est connue (audit UX B5). */
+    data class OpenTocEntry(val chapterIndex: Int, val fragment: String?) : ReaderIntent
     data class OpenFootnote(val path: String, val fragment: String) : ReaderIntent
     data object DismissFootnote : ReaderIntent
     data object ToggleToc : ReaderIntent
