@@ -102,6 +102,8 @@ data class ReaderUiState(
     // Échec de la narration (moteur en panne) : message passager, la page
     // reste affichée — contrairement à errorMessage, qui remplace l'écran.
     val narrationError: String? = null,
+    /** Texte de la note de bas de page affichée en fenêtre (audit UX D15), ou null. */
+    val footnote: String? = null,
     // B.1 — Mode de lecture actif (scroll vertical ou paginé horizontal).
     val readingMode: ReadingMode = ReadingMode.SCROLL,
     // 3d.1 — profil vocal actif résolu (même repli que playCurrentSentence,
@@ -339,6 +341,8 @@ sealed interface ReaderIntent {
     data object NextChapter : ReaderIntent
     data object PreviousChapter : ReaderIntent
     data class JumpToChapter(val chapterIndex: Int) : ReaderIntent
+    data class OpenFootnote(val path: String, val fragment: String) : ReaderIntent
+    data object DismissFootnote : ReaderIntent
     data object ToggleToc : ReaderIntent
     data object PlayCurrentSentence : ReaderIntent
     data object Pause : ReaderIntent

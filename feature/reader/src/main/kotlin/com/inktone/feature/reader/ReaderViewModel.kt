@@ -360,6 +360,8 @@ class ReaderViewModel @Inject constructor(
             is ReaderIntent.NextChapter -> navigateToChapter(_state.value.currentChapterIndex + 1)
             is ReaderIntent.PreviousChapter -> navigateToChapter(_state.value.currentChapterIndex - 1)
             is ReaderIntent.JumpToChapter -> navigateToChapter(intent.chapterIndex)
+            is ReaderIntent.OpenFootnote -> openFootnote(intent.path, intent.fragment)
+            ReaderIntent.DismissFootnote -> _state.value = _state.value.copy(footnote = null)
             is ReaderIntent.ToggleToc -> _state.value = _state.value.copy(isTocVisible = !_state.value.isTocVisible)
             is ReaderIntent.PlayCurrentSentence -> playCurrentSentence()
             is ReaderIntent.Pause -> pausePlayback()
@@ -1625,6 +1627,31 @@ class ReaderViewModel @Inject constructor(
                 chapterIndex = chapter.index,
                 resourceHref = chapter.href,
             )
+        }
+    }
+
+    /**
+     * Charge la note ciblée par [fragment] dans [path] (ressource hors lecture linéaire) et
+     * l'expose en fenêtre : son premier bloc de texte (audit UX D15). Rien ne s'affiche si la
+     * ressource ou l'ancre est introuvable.
+     */
+    private fun openFootnote(path: String, fragment: String) {
+        val publicationId = currentPublicationId ?: return
+        viewModelScope.launch {
+            val text = listOf(path, "/$path").firstNotNullOfOrNull { candidate ->
+                runCatching { chapterParser.parseChapter(publicationId, candidate, fragment) }.getOrNull()
+                    ?.let { chapter ->
+                        (chapter.content as? ChapterContent.Rich)?.blocks.orEmpty()
+                            .firstNotNullOfOrNull { block ->
+                                when (block) {
+                                    is BookBlock.ParagraphBlock -> block.richText.plainText
+                                    is BookBlock.HeadingBlock -> block.richText.plainText
+                                    else -> null
+                                }?.trim()?.takeIf { it.isNotEmpty() }
+                            }
+                    }
+            }
+            if (text != null) _state.value = _state.value.copy(footnote = text)
         }
     }
 

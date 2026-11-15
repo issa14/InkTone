@@ -32,6 +32,9 @@ val LocalLinkTapHandler = staticCompositionLocalOf<(String) -> Unit> { {} }
 sealed interface LinkTarget {
     data class Chapter(val index: Int) : LinkTarget
     data class External(val url: String) : LinkTarget
+
+    /** Ressource du livre hors de la liste des chapitres (une note de bas de page hors lecture linéaire). */
+    data class Resource(val path: String, val fragment: String) : LinkTarget
     data object None : LinkTarget
 }
 
@@ -62,7 +65,11 @@ fun resolveLinkTarget(href: String, currentChapterHref: String, chapterHrefs: Li
     }
     val target = resolved.joinToString("/")
     val index = chapterHrefs.indexOfFirst { percentDecode(it).substringBefore('#').trimStart('/') == target }
-    return if (index >= 0) LinkTarget.Chapter(index) else LinkTarget.None
+    if (index >= 0) return LinkTarget.Chapter(index)
+    // Hors des chapitres (ex. `footnotes.xml` en `linear="no"`) : une note ciblée par un fragment
+    // s'affiche dans une fenêtre, sans changer de chapitre (audit UX D15).
+    val fragment = percentDecode(raw.substringAfter('#', ""))
+    return if (fragment.isNotEmpty() && target.isNotEmpty()) LinkTarget.Resource(target, fragment) else LinkTarget.None
 }
 
 private fun percentDecode(value: String): String =

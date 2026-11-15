@@ -35,4 +35,12 @@ class LinkTargetTest {
         assertEquals(LinkTarget.None, resolve("ftp://x/y"))
         assertEquals(LinkTarget.None, resolve(""))
     }
+
+    @Test
+    fun une_note_hors_des_chapitres_est_une_ressource_a_afficher_en_fenetre() {
+        assertEquals(
+            LinkTarget.Resource("OEBPS/Text/footnotes.xml", "footnote_1"),
+            resolve("footnotes.xml#footnote_1"),
+        )
+    }
 }

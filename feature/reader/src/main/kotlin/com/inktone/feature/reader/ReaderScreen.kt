@@ -876,6 +876,7 @@ fun ReaderScreen(
             when (val target = resolveLinkTarget(href, currentChapterHref, chapterHrefs)) {
                 is LinkTarget.Chapter -> viewModel.onIntent(ReaderIntent.JumpToChapter(target.index))
                 is LinkTarget.External -> runCatching { uriHandler.openUri(target.url) }
+                is LinkTarget.Resource -> viewModel.onIntent(ReaderIntent.OpenFootnote(target.path, target.fragment))
                 LinkTarget.None -> Unit
             }
         }
@@ -1782,6 +1783,18 @@ fun ReaderScreen(
         // (voix upmc + modèle CTC, ~183 Mo) se confirme et se suit —
         // pas de logique de téléchargement dupliquée ici.
         ReadingThemeScope(state.resolvedTheme) {
+        state.footnote?.let { note ->
+            androidx.compose.material3.AlertDialog(
+                onDismissRequest = { viewModel.onIntent(ReaderIntent.DismissFootnote) },
+                title = { Text("Note") },
+                text = { Text(note) },
+                confirmButton = {
+                    androidx.compose.material3.TextButton(onClick = { viewModel.onIntent(ReaderIntent.DismissFootnote) }) {
+                        Text("Fermer")
+                    }
+                },
+            )
+        }
         if (state.showVoiceDownloadPrompt) {
             androidx.compose.material3.AlertDialog(
                 onDismissRequest = { viewModel.onIntent(ReaderIntent.DismissVoiceDownloadPrompt) },
