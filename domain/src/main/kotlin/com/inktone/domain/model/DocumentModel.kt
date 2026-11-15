@@ -30,6 +30,8 @@ data class Chapter(
     val title: String?,
     val content: ChapterContent,
     val sentences: List<Sentence> = emptyList(),
+    /** Ancres du chapitre (`id`, `a[name]`) vers leur offset de caractère dans le chapitre (audit UX B5). */
+    val anchors: Map<String, Int> = emptyMap(),
 )
 
 /**
@@ -116,7 +118,13 @@ data class TableOfContentsEntry(
     val title: String,
     val chapterIndex: Int,
     val children: List<TableOfContentsEntry> = emptyList(),
-)
+    /** Ancre visée dans le chapitre (`#fragment` du lien), ou null pour le début du chapitre (audit UX B5). */
+    val fragment: String? = null,
+) {
+    init {
+        require(fragment == null || fragment.isNotBlank()) { "fragment ne peut pas être vide" }
+    }
+}
 
 data class Resource(
     val href: String,

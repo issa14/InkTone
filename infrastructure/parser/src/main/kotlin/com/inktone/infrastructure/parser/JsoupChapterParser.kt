@@ -86,7 +86,14 @@ class JsoupChapterParser {
         val body = document.body()
         applyStyles(document, chapterHref, loadStyleSheet)
 
-        val blocks = extractBlocks(body, fragment, chapterHref)
+        // Ancres collectées seulement pour un chapitre entier : un fragment fait repartir les offsets de 0.
+        val anchors = if (fragment == null) mutableMapOf<String, Int>() else null
+        anchorSink.set(anchors)
+        val blocks = try {
+            extractBlocks(body, fragment, chapterHref)
+        } finally {
+            anchorSink.remove()
+        }
         val sentences = tokenizeSentences(blocks)
 
         return Chapter(
@@ -95,6 +102,7 @@ class JsoupChapterParser {
             title = document.title().takeIf { it.isNotBlank() },
             content = ChapterContent.Rich(blocks = blocks),
             sentences = sentences,
+            anchors = anchors.orEmpty(),
         )
     }
 
@@ -135,6 +143,26 @@ class JsoupChapterParser {
         val wrapper = Element(tag)
         element.childNodes().toList().forEach { wrapper.appendChild(it) }
         element.appendChild(wrapper)
+    }
+
+    /** Collecteur d'ancres de l'analyse en cours, propre au thread : le parseur est partagé. */
+    private val anchorSink = ThreadLocal<MutableMap<String, Int>?>()
+
+    /**
+     * Note l'offset de l'`id` et du `name` de [node] (et de ses descendants si [withDescendants]),
+     * sans écraser une ancre déjà notée avec un offset plus précis. Borné pour les chapitres
+     * très chargés en ancres (audit UX B5).
+     */
+    private fun recordAnchors(node: Node, offset: Int, withDescendants: Boolean) {
+        val sink = anchorSink.get() ?: return
+        val element = node as? Element ?: return
+        fun note(e: Element) {
+            if (sink.size >= MAX_ANCHORS) return
+            e.id().takeIf { it.isNotBlank() }?.let { sink.putIfAbsent(it, offset) }
+            if (e.normalName() == "a") e.attr("name").takeIf { it.isNotBlank() }?.let { sink.putIfAbsent(it, offset) }
+        }
+        note(element)
+        if (withDescendants) element.select("[id], a[name]").forEach(::note)
     }
 
     /**
@@ -195,6 +223,8 @@ class JsoupChapterParser {
 
         fun flushInlineBuffer() {
             if (inlineBuffer.isEmpty()) return
+            // Les ancres du texte en ligne pointent le début du paragraphe qu'il va former.
+            inlineBuffer.forEach { recordAnchors(it, runningOffset, withDescendants = true) }
             val richText = extractRichTextFromNodes(inlineBuffer)
             inlineBuffer.clear()
             if (richText.plainText.isBlank()) return
@@ -216,12 +246,17 @@ class JsoupChapterParser {
                 continue
             }
             flushInlineBuffer()
+            val offsetBefore = runningOffset
+            // Son propre id d'abord ; ses descendants après, pour que les blocs imbriqués
+            // déjà notés avec leur offset précis l'emportent sur l'offset du conteneur.
+            recordAnchors(child, offsetBefore, withDescendants = false)
             for (block in extractBlocksFromNode(child, runningOffset, chapterHref)) {
                 blocks.add(block)
                 if (block is BookBlock.ParagraphBlock || block is BookBlock.HeadingBlock) {
                     runningOffset = block.globalOffsetRange!!.last + 1 + BLOCK_SEPARATOR.length
                 }
             }
+            recordAnchors(child, offsetBefore, withDescendants = true)
         }
         flushInlineBuffer()
 
@@ -897,6 +932,8 @@ class JsoupChapterParser {
 
         /** Cf. [isStandaloneBlockNode] — exclues de [BLOCK_LEVEL_TAGS] mais jamais fondues dans du texte inline. */
         val STANDALONE_IMAGE_TAGS = setOf("img", "svg")
+
+        private const val MAX_ANCHORS = 5000
 
         private val BOLD_TAGS = setOf("b", "strong", "h1", "h2", "h3", "h4", "h5", "h6")
         private val ITALIC_TAGS = setOf("i", "em")

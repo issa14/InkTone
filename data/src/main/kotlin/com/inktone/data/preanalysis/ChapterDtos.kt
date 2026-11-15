@@ -35,6 +35,8 @@ internal data class ChapterDto(
     val title: String? = null,
     val blocks: List<BookBlockDto>,
     val sentences: List<SentenceDto>,
+    /** Ancres du chapitre (audit UX B5) ; absent d'une pré-analyse plus ancienne. */
+    val anchors: Map<String, Int> = emptyMap(),
 )
 
 @Serializable
@@ -85,6 +87,7 @@ internal fun Chapter.toDto(): ChapterDto {
         title = title,
         blocks = blocks.map { it.toDto() },
         sentences = sentences.map { it.toDto() },
+        anchors = anchors,
     )
 }
 
@@ -94,6 +97,7 @@ internal fun ChapterDto.toDomain(): Chapter = Chapter(
     title = title,
     content = ChapterContent.Rich(blocks = blocks.map { it.toDomain() }),
     sentences = sentences.map { it.toDomain() },
+    anchors = anchors,
 )
 
 internal fun Sentence.toDto(): SentenceDto =

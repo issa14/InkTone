@@ -33,6 +33,45 @@ class JsoupChapterParserTest {
 
     // ---- Tests de normalisation des spans ----
 
+    // ---- Audit UX B5 : ancres des chapitres ----
+
+    @Test
+    fun `l'id d'un bloc donne l'offset du debut de ce bloc`() {
+        val chapter = parse("<html><body><p>Premier.</p><p id=\"deux\">Deuxieme.</p><h2 id=\"trois\">Trois</h2></body></html>")
+        val blocks = richBlocks(chapter).filterIsInstance<BookBlock.ParagraphBlock>()
+        assertEquals(blocks[1].globalOffsetRange.first, chapter.anchors["deux"])
+        assertTrue("le premier bloc précède", chapter.anchors.getValue("deux") > 0)
+        assertTrue(chapter.anchors.getValue("trois") > chapter.anchors.getValue("deux"))
+    }
+
+    @Test
+    fun `une ancre en ligne dans un paragraphe prend le debut du paragraphe`() {
+        val chapter = parse("<html><body><p>Avant.</p><p>Un <a name=\"ici\"></a>mot.</p></body></html>")
+        val blocks = richBlocks(chapter).filterIsInstance<BookBlock.ParagraphBlock>()
+        assertEquals(blocks[1].globalOffsetRange.first, chapter.anchors["ici"])
+    }
+
+    @Test
+    fun `les ancres dans un conteneur gardent l'offset de leur bloc et non celui du conteneur`() {
+        val chapter = parse("<html><body><div id=\"c\"><p>Un.</p><p id=\"a\">Deux.</p><p id=\"b\">Trois.</p></div></body></html>")
+        val blocks = richBlocks(chapter).filterIsInstance<BookBlock.ParagraphBlock>()
+        assertEquals(0, chapter.anchors["c"])
+        assertEquals(blocks[1].globalOffsetRange.first, chapter.anchors["a"])
+        assertEquals(blocks[2].globalOffsetRange.first, chapter.anchors["b"])
+    }
+
+    @Test
+    fun `un id en double garde la premiere position`() {
+        val chapter = parse("<html><body><p id=\"x\">Un.</p><p id=\"x\">Deux.</p></body></html>")
+        assertEquals(0, chapter.anchors["x"])
+    }
+
+    @Test
+    fun `un chapitre extrait par fragment ne porte pas d'ancres`() {
+        val chapter = parse("<html><body><p>Avant.</p><p id=\"f\">Cible.</p></body></html>", fragment = "f")
+        assertTrue(chapter.anchors.isEmpty())
+    }
+
     // ---- Audit UX D16 : italique, gras et contenu masqué posés par le CSS ----
 
     private fun parseWithCss(html: String, css: String? = null): Chapter =

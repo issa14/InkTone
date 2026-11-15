@@ -141,7 +141,8 @@ class FilePreAnalysisStore @Inject constructor(
          *     les positions sont ré-ancrées par leur contexte (ADR-027).
          * 8 : le CSS retire le contenu masqué (display:none), les offsets changent ; italique et gras
          *     par CSS (audit UX D16).
+         * 9 : ancres des chapitres (audit UX B5), texte et offsets inchangés.
          */
-        const val PARSER_VERSION = 8
+        const val PARSER_VERSION = 9
     }
 }

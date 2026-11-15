@@ -351,6 +351,7 @@ class ReadiumPublicationParser @Inject constructor(
                 title = link.title ?: "",
                 chapterIndex = chapterIndex + chapterIndexOffset,
                 children = children,
+                fragment = link.href.resolve().fragment?.takeIf { it.isNotBlank() },
             ),
         )
     }

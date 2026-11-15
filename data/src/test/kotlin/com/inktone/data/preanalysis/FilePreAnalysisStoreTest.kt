@@ -50,6 +50,24 @@ class FilePreAnalysisStoreTest {
     }
 
     @Test
+    fun `les ancres d'un chapitre survivent au round-trip`() = runTest {
+        val store = tempStore()
+        val withAnchors = chapter(0, "chap1.xhtml", "Bonjour monde.").copy(anchors = mapOf("note1" to 0, "partie2" to 8))
+
+        store.save("pub-1", "hash-abc", listOf(withAnchors))
+
+        assertEquals(mapOf("note1" to 0, "partie2" to 8), store.loadChapter("pub-1", "hash-abc", "chap1.xhtml")?.anchors)
+    }
+
+    @Test
+    fun `un chapitre sans ancres se relit avec une table vide`() = runTest {
+        val store = tempStore()
+        store.save("pub-1", "hash-abc", listOf(chapter(0, "chap1.xhtml", "Bonjour monde.")))
+
+        assertEquals(emptyMap<String, Int>(), store.loadChapter("pub-1", "hash-abc", "chap1.xhtml")?.anchors)
+    }
+
+    @Test
     fun `un round-trip sauvegarde puis relit les chapitres a l'identique`() = runTest {
         val store = tempStore()
         val chapters = listOf(
