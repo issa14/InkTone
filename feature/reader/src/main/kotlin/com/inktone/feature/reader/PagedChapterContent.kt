@@ -72,6 +72,9 @@ import androidx.compose.foundation.gestures.detectTapGestures
 import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.input.pointer.pointerInput
+import androidx.compose.foundation.gestures.awaitEachGesture
+import androidx.compose.foundation.gestures.awaitFirstDown
+import kotlinx.coroutines.launch
 
 /**
  * 3a.2/3b.1 — Contenu paginé par swipe horizontal, rendu depuis le
@@ -450,7 +453,29 @@ fun PagedChapterContent(
         chapterTransition.finish()
     }
 
-    Box(modifier = Modifier.fillMaxSize().onSizeChanged { pagerWidthPx = it.width }) {
+    // Position du dernier appui, lue en passe Initial sans rien consommer.
+    val lastDownX = remember { FloatArray(1) { -1f } }
+    val pageTurnScope = androidx.compose.runtime.rememberCoroutineScope()
+    fun turnPage(delta: Int) {
+        val target = pagerState.currentPage + delta
+        when {
+            target in 0 until pageCount -> pageTurnScope.launch { pagerState.animateScrollToPage(target) }
+            delta > 0 && latestHasNext.value -> latestOnNext.value()
+            delta < 0 && latestHasPrevious.value -> latestOnPrevious.value()
+        }
+    }
+
+    Box(
+        modifier = Modifier
+            .fillMaxSize()
+            .onSizeChanged { pagerWidthPx = it.width }
+            .pointerInput(Unit) {
+                awaitEachGesture {
+                    val down = awaitFirstDown(requireUnconsumed = false, pass = androidx.compose.ui.input.pointer.PointerEventPass.Initial)
+                    lastDownX[0] = down.position.x
+                }
+            },
+    ) {
         HorizontalPager(
             state = pagerState,
             modifier = modifier
@@ -494,7 +519,20 @@ fun PagedChapterContent(
                         onFreeSelectionBoundsInWindow = { bounds ->
                             onFreeSelectionBoundsInWindow(pageOffsetRange.first, bounds)
                         },
-                        onClick = onClick,
+                        onClick = {
+                            // Un tap sur un bord tourne la page, le centre garde l'affichage
+                            // des commandes (audit UX D75). Position lue avant que le champ
+                            // de texte n'avale le tap ; sans appui préalable (accessibilité),
+                            // c'est le centre.
+                            val x = lastDownX[0]
+                            lastDownX[0] = -1f
+                            val width = pagerWidthPx
+                            when {
+                                width > 0 && x >= 0f && x < width * EDGE_TAP_FRACTION -> turnPage(-1)
+                                width > 0 && x > width * (1f - EDGE_TAP_FRACTION) -> turnPage(+1)
+                                else -> onClick()
+                            }
+                        },
                     )
                 }
             }
@@ -956,3 +994,6 @@ internal fun buildPageAnnotatedString(
         }
     }
 }
+
+/** Fraction de la largeur, à chaque bord, où un tap tourne la page (audit UX D75). */
+private const val EDGE_TAP_FRACTION = 0.25f
