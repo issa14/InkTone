@@ -41,6 +41,7 @@ fun UserPreferences.toEntity(): UserPreferencesEntity = UserPreferencesEntity(
     recentAnnotationColors = recentAnnotationColors.joinToString(",") { it.toHex() },
     darkModePresetBackup = darkModePresetBackup?.encode(),
     accessibilityPresetBackup = accessibilityPresetBackup?.encode(),
+    volumeKeysTurnPages = volumeKeysTurnPages,
 )
 
 fun UserPreferencesEntity.toDomain(): UserPreferences = UserPreferences(
@@ -82,4 +83,5 @@ fun UserPreferencesEntity.toDomain(): UserPreferences = UserPreferences(
         .mapNotNull { raw -> if (raw.isBlank()) null else runCatching { AnnotationColor.parse(raw) }.getOrNull() },
     darkModePresetBackup = DarkModePresetBackup.decode(darkModePresetBackup),
     accessibilityPresetBackup = AccessibilityPresetBackup.decode(accessibilityPresetBackup),
+    volumeKeysTurnPages = volumeKeysTurnPages,
 )

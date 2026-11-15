@@ -94,6 +94,8 @@ data class ReaderUiState(
     // Tache 9bis.5), pas resolu une seule fois comme effectiveSettings :
     // c'est un reglage global, pas une cascade overrides/preferences.
     val isReadingRulerEnabled: Boolean = false,
+    /** Les touches de volume tournent la page en mode paginé (audit UX D75). */
+    val volumeKeysTurnPages: Boolean = false,
     // A.3 — Message d'erreur surfacé quand le parsing ou l'ouverture
     // échoue. null = pas d'erreur, l'écran affiche le contenu normal.
     val errorMessage: String? = null,
@@ -539,6 +541,9 @@ sealed interface ReaderIntent {
 
     /** Réglette de lecture, réglage propre : elle ne s'obtenait qu'avec le préréglage Accessibilité (audit UX A11). */
     data class SetReadingRulerEnabled(val enabled: Boolean) : ReaderIntent
+
+    /** Touches de volume pour tourner la page, réglage global désactivé par défaut. */
+    data class SetVolumeKeysTurnPages(val enabled: Boolean) : ReaderIntent
 
     /**
      * Correctif Lot 21 — jusqu'ici aucun écran ne permettait de choisir

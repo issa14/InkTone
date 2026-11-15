@@ -42,6 +42,11 @@ import dagger.hilt.android.AndroidEntryPoint
 @AndroidEntryPoint
 class MainActivity : ComponentActivity() {
 
+    // Touches de volume pour tourner la page (audit UX D75), avant le système.
+    override fun dispatchKeyEvent(event: android.view.KeyEvent): Boolean =
+        com.inktone.feature.reader.VolumeKeyPageTurn.consume(event) || super.dispatchKeyEvent(event)
+
+
     @OptIn(ExperimentalMaterial3WindowSizeClassApi::class)
     override fun onCreate(savedInstanceState: Bundle?) {
         val splashScreen = installSplashScreen()

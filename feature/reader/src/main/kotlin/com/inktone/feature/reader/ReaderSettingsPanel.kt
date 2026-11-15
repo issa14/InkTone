@@ -98,6 +98,9 @@ fun ReaderSettingsPanel(
     // Audit UX A11 — réglette de lecture, réglage propre.
     isReadingRulerEnabled: Boolean = false,
     onReadingRulerChange: (Boolean) -> Unit = {},
+    // Audit UX D75 — touches de volume pour tourner la page, mode paginé.
+    volumeKeysTurnPages: Boolean = false,
+    onVolumeKeysChange: (Boolean) -> Unit = {},
     onDismiss: () -> Unit,
 ) {
     val sheetState = rememberModalBottomSheetState(skipPartiallyExpanded = true)
@@ -244,6 +247,15 @@ fun ReaderSettingsPanel(
                 supporting = "Une bande suit la ligne lue pendant la narration",
                 checked = isReadingRulerEnabled,
                 onCheckedChange = onReadingRulerChange,
+            )
+
+            Spacer(Modifier.height(8.dp))
+
+            SettingSwitchRow(
+                label = "Touches de volume",
+                supporting = "Tournent la page en mode paginé",
+                checked = volumeKeysTurnPages,
+                onCheckedChange = onVolumeKeysChange,
             )
 
             if (showPdfInversion) {

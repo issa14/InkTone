@@ -126,6 +126,8 @@ data class UserPreferences(
     val recentAnnotationColors: List<AnnotationColor> = emptyList(),
     /** État d'avant le préréglage Mode sombre ; `null` quand il n'est pas actif (audit UX A11). */
     val darkModePresetBackup: DarkModePresetBackup? = null,
+    /** Les touches de volume tournent la page en mode paginé ; désactivé par défaut (audit UX D75). */
+    val volumeKeysTurnPages: Boolean = false,
     /** État d'avant le préréglage Accessibilité ; `null` quand il n'est pas actif (audit UX A11). */
     val accessibilityPresetBackup: AccessibilityPresetBackup? = null,
 ) {

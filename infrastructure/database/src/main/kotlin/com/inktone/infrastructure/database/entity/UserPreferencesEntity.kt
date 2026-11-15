@@ -54,4 +54,6 @@ data class UserPreferencesEntity(
     // encodé par DarkModePresetBackup / AccessibilityPresetBackup ; nul = préréglage inactif.
     val darkModePresetBackup: String? = null,
     val accessibilityPresetBackup: String? = null,
+    // Audit UX D75 (MIGRATION_36_37) — touches de volume = tourner la page, opt-in.
+    val volumeKeysTurnPages: Boolean = false,
 )

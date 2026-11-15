@@ -584,3 +584,10 @@ val MIGRATION_35_36 = object : Migration(35, 36) {
         db.execSQL("ALTER TABLE user_preferences ADD COLUMN accessibilityPresetBackup TEXT DEFAULT NULL")
     }
 }
+
+/** Réglage des touches de volume pour tourner la page (audit UX D75), désactivé par défaut. */
+val MIGRATION_36_37 = object : Migration(36, 37) {
+    override fun migrate(db: SupportSQLiteDatabase) {
+        db.execSQL("ALTER TABLE user_preferences ADD COLUMN volumeKeysTurnPages INTEGER NOT NULL DEFAULT 0")
+    }
+}

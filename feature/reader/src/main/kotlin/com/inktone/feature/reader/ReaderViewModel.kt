@@ -437,6 +437,9 @@ class ReaderViewModel @Inject constructor(
             is ReaderIntent.SetReaderMarginStep -> setReaderMarginStep(intent.step)
             is ReaderIntent.SetTextJustified -> setTextJustified(intent.justified)
             is ReaderIntent.SetReadingRulerEnabled -> setReadingRulerEnabled(intent.enabled)
+            is ReaderIntent.SetVolumeKeysTurnPages -> viewModelScope.launch {
+                preferencesRepository.update { it.copy(volumeKeysTurnPages = intent.enabled) }
+            }
             is ReaderIntent.SetFontFamily -> setFontFamily(intent.fontFamily)
             is ReaderIntent.SetKeepScreenOn -> setKeepScreenOn(intent.enabled)
             is ReaderIntent.SetAutoScrollSpeed -> setAutoScrollSpeed(intent.speed)
@@ -2131,6 +2134,7 @@ class ReaderViewModel @Inject constructor(
      */
     private fun ReaderUiState.withGlobalPreferences(preferences: UserPreferences): ReaderUiState = copy(
         isReadingRulerEnabled = preferences.readingRulerEnabled,
+        volumeKeysTurnPages = preferences.volumeKeysTurnPages,
         lineHeightMultiplier = preferences.lineHeightMultiplier,
         readerMarginStep = preferences.readerMarginStep,
         isTextJustified = preferences.textJustified,

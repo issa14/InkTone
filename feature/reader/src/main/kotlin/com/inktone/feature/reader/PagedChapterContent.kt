@@ -157,6 +157,8 @@ fun PagedChapterContent(
     // le popup qu'une AUTRE page vient d'ouvrir. Arbitrage :
     // `resolveSelectionPopupBounds` (ReaderScreen).
     onFreeSelectionBoundsInWindow: (ownerKey: Int, bounds: Rect?) -> Unit = { _, _ -> },
+    /** Demandes de changement de page venues d'ailleurs (touches de volume) : +1 suivante, -1 précédente. */
+    pageTurnRequests: kotlinx.coroutines.flow.Flow<Int> = kotlinx.coroutines.flow.emptyFlow(),
     /** Publication ouverte, pour charger les images EPUB (`EpubImageKey`) ; `null` hors EPUB. */
     publicationId: String? = null,
     modifier: Modifier = Modifier,
@@ -464,6 +466,11 @@ fun PagedChapterContent(
             delta < 0 && latestHasPrevious.value -> latestOnPrevious.value()
         }
     }
+
+    // La version à jour de turnPage : le nombre de pages change avec la mesure, une
+    // copie figée au lancement de l'effet confondait « page suivante » et « chapitre suivant ».
+    val latestTurnPage = rememberUpdatedState<(Int) -> Unit>({ delta -> turnPage(delta) })
+    LaunchedEffect(pageTurnRequests) { pageTurnRequests.collect { delta -> latestTurnPage.value(delta) } }
 
     Box(
         modifier = Modifier

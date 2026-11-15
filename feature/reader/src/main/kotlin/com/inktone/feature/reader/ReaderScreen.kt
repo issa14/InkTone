@@ -358,6 +358,15 @@ fun ReaderScreen(
     // remesure complète de la pagination (`readingAreaSize` → `styleKey`,
     // voir `ChapterPaginationState`) pendant que l'utilisateur lisait —
     // cause racine du clignotement de page documenté dans cette note.
+    // Touches de volume : tournent la page en mode paginé quand le réglage est actif
+    // (audit UX D75), par l'activité qui les intercepte avant le système.
+    val volumeKeysActive = state.volumeKeysTurnPages && state.readingMode == ReadingMode.PAGED &&
+        state.publicationFormat != PublicationFormat.PDF
+    val pageTurnRequests = remember { kotlinx.coroutines.flow.MutableSharedFlow<Int>(extraBufferCapacity = 8) }
+    DisposableEffect(volumeKeysActive) {
+        if (volumeKeysActive) VolumeKeyPageTurn.handler = { delta -> pageTurnRequests.tryEmit(delta) }
+        onDispose { VolumeKeyPageTurn.handler = null }
+    }
     Box(
         modifier = Modifier
             .fillMaxSize()
@@ -1150,6 +1159,7 @@ fun ReaderScreen(
                 ReadingMode.PAGED -> {
                     WithLiveValue({ uiState.value.currentSentenceIndex }) { live ->
                         PagedChapterContent(
+                            pageTurnRequests = pageTurnRequests,
                             chapter = state.currentChapter,
                             pagination = pagination,
                             currentSentenceIndex = live,
@@ -1527,6 +1537,8 @@ fun ReaderScreen(
                 onKeepScreenOnChange = { enabled -> viewModel.onIntent(ReaderIntent.SetKeepScreenOn(enabled)) },
                 isReadingRulerEnabled = state.isReadingRulerEnabled,
                 onReadingRulerChange = { enabled -> viewModel.onIntent(ReaderIntent.SetReadingRulerEnabled(enabled)) },
+                volumeKeysTurnPages = state.volumeKeysTurnPages,
+                onVolumeKeysChange = { enabled -> viewModel.onIntent(ReaderIntent.SetVolumeKeysTurnPages(enabled)) },
                 showPdfInversion = isPdf,
                 forcePdfInversion = state.forcePdfInversion,
                 onForcePdfInversionChange = { viewModel.onIntent(ReaderIntent.ToggleForcePdfInversion) },

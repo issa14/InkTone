@@ -42,7 +42,7 @@ import com.inktone.infrastructure.database.entity.VoiceProfileEntity
         CatalogEntity::class,
     ],
     views = [LibraryItemView::class],
-    version = 36, // Retour d'un préréglage à l'état d'avant (MIGRATION_35_36)
+    version = 37, // Touches de volume pour tourner la page (MIGRATION_36_37)
     exportSchema = true, // condition du harnais de migration — Tâche 2.4
 )
 @TypeConverters(StringListConverter::class)
