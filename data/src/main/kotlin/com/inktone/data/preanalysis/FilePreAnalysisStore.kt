@@ -132,7 +132,9 @@ class FilePreAnalysisStore @Inject constructor(
         /**
          * Version de la sortie du parseur — incrémenter à toute évolution du parsing.
          * 3 : découpage en phrases revu (audit UX D70), texte et offsets inchangés.
+         * 4 : `<br>` rendu en saut de ligne (audit UX D12), même longueur de texte donc offsets
+         *     inchangés ; les positions sont ré-ancrées par leur contexte (ADR-027).
          */
-        const val PARSER_VERSION = 3
+        const val PARSER_VERSION = 4
     }
 }

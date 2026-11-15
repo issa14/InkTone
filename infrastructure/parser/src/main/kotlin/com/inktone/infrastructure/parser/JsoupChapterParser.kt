@@ -60,7 +60,7 @@ import java.io.InputStream
  * ## Éléments ignorés (v1)
  *
  * `<table>`, `<figure>`, `<math>`, `<svg>`, `<script>`, `<style>`,
- * `<head>`, `<br>` (fusionné comme espace).
+ * `<head>`, `<br>` (saut de ligne).
  */
 class JsoupChapterParser {
 
@@ -573,9 +573,11 @@ class JsoupChapterParser {
                         val href = node.attr("href").takeIf { it.isNotBlank() }
                         inheritedStyles + SpanStyles.REFERENCE to (href ?: inheritedHref)
                     }
-                    // <br> → espace
+                    // <br> → saut de ligne : vers, adresses et dialogues en ligne ne sont
+                    // plus fondus en un paragraphe (audit UX D12). Un caractère comme
+                    // avant (l'espace) : aucun offset ne se décale.
                     "br" -> {
-                        textBuilder.append(' ')
+                        textBuilder.append('\n')
                         return
                     }
                     else -> inheritedStyles to inheritedHref

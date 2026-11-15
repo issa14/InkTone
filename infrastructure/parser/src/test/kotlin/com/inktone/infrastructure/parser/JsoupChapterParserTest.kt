@@ -609,6 +609,19 @@ class JsoupChapterParserTest {
         assertTrue(text.contains('\n'))
     }
 
+    // ---- Audit UX D12 : `<br>` ----
+
+    @Test
+    fun `un br donne un saut de ligne, sans decaler un seul offset`() {
+        val html = "<html><body><p>Premier vers,<br/>deuxieme vers.<br>Troisieme.</p></body></html>"
+        val chapter = parse(html)
+
+        val block = richBlocks(chapter)[0] as BookBlock.ParagraphBlock
+        assertEquals("Premier vers,\ndeuxieme vers.\nTroisieme.", block.richText.plainText)
+        // Même longueur que lorsque le br était une espace.
+        assertEquals("Premier vers, deuxieme vers. Troisieme.".length, block.richText.plainText.length)
+    }
+
     private fun parse(html: String, fragment: String? = null): Chapter {
         val stream = ByteArrayInputStream(html.toByteArray(Charsets.UTF_8))
         return parser.parse(stream, "http://example.com/chapter.xhtml", 0, "chapter.xhtml", fragment)
