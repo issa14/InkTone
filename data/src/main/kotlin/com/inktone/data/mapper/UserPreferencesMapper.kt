@@ -1,7 +1,9 @@
 package com.inktone.data.mapper
 
+import com.inktone.domain.model.AccessibilityPresetBackup
 import com.inktone.domain.model.AnnotationColor
 import com.inktone.domain.model.AppTheme
+import com.inktone.domain.model.DarkModePresetBackup
 import com.inktone.domain.model.FontFamily
 import com.inktone.domain.model.TtsEngineId
 import com.inktone.domain.model.UserPreferences
@@ -37,6 +39,8 @@ fun UserPreferences.toEntity(): UserPreferencesEntity = UserPreferencesEntity(
     keepScreenOn = keepScreenOn,
     autoScrollSpeed = autoScrollSpeed,
     recentAnnotationColors = recentAnnotationColors.joinToString(",") { it.toHex() },
+    darkModePresetBackup = darkModePresetBackup?.encode(),
+    accessibilityPresetBackup = accessibilityPresetBackup?.encode(),
 )
 
 fun UserPreferencesEntity.toDomain(): UserPreferences = UserPreferences(
@@ -76,4 +80,6 @@ fun UserPreferencesEntity.toDomain(): UserPreferences = UserPreferences(
     // plutôt que de faire planter la restauration des préférences).
     recentAnnotationColors = recentAnnotationColors.split(",")
         .mapNotNull { raw -> if (raw.isBlank()) null else runCatching { AnnotationColor.parse(raw) }.getOrNull() },
+    darkModePresetBackup = DarkModePresetBackup.decode(darkModePresetBackup),
+    accessibilityPresetBackup = AccessibilityPresetBackup.decode(accessibilityPresetBackup),
 )

@@ -14,6 +14,7 @@ import com.inktone.domain.model.PronunciationRule
 import com.inktone.domain.model.ReadingTheme
 import com.inktone.domain.model.TtsEngineId
 import com.inktone.domain.model.VoiceProfile
+import com.inktone.domain.model.UserPreferences
 import com.inktone.domain.service.AudioPlayer
 import com.inktone.domain.service.TtsCapabilityCatalog
 import com.inktone.domain.service.AudioSegment
@@ -220,6 +221,50 @@ class SettingsViewModelTest {
         assertEquals(ReadingTheme.DEFAULT.id, prefs.theme)
         assertEquals(false, prefs.reduceMotion)
         assertEquals("GRID_DETAILED", prefs.libraryLayoutMode)
+    }
+
+    /**
+     * Audit UX A11 : désactiver « Accessibilité » remettait les valeurs par
+     * défaut, pas les réglages d'avant : un lecteur en Sépia et Serif se
+     * retrouvait en Papier Clair, police système, 18 sp, grille détaillée.
+     */
+    @Test
+    fun `desactiver le preset Accessibilite restaure les reglages d avant`() = runTest {
+        val preferencesRepository = FakePreferencesRepository()
+        preferencesRepository.update(
+            UserPreferences(
+                theme = "sepia_vintage", fontSize = 21, fontFamily = FontFamily.SERIF,
+                reduceMotion = false, readingRulerEnabled = false, libraryLayoutMode = "GRID_COMPACT",
+            ),
+        )
+        val before = preferencesRepository.get()
+        val vm = viewModel(preferencesRepository)
+        dispatcher.scheduler.advanceUntilIdle()
+
+        vm.onIntent(SettingsIntent.SetAccessibilityPreset(true))
+        dispatcher.scheduler.advanceUntilIdle()
+        assertEquals(24, preferencesRepository.get().fontSize)
+        vm.onIntent(SettingsIntent.SetAccessibilityPreset(false))
+        dispatcher.scheduler.advanceUntilIdle()
+
+        assertEquals(before, preferencesRepository.get())
+    }
+
+    @Test
+    fun `desactiver le preset Mode sombre restaure le theme d avant, interface claire comprise`() = runTest {
+        val preferencesRepository = FakePreferencesRepository()
+        preferencesRepository.update(UserPreferences(theme = "sepia_vintage", appTheme = AppTheme.LIGHT))
+        val before = preferencesRepository.get()
+        val vm = viewModel(preferencesRepository)
+        dispatcher.scheduler.advanceUntilIdle()
+
+        vm.onIntent(SettingsIntent.SetDarkModePreset(true))
+        dispatcher.scheduler.advanceUntilIdle()
+        assertEquals(AppTheme.DARK, preferencesRepository.get().appTheme)
+        vm.onIntent(SettingsIntent.SetDarkModePreset(false))
+        dispatcher.scheduler.advanceUntilIdle()
+
+        assertEquals(before, preferencesRepository.get())
     }
 
     @Test

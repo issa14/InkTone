@@ -1,5 +1,9 @@
 package com.inktone.data.mapper
 
+import com.inktone.domain.model.AccessibilityPresetBackup
+import com.inktone.domain.model.AppTheme
+import com.inktone.domain.model.DarkModePresetBackup
+import com.inktone.domain.model.FontFamily
 import com.inktone.domain.model.AnnotationColor
 import com.inktone.domain.model.UserPreferences
 import com.inktone.infrastructure.database.entity.UserPreferencesEntity
@@ -42,5 +46,20 @@ class UserPreferencesMapperTest {
         val domain = entity.toDomain()
 
         assertEquals(listOf(AnnotationColor.YELLOW, AnnotationColor.BLUE), domain.recentAnnotationColors)
+    }
+
+    /** Audit UX A11 : l'état d'avant un préréglage survit à l'enregistrement. */
+    @Test
+    fun `l'etat d'avant les prereglages fait l'aller-retour`() {
+        val original = UserPreferences(
+            darkModePresetBackup = DarkModePresetBackup("sepia_vintage", AppTheme.LIGHT),
+            accessibilityPresetBackup = AccessibilityPresetBackup(
+                fontSize = 21, theme = "sepia_vintage", fontFamily = FontFamily.SERIF,
+                reduceMotion = false, readingRulerEnabled = false, libraryLayoutMode = "GRID_COMPACT",
+            ),
+        )
+
+        assertEquals(original, original.toEntity().toDomain())
+        assertEquals(UserPreferences(), UserPreferences().toEntity().toDomain())
     }
 }

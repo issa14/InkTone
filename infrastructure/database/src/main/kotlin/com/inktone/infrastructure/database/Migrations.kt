@@ -572,3 +572,15 @@ val MIGRATION_34_35 = object : Migration(34, 35) {
         db.execSQL("ALTER TABLE reading_states ADD COLUMN pageOffsetY REAL DEFAULT NULL")
     }
 }
+
+/**
+ * Mémorise l'état d'avant chaque préréglage (audit UX A11) : désactiver
+ * « Mode sombre » ou « Accessibilité » remettait les valeurs par défaut, pas
+ * les réglages que l'utilisateur avait avant de l'essayer.
+ */
+val MIGRATION_35_36 = object : Migration(35, 36) {
+    override fun migrate(db: SupportSQLiteDatabase) {
+        db.execSQL("ALTER TABLE user_preferences ADD COLUMN darkModePresetBackup TEXT DEFAULT NULL")
+        db.execSQL("ALTER TABLE user_preferences ADD COLUMN accessibilityPresetBackup TEXT DEFAULT NULL")
+    }
+}

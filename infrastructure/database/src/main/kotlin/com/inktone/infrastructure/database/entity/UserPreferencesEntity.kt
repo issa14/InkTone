@@ -50,4 +50,8 @@ data class UserPreferencesEntity(
     // CSV de couleurs ARGB hex (`#AARRGGBB`, réécrit depuis les noms
     // d'enum hérités par MIGRATION_30_31, Lot 23), la plus récente en premier.
     val recentAnnotationColors: String = "",
+    // Audit UX A11 (MIGRATION_35_36) — état d'avant chaque préréglage,
+    // encodé par DarkModePresetBackup / AccessibilityPresetBackup ; nul = préréglage inactif.
+    val darkModePresetBackup: String? = null,
+    val accessibilityPresetBackup: String? = null,
 )

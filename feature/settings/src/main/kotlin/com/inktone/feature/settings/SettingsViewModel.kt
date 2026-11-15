@@ -12,6 +12,8 @@ import com.inktone.domain.model.TtsEngineId
 import com.inktone.domain.model.UserPreferences
 import com.inktone.domain.model.VoiceProfile
 import com.inktone.domain.model.defaultVoiceFor
+import com.inktone.domain.model.AccessibilityPresetBackup
+import com.inktone.domain.model.DarkModePresetBackup
 import com.inktone.domain.repository.PreferencesRepository
 import com.inktone.domain.repository.PronunciationRuleRepository
 import com.inktone.domain.repository.VoiceProfileRepository
@@ -379,16 +381,27 @@ class SettingsViewModel @Inject constructor(
      * Lot 6/9 — Préset Mode sombre.
      * ON : ReadingTheme.OBSIDIENNE (Lot 9 — id du thème intégré remplaçant
      * l'ancien `ReadingTheme.DARK`) + AppTheme.DARK.
-     * OFF : retour aux valeurs par défaut (approche simple et prévisible plutôt
-     * que mémoriser l'état antérieur, qui surprend si l'utilisateur a modifié
-     * des réglages entre-temps).
+     * OFF : retour à l'état d'avant l'activation (audit UX A11).
      */
     private suspend fun applyDarkModePreset(enabled: Boolean, current: UserPreferences) {
         if (enabled) {
-            preferencesRepository.update(current.copy(theme = ReadingTheme.OBSIDIENNE.id, appTheme = AppTheme.DARK))
+            // L'état d'avant est mémorisé à chaque activation : le préréglage
+            // n'était pas actif, il vient d'être demandé (audit UX A11).
+            preferencesRepository.update(
+                current.copy(
+                    theme = ReadingTheme.OBSIDIENNE.id,
+                    appTheme = AppTheme.DARK,
+                    darkModePresetBackup = DarkModePresetBackup(current.theme, current.appTheme),
+                ),
+            )
         } else {
-            val defaults = UserPreferences()
-            preferencesRepository.update(current.copy(theme = defaults.theme, appTheme = AppTheme.SYSTEM))
+            // Retour à l'état d'avant ; les valeurs par défaut seulement si
+            // aucun n'est mémorisé (préréglage activé avant A11).
+            val previous = current.darkModePresetBackup
+                ?: DarkModePresetBackup(UserPreferences().theme, AppTheme.SYSTEM)
+            preferencesRepository.update(
+                current.copy(theme = previous.theme, appTheme = previous.appTheme, darkModePresetBackup = null),
+            )
         }
     }
 
@@ -400,7 +413,7 @@ class SettingsViewModel @Inject constructor(
      * actée au lot 2b — cohérent avec l'esprit du préréglage :
      * reconnaissance d'un livre par le texte plutôt que par la seule
      * couverture).
-     * OFF : retour aux valeurs par défaut — plus simple et prévisible.
+     * OFF : retour à l'état d'avant l'activation (audit UX A11).
      */
     private suspend fun applyAccessibilityPresetToggle(enabled: Boolean, current: UserPreferences) {
         if (enabled) {
@@ -412,18 +425,35 @@ class SettingsViewModel @Inject constructor(
                     reduceMotion = true,
                     readingRulerEnabled = true,
                     libraryLayoutMode = "LIST",
+                    accessibilityPresetBackup = AccessibilityPresetBackup(
+                        fontSize = current.fontSize,
+                        theme = current.theme,
+                        fontFamily = current.fontFamily,
+                        reduceMotion = current.reduceMotion,
+                        readingRulerEnabled = current.readingRulerEnabled,
+                        libraryLayoutMode = current.libraryLayoutMode,
+                    ),
                 ),
             )
         } else {
             val defaults = UserPreferences()
+            val previous = current.accessibilityPresetBackup ?: AccessibilityPresetBackup(
+                fontSize = defaults.fontSize,
+                theme = defaults.theme,
+                fontFamily = defaults.fontFamily,
+                reduceMotion = defaults.reduceMotion,
+                readingRulerEnabled = defaults.readingRulerEnabled,
+                libraryLayoutMode = defaults.libraryLayoutMode,
+            )
             preferencesRepository.update(
                 current.copy(
-                    fontSize = defaults.fontSize,
-                    theme = defaults.theme,
-                    fontFamily = defaults.fontFamily,
-                    reduceMotion = defaults.reduceMotion,
-                    readingRulerEnabled = defaults.readingRulerEnabled,
-                    libraryLayoutMode = defaults.libraryLayoutMode,
+                    fontSize = previous.fontSize,
+                    theme = previous.theme,
+                    fontFamily = previous.fontFamily,
+                    reduceMotion = previous.reduceMotion,
+                    readingRulerEnabled = previous.readingRulerEnabled,
+                    libraryLayoutMode = previous.libraryLayoutMode,
+                    accessibilityPresetBackup = null,
                 ),
             )
         }

@@ -124,6 +124,10 @@ data class UserPreferences(
      * construction (voir `withRecentColor`, feature/reader).
      */
     val recentAnnotationColors: List<AnnotationColor> = emptyList(),
+    /** État d'avant le préréglage Mode sombre ; `null` quand il n'est pas actif (audit UX A11). */
+    val darkModePresetBackup: DarkModePresetBackup? = null,
+    /** État d'avant le préréglage Accessibilité ; `null` quand il n'est pas actif (audit UX A11). */
+    val accessibilityPresetBackup: AccessibilityPresetBackup? = null,
 ) {
     init {
         require(fontSize > 0) { "fontSize doit être strictement positif" }
