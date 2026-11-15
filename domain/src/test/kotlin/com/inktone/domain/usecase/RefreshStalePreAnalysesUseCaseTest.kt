@@ -4,6 +4,7 @@ import com.inktone.core.testing.fake.FakePreAnalysisBuilder
 import com.inktone.core.testing.fake.FakePreAnalysisStore
 import com.inktone.core.testing.fake.FakePublicationParser
 import com.inktone.core.testing.fake.FakePublicationRepository
+import com.inktone.core.testing.fake.FakeSearchService
 import com.inktone.domain.model.Chapter
 import com.inktone.domain.model.ChapterContent
 import com.inktone.domain.model.DocumentModel
@@ -47,10 +48,13 @@ class RefreshStalePreAnalysesUseCaseTest {
         val repository = FakePublicationRepository().apply { insert(publication("pub-1")) }
         val store = FakePreAnalysisStore()
         val builder = FakePreAnalysisBuilder()
+        val search = FakeSearchService()
 
-        val outcome = RefreshStalePreAnalysesUseCase(repository, parserWithTwoChapters(), builder, store)()
+        val outcome = RefreshStalePreAnalysesUseCase(repository, parserWithTwoChapters(), builder, store, search)()
 
         assertEquals(RefreshStalePreAnalysesUseCase.Outcome(refreshed = 1, alreadyFresh = 0, failed = 0), outcome)
+        assertEquals("l'index du livre est vidé puis refait", listOf("pub-1"), search.deletedPublications)
+        assertEquals(listOf(0 to "cover.xhtml", 1 to "chap1.xhtml"), search.indexedChapters)
         assertEquals(listOf("cover.xhtml", "chap1.xhtml"), store.savedChapters("pub-1")?.map { it.href })
         assertTrue("la régénération doit être enregistrée sous le hash courant", store.isFresh("pub-1", "hash-pub-1"))
         assertEquals(
@@ -66,7 +70,7 @@ class RefreshStalePreAnalysesUseCaseTest {
         val store = FakePreAnalysisStore().apply { save("pub-1", "hash-pub-1", listOf(shell("chap1.xhtml"))) }
         val builder = FakePreAnalysisBuilder()
 
-        val outcome = RefreshStalePreAnalysesUseCase(repository, parserWithTwoChapters(), builder, store)()
+        val outcome = RefreshStalePreAnalysesUseCase(repository, parserWithTwoChapters(), builder, store, FakeSearchService())()
 
         assertEquals(RefreshStalePreAnalysesUseCase.Outcome(refreshed = 0, alreadyFresh = 1, failed = 0), outcome)
         assertTrue(builder.analyzedFileUris.isEmpty())
@@ -80,7 +84,7 @@ class RefreshStalePreAnalysesUseCaseTest {
         }
         val builder = FakePreAnalysisBuilder()
 
-        val outcome = RefreshStalePreAnalysesUseCase(repository, parserWithTwoChapters(), builder, FakePreAnalysisStore())()
+        val outcome = RefreshStalePreAnalysesUseCase(repository, parserWithTwoChapters(), builder, FakePreAnalysisStore(), FakeSearchService())()
 
         assertEquals(RefreshStalePreAnalysesUseCase.Outcome(refreshed = 0, alreadyFresh = 0, failed = 0), outcome)
         assertTrue(builder.analyzedFileUris.isEmpty())
@@ -95,7 +99,7 @@ class RefreshStalePreAnalysesUseCaseTest {
         val store = FakePreAnalysisStore()
         val builder = FakePreAnalysisBuilder(failingFileUris = setOf("content://fake/pub-1"))
 
-        val outcome = RefreshStalePreAnalysesUseCase(repository, parserWithTwoChapters(), builder, store)()
+        val outcome = RefreshStalePreAnalysesUseCase(repository, parserWithTwoChapters(), builder, store, FakeSearchService())()
 
         assertEquals(RefreshStalePreAnalysesUseCase.Outcome(refreshed = 1, alreadyFresh = 0, failed = 1), outcome)
         assertTrue(store.isFresh("pub-2", "hash-pub-2"))

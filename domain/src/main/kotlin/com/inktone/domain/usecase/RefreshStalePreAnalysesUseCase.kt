@@ -7,6 +7,7 @@ import com.inktone.domain.service.ParseResult
 import com.inktone.domain.service.PreAnalysisBuilder
 import com.inktone.domain.service.PreAnalysisStore
 import com.inktone.domain.service.PublicationParser
+import com.inktone.domain.service.SearchService
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.flow.first
 
@@ -19,6 +20,8 @@ import kotlinx.coroutines.flow.first
  * déplacée, permission SAF perdue, EPUB malformé) est compté puis ignoré —
  * il ne bloque jamais les suivants.
  *
+ * Réindexe aussi la recherche du livre (même source de phrases).
+ *
  * Mêmes chapitres que l'import : la liste vient du parsing d'import
  * ([PublicationParser.parse]), seule source qui inclut la page de
  * couverture ajoutée en tête quand l'OPF la sort de l'ordre de lecture.
@@ -28,6 +31,7 @@ class RefreshStalePreAnalysesUseCase(
     private val publicationParser: PublicationParser,
     private val preAnalysisBuilder: PreAnalysisBuilder,
     private val preAnalysisStore: PreAnalysisStore,
+    private val searchService: SearchService,
 ) {
 
     data class Outcome(val refreshed: Int, val alreadyFresh: Int, val failed: Int)
@@ -56,6 +60,13 @@ class RefreshStalePreAnalysesUseCase(
                 // analyse que celle que le Lecteur relira.
                 if (chapters.size == publication.chapterCount) {
                     publicationRepository.setChapterLengths(publication.id, ChapterLengths.of(chapters))
+                }
+                // L'index de recherche est adressé par les mêmes offsets : il suit la
+                // pré-analyse, sans quoi un parseur ou un tokeniseur qui change le laisse
+                // dans l'ancien espace (audit UX D8, D17).
+                searchService.deletePublication(publication.id)
+                chapters.forEachIndexed { position, chapter ->
+                    searchService.indexSentences(publication.id, position, chapter.href, chapter.sentences)
                 }
                 preAnalysisBuilder.onPreAnalysisRewritten(publication.id)
                 refreshed++

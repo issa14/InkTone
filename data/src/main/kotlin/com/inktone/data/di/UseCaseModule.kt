@@ -151,8 +151,9 @@ object UseCaseModule {
         publicationParser: PublicationParser,
         preAnalysisBuilder: PreAnalysisBuilder,
         preAnalysisStore: PreAnalysisStore,
+        searchService: SearchService,
     ): RefreshStalePreAnalysesUseCase =
-        RefreshStalePreAnalysesUseCase(publicationRepository, publicationParser, preAnalysisBuilder, preAnalysisStore)
+        RefreshStalePreAnalysesUseCase(publicationRepository, publicationParser, preAnalysisBuilder, preAnalysisStore, searchService)
 
     @Provides
     fun provideCopyLibraryToPrivateStorageUseCase(

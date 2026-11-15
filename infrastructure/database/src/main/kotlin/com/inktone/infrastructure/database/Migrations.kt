@@ -610,3 +610,22 @@ val MIGRATION_37_38 = object : Migration(37, 38) {
         db.execSQL("ALTER TABLE publications ADD COLUMN locatorAnchorVersion INTEGER NOT NULL DEFAULT 0")
     }
 }
+
+/**
+ * Audit UX D8 : l'index de recherche passe au tokeniseur `unicode61` (accents et
+ * casse ignorés). Un tokeniseur ne se change pas en place : la table est recréée,
+ * vide, puis repeuplée par la régénération des pré-analyses (le texte source n'est
+ * pas en base).
+ */
+val MIGRATION_38_39 = object : Migration(38, 39) {
+    override fun migrate(db: SupportSQLiteDatabase) {
+        db.execSQL("DROP TABLE IF EXISTS sentence_fts")
+        db.execSQL(
+            """
+            CREATE VIRTUAL TABLE IF NOT EXISTS sentence_fts USING fts4(
+                publicationId, chapterIndex, resourceHref, charOffset, text, tokenize=unicode61
+            )
+            """.trimIndent(),
+        )
+    }
+}
