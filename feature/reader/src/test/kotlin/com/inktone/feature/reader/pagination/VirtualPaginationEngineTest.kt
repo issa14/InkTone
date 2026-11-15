@@ -275,4 +275,68 @@ class VirtualPaginationEngineTest {
         val landscapePage = engine.pageIndexAt(0, currentSentenceIndex)
         assertTrue(currentSentenceIndex in engine.sentenceRangeOf(0, landscapePage))
     }
+
+    // ---- Pages d'image (audit UX D48) ----
+
+    @Test
+    fun `un chapitre fait d'une seule image a une page, celle de l'image`() {
+        val engine = VirtualPaginationEngine()
+        engine.updateChapter(0, defaultStyleKey, emptyList(), emptyList(), imageAnchors = listOf(ImageAnchor(0, 0)))
+
+        assertEquals(1, engine.pageCount(0))
+        assertEquals(0, engine.pageImageIndex(0, 0))
+        assertTrue(engine.sentenceRangeOf(0, 0).isEmpty())
+    }
+
+    @Test
+    fun `une image au milieu a sa propre page, entre deux pages de texte qu'elle ne coupe pas`() {
+        val engine = VirtualPaginationEngine()
+        val (lines, offsets) = uniformLines(4) // 4 lignes de 20 px : tiennent sur une page de 100 px
+        val anchor = ImageAnchor(textOffset = offsets[2], imageIndex = 0)
+        engine.updateChapter(0, defaultStyleKey, lines, offsets, imageAnchors = listOf(anchor))
+
+        assertEquals(3, engine.pageCount(0))
+        assertEquals(listOf(null, 0, null), (0 until 3).map { engine.pageImageIndex(0, it) })
+        assertEquals(0..1, engine.sentenceRangeOf(0, 0))
+        assertTrue(engine.sentenceRangeOf(0, 1).isEmpty())
+        assertEquals(2..3, engine.sentenceRangeOf(0, 2))
+        assertEquals(offsets[2], engine.pageOffsetRange(0, 2).first)
+        assertEquals(2, engine.pageIndexAt(0, 2))
+        assertEquals(2, engine.pageIndexAtOffset(0, offsets[3]))
+    }
+
+    @Test
+    fun `l'illustration d'ouverture est la page de la premiere phrase`() {
+        val engine = VirtualPaginationEngine()
+        val (lines, offsets) = uniformLines(3)
+        engine.updateChapter(0, defaultStyleKey, lines, offsets, imageAnchors = listOf(ImageAnchor(0, 0)))
+
+        assertEquals(0, engine.pageImageIndex(0, 0))
+        assertEquals(0, engine.pageIndexAt(0, 0))
+        assertEquals(1, engine.pageIndexAt(0, 1))
+    }
+
+    @Test
+    fun `une image de fin de chapitre suit la derniere page de texte`() {
+        val engine = VirtualPaginationEngine()
+        val (lines, offsets) = uniformLines(3)
+        val end = lines.last().endOffset
+        engine.updateChapter(0, defaultStyleKey, lines, offsets, imageAnchors = listOf(ImageAnchor(end, 0), ImageAnchor(end, 1)))
+
+        assertEquals(3, engine.pageCount(0))
+        assertEquals(listOf(null, 0, 1), (0 until 3).map { engine.pageImageIndex(0, it) })
+        assertEquals(0..2, engine.sentenceRangeOf(0, 0))
+    }
+
+    @Test
+    fun `avec des images, aucune phrase n'est perdue ni dupliquee`() {
+        val engine = VirtualPaginationEngine()
+        val (lines, offsets) = uniformLines(23)
+        val anchors = listOf(ImageAnchor(0, 0), ImageAnchor(offsets[7], 1), ImageAnchor(offsets[15], 2))
+        engine.updateChapter(0, defaultStyleKey, lines, offsets, imageAnchors = anchors)
+
+        val covered = (0 until engine.pageCount(0)).flatMap { engine.sentenceRangeOf(0, it).toList() }
+        assertEquals((0 until 23).toList(), covered)
+        assertEquals(3, (0 until engine.pageCount(0)).count { engine.pageImageIndex(0, it) != null })
+    }
 }

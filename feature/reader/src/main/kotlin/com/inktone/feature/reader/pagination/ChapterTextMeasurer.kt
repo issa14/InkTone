@@ -1,6 +1,11 @@
 package com.inktone.feature.reader.pagination
 
 import androidx.compose.ui.text.AnnotatedString
+import androidx.compose.ui.text.ParagraphStyle
+import androidx.compose.ui.text.SpanStyle
+import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.unit.TextUnit
+import androidx.compose.ui.unit.em
 import androidx.compose.ui.text.TextMeasurer
 import androidx.compose.ui.text.TextStyle
 import androidx.compose.ui.text.buildAnnotatedString
@@ -28,6 +33,9 @@ data class ChapterMeasurement(
     val annotatedString: AnnotatedString,
     val lines: List<LineGeometry>,
     val sentenceStartOffsets: List<Int>,
+    /** Images du chapitre couvertes par cette mesure, désignées par [ImageAnchor.imageIndex]. */
+    val images: List<BookBlock.ImageBlock> = emptyList(),
+    val imageAnchors: List<ImageAnchor> = emptyList(),
 )
 
 /**
@@ -142,7 +150,12 @@ class ChapterTextMeasurer(private val textMeasurer: TextMeasurer) {
             it.value is BookBlock.ParagraphBlock || it.value is BookBlock.HeadingBlock
         }
         if (textBlocks.isEmpty()) {
-            return ChapterMeasurement(AnnotatedString(""), emptyList(), emptyList())
+            val images = content.blocks.filterIsInstance<BookBlock.ImageBlock>()
+            return ChapterMeasurement(
+                AnnotatedString(""), emptyList(), emptyList(),
+                images = images,
+                imageAnchors = images.indices.map { ImageAnchor(textOffset = 0, imageIndex = it) },
+            )
         }
 
         // 1. Borner au budget total demandé — [maxChars] est un budget de
@@ -173,6 +186,7 @@ class ChapterTextMeasurer(private val textMeasurer: TextMeasurer) {
         // 3. Mesurer chaque lot et accumuler
         val allLines = mutableListOf<LineGeometry>()
         val allSentenceOffsets = mutableListOf<Int>()
+        val textBlockStarts = mutableMapOf<Int, Int>()
         val batchAnnotatedStrings = mutableListOf<AnnotatedString>()
         var cumulativeTop = 0f
         var globalOffset = 0
@@ -181,6 +195,8 @@ class ChapterTextMeasurer(private val textMeasurer: TextMeasurer) {
             val (annotatedString, localOffsets) = buildBatchAnnotatedString(
                 blocks = batch,
                 sentencesByBlock = sentencesByBlock,
+                onBlockStart = { originalIndex, start -> textBlockStarts[originalIndex] = start + globalOffset },
+                baseStyle = baseStyle,
                 // Un "\n" doit séparer TOUT couple de blocs de texte
                 // consécutifs, y compris à une frontière de lot — sinon
                 // l'espace d'offsets global dérive de 1 caractère par
@@ -246,7 +262,37 @@ class ChapterTextMeasurer(private val textMeasurer: TextMeasurer) {
                 batchAnnotatedStrings.forEach { append(it) }
             }
         }
-        return ChapterMeasurement(fullAnnotatedString, allLines, allSentenceOffsets)
+        val (images, anchors) = imageAnchorsOf(
+            blocks = content.blocks,
+            textBlockStarts = textBlockStarts,
+            coversAllText = boundedBlocks.size == textBlocks.size,
+            textLength = fullAnnotatedString.length,
+        )
+        return ChapterMeasurement(fullAnnotatedString, allLines, allSentenceOffsets, images, anchors)
+    }
+
+    /**
+     * Ancre chaque image au début du premier bloc de texte mesuré qui la suit.
+     * Une image sans texte mesuré après elle n'est retenue que si la mesure
+     * couvre tout le texte (image de fin de chapitre) : dans un préfixe, sa
+     * place n'est pas encore connue.
+     */
+    private fun imageAnchorsOf(
+        blocks: List<BookBlock>,
+        textBlockStarts: Map<Int, Int>,
+        coversAllText: Boolean,
+        textLength: Int,
+    ): Pair<List<BookBlock.ImageBlock>, List<ImageAnchor>> {
+        val images = mutableListOf<BookBlock.ImageBlock>()
+        val anchors = mutableListOf<ImageAnchor>()
+        blocks.forEachIndexed { index, block ->
+            if (block !is BookBlock.ImageBlock) return@forEachIndexed
+            val nextTextStart = ((index + 1) until blocks.size).firstNotNullOfOrNull { textBlockStarts[it] }
+            val offset = nextTextStart ?: if (coversAllText) textLength else return@forEachIndexed
+            anchors.add(ImageAnchor(textOffset = offset, imageIndex = images.size))
+            images.add(block)
+        }
+        return images to anchors
     }
 
     /**
@@ -307,6 +353,8 @@ class ChapterTextMeasurer(private val textMeasurer: TextMeasurer) {
         blocks: List<IndexedValue<BookBlock>>,
         sentencesByBlock: Map<Int, List<Sentence>>,
         leadingSeparator: Boolean,
+        onBlockStart: (originalIndex: Int, startInBatch: Int) -> Unit,
+        baseStyle: TextStyle,
     ): Pair<AnnotatedString, List<Int>> {
         val sentenceStartOffsets = mutableListOf<Int>()
         val annotatedString = buildAnnotatedString {
@@ -319,6 +367,7 @@ class ChapterTextMeasurer(private val textMeasurer: TextMeasurer) {
 
                 if (position > 0 || leadingSeparator) append('\n')
                 val blockStartInBatch = length
+                onBlockStart(originalIndex, blockStartInBatch)
                 val blockGlobalStart = block.globalOffsetRange?.first ?: 0
                 val blockSentences = sentencesByBlock[originalIndex].orEmpty()
                 if (blockSentences.isNotEmpty()) {
@@ -329,20 +378,34 @@ class ChapterTextMeasurer(private val textMeasurer: TextMeasurer) {
                     sentenceStartOffsets.add(blockStartInBatch)
                 }
 
-                val plainText = richText.plainText
-                val spans = richText.spans
-                var lastEnd = 0
-                for (span in spans) {
-                    if (span.start > lastEnd) {
-                        append(plainText.substring(lastEnd, span.start))
+                val appendRichText = {
+                    val plainText = richText.plainText
+                    var lastEnd = 0
+                    for (span in richText.spans) {
+                        if (span.start > lastEnd) {
+                            append(plainText.substring(lastEnd, span.start))
+                        }
+                        withStyle(BookBlockStyleMapper.spanStyleFor(span.styles)) {
+                            append(plainText.substring(span.start, span.end))
+                        }
+                        lastEnd = span.end
                     }
-                    withStyle(BookBlockStyleMapper.spanStyleFor(span.styles)) {
-                        append(plainText.substring(span.start, span.end))
+                    if (lastEnd < plainText.length) {
+                        append(plainText.substring(lastEnd))
                     }
-                    lastEnd = span.end
                 }
-                if (lastEnd < plainText.length) {
-                    append(plainText.substring(lastEnd))
+                if (block is BookBlock.HeadingBlock) {
+                    // Titre mis en forme comme en défilement (D48), par des
+                    // styles qui ne changent aucun offset ; l'interligne suit
+                    // la taille pour que les lignes d'un titre long ne se
+                    // chevauchent pas.
+                    val scale = BookBlockStyleMapper.headingScale(block.level)
+                    val lineHeight = if (baseStyle.lineHeight.isSp) baseStyle.lineHeight * scale else TextUnit.Unspecified
+                    withStyle(ParagraphStyle(lineHeight = lineHeight)) {
+                        withStyle(SpanStyle(fontSize = scale.em, fontWeight = FontWeight.Bold)) { appendRichText() }
+                    }
+                } else {
+                    appendRichText()
                 }
             }
         }

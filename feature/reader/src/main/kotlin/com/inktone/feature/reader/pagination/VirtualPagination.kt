@@ -47,3 +47,15 @@ data class PaginationStyleKey(
     /** P4 — la césure (solidaire de la justification) change les coupures de ligne. */
     val justified: Boolean = false,
 )
+
+/**
+ * Image placée avant le texte qui commence à [textOffset] (repère de
+ * l'`AnnotatedString` mesuré ; la longueur du texte pour une image en fin de
+ * chapitre). [imageIndex] désigne l'image dans `ChapterMeasurement.images` :
+ * le moteur ne connaît pas le modèle du domaine. Chaque image occupe sa propre
+ * page, le texte n'étant jamais coupé en son milieu par elle (audit UX D48).
+ */
+data class ImageAnchor(
+    val textOffset: Int,
+    val imageIndex: Int,
+)

@@ -68,13 +68,16 @@ object BookBlockStyleMapper {
         else -> baseStyle
     }
 
+    /** Agrandissement d'un titre de niveau [level] ; partagé avec le mode paginé. */
+    fun headingScale(level: Int): Float = when (level) {
+        1 -> 1.5f
+        2 -> 1.25f
+        else -> 1.1f // h3–h6 : légèrement plus grand que le corps
+    }
+
     /** Style pour un titre de niveau [level] (1–6). */
     private fun headingStyle(level: Int, base: TextStyle): TextStyle {
-        val fontSizeMultiplier = when (level) {
-            1 -> 1.5f
-            2 -> 1.25f
-            else -> 1.1f // h3–h6 : légèrement plus grand que le corps
-        }
+        val fontSizeMultiplier = headingScale(level)
         // L'interligne suit la taille : depuis que le style de base porte un
         // `lineHeight` ABSOLU (en sp, réglage utilisateur), grossir la seule
         // police ferait se chevaucher les lignes d'un titre long, qui garderait

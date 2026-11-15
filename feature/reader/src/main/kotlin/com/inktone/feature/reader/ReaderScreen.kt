@@ -1132,6 +1132,7 @@ fun ReaderScreen(
                             textColor = ThemeColors.text(state.resolvedTheme),
                             isReadingRulerEnabled = state.isReadingRulerEnabled,
                             contentPadding = readerMargin,
+                            publicationId = state.publicationId.takeIf { state.epubResourceResolver != null },
                             onClick = { chrome.onReadingAreaTap(state.isPlaying) },
                             onNextChapter = { viewModel.onIntent(ReaderIntent.NextChapter) },
                             onPreviousChapter = { viewModel.onIntent(ReaderIntent.PreviousChapter) },

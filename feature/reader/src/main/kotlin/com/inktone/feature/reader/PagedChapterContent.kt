@@ -65,6 +65,13 @@ import com.inktone.domain.model.Annotation
 import com.inktone.domain.model.AnnotationColor
 import com.inktone.domain.model.Chapter
 import com.inktone.feature.reader.pagination.ChapterPaginationState
+import com.inktone.feature.reader.rendering.EpubImageKey
+import com.inktone.domain.model.BookBlock
+import coil.compose.AsyncImage
+import androidx.compose.foundation.gestures.detectTapGestures
+import androidx.compose.ui.semantics.contentDescription
+import androidx.compose.ui.layout.ContentScale
+import androidx.compose.ui.input.pointer.pointerInput
 
 /**
  * 3a.2/3b.1 — Contenu paginé par swipe horizontal, rendu depuis le
@@ -147,6 +154,8 @@ fun PagedChapterContent(
     // le popup qu'une AUTRE page vient d'ouvrir. Arbitrage :
     // `resolveSelectionPopupBounds` (ReaderScreen).
     onFreeSelectionBoundsInWindow: (ownerKey: Int, bounds: Rect?) -> Unit = { _, _ -> },
+    /** Publication ouverte, pour charger les images EPUB (`EpubImageKey`) ; `null` hors EPUB. */
+    publicationId: String? = null,
     modifier: Modifier = Modifier,
 ) {
     val renderTextStyle = remember(pagination.baseTextStyle, textColor) {
@@ -452,8 +461,11 @@ fun PagedChapterContent(
         ) { pageIndex ->
             Box(modifier = Modifier.fillMaxSize().padding(contentPadding)) {
                 if (chapter != null && currentMeasurement != null && pageIndex < pageCount) {
+                val pageImage = pagination.pageImage(chapter.index, pageIndex)
                 val pageOffsetRange = pagination.pageOffsetRange(chapter.index, pageIndex)
-                if (!pageOffsetRange.isEmpty()) {
+                if (pageImage != null) {
+                    PagedImage(image = pageImage, publicationId = publicationId, onClick = onClick)
+                } else if (!pageOffsetRange.isEmpty()) {
                     val pageText = remember(currentMeasurement, pageOffsetRange, annotations) {
                         buildPageAnnotatedString(
                             full = currentMeasurement.annotatedString,
@@ -504,6 +516,30 @@ fun PagedChapterContent(
                             Alignment.CenterStart else Alignment.CenterEnd
                     )
                     .padding(horizontal = 8.dp),
+            )
+        }
+    }
+}
+
+/**
+ * Page d'illustration du mode paginé (audit UX D48) : l'image entière, mise à
+ * l'échelle de la page. Un tap bascule les commandes, comme sur une page de texte.
+ */
+@Composable
+private fun PagedImage(image: BookBlock.ImageBlock, publicationId: String?, onClick: () -> Unit) {
+    Box(
+        modifier = Modifier
+            .fillMaxSize()
+            .pointerInput(Unit) { detectTapGestures { onClick() } }
+            .semantics { image.alt?.let { contentDescription = it } },
+        contentAlignment = Alignment.Center,
+    ) {
+        if (!publicationId.isNullOrEmpty()) {
+            AsyncImage(
+                model = EpubImageKey(publicationId, image.href),
+                contentDescription = image.alt,
+                contentScale = ContentScale.Fit,
+                modifier = Modifier.fillMaxSize(),
             )
         }
     }

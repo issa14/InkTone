@@ -7,6 +7,7 @@ import androidx.compose.ui.text.font.createFontFamilyResolver
 import androidx.compose.ui.unit.Density
 import androidx.compose.ui.unit.LayoutDirection
 import androidx.compose.ui.unit.sp
+import androidx.compose.ui.unit.em
 import androidx.test.core.app.ApplicationProvider
 import com.inktone.domain.model.BookBlock
 import com.inktone.domain.model.Chapter
@@ -83,6 +84,73 @@ class ChapterTextMeasurerTest {
         // consécutifs (correctif : le texte de deux paragraphes ne doit
         // jamais fusionner sans espace dans le rendu/la mesure).
         assertEquals("Titre.\nPremière phrase. Deuxième phrase.", result.annotatedString.text)
+    }
+
+    /**
+     * Audit UX D48 : chaque image est ancrée au début du texte qui la suit,
+     * sans changer le texte mesuré (ses offsets sont ceux du parseur).
+     */
+    @Test
+    fun `les images sont ancrees au debut du texte qui les suit, sans changer le texte`() {
+        val ouverture = BookBlock.ImageBlock(href = "ouverture.jpg")
+        val milieu = BookBlock.ImageBlock(href = "milieu.jpg")
+        val fin = BookBlock.ImageBlock(href = "fin.jpg")
+        val chapter = Chapter(
+            index = 0,
+            href = "chap1.xhtml",
+            title = "Chapitre 1",
+            content = ChapterContent.Rich(
+                blocks = listOf(
+                    ouverture,
+                    BookBlock.ParagraphBlock(richText = StyledText.plain("Avant."), globalOffsetRange = 0..5),
+                    milieu,
+                    BookBlock.ParagraphBlock(richText = StyledText.plain("Après."), globalOffsetRange = 7..12),
+                    fin,
+                ),
+            ),
+        )
+
+        val result = measurer.measure(chapter, TextStyle(fontSize = 18.sp), maxWidthPx = 2000)
+
+        assertEquals("Avant.\nAprès.", result.annotatedString.text)
+        assertEquals(listOf(ouverture, milieu, fin), result.images)
+        assertEquals(listOf(0, 7, 13), result.imageAnchors.map { it.textOffset })
+    }
+
+    /** Audit UX D48 : en mode paginé, un titre était rendu comme du texte courant. */
+    @Test
+    fun `un titre est mis en forme sans changer le texte mesure`() {
+        val chapter = Chapter(
+            index = 0, href = "chap1.xhtml", title = null,
+            content = ChapterContent.Rich(
+                blocks = listOf(
+                    BookBlock.HeadingBlock(level = 1, richText = StyledText.plain("Titre"), globalOffsetRange = 0..4),
+                    BookBlock.ParagraphBlock(richText = StyledText.plain("Corps."), globalOffsetRange = 6..11),
+                ),
+            ),
+        )
+
+        val result = measurer.measure(chapter, TextStyle(fontSize = 18.sp, lineHeight = 24.sp), maxWidthPx = 2000)
+
+        assertEquals("Titre\nCorps.", result.annotatedString.text)
+        val heading = result.annotatedString.paragraphStyles.single()
+        assertEquals(0 until 5, heading.start until heading.end)
+        assertEquals(36f, heading.item.lineHeight.value, 0.01f)
+        assertTrue(result.annotatedString.spanStyles.any { it.start == 0 && it.end == 5 && it.item.fontSize == 1.5.em })
+    }
+
+    @Test
+    fun `un chapitre sans texte garde ses images`() {
+        val couverture = BookBlock.ImageBlock(href = "cover.jpg")
+        val chapter = Chapter(
+            index = 0, href = "cover.xhtml", title = null,
+            content = ChapterContent.Rich(blocks = listOf(couverture)),
+        )
+
+        val result = measurer.measure(chapter, TextStyle(fontSize = 18.sp), maxWidthPx = 2000)
+
+        assertEquals(listOf(couverture), result.images)
+        assertEquals(listOf(ImageAnchor(0, 0)), result.imageAnchors)
     }
 
     /**

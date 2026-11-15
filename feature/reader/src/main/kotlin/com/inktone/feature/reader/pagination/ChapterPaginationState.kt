@@ -89,6 +89,13 @@ class ChapterPaginationState internal constructor(
         return engine.pageIndexAtOffset(chapterIndex, charOffset)
     }
 
+    /** Image affichée par cette page du chapitre mesuré, `null` pour une page de texte (D48). */
+    fun pageImage(chapterIndex: Int, pageIndex: Int): BookBlock.ImageBlock? {
+        paginationVersion
+        val index = engine.pageImageIndex(chapterIndex, pageIndex) ?: return null
+        return measurement?.images?.getOrNull(index)
+    }
+
     /**
      * Vrai si la mesure courante couvre TOUTES les phrases du chapitre
      * (mesure complète) — c'est-à-dire qu'aucune page n'est encore en
@@ -327,7 +334,7 @@ fun rememberChapterPaginationState(
         }
         state.measurement = partial
         state.bumpIfChanged(
-            engine.updateChapter(chapter.index, styleKey, partial.lines, partial.sentenceStartOffsets, force = true),
+            engine.updateChapter(chapter.index, styleKey, partial.lines, partial.sentenceStartOffsets, force = true, imageAnchors = partial.imageAnchors),
         )
 
         // Reprise en milieu de chapitre : élargit le préfixe jusqu'à couvrir
@@ -351,7 +358,7 @@ fun rememberChapterPaginationState(
             }
             state.measurement = partial
             state.bumpIfChanged(
-                engine.updateChapter(chapter.index, styleKey, partial.lines, partial.sentenceStartOffsets, force = true),
+                engine.updateChapter(chapter.index, styleKey, partial.lines, partial.sentenceStartOffsets, force = true, imageAnchors = partial.imageAnchors),
             )
         }
 
@@ -364,7 +371,7 @@ fun rememberChapterPaginationState(
         }
         state.measurement = full
         state.bumpIfChanged(
-            engine.updateChapter(chapter.index, styleKey, full.lines, full.sentenceStartOffsets, force = true),
+            engine.updateChapter(chapter.index, styleKey, full.lines, full.sentenceStartOffsets, force = true, imageAnchors = full.imageAnchors),
         )
 
         // Préchargement du chapitre suivant (3a.3, évalué) : le chapitre
@@ -373,7 +380,10 @@ fun rememberChapterPaginationState(
             val nextMeasurement = withContext(Dispatchers.Default) {
                 newBackgroundMeasurer().measure(nextChapter, baseTextStyle, contentWidthPx)
             }
-            engine.updateChapter(nextChapter.index, styleKey, nextMeasurement.lines, nextMeasurement.sentenceStartOffsets)
+            engine.updateChapter(
+                nextChapter.index, styleKey, nextMeasurement.lines, nextMeasurement.sentenceStartOffsets,
+                imageAnchors = nextMeasurement.imageAnchors,
+            )
         }
     }
 

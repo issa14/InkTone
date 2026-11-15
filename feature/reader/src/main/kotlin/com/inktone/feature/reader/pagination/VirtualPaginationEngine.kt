@@ -37,6 +37,8 @@ class VirtualPaginationEngine : VirtualPagination {
         val styleKey: PaginationStyleKey,
         val pages: List<IntRange>,
         val pageOffsetRanges: List<IntRange>,
+        /** Index d'image par page (voir [ImageAnchor]), `null` pour une page de texte. */
+        val pageImages: List<Int?>,
     )
 
     private val cache = mutableMapOf<Int, ChapterEntry>()
@@ -62,11 +64,12 @@ class VirtualPaginationEngine : VirtualPagination {
         lines: List<LineGeometry>,
         sentenceStartOffsets: List<Int>,
         force: Boolean = false,
+        imageAnchors: List<ImageAnchor> = emptyList(),
     ): Boolean {
         val existing = cache[chapterIndex]
         if (!force && existing != null && existing.styleKey == styleKey) return false
-        val computed = computePages(lines, sentenceStartOffsets, styleKey.viewportHeightPx.toFloat())
-        cache[chapterIndex] = ChapterEntry(styleKey, computed.sentenceRanges, computed.offsetRanges)
+        val computed = computePages(lines, sentenceStartOffsets, styleKey.viewportHeightPx.toFloat(), imageAnchors)
+        cache[chapterIndex] = ChapterEntry(styleKey, computed.sentenceRanges, computed.offsetRanges, computed.images)
         return true
     }
 
@@ -76,10 +79,17 @@ class VirtualPaginationEngine : VirtualPagination {
     override fun pageIndexAt(chapterIndex: Int, sentenceIndex: Int): Int {
         val pages = cache[chapterIndex]?.pages ?: return 0
         if (pages.isEmpty()) return 0
+        // Le début du chapitre est sa première page, illustration d'ouverture
+        // comprise : sinon l'ouvrir ou y arriver par un swipe la sauterait (D48).
+        if (sentenceIndex == 0) return 0
         val found = pages.indexOfFirst { sentenceIndex in it }
         if (found >= 0) return found
-        return if (sentenceIndex < (pages.firstOrNull()?.first ?: 0)) 0 else pages.lastIndex
+        return if (sentenceIndex < (pages.firstOrNull { !it.isEmpty() }?.first ?: 0)) 0 else pages.lastIndex
     }
+
+    /** Index de l'image affichée par cette page (voir [ImageAnchor]), `null` pour une page de texte. */
+    fun pageImageIndex(chapterIndex: Int, pageIndex: Int): Int? =
+        cache[chapterIndex]?.pageImages?.getOrNull(pageIndex)
 
     override fun sentenceRangeOf(chapterIndex: Int, pageIndex: Int): IntRange =
         cache[chapterIndex]?.pages?.getOrNull(pageIndex) ?: IntRange.EMPTY
@@ -100,21 +110,73 @@ class VirtualPaginationEngine : VirtualPagination {
     fun pageIndexAtOffset(chapterIndex: Int, charOffset: Int): Int =
         cache[chapterIndex]?.pageOffsetRanges?.indexOfFirst { charOffset in it } ?: -1
 
-    private data class ComputedPages(val sentenceRanges: List<IntRange>, val offsetRanges: List<IntRange>)
+    private data class ComputedPages(
+        val sentenceRanges: List<IntRange>,
+        val offsetRanges: List<IntRange>,
+        val images: List<Int?>,
+    )
 
+    /**
+     * Pages de texte coupées à chaque [ImageAnchor], une page par image
+     * intercalée à sa place. Une page d'image n'a ni phrase ni plage
+     * d'offsets : le texte, ses offsets et la partition des phrases restent
+     * exactement ceux d'un chapitre sans image.
+     */
     private fun computePages(
         lines: List<LineGeometry>,
         sentenceStartOffsets: List<Int>,
         viewportHeightPx: Float,
+        imageAnchors: List<ImageAnchor>,
     ): ComputedPages {
-        if (lines.isEmpty() || sentenceStartOffsets.isEmpty()) {
-            return ComputedPages(listOf(IntRange.EMPTY), listOf(IntRange.EMPTY))
+        val hasText = lines.isNotEmpty() && sentenceStartOffsets.isNotEmpty()
+        if (!hasText && imageAnchors.isEmpty()) {
+            return ComputedPages(listOf(IntRange.EMPTY), listOf(IntRange.EMPTY), listOf(null))
         }
-        val pageLineRanges = computePageLineRanges(lines, viewportHeightPx)
-        val offsetRanges = pageLineRanges.map { range -> lines[range.first].startOffset..lines[range.last].endOffset }
-        val pageEndOffsets = offsetRanges.map { it.last }
-        val sentenceRanges = computeSentenceRanges(sentenceStartOffsets, pageEndOffsets)
-        return ComputedPages(sentenceRanges, offsetRanges)
+        if (imageAnchors.isEmpty()) {
+            val pageLineRanges = computePageLineRanges(lines, viewportHeightPx)
+            val offsetRanges = pageLineRanges.map { range -> lines[range.first].startOffset..lines[range.last].endOffset }
+            val sentenceRanges = computeSentenceRanges(sentenceStartOffsets, offsetRanges.map { it.last })
+            return ComputedPages(sentenceRanges, offsetRanges, sentenceRanges.map { null })
+        }
+        // Séquence des pages : un index dans `textPageLines`, ou une image.
+        val textPageLines = mutableListOf<IntRange>()
+        val sequence = mutableListOf<Int?>()
+        val sequenceImages = mutableListOf<Int?>()
+        fun addText(fromLine: Int, toLineExclusive: Int) {
+            if (!hasText || fromLine >= toLineExclusive) return
+            computePageLineRanges(lines.subList(fromLine, toLineExclusive), viewportHeightPx).forEach { range ->
+                sequence.add(textPageLines.size)
+                sequenceImages.add(null)
+                textPageLines.add((range.first + fromLine)..(range.last + fromLine))
+            }
+        }
+        var lineCursor = 0
+        for (anchor in imageAnchors.sortedBy { it.textOffset }) {
+            var segmentEnd = lineCursor
+            if (hasText) {
+                while (segmentEnd < lines.size && lines[segmentEnd].startOffset < anchor.textOffset) segmentEnd++
+            }
+            addText(lineCursor, segmentEnd)
+            lineCursor = segmentEnd
+            sequence.add(null)
+            sequenceImages.add(anchor.imageIndex)
+        }
+        addText(lineCursor, lines.size)
+
+        val textOffsetRanges = textPageLines.map { range -> lines[range.first].startOffset..lines[range.last].endOffset }
+        val textSentenceRanges = if (hasText) {
+            computeSentenceRanges(sentenceStartOffsets, textOffsetRanges.map { it.last })
+        } else {
+            emptyList()
+        }
+        // Comme sans image : une page de texte sans début de phrase (fin d'une
+        // très longue dernière phrase) n'est pas comptée.
+        val kept = sequence.indices.filter { i -> sequence[i].let { it == null || it < textSentenceRanges.size } }
+        return ComputedPages(
+            sentenceRanges = kept.map { i -> sequence[i]?.let { textSentenceRanges[it] } ?: IntRange.EMPTY },
+            offsetRanges = kept.map { i -> sequence[i]?.let { textOffsetRanges[it] } ?: IntRange.EMPTY },
+            images = kept.map { i -> sequenceImages[i] },
+        )
     }
 
     private fun computeSentenceRanges(sentenceStartOffsets: List<Int>, pageEndOffsets: List<Int>): List<IntRange> {
