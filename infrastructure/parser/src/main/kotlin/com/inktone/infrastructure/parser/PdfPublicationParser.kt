@@ -57,9 +57,23 @@ class PdfPublicationParser @Inject constructor(
     override suspend fun openForReading(publication: Publication): ParseResult = parse(publication.fileUri, extractCover = false)
 
     private suspend fun parse(fileUri: String, extractCover: Boolean): ParseResult = withContext(pdfiumDispatcher) {
-        val bytes = fileStorageService.openInputStream(fileUri)
-            ?.use { stream -> runCatching { stream.readBytes() }.getOrNull() }
-            ?: return@withContext ParseResult.Corrupted("Fichier introuvable ou illisible : $fileUri")
+        // Le PDF est chargé entièrement en mémoire : trop gros, l'échec d'allocation
+        // était présenté comme « Fichier introuvable ou illisible » (audit UX D24).
+        var tooLarge = false
+        val bytes = fileStorageService.openInputStream(fileUri)?.use { stream ->
+            try {
+                stream.readBytes()
+            } catch (e: OutOfMemoryError) {
+                tooLarge = true
+                null
+            } catch (e: Exception) {
+                null
+            }
+        }
+        if (tooLarge) {
+            return@withContext ParseResult.Corrupted("PDF trop volumineux pour être ouvert sur cet appareil : $fileUri")
+        }
+        bytes ?: return@withContext ParseResult.Corrupted("Fichier introuvable ou illisible : $fileUri")
 
         if (!hasPdfMagicBytes(bytes)) {
             return@withContext ParseResult.UnsupportedFormat("Signature PDF absente (extension usurpee ?)")
