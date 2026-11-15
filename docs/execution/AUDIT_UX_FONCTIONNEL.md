@@ -718,6 +718,7 @@ Vérification : « Appareil (adb) » = pilotée par adb sur le V2206, pas encore
 | A11 (**P1**) | Les préréglages restaurent l'état d'avant (`MIGRATION_35_36`) | `3af3a659` | Instrumenté (migration) + tests JVM |
 | A17 (**P1**) et A11, second volet | Réglette placée sur la ligne lue, masquée hors narration, avec son interrupteur | `fbb580d2` | Appareil (adb) |
 | D29 (a, b) | Crédit de lecture visuelle borné par le temps ; remis à zéro après un saut | `11081688` | Tests JVM |
+| B4 (PDF) | « Aller à la page » à la place du sommaire absent ; la barre de progression reste passive | `c4630bc3` | Appareil (adb) + tests JVM |
 
 **Vérifications sur appareil à faire par Issa** :
 - **B18** : mode défilement, auto-défilement jusqu'en fin de chapitre : il s'arrête.
@@ -726,10 +727,11 @@ Vérification : « Appareil (adb) » = pilotée par adb sur le V2206, pas encore
 - **D44** : voix système, livre en anglais : lu avec une phonétique anglaise.
 - **B15** : Bibliothèque, menu, « Synchroniser » : « Synchronisation en cours… » puis le résultat.
 - **A11** : activer puis désactiver « Accessibilité » et « Mode sombre » : réglages identiques à ceux d'avant.
+- **B4** : PDF, bouton à gauche du panneau : saisir un numéro de page.
 - **D56, D19** : couverts par des tests seulement.
 
 **Reste à traiter** :
-- **Nécessitent une décision de conception** : D75 (tourner la page au tap sur les bords ou aux touches de volume), B4 (sauter loin dans un livre), B5 (sommaire précis), B16 et B17 (luminosité, thème des panneaux).
+- **Nécessitent une décision de conception** : D75 (tourner la page au tap sur les bords ou aux touches de volume : change le geste actuel du tap, qui bascule les commandes), B5 (sommaire précis, touche l'analyse EPUB), B16 et B17 (luminosité, thème des panneaux), D65 (surlignage de phrase quand le mot est inconnu).
 - **Lourds** : D8 (recherche insensible aux accents : changer le tokeniseur FTS impose de réindexer toute la bibliothèque, soit plusieurs minutes pour 1,7 Go), D61 (suppressions et modifications non propagées entre appareils : tombes horodatées), D11, D4.
 - **Après implémentation d'ADR-027** (contexte textuel du `Locator`) : D12 à D17.
 - **D1** : décidé (pas de couverture ajoutée) ; demande la migration de l'index de chapitre (positions, signets, longueurs).
