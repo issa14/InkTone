@@ -137,7 +137,9 @@ class FilePreAnalysisStore @Inject constructor(
          * 5 : espaces regroupées comme en HTML (audit UX D14) : les offsets de TOUT le
          *     texte changent, les positions sont ré-ancrées par leur contexte (ADR-027).
          * 6 : texte inchangé ; force la réindexation de la recherche (tokeniseur unicode61, audit UX D8).
+         * 7 : listes, tableaux et citations en un bloc par élément (audit UX D13) : blocs et offsets changent,
+         *     les positions sont ré-ancrées par leur contexte (ADR-027).
          */
-        const val PARSER_VERSION = 6
+        const val PARSER_VERSION = 7
     }
 }

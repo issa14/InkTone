@@ -33,6 +33,39 @@ class JsoupChapterParserTest {
 
     // ---- Tests de normalisation des spans ----
 
+    // ---- Audit UX D13 : listes, tableaux et citations n'étaient plus fondus en un paragraphe ----
+
+    @Test
+    fun `chaque element de liste est un bloc`() {
+        val blocks = richBlocks(parse("<html><body><ul><li>Un</li><li>Deux</li></ul><ol><li>Trois</li></ol></body></html>"))
+            .filterIsInstance<BookBlock.ParagraphBlock>()
+        assertEquals(listOf("Un", "Deux", "Trois"), blocks.map { it.richText.plainText })
+    }
+
+    @Test
+    fun `chaque cellule d'un tableau est un bloc`() {
+        val html = "<html><body><table><thead><tr><th>Nom</th><th>Age</th></tr></thead>" +
+            "<tbody><tr><td>Anne</td><td>12</td></tr></tbody></table></body></html>"
+        val blocks = richBlocks(parse(html)).filterIsInstance<BookBlock.ParagraphBlock>()
+        assertEquals(listOf("Nom", "Age", "Anne", "12"), blocks.map { it.richText.plainText })
+    }
+
+    @Test
+    fun `une citation a plusieurs paragraphes garde un bloc par paragraphe, tous en citation`() {
+        val html = "<html><body><blockquote><p>Premier.</p><p>Second.</p></blockquote></body></html>"
+        val blocks = richBlocks(parse(html)).filterIsInstance<BookBlock.ParagraphBlock>()
+        assertEquals(listOf("Premier.", "Second."), blocks.map { it.richText.plainText })
+        assertTrue(blocks.all { it.isBlockquote })
+    }
+
+    @Test
+    fun `les plages de caracteres des blocs de liste ne se chevauchent pas`() {
+        val blocks = richBlocks(parse("<html><body><p>Avant.</p><ul><li>Un</li><li>Deux</li></ul></body></html>"))
+            .filterIsInstance<BookBlock.ParagraphBlock>()
+        val ranges = blocks.map { it.globalOffsetRange }
+        ranges.zipWithNext().forEach { (a, b) -> assertTrue("$a puis $b", a.last < b.first) }
+    }
+
     @Test
     fun `texte simple sans balise produit un ParagraphBlock sans spans`() {
         val html = "<html><body><p>Bonjour le monde.</p></body></html>"

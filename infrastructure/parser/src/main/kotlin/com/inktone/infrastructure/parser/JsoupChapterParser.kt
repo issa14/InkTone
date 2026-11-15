@@ -276,8 +276,17 @@ class JsoupChapterParser {
                     ),
                 )
             }
+            // Listes, tableaux : chaque élément devient son propre bloc (audit UX D13).
+            "ul", "ol", "dl", "table", "thead", "tbody", "tfoot", "tr" ->
+                extractContainerBlocks(element, runningOffset, chapterHref)
             "p", "blockquote", "li", "td", "th" -> {
-                if (element.selectFirst("img, svg") != null) {
+                if ((tagName == "blockquote" || tagName == "li") && hasBlockLevelChild(element)) {
+                    // Citation à plusieurs paragraphes, élément de liste contenant des
+                    // paragraphes ou une sous-liste : un bloc par enfant.
+                    extractContainerBlocks(element, runningOffset, chapterHref).map { block ->
+                        if (tagName == "blockquote" && block is BookBlock.ParagraphBlock) block.copy(isBlockquote = true) else block
+                    }
+                } else if (element.selectFirst("img, svg") != null) {
                     // Image inline (ou conteneur d'image) : scinder le flux
                     // en segments texte/image/texte.
                     extractInlineBlocks(element, runningOffset, chapterHref)
@@ -842,6 +851,7 @@ class JsoupChapterParser {
             "blockquote", "ul", "ol", "li", "table", "figure", "figcaption", "hr",
             "pre", "address", "details", "summary", "dl", "dt", "dd", "fieldset",
             "form", "center",
+            "tbody", "thead", "tfoot", "tr", "td", "th",
         )
 
         /** Cf. [isStandaloneBlockNode] — exclues de [BLOCK_LEVEL_TAGS] mais jamais fondues dans du texte inline. */
