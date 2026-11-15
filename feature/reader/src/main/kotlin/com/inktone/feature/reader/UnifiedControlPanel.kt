@@ -80,6 +80,8 @@ fun UnifiedControlPanel(
     // aucune table des matières (parsers -> tableOfContents vide) ; avant
     // le fix, le bouton Sommaire ouvrait une feuille vide sans message.
     showToc: Boolean = true,
+    // PDF : le même bouton ouvre « Aller à la page », il n'y a pas de sommaire (audit UX B4).
+    tocContentDescription: String = "Sommaire",
     // Contraste garanti avec la page de lecture par défaut (voir
     // ThemeColors.barSurface/barContent) — les défauts au thème chrome ne
     // servent qu'aux previews/tests qui n'ont pas de ReadingTheme.
@@ -118,7 +120,7 @@ fun UnifiedControlPanel(
             ) {
                 Box(Modifier.weight(1f), contentAlignment = Alignment.Center) {
                     if (showToc) {
-                        SecondaryAction(symbol = AppSymbol.Toc, contentDescription = "Sommaire", tint = iconTint, onClick = onTocClick)
+                        SecondaryAction(symbol = AppSymbol.Toc, contentDescription = tocContentDescription, tint = iconTint, onClick = onTocClick)
                     }
                 }
                 Box(Modifier.weight(1f), contentAlignment = Alignment.Center) {

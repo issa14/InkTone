@@ -392,6 +392,9 @@ fun ReaderScreen(
 
         val freeSelectedRange = state.freeSelectionRange
 
+        // Saisie d'un numéro de page (PDF), audit UX B4.
+        var showGoToPage by remember { mutableStateOf(false) }
+
         // A.1 / Tache 9bis.3.6 - position Y de la phrase active, LOCALE au
         // paragraphe qui la contient (voir ParagraphText.onCurrentLineY) —
         // sert la réglette de lecture. N'est plus une cible de défilement :
@@ -1353,7 +1356,10 @@ fun ReaderScreen(
                                 onSleepTimerClick = { chrome.keepHudVisible(); chrome.showSleepTimerPanel = true },
                                 onSearchClick = { chrome.keepHudVisible(); onSearchClick() },
                                 onBookmarksClick = { chrome.keepHudVisible(); viewModel.onIntent(ReaderIntent.ToggleBookmarkList) },
-                                onTocClick = { chrome.keepHudVisible(); viewModel.onIntent(ReaderIntent.ToggleToc) },
+                                onTocClick = {
+                                    chrome.keepHudVisible()
+                                    if (isPdf) showGoToPage = true else viewModel.onIntent(ReaderIntent.ToggleToc)
+                                },
                                 onThemeCycle = {
                                     chrome.keepHudVisible()
                                     viewModel.onIntent(ReaderIntent.SetReadingTheme(nextReadingTheme(state.effectiveSettings.theme)))
@@ -1368,7 +1374,8 @@ fun ReaderScreen(
                                 showTtsControls = state.supportsTts,
                                 showReadingModeToggle = !isPdf,
                                 // Audit v1.0.0 (M6) : pas de sommaire pour PDF/TXT.
-                                showToc = state.publicationFormat == PublicationFormat.EPUB,
+                                showToc = state.publicationFormat == PublicationFormat.EPUB || isPdf,
+                                tocContentDescription = if (isPdf) "Aller à une page" else "Sommaire",
                                 surfaceColor = ThemeColors.barSurface(state.resolvedTheme),
                                 accentColor = ThemeColors.accent(state.resolvedTheme),
                                 onBrightnessClick = {
@@ -1465,6 +1472,18 @@ fun ReaderScreen(
                     }
                 }
             }
+        }
+
+        if (showGoToPage) {
+            GoToPageDialog(
+                currentPage = state.currentChapterIndex + 1,
+                pageCount = state.chapters.size,
+                onGo = { pageIndex ->
+                    showGoToPage = false
+                    viewModel.onIntent(ReaderIntent.JumpToChapter(pageIndex))
+                },
+                onDismiss = { showGoToPage = false },
+            )
         }
 
         // B.2/3d.2 — Panneau réglages de typographie in-reader (TT). Le
