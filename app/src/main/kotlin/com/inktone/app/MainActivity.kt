@@ -42,9 +42,13 @@ import dagger.hilt.android.AndroidEntryPoint
 @AndroidEntryPoint
 class MainActivity : ComponentActivity() {
 
-    // Touches de volume pour tourner la page (audit UX D75), avant le système.
-    override fun dispatchKeyEvent(event: android.view.KeyEvent): Boolean =
-        com.inktone.feature.reader.VolumeKeyPageTurn.consume(event) || super.dispatchKeyEvent(event)
+    // Touches de volume pour tourner la page (audit UX D75), avant le système : retourner vrai ici
+    // l'empêche de régler le volume. `dispatchKeyEvent` est réservé à AndroidX (lint RestrictedApi).
+    override fun onKeyDown(keyCode: Int, event: android.view.KeyEvent): Boolean =
+        com.inktone.feature.reader.VolumeKeyPageTurn.consume(event) || super.onKeyDown(keyCode, event)
+
+    override fun onKeyUp(keyCode: Int, event: android.view.KeyEvent): Boolean =
+        com.inktone.feature.reader.VolumeKeyPageTurn.consume(event) || super.onKeyUp(keyCode, event)
 
 
     @OptIn(ExperimentalMaterial3WindowSizeClassApi::class)
