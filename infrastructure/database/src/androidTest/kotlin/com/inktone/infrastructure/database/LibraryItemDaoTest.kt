@@ -129,6 +129,17 @@ class LibraryItemDaoTest {
         assertEquals(setOf("an-1", "bm-2"), db.libraryItemDao().observe(null, "Autre", false, testLimit).first().map { it.id }.toSet())
     }
 
+    // Audit UX D66 : la requête reçoit un motif déjà échappé (`\\%`), le joker
+    // saisi ne correspond plus à « n'importe quoi ».
+    @Test
+    fun observe_traite_un_pourcent_echappe_comme_un_caractere_et_non_un_joker() = runTest {
+        insertPublication("pub-1", "Livre")
+        insertBookmark("bm-1", "pub-1", createdAt = 100, excerpt = "50% de remise")
+        insertBookmark("bm-2", "pub-1", createdAt = 200, excerpt = "500 pages")
+
+        assertEquals(listOf("bm-1"), db.libraryItemDao().observe(null, "50\\%", false, testLimit).first().map { it.id })
+    }
+
     @Test
     fun observe_epingle_remonte_en_tete_quel_que_soit_le_tri() = runTest {
         insertPublication("pub-1", "B livre")

@@ -21,8 +21,12 @@ class RoomLibraryItemRepository @Inject constructor(
         limit: Int,
     ): Flow<List<LibraryItem>> = dao.observe(
         typeFilter = filter.toSqlTypeFilter(),
-        searchQuery = searchQuery,
+        searchQuery = searchQuery.escapedForLike(),
         alphabetical = sortOrder == LibraryItemSortOrder.ALPHABETICAL,
         limit = limit,
     ).map { list -> list.map { it.toDomain() } }
 }
+
+/** Neutralise les jokers de `LIKE` : « 50% » ou « a_b » se cherchent tels quels (audit UX D66). */
+internal fun String.escapedForLike(): String =
+    replace("\\", "\\\\").replace("%", "\\%").replace("_", "\\_")

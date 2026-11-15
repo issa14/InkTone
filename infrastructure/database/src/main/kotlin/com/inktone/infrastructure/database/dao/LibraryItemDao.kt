@@ -27,9 +27,9 @@ interface LibraryItemDao {
                 OR (:typeFilter = 'HIGHLIGHT' AND type = 'annotation' AND note IS NULL)
                 OR (:typeFilter = 'NOTE' AND type = 'annotation' AND note IS NOT NULL))
             AND (:searchQuery = ''
-                OR excerpt LIKE '%' || :searchQuery || '%'
-                OR note LIKE '%' || :searchQuery || '%'
-                OR publicationTitle LIKE '%' || :searchQuery || '%')
+                OR excerpt LIKE '%' || :searchQuery || '%' ESCAPE '\'
+                OR note LIKE '%' || :searchQuery || '%' ESCAPE '\'
+                OR publicationTitle LIKE '%' || :searchQuery || '%' ESCAPE '\')
         ORDER BY
             isPinned DESC,
             CASE WHEN :alphabetical THEN publicationTitle END ASC,
