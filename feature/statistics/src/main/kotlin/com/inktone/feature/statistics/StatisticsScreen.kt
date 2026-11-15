@@ -177,6 +177,16 @@ private fun DashboardContent(state: com.inktone.domain.usecase.StatisticsUiState
             bottom = WindowInsets.navigationBars.asPaddingValues().calculateBottomPadding(),
         ),
     ) {
+        // Compte neuf : une phrase plutôt que des zéros seuls (audit UX C13).
+        if (isStatisticsEmpty(state.kpi, state.currentBook)) {
+            item {
+                Text(
+                    "Aucune lecture enregistrée pour l'instant : vos statistiques apparaîtront ici dès votre première session.",
+                    style = MaterialTheme.typography.bodyMedium,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                )
+            }
+        }
         item { Section1Kpis(state.kpi) }
         item { Section2Charts(state.activity, onPeriodSelected = viewModel::onPeriodSelected) }
         if (state.currentBook != null) {
@@ -783,3 +793,10 @@ private fun StatCard(icon: AppSymbol, label: String, value: String, modifier: Mo
         }
     }
 }
+
+/** Vrai pour un compte sans aucune lecture : ni temps, ni livre fini, ni livre en cours (audit UX C13). */
+internal fun isStatisticsEmpty(kpi: com.inktone.domain.usecase.KpiState, currentBook: com.inktone.domain.usecase.CurrentBookState?): Boolean =
+    currentBook == null && kpi.booksFinished == 0 && kpi.todayReadingMinutes == 0L &&
+        kpi.totalVisualTimeFormatted == EMPTY_DURATION && kpi.totalTtsTimeFormatted == EMPTY_DURATION
+
+private const val EMPTY_DURATION = "0h 0m"
