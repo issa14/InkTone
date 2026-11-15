@@ -595,9 +595,11 @@ class PlaybackOrchestrator @Inject constructor(
                 .coerceAtLeast(0)
 
             val prefs = preferencesRepository.get()
-            val voiceProfile = prefs.activeVoiceProfileId
-                ?.let { voiceProfileRepository.getById(it) }
-                ?: VoiceProfile.defaultFor(prefs)
+            val voiceProfile = (
+                prefs.activeVoiceProfileId
+                    ?.let { voiceProfileRepository.getById(it) }
+                    ?: VoiceProfile.defaultFor(prefs)
+                ).withBookLanguage(publication.language)
 
             setMetadata(
                 publicationId = publication.id,

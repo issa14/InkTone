@@ -25,6 +25,19 @@ data class VoiceProfile(
         require(pitch > 0f) { "pitch doit être strictement positif" }
     }
 
+    /**
+     * Ce profil, parlant la langue du livre quand c'est la voix système : elle
+     * lit toutes les langues installées, alors que les modèles neuronaux et les
+     * voix Edge sont propres à une langue. Pour la narration seulement — le
+     * résultat ne doit jamais être enregistré comme profil (audit UX D44).
+     */
+    fun withBookLanguage(bookLanguage: String?): VoiceProfile =
+        if (engine == TtsEngineId.ANDROID_NATIVE && !bookLanguage.isNullOrBlank()) {
+            copy(language = bookLanguage.trim())
+        } else {
+            this
+        }
+
     companion object {
         /**
          * Bornes proposées dans les deux écrans qui règlent la voix (audit UX

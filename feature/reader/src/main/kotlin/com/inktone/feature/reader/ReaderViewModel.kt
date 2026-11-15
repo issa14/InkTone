@@ -662,6 +662,9 @@ class ReaderViewModel @Inject constructor(
      * ligne dans `playCurrentSentence` uniquement, aucune autre fonction
      * n'avait besoin de connaître le profil actif.
      */
+    /** Langue déclarée du livre ouvert, pour la voix système (audit UX D44). */
+    private var bookLanguage: String? = null
+
     private suspend fun resolveVoiceProfile(prefs: UserPreferences): VoiceProfile =
         prefs.activeVoiceProfileId
             ?.let { voiceProfileRepository.getById(it) }
@@ -738,6 +741,7 @@ class ReaderViewModel @Inject constructor(
             when (val result = publicationParser.openForReading(publication)) {
                 is ParseResult.Success -> {
                     currentPublicationId = publicationId
+                    bookLanguage = publication.language
 
                     // Lot 17, tâche 1 — écrit lastOpened à l'ouverture : la
                     // carte « Reprendre la lecture » (LibraryUiState) dérive de
@@ -1550,7 +1554,7 @@ class ReaderViewModel @Inject constructor(
 
         viewModelScope.launch {
             val prefs = preferencesRepository.get()
-            val voiceProfile = resolveVoiceProfile(prefs)
+            val voiceProfile = resolveVoiceProfile(prefs).withBookLanguage(bookLanguage)
             playbackOrchestrator.play(
                 sentences = sentences,
                 voiceProfile = voiceProfile,

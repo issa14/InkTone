@@ -86,7 +86,12 @@ class AndroidNativeTtsEngine @Inject constructor(
 
     override suspend fun synthesize(sentence: Sentence, voiceProfile: VoiceProfile): AudioSegment {
         val engine = ensureInitialized()
-        engine.language = Locale.FRENCH
+        // Langue du livre quand elle est installée, français sinon : un livre en
+        // anglais n'est plus lu avec une phonétique française (audit UX D44).
+        val availability = engine.setLanguage(nativeLocaleFor(voiceProfile.language))
+        if (availability == TextToSpeech.LANG_MISSING_DATA || availability == TextToSpeech.LANG_NOT_SUPPORTED) {
+            engine.language = Locale.FRENCH
+        }
         val utteranceId = UUID.randomUUID().toString()
         val outputFile = File(context.cacheDir, "tts-$utteranceId.wav")
         val boundaries = mutableListOf<WordBoundary>()
@@ -199,4 +204,19 @@ internal fun resolveWordBoundary(start: Int, end: Int, frame: Int, textLength: I
         isValidRange(end, frame) -> WordBoundary(charStart = end, charEnd = frame, audioFrame = start)
         else -> null
     }
+}
+
+/**
+ * Locale de la voix système pour [language] (`fr-FR`, `en`, ou un code ISO 639-2
+ * à trois lettres comme `eng`, courant dans les EPUB). Français si le code est
+ * vide ou illisible.
+ */
+internal fun nativeLocaleFor(language: String): Locale {
+    val tag = Locale.forLanguageTag(language.trim().replace('_', '-'))
+    if (tag.language.isBlank()) return Locale.FRENCH
+    if (tag.language.length == 3) {
+        val twoLetters = Locale.getAvailableLocales().firstOrNull { runCatching { it.isO3Language }.getOrNull() == tag.language }
+        if (twoLetters != null) return Locale(twoLetters.language, tag.country)
+    }
+    return tag
 }
