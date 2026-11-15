@@ -13,7 +13,7 @@ fun Publication.toEntity(): PublicationEntity = PublicationEntity(
     pageCount = pageCount, chapterLengths = chapterLengths?.toColumn(),
     seriesName = seriesName, seriesIndex = seriesIndex, isFavorite = isFavorite,
     isPinned = isPinned, subjects = subjects, isDrmProtected = isDrmProtected,
-    importDate = importDate, lastOpened = lastOpened,
+    importDate = importDate, lastOpened = lastOpened, locatorAnchorVersion = locatorAnchorVersion,
 )
 
 fun PublicationEntity.toDomain(): Publication = Publication(
@@ -24,7 +24,7 @@ fun PublicationEntity.toDomain(): Publication = Publication(
     pageCount = pageCount, chapterLengths = chapterLengthsFromColumn(chapterLengths, chapterCount),
     seriesName = seriesName, seriesIndex = seriesIndex, isFavorite = isFavorite,
     isPinned = isPinned, subjects = subjects, isDrmProtected = isDrmProtected,
-    importDate = importDate, lastOpened = lastOpened,
+    importDate = importDate, lastOpened = lastOpened, locatorAnchorVersion = locatorAnchorVersion,
 )
 
 /** CSV d'entiers, dans l'ordre de lecture (`"0,1520,8840"`). */

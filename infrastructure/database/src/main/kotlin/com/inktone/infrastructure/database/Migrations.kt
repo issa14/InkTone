@@ -591,3 +591,22 @@ val MIGRATION_36_37 = object : Migration(36, 37) {
         db.execSQL("ALTER TABLE user_preferences ADD COLUMN volumeKeysTurnPages INTEGER NOT NULL DEFAULT 0")
     }
 }
+
+/**
+ * Contexte textuel des positions et version d'ancrage des livres (ADR-027) : de
+ * quoi retrouver un signet ou un surlignage quand le texte extrait d'un chapitre
+ * change. Colonnes nulles, rattrapées en tâche de fond.
+ */
+val MIGRATION_37_38 = object : Migration(37, 38) {
+    override fun migrate(db: SupportSQLiteDatabase) {
+        db.execSQL("ALTER TABLE reading_states ADD COLUMN textBefore TEXT DEFAULT NULL")
+        db.execSQL("ALTER TABLE reading_states ADD COLUMN textAfter TEXT DEFAULT NULL")
+        db.execSQL("ALTER TABLE bookmarks ADD COLUMN textBefore TEXT DEFAULT NULL")
+        db.execSQL("ALTER TABLE bookmarks ADD COLUMN textAfter TEXT DEFAULT NULL")
+        db.execSQL("ALTER TABLE annotations ADD COLUMN startTextBefore TEXT DEFAULT NULL")
+        db.execSQL("ALTER TABLE annotations ADD COLUMN startTextAfter TEXT DEFAULT NULL")
+        db.execSQL("ALTER TABLE annotations ADD COLUMN endTextBefore TEXT DEFAULT NULL")
+        db.execSQL("ALTER TABLE annotations ADD COLUMN endTextAfter TEXT DEFAULT NULL")
+        db.execSQL("ALTER TABLE publications ADD COLUMN locatorAnchorVersion INTEGER NOT NULL DEFAULT 0")
+    }
+}

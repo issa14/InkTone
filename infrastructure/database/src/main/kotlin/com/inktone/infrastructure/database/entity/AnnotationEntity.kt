@@ -32,4 +32,9 @@ data class AnnotationEntity(
     val isPinned: Boolean = false,
     val createdAt: Long,
     val updatedAt: Long,
+    // Contexte textuel de chaque borne (ADR-027, MIGRATION_37_38).
+    val startTextBefore: String? = null,
+    val startTextAfter: String? = null,
+    val endTextBefore: String? = null,
+    val endTextAfter: String? = null,
 )

@@ -17,13 +17,15 @@ fun Annotation.toEntity(): AnnotationEntity {
         endParagraphIndex = end.paragraphIndex, endCharOffset = end.charOffset,
         color = color.toHex(), kind = kind.name, content = content, excerpt = excerpt, isPinned = isPinned,
         createdAt = createdAt, updatedAt = updatedAt,
+        startTextBefore = start.textBefore, startTextAfter = start.textAfter,
+        endTextBefore = end.textBefore, endTextAfter = end.textAfter,
     )
 }
 
 fun AnnotationEntity.toDomain(): Annotation = Annotation(
     id = id, publicationId = publicationId,
-    startLocator = LocatorColumns(startResourceHref, startChapterIndex, startParagraphIndex, startCharOffset).toLocator(),
-    endLocator = LocatorColumns(endResourceHref, endChapterIndex, endParagraphIndex, endCharOffset).toLocator(),
+    startLocator = LocatorColumns(startResourceHref, startChapterIndex, startParagraphIndex, startCharOffset, textBefore = startTextBefore, textAfter = startTextAfter).toLocator(),
+    endLocator = LocatorColumns(endResourceHref, endChapterIndex, endParagraphIndex, endCharOffset, textBefore = endTextBefore, textAfter = endTextAfter).toLocator(),
     color = AnnotationColor.parse(color), kind = AnnotationKind.valueOf(kind), content = content, excerpt = excerpt, isPinned = isPinned,
     createdAt = createdAt, updatedAt = updatedAt,
 )

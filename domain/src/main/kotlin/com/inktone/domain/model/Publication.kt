@@ -47,6 +47,8 @@ data class Publication(
     val isDrmProtected: Boolean = false,
     val importDate: Long,
     val lastOpened: Long? = null,
+    /** Version du parseur pour laquelle les positions de ce livre sont ancrées (ADR-027) ; 0 = pas encore. */
+    val locatorAnchorVersion: Int = 0,
 ) {
     init {
         require(title.isNotBlank()) { "title ne peut pas être vide" }

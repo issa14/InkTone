@@ -25,4 +25,7 @@ data class BookmarkEntity(
     val excerpt: String? = null,
     val isPinned: Boolean = false,
     val createdAt: Long,
+    // Contexte textuel de la position (ADR-027, MIGRATION_37_38).
+    val textBefore: String? = null,
+    val textAfter: String? = null,
 )

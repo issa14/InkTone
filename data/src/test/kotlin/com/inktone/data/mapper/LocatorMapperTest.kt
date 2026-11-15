@@ -2,6 +2,7 @@ package com.inktone.data.mapper
 
 import com.inktone.domain.model.ReadingState
 import com.inktone.domain.valueobject.Locator
+import com.inktone.domain.valueobject.LocatorText
 import org.junit.Assert.assertEquals
 import org.junit.Test
 
@@ -31,5 +32,24 @@ class LocatorMapperTest {
             lastReadAt = 1_000L,
         )
         assertEquals(state, state.toEntity().toDomain())
+    }
+
+    /** ADR-027 : le contexte textuel survit à l'enregistrement, sans entrer dans l'égalité. */
+    @Test
+    fun `le contexte textuel fait l'aller-retour des colonnes`() {
+        val original = Locator(
+            resourceHref = "ch1.xhtml", chapterIndex = 1, charOffset = 40,
+            text = LocatorText(before = "avant le point", after = "après le point"),
+        )
+        val roundTripped = original.toColumns().toLocator()
+
+        assertEquals(original.text, roundTripped.text)
+        assertEquals(original, roundTripped)
+    }
+
+    @Test
+    fun `un contexte a moitie lisible vaut aucun contexte`() {
+        val columns = LocatorColumns("ch1.xhtml", 0, null, 5, textBefore = "seul avant", textAfter = null)
+        assertEquals(null, columns.toLocator().text)
     }
 }

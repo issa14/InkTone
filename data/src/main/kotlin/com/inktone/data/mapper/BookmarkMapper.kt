@@ -10,11 +10,12 @@ fun Bookmark.toEntity(): BookmarkEntity {
         resourceHref = cols.resourceHref, chapterIndex = cols.chapterIndex,
         paragraphIndex = cols.paragraphIndex, charOffset = cols.charOffset,
         title = title, note = note, excerpt = excerpt, isPinned = isPinned, createdAt = createdAt,
+        textBefore = cols.textBefore, textAfter = cols.textAfter,
     )
 }
 
 fun BookmarkEntity.toDomain(): Bookmark = Bookmark(
     id = id, publicationId = publicationId,
-    locator = LocatorColumns(resourceHref, chapterIndex, paragraphIndex, charOffset).toLocator(),
+    locator = LocatorColumns(resourceHref, chapterIndex, paragraphIndex, charOffset, textBefore = textBefore, textAfter = textAfter).toLocator(),
     title = title, note = note, excerpt = excerpt, isPinned = isPinned, createdAt = createdAt,
 )

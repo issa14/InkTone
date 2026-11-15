@@ -1479,6 +1479,51 @@ class DatabaseMigrationTest {
         v37.close()
     }
 
+    // Contexte textuel des positions et version d'ancrage (MIGRATION_37_38, ADR-027) :
+    // les positions existantes sont conservées, sans contexte, et les livres
+    // n'ont encore aucune version d'ancrage.
+    @Test
+    fun migration_37_vers_38_ajoute_le_contexte_textuel_sans_toucher_aux_positions() {
+        val v37 = helper.createDatabase(TEST_DB_NAME, 37)
+        v37.execSQL(
+            """
+            INSERT INTO publications (id, title, authors, format, fileUri, fileHash, fileSize, chapterCount, subjects, isFavorite, isPinned, isDrmProtected, importDate, lastOpened)
+            VALUES ('pub-1', 'Titre', '', 'EPUB', 'content://pub-1', 'hash1', 1000, 3, '', 0, 0, 0, 500, 900)
+            """.trimIndent(),
+        )
+        v37.execSQL(
+            "INSERT INTO reading_states (publicationId, resourceHref, chapterIndex, paragraphIndex, charOffset, lastReadAt, voiceProfileId, overrideTheme, overrideFontSize) " +
+                "VALUES ('pub-1', 'ch2.xhtml', 2, NULL, 123, 1000, NULL, NULL, NULL)",
+        )
+        v37.close()
+
+        val v38 = helper.runMigrationsAndValidate(
+            TEST_DB_NAME, 38, true,
+            MIGRATION_1_2, MIGRATION_2_3, MIGRATION_3_4, MIGRATION_4_5, MIGRATION_5_6, MIGRATION_6_7,
+            MIGRATION_7_8, MIGRATION_8_9, MIGRATION_9_10, MIGRATION_10_11, MIGRATION_11_12, MIGRATION_12_13,
+            MIGRATION_13_14, MIGRATION_14_15, MIGRATION_15_16, MIGRATION_16_17, MIGRATION_17_18, MIGRATION_18_19,
+            MIGRATION_19_20, MIGRATION_20_21, MIGRATION_21_22, MIGRATION_22_23, MIGRATION_23_24, MIGRATION_24_25,
+            MIGRATION_25_26, MIGRATION_26_27, MIGRATION_27_28, MIGRATION_28_29, MIGRATION_29_30, MIGRATION_30_31,
+            MIGRATION_31_32, MIGRATION_32_33, MIGRATION_33_34, MIGRATION_34_35, MIGRATION_35_36, MIGRATION_36_37,
+            MIGRATION_37_38,
+        )
+
+        v38.query("SELECT charOffset, textBefore, textAfter FROM reading_states WHERE publicationId = 'pub-1'").use { cursor ->
+            assertEquals(true, cursor.moveToFirst())
+            assertEquals(123, cursor.getInt(0))
+            assertEquals(true, cursor.isNull(1))
+            assertEquals(true, cursor.isNull(2))
+        }
+        v38.query("SELECT locatorAnchorVersion FROM publications WHERE id = 'pub-1'").use { cursor ->
+            cursor.moveToFirst()
+            assertEquals(0, cursor.getInt(0))
+        }
+        // Les colonnes des signets et des bornes d'annotation existent.
+        v38.query("SELECT textBefore, textAfter FROM bookmarks").use { it.count }
+        v38.query("SELECT startTextBefore, startTextAfter, endTextBefore, endTextAfter FROM annotations").use { it.count }
+        v38.close()
+    }
+
     companion object {
         private const val TEST_DB_NAME = "migration-test"
     }

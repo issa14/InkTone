@@ -33,4 +33,7 @@ data class ReadingStateEntity(
     val overrideFontSize: Int?,
     /** Défilement vertical dans la page d'un PDF (`Locator.pageOffsetY`), nul ailleurs. */
     val pageOffsetY: Float? = null,
+    // Contexte textuel de la position (ADR-027, MIGRATION_37_38), nul tant qu'il n'est pas capturé.
+    val textBefore: String? = null,
+    val textAfter: String? = null,
 )
