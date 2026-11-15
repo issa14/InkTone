@@ -175,8 +175,11 @@ class ReaderViewModel @Inject constructor(
                             isPlaying = false, isAudioActive = false,
                         )
                     }
+                    // La synthèse de la narration de ce livre est une lecture
+                    // engagée : l'`Idle` qui la précède quand une autre narration
+                    // est arrêtée ne doit pas laisser le bouton sur Play (D36).
                     PlaybackOrchestrator.PlaybackStatus.Buffering ->
-                        _state.value = _state.value.copy(isAudioActive = false)
+                        _state.value = _state.value.copy(isAudioActive = false, isPlaying = true)
                     PlaybackOrchestrator.PlaybackStatus.Playing -> {
                         // P1 — isPlaying = true ici (et pas seulement dans
                         // playCurrentSentence) : une reprise déclenchée par la
@@ -1630,7 +1633,9 @@ class ReaderViewModel @Inject constructor(
         _highlightedWordRange.value = null
         _state.value = _state.value.copy(isPlaying = false, isAudioActive = false)
         highlightJob?.cancel()
-        playbackOrchestrator.stop()
+        // La narration d'un autre livre n'appartient pas à ce Lecteur : ses
+        // navigations (position enregistrée, signet, chapitre) n'y touchent pas (D36).
+        if (!narratesAnotherBook()) playbackOrchestrator.stop()
 
         // ───── Lot Sessions : retour en mode visuel ─────
         sessionTracker?.switchMode(DomainReadingMode.VISUAL)

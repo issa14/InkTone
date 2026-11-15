@@ -20,6 +20,7 @@ import com.inktone.domain.model.ChapterContent
 import com.inktone.domain.model.DocumentModel
 import com.inktone.domain.model.Publication
 import com.inktone.domain.model.PublicationFormat
+import com.inktone.domain.model.ReadingState
 import com.inktone.domain.model.Sentence
 import com.inktone.domain.model.StyledText
 import com.inktone.domain.model.TtsEngineId
@@ -130,7 +131,7 @@ class ReaderViewModelNarrationOwnershipTest {
         FakePronunciationRuleRepository(),
     )
 
-    private suspend fun openBook(id: String): ReaderViewModel {
+    private suspend fun openBook(id: String, savedPosition: Locator? = null): ReaderViewModel {
         val preferencesRepository = FakePreferencesRepository()
         preferencesRepository.update(UserPreferences(eyeRestReminderEnabled = false))
         val publicationRepository = FakePublicationRepository()
@@ -145,6 +146,7 @@ class ReaderViewModelNarrationOwnershipTest {
             Chapter(index = index, href = href, title = null, content = ChapterContent.Rich(blocks = emptyList()))
         }
         val readingStateRepository = FakeReadingStateRepository()
+        savedPosition?.let { readingStateRepository.save(ReadingState(publicationId = id, locator = it, lastReadAt = 0L)) }
         val annotationRepository = FakeAnnotationRepository()
         val viewModel = ReaderViewModel(
             ttsEngine = FakeTtsEngine(),
@@ -233,6 +235,52 @@ class ReaderViewModelNarrationOwnershipTest {
             assertEquals("livre-a", orchestrator.metadata.value.publicationId)
             assertFalse(viewModel.state.value.isPlaying)
             assertEquals("B reste à sa propre position", 0, viewModel.state.value.currentChapterIndex)
+        } finally {
+            cleanUp(viewModel)
+        }
+    }
+
+    /**
+     * Audit UX D36, vu sur appareil : B se place sur sa position enregistrée,
+     * et cette navigation arrêtait la narration de A.
+     */
+    @Test
+    fun ouvrir_un_autre_livre_a_sa_position_enregistree_n_arrete_pas_la_narration() = runTest {
+        narrate("livre-a", chapterIndex = 1, startFrom = 0)
+
+        val viewModel = openBook(
+            "livre-b",
+            savedPosition = Locator(resourceHref = "ch2.xhtml", chapterIndex = 2, charOffset = 25),
+        )
+        try {
+            assertTrue("la narration de A continue", orchestrator.isSessionEngaged())
+            assertEquals("livre-a", orchestrator.narratedPublicationId)
+            assertEquals("B rejoint sa position enregistrée", 2, viewModel.state.value.currentChapterIndex)
+            assertEquals(1, viewModel.state.value.currentSentenceIndex)
+            assertFalse(viewModel.state.value.isPlaying)
+        } finally {
+            cleanUp(viewModel)
+        }
+    }
+
+    /**
+     * Audit UX D36, vu sur appareil : lancer B pendant la narration de A fait
+     * passer l'ordonnanceur par `Idle` (arrêt de A, publié une fois la piste
+     * libérée) puis `Buffering`. Le Lecteur de B se disait arrêté pendant toute
+     * la synthèse, et chaque nouvel appui sur Play relançait la préparation.
+     * La séquence est rejouée ici état par état, telle que l'appareil la livre.
+     */
+    @Test
+    fun la_synthese_de_la_narration_de_ce_livre_compte_comme_lecture() = runTest {
+        narrate("livre-a", chapterIndex = 1, startFrom = 0)
+        val viewModel = openBook("livre-b")
+        try {
+            orchestrator.stop()
+            dispatcher.scheduler.runCurrent()
+            narrate("livre-b", chapterIndex = 0, startFrom = 0)
+            dispatcher.scheduler.runCurrent()
+
+            assertTrue("B est en lecture pendant sa synthèse", viewModel.state.value.isPlaying)
         } finally {
             cleanUp(viewModel)
         }
