@@ -3,9 +3,11 @@ package com.inktone.data.export
 import android.content.Context
 import com.inktone.domain.service.ExportFormat
 import com.inktone.domain.service.StatisticsExportService
+import com.inktone.infrastructure.database.dao.PublicationDao
 import com.inktone.infrastructure.database.dao.ReadingSessionDao
 import dagger.hilt.android.qualifiers.ApplicationContext
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.withContext
 import org.json.JSONArray
 import org.json.JSONObject
@@ -16,6 +18,7 @@ import javax.inject.Singleton
 @Singleton
 class ExportStatisticsUseCase @Inject constructor(
     private val readingSessionDao: ReadingSessionDao,
+    private val publicationDao: PublicationDao,
     @ApplicationContext private val context: Context,
 ) : StatisticsExportService {
 
@@ -24,6 +27,9 @@ class ExportStatisticsUseCase @Inject constructor(
 
     private suspend fun export(format: ExportFormat): File = withContext(Dispatchers.IO) {
         val sessions = readingSessionDao.getAll()
+        // Titres des livres encore en bibliothèque : une session d'un livre retiré
+        // garde son identifiant, sans titre (audit UX D38).
+        val titles = publicationDao.observeAll().first().associate { it.id to it.title }
         val dir = File(context.cacheDir, "exports")
         dir.mkdirs()
 
@@ -38,9 +44,12 @@ class ExportStatisticsUseCase @Inject constructor(
 
         val content = when (format) {
             ExportFormat.CSV -> buildString {
-                appendLine("id,publicationId,startTimestamp,endTimestamp,visualDurationMs,ttsDurationMs")
+                appendLine("id,publicationId,title,startTimestamp,endTimestamp,visualDurationMs,ttsDurationMs,wordsRead")
                 sessions.forEach { s ->
-                    appendLine("${s.id.escapeCsv()},${s.publicationId.escapeCsv()},${s.startedAt},${s.endedAt ?: ""},${s.visualDurationMs},${s.ttsDurationMs}")
+                    appendLine(
+                        "${s.id.escapeCsv()},${s.publicationId.escapeCsv()},${(titles[s.publicationId] ?: "").escapeCsv()}," +
+                            "${s.startedAt},${s.endedAt ?: ""},${s.visualDurationMs},${s.ttsDurationMs},${s.wordsRead}",
+                    )
                 }
             }
             ExportFormat.JSON -> {
@@ -49,10 +58,12 @@ class ExportStatisticsUseCase @Inject constructor(
                     array.put(JSONObject().apply {
                         put("id", s.id)
                         put("publicationId", s.publicationId)
+                        put("title", titles[s.publicationId] ?: JSONObject.NULL)
                         put("startTimestamp", s.startedAt)
                         put("endTimestamp", s.endedAt ?: JSONObject.NULL)
                         put("visualDurationMs", s.visualDurationMs)
                         put("ttsDurationMs", s.ttsDurationMs)
+                        put("wordsRead", s.wordsRead)
                     })
                 }
                 array.toString(2)

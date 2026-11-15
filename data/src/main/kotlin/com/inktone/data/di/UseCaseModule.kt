@@ -66,6 +66,7 @@ import com.inktone.domain.usecase.TogglePinUseCase
 import com.inktone.domain.usecase.UpdateReadingStateUseCase
 import com.inktone.domain.usecase.UpdateAnnotationUseCase
 import com.inktone.domain.usecase.UpdateBookmarkNoteUseCase
+import com.inktone.infrastructure.database.dao.PublicationDao
 import com.inktone.infrastructure.database.dao.ReadingSessionDao
 import dagger.Module
 import dagger.Provides
@@ -281,8 +282,9 @@ object UseCaseModule {
     @Singleton
     fun provideStatisticsExportService(
         readingSessionDao: ReadingSessionDao,
+        publicationDao: PublicationDao,
         @ApplicationContext context: Context,
-    ): StatisticsExportService = ExportStatisticsUseCase(readingSessionDao, context)
+    ): StatisticsExportService = ExportStatisticsUseCase(readingSessionDao, publicationDao, context)
 
     @Provides
     fun provideGetCatalogsUseCase(

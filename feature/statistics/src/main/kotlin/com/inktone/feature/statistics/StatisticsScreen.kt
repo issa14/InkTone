@@ -110,7 +110,13 @@ fun StatisticsScreen(
                         putExtra(Intent.EXTRA_STREAM, uri)
                         addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION)
                     }
-                    context.startActivity(intent)
+                    // Sélecteur de partage, et aucun plantage sans application cible
+                    // (audit UX D38).
+                    try {
+                        context.startActivity(Intent.createChooser(intent, "Partager les statistiques"))
+                    } catch (e: android.content.ActivityNotFoundException) {
+                        Toast.makeText(context, "Aucune application ne peut recevoir ce fichier", Toast.LENGTH_LONG).show()
+                    }
                 }
                 is ExportEvent.Error -> {
                     Toast.makeText(context, event.message, Toast.LENGTH_LONG).show()
