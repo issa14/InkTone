@@ -7,6 +7,7 @@ import com.inktone.domain.repository.ReadingSessionRepository
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.async
 import kotlinx.coroutines.coroutineScope
+import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.flow
 import kotlinx.coroutines.flow.flowOn
@@ -54,10 +55,23 @@ class GetStatisticsUseCase(
     private val readingSessionRepository: ReadingSessionRepository,
     private val publicationRepository: PublicationRepository,
     private val clock: Clock = Clock.systemDefaultZone(),
+    /**
+     * Intervalle de recalcul pendant que le flux est observé, `null` pour une seule
+     * émission. Les statistiques n'étaient calculées qu'une fois à l'affichage : une
+     * narration en cours ne les faisait pas évoluer (audit UX D34).
+     */
+    private val refreshIntervalMs: Long? = null,
 ) {
     /** Retourne un Flow pour intégration directe dans `combine()` — pas de `flow { emit() }` wrapper dans le ViewModel. */
     operator fun invoke(): Flow<StatisticsResult> = flow {
-        val result = coroutineScope {
+        while (true) {
+            emit(compute())
+            delay(refreshIntervalMs ?: break)
+        }
+    }.flowOn(Dispatchers.Default)
+
+    private suspend fun compute(): StatisticsResult =
+        coroutineScope {
             val thirtyDaysAgo = clock.millis() - TimeUnit.DAYS.toMillis(30)
             // Tache 7.4 — 60 jours pour permettre la comparaison mois courant / mois
             // precedent (30 vs 30) en plus de la comparaison semaine (7 vs 7).
@@ -113,8 +127,6 @@ class GetStatisticsUseCase(
                 peakSlotIndex = peakSlotIndex,
             )
         }
-        emit(result)
-    }.flowOn(Dispatchers.Default)
 
     // ───── Streak (sur des epochDays, pas des timestamps) ─────
 

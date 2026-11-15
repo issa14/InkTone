@@ -8,6 +8,7 @@ import com.inktone.domain.model.PublicationFormat
 import com.inktone.domain.model.ReadingMode
 import com.inktone.domain.model.ReadingSession
 import kotlinx.coroutines.flow.first
+import kotlinx.coroutines.flow.take
 import kotlinx.coroutines.test.runTest
 import org.junit.After
 import org.junit.Assert.assertEquals
@@ -258,5 +259,29 @@ class GetStatisticsUseCaseTest {
     fun pic_absent_sans_donnees() = runTest {
         val useCase = GetStatisticsUseCase(FakeReadingSessionRepository(), FakePublicationRepository())
         assertEquals(null, useCase.computePeakSlotIndex(emptyList()))
+    }
+
+    /** Audit UX D34 : les statistiques n'évoluaient pas pendant que l'écran était affiché. */
+    @Test
+    fun avec_un_intervalle_les_statistiques_se_recalculent() = kotlinx.coroutines.runBlocking {
+        val readingSessionRepository = FakeReadingSessionRepository()
+        val useCase = GetStatisticsUseCase(
+            readingSessionRepository, FakePublicationRepository(), refreshIntervalMs = 20L,
+        )
+        val results = mutableListOf<StatisticsResult>()
+        useCase().take(2).collect { result ->
+            results += result
+            if (results.size == 1) {
+                readingSessionRepository.insert(
+                    ReadingSession(
+                        id = "s1", publicationId = "p", startedAt = 0L, endedAt = 1000L,
+                        mode = ReadingMode.VISUAL, visualDurationMs = 1000L,
+                    ),
+                )
+            }
+        }
+
+        assertEquals(0L, results[0].totalVisualMs)
+        assertEquals(1000L, results[1].totalVisualMs)
     }
 }

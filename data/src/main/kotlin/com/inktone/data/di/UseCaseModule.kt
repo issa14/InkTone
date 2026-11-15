@@ -257,7 +257,7 @@ object UseCaseModule {
         readingSessionRepository: ReadingSessionRepository,
         publicationRepository: PublicationRepository,
         clock: Clock,
-    ): GetStatisticsUseCase = GetStatisticsUseCase(readingSessionRepository, publicationRepository, clock)
+    ): GetStatisticsUseCase = GetStatisticsUseCase(readingSessionRepository, publicationRepository, clock, refreshIntervalMs = STATISTICS_REFRESH_MS)
 
     @Provides
     fun provideGetCurrentBookUseCase(
@@ -327,3 +327,6 @@ object UseCaseModule {
         scheduler: OpdsDownloadScheduler,
     ): DownloadOpdsBookUseCase = DownloadOpdsBookUseCase(scheduler)
 }
+
+/** Recalcul des statistiques tant que leur écran est observé (audit UX D34). */
+private const val STATISTICS_REFRESH_MS = 15_000L
