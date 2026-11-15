@@ -2,6 +2,7 @@ package com.inktone.data.sync
 
 import com.inktone.data.backup.BackupManager
 import com.inktone.data.backup.BackupPayload
+import com.inktone.data.backup.PublicationMatcher
 import com.inktone.data.backup.backupJson
 import com.inktone.data.backup.toDomain
 import com.inktone.domain.model.DeviceFleetEntry
@@ -141,19 +142,22 @@ class SyncNowManager @Inject constructor(
             val payload = runCatching { backupJson.decodeFromString(BackupPayload.serializer(), bytes.decodeToString()) }.getOrNull() ?: continue
             val remoteDeviceId = file.name.removePrefix(SNAPSHOT_PREFIX).removeSuffix(SNAPSHOT_SUFFIX)
             val remoteDeviceLabel = fleetLabels[remoteDeviceId] ?: remoteDeviceId
+            // Les livres de l'autre appareil n'ont pas nos identifiants : ils
+            // sont retrouvés par l'empreinte de leur fichier (audit UX D57).
+            val matcher = PublicationMatcher(payload, publicationRepository)
 
             // Fusion silencieuse — additive, jamais de question posée.
             payload.bookmarks.forEach { backup ->
-                if (backup.id !in localBookmarkIds && publicationRepository.getById(backup.publicationId) != null) {
-                    bookmarkRepository.insert(backup.toDomain())
-                    localBookmarkIds += backup.id
-                }
+                if (backup.id in localBookmarkIds) return@forEach
+                val publicationId = matcher.localIdOf(backup.publicationId) ?: return@forEach
+                bookmarkRepository.insert(backup.toDomain().copy(publicationId = publicationId))
+                localBookmarkIds += backup.id
             }
             payload.annotations.forEach { backup ->
-                if (backup.id !in localAnnotationIds && publicationRepository.getById(backup.publicationId) != null) {
-                    annotationRepository.insert(backup.toDomain())
-                    localAnnotationIds += backup.id
-                }
+                if (backup.id in localAnnotationIds) return@forEach
+                val publicationId = matcher.localIdOf(backup.publicationId) ?: return@forEach
+                annotationRepository.insert(backup.toDomain().copy(publicationId = publicationId))
+                localAnnotationIds += backup.id
             }
             // Réglages/thèmes : dernier écrit gagne (REPLACE au niveau DAO).
             payload.pronunciationRules.forEach { pronunciationRuleRepository.save(it.toDomain()) }
@@ -167,11 +171,12 @@ class SyncNowManager @Inject constructor(
             // (position, 1 par livre).
             payload.readingSessions.forEach { backup ->
                 if (backup.id in localSessionIds) return@forEach
-                if (publicationRepository.getById(backup.publicationId) == null) {
+                val publicationId = matcher.localIdOf(backup.publicationId)
+                if (publicationId == null) {
                     skippedOrphanSessions++
                     return@forEach
                 }
-                readingSessionRepository.insert(backup.toDomain())
+                readingSessionRepository.insert(backup.toDomain().copy(publicationId = publicationId))
                 localSessionIds += backup.id
             }
 
@@ -180,10 +185,11 @@ class SyncNowManager @Inject constructor(
             // depuis la dernière synchro réussie ; sinon, choix explicite via
             // SyncConflictBottomSheet (file PendingConflictEntity).
             payload.readingStates.forEach { remoteBackup ->
-                if (remoteBackup.publicationId in pendingConflictPublicationIds) return@forEach
-                val publication = publicationRepository.getById(remoteBackup.publicationId) ?: return@forEach
-                val remoteState = remoteBackup.toDomain()
-                val localState = readingStateRepository.get(remoteBackup.publicationId)
+                val publicationId = matcher.localIdOf(remoteBackup.publicationId) ?: return@forEach
+                if (publicationId in pendingConflictPublicationIds) return@forEach
+                val publication = publicationRepository.getById(publicationId) ?: return@forEach
+                val remoteState = remoteBackup.toDomain().copy(publicationId = publicationId)
+                val localState = readingStateRepository.get(publicationId)
 
                 if (localState == null) {
                     readingStateRepository.save(remoteState)
@@ -199,7 +205,7 @@ class SyncNowManager @Inject constructor(
                         else -> {
                             conflictQueueRepository.enqueue(
                                 PositionConflict(
-                                    publicationId = remoteBackup.publicationId,
+                                    publicationId = publicationId,
                                     bookTitle = publication.title,
                                     local = ReadingPositionSnapshot(
                                         locator = localState.locator, deviceLabel = currentDeviceLabel, at = localState.lastReadAt,
@@ -211,7 +217,7 @@ class SyncNowManager @Inject constructor(
                                     ),
                                 ),
                             )
-                            pendingConflictPublicationIds += remoteBackup.publicationId
+                            pendingConflictPublicationIds += publicationId
                         }
                     }
                 }

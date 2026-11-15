@@ -331,4 +331,55 @@ class BackupManagerTest {
         val bytes = fileStorageService.rawBytes("backup://secret")!!
         assertFalse(String(bytes, Charsets.ISO_8859_1).contains(password))
     }
+
+    /**
+     * Audit UX D58 : une sauvegarde ne se restaurait pas sur un nouveau
+     * téléphone ni après réinstallation. Le livre réimporté y a un autre
+     * identifiant ; seule l'empreinte de son fichier est la même.
+     */
+    @Test
+    fun une_sauvegarde_se_restaure_sur_une_autre_installation_par_l_empreinte_du_livre() = runTest {
+        val storage = InMemoryFileStorageService()
+        val bookmarks = FakeBookmarkRepository()
+        val states = FakeReadingStateRepository()
+        val sessions = FakeReadingSessionRepository()
+        val annotations = FakeAnnotationRepository()
+
+        // Installation d'origine : le livre s'appelle « ancien-id ».
+        val origine = FakePublicationRepository()
+        origine.insert(publication(id = "ancien-id", hash = "empreinte"))
+        val origineBookmarks = FakeBookmarkRepository()
+        origineBookmarks.insert(
+            com.inktone.domain.model.Bookmark(
+                id = "b1", publicationId = "ancien-id",
+                locator = Locator(resourceHref = "ch1.xhtml", chapterIndex = 1, charOffset = 10), createdAt = 0L,
+            ),
+        )
+        val origineStates = FakeReadingStateRepository()
+        origineStates.save(
+            com.inktone.domain.model.ReadingState(
+                publicationId = "ancien-id",
+                locator = Locator(resourceHref = "ch2.xhtml", chapterIndex = 2, charOffset = 40), lastReadAt = 5L,
+            ),
+        )
+        backupManager(storage, bookmarkRepository = origineBookmarks, readingStateRepository = origineStates, publicationRepository = origine)
+            .exportTo("backup://export", appVersion = "1.0", password = "mdp")
+
+        // Nouvelle installation : même fichier réimporté, autre identifiant.
+        val nouvelle = FakePublicationRepository()
+        nouvelle.insert(publication(id = "nouvel-id", hash = "empreinte"))
+        val result = backupManager(
+            storage, bookmarkRepository = bookmarks, readingStateRepository = states,
+            readingSessionRepository = sessions, publicationRepository = nouvelle, annotationRepository = annotations,
+        ).importFrom("backup://export", "mdp")
+
+        assertEquals(0, (result as ImportBackupResult.Success).skippedOrphans)
+        assertEquals(listOf("nouvel-id"), bookmarks.observeAll().first().map { it.publicationId })
+        assertEquals(2, states.get("nouvel-id")?.locator?.chapterIndex)
+    }
+
+    private fun publication(id: String, hash: String) = Publication(
+        id = id, title = "Livre", format = PublicationFormat.EPUB,
+        fileUri = "content://$id", fileHash = hash, fileSize = 10, chapterCount = 3, importDate = 0L,
+    )
 }

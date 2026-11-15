@@ -14,6 +14,7 @@ import com.inktone.core.testing.fake.FakeSyncProvider
 import com.inktone.core.testing.fake.FakeThemeRepository
 import com.inktone.data.backup.BackupManager
 import com.inktone.data.backup.backupJson
+import kotlinx.coroutines.flow.first
 import com.inktone.data.repository.RemoteDeviceFleetRepository
 import com.inktone.data.repository.RemoteSyncActivityLogRepository
 import com.inktone.domain.model.Annotation
@@ -412,5 +413,72 @@ class SyncNowManagerTest {
         // Seul le local a bougé : il fait foi, pas d'écrasement, pas de conflit.
         assertEquals(4, readingStateRepository.get("pub-1")?.locator?.chapterIndex)
         assertTrue(fixture.conflictQueueRepository.listPending().isEmpty())
+    }
+
+    /**
+     * Audit UX D57 : deux appareils ne reconnaissaient jamais le même livre,
+     * chacun lui ayant tiré son propre identifiant à l'import. Tout ce qui
+     * venait de l'autre appareil était écarté comme « livre absent ».
+     */
+    @Test
+    fun synchronizeNow_retrouve_le_livre_de_l_autre_appareil_par_l_empreinte_de_son_fichier() = runTest {
+        val syncProvider = FakeSyncProvider()
+        val local = Publication(
+            id = "id-local", title = "Le Livre", format = PublicationFormat.EPUB, fileUri = "content://local",
+            fileHash = "empreinte", fileSize = 10, chapterCount = 20, importDate = 0L,
+        )
+        val publicationRepository = FakePublicationRepository().apply { insert(local) }
+        val readingStateRepository = FakeReadingStateRepository().apply {
+            save(ReadingState("id-local", Locator("ch1.xhtml", 1, null, 0), lastReadAt = 50L))
+        }
+        val remotePayload = com.inktone.data.backup.BackupPayload(
+            appVersion = "sync", createdAt = 0L,
+            bookmarks = listOf(
+                com.inktone.data.backup.BookmarkBackup(
+                    id = "signet-b", publicationId = "id-distant",
+                    locator = com.inktone.data.backup.LocatorBackup("ch3.xhtml", 3, null, 0), createdAt = 0L,
+                ),
+            ),
+            pronunciationRules = emptyList(),
+            readingStates = listOf(
+                com.inktone.data.backup.ReadingStateBackup(
+                    publicationId = "id-distant", locator = com.inktone.data.backup.LocatorBackup("ch8.xhtml", 8, null, 0), lastReadAt = 200L,
+                ),
+            ),
+            readingSessions = emptyList(), annotations = emptyList(),
+            publications = listOf(com.inktone.data.backup.PublicationKeyBackup(id = "id-distant", fileHash = "empreinte")),
+        )
+        syncProvider.upload("snapshot-device-b.json", backupJson.encodeToString(remotePayload).encodeToByteArray())
+
+        val fixture = Fixture(
+            syncProvider = syncProvider, publicationRepository = publicationRepository,
+            readingStateRepository = readingStateRepository,
+        )
+
+        fixture.manager.synchronizeNow()
+
+        assertEquals(listOf("id-local"), fixture.bookmarkRepository.observeAll().first().map { it.publicationId })
+        val conflict = fixture.conflictQueueRepository.listPending().single()
+        assertEquals("id-local", conflict.publicationId)
+        assertEquals(8, conflict.remote.chapterIndex)
+    }
+
+    @Test
+    fun l_instantane_televerse_porte_l_empreinte_de_chaque_livre() = runTest {
+        val publicationRepository = FakePublicationRepository().apply {
+            insert(
+                Publication(
+                    id = "id-local", title = "Le Livre", format = PublicationFormat.EPUB, fileUri = "content://local",
+                    fileHash = "empreinte", fileSize = 10, chapterCount = 20, importDate = 0L,
+                ),
+            )
+        }
+        val fixture = Fixture(publicationRepository = publicationRepository)
+
+        fixture.manager.synchronizeNow()
+
+        val uploaded = fixture.syncProvider.download("snapshot-device-a.json")!!.decodeToString()
+        val payload = backupJson.decodeFromString(com.inktone.data.backup.BackupPayload.serializer(), uploaded)
+        assertEquals(listOf(com.inktone.data.backup.PublicationKeyBackup("id-local", "empreinte")), payload.publications)
     }
 }

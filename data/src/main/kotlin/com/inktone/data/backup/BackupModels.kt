@@ -38,6 +38,18 @@ data class BackupPayload(
     // du lot 6). Défaut vide : un import d'une sauvegarde pré-lot 11 ne
     // perd rien qu'elle ne contenait déjà pas.
     val annotations: List<AnnotationBackup> = emptyList(),
+    // Audit UX D57/D58 — identité des livres d'une installation à l'autre :
+    // l'identifiant d'un livre est tiré au hasard à chaque import, seule
+    // l'empreinte de son fichier est commune. Absente des sauvegardes
+    // antérieures : on retombe alors sur l'identifiant (même installation).
+    val publications: List<PublicationKeyBackup> = emptyList(),
+)
+
+/** Identifiant d'un livre sur l'appareil qui a produit la sauvegarde, et l'empreinte de son fichier. */
+@Serializable
+data class PublicationKeyBackup(
+    val id: String,
+    val fileHash: String,
 )
 
 @Serializable

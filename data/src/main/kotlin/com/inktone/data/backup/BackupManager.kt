@@ -90,6 +90,7 @@ class BackupManager @Inject constructor(
         readingSessions = readingSessionRepository.getAll().map { it.toBackup() },
         customThemes = themeRepository.observeAll().first().filterNot { it.isBuiltIn }.map { it.toBackup() },
         annotations = annotationRepository.getAll().map { it.toBackup() },
+        publications = publicationRepository.observeAll().first().map { PublicationKeyBackup(it.id, it.fileHash) },
     )
 
     /** @param password ignoré si le fichier est un export antérieur en clair (compatibilité ascendante). */
@@ -115,28 +116,32 @@ class BackupManager @Inject constructor(
 
         var restored = 0
         var skippedOrphans = 0
+        val matcher = PublicationMatcher(payload, publicationRepository)
 
         // CORRECTIF par rapport au legacy : le legacy inserait sans
         // verifier que la Publication referencee existe encore - une
         // contrainte FK aurait fait planter tout l'import sur un seul
         // signet orphelin. Ici : verification explicite, comptage
         // separe, jamais un crash sur une donnee partiellement obsolete.
+        // Le livre est retrouve par l'empreinte de son fichier, son
+        // identifiant changeant d'une installation a l'autre (D58).
         //
         // Même principe pour les identifiants déjà présents : signets,
         // annotations et sessions sont insérés avec la stratégie ABORT de
         // Room, qui lève une exception sur un identifiant existant.
-        // Restaurer une sauvegarde sur l'installation qui l'a produite (seul
-        // cas où les identifiants de livre concordent) faisait donc planter
-        // l'application. Ce qui existe déjà est conservé, jamais réinséré —
-        // même règle que la fusion de synchronisation (SyncNowManager).
+        // Restaurer une sauvegarde sur l'installation qui l'a produite
+        // faisait donc planter l'application. Ce qui existe déjà est
+        // conservé, jamais réinséré — même règle que la fusion de
+        // synchronisation (SyncNowManager).
         val existingBookmarkIds = bookmarkRepository.observeAll().first().mapTo(HashSet()) { it.id }
         val existingAnnotationIds = annotationRepository.getAll().mapTo(HashSet()) { it.id }
         val existingSessionIds = readingSessionRepository.getAll().mapTo(HashSet()) { it.id }
 
         payload.bookmarks.forEach { backup ->
             if (backup.id in existingBookmarkIds) return@forEach
-            if (publicationRepository.getById(backup.publicationId) != null) {
-                bookmarkRepository.insert(backup.toDomain())
+            val publicationId = matcher.localIdOf(backup.publicationId)
+            if (publicationId != null) {
+                bookmarkRepository.insert(backup.toDomain().copy(publicationId = publicationId))
                 restored++
             } else {
                 skippedOrphans++
@@ -151,8 +156,9 @@ class BackupManager @Inject constructor(
             restored++
         }
         payload.readingStates.forEach { backup ->
-            if (publicationRepository.getById(backup.publicationId) != null) {
-                readingStateRepository.save(backup.toDomain())
+            val publicationId = matcher.localIdOf(backup.publicationId)
+            if (publicationId != null) {
+                readingStateRepository.save(backup.toDomain().copy(publicationId = publicationId))
                 restored++
             } else {
                 skippedOrphans++
@@ -160,8 +166,9 @@ class BackupManager @Inject constructor(
         }
         payload.readingSessions.forEach { backup ->
             if (backup.id in existingSessionIds) return@forEach
-            if (publicationRepository.getById(backup.publicationId) != null) {
-                readingSessionRepository.insert(backup.toDomain())
+            val publicationId = matcher.localIdOf(backup.publicationId)
+            if (publicationId != null) {
+                readingSessionRepository.insert(backup.toDomain().copy(publicationId = publicationId))
                 restored++
             } else {
                 skippedOrphans++
@@ -169,8 +176,9 @@ class BackupManager @Inject constructor(
         }
         payload.annotations.forEach { backup ->
             if (backup.id in existingAnnotationIds) return@forEach
-            if (publicationRepository.getById(backup.publicationId) != null) {
-                annotationRepository.insert(backup.toDomain())
+            val publicationId = matcher.localIdOf(backup.publicationId)
+            if (publicationId != null) {
+                annotationRepository.insert(backup.toDomain().copy(publicationId = publicationId))
                 restored++
             } else {
                 skippedOrphans++
