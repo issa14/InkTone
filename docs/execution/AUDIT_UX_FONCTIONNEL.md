@@ -740,6 +740,7 @@ Vérification : « Appareil (adb) » = pilotée par adb sur le V2206, pas encore
 | D75 | Tap sur le quart gauche ou droit : tourne la page en mode paginé ; centre : commandes (décision d'Issa) | `813f26aa` | Appareil (adb) |
 | B17 | Panneaux et dialogues du Lecteur au thème de lecture (décision d'Issa) | `8279af0c` | Appareil (adb) pour les réglages |
 | B16 (en partie) | Luminosité : état local pendant le geste, écriture différée, libellé « Auto », action TalkBack | `312a2dcc` | Appareil (adb) : affichage seulement |
+| D52 (en partie) | « Retour » et « Terminé » dans le sélecteur de couleur de la sélection ; couleur d'une note non choisissable | `06d1092e` | Compilation |
 
 **Vérifications sur appareil à faire par Issa** :
 - **B18** : mode défilement, auto-défilement jusqu'en fin de chapitre : il s'arrête.
@@ -757,6 +758,6 @@ Vérification : « Appareil (adb) » = pilotée par adb sur le V2206, pas encore
 - **Après implémentation d'ADR-027** (contexte textuel du `Locator`) : D12 à D17.
 - **D1** : décidé (pas de couverture ajoutée) ; demande la migration de l'index de chapitre (positions, signets, longueurs).
 - **Compléments** : B16 (barre vide en mode système), B17 (les autres panneaux n'ont pas été passés en revue un à un), C10 (fiche d'un livre OPDS), D24 (chargement en mémoire, plan du PDF), D29 (c, d, e), D43 (la clé de cache reste sensible à l'intonation), D44 (avertissement de langue), D66 (recherche des notes), D67 (mises à jour en deux temps des Réglages et préréglages), conflit de position laissé en dehors d'A19.
-- **P2/P3 non examinés** : D16, D45, D50, D52, D62 ; D64 (le worker écrit tout en `.epub` : accepter les PDF demande de transmettre le type MIME jusqu'à lui) ; C3 (menu 3-points des couvertures, actions du HUD et de la barre TTS).
+- **P2/P3 non examinés** : D16, D45, D50, D62 ; D64 (le worker écrit tout en `.epub` : accepter les PDF demande de transmettre le type MIME jusqu'à lui) ; C3 (menu 3-points des couvertures, actions du HUD et de la barre TTS).
 - **A7 (complément)** : le défilement automatique vers la carte de la voix n'est pas fait.
 - `scripts/audition-edge-voices.sh` : non suivi, sort à décider.
