@@ -1,5 +1,6 @@
 package com.inktone.domain.usecase
 
+import com.inktone.domain.model.cleanedForDisplay
 import com.inktone.domain.model.progressionAt
 import com.inktone.domain.repository.PublicationRepository
 import com.inktone.domain.repository.ReadingSessionRepository
@@ -48,7 +49,9 @@ class GetCurrentBookUseCase(
         emit(
             CurrentBookState(
                 id = publication.id,
-                title = publication.title,
+                // Titre nettoyé comme partout ailleurs (Bibliothèque, Lecteur) : un
+                // titre préfixé d'un tiret ne doit pas s'afficher différemment ici (D33).
+                title = publication.title.cleanedForDisplay(),
                 coverUri = publication.coverUri,
                 progressPercent = progressPercent,
                 totalBookTimeMs = totalBookTimeMs,
