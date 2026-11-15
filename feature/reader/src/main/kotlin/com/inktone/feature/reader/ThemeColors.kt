@@ -72,3 +72,42 @@ object ThemeColors {
         DomainFontFamily.SOURCE_SERIF -> SourceSerifFamily
     }
 }
+
+/**
+ * Les panneaux et boîtes de dialogue du Lecteur (luminosité, réglages, voix,
+ * minuteur, sommaire, signets…) reprennent les couleurs du thème de LECTURE
+ * plutôt que celles de l'interface (audit UX B17). Les couleurs de surface, de
+ * texte et d'accent sont dérivées comme celles des barres du HUD.
+ */
+@androidx.compose.runtime.Composable
+internal fun ReadingThemeScope(
+    theme: ReadingTheme,
+    content: @androidx.compose.runtime.Composable () -> Unit,
+) {
+    val base = androidx.compose.material3.MaterialTheme.colorScheme
+    val surface = ThemeColors.barSurface(theme)
+    val text = ThemeColors.barContent(theme)
+    val scheme = base.copy(
+        surface = surface,
+        onSurface = text,
+        surfaceVariant = surface,
+        onSurfaceVariant = text.copy(alpha = 0.7f),
+        surfaceContainerLowest = surface,
+        surfaceContainerLow = surface,
+        surfaceContainer = surface,
+        surfaceContainerHigh = surface,
+        surfaceContainerHighest = surface,
+        background = ThemeColors.background(theme),
+        onBackground = text,
+        primary = ThemeColors.accent(theme),
+        onPrimary = ThemeColors.background(theme),
+        secondaryContainer = androidx.compose.ui.graphics.lerp(surface, ThemeColors.accent(theme), 0.3f),
+        onSecondaryContainer = text,
+    )
+    androidx.compose.material3.MaterialTheme(
+        colorScheme = scheme,
+        typography = androidx.compose.material3.MaterialTheme.typography,
+        shapes = androidx.compose.material3.MaterialTheme.shapes,
+        content = content,
+    )
+}

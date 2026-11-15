@@ -1391,6 +1391,7 @@ fun ReaderScreen(
                 // pendant l'ajustement), pas un panneau séparé (UX_FLOW_DESIGN.md
                 // §Luminosité). S'auto-masque après 3s d'inactivité (voir
                 // LaunchedEffect ci-dessus), relancé à chaque ajustement.
+                ReadingThemeScope(state.resolvedTheme) {
                 if (chrome.showBrightnessBar) {
                     ReaderBrightnessBar(
                         value = state.readerBrightness,
@@ -1399,6 +1400,7 @@ fun ReaderScreen(
                             chrome.onBrightnessAdjusted()
                         },
                     )
+                }
                 }
 
                 // 3b.4/3c.1 — ligne de statut persistante, hors HUD : visible en
@@ -1472,6 +1474,7 @@ fun ReaderScreen(
             }
         }
 
+        ReadingThemeScope(state.resolvedTheme) {
         if (showGoToPage) {
             GoToPageDialog(
                 currentPage = state.currentChapterIndex + 1,
@@ -1483,12 +1486,14 @@ fun ReaderScreen(
                 onDismiss = { showGoToPage = false },
             )
         }
+        }
 
         // B.2/3d.2 — Panneau réglages de typographie in-reader (TT). Le
         // thème n'y vit plus (bascule cyclique du lot 3b, cartes devenues
         // redondantes) — seuls taille et interligne restent, avec un
         // aperçu du texte RÉELLEMENT en cours de lecture, pas un exemple
         // inventé.
+        ReadingThemeScope(state.resolvedTheme) {
         if (chrome.showSettingsPanel) {
             val previewSentences = state.currentChapter?.sentences.orEmpty()
             val previewText = previewSentences
@@ -1537,8 +1542,10 @@ fun ReaderScreen(
                 onDismiss = { chrome.showSettingsPanel = false },
             )
         }
+        }
 
         // B.3 — Panneau TTS in-reader
+        ReadingThemeScope(state.resolvedTheme) {
         if (chrome.showTtsPanel) {
             val sentences = state.currentChapter?.sentences ?: emptyList()
             ReaderTtsPanel(
@@ -1560,8 +1567,10 @@ fun ReaderScreen(
                 onDismiss = { chrome.showTtsPanel = false },
             )
         }
+        }
 
         // 3d.4/3d.5 — Panneau Minuteur (remplace le cycle sur l'icône Veille) + repos oculaire
+        ReadingThemeScope(state.resolvedTheme) {
         if (chrome.showSleepTimerPanel) {
             WithLiveValue({ uiState.value.sleepTimer }) { live ->
                 SleepTimerPanel(
@@ -1577,11 +1586,13 @@ fun ReaderScreen(
                 )
             }
         }
+        }
 
         // 3d.5 — popup de rappel de repos oculaire, indépendant du HUD :
         // doit rester visible même si isHudVisible est déjà retombé à
         // faux (contrairement aux panneaux ci-dessus, ouverts par une
         // action HUD explicite).
+        ReadingThemeScope(state.resolvedTheme) {
         if (state.isEyeRestReminderVisible) {
             WithLiveValue({ uiState.value.eyeRestReminderCountdownS }) { live ->
                 EyeRestReminderDialog(
@@ -1591,12 +1602,14 @@ fun ReaderScreen(
                 )
             }
         }
+        }
 
         // 3c.2 — Sommaire en bottom sheet : superposé, ne démonte plus le
         // lecteur (avant ce lot, `return@Column` remplaçait tout l'écran,
         // HUD compris). Même pattern que ReaderSettingsPanel/ReaderTtsPanel
         // ci-dessus : ModalBottomSheet se rend dans sa propre fenêtre, il
         // ne consomme pas d'espace dans cette Column.
+        ReadingThemeScope(state.resolvedTheme) {
         if (state.isTocVisible) {
             TableOfContentsSheet(
                 entries = state.tableOfContents,
@@ -1604,6 +1617,7 @@ fun ReaderScreen(
                 onEntryClick = { chapterIndex -> viewModel.onIntent(ReaderIntent.JumpToChapter(chapterIndex)) },
                 onClose = { viewModel.onIntent(ReaderIntent.ToggleToc) },
             )
+        }
         }
 
         // 3c.3 — Marque-pages en panneau latéral (≈85% de la largeur,
@@ -1622,6 +1636,7 @@ fun ReaderScreen(
         // ModalBottomSheet en interne) rend dans une fenêtre séparée,
         // superposée par construction, indépendamment de sa position dans
         // cette Column.
+        ReadingThemeScope(state.resolvedTheme) {
         if (state.isBookmarkListVisible) {
             Dialog(
                 onDismissRequest = { viewModel.onIntent(ReaderIntent.ToggleBookmarkList) },
@@ -1660,6 +1675,7 @@ fun ReaderScreen(
                 )
             }
         }
+        }
 
         // Lot 23, tâche 12 — menu contextuel in-situ, tap sur une
         // annotation déjà posée. `onEdit` réutilise `editingAnnotation`
@@ -1681,6 +1697,7 @@ fun ReaderScreen(
             )
         }
 
+        ReadingThemeScope(state.resolvedTheme) {
         if (chrome.editingAnnotation != null) {
             EditNoteDialog(
                 title = "Modifier la note",
@@ -1692,7 +1709,9 @@ fun ReaderScreen(
                 onDismiss = { chrome.editingAnnotation = null },
             )
         }
+        }
 
+        ReadingThemeScope(state.resolvedTheme) {
         if (chrome.editingBookmark != null) {
             EditNoteDialog(
                 title = "Modifier la note",
@@ -1704,12 +1723,14 @@ fun ReaderScreen(
                 onDismiss = { chrome.editingBookmark = null },
             )
         }
+        }
 
         // Lot 21, tâche 5 (corrigé) — saisie de note OPTIONNELLE : n'apparaît
         // que si l'utilisateur a explicitement demandé « Ajouter une note »
         // depuis le Snackbar ci-dessus, jamais imposée au geste de créer un
         // signet. Fermer (« Plus tard », tap hors champ) laisse le signet
         // sans note ; la note vide est enregistrée comme `null`.
+        ReadingThemeScope(state.resolvedTheme) {
         if (chrome.showBookmarkNoteDialog && state.pendingBookmarkNoteId != null) {
             BookmarkNoteDialog(
                 onSave = { note ->
@@ -1722,6 +1743,7 @@ fun ReaderScreen(
                 },
             )
         }
+        }
 
         SnackbarHost(
             hostState = snackbarHostState,
@@ -1733,6 +1755,7 @@ fun ReaderScreen(
         // les Réglages (carte Lecture) où le téléchargement réel
         // (voix upmc + modèle CTC, ~183 Mo) se confirme et se suit —
         // pas de logique de téléchargement dupliquée ici.
+        ReadingThemeScope(state.resolvedTheme) {
         if (state.showVoiceDownloadPrompt) {
             androidx.compose.material3.AlertDialog(
                 onDismissRequest = { viewModel.onIntent(ReaderIntent.DismissVoiceDownloadPrompt) },
@@ -1752,6 +1775,7 @@ fun ReaderScreen(
                     }
                 },
             )
+        }
         }
     }
     }
