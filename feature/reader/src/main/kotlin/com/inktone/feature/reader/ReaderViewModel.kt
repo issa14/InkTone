@@ -293,6 +293,20 @@ class ReaderViewModel @Inject constructor(
 
     /** Phrase la plus avancée déjà créditée au défilement dans ce chapitre. */
     private var visualProgressHighWaterMark: Int = -1
+
+    /** Instant du dernier crédit de lecture visuelle, borne de vraisemblance du suivant (D29). */
+    private var lastVisualCreditAtMs: Long = 0L
+
+    /**
+     * Une navigation (signet, résultat de recherche, sommaire) saute à [sentenceIndex] :
+     * ce qui précède n'a pas été lu, le prochain petit défilement ne doit pas
+     * créditer tout l'intervalle sauté (audit UX D29).
+     */
+    private fun resetVisualProgress(chapterIndex: Int, sentenceIndex: Int) {
+        visualProgressChapterIndex = chapterIndex
+        visualProgressHighWaterMark = sentenceIndex - 1
+        lastVisualCreditAtMs = System.currentTimeMillis()
+    }
     private var checkpointJob: Job? = null
     private var lastFragmentSavedMs: Long = 0L
     // ───── Fin Lot Sessions ─────
@@ -527,6 +541,7 @@ class ReaderViewModel @Inject constructor(
             // Position d'entrée dans le chapitre : rien n'y a encore été lu, et
             // ce qui précède relève d'une reprise, pas d'une lecture.
             visualProgressHighWaterMark = _state.value.currentSentenceIndex - 1
+            lastVisualCreditAtMs = System.currentTimeMillis()
         }
 
         val lastCompleted = sentenceIndex - 1
@@ -538,7 +553,19 @@ class ReaderViewModel @Inject constructor(
 
         val crossed = sentences.subList(from, to)
         if (crossed.isEmpty()) return
-        tracker.addProgress(words = crossed.sumOf { it.wordCount }, sentences = crossed.size)
+        // Un défilement trop rapide pour avoir été lu ne crédite que ce qu'un
+        // rythme plausible permet, jamais tous les mots franchis (D29).
+        val now = System.currentTimeMillis()
+        val limit = plausibleWordLimit(now - lastVisualCreditAtMs)
+        lastVisualCreditAtMs = now
+        var words = 0
+        var count = 0
+        for (sentence in crossed) {
+            if (count > 0 && words + sentence.wordCount > limit) break
+            words += sentence.wordCount
+            count++
+        }
+        tracker.addProgress(words = words, sentences = count)
     }
 
     /**
@@ -1193,6 +1220,7 @@ class ReaderViewModel @Inject constructor(
             isTocVisible = false, isBookmarkListVisible = false,
             pageOffsetY = locator.pageOffsetY ?: 0f,
         )
+        resetVisualProgress(targetIndex, sentenceIndex)
         persistPosition(chapterIndex = targetIndex, sentenceIndex = sentenceIndex)
         preloadAdjacentChapters(targetIndex)
         if (wasPlaying) playCurrentSentence()

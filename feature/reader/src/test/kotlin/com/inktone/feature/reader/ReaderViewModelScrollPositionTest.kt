@@ -504,4 +504,73 @@ class ReaderViewModelScrollPositionTest {
 
         assertNull(readingStateRepository.get("pub-1"))
     }
+
+    /**
+     * Audit UX D29 : après un saut par signet dans le même chapitre, le prochain
+     * petit défilement créditait tout l'intervalle sauté.
+     */
+    @Test
+    fun un_saut_par_signet_ne_credite_pas_l_intervalle_saute() = runTest {
+        val sentences = (0 until 6).map { i ->
+            Sentence(index = i, text = "Phrase numero $i.", startOffset = i * 20, endOffset = i * 20 + 16)
+        }
+        val chapter = Chapter(
+            index = 0, href = "OEBPS/chapter1.xhtml", title = null,
+            content = ChapterContent.Rich(
+                blocks = listOf(
+                    BookBlock.ParagraphBlock(
+                        richText = StyledText.plain(sentences.joinToString(" ") { it.text }),
+                        globalOffsetRange = 0 until 116,
+                    ),
+                ),
+            ),
+            sentences = sentences,
+        )
+        val parser = FakePublicationParser(
+            result = ParseResult.Success(
+                documentModel = DocumentModel(chapters = listOf(chapter), tableOfContents = emptyList(), resources = emptyList()),
+                isDrmProtected = false,
+                metadata = PublicationMetadata(title = "Titre de test"),
+            ),
+        )
+        val publicationRepository = FakePublicationRepository()
+        publicationRepository.insert(
+            Publication(
+                id = "pub-1", title = "Test", format = PublicationFormat.EPUB,
+                fileUri = "content://x", fileHash = "hash", fileSize = 10, chapterCount = 1,
+                importDate = 0L,
+            ),
+        )
+        val viewModel = buildViewModel(FakeReadingStateRepository(), publicationRepository, parser)
+        viewModel.onIntent(ReaderIntent.OpenPublication("pub-1"))
+        dispatcher.scheduler.runCurrent()
+
+        try {
+            // Lecture réelle des deux premières phrases : 3 mots chacune.
+            viewModel.onIntent(ReaderIntent.UpdateScrollPosition(1))
+            viewModel.onIntent(ReaderIntent.UpdateScrollPosition(2))
+            assertEquals(6, viewModel.sessionWordsReadForTest())
+
+            // Saut par signet à la phrase 5, puis un petit défilement jusqu'à la suivante.
+            viewModel.onIntent(
+                ReaderIntent.NavigateToLocator(
+                    com.inktone.domain.valueobject.Locator(resourceHref = "OEBPS/chapter1.xhtml", chapterIndex = 0, charOffset = 100),
+                ),
+            )
+            dispatcher.scheduler.runCurrent()
+            assertEquals(5, viewModel.state.value.currentSentenceIndex)
+            viewModel.onIntent(ReaderIntent.UpdateScrollPosition(4))
+            viewModel.onIntent(ReaderIntent.UpdateScrollPosition(5))
+
+            assertEquals(
+                "les phrases 3 et 4, sautées, ne comptent pas comme lues",
+                6,
+                viewModel.sessionWordsReadForTest(),
+            )
+
+        } finally {
+            viewModel.cancelCheckpointTimerForTest()
+            dispatcher.scheduler.runCurrent()
+        }
+    }
 }
