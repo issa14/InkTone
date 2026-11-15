@@ -313,14 +313,22 @@ class LibraryViewModel @Inject constructor(
                     // AUDIT_REACTIVITE_UX §3.5 — même traitement pour les sept
                     // dérivations (withDerivedFields) : calculées une fois par
                     // émission sur Default, plus rejouées par la composition.
-                    _state.value = withContext(defaultDispatcher) {
-                        val progressMap = computeProgressMap(publications, readingStates)
-                        _state.value.copy(
-                            publications = publications,
-                            progressMap = progressMap,
-                            startedPublicationIds = startedPublicationIds(readingStates),
-                            isLoading = false,
-                        ).withDerivedFields()
+                    //
+                    // L'état de base est relu tant qu'il change pendant le calcul :
+                    // l'affecter à l'aveugle écrasait une frappe de recherche
+                    // survenue entre-temps (audit UX C9).
+                    while (true) {
+                        val base = _state.value
+                        val next = withContext(defaultDispatcher) {
+                            val progressMap = computeProgressMap(publications, readingStates)
+                            base.copy(
+                                publications = publications,
+                                progressMap = progressMap,
+                                startedPublicationIds = startedPublicationIds(readingStates),
+                                isLoading = false,
+                            ).withDerivedFields()
+                        }
+                        if (_state.compareAndSet(base, next)) break
                     }
                 }
         }
