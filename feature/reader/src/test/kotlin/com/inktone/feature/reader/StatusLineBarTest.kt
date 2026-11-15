@@ -47,4 +47,11 @@ class StatusLineBarTest {
         // Mesure partielle : jamais de total partiel présenté comme final.
         assertEquals("Chapitre 12", chapterCounterText(12, 54, 54, showPageCounter = false))
     }
+
+    // Audit UX B3 : un PDF n'a pas de chapitres.
+    @Test
+    fun `fixedPageCounterText ecrit Page N sur total`() {
+        assertEquals("Page 31 / 356", fixedPageCounterText(31, 356))
+        assertEquals("Page 31", fixedPageCounterText(31, 0))
+    }
 }

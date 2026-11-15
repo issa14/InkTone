@@ -27,6 +27,9 @@ import com.inktone.core.designsystem.AppIcon
 import com.inktone.core.designsystem.AppSymbol
 import com.inktone.domain.model.ReadingPositionSnapshot
 import java.util.Locale
+import com.inktone.domain.valueobject.positionLabel
+import com.inktone.domain.valueobject.isFixedPage
+import com.inktone.domain.valueobject.Locator
 
 /**
  * Conçu directement en code, sans maquette préalable (tâche 11.10,
@@ -71,13 +74,13 @@ fun SyncConflictBottomSheet(
             PositionOption(
                 originLabel = "Sur cet appareil",
                 snapshot = conflict.local,
-                actionLabel = "Reprendre au chapitre ${conflict.local.chapterIndex + 1}",
+                actionLabel = "Reprendre ${conflict.local.locator.resumeLabel()}",
                 onChoose = { viewModel.resolve(conflict, conflict.local.locator) },
             )
             PositionOption(
                 originLabel = "Depuis ${conflict.remote.deviceLabel}",
                 snapshot = conflict.remote,
-                actionLabel = "Reprendre au chapitre ${conflict.remote.chapterIndex + 1}",
+                actionLabel = "Reprendre ${conflict.remote.locator.resumeLabel()}",
                 onChoose = { viewModel.resolve(conflict, conflict.remote.locator) },
             )
         }
@@ -98,7 +101,7 @@ private fun PositionOption(originLabel: String, snapshot: ReadingPositionSnapsho
                 color = MaterialTheme.colorScheme.onSurfaceVariant,
             )
             Text(
-                "Chapitre ${snapshot.chapterIndex + 1}, ${formatPercent(snapshot.progressFraction)}",
+                "${snapshot.locator.positionLabel()}, ${formatPercent(snapshot.progressFraction)}",
                 style = MaterialTheme.typography.bodyMedium,
             )
             Button(onClick = onChoose, modifier = Modifier.fillMaxWidth().padding(top = 8.dp)) {
@@ -109,3 +112,7 @@ private fun PositionOption(originLabel: String, snapshot: ReadingPositionSnapsho
 }
 
 private fun formatPercent(fraction: Float): String = String.format(Locale.FRANCE, "%.1f %%", fraction * 100)
+
+/** « à la page N » ou « au chapitre N », pour le bouton de reprise. */
+private fun Locator.resumeLabel(): String =
+    if (isFixedPage) "à la page ${chapterIndex + 1}" else "au chapitre ${chapterIndex + 1}"

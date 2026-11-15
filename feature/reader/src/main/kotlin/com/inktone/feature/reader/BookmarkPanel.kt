@@ -57,6 +57,7 @@ import com.inktone.domain.model.Bookmark
 import kotlinx.coroutines.launch
 import java.text.SimpleDateFormat
 import java.util.Locale
+import com.inktone.domain.valueobject.positionLabel
 
 /**
  * Tâche 3c.3 — remplace `BookmarkListSheet` (liste de signets plein
@@ -273,7 +274,7 @@ private fun NotesTab(
                     }
                     Spacer(Modifier.height(4.dp))
                     Text(
-                        "Chapitre ${annotation.startLocator.chapterIndex + 1} · ${formatAnnotationDate(annotation.createdAt)}",
+                        "${annotation.startLocator.positionLabel()} · ${formatAnnotationDate(annotation.createdAt)}",
                         style = MaterialTheme.typography.labelSmall,
                         color = MaterialTheme.colorScheme.onSurfaceVariant,
                     )
@@ -318,14 +319,14 @@ private fun HighlightsTab(highlights: List<Annotation>, onClick: (Annotation) ->
                 Column(modifier = Modifier.weight(1f)) {
                     Text(
                         annotation.excerpt?.takeIf { it.isNotBlank() }
-                            ?: "Chapitre ${annotation.startLocator.chapterIndex + 1}",
+                            ?: annotation.startLocator.positionLabel(),
                         style = MaterialTheme.typography.bodyMedium,
                         maxLines = 2,
                         overflow = TextOverflow.Ellipsis,
                     )
                     Spacer(Modifier.height(4.dp))
                     Text(
-                        "Chapitre ${annotation.startLocator.chapterIndex + 1} · ${formatAnnotationDate(annotation.createdAt)}",
+                        "${annotation.startLocator.positionLabel()} · ${formatAnnotationDate(annotation.createdAt)}",
                         style = MaterialTheme.typography.labelSmall,
                         color = MaterialTheme.colorScheme.onSurfaceVariant,
                     )
@@ -362,7 +363,7 @@ private fun BookmarksTab(
                 Spacer(Modifier.width(12.dp))
                 Column(modifier = Modifier.weight(1f)) {
                     Text(
-                        bookmark.title?.takeIf { it.isNotBlank() } ?: "Chapitre ${bookmark.locator.chapterIndex + 1}",
+                        bookmark.title?.takeIf { it.isNotBlank() } ?: bookmark.locator.positionLabel(),
                         style = MaterialTheme.typography.bodyMedium,
                         maxLines = 2,
                         overflow = TextOverflow.Ellipsis,
@@ -373,7 +374,7 @@ private fun BookmarksTab(
                     // la référence de position disparaissait du panneau.
                     // Ligne dédiée, toujours affichée.
                     Text(
-                        "Chapitre ${bookmark.locator.chapterIndex + 1}",
+                        bookmark.locator.positionLabel(),
                         style = MaterialTheme.typography.labelSmall,
                         color = MaterialTheme.colorScheme.onSurfaceVariant,
                     )

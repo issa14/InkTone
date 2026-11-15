@@ -72,6 +72,7 @@ import com.inktone.domain.model.LibraryItemSortOrder
 import com.inktone.domain.model.LibraryItemType
 import java.text.SimpleDateFormat
 import java.util.Locale
+import com.inktone.domain.valueobject.positionLabel
 
 /**
  * Lot 4, tâche 4.6 — reconstruction complète de l'écran (remplace
@@ -396,7 +397,7 @@ private fun LibraryItemRow(
                     // Ligne 3 — chapitre + date, toujours entièrement visibles
                     // (jamais concaténés avec le titre, qui peut être long).
                     Text(
-                        "Chapitre ${item.startLocator.chapterIndex + 1} · ${formatItemDate(item.createdAt)}",
+                        "${item.startLocator.positionLabel()} · ${formatItemDate(item.createdAt)}",
                         style = MaterialTheme.typography.labelSmall,
                         color = MaterialTheme.colorScheme.onSurfaceVariant,
                     )

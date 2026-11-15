@@ -1435,9 +1435,12 @@ fun ReaderScreen(
                         StatusLineBar(
                             chapterNumber = state.currentChapterIndex + 1,
                             pageInChapter = values.pageInChapter,
-                            pageCountInChapter = values.pageCountInChapter,
+                            // PDF : une page par « chapitre », le total de pages
+                            // est celui du livre (audit UX B3).
+                            pageCountInChapter = if (isPdf) state.chapters.size else values.pageCountInChapter,
                             bookProgression = values.bookProgression,
                             showPageCounter = values.showPageCounter,
+                            isFixedPage = isPdf,
                             contentColor = ThemeColors.barContent(state.resolvedTheme),
                             backgroundColor = ThemeColors.barSurface(state.resolvedTheme),
                         )

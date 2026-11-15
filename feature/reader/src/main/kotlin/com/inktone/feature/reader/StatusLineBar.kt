@@ -54,6 +54,7 @@ fun StatusLineBar(
     bookProgression: Float?,
     modifier: Modifier = Modifier,
     showPageCounter: Boolean = true,
+    isFixedPage: Boolean = false,
     contentColor: Color = MaterialTheme.colorScheme.onSurface,
     backgroundColor: Color = Color.Transparent,
 ) {
@@ -75,7 +76,8 @@ fun StatusLineBar(
     ) {
         Text(timeText, style = MaterialTheme.typography.labelSmall, color = contentColor)
         Text(
-            chapterCounterText(chapterNumber, pageInChapter, pageCountInChapter, showPageCounter),
+            if (isFixedPage) fixedPageCounterText(chapterNumber, pageCountInChapter)
+            else chapterCounterText(chapterNumber, pageInChapter, pageCountInChapter, showPageCounter),
             style = MaterialTheme.typography.labelSmall,
             color = contentColor,
         )
@@ -83,6 +85,13 @@ fun StatusLineBar(
         Text(bookProgression?.let(::formatProgressionFr).orEmpty(), style = MaterialTheme.typography.labelSmall, color = contentColor)
     }
 }
+
+/**
+ * Compteur d'un format à pages fixes (PDF) : la page est le seul repère, il n'y
+ * a pas de chapitres (audit UX B3). [pageCount] est le nombre total de pages.
+ */
+internal fun fixedPageCounterText(page: Int, pageCount: Int): String =
+    if (pageCount > 0) "Page $page / $pageCount" else "Page $page"
 
 /**
  * Texte du compteur de chapitre de la ligne de statut. Sans compteur
