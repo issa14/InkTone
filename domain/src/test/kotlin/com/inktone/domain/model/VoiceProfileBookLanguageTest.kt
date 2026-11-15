@@ -1,6 +1,8 @@
 package com.inktone.domain.model
 
 import org.junit.Assert.assertEquals
+import org.junit.Assert.assertFalse
+import org.junit.Assert.assertTrue
 import org.junit.Test
 
 class VoiceProfileBookLanguageTest {
@@ -24,5 +26,20 @@ class VoiceProfileBookLanguageTest {
     fun `sans langue de livre, le profil est inchange`() {
         assertEquals("fr-FR", profile(TtsEngineId.ANDROID_NATIVE).withBookLanguage(null).language)
         assertEquals("fr-FR", profile(TtsEngineId.ANDROID_NATIVE).withBookLanguage("  ").language)
+    }
+
+    @Test
+    fun `une voix propre a une langue avertit pour un livre d'une autre langue`() {
+        assertTrue(profile(TtsEngineId.SHERPA_ONNX).readsOtherLanguageThan("en"))
+        assertTrue(profile(TtsEngineId.EDGE_TTS).readsOtherLanguageThan("en-GB"))
+    }
+
+    @Test
+    fun `pas d'avertissement pour la meme langue, la voix systeme ou une langue inconnue`() {
+        assertFalse(profile(TtsEngineId.EDGE_TTS).readsOtherLanguageThan("fr"))
+        assertFalse(profile(TtsEngineId.EDGE_TTS).readsOtherLanguageThan("FR_ca"))
+        assertFalse(profile(TtsEngineId.ANDROID_NATIVE).readsOtherLanguageThan("en"))
+        assertFalse(profile(TtsEngineId.SHERPA_ONNX).readsOtherLanguageThan(null))
+        assertFalse(profile(TtsEngineId.SHERPA_ONNX).readsOtherLanguageThan(" "))
     }
 }

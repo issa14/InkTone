@@ -710,6 +710,7 @@ class ReaderViewModel @Inject constructor(
 
     /** Langue déclarée du livre ouvert, pour la voix système (audit UX D44). */
     private var bookLanguage: String? = null
+    private var languageWarningShown = false
 
     private suspend fun resolveVoiceProfile(prefs: UserPreferences): VoiceProfile =
         prefs.activeVoiceProfileId
@@ -1607,6 +1608,15 @@ class ReaderViewModel @Inject constructor(
         viewModelScope.launch {
             val prefs = preferencesRepository.get()
             val voiceProfile = resolveVoiceProfile(prefs).withBookLanguage(bookLanguage)
+            // Avertit une fois par ouverture : le livre ne sera pas lu avec la bonne
+            // phonétique (audit UX D44). Réutilise le message passager de la narration.
+            if (!languageWarningShown && voiceProfile.readsOtherLanguageThan(bookLanguage)) {
+                languageWarningShown = true
+                _state.value = _state.value.copy(
+                    narrationError = "La voix choisie lit une autre langue que ce livre : " +
+                        "la prononciation sera approximative. Choisissez une voix adaptée dans les Réglages.",
+                )
+            }
             playbackOrchestrator.play(
                 sentences = sentences,
                 voiceProfile = voiceProfile,

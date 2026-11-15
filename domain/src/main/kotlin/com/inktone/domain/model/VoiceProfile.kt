@@ -38,7 +38,22 @@ data class VoiceProfile(
             this
         }
 
+    /**
+     * Vrai si ce profil lit dans une autre langue que le livre : une voix neuronale ou
+     * Edge est propre à une langue, un livre étranger serait lu avec sa phonétique
+     * (audit UX D44). Jamais vrai pour la voix système, qui prend la langue du livre
+     * ([withBookLanguage]), ni quand la langue du livre est inconnue. Seule la langue
+     * principale compte : « fr-CA » et « fr » sont la même.
+     */
+    fun readsOtherLanguageThan(bookLanguage: String?): Boolean {
+        if (engine == TtsEngineId.ANDROID_NATIVE || bookLanguage.isNullOrBlank()) return false
+        return primaryLanguage(bookLanguage) != primaryLanguage(language)
+    }
+
     companion object {
+        private fun primaryLanguage(tag: String): String =
+            tag.trim().lowercase().split('-', '_').first()
+
         /**
          * Bornes proposées dans les deux écrans qui règlent la voix (audit UX
          * B9 : 0,5–2,0 aux Réglages, 0,5–3,0 au Lecteur, alors qu'Edge plafonne
