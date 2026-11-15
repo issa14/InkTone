@@ -227,7 +227,7 @@ class ReadiumPublicationParser @Inject constructor(
         // entrée de la TOC ne pointe plus vers rien de valide.
         val chapterIndexOffset = if (coverPrepended) 1 else 0
         val readingOrderUrls = publication.readingOrder.map { it.href.resolve().removeFragment() }
-        val toc = publication.tableOfContents.map { link -> toTocEntry(link, readingOrderUrls, chapterIndexOffset) }
+        val toc = publication.tableOfContents.flatMap { link -> toTocEntries(link, readingOrderUrls, chapterIndexOffset) }
 
         return ParseResult.Success(
             documentModel = DocumentModel(
@@ -335,16 +335,23 @@ class ReadiumPublicationParser @Inject constructor(
      *   sans ce décalage, chaque entrée de la TOC ouvrait le chapitre
      *   PRÉCÉDENT le sien, et la dernière entrée pointait au-delà de la fin.
      */
-    private fun toTocEntry(
+    private fun toTocEntries(
         link: Link,
         readingOrderUrls: List<org.readium.r2.shared.util.Url>,
         chapterIndexOffset: Int,
-    ): TableOfContentsEntry {
+    ): List<TableOfContentsEntry> {
         val chapterIndex = readingOrderUrls.indexOf(link.href.resolve().removeFragment())
-        return TableOfContentsEntry(
-            title = link.title ?: "",
-            chapterIndex = chapterIndex.coerceAtLeast(0) + chapterIndexOffset,
-            children = link.children.map { child -> toTocEntry(child, readingOrderUrls, chapterIndexOffset) },
+        val children = link.children.flatMap { child -> toTocEntries(child, readingOrderUrls, chapterIndexOffset) }
+        // Une entrée dont la cible n'est pas dans l'ordre de lecture n'est plus
+        // renvoyée en silence au premier chapitre (audit UX D5) : elle disparaît,
+        // ses sous-entrées valides sont conservées à sa place.
+        if (chapterIndex < 0) return children
+        return listOf(
+            TableOfContentsEntry(
+                title = link.title ?: "",
+                chapterIndex = chapterIndex + chapterIndexOffset,
+                children = children,
+            ),
         )
     }
 
