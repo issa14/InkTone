@@ -33,6 +33,7 @@ import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.LinearProgressIndicator
 import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.minimumInteractiveComponentSize
 import androidx.compose.material3.ModalBottomSheet
 import androidx.compose.material3.NavigationDrawerItem
 import androidx.compose.material3.OutlinedButton
@@ -1079,12 +1080,19 @@ private fun ResumeReadingCard(
             // Bouton Lecture/Pause — pilote la NARRATION seule, sans ouvrir
             // le Lecteur : écouter n'oblige plus à quitter la Bibliothèque.
             // L'ouverture du livre reste le tap sur la carte elle-même.
+            // Zone tactile de 48 dp autour du disque de 36 dp (audit UX C3).
+            Box(
+                modifier = Modifier
+                    .minimumInteractiveComponentSize()
+                    .clip(CircleShape)
+                    .clickable(onClick = onTogglePlayback),
+                contentAlignment = Alignment.Center,
+            ) {
             Box(
                 modifier = Modifier
                     .size(36.dp)
                     .clip(CircleShape)
-                    .background(MaterialTheme.colorScheme.primaryContainer)
-                    .clickable(onClick = onTogglePlayback),
+                    .background(MaterialTheme.colorScheme.primaryContainer),
                 contentAlignment = Alignment.Center
             ) {
                 AppIcon(
@@ -1097,6 +1105,7 @@ private fun ResumeReadingCard(
                     tint = MaterialTheme.colorScheme.onPrimaryContainer,
                     modifier = Modifier.size(20.dp)
                 )
+            }
             }
         }
     }
