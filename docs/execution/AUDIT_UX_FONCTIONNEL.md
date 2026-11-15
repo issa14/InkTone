@@ -730,6 +730,9 @@ Vérification : « Appareil (adb) » = pilotée par adb sur le V2206, pas encore
 | D23 | Format détecté par le contenu sans extension | `df9c2141` | Tests JVM |
 | D20 | Écriture atomique de l'état de lecture | `ea07beb2` | Tests JVM (échoue sans le verrou) |
 | D34 | Statistiques recalculées toutes les 15 s tant que l'écran est affiché | `efd68d10` | Test JVM |
+| C9 | Calcul de l'état de la Bibliothèque par compareAndSet : une frappe de recherche n'est plus écrasée | `75837efd` | Suite existante (pas de test dédié) |
+| C12 | Bouton « Suivant » dans l'onboarding ; promesse de voix corrigée | `7d3c477d` | Compilation seulement |
+| C3 (en partie) | Zone tactile de 48 dp pour le bouton lecture de la carte « Reprendre » | `ae0f5540` | Compilation seulement |
 
 **Vérifications sur appareil à faire par Issa** :
 - **B18** : mode défilement, auto-défilement jusqu'en fin de chapitre : il s'arrête.
@@ -747,6 +750,6 @@ Vérification : « Appareil (adb) » = pilotée par adb sur le V2206, pas encore
 - **Après implémentation d'ADR-027** (contexte textuel du `Locator`) : D12 à D17.
 - **D1** : décidé (pas de couverture ajoutée) ; demande la migration de l'index de chapitre (positions, signets, longueurs).
 - **Compléments** : D29 (c, d, e), D43 (la clé de cache reste sensible à l'intonation), D44 (avertissement de langue), D66 (recherche des notes), D67 (mises à jour en deux temps des Réglages et préréglages), C14 (code mort), conflit de position laissé en dehors d'A19.
-- **P2/P3 non examinés** : D16, D24, D32 (décision), D45, D50, D52, D62, D64, C3, C9, C10, C12.
+- **P2/P3 non examinés** : D16, D24, D32 (décision), D45, D50, D52, D62, C10 ; D64 (le worker écrit tout en `.epub` : accepter les PDF demande de transmettre le type MIME jusqu'à lui) ; C3 (menu 3-points des couvertures, actions du HUD et de la barre TTS).
 - **A7 (complément)** : le défilement automatique vers la carte de la voix n'est pas fait.
 - `scripts/audition-edge-voices.sh` : non suivi, sort à décider.
