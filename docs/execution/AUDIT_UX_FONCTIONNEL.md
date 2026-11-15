@@ -695,10 +695,45 @@ Vérifications sur appareil faites par Issa le 2026-11-15 (D18 avec zoom, D48, D
 
 **Instabilité constatée** : `ReaderViewModelBackgroundTrackerTest.onAppBackground_pendant_ecoute_tts_laisse_le_tracker_actif` a échoué une fois dans la suite complète (« Dispatchers.Main is used concurrently with setting it », dans `resetMain`), puis passé trois fois seul et dans la suite complète suivante. Non qualifiée plus avant.
 
-**Reste à traiter**, par priorité :
-- **Lot A (suite)** : D61 (suppressions et modifications non propagées, P2) et le conflit de position laissé en dehors d'A19.
+**Rectificatif** : A11 et A17 sont des **P1** (§3). Ce suivi les rangeait par erreur avec les P2/P3 ; ils étaient donc restés ouverts après le lot des derniers P1. Traités en §10.3.
+
+### 10.3 P2 (branche `audit-p2`)
+
+État au 2026-11-15. Branche empilée sur `main` (`c4a8a919`), non poussée.
+Vérification : « Appareil (adb) » = pilotée par adb sur le V2206, pas encore par Issa.
+
+| Constat | Correction | Commit | Vérification |
+|---|---|---|---|
+| D19 | Chapitre restauré borné à la structure lue | `8841dd86` | Test JVM |
+| B18 | La boucle d'auto-défilement sort en fin de chapitre | `36eecfd3` | Compilation |
+| D22 | TXT non UTF-8 décodé en Windows-1252 ; UTF-16 et marque d'ordre des octets lus | `12f6a5eb` | Tests JVM |
+| D56 | Un chapitre illisible n'interrompt plus l'import du reste du livre | `2626657e` | Test JVM |
+| B3 | « Page N » pour une page de PDF (ligne de statut, signets, vue globale, conflit de synchro) | `d817e6c2` | Appareil (adb) + tests JVM |
+| D51 | Un signet posé n'importe où sur la page affichée est reconnu | `23634a9f` | Appareil (adb) + tests JVM |
+| D33 (en partie) | Titre nettoyé dans les Statistiques ; les deux définitions du « livre en cours » restent distinctes (voir `ObserveResumePublicationUseCase`) | `9fe64c6b` | Test JVM |
+| D76 | Segments de repli jamais rangés dans le cache audio ; `synthesisVersion` 2 | `e88ef4d9` | Tests JVM |
+| B6 | Interrupteur « Inverser les pages scannées » ; fond sombre reconnu par sa luminance | `324ecbc7` | Appareil (adb) + tests JVM |
+| D44 (en partie) | Voix système dans la langue du livre ; pas d'avertissement pour les voix neuronales et Edge | `010d078e` | Tests JVM |
+| B15 | Synchronisation manuelle : progression visible, motif d'échec relayé, message reformulé | `ce5a9652` | Tests JVM |
+| A11 (**P1**) | Les préréglages restaurent l'état d'avant (`MIGRATION_35_36`) | `3af3a659` | Instrumenté (migration) + tests JVM |
+| A17 (**P1**) et A11, second volet | Réglette placée sur la ligne lue, masquée hors narration, avec son interrupteur | `fbb580d2` | Appareil (adb) |
+| D29 (a, b) | Crédit de lecture visuelle borné par le temps ; remis à zéro après un saut | `11081688` | Tests JVM |
+
+**Vérifications sur appareil à faire par Issa** :
+- **B18** : mode défilement, auto-défilement jusqu'en fin de chapitre : il s'arrête.
+- **D22** : importer un TXT en Windows-1252 : les accents s'affichent.
+- **D76** : voix Edge sans réseau : les phrases de repli ne se retrouvent pas en voix Edge à la relecture avec réseau.
+- **D44** : voix système, livre en anglais : lu avec une phonétique anglaise.
+- **B15** : Bibliothèque, menu, « Synchroniser » : « Synchronisation en cours… » puis le résultat.
+- **A11** : activer puis désactiver « Accessibilité » et « Mode sombre » : réglages identiques à ceux d'avant.
+- **D56, D19** : couverts par des tests seulement.
+
+**Reste à traiter** :
+- **Nécessitent une décision de conception** : D75 (tourner la page au tap sur les bords ou aux touches de volume), B4 (sauter loin dans un livre), B5 (sommaire précis), B16 et B17 (luminosité, thème des panneaux).
+- **Lourds** : D8 (recherche insensible aux accents : changer le tokeniseur FTS impose de réindexer toute la bibliothèque, soit plusieurs minutes pour 1,7 Go), D61 (suppressions et modifications non propagées entre appareils : tombes horodatées), D11, D4.
 - **Après implémentation d'ADR-027** (contexte textuel du `Locator`) : D12 à D17.
 - **D1** : décidé (pas de couverture ajoutée) ; demande la migration de l'index de chapitre (positions, signets, longueurs).
-- **P2/P3 restants** : D4, D5, D8, D11, D16, D19, D20, D22, D23, D24, D29, D32, D33, D34, D37, D38, D43 (clé de cache), D44, D45, D50, D51, D52, D56, D62, D64, D65, D66 (recherche des notes), D67, D68, D75, D76, A11, A17, B3 à B6, B15 à B18, C3, C9 à C14 ; séparateurs absents du mode paginé (reste de D48).
+- **Compléments** : D29 (c, d, e), D43 (la clé de cache reste sensible à l'intonation), D44 (avertissement de langue), D66 (recherche des notes), conflit de position laissé en dehors d'A19.
+- **P2/P3 non examinés** : D5, D16, D20, D23, D24, D32, D34, D37, D38, D45, D50, D52, D62, D64, D65, D67, D68, C3, C9 à C14.
 - **A7 (complément)** : le défilement automatique vers la carte de la voix n'est pas fait.
 - `scripts/audition-edge-voices.sh` : non suivi, sort à décider.
