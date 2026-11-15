@@ -137,4 +137,39 @@ class TxtPublicationParserTest {
     fun sans_ligne_vide_chaque_ligne_est_un_paragraphe() {
         assertEquals(listOf(0 until 3, 4 until 8), paragraphRanges("Une\nDeux"))
     }
+
+    // Audit UX D22 : le décodage UTF-8 ne levait jamais d'erreur, un TXT en
+    // Windows-1252 s'affichait avec des caractères de remplacement.
+    @Test
+    fun decode_un_texte_windows_1252() {
+        val bytes = "L'été dernier, à Noël, où elle était née.".toByteArray(charset("windows-1252"))
+        assertEquals("L'été dernier, à Noël, où elle était née.", decodeText(bytes))
+    }
+
+    @Test
+    fun garde_un_texte_utf_8_valide_et_ecarte_sa_marque_d_ordre_des_octets() {
+        val utf8 = "Élève né à Noël — « oui ».".toByteArray(Charsets.UTF_8)
+        assertEquals("Élève né à Noël — « oui ».", decodeText(utf8))
+        assertEquals("Élève", decodeText(byteArrayOf(0xEF.toByte(), 0xBB.toByte(), 0xBF.toByte()) + "Élève".toByteArray()))
+    }
+
+    @Test
+    fun decode_un_texte_utf_16_par_sa_marque_d_ordre_des_octets() {
+        val le = byteArrayOf(0xFF.toByte(), 0xFE.toByte()) + "Été".toByteArray(Charsets.UTF_16LE)
+        val be = byteArrayOf(0xFE.toByte(), 0xFF.toByte()) + "Été".toByteArray(Charsets.UTF_16BE)
+        assertEquals("Été", decodeText(le))
+        assertEquals("Été", decodeText(be))
+    }
+
+    @Test
+    fun un_fichier_windows_1252_s_importe_avec_ses_accents() = runTest {
+        val file = File.createTempFile("test", ".txt").apply {
+            writeBytes("Il était une fois. Un été brûlant.".toByteArray(charset("windows-1252")))
+            deleteOnExit()
+        }
+        val result = parser.parse(file.absolutePath)
+        check(result is ParseResult.Success)
+
+        assertEquals("Il était une fois.", result.documentModel.chapters.single().sentences.first().text)
+    }
 }

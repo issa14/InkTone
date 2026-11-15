@@ -45,7 +45,7 @@ class TxtPublicationParser @Inject constructor(
 
     override suspend fun parse(fileUri: String): ParseResult {
         val text = fileStorageService.openInputStream(fileUri)
-            ?.use { stream -> runCatching { stream.readBytes().toString(Charsets.UTF_8) }.getOrNull() }
+            ?.use { stream -> runCatching { decodeText(stream.readBytes()) }.getOrNull() }
             ?: return ParseResult.Corrupted("Fichier introuvable ou illisible (encodage ?): $fileUri")
 
         if (text.isBlank()) return ParseResult.Corrupted("Fichier TXT vide")
@@ -124,3 +124,28 @@ internal fun paragraphRanges(text: String): List<IntRange> {
     addTrimmed(start, text.length)
     return ranges
 }
+
+/**
+ * Décode un TXT : UTF-16 si une marque d'ordre des octets le dit, UTF-8 sinon,
+ * et Windows-1252 si les octets ne sont pas de l'UTF-8 valide (audit UX D22).
+ * `toString(UTF_8)` ne lève jamais d'erreur : un TXT en Windows-1252, courant
+ * pour les textes français anciens, s'affichait avec des caractères de
+ * remplacement. La marque d'ordre des octets n'est jamais gardée dans le texte.
+ */
+internal fun decodeText(bytes: ByteArray): String {
+    fun hasPrefix(vararg prefix: Int) =
+        bytes.size >= prefix.size && prefix.indices.all { bytes[it] == prefix[it].toByte() }
+    return when {
+        hasPrefix(0xFF, 0xFE) -> String(bytes, 2, bytes.size - 2, Charsets.UTF_16LE)
+        hasPrefix(0xFE, 0xFF) -> String(bytes, 2, bytes.size - 2, Charsets.UTF_16BE)
+        else -> {
+            val start = if (hasPrefix(0xEF, 0xBB, 0xBF)) 3 else 0
+            val decoder = Charsets.UTF_8.newDecoder()
+                .onMalformedInput(java.nio.charset.CodingErrorAction.REPORT)
+                .onUnmappableCharacter(java.nio.charset.CodingErrorAction.REPORT)
+            runCatching { decoder.decode(java.nio.ByteBuffer.wrap(bytes, start, bytes.size - start)).toString() }
+                .getOrElse { String(bytes, start, bytes.size - start, charset("windows-1252")) }
+        }
+    }
+}
+
