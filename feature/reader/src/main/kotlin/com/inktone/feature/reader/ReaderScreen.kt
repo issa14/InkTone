@@ -1395,10 +1395,8 @@ fun ReaderScreen(
                 if (chrome.showBrightnessBar) {
                     ReaderBrightnessBar(
                         value = state.readerBrightness,
-                        onValueChange = { value ->
-                            viewModel.onIntent(ReaderIntent.SetReaderBrightness(value))
-                            chrome.onBrightnessAdjusted()
-                        },
+                        onValueChange = { value -> viewModel.onIntent(ReaderIntent.SetReaderBrightness(value)) },
+                        onAdjusting = { chrome.onBrightnessAdjusted() },
                     )
                 }
                 }

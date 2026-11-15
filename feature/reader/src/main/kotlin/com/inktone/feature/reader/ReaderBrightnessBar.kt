@@ -24,6 +24,15 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.LocalView
 import androidx.compose.ui.unit.dp
+import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
+import androidx.compose.ui.semantics.contentDescription
+import androidx.compose.ui.semantics.semantics
+import android.view.View
+import kotlinx.coroutines.delay
 
 /**
  * 3d.3 — Applique la luminosité choisie à la SEULE fenêtre du lecteur
@@ -71,7 +80,19 @@ private const val MIN_BRIGHTNESS = 0.01f
  * jusqu'au minimum pour retrouver le comportement par défaut.
  */
 @Composable
-fun ReaderBrightnessBar(value: Float?, onValueChange: (Float?) -> Unit) {
+fun ReaderBrightnessBar(value: Float?, onValueChange: (Float?) -> Unit, onAdjusting: () -> Unit = {}) {
+    // État local pendant le geste : l'écran et la barre bougent aussitôt, la base
+    // n'est écrite qu'une fois le geste posé (audit UX B16). Chaque échantillon
+    // faisait une lecture et une écriture en base, et recomposait tout l'écran.
+    var live by remember(value) { mutableStateOf(value) }
+    val view = LocalView.current
+    LaunchedEffect(live) {
+        applyWindowBrightness(view, live)
+        if (live != value) {
+            delay(BRIGHTNESS_PERSIST_DELAY_MS)
+            onValueChange(live)
+        }
+    }
     Surface(
         modifier = Modifier.fillMaxWidth().padding(horizontal = 20.dp, vertical = 4.dp),
         color = MaterialTheme.colorScheme.surface.copy(alpha = 0.95f),
@@ -81,17 +102,20 @@ fun ReaderBrightnessBar(value: Float?, onValueChange: (Float?) -> Unit) {
             modifier = Modifier.fillMaxWidth().padding(horizontal = 16.dp, vertical = 8.dp),
             verticalAlignment = Alignment.CenterVertically,
         ) {
-            AppIcon(
-                AppSymbol.Brightness,
-                contentDescription = "Valeur système",
+            // Retour au réglage du système : un libellé « Auto », distinct du soleil
+            // de droite (luminosité maximale) qui lui ressemblait trait pour trait.
+            Text(
+                "Auto",
+                style = MaterialTheme.typography.labelLarge,
+                color = if (live == null) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurfaceVariant,
                 modifier = Modifier
-                    .combinedClickable(onClick = { onValueChange(null) })
+                    .semantics { contentDescription = "Luminosité du système" }
+                    .combinedClickable(onClick = { live = null; onAdjusting() })
                     .background(
-                        if (value == null) MaterialTheme.colorScheme.primary.copy(alpha = 0.15f) else Color.Transparent,
+                        if (live == null) MaterialTheme.colorScheme.primary.copy(alpha = 0.15f) else Color.Transparent,
                         RoundedCornerShape(8.dp),
                     )
-                    .padding(4.dp),
-                tint = MaterialTheme.colorScheme.onSurfaceVariant,
+                    .padding(horizontal = 8.dp, vertical = 6.dp),
             )
             Spacer(Modifier.width(8.dp))
             // Rail sans pouce plutôt qu'un curseur : ce réglage se manipule au
@@ -99,10 +123,10 @@ fun ReaderBrightnessBar(value: Float?, onValueChange: (Float?) -> Unit) {
             // largeur se trouve sans regarder, et le chiffre exact n'apprend
             // rien au lecteur, seul le résultat à l'écran compte.
             InkToneLevelBar(
-                value = value ?: MIN_BRIGHTNESS,
+                value = live ?: MIN_BRIGHTNESS,
                 // Le plancher est conservé : à zéro l'écran serait noir, et
                 // l'utilisateur n'aurait plus de quoi viser pour remonter.
-                onValueChange = { onValueChange(it.coerceAtLeast(MIN_BRIGHTNESS)) },
+                onValueChange = { live = it.coerceAtLeast(MIN_BRIGHTNESS); onAdjusting() },
                 contentDescription = "Luminosité",
                 modifier = Modifier.weight(1f),
             )
@@ -113,5 +137,15 @@ fun ReaderBrightnessBar(value: Float?, onValueChange: (Float?) -> Unit) {
                 tint = MaterialTheme.colorScheme.onSurfaceVariant,
             )
         }
+    }
+}
+
+/** Délai sans geste avant d'écrire la luminosité en base. */
+private const val BRIGHTNESS_PERSIST_DELAY_MS = 250L
+
+private fun applyWindowBrightness(view: View, value: Float?) {
+    val window = (view.context as? Activity)?.window ?: return
+    window.attributes = window.attributes.apply {
+        screenBrightness = value ?: WindowManager.LayoutParams.BRIGHTNESS_OVERRIDE_NONE
     }
 }

@@ -22,6 +22,7 @@ import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.layout.layout
 import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.semantics
+import androidx.compose.ui.semantics.setProgress
 import androidx.compose.ui.unit.dp
 
 /**
@@ -87,7 +88,15 @@ fun InkToneLevelBar(
                 detectHorizontalDragGestures { change, _ -> report(change.position.x) }
             }
             .progressSemantics(level)
-            .semantics { this.contentDescription = contentDescription },
+            .semantics {
+                this.contentDescription = contentDescription
+                // Réglable avec TalkBack : sans action de réglage, la barre ne se
+                // modifiait qu'au toucher (audit UX B16).
+                setProgress { target ->
+                    currentOnValueChange(target.coerceIn(0f, 1f))
+                    true
+                }
+            },
     ) {
         Box(
             modifier = Modifier
