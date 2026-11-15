@@ -9,6 +9,7 @@ import com.inktone.domain.model.AnnotationColor
 import com.inktone.domain.model.AnnotationKind
 import com.inktone.domain.model.BookBlock
 import com.inktone.domain.model.Bookmark
+import com.inktone.domain.model.Chapter
 import com.inktone.domain.model.ChapterContent
 import com.inktone.domain.model.FontFamily
 import com.inktone.domain.model.EffectiveReadingSettings
@@ -69,6 +70,7 @@ import kotlinx.coroutines.flow.combine
 import kotlinx.coroutines.launch
 import java.util.UUID
 import javax.inject.Inject
+import com.inktone.domain.model.plainText
 
 /**
  * MVI complet du Reader (Tâche 4.5) — remplace le squelette à une seule
@@ -693,6 +695,19 @@ class ReaderViewModel @Inject constructor(
      * ligne dans `playCurrentSentence` uniquement, aucune autre fonction
      * n'avait besoin de connaître le profil actif.
      */
+    private var contextTextCache: Pair<Chapter, String>? = null
+
+    /**
+     * Texte du chapitre dans l'espace de ses offsets, pour capturer le contexte
+     * textuel d'une position (ADR-027) ; gardé tant que le chapitre ne change pas.
+     */
+    private fun contextTextOf(chapter: Chapter): String? {
+        contextTextCache?.takeIf { it.first === chapter }?.let { return it.second }
+        val text = runCatching { chapter.plainText() }.getOrNull() ?: return null
+        contextTextCache = chapter to text
+        return text
+    }
+
     /** Langue déclarée du livre ouvert, pour la voix système (audit UX D44). */
     private var bookLanguage: String? = null
 
@@ -1009,6 +1024,7 @@ class ReaderViewModel @Inject constructor(
         val blocks = (chapter.content as? ChapterContent.Rich)?.blocks.orEmpty()
         val (startLocator, endLocator) = annotationSelectionHandler.resolveCharRange(
             freeRange.first, endOffsetExclusive, chapter.index, chapter.href, blocks,
+            chapterText = contextTextOf(chapter),
         ) ?: return
         val excerpt = sliceChapterText(sentences, freeRange.first, endOffsetExclusive)
             .take(Annotation.MAX_EXCERPT_LENGTH)
@@ -1115,7 +1131,10 @@ class ReaderViewModel @Inject constructor(
                 val bookmark = Bookmark(
                     id = UUID.randomUUID().toString(),
                     publicationId = publicationId,
-                    locator = sentence.startLocator(chapterIndex = chapter.index, resourceHref = chapter.href),
+                    locator = sentence.startLocator(
+                        chapterIndex = chapter.index, resourceHref = chapter.href,
+                        chapterText = contextTextOf(chapter),
+                    ),
                     // Lot 21, tâche 5 — le signet porte un titre lisible
                     // (début de la phrase) au lieu de rester sans titre ;
                     // la note optionnelle est proposée après la création.
@@ -1442,7 +1461,10 @@ class ReaderViewModel @Inject constructor(
         } else {
             val chapter = _state.value.chapters.getOrNull(chapterIndex) ?: return
             val sentence = chapter.sentences.getOrNull(sentenceIndex) ?: return
-            sentence.startLocator(chapterIndex = chapterIndex, resourceHref = chapter.href)
+            sentence.startLocator(
+                chapterIndex = chapterIndex, resourceHref = chapter.href,
+                chapterText = contextTextOf(chapter),
+            )
         }
         scope.launch {
             // Bug réel trouvé au diagnostic : reconstruire un ReadingState

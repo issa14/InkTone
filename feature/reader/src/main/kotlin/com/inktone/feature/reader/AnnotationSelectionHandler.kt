@@ -3,6 +3,7 @@ package com.inktone.feature.reader
 import com.inktone.domain.model.BookBlock
 import com.inktone.domain.model.Sentence
 import com.inktone.domain.valueobject.Locator
+import com.inktone.domain.valueobject.LocatorText
 
 /**
  * Résout une sélection libre au mot (offsets de caractère absolus au
@@ -26,6 +27,8 @@ class AnnotationSelectionHandler {
         chapterIndex: Int,
         resourceHref: String,
         blocks: List<BookBlock> = emptyList(),
+        // Texte du chapitre (Chapter.plainText) : les deux bornes portent alors leur contexte (ADR-027).
+        chapterText: String? = null,
     ): Pair<Locator, Locator>? {
         if (endOffsetExclusive <= startOffset) return null
         val startParagraphIndex = blocks.findBlockIndex(startOffset)
@@ -36,6 +39,7 @@ class AnnotationSelectionHandler {
         val startLocator = Locator(
             resourceHref = resourceHref, chapterIndex = chapterIndex,
             charOffset = startOffset, paragraphIndex = startParagraphIndex,
+            text = chapterText?.let { LocatorText.capture(it, startOffset) },
         )
         // Convention à connaître avant de consommer `endLocator.paragraphIndex` :
         // `charOffset` reste EXCLUSIF (fin de la sélection), mais
@@ -49,6 +53,7 @@ class AnnotationSelectionHandler {
         val endLocator = Locator(
             resourceHref = resourceHref, chapterIndex = chapterIndex,
             charOffset = endOffsetExclusive, paragraphIndex = endParagraphIndex,
+            text = chapterText?.let { LocatorText.capture(it, endOffsetExclusive) },
         )
         return startLocator to endLocator
     }

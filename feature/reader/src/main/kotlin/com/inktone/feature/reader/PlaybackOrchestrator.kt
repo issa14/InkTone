@@ -58,6 +58,7 @@ import java.util.concurrent.atomic.AtomicLong
 import java.util.concurrent.locks.ReentrantLock
 import javax.inject.Inject
 import javax.inject.Singleton
+import com.inktone.domain.valueobject.LocatorText
 
 /**
  * Ordonnanceur de lecture gapless (Lot 15, ADR-025) — **borné**, sans preWarm
@@ -987,7 +988,11 @@ class PlaybackOrchestrator @Inject constructor(
             // écrasait silencieusement overrides/voiceProfileId déjà
             // enregistrés à CHAQUE transition de phrase narrée — préserver
             // l'existant, comme le chemin manuel le fait déjà.
-            val locator = sentence.startLocator(chapterIndex = chapterIndex, resourceHref = resourceHref)
+            // Le texte du chapitre n'est pas là : le contexte n'a que son « après »
+            // (le début de la phrase), ce qu'ADR-027 admet comme repli.
+            val locator = sentence.startLocator(chapterIndex = chapterIndex, resourceHref = resourceHref).copy(
+                text = LocatorText(before = "", after = sentence.text.take(LocatorText.MAX_CONTEXT_LENGTH)),
+            )
             updateReadingState.update(publicationId) { existing ->
                 ReadingState(
                     publicationId = publicationId,

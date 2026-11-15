@@ -33,6 +33,27 @@ data class Chapter(
 )
 
 /**
+ * Texte du chapitre dans l'espace de ses `charOffset` : chaque bloc de texte est
+ * placé à son `globalOffsetRange`, les vides comblés par un saut de ligne. C'est le
+ * texte dans lequel un contexte textuel est capturé (ADR-027).
+ */
+fun Chapter.plainText(): String {
+    val blocks = (content as ChapterContent.Rich).blocks
+    val out = StringBuilder()
+    for (block in blocks) {
+        val range = block.globalOffsetRange ?: continue
+        val text = when (block) {
+            is BookBlock.ParagraphBlock -> block.richText.plainText
+            is BookBlock.HeadingBlock -> block.richText.plainText
+            else -> continue
+        }
+        while (out.length < range.first) out.append('\n')
+        out.append(text)
+    }
+    return out.toString()
+}
+
+/**
  * Unité de synthèse TTS. `startOffset`/`endOffset` sont des offsets de
  * caractère dans la ressource du chapitre — c'est ce qui rend possible la
  * synchronisation mot-à-mot (Blueprint §8.6 : "le découpage en phrases
@@ -73,16 +94,21 @@ data class Sentence(
         val WHITESPACE = Regex("\\s+")
     }
 
-    /** Construit le Locator de début de cette phrase. */
+    /**
+     * Construit le Locator de début de cette phrase. Avec [chapterText] (voir
+     * [plainText]), il porte son contexte textuel (ADR-027).
+     */
     fun startLocator(
         chapterIndex: Int,
         resourceHref: String,
         paragraphIndex: Int? = null,
+        chapterText: String? = null,
     ): com.inktone.domain.valueobject.Locator = com.inktone.domain.valueobject.Locator(
         resourceHref = resourceHref,
         chapterIndex = chapterIndex,
         paragraphIndex = paragraphIndex,
         charOffset = startOffset,
+        text = chapterText?.let { com.inktone.domain.valueobject.LocatorText.capture(it, startOffset) },
     )
 }
 
