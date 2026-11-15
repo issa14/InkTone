@@ -1241,7 +1241,8 @@ fun ReaderScreen(
         // sans bornes = glissement de poignée en cours : rien à l'écran,
         // la loupe native reste dégagée.
         if (freeSelectedRange != null && selectionBoundsInWindow != null) {
-            SelectionActionPopup(
+            ReadingThemeScope(state.resolvedTheme) {
+SelectionActionPopup(
                 selectedText = selectedText,
                 selectionBoundsInWindow = selectionBoundsInWindow,
                 // Lot 24, tâche 2 — application immédiate SANS purger la
@@ -1273,6 +1274,7 @@ fun ReaderScreen(
                 ),
                 recentColors = state.recentAnnotationColors,
             )
+}
         }
 
         // Pile basse du HUD (panneau/pilule TTS, barre de luminosité, ligne
@@ -1710,7 +1712,8 @@ fun ReaderScreen(
         val currentTappedAnnotation = chrome.tappedAnnotation
         val currentTappedBounds = chrome.tappedAnnotationBounds
         if (currentTappedAnnotation != null && currentTappedBounds != null) {
-            AnnotationTapPopup(
+            ReadingThemeScope(state.resolvedTheme) {
+AnnotationTapPopup(
                 boundsInWindow = currentTappedBounds,
                 onEdit = {
                     chrome.editingAnnotation = currentTappedAnnotation
@@ -1722,6 +1725,7 @@ fun ReaderScreen(
                 },
                 onDismiss = { chrome.dismissAnnotationMenu() },
             )
+}
         }
 
         ReadingThemeScope(state.resolvedTheme) {
