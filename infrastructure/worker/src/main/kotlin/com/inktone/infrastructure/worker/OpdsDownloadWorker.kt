@@ -5,6 +5,8 @@ import androidx.core.content.FileProvider
 import androidx.hilt.work.HiltWorker
 import androidx.work.CoroutineWorker
 import androidx.work.WorkerParameters
+import com.inktone.domain.model.detectPublicationFormat
+import com.inktone.domain.model.fileExtension
 import com.inktone.domain.service.OpdsDownloadEvent
 import com.inktone.domain.service.OpdsDownloadObserver
 import com.inktone.domain.service.OpdsDownloadResult
@@ -60,8 +62,12 @@ class OpdsDownloadWorker @AssistedInject constructor(
         val file = withContext(Dispatchers.IO) {
             val dir = File(applicationContext.getExternalFilesDir(null), DIR_DOWNLOADS)
             dir.mkdirs()
-            val target = File(dir, "${UUID.randomUUID()}.epub")
-            target.writeBytes((download as OpdsDownloadResult.Success).bytes)
+            val bytes = (download as OpdsDownloadResult.Success).bytes
+            // Extension déduite de l'adresse puis du contenu : l'import choisit
+            // son parseur par l'extension (audit UX D64, un PDF était écrit en .epub).
+            val format = detectPublicationFormat(href.substringBefore('?'), bytes.copyOf(minOf(bytes.size, 16)))
+            val target = File(dir, "${UUID.randomUUID()}.${format.fileExtension}")
+            target.writeBytes(bytes)
             target
         }
         if (isStopped) {
