@@ -610,3 +610,24 @@ val MIGRATION_37_38 = object : Migration(37, 38) {
         db.execSQL("ALTER TABLE publications ADD COLUMN locatorAnchorVersion INTEGER NOT NULL DEFAULT 0")
     }
 }
+
+/**
+ * Audit UX D61 : `updatedAt` des signets (départage deux versions à la synchronisation) et table des
+ * tombes de suppression. Opérations instantanées : une colonne ajoutée sans réécriture, une table vide.
+ */
+val MIGRATION_38_39 = object : Migration(38, 39) {
+    override fun migrate(db: SupportSQLiteDatabase) {
+        db.execSQL("ALTER TABLE bookmarks ADD COLUMN updatedAt INTEGER NOT NULL DEFAULT 0")
+        db.execSQL("UPDATE bookmarks SET updatedAt = createdAt")
+        db.execSQL(
+            """
+            CREATE TABLE IF NOT EXISTS sync_tombstones (
+                id TEXT NOT NULL,
+                kind TEXT NOT NULL,
+                deletedAt INTEGER NOT NULL,
+                PRIMARY KEY(id)
+            )
+            """.trimIndent(),
+        )
+    }
+}

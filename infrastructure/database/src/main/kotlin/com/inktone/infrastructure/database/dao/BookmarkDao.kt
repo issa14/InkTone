@@ -27,6 +27,6 @@ interface BookmarkDao {
     suspend fun setPinned(id: String, isPinned: Boolean)
 
     // Lot 21, tâche 5 — note optionnelle d'un signet.
-    @Query("UPDATE bookmarks SET note = :note WHERE id = :id")
-    suspend fun updateNote(id: String, note: String?)
+    @Query("UPDATE bookmarks SET note = :note, updatedAt = :updatedAt WHERE id = :id")
+    suspend fun updateNote(id: String, note: String?, updatedAt: Long)
 }

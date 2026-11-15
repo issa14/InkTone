@@ -28,4 +28,6 @@ data class BookmarkEntity(
     // Contexte textuel de la position (ADR-027, MIGRATION_37_38).
     val textBefore: String? = null,
     val textAfter: String? = null,
+    // Dernière modification (MIGRATION_38_39) : départage deux versions d'un même signet à la synchronisation.
+    val updatedAt: Long = 0,
 )

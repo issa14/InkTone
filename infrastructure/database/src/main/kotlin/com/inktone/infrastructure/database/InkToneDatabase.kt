@@ -5,6 +5,8 @@ import androidx.room.RoomDatabase
 import androidx.room.TypeConverters
 import com.inktone.infrastructure.database.converter.StringListConverter
 import com.inktone.infrastructure.database.dao.AnnotationDao
+import com.inktone.infrastructure.database.dao.SyncTombstoneDao
+import com.inktone.infrastructure.database.entity.SyncTombstoneEntity
 import com.inktone.infrastructure.database.dao.BookmarkDao
 import com.inktone.infrastructure.database.dao.CatalogDao
 import com.inktone.infrastructure.database.dao.CustomThemeDao
@@ -39,10 +41,10 @@ import com.inktone.infrastructure.database.entity.VoiceProfileEntity
         BookmarkEntity::class, AnnotationEntity::class, VoiceProfileEntity::class,
         UserPreferencesEntity::class, SentenceFtsEntity::class, PronunciationRuleEntity::class,
         ImportResultEntity::class, CustomThemeEntity::class, PendingConflictEntity::class,
-        CatalogEntity::class,
+        CatalogEntity::class, SyncTombstoneEntity::class,
     ],
     views = [LibraryItemView::class],
-    version = 38, // Contexte textuel des positions (MIGRATION_37_38, ADR-027)
+    version = 39, // Tombes de synchronisation et updatedAt des signets (MIGRATION_38_39, D61)
     exportSchema = true, // condition du harnais de migration — Tâche 2.4
 )
 @TypeConverters(StringListConverter::class)
@@ -61,4 +63,5 @@ abstract class InkToneDatabase : RoomDatabase() {
     abstract fun customThemeDao(): CustomThemeDao
     abstract fun pendingConflictDao(): PendingConflictDao
     abstract fun catalogDao(): CatalogDao
+    abstract fun syncTombstoneDao(): SyncTombstoneDao
 }

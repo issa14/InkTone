@@ -1524,6 +1524,50 @@ class DatabaseMigrationTest {
         v38.close()
     }
 
+    @Test
+    fun migration_38_vers_39_ajoute_updatedAt_aux_signets_et_la_table_des_tombes() {
+        val v38 = helper.createDatabase(TEST_DB_NAME, 38)
+        v38.execSQL(
+            """
+            INSERT INTO publications (id, title, authors, format, fileUri, fileHash, fileSize, chapterCount, subjects, isFavorite, isPinned, isDrmProtected, importDate, lastOpened, locatorAnchorVersion)
+            VALUES ('pub-1', 'Titre', '', 'EPUB', 'content://pub-1', 'hash1', 1000, 3, '', 0, 0, 0, 500, 900, 0)
+            """.trimIndent(),
+        )
+        v38.execSQL(
+            "INSERT INTO bookmarks (id, publicationId, resourceHref, chapterIndex, paragraphIndex, charOffset, title, note, excerpt, isPinned, createdAt) " +
+                "VALUES ('bm-1', 'pub-1', 'ch1.xhtml', 1, NULL, 42, 'Titre', 'ma note', NULL, 0, 7000)",
+        )
+        v38.close()
+
+        val v39 = helper.runMigrationsAndValidate(
+            TEST_DB_NAME, 39, true,
+            MIGRATION_1_2, MIGRATION_2_3, MIGRATION_3_4, MIGRATION_4_5, MIGRATION_5_6, MIGRATION_6_7,
+            MIGRATION_7_8, MIGRATION_8_9, MIGRATION_9_10, MIGRATION_10_11, MIGRATION_11_12, MIGRATION_12_13,
+            MIGRATION_13_14, MIGRATION_14_15, MIGRATION_15_16, MIGRATION_16_17, MIGRATION_17_18, MIGRATION_18_19,
+            MIGRATION_19_20, MIGRATION_20_21, MIGRATION_21_22, MIGRATION_22_23, MIGRATION_23_24, MIGRATION_24_25,
+            MIGRATION_25_26, MIGRATION_26_27, MIGRATION_27_28, MIGRATION_28_29, MIGRATION_29_30, MIGRATION_30_31,
+            MIGRATION_31_32, MIGRATION_32_33, MIGRATION_33_34, MIGRATION_34_35, MIGRATION_35_36, MIGRATION_36_37,
+            MIGRATION_37_38, MIGRATION_38_39,
+        )
+
+        // Le signet existant garde ses données ; sa dernière modification vaut sa création.
+        v39.query("SELECT note, createdAt, updatedAt FROM bookmarks WHERE id = 'bm-1'").use { cursor ->
+            assertEquals(true, cursor.moveToFirst())
+            assertEquals("ma note", cursor.getString(0))
+            assertEquals(7000L, cursor.getLong(1))
+            assertEquals(7000L, cursor.getLong(2))
+        }
+        // La table des tombes existe, vide, et accepte une écriture.
+        v39.query("SELECT count(*) FROM sync_tombstones").use { it.moveToFirst(); assertEquals(0, it.getInt(0)) }
+        v39.execSQL("INSERT INTO sync_tombstones (id, kind, deletedAt) VALUES ('bm-9', 'BOOKMARK', 8000)")
+        v39.query("SELECT kind, deletedAt FROM sync_tombstones WHERE id = 'bm-9'").use { cursor ->
+            assertEquals(true, cursor.moveToFirst())
+            assertEquals("BOOKMARK", cursor.getString(0))
+            assertEquals(8000L, cursor.getLong(1))
+        }
+        v39.close()
+    }
+
     companion object {
         private const val TEST_DB_NAME = "migration-test"
     }
