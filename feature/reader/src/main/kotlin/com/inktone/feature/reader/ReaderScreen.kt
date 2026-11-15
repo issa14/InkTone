@@ -1460,9 +1460,18 @@ SelectionActionPopup(
                     // dans `WithLiveValue` : seule la ligne de statut se
                     // recompose quand elles changent, jamais l'écran.
                     val readingMode = state.readingMode
+                    val tocFlat = remember(state.tableOfContents) { flattenTableOfContents(state.tableOfContents) }
                     WithLiveValue({
                         val live = uiState.value
                         val complete = pagination.isMeasurementComplete(chapter)
+                        // Section du sommaire en cours : titre et pages propres à la section, au lieu
+                        // du « chapitre » (fichier) du livre (audit UX, ligne de statut).
+                        val section = currentTocSection(
+                            tocFlat,
+                            state.currentChapterIndex,
+                            chapter.sentences.getOrNull(live.currentSentenceIndex)?.startOffset ?: 0,
+                            chapter.anchors,
+                        )
                         val pageIndexInChapter = if (complete) {
                             when (readingMode) {
                                 ReadingMode.PAGED -> pagedLivePageIndex
@@ -1471,10 +1480,20 @@ SelectionActionPopup(
                         } else {
                             0
                         }
+                        val sectionPages = if (complete && section != null) {
+                            val startPage = pagination.pageIndexAtOffset(chapter.index, section.startOffset)
+                            val lastPage = section.endOffset
+                                ?.let { pagination.pageIndexAtOffset(chapter.index, it - 1) }
+                                ?: (pagination.pageCount(chapter.index) - 1)
+                            pageInSection(pageIndexInChapter, startPage, lastPage)
+                        } else {
+                            null
+                        }
                         StatusLineValues(
-                            pageInChapter = pageIndexInChapter + 1,
-                            pageCountInChapter = if (complete) pagination.pageCount(chapter.index) else 0,
+                            pageInChapter = sectionPages?.first ?: (pageIndexInChapter + 1),
+                            pageCountInChapter = sectionPages?.second ?: if (complete) pagination.pageCount(chapter.index) else 0,
                             showPageCounter = complete,
+                            sectionTitle = section?.title,
                             // Arrondie à la précision AFFICHÉE (dixième de
                             // pourcent, même arrondi que `formatProgressionFr`) :
                             // la valeur brute change à chaque paragraphe, la
@@ -1492,6 +1511,7 @@ SelectionActionPopup(
                             pageCountInChapter = if (isPdf) state.chapters.size else values.pageCountInChapter,
                             bookProgression = values.bookProgression,
                             showPageCounter = values.showPageCounter,
+                            sectionTitle = values.sectionTitle,
                             isFixedPage = isPdf,
                             contentColor = ThemeColors.barContent(state.resolvedTheme),
                             backgroundColor = ThemeColors.barSurface(state.resolvedTheme),
@@ -2009,6 +2029,7 @@ private data class StatusLineValues(
     val pageInChapter: Int,
     val pageCountInChapter: Int,
     val showPageCounter: Boolean,
+    val sectionTitle: String?,
     val bookProgression: Float?,
 )
 

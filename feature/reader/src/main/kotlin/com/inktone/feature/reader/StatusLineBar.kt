@@ -54,6 +54,7 @@ fun StatusLineBar(
     bookProgression: Float?,
     modifier: Modifier = Modifier,
     showPageCounter: Boolean = true,
+    sectionTitle: String? = null,
     isFixedPage: Boolean = false,
     contentColor: Color = MaterialTheme.colorScheme.onSurface,
     backgroundColor: Color = Color.Transparent,
@@ -77,9 +78,14 @@ fun StatusLineBar(
         Text(timeText, style = MaterialTheme.typography.labelSmall, color = contentColor)
         Text(
             if (isFixedPage) fixedPageCounterText(chapterNumber, pageCountInChapter)
-            else chapterCounterText(chapterNumber, pageInChapter, pageCountInChapter, showPageCounter),
+            else chapterCounterText(chapterNumber, pageInChapter, pageCountInChapter, showPageCounter, sectionTitle),
             style = MaterialTheme.typography.labelSmall,
             color = contentColor,
+            // Le titre d'une section peut être long : il se tronque, jamais les chiffres voisins.
+            maxLines = 1,
+            overflow = androidx.compose.ui.text.style.TextOverflow.Ellipsis,
+            textAlign = androidx.compose.ui.text.style.TextAlign.Center,
+            modifier = Modifier.weight(1f).padding(horizontal = 12.dp),
         )
         // Progression inconnue : emplacement vide, jamais un chiffre estimé.
         Text(bookProgression?.let(::formatProgressionFr).orEmpty(), style = MaterialTheme.typography.labelSmall, color = contentColor)
@@ -106,10 +112,12 @@ internal fun chapterCounterText(
     pageInChapter: Int,
     pageCountInChapter: Int,
     showPageCounter: Boolean,
-): String = if (showPageCounter) {
-    "Chapitre $chapterNumber ($pageInChapter/$pageCountInChapter)"
-} else {
-    "Chapitre $chapterNumber"
+    sectionTitle: String? = null,
+): String {
+    // La section du sommaire dit où l'on est ; « Chapitre N » ne désigne qu'un fichier du livre, qui
+    // peut en contenir plusieurs sections ou une partie seulement d'un chapitre.
+    val label = sectionTitle ?: "Chapitre $chapterNumber"
+    return if (showPageCounter) "$label ($pageInChapter/$pageCountInChapter)" else label
 }
 
 /**
