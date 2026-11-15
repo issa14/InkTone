@@ -153,31 +153,31 @@ class SettingsViewModel @Inject constructor(
             // jusqu'a _state.value (Tache 6.6, regression trouvee par test).
             val current = preferencesRepository.get()
             when (intent) {
-                is SettingsIntent.SetTheme -> preferencesRepository.update(current.copy(theme = intent.themeId))
-                is SettingsIntent.SetFontSize -> preferencesRepository.update(current.copy(fontSize = intent.fontSize))
-                is SettingsIntent.SetFontFamily -> preferencesRepository.update(current.copy(fontFamily = intent.fontFamily))
+                is SettingsIntent.SetTheme -> preferencesRepository.update { it.copy(theme = intent.themeId) }
+                is SettingsIntent.SetFontSize -> preferencesRepository.update { it.copy(fontSize = intent.fontSize) }
+                is SettingsIntent.SetFontFamily -> preferencesRepository.update { it.copy(fontFamily = intent.fontFamily) }
                 is SettingsIntent.SetDefaultTtsEngine -> setDefaultTtsEngine(current, intent.engine)
                 is SettingsIntent.SetActiveVoiceProfileVoice ->
                     updateActiveVoiceProfile(current) { it.copy(voice = intent.voice) }
                 is SettingsIntent.SetCrashReportingEnabled ->
-                    preferencesRepository.update(current.copy(crashReportingEnabled = intent.enabled))
-                is SettingsIntent.SetReduceMotion -> preferencesRepository.update(current.copy(reduceMotion = intent.enabled))
+                    preferencesRepository.update { it.copy(crashReportingEnabled = intent.enabled) }
+                is SettingsIntent.SetReduceMotion -> preferencesRepository.update { it.copy(reduceMotion = intent.enabled) }
                 is SettingsIntent.SetDynamicColorEnabled ->
-                    preferencesRepository.update(current.copy(dynamicColorEnabled = intent.enabled))
+                    preferencesRepository.update { it.copy(dynamicColorEnabled = intent.enabled) }
                 is SettingsIntent.SetReadingRulerEnabled ->
-                    preferencesRepository.update(current.copy(readingRulerEnabled = intent.enabled))
+                    preferencesRepository.update { it.copy(readingRulerEnabled = intent.enabled) }
                 is SettingsIntent.SetActiveVoiceProfile ->
-                    preferencesRepository.update(current.copy(activeVoiceProfileId = intent.profileId))
+                    preferencesRepository.update { it.copy(activeVoiceProfileId = intent.profileId) }
                 // Lot 6 — thème système (ne touche pas ReadingTheme)
                 is SettingsIntent.SetAppTheme ->
-                    preferencesRepository.update(current.copy(appTheme = intent.appTheme))
+                    preferencesRepository.update { it.copy(appTheme = intent.appTheme) }
                 // Lot 6 — objectif quotidien et bien-être
                 is SettingsIntent.SetDailyGoalMinutes ->
-                    preferencesRepository.update(current.copy(dailyGoalMinutes = intent.minutes))
+                    preferencesRepository.update { it.copy(dailyGoalMinutes = intent.minutes) }
                 is SettingsIntent.SetEyeRestReminderEnabled ->
-                    preferencesRepository.update(current.copy(eyeRestReminderEnabled = intent.enabled))
+                    preferencesRepository.update { it.copy(eyeRestReminderEnabled = intent.enabled) }
                 is SettingsIntent.SetEyeRestReminderIntervalMinutes ->
-                    preferencesRepository.update(current.copy(eyeRestReminderIntervalMinutes = intent.minutes))
+                    preferencesRepository.update { it.copy(eyeRestReminderIntervalMinutes = intent.minutes) }
                 // Audit v1.0.0 (B1) — « Écouter un extrait » ré-implémenté :
                 // bascule lecture/arrêt d'une phrase d'exemple.
                 is SettingsIntent.PlayPreview -> togglePreview()
@@ -203,7 +203,7 @@ class SettingsViewModel @Inject constructor(
                 // Lot 6, Palier B — carte Données
                 is SettingsIntent.RefreshCacheSize -> refreshCacheSize()
                 is SettingsIntent.ClearCache -> clearCache()
-                is SettingsIntent.ResetPreferences -> preferencesRepository.update(current.withSettingsReset())
+                is SettingsIntent.ResetPreferences -> preferencesRepository.update { it.withSettingsReset() }
 
                 // Lot 6, Palier B — carte Prononciation inline
                 is SettingsIntent.SavePronunciationRule -> savePronunciationRule(intent)
