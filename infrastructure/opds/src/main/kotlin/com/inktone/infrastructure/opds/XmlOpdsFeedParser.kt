@@ -52,6 +52,7 @@ class XmlOpdsFeedParser @Inject constructor() : OpdsFeedParser {
         var entryNavHref: String? = null
         var entryAcqHref: String? = null
         var entryAcqType: String? = null
+        var entrySummary: String? = null
 
         var eventType = parser.eventType
         while (eventType != XmlPullParser.END_DOCUMENT) {
@@ -66,8 +67,15 @@ class XmlOpdsFeedParser @Inject constructor() : OpdsFeedParser {
                         entryNavHref = null
                         entryAcqHref = null
                         entryAcqType = null
+                        entrySummary = null
                     }
                     "author" -> inAuthor = true
+                    // Description : `summary` prime sur `content` ; le contenu XHTML imbriqué est aplati en texte.
+                    "summary", "content" -> if (inEntry) {
+                        val isSummary = parser.name == "summary"
+                        val text = readDeepText(parser)
+                        if (text.isNotBlank() && (entrySummary == null || isSummary)) entrySummary = text
+                    }
                     "title" -> {
                         val text = readText(parser)
                         if (inEntry) entryTitle = text else feedTitle = text
@@ -139,7 +147,7 @@ class XmlOpdsFeedParser @Inject constructor() : OpdsFeedParser {
                         if (inEntry) {
                             buildItem(
                                 title = entryTitle, authors = entryAuthors, coverUrl = entryCoverUrl,
-                                navHref = entryNavHref, acqHref = entryAcqHref, acqType = entryAcqType,
+                                navHref = entryNavHref, acqHref = entryAcqHref, acqType = entryAcqType, summary = entrySummary,
                             )?.let(items::add)
                             inEntry = false
                         }
@@ -164,6 +172,7 @@ class XmlOpdsFeedParser @Inject constructor() : OpdsFeedParser {
         navHref: String?,
         acqHref: String?,
         acqType: String?,
+        summary: String? = null,
     ): OpdsItem? {
         val itemTitle = title ?: return null
         return when {
@@ -175,6 +184,7 @@ class XmlOpdsFeedParser @Inject constructor() : OpdsFeedParser {
                 coverUrl = coverUrl,
                 acquisitionHref = acqHref,
                 mimeType = acqType ?: "",
+                summary = summary,
             )
             navHref != null -> OpdsItem.Navigation(title = itemTitle, href = navHref)
             else -> null
@@ -199,6 +209,25 @@ class XmlOpdsFeedParser @Inject constructor() : OpdsFeedParser {
     }
 
     /** Lit le texte d'un élément : on est sur START_TAG, on avance jusqu'au texte et on s'arrête sur END_TAG. */
+    /** Texte de l'élément courant, balises imbriquées comprises (contenu XHTML), jusqu'à sa balise fermante. */
+    private fun readDeepText(parser: XmlPullParser): String {
+        var depth = 1
+        val text = StringBuilder()
+        while (depth > 0) {
+            when (parser.next()) {
+                XmlPullParser.START_TAG -> depth++
+                XmlPullParser.END_TAG -> {
+                    depth--
+                    // Les éléments de bloc se séparent par un retour à la ligne, pas les éléments en ligne.
+                    if (parser.name in BLOCK_TAGS) text.append('\n')
+                }
+                XmlPullParser.TEXT -> text.append(parser.text)
+                XmlPullParser.END_DOCUMENT -> return cleanDescription(text.toString())
+            }
+        }
+        return cleanDescription(text.toString())
+    }
+
     private fun readText(parser: XmlPullParser): String {
         var event = parser.next()
         var text = ""
@@ -246,3 +275,22 @@ class XmlOpdsFeedParser @Inject constructor() : OpdsFeedParser {
         )
     }
 }
+
+private val BLOCK_TAGS = setOf("p", "div", "li", "br", "h1", "h2", "h3", "h4")
+
+private val HTML_BREAK = Regex("(?i)<br\\s*/?>|</(?:p|div|li|h[1-6])>")
+private val HTML_TAG = Regex("<[^>]+>")
+
+/**
+ * Description d'un catalogue en texte brut : certains catalogues y mettent du HTML échappé
+ * (`&lt;br&gt;`) que le parseur rend en balises littérales. Sauts et fins de bloc deviennent des
+ * retours à la ligne, les autres balises disparaissent (audit UX C10).
+ */
+internal fun cleanDescription(raw: String): String =
+    raw.replace(HTML_BREAK, "\n")
+        .replace(HTML_TAG, "")
+        .replace("&nbsp;", " ").replace("&amp;", "&").replace("&quot;", "\"").replace("&#39;", "'")
+        .lines()
+        .map { it.replace(Regex("[ \\t\\u00A0]+"), " ").trim() }
+        .filter { it.isNotEmpty() }
+        .joinToString("\n")

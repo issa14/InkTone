@@ -35,6 +35,34 @@ class OpdsFeedParserTest {
     """.trimIndent()
 
     @Test
+    fun lit_la_description_d_un_livre_en_texte_ou_en_xhtml() {
+        val xml = """
+            <feed xmlns="http://www.w3.org/2005/Atom">
+              <title>Catalogue</title>
+              <entry>
+                <title>Livre A</title>
+                <summary>Un roman  court.</summary>
+                <link rel="http://opds-spec.org/acquisition" type="application/epub+zip" href="/a.epub"/>
+              </entry>
+              <entry>
+                <title>Livre B</title>
+                <content type="xhtml"><div xmlns="http://www.w3.org/1999/xhtml"><p>Premier <b>paragraphe</b>.</p><p>Second.</p></div></content>
+                <link rel="http://opds-spec.org/acquisition" type="application/epub+zip" href="/b.epub"/>
+              </entry>
+              <entry>
+                <title>Livre C</title>
+                <link rel="http://opds-spec.org/acquisition" type="application/epub+zip" href="/c.epub"/>
+              </entry>
+            </feed>
+        """.trimIndent()
+
+        val items = (parser.parse(xml, "https://ex.org/feed") as OpdsParseResult.Success).feed.items.map { it as OpdsItem.Book }
+        assertEquals("Un roman court.", items[0].summary)
+        assertEquals("Premier paragraphe.\nSecond.", items[1].summary)
+        assertEquals(null, items[2].summary)
+    }
+
+    @Test
     fun parse_un_flux_atom_reel_en_navigation_et_livre() {
         val result = parser.parse(gutenbergFeed, "https://www.gutenberg.org/ebooks.opds")
 
@@ -215,5 +243,22 @@ class OpdsFeedParserTest {
         assertEquals("Le Livre", book.title)
         assertEquals("https://www.ebooksgratuits.com/newsendbook.php?id=2081&format=epub", book.acquisitionHref)
         assertEquals("application/epub+zip", book.mimeType)
+    }
+
+    @Test
+    fun nettoie_le_html_echappe_d_une_description() {
+        val xml = """
+            <feed xmlns="http://www.w3.org/2005/Atom">
+              <title>Catalogue</title>
+              <entry>
+                <title>Livre</title>
+                <summary type="html">&lt;p&gt;Un &lt;b&gt;grand&lt;/b&gt; roman.&lt;br&gt;&lt;br /&gt;Suite &amp;amp; fin.&lt;/p&gt;</summary>
+                <link rel="http://opds-spec.org/acquisition" type="application/epub+zip" href="/a.epub"/>
+              </entry>
+            </feed>
+        """.trimIndent()
+
+        val book = (parser.parse(xml, "https://ex.org/feed") as OpdsParseResult.Success).feed.items.single() as OpdsItem.Book
+        assertEquals("Un grand roman.\nSuite & fin.", book.summary)
     }
 }

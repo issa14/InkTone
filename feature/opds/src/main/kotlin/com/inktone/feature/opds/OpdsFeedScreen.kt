@@ -1,6 +1,14 @@
 package com.inktone.feature.opds
 
+import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.verticalScroll
+import androidx.compose.material3.ExperimentalMaterial3Api
+import androidx.compose.material3.ModalBottomSheet
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.setValue
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.PaddingValues
@@ -124,6 +132,8 @@ private fun FeedGrid(
     onLoadNextPage: (String) -> Unit,
 ) {
     val gridState = rememberLazyGridState()
+    // Fiche du livre ouverte par un appui sur sa carte (audit UX C10).
+    var detail by remember { mutableStateOf<OpdsItem.Book?>(null) }
 
     // Pagination — déclenche le chargement de la page suivante quand le
     // dernier élément visible approche de la fin de la grille.
@@ -149,7 +159,7 @@ private fun FeedGrid(
         itemsIndexed(state.items, key = { index, item -> "$index:${itemKey(item)}" }) { _, item ->
             when (item) {
                 is OpdsItem.Navigation -> DirectoryCard(item, onOpenNavigation)
-                is OpdsItem.Book -> BookCard(item, state.catalogId, state.downloads[item.acquisitionHref], onDownloadBook)
+                is OpdsItem.Book -> BookCard(item, state.catalogId, state.downloads[item.acquisitionHref], onDownloadBook, onOpenDetail = { detail = item })
             }
         }
         if (state.isLoadingMore) {
@@ -159,6 +169,16 @@ private fun FeedGrid(
                 }
             }
         }
+    }
+
+    detail?.let { book ->
+        BookDetailSheet(
+            item = book,
+            catalogId = state.catalogId,
+            download = state.downloads[book.acquisitionHref],
+            onDownloadBook = onDownloadBook,
+            onDismiss = { detail = null },
+        )
     }
 }
 
@@ -198,9 +218,10 @@ private fun BookCard(
     catalogId: String?,
     download: OpdsBookDownload?,
     onDownloadBook: (OpdsItem.Book) -> Unit,
+    onOpenDetail: () -> Unit,
 ) {
     val coverUrl = item.coverUrl
-    Card {
+    Card(modifier = Modifier.clickable(onClickLabel = "Voir la fiche de ${item.title}", onClick = onOpenDetail)) {
         Column(Modifier.fillMaxWidth()) {
             if (coverUrl != null) {
                 AsyncImage(
@@ -234,7 +255,19 @@ private fun BookCard(
                         overflow = TextOverflow.Ellipsis,
                     )
                 }
-                when (download) {
+                DownloadControl(item, download, onDownloadBook)
+            }
+        }
+    }
+}
+
+@Composable
+private fun DownloadControl(
+    item: OpdsItem.Book,
+    download: OpdsBookDownload?,
+    onDownloadBook: (OpdsItem.Book) -> Unit,
+) {
+    when (download) {
                     OpdsBookDownload.IN_PROGRESS -> Row(
                         modifier = Modifier.padding(top = 8.dp),
                         verticalAlignment = Alignment.CenterVertically,
@@ -253,7 +286,58 @@ private fun BookCard(
                         AppIcon(AppSymbol.Download, contentDescription = "Télécharger ${item.title}")
                     }
                 }
+}
+
+/** Fiche d'un livre du catalogue : couverture, auteurs, format, description et téléchargement (audit UX C10). */
+@OptIn(ExperimentalMaterial3Api::class)
+@Composable
+private fun BookDetailSheet(
+    item: OpdsItem.Book,
+    catalogId: String?,
+    download: OpdsBookDownload?,
+    onDownloadBook: (OpdsItem.Book) -> Unit,
+    onDismiss: () -> Unit,
+) {
+    ModalBottomSheet(onDismissRequest = onDismiss) {
+        Column(
+            modifier = Modifier.fillMaxWidth().verticalScroll(rememberScrollState()).padding(horizontal = 24.dp, vertical = 8.dp),
+            verticalArrangement = Arrangement.spacedBy(12.dp),
+        ) {
+            Row(horizontalArrangement = Arrangement.spacedBy(16.dp)) {
+                item.coverUrl?.let { url ->
+                    AsyncImage(
+                        model = OpdsCoverKey(url, catalogId),
+                        contentDescription = "Couverture de ${item.title}",
+                        contentScale = ContentScale.Crop,
+                        modifier = Modifier.size(width = 96.dp, height = 144.dp),
+                    )
+                }
+                Column(verticalArrangement = Arrangement.spacedBy(4.dp)) {
+                    Text(item.title, style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.Medium)
+                    if (item.authors.isNotEmpty()) {
+                        Text(
+                            item.authors.joinToString(", "),
+                            style = MaterialTheme.typography.bodyMedium,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant,
+                        )
+                    }
+                    formatLabel(item.mimeType)?.let {
+                        Text(it, style = MaterialTheme.typography.labelMedium, color = MaterialTheme.colorScheme.primary)
+                    }
+                }
             }
+            DownloadControl(item, download, onDownloadBook)
+            Text(
+                item.summary ?: "Aucune description fournie par le catalogue.",
+                style = MaterialTheme.typography.bodyMedium,
+            )
+            Spacer(Modifier.height(24.dp))
         }
     }
+}
+
+private fun formatLabel(mimeType: String): String? = when {
+    mimeType.contains("epub", ignoreCase = true) -> "EPUB"
+    mimeType.contains("pdf", ignoreCase = true) -> "PDF"
+    else -> null
 }

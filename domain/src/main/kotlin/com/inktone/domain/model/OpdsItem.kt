@@ -19,5 +19,7 @@ sealed interface OpdsItem {
         val coverUrl: String?,
         val acquisitionHref: String,
         val mimeType: String,
+        /** Description de l'entrée (`summary` ou `content`), texte brut, ou null. */
+        val summary: String? = null,
     ) : OpdsItem
 }
