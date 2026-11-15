@@ -7,6 +7,8 @@ import com.inktone.data.repository.InMemoryOpdsDownloadObserver
 import com.inktone.data.repository.InMemorySyncOperationTracker
 import com.inktone.data.repository.RoomAnnotationRepository
 import com.inktone.data.repository.RoomBookmarkRepository
+import com.inktone.data.repository.RoomSyncTombstoneRepository
+import com.inktone.domain.repository.SyncTombstoneRepository
 import com.inktone.data.repository.RoomLibraryItemRepository
 import com.inktone.data.repository.RoomOpdsCatalogRepository
 import com.inktone.data.repository.RoomPreferencesRepository
@@ -61,6 +63,7 @@ abstract class RepositoryModule {
     @Binds @Singleton abstract fun bindReadingStateRepository(impl: RoomReadingStateRepository): ReadingStateRepository
     @Binds @Singleton abstract fun bindReadingSessionRepository(impl: RoomReadingSessionRepository): ReadingSessionRepository
     @Binds @Singleton abstract fun bindBookmarkRepository(impl: RoomBookmarkRepository): BookmarkRepository
+    @Binds @Singleton abstract fun bindSyncTombstoneRepository(impl: RoomSyncTombstoneRepository): SyncTombstoneRepository
     @Binds @Singleton abstract fun bindAnnotationRepository(impl: RoomAnnotationRepository): AnnotationRepository
     @Binds @Singleton abstract fun bindVoiceProfileRepository(impl: RoomVoiceProfileRepository): VoiceProfileRepository
     @Binds @Singleton abstract fun bindPreferencesRepository(impl: RoomPreferencesRepository): PreferencesRepository

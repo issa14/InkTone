@@ -11,6 +11,8 @@ data class Bookmark(
     val excerpt: String? = null,
     val isPinned: Boolean = false,
     val createdAt: Long,
+    /** Dernière modification (titre, note) ; départage deux versions à la synchronisation (audit UX D61). */
+    val updatedAt: Long = createdAt,
 ) {
     init {
         require(publicationId.isNotBlank()) { "publicationId ne peut pas être vide" }
