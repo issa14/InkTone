@@ -255,5 +255,7 @@ sealed interface LibraryEffect {
     // Retours des actions du menu 3-points — mêmes règles que les
     // couvertures : un retour utilisateur, jamais un no-op muet.
     data object RandomBookUnavailable : LibraryEffect
+    /** La synchronisation manuelle démarre : l'écran l'affiche jusqu'à [SyncCompleted] (audit UX B15). */
+    data object SyncStarted : LibraryEffect
     data class SyncCompleted(val result: SyncOperationResult) : LibraryEffect
 }

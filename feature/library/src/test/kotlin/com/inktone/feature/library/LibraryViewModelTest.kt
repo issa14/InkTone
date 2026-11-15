@@ -45,6 +45,8 @@ import org.junit.Assert.assertTrue
 import org.junit.Before
 import org.junit.Test
 import com.inktone.core.testing.fake.FakeFileStorageService
+import com.inktone.domain.service.SyncFailureReason
+import com.inktone.domain.service.SyncOperationResult
 
 @OptIn(ExperimentalCoroutinesApi::class)
 class LibraryViewModelTest {
@@ -304,6 +306,42 @@ class LibraryViewModelTest {
         dispatcher.scheduler.advanceUntilIdle()
 
         assertEquals(1, syncNowService.callCount)
+    }
+
+    /** Audit UX B15 : rien n'indiquait qu'une synchronisation manuelle était en cours. */
+    @Test
+    fun `synchroniser annonce le demarrage puis le resultat`() = runTest {
+        val syncAccountRepository = FakeSyncAccountRepository()
+        syncAccountRepository.save(SyncAccount(SyncProviderId.GOOGLE_DRIVE, "issa@example.com", linkedAt = 0L))
+        val syncNowService = FakeSyncNowService(SyncOperationResult.Failed(SyncFailureReason.NETWORK, "Hors ligne"))
+        val viewModel = viewModel(syncAccountRepository = syncAccountRepository, syncNowService = syncNowService)
+        dispatcher.scheduler.advanceUntilIdle()
+
+        val effects = mutableListOf<LibraryEffect>()
+        val job = launch(dispatcher) { viewModel.effects.collect { effects += it } }
+        dispatcher.scheduler.advanceUntilIdle()
+
+        viewModel.onIntent(LibraryIntent.SyncNow)
+        dispatcher.scheduler.advanceUntilIdle()
+        job.cancel()
+
+        assertEquals(
+            listOf(LibraryEffect.SyncStarted, LibraryEffect.SyncCompleted(SyncOperationResult.Failed(SyncFailureReason.NETWORK, "Hors ligne"))),
+            effects,
+        )
+    }
+
+    @Test
+    fun `le message d'une synchronisation en echec donne le motif`() {
+        assertEquals("Synchronisation terminée", syncResultMessage(SyncOperationResult.Success))
+        assertEquals(
+            "Échec de la synchronisation : Hors ligne",
+            syncResultMessage(SyncOperationResult.Failed(SyncFailureReason.NETWORK, "Hors ligne")),
+        )
+        assertEquals(
+            "Échec de la synchronisation",
+            syncResultMessage(SyncOperationResult.Failed(SyncFailureReason.UNKNOWN, " ")),
+        )
     }
 
     @Test

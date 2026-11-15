@@ -308,7 +308,7 @@ private fun GoogleDriveCard(
                     // sont un prérequis hors périmètre de Claude Code, pris
                     // en charge par Issa (docs/execution/LOT_11_SYNCHRONISATION.md).
                     Text(
-                        "Configuration Google absente (clientId non renseigné) — le bouton restera inactif tant qu'elle n'est pas fournie.",
+                        "La connexion à Google Drive n'est pas disponible dans cette version de l'application.",
                         style = MaterialTheme.typography.bodySmall,
                         color = MaterialTheme.colorScheme.error,
                     )

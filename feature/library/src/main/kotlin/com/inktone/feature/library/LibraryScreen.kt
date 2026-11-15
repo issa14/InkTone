@@ -37,6 +37,7 @@ import androidx.compose.material3.ModalBottomSheet
 import androidx.compose.material3.NavigationDrawerItem
 import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.Scaffold
+import androidx.compose.material3.SnackbarDuration
 import androidx.compose.material3.SnackbarHost
 import androidx.compose.material3.SnackbarHostState
 import androidx.compose.material3.Text
@@ -150,12 +151,14 @@ fun LibraryScreen(
                 is LibraryEffect.RandomBookUnavailable -> scope.launch {
                     snackbarHostState.showSnackbar("Aucun livre à ouvrir")
                 }
+                // Audit UX B15 : rien n'indiquait qu'une synchronisation était en cours,
+                // et l'échec s'affichait sans motif.
+                is LibraryEffect.SyncStarted -> scope.launch {
+                    snackbarHostState.showSnackbar("Synchronisation en cours…", duration = SnackbarDuration.Indefinite)
+                }
                 is LibraryEffect.SyncCompleted -> scope.launch {
-                    val message = when (effect.result) {
-                        is SyncOperationResult.Success -> "Synchronisation terminée"
-                        is SyncOperationResult.Failed -> "Échec de la synchronisation"
-                    }
-                    snackbarHostState.showSnackbar(message)
+                    snackbarHostState.currentSnackbarData?.dismiss()
+                    snackbarHostState.showSnackbar(syncResultMessage(effect.result))
                 }
             }
         }
@@ -1251,3 +1254,9 @@ private fun ErrorState(message: String, onRetry: () -> Unit, onDismiss: () -> Un
     }
 }
 
+/** Message du résultat d'une synchronisation manuelle, avec le motif d'un échec. */
+internal fun syncResultMessage(result: SyncOperationResult): String = when (result) {
+    is SyncOperationResult.Success -> "Synchronisation terminée"
+    is SyncOperationResult.Failed ->
+        if (result.message.isBlank()) "Échec de la synchronisation" else "Échec de la synchronisation : ${result.message}"
+}

@@ -210,6 +210,7 @@ class LibraryViewModel @Inject constructor(
                 if (syncAccountRepository.get() == null) {
                     _effects.send(LibraryEffect.NavigateToSync)
                 } else {
+                    _effects.send(LibraryEffect.SyncStarted)
                     val result = synchronizeNow()
                     _effects.send(LibraryEffect.SyncCompleted(result))
                 }
