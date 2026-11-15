@@ -165,12 +165,14 @@ Locator
 ├── resourceHref        ancre stable vers la ressource (fichier de chapitre)
 ├── chapterIndex        index du chapitre dans l'ordre de lecture
 ├── paragraphIndex      index du paragraphe dans la ressource (nullable)
-├── charOffset          offset caractère dans la ressource
+├── charOffset          offset caractère dans la ressource — source de vérité de la position
+├── text                contexte textuel optionnel (before/after, 32 caractères chacun) — ADR-027
 └── progression         fraction 0..1 dérivée — jamais source de vérité
 ```
 
 Règles :
 
+* `charOffset` reste la source de vérité. `text` ne sert qu'à le recalculer quand le texte extrait d'un chapitre change (ré-ancrage, ADR-027) ; il n'entre ni dans l'égalité, ni dans l'ordre, ni dans la progression.
 * La position ne dépend **jamais** d'un numéro de page, qui varie selon la police, la taille du texte et l'écran.
 * `progression` est toujours recalculable depuis les autres champs ; elle sert à l'affichage (badge %) et à la réconciliation de synchronisation, pas à la reprise.
 * Le Locator du domaine encapsule le Locator de Readium sans l'exposer (ADR-011) : le domaine ne dépend pas de Readium, mais le mapping est sans perte.

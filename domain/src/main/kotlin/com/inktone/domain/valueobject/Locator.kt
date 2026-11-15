@@ -24,6 +24,13 @@ data class Locator(
     val paragraphIndex: Int? = null,
     val charOffset: Int,
     val pageOffsetY: Float? = null,
+    /**
+     * Texte qui entoure [charOffset], pour retrouver la position quand le texte
+     * extrait du chapitre change (ADR-027). `charOffset` reste la source de vérité :
+     * ce contexte n'entre ni dans l'égalité, ni dans `compareTo`, ni dans la
+     * progression.
+     */
+    val text: LocatorText? = null,
 ) : Comparable<Locator> {
 
     init {
@@ -46,6 +53,25 @@ data class Locator(
      */
     override fun compareTo(other: Locator): Int =
         compareValuesBy(this, other, Locator::chapterIndex, Locator::charOffset)
+
+    // Hors égalité : deux positions identiques à leur contexte près restent la
+    // même position (ADR-027, décision 2).
+    override fun equals(other: Any?): Boolean =
+        this === other || (
+            other is Locator &&
+                resourceHref == other.resourceHref && chapterIndex == other.chapterIndex &&
+                paragraphIndex == other.paragraphIndex && charOffset == other.charOffset &&
+                pageOffsetY == other.pageOffsetY
+            )
+
+    override fun hashCode(): Int {
+        var result = resourceHref.hashCode()
+        result = 31 * result + chapterIndex
+        result = 31 * result + (paragraphIndex ?: 0)
+        result = 31 * result + charOffset
+        result = 31 * result + (pageOffsetY?.hashCode() ?: 0)
+        return result
+    }
 
     companion object {
         /**
