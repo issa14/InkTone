@@ -1,5 +1,6 @@
 package com.inktone.feature.onboarding
 
+import kotlinx.coroutines.launch
 import androidx.compose.foundation.Image
 import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.background
@@ -86,6 +87,7 @@ private fun accentColor(): Color = if (isSystemInDarkTheme()) InkToneVioletLight
 fun OnboardingScreen(viewModel: OnboardingViewModel = hiltViewModel(), onDone: () -> Unit = {}) {
     val state by viewModel.state.collectAsStateWithLifecycle()
     val pagerState = rememberPagerState(pageCount = { 3 })
+    val scope = androidx.compose.runtime.rememberCoroutineScope()
     val accent = accentColor()
 
     LaunchedEffect(state.hasCompleted) {
@@ -117,6 +119,13 @@ fun OnboardingScreen(viewModel: OnboardingViewModel = hiltViewModel(), onDone: (
                     modifier = Modifier.align(Alignment.TopEnd).padding(24.dp),
                 ) {
                     Text("Passer", color = accent)
+                }
+                // Le balayage seul n'était pas découvrable (audit UX C12).
+                TextButton(
+                    onClick = { scope.launch { pagerState.animateScrollToPage(pagerState.currentPage + 1) } },
+                    modifier = Modifier.align(Alignment.BottomEnd).padding(24.dp),
+                ) {
+                    Text("Suivant", color = accent)
                 }
             }
 
@@ -189,7 +198,7 @@ private fun FeaturesCard(accent: Color) {
                 accent = accent,
                 icon = AppSymbol.Speaking,
                 title = "Narration naturelle",
-                body = "Des voix ultra-réalistes et fluides. Ajustez la vitesse et laissez-vous porter par l'histoire.",
+                body = "Une voix de synthèse lit vos livres à voix haute, hors ligne. Ajustez la vitesse et laissez-vous porter par l'histoire.",
             )
         }
     }
