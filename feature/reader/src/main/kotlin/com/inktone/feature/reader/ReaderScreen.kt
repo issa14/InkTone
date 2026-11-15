@@ -123,6 +123,8 @@ import com.inktone.feature.reader.rendering.BookBlockStyleMapper
 import com.inktone.feature.reader.rendering.EpubImageFetcher
 import kotlinx.coroutines.delay
 import kotlin.math.roundToInt
+import androidx.compose.ui.unit.Density
+import androidx.compose.foundation.lazy.LazyListLayoutInfo
 
 /**
  * `effectiveSettings` (theme, taille de police) arrive déjà résolu dans
@@ -860,8 +862,24 @@ fun ReaderScreen(
                 .fillMaxSize()
                 .onGloballyPositioned { coordinates -> measuredAreaSize = coordinates.size },
         ) {
-            if (state.isReadingRulerEnabled && !isPdf) {
-                ReadingRuler(currentLineY = currentLineYDp, enabled = true)
+            // Pendant la narration seulement : la position vient du mot prononcé,
+            // en lecture silencieuse la bande resterait figée en haut de page
+            // (audit UX A17).
+            if (state.isReadingRulerEnabled && !isPdf && state.isPlaying) {
+                ReadingRuler(
+                    currentLineY = {
+                        readingRulerY(
+                            lineYInParagraph = currentLineYDp,
+                            readingMode = state.readingMode,
+                            activeBlockIndex = uiState.value.currentChapter?.sentences
+                                ?.getOrNull(uiState.value.currentSentenceIndex)?.blockIndex,
+                            scrollLayout = scrollState.layoutInfo,
+                            margin = readerMargin,
+                            density = density,
+                        )
+                    },
+                    enabled = true,
+                )
             }
 
             if (isPdf) {
@@ -1487,6 +1505,8 @@ fun ReaderScreen(
                 onMarginStepChange = { step -> viewModel.onIntent(ReaderIntent.SetReaderMarginStep(step)) },
                 onTextJustifiedChange = { justified -> viewModel.onIntent(ReaderIntent.SetTextJustified(justified)) },
                 onKeepScreenOnChange = { enabled -> viewModel.onIntent(ReaderIntent.SetKeepScreenOn(enabled)) },
+                isReadingRulerEnabled = state.isReadingRulerEnabled,
+                onReadingRulerChange = { enabled -> viewModel.onIntent(ReaderIntent.SetReadingRulerEnabled(enabled)) },
                 showPdfInversion = isPdf,
                 forcePdfInversion = state.forcePdfInversion,
                 onForcePdfInversionChange = { viewModel.onIntent(ReaderIntent.ToggleForcePdfInversion) },
@@ -1921,5 +1941,26 @@ private data class ChapterAnchorKey(val href: String, val blockCount: Int, val s
                 sentenceCount = it.sentences.size,
             )
         }
+    }
+}
+
+/**
+ * Hauteur de la réglette dans la zone de lecture (audit UX A17). En défilement,
+ * la ligne prononcée est repérée dans son paragraphe : on y ajoute la position
+ * du paragraphe dans la liste, `null` s'il n'est pas à l'écran. En mode paginé,
+ * elle l'est dans la page, décalée de la marge.
+ */
+private fun readingRulerY(
+    lineYInParagraph: Dp,
+    readingMode: ReadingMode,
+    activeBlockIndex: Int?,
+    scrollLayout: LazyListLayoutInfo,
+    margin: Dp,
+    density: Density,
+): Dp? = when (readingMode) {
+    ReadingMode.PAGED -> margin + lineYInParagraph
+    ReadingMode.SCROLL -> {
+        val item = scrollLayout.visibleItemsInfo.firstOrNull { it.index == activeBlockIndex }
+        item?.let { with(density) { (it.offset - scrollLayout.viewportStartOffset).toDp() } + lineYInParagraph }
     }
 }

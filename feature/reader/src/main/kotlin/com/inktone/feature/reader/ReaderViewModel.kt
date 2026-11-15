@@ -423,6 +423,7 @@ class ReaderViewModel @Inject constructor(
             is ReaderIntent.SetLineHeight -> setLineHeight(intent.multiplier)
             is ReaderIntent.SetReaderMarginStep -> setReaderMarginStep(intent.step)
             is ReaderIntent.SetTextJustified -> setTextJustified(intent.justified)
+            is ReaderIntent.SetReadingRulerEnabled -> setReadingRulerEnabled(intent.enabled)
             is ReaderIntent.SetFontFamily -> setFontFamily(intent.fontFamily)
             is ReaderIntent.SetKeepScreenOn -> setKeepScreenOn(intent.enabled)
             is ReaderIntent.SetAutoScrollSpeed -> setAutoScrollSpeed(intent.speed)
@@ -1721,6 +1722,13 @@ class ReaderViewModel @Inject constructor(
         viewModelScope.launch {
             val current = preferencesRepository.get()
             preferencesRepository.update(current.copy(readerMarginStep = bounded))
+        }
+    }
+
+    private fun setReadingRulerEnabled(enabled: Boolean) {
+        viewModelScope.launch {
+            val current = preferencesRepository.get()
+            preferencesRepository.update(current.copy(readingRulerEnabled = enabled))
         }
     }
 

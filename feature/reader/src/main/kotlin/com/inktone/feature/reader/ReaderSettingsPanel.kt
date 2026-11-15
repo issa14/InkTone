@@ -95,6 +95,9 @@ fun ReaderSettingsPanel(
     showPdfInversion: Boolean = false,
     forcePdfInversion: Boolean = false,
     onForcePdfInversionChange: (Boolean) -> Unit = {},
+    // Audit UX A11 — réglette de lecture, réglage propre.
+    isReadingRulerEnabled: Boolean = false,
+    onReadingRulerChange: (Boolean) -> Unit = {},
     onDismiss: () -> Unit,
 ) {
     val sheetState = rememberModalBottomSheetState(skipPartiallyExpanded = true)
@@ -232,6 +235,15 @@ fun ReaderSettingsPanel(
                 supporting = "Pendant la lecture visuelle uniquement",
                 checked = keepScreenOn,
                 onCheckedChange = onKeepScreenOnChange,
+            )
+
+            Spacer(Modifier.height(8.dp))
+
+            SettingSwitchRow(
+                label = "Réglette de lecture",
+                supporting = "Une bande suit la ligne lue pendant la narration",
+                checked = isReadingRulerEnabled,
+                onCheckedChange = onReadingRulerChange,
             )
 
             if (showPdfInversion) {

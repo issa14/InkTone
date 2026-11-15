@@ -537,6 +537,9 @@ sealed interface ReaderIntent {
     /** P4 — justification du texte, césure comprise. */
     data class SetTextJustified(val justified: Boolean) : ReaderIntent
 
+    /** Réglette de lecture, réglage propre : elle ne s'obtenait qu'avec le préréglage Accessibilité (audit UX A11). */
+    data class SetReadingRulerEnabled(val enabled: Boolean) : ReaderIntent
+
     /**
      * Correctif Lot 21 — jusqu'ici aucun écran ne permettait de choisir
      * la famille de police depuis le Lecteur : `SettingsIntent.SetFontFamily`
