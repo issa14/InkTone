@@ -33,6 +33,40 @@ class JsoupChapterParserTest {
 
     // ---- Tests de normalisation des spans ----
 
+    // ---- Audit UX D16 : italique, gras et contenu masqué posés par le CSS ----
+
+    private fun parseWithCss(html: String, css: String? = null): Chapter =
+        parser.parse(
+            inputStream = ByteArrayInputStream(html.toByteArray()),
+            baseUrl = "OEBPS/ch1.xhtml",
+            chapterIndex = 0,
+            chapterHref = "OEBPS/ch1.xhtml",
+            loadStyleSheet = css?.let { sheet -> { path -> if (path == "OEBPS/style.css") sheet else null } },
+        )
+
+    @Test
+    fun `une classe d'un bloc style met le texte en italique`() {
+        val html = "<html><head><style>.it { font-style: italic }</style></head><body><p>Le <span class=\"it\">Petit</span> Prince.</p></body></html>"
+        val block = richBlocks(parseWithCss(html)).single() as BookBlock.ParagraphBlock
+        assertEquals("Le Petit Prince.", block.richText.plainText)
+        assertTrue(block.richText.spans.any { SpanStyles.EMPHASIS in it.styles && block.richText.plainText.substring(it.start, it.end) == "Petit" })
+    }
+
+    @Test
+    fun `une feuille liee met le texte en gras`() {
+        val html = "<html><head><link rel=\"stylesheet\" href=\"style.css\"/></head><body><p class=\"b\">Titre</p></body></html>"
+        val block = richBlocks(parseWithCss(html, css = ".b { font-weight: bold }")).single() as BookBlock.ParagraphBlock
+        assertTrue(block.richText.spans.any { SpanStyles.STRONG in it.styles })
+    }
+
+    @Test
+    fun `l'attribut style est lu et le contenu masque est retire`() {
+        val html = "<html><body><p style=\"font-style: italic\">Penche.</p><p style=\"display:none\">Cache.</p><p>Visible.</p></body></html>"
+        val blocks = richBlocks(parseWithCss(html)).filterIsInstance<BookBlock.ParagraphBlock>()
+        assertEquals(listOf("Penche.", "Visible."), blocks.map { it.richText.plainText })
+        assertTrue(blocks[0].richText.spans.any { SpanStyles.EMPHASIS in it.styles })
+    }
+
     // ---- Audit UX D13 : listes, tableaux et citations n'étaient plus fondus en un paragraphe ----
 
     @Test

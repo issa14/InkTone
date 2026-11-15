@@ -139,7 +139,9 @@ class FilePreAnalysisStore @Inject constructor(
          * 6 : texte inchangé ; force la réindexation de la recherche (tokeniseur unicode61, audit UX D8).
          * 7 : listes, tableaux et citations en un bloc par élément (audit UX D13) : blocs et offsets changent,
          *     les positions sont ré-ancrées par leur contexte (ADR-027).
+         * 8 : le CSS retire le contenu masqué (display:none), les offsets changent ; italique et gras
+         *     par CSS (audit UX D16).
          */
-        const val PARSER_VERSION = 7
+        const val PARSER_VERSION = 8
     }
 }

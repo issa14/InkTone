@@ -80,9 +80,11 @@ class JsoupChapterParser {
         chapterIndex: Int,
         chapterHref: String,
         fragment: String? = null,
+        loadStyleSheet: ((String) -> String?)? = null,
     ): Chapter {
         val document = Jsoup.parse(inputStream, "UTF-8", baseUrl)
         val body = document.body()
+        applyStyles(document, chapterHref, loadStyleSheet)
 
         val blocks = extractBlocks(body, fragment, chapterHref)
         val sentences = tokenizeSentences(blocks)
@@ -94,6 +96,45 @@ class JsoupChapterParser {
             content = ChapterContent.Rich(blocks = blocks),
             sentences = sentences,
         )
+    }
+
+    /**
+     * Applique au DOM ce que le CSS (blocs `<style>`, feuilles liées, attribut `style`) dit de
+     * l'italique, du gras et du contenu masqué : l'italique et le gras deviennent des balises
+     * `<i>` et `<b>` autour du contenu, le contenu masqué est retiré (audit UX D16). Le centrage
+     * et le reste du CSS sont ignorés : le modèle de texte ne les porte pas.
+     */
+    private fun applyStyles(document: org.jsoup.nodes.Document, chapterHref: String, loadStyleSheet: ((String) -> String?)?) {
+        val css = StringBuilder()
+        document.select("style").forEach { css.append(it.data()).append('\n') }
+        if (loadStyleSheet != null) {
+            document.select("link[href]").filter { it.attr("rel").contains("stylesheet", ignoreCase = true) }.forEach { link ->
+                runCatching { loadStyleSheet(resolveHref(chapterHref, link.attr("href"))) }.getOrNull()
+                    ?.let { css.append(it).append('\n') }
+            }
+        }
+        val sheet = StyleSheet.parse(css.toString())
+        val body = document.body()
+        val hidden = mutableListOf<Element>()
+        for (element in body.allElements) {
+            if (element === body) continue
+            var effect = sheet.effectFor(element)
+            element.attr("style").takeIf { it.isNotBlank() }?.let { effect = effect.overriddenBy(parseDeclarations(it)) }
+            if (effect.hidden == true) {
+                hidden += element
+                continue
+            }
+            val name = element.normalName()
+            if (effect.bold == true && name !in BOLD_TAGS) wrapContents(element, "b")
+            if (effect.italic == true && name !in ITALIC_TAGS) wrapContents(element, "i")
+        }
+        hidden.forEach { it.remove() }
+    }
+
+    private fun wrapContents(element: Element, tag: String) {
+        val wrapper = Element(tag)
+        element.childNodes().toList().forEach { wrapper.appendChild(it) }
+        element.appendChild(wrapper)
     }
 
     /**
@@ -856,5 +897,8 @@ class JsoupChapterParser {
 
         /** Cf. [isStandaloneBlockNode] — exclues de [BLOCK_LEVEL_TAGS] mais jamais fondues dans du texte inline. */
         val STANDALONE_IMAGE_TAGS = setOf("img", "svg")
+
+        private val BOLD_TAGS = setOf("b", "strong", "h1", "h2", "h3", "h4", "h5", "h6")
+        private val ITALIC_TAGS = setOf("i", "em")
     }
 }

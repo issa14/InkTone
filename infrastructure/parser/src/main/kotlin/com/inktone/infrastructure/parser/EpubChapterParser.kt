@@ -14,6 +14,7 @@ import kotlinx.coroutines.asCoroutineDispatcher
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.sync.Semaphore
 import kotlinx.coroutines.sync.withPermit
+import kotlinx.coroutines.runBlocking
 import kotlinx.coroutines.withContext
 import org.readium.r2.shared.ExperimentalReadiumApi
 import org.readium.r2.shared.publication.Link
@@ -145,6 +146,7 @@ class EpubChapterParser @Inject constructor(
                         chapterIndex = chapterIndex,
                         chapterHref = chapterHref,
                         fragment = fragment,
+                        loadStyleSheet = styleSheetLoader(publication),
                     )
                 }
                 cache.put(cacheKey, chapter)
@@ -218,6 +220,7 @@ class EpubChapterParser @Inject constructor(
                         baseUrl = chapterHref,
                         chapterIndex = chapterIndex,
                         chapterHref = chapterHref,
+                        loadStyleSheet = styleSheetLoader(publication),
                     )
                 }
             } catch (e: CancellationException) {
@@ -252,6 +255,7 @@ class EpubChapterParser @Inject constructor(
                         baseUrl = chapterHref,
                         chapterIndex = chapterIndex,
                         chapterHref = chapterHref,
+                        loadStyleSheet = styleSheetLoader(publication),
                     )
                 }
             } finally {
@@ -340,6 +344,21 @@ class EpubChapterParser @Inject constructor(
         }
 
         return ByteArrayInputStream(bytes)
+    }
+
+    /**
+     * Lecteur de feuilles de style liées par un chapitre (audit UX D16). Le parseur Jsoup n'est pas
+     * suspendu : la lecture s'y fait en bloquant, sur le thread de parsing déjà dédié.
+     */
+    private fun styleSheetLoader(publication: Publication): (String) -> String? = { path ->
+        runBlocking {
+            val url = Url(path)
+            val link = url?.let { publication.linkWithHref(it) }
+            val resource = link?.let { publication.get(it) }
+            val length = resource?.length()?.getOrNull()?.toLong()
+            if (resource == null || length == null) null
+            else resource.read(0L until length).getOrNull()?.toString(Charsets.UTF_8)
+        }
     }
 
     private companion object {
