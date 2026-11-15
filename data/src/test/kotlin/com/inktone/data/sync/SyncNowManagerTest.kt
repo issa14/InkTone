@@ -61,10 +61,11 @@ private fun backupManager(
     readingStateRepository: ReadingStateRepository = FakeReadingStateRepository(),
     readingSessionRepository: ReadingSessionRepository = FakeReadingSessionRepository(),
     publicationRepository: PublicationRepository = FakePublicationRepository(),
+    syncTombstoneRepository: com.inktone.domain.repository.SyncTombstoneRepository = com.inktone.core.testing.fake.FakeSyncTombstoneRepository(),
 ) = BackupManager(
     NoopFileStorageService(), bookmarkRepository, FakePronunciationRuleRepository(),
     readingStateRepository, readingSessionRepository, publicationRepository,
-    FakeThemeRepository(), annotationRepository,
+    FakeThemeRepository(), annotationRepository, syncTombstoneRepository,
 )
 
 private fun publication(id: String, title: String = "Livre $id") = Publication(
@@ -85,13 +86,14 @@ class SyncNowManagerTest {
         val conflictQueueRepository: FakeConflictQueueRepository = FakeConflictQueueRepository(),
         val syncOperationTracker: FakeSyncOperationTracker = FakeSyncOperationTracker(),
         val syncAccountRepository: FakeSyncAccountRepository = FakeSyncAccountRepository(),
+        val tombstoneRepository: com.inktone.core.testing.fake.FakeSyncTombstoneRepository = com.inktone.core.testing.fake.FakeSyncTombstoneRepository(),
         deviceIdentity: DeviceIdentity = DeviceIdentity("device-a", "Téléphone A"),
     ) {
         val fleetRepository = RemoteDeviceFleetRepository(syncProvider)
         val activityLogRepository = RemoteSyncActivityLogRepository(syncProvider)
         val manager = SyncNowManager(
             syncProvider = syncProvider,
-            backupManager = backupManager(bookmarkRepository, annotationRepository, readingStateRepository, readingSessionRepository, publicationRepository),
+            backupManager = backupManager(bookmarkRepository, annotationRepository, readingStateRepository, readingSessionRepository, publicationRepository, tombstoneRepository),
             syncOperationTracker = syncOperationTracker,
             syncAccountRepository = syncAccountRepository,
             syncFleetRepository = fleetRepository,
@@ -105,6 +107,7 @@ class SyncNowManagerTest {
             readingStateRepository = readingStateRepository,
             publicationRepository = publicationRepository,
             conflictQueueRepository = conflictQueueRepository,
+            syncTombstoneRepository = tombstoneRepository,
         )
     }
 
@@ -213,6 +216,196 @@ class SyncNowManagerTest {
 
         assertEquals(1, fixture.annotationRepository.getAll().size)
         assertEquals("locale", fixture.annotationRepository.getAll().first().content)
+    }
+
+    // ---- Audit UX D61 : suppressions et modifications propagées ----
+
+    private fun payloadOf(
+        bookmarks: List<com.inktone.data.backup.BookmarkBackup> = emptyList(),
+        annotations: List<com.inktone.data.backup.AnnotationBackup> = emptyList(),
+        deletions: List<com.inktone.data.backup.TombstoneBackup> = emptyList(),
+    ) = com.inktone.data.backup.BackupPayload(
+        appVersion = "sync", createdAt = 0L, bookmarks = bookmarks, pronunciationRules = emptyList(),
+        readingStates = emptyList(), readingSessions = emptyList(), annotations = annotations, deletions = deletions,
+    )
+
+    private suspend fun upload(provider: FakeSyncProvider, payload: com.inktone.data.backup.BackupPayload) =
+        provider.upload("snapshot-device-b.json", backupJson.encodeToString(payload).encodeToByteArray())
+
+    private fun bookmarkBackup(id: String, note: String? = null, createdAt: Long = 100L, updatedAt: Long = 0L) =
+        com.inktone.data.backup.BookmarkBackup(
+            id = id, publicationId = "pub-1", locator = com.inktone.data.backup.LocatorBackup("ch1.xhtml", 0, null, 5),
+            note = note, createdAt = createdAt, updatedAt = updatedAt,
+        )
+
+    private fun localBookmark(id: String, note: String? = null, createdAt: Long = 100L, updatedAt: Long = createdAt) =
+        com.inktone.domain.model.Bookmark(id, "pub-1", Locator("ch1.xhtml", 0, null, 5), note = note, createdAt = createdAt, updatedAt = updatedAt)
+
+    private fun annotationBackup(id: String, content: String?, color: String, updatedAt: Long) =
+        com.inktone.data.backup.AnnotationBackup(
+            id = id, publicationId = "pub-1",
+            startLocator = com.inktone.data.backup.LocatorBackup("ch1.xhtml", 0, null, 0),
+            endLocator = com.inktone.data.backup.LocatorBackup("ch1.xhtml", 0, null, 10),
+            color = color, content = content, createdAt = 0L, updatedAt = updatedAt,
+        )
+
+    @Test
+    fun une_suppression_distante_supprime_le_signet_local_et_garde_sa_tombe() = runTest {
+        val provider = FakeSyncProvider()
+        val publications = FakePublicationRepository().apply { insert(publication("pub-1")) }
+        val bookmarks = FakeBookmarkRepository().apply { insert(localBookmark("bm-1", createdAt = 100L)) }
+        upload(provider, payloadOf(deletions = listOf(com.inktone.data.backup.TombstoneBackup("bm-1", "BOOKMARK", deletedAt = System.currentTimeMillis() - 1000L))))
+        val fixture = Fixture(syncProvider = provider, publicationRepository = publications, bookmarkRepository = bookmarks)
+
+        fixture.manager.synchronizeNow()
+
+        assertTrue(fixture.bookmarkRepository.observeAll().first().isEmpty())
+        assertEquals(listOf("bm-1"), fixture.tombstoneRepository.getAll().map { it.id })
+    }
+
+    @Test
+    fun un_signet_supprime_localement_ne_revient_pas_depuis_un_autre_appareil() = runTest {
+        val provider = FakeSyncProvider()
+        val publications = FakePublicationRepository().apply { insert(publication("pub-1")) }
+        val tombstones = com.inktone.core.testing.fake.FakeSyncTombstoneRepository().apply {
+            record(com.inktone.domain.model.SyncTombstone("bm-1", com.inktone.domain.model.TombstoneKind.BOOKMARK, deletedAt = 900L))
+        }
+        upload(provider, payloadOf(bookmarks = listOf(bookmarkBackup("bm-1", createdAt = 100L, updatedAt = 100L))))
+        val fixture = Fixture(syncProvider = provider, publicationRepository = publications, tombstoneRepository = tombstones)
+
+        fixture.manager.synchronizeNow()
+
+        assertTrue("l'instantané d'un autre appareil ne ressuscite pas un signet supprimé", fixture.bookmarkRepository.observeAll().first().isEmpty())
+    }
+
+    @Test
+    fun un_signet_modifie_apres_sa_suppression_est_recree_et_sa_tombe_retiree() = runTest {
+        val provider = FakeSyncProvider()
+        val publications = FakePublicationRepository().apply { insert(publication("pub-1")) }
+        val tombstones = com.inktone.core.testing.fake.FakeSyncTombstoneRepository().apply {
+            record(com.inktone.domain.model.SyncTombstone("bm-1", com.inktone.domain.model.TombstoneKind.BOOKMARK, deletedAt = 500L))
+        }
+        upload(provider, payloadOf(bookmarks = listOf(bookmarkBackup("bm-1", note = "revu", createdAt = 100L, updatedAt = 800L))))
+        val fixture = Fixture(syncProvider = provider, publicationRepository = publications, tombstoneRepository = tombstones)
+
+        fixture.manager.synchronizeNow()
+
+        assertEquals(listOf("bm-1"), fixture.bookmarkRepository.observeAll().first().map { it.id })
+        assertTrue(fixture.tombstoneRepository.getAll().none { it.id == "bm-1" })
+    }
+
+    @Test
+    fun une_suppression_ne_touche_pas_un_signet_modifie_apres_elle() = runTest {
+        val provider = FakeSyncProvider()
+        val publications = FakePublicationRepository().apply { insert(publication("pub-1")) }
+        val bookmarks = FakeBookmarkRepository().apply { insert(localBookmark("bm-1", note = "récent", createdAt = 100L, updatedAt = 900L)) }
+        upload(provider, payloadOf(deletions = listOf(com.inktone.data.backup.TombstoneBackup("bm-1", "BOOKMARK", deletedAt = 500L))))
+        val fixture = Fixture(syncProvider = provider, publicationRepository = publications, bookmarkRepository = bookmarks)
+
+        fixture.manager.synchronizeNow()
+
+        assertEquals("récent", fixture.bookmarkRepository.observeAll().first().single().note)
+    }
+
+    @Test
+    fun la_version_la_plus_recente_d_un_signet_l_emporte() = runTest {
+        val provider = FakeSyncProvider()
+        val publications = FakePublicationRepository().apply { insert(publication("pub-1")) }
+        val bookmarks = FakeBookmarkRepository().apply {
+            insert(localBookmark("ancien", note = "ancienne", createdAt = 100L, updatedAt = 200L))
+            insert(localBookmark("recent", note = "locale récente", createdAt = 100L, updatedAt = 900L))
+        }
+        upload(
+            provider,
+            payloadOf(
+                bookmarks = listOf(
+                    bookmarkBackup("ancien", note = "distante récente", updatedAt = 700L),
+                    bookmarkBackup("recent", note = "distante ancienne", updatedAt = 300L),
+                ),
+            ),
+        )
+        val fixture = Fixture(syncProvider = provider, publicationRepository = publications, bookmarkRepository = bookmarks)
+
+        fixture.manager.synchronizeNow()
+
+        val byId = fixture.bookmarkRepository.observeAll().first().associateBy { it.id }
+        assertEquals("distante récente", byId.getValue("ancien").note)
+        assertEquals("locale récente", byId.getValue("recent").note)
+    }
+
+    @Test
+    fun une_annotation_modifiee_ailleurs_est_mise_a_jour_localement() = runTest {
+        val provider = FakeSyncProvider()
+        val publications = FakePublicationRepository().apply { insert(publication("pub-1")) }
+        val annotations = FakeAnnotationRepository().apply {
+            insert(
+                Annotation(
+                    id = "an-1", publicationId = "pub-1",
+                    startLocator = Locator("ch1.xhtml", 0, null, 0), endLocator = Locator("ch1.xhtml", 0, null, 10),
+                    color = AnnotationColor.GREEN, content = "avant", createdAt = 0L, updatedAt = 100L,
+                ),
+            )
+        }
+        upload(provider, payloadOf(annotations = listOf(annotationBackup("an-1", content = "après", color = "YELLOW", updatedAt = 400L))))
+        val fixture = Fixture(syncProvider = provider, publicationRepository = publications, annotationRepository = annotations)
+
+        fixture.manager.synchronizeNow()
+
+        val merged = fixture.annotationRepository.getAll().single()
+        assertEquals("après", merged.content)
+        assertEquals(400L, merged.updatedAt)
+    }
+
+    @Test
+    fun une_annotation_supprimee_ailleurs_disparait_ici_et_l_instantane_televerse_porte_la_tombe() = runTest {
+        val provider = FakeSyncProvider()
+        val publications = FakePublicationRepository().apply { insert(publication("pub-1")) }
+        val annotations = FakeAnnotationRepository().apply {
+            insert(
+                Annotation(
+                    id = "an-1", publicationId = "pub-1",
+                    startLocator = Locator("ch1.xhtml", 0, null, 0), endLocator = Locator("ch1.xhtml", 0, null, 10),
+                    color = AnnotationColor.GREEN, createdAt = 0L, updatedAt = 100L,
+                ),
+            )
+        }
+        upload(provider, payloadOf(deletions = listOf(com.inktone.data.backup.TombstoneBackup("an-1", "ANNOTATION", deletedAt = System.currentTimeMillis() - 1000L))))
+        val fixture = Fixture(syncProvider = provider, publicationRepository = publications, annotationRepository = annotations)
+
+        fixture.manager.synchronizeNow()
+        // Une seconde synchro téléverse un instantané qui relaie la tombe aux autres appareils.
+        fixture.manager.synchronizeNow()
+
+        assertTrue(fixture.annotationRepository.getAll().isEmpty())
+        val own = backupJson.decodeFromString(
+            com.inktone.data.backup.BackupPayload.serializer(),
+            fixture.syncProvider.download("snapshot-device-a.json")!!.decodeToString(),
+        )
+        assertEquals(listOf("an-1"), own.deletions.map { it.id })
+    }
+
+    @Test
+    fun les_tombes_de_plus_de_cent_quatre_vingts_jours_sont_purgees() = runTest {
+        val tombstones = com.inktone.core.testing.fake.FakeSyncTombstoneRepository().apply {
+            val day = 24L * 60 * 60 * 1000
+            record(com.inktone.domain.model.SyncTombstone("vieux", com.inktone.domain.model.TombstoneKind.BOOKMARK, System.currentTimeMillis() - 200 * day))
+            record(com.inktone.domain.model.SyncTombstone("recent", com.inktone.domain.model.TombstoneKind.BOOKMARK, System.currentTimeMillis() - 10 * day))
+        }
+        val provider = FakeSyncProvider()
+        upload(provider, payloadOf())
+        val fixture = Fixture(syncProvider = provider, tombstoneRepository = tombstones)
+
+        fixture.manager.synchronizeNow()
+
+        assertEquals(listOf("recent"), fixture.tombstoneRepository.getAll().map { it.id })
+    }
+
+    @Test
+    fun un_instantane_ancien_sans_suppressions_se_decode() {
+        val legacy = """{"appVersion":"sync","createdAt":0,"bookmarks":[{"id":"b","publicationId":"p","locator":{"resourceHref":"c","chapterIndex":0,"charOffset":1},"createdAt":5}],"pronunciationRules":[],"readingStates":[],"readingSessions":[]}"""
+        val payload = backupJson.decodeFromString(com.inktone.data.backup.BackupPayload.serializer(), legacy)
+        assertTrue(payload.deletions.isEmpty())
+        assertEquals(5L, with(payload.bookmarks.single()) { if (updatedAt == 0L) createdAt else updatedAt })
     }
 
     @Test

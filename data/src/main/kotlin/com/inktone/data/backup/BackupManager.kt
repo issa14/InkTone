@@ -6,6 +6,7 @@ import com.inktone.domain.repository.PronunciationRuleRepository
 import com.inktone.domain.repository.PublicationRepository
 import com.inktone.domain.repository.ReadingSessionRepository
 import com.inktone.domain.repository.ReadingStateRepository
+import com.inktone.domain.repository.SyncTombstoneRepository
 import com.inktone.domain.repository.ThemeRepository
 import com.inktone.domain.service.FileStorageService
 import kotlinx.coroutines.flow.first
@@ -49,6 +50,7 @@ class BackupManager @Inject constructor(
     private val publicationRepository: PublicationRepository,
     private val themeRepository: ThemeRepository,
     private val annotationRepository: AnnotationRepository,
+    private val syncTombstoneRepository: SyncTombstoneRepository,
 ) {
     /**
      * @param password mot de passe E2EE — un mot de passe perdu rend la
@@ -91,6 +93,7 @@ class BackupManager @Inject constructor(
         customThemes = themeRepository.observeAll().first().filterNot { it.isBuiltIn }.map { it.toBackup() },
         annotations = annotationRepository.getAll().map { it.toBackup() },
         publications = publicationRepository.observeAll().first().map { PublicationKeyBackup(it.id, it.fileHash) },
+        deletions = syncTombstoneRepository.getAll().map { it.toBackup() },
     )
 
     /** @param password ignoré si le fichier est un export antérieur en clair (compatibilité ascendante). */

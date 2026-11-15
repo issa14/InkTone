@@ -51,10 +51,11 @@ private fun backupManager(
     publicationRepository: com.inktone.domain.repository.PublicationRepository = FakePublicationRepository(),
     themeRepository: com.inktone.domain.repository.ThemeRepository = FakeThemeRepository(),
     annotationRepository: com.inktone.domain.repository.AnnotationRepository = FakeAnnotationRepository(),
+    syncTombstoneRepository: com.inktone.domain.repository.SyncTombstoneRepository = com.inktone.core.testing.fake.FakeSyncTombstoneRepository(),
 ) = BackupManager(
     fileStorageService, bookmarkRepository, pronunciationRuleRepository,
     readingStateRepository, readingSessionRepository, publicationRepository,
-    themeRepository, annotationRepository,
+    themeRepository, annotationRepository, syncTombstoneRepository,
 )
 
 /**

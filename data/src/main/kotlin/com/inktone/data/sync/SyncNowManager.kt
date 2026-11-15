@@ -10,6 +10,8 @@ import com.inktone.domain.model.PositionConflict
 import com.inktone.domain.model.ReadingPositionSnapshot
 import com.inktone.domain.model.SyncActivityEvent
 import com.inktone.domain.model.SyncActivityEventType
+import com.inktone.domain.model.SyncTombstone
+import com.inktone.domain.model.TombstoneKind
 import com.inktone.domain.repository.AnnotationRepository
 import com.inktone.domain.repository.BookmarkRepository
 import com.inktone.domain.repository.ConflictQueueRepository
@@ -21,6 +23,7 @@ import com.inktone.domain.repository.ReadingStateRepository
 import com.inktone.domain.repository.SyncAccountRepository
 import com.inktone.domain.repository.SyncActivityLogRepository
 import com.inktone.domain.repository.SyncFleetRepository
+import com.inktone.domain.repository.SyncTombstoneRepository
 import com.inktone.domain.repository.ThemeRepository
 import com.inktone.domain.service.SyncFailureReason
 import com.inktone.domain.service.SyncNowService
@@ -36,6 +39,9 @@ import javax.inject.Inject
 private const val SNAPSHOT_PREFIX = "snapshot-"
 private const val SNAPSHOT_SUFFIX = ".json"
 
+/** Durée de conservation d'une tombe : au-delà, tous les appareils ont eu le temps de la recevoir (180 jours). */
+private const val TOMBSTONE_RETENTION_MS = 180L * 24 * 60 * 60 * 1000
+
 /**
  * Implémente [SyncNowService] (tâche 11.8, étendue tâche 11.10) —
  * téléverse un instantané propre à l'appareil courant, puis télécharge
@@ -48,13 +54,13 @@ private const val SNAPSHOT_SUFFIX = ".json"
  *   ([ConflictQueueRepository]) plutôt que tranchée ici — la synchro
  *   (manuelle ou en arrière-plan) ne peut jamais arbitrer elle-même.
  *
- * **Écart déclaré (tâche 11.10/11.11)** : aucun marqueur de suppression
- * horodaté n'existe encore pour bookmarks/annotations — un élément
- * supprimé localement peut réapparaître si un autre appareil le
- * televerse encore. La matrice de résolution l'exige ; son
- * implémentation (retrofit des chemins de suppression existants pour
- * écrire une tombe plutôt qu'un DELETE dur) est un chantier à part,
- * volontairement hors de ce palier plutôt que retrofitté en hâte.
+ * **Suppressions et modifications (audit UX D61)** : chaque suppression de signet ou
+ * d'annotation laisse une tombe horodatée, transportée par l'instantané. À la fusion :
+ * - une tombe supprime l'élément local, sauf s'il a été modifié après la suppression ;
+ * - un élément distant n'est pas recréé si une tombe locale est plus récente que sa dernière
+ *   modification (il serait revenu de l'instantané d'un autre appareil) ;
+ * - un élément déjà connu prend la version la plus récente (`updatedAt`), la plus récente gagne.
+ * Les tombes reçues sont gardées pour être relayées, et purgées après [TOMBSTONE_RETENTION_MS].
  */
 class SyncNowManager @Inject constructor(
     private val syncProvider: SyncProvider,
@@ -72,6 +78,7 @@ class SyncNowManager @Inject constructor(
     private val readingStateRepository: ReadingStateRepository,
     private val publicationRepository: PublicationRepository,
     private val conflictQueueRepository: ConflictQueueRepository,
+    private val syncTombstoneRepository: SyncTombstoneRepository,
 ) : SyncNowService {
 
     override suspend fun synchronizeNow(): SyncOperationResult {
@@ -124,8 +131,9 @@ class SyncNowManager @Inject constructor(
         if (remoteFiles.isEmpty()) return
 
         val fleetLabels = syncFleetRepository.listDevices().associate { it.deviceId to it.displayName }
-        val localBookmarkIds = bookmarkRepository.observeAll().first().map { it.id }.toMutableSet()
-        val localAnnotationIds = annotationRepository.getAll().map { it.id }.toMutableSet()
+        val localBookmarks = bookmarkRepository.observeAll().first().associateBy { it.id }.toMutableMap()
+        val localAnnotations = annotationRepository.getAll().associateBy { it.id }.toMutableMap()
+        val localTombstones = syncTombstoneRepository.getAll().associateBy { it.id }.toMutableMap()
         // Lot 22, tâche 13 — union des sessions par clé primaire (id stable),
         // idempotente par construction : on ne réinsère jamais un id déjà
         // local, d'où aucune agrégation à écrire.
@@ -146,18 +154,71 @@ class SyncNowManager @Inject constructor(
             // sont retrouvés par l'empreinte de leur fichier (audit UX D57).
             val matcher = PublicationMatcher(payload, publicationRepository)
 
-            // Fusion silencieuse — additive, jamais de question posée.
+            // Suppressions d'abord : elles s'appliquent avant que les éléments de cet instantané
+            // ne soient recréés (audit UX D61).
+            payload.deletions.mapNotNull { it.toDomain() }.forEach { tombstone ->
+                val known = localTombstones[tombstone.id]
+                if (known == null || known.deletedAt < tombstone.deletedAt) {
+                    syncTombstoneRepository.record(tombstone)
+                    localTombstones[tombstone.id] = tombstone
+                }
+                when (tombstone.kind) {
+                    TombstoneKind.BOOKMARK -> localBookmarks[tombstone.id]?.let { local ->
+                        // Modifié après sa suppression ailleurs : la modification l'emporte.
+                        if (local.updatedAt <= tombstone.deletedAt) {
+                            bookmarkRepository.delete(tombstone.id)
+                            localBookmarks.remove(tombstone.id)
+                        }
+                    }
+                    TombstoneKind.ANNOTATION -> localAnnotations[tombstone.id]?.let { local ->
+                        if (local.updatedAt <= tombstone.deletedAt) {
+                            annotationRepository.delete(tombstone.id)
+                            localAnnotations.remove(tombstone.id)
+                        }
+                    }
+                }
+            }
+
+            // Signets et annotations : jamais de question posée. Un élément supprimé ne revient pas ;
+            // un élément déjà connu prend la version la plus récente.
             payload.bookmarks.forEach { backup ->
-                if (backup.id in localBookmarkIds) return@forEach
+                val remote = backup.toDomain()
+                if (isDeletedSince(localTombstones[backup.id], remote.updatedAt)) return@forEach
+                val local = localBookmarks[backup.id]
+                if (local != null) {
+                    if (remote.updatedAt > local.updatedAt) {
+                        val merged = local.copy(title = remote.title, note = remote.note, updatedAt = remote.updatedAt)
+                        bookmarkRepository.update(merged)
+                        localBookmarks[backup.id] = merged
+                    }
+                    return@forEach
+                }
                 val publicationId = matcher.localIdOf(backup.publicationId) ?: return@forEach
-                bookmarkRepository.insert(backup.toDomain().copy(publicationId = publicationId))
-                localBookmarkIds += backup.id
+                forgetTombstone(localTombstones, backup.id)
+                val inserted = remote.copy(publicationId = publicationId)
+                bookmarkRepository.insert(inserted)
+                localBookmarks[backup.id] = inserted
             }
             payload.annotations.forEach { backup ->
-                if (backup.id in localAnnotationIds) return@forEach
+                val remote = backup.toDomain()
+                if (isDeletedSince(localTombstones[backup.id], remote.updatedAt)) return@forEach
+                val local = localAnnotations[backup.id]
+                if (local != null) {
+                    if (remote.updatedAt > local.updatedAt) {
+                        val merged = local.copy(
+                            color = remote.color, kind = remote.kind, content = remote.content,
+                            excerpt = remote.excerpt, updatedAt = remote.updatedAt,
+                        )
+                        annotationRepository.update(merged)
+                        localAnnotations[backup.id] = merged
+                    }
+                    return@forEach
+                }
                 val publicationId = matcher.localIdOf(backup.publicationId) ?: return@forEach
-                annotationRepository.insert(backup.toDomain().copy(publicationId = publicationId))
-                localAnnotationIds += backup.id
+                forgetTombstone(localTombstones, backup.id)
+                val inserted = remote.copy(publicationId = publicationId)
+                annotationRepository.insert(inserted)
+                localAnnotations[backup.id] = inserted
             }
             // Réglages/thèmes : dernier écrit gagne (REPLACE au niveau DAO).
             payload.pronunciationRules.forEach { pronunciationRuleRepository.save(it.toDomain()) }
@@ -224,6 +285,9 @@ class SyncNowManager @Inject constructor(
             }
         }
 
+        // Les tombes assez anciennes ont eu le temps de se propager à tous les appareils.
+        syncTombstoneRepository.purgeBefore(System.currentTimeMillis() - TOMBSTONE_RETENTION_MS)
+
         // Journalise les sessions orphelines ignorées — jamais silencieux
         // (décision 6), mais en un seul événement pour ne pas saturer le
         // journal d'une synchro à l'autre.
@@ -237,5 +301,13 @@ class SyncNowManager @Inject constructor(
                 ),
             )
         }
+    }
+    /** Vrai si [tombstone] supprime un élément dont la dernière modification ([updatedAt]) ne la dépasse pas. */
+    private fun isDeletedSince(tombstone: SyncTombstone?, updatedAt: Long): Boolean =
+        tombstone != null && tombstone.deletedAt >= updatedAt
+
+    /** Un élément modifié après sa suppression ailleurs est recréé : sa tombe n'a plus lieu d'être. */
+    private suspend fun forgetTombstone(localTombstones: MutableMap<String, SyncTombstone>, id: String) {
+        if (localTombstones.remove(id) != null) syncTombstoneRepository.remove(id)
     }
 }

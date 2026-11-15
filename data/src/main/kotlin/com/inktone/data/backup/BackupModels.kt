@@ -4,6 +4,8 @@ import com.inktone.domain.model.Annotation
 import com.inktone.domain.model.AnnotationColor
 import com.inktone.domain.model.AnnotationKind
 import com.inktone.domain.model.Bookmark
+import com.inktone.domain.model.SyncTombstone
+import com.inktone.domain.model.TombstoneKind
 import com.inktone.domain.model.FontFamily
 import com.inktone.domain.model.PronunciationRule
 import com.inktone.domain.model.ReadingMode
@@ -44,6 +46,17 @@ data class BackupPayload(
     // l'empreinte de son fichier est commune. Absente des sauvegardes
     // antérieures : on retombe alors sur l'identifiant (même installation).
     val publications: List<PublicationKeyBackup> = emptyList(),
+    // Audit UX D61 — suppressions de signets et d'annotations, pour que la synchronisation les
+    // propage. Absentes des sauvegardes antérieures (défaut vide : rien n'est supprimé à tort).
+    val deletions: List<TombstoneBackup> = emptyList(),
+)
+
+/** Suppression d'un signet (`BOOKMARK`) ou d'une annotation (`ANNOTATION`), et quand. */
+@Serializable
+data class TombstoneBackup(
+    val id: String,
+    val kind: String,
+    val deletedAt: Long,
 )
 
 /** Identifiant d'un livre sur l'appareil qui a produit la sauvegarde, et l'empreinte de son fichier. */
@@ -73,6 +86,8 @@ data class BookmarkBackup(
     val title: String? = null,
     val note: String? = null,
     val createdAt: Long,
+    // Absent des sauvegardes antérieures : 0 = jamais modifié depuis sa création.
+    val updatedAt: Long = 0,
 )
 
 @Serializable
@@ -144,8 +159,13 @@ fun LocatorBackup.toDomain(): Locator = Locator(
     text = if (textBefore != null && textAfter != null) LocatorText(textBefore, textAfter) else null,
 )
 
-fun Bookmark.toBackup(): BookmarkBackup = BookmarkBackup(id, publicationId, locator.toBackup(), title, note, createdAt)
-fun BookmarkBackup.toDomain(): Bookmark = Bookmark(id, publicationId, locator.toDomain(), title, note, createdAt = createdAt)
+fun Bookmark.toBackup(): BookmarkBackup = BookmarkBackup(id, publicationId, locator.toBackup(), title, note, createdAt, updatedAt)
+fun BookmarkBackup.toDomain(): Bookmark =
+    Bookmark(id, publicationId, locator.toDomain(), title, note, createdAt = createdAt, updatedAt = if (updatedAt == 0L) createdAt else updatedAt)
+
+fun SyncTombstone.toBackup(): TombstoneBackup = TombstoneBackup(id, kind.name, deletedAt)
+fun TombstoneBackup.toDomain(): SyncTombstone? =
+    runCatching { TombstoneKind.valueOf(kind) }.getOrNull()?.let { SyncTombstone(id, it, deletedAt) }
 
 fun PronunciationRule.toBackup(): PronunciationRuleBackup =
     PronunciationRuleBackup(id, originalText, replacementText, isRegex, isEnabled)
