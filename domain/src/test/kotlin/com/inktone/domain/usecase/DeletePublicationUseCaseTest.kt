@@ -15,6 +15,7 @@ import com.inktone.domain.service.PlaybackSessionState
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertTrue
 import org.junit.Test
+import com.inktone.core.testing.fake.FakeFileStorageService
 
 /**
  * Lot 22, Palier A — la purge de la pré-analyse à la suppression d'une
@@ -38,7 +39,7 @@ class DeletePublicationUseCaseTest {
         )
         publicationRepository.insert(publication)
 
-        val useCase = DeletePublicationUseCase(publicationRepository, preAnalysisStore, ttsSegmentCache, renderedPageCache, FakePlaybackSession(), searchService)
+        val useCase = DeletePublicationUseCase(publicationRepository, preAnalysisStore, ttsSegmentCache, renderedPageCache, FakePlaybackSession(), searchService, FakeFileStorageService())
         useCase("pub-1")
 
         assertTrue(publicationRepository.observeAll().first().isEmpty())
@@ -58,7 +59,7 @@ class DeletePublicationUseCaseTest {
                 chapterCount = 1, importDate = 0L,
             ),
         )
-        return DeletePublicationUseCase(publicationRepository, FakePreAnalysisStore(), FakeTtsSegmentCache(), FakeRenderedPageCache(), playbackSession, FakeSearchService())
+        return DeletePublicationUseCase(publicationRepository, FakePreAnalysisStore(), FakeTtsSegmentCache(), FakeRenderedPageCache(), playbackSession, FakeSearchService(), FakeFileStorageService())
     }
 
     /**

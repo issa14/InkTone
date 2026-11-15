@@ -34,4 +34,20 @@ interface FileStorageService {
      * exception (Blueprint §7.11).
      */
     suspend fun writeToUri(uri: String, sourceFile: File): Boolean
+
+    /**
+     * Copie le livre [uri] dans le stockage privé de l'application et
+     * renvoie l'URI de la copie (ADR-028), nommée par [fileHash] et
+     * l'extension de [fileName]. Un fichier qui appartient déjà à
+     * l'application est renvoyé tel quel, sans copie. `null` si la copie
+     * échoue (lecture impossible, espace insuffisant) : aucune copie
+     * partielle ne subsiste.
+     */
+    suspend fun copyToLibrary(uri: String, fileName: String, fileHash: String): String?
+
+    /** Vrai si [uri] désigne un fichier de l'application (copie de bibliothèque, téléchargement OPDS). */
+    fun isAppOwned(uri: String): Boolean
+
+    /** Supprime le fichier [uri] s'il appartient à l'application ; sans effet sinon (ADR-028, D63). */
+    suspend fun deleteOwnedFile(uri: String)
 }

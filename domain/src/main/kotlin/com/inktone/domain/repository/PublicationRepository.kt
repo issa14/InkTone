@@ -30,6 +30,9 @@ interface PublicationRepository {
      */
     suspend fun setCoverUri(id: String, coverUri: String?)
 
+    /** Fait pointer une publication sur un autre fichier du même livre (copie privée, ADR-028). */
+    suspend fun setFileUri(id: String, fileUri: String)
+
     /**
      * Pose les longueurs de chapitres d'une publication (base de sa
      * progression, voir [com.inktone.domain.model.ChapterLengths]) —

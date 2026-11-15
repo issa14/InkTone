@@ -33,6 +33,7 @@ import org.junit.Assert.assertFalse
 import org.junit.Assert.assertTrue
 import org.junit.Before
 import org.junit.Test
+import com.inktone.core.testing.fake.FakeFileStorageService
 
 /**
  * Barre de recherche de la Bibliothèque portée par l'état de l'écran.
@@ -64,7 +65,7 @@ class LibraryViewModelSearchTest {
         FakeReadingStateRepository(),
         ToggleFavoriteUseCase(publicationRepository),
         TogglePinUseCase(publicationRepository),
-        DeletePublicationUseCase(publicationRepository, FakePreAnalysisStore(), FakeTtsSegmentCache(), FakeRenderedPageCache(), FakePlaybackSession(), FakeSearchService()),
+        DeletePublicationUseCase(publicationRepository, FakePreAnalysisStore(), FakeTtsSegmentCache(), FakeRenderedPageCache(), FakePlaybackSession(), FakeSearchService(), FakeFileStorageService()),
         FakeImportProgressObserver(),
         FakeImportResultsStore(),
         ImportSessionStore(),

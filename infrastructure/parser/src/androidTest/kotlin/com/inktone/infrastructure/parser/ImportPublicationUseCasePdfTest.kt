@@ -42,6 +42,7 @@ private class InMemoryPublicationRepository : PublicationRepository {
 
     override suspend fun setFavorite(id: String, isFavorite: Boolean) = Unit
     override suspend fun setPinned(id: String, isPinned: Boolean) = Unit
+    override suspend fun setFileUri(id: String, fileUri: String) = Unit
     // Sans effet, comme les deux precedentes : ce test porte sur l'import
     // d'un PDF, aucun de ces champs n'y est lu.
     override suspend fun setLastOpened(id: String, lastOpened: Long) = Unit

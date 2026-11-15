@@ -27,6 +27,7 @@ import org.junit.Assert.assertEquals
 import org.junit.Assert.assertTrue
 import org.junit.Before
 import org.junit.Test
+import com.inktone.core.testing.fake.FakeFileStorageService
 
 /** Lot 8 — Tâche 8.3, les 7 points de vérification listés dans LOT_8_RECENTS.md, couverts autant que possible en test unitaire. */
 @OptIn(ExperimentalCoroutinesApi::class)
@@ -61,7 +62,7 @@ class RecentsViewModelTest {
         RecentsViewModel(
             publicationRepository, readingStateRepository,
             ToggleFavoriteUseCase(publicationRepository), TogglePinUseCase(publicationRepository),
-            DeletePublicationUseCase(publicationRepository, FakePreAnalysisStore(), FakeTtsSegmentCache(), FakeRenderedPageCache(), FakePlaybackSession(), FakeSearchService()),
+            DeletePublicationUseCase(publicationRepository, FakePreAnalysisStore(), FakeTtsSegmentCache(), FakeRenderedPageCache(), FakePlaybackSession(), FakeSearchService(), FakeFileStorageService()),
             // Audit v1.0.0 (P5) : même StandardTestDispatcher que setMain.
             dispatcher,
         )

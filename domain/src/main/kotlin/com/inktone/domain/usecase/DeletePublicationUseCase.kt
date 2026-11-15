@@ -1,6 +1,7 @@
 package com.inktone.domain.usecase
 
 import com.inktone.domain.repository.PublicationRepository
+import com.inktone.domain.service.FileStorageService
 import com.inktone.domain.service.PreAnalysisStore
 import com.inktone.domain.service.RenderedPageCache
 import com.inktone.domain.service.TtsSegmentCache
@@ -27,6 +28,7 @@ class DeletePublicationUseCase(
     private val renderedPageCache: RenderedPageCache,
     private val playbackSession: PlaybackSession,
     private val searchService: SearchService,
+    private val fileStorageService: FileStorageService,
 ) {
     suspend operator fun invoke(publicationId: String) {
         // Audit UX A12 : supprimer le livre en cours de narration laissait la
@@ -37,7 +39,12 @@ class DeletePublicationUseCase(
         ) {
             playbackSession.stop()
         }
+        val fileUri = publicationRepository.getById(publicationId)?.fileUri
         publicationRepository.delete(publicationId)
+        // Copie privée ou téléchargement OPDS : le fichier appartient au livre
+        // (ADR-028, audit UX D63). Le fichier d'origine d'un ancien import
+        // reste à l'utilisateur.
+        fileUri?.let { fileStorageService.deleteOwnedFile(it) }
         preAnalysisStore.delete(publicationId)
         ttsSegmentCache.deletePublication(publicationId)
         renderedPageCache.deletePublication(publicationId)

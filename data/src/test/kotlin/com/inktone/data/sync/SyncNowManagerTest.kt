@@ -49,6 +49,9 @@ private class NoopFileStorageService : FileStorageService {
     override suspend fun getFileName(uri: String): String? = null
     override suspend fun persistReadPermission(uri: String) = Unit
     override suspend fun writeToUri(uri: String, sourceFile: File): Boolean = true
+    override suspend fun copyToLibrary(uri: String, fileName: String, fileHash: String): String? = uri
+    override fun isAppOwned(uri: String): Boolean = false
+    override suspend fun deleteOwnedFile(uri: String) = Unit
 }
 
 private fun backupManager(

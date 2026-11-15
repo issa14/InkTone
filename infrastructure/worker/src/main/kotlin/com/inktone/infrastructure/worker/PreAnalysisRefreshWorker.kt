@@ -7,6 +7,7 @@ import androidx.work.WorkManager
 import androidx.work.WorkerParameters
 import androidx.work.workDataOf
 import com.inktone.domain.usecase.BackfillChapterLengthsUseCase
+import com.inktone.domain.usecase.CopyLibraryToPrivateStorageUseCase
 import com.inktone.domain.usecase.RefreshStalePreAnalysesUseCase
 import dagger.assisted.Assisted
 import dagger.assisted.AssistedInject
@@ -28,6 +29,7 @@ import kotlinx.coroutines.flow.first
 class PreAnalysisRefreshWorker @AssistedInject constructor(
     @Assisted context: Context,
     @Assisted params: WorkerParameters,
+    private val copyLibraryToPrivateStorage: CopyLibraryToPrivateStorageUseCase,
     private val refreshStalePreAnalyses: RefreshStalePreAnalysesUseCase,
     private val backfillChapterLengths: BackfillChapterLengthsUseCase,
     private val workManager: WorkManager,
@@ -40,6 +42,9 @@ class PreAnalysisRefreshWorker @AssistedInject constructor(
             .any { !it.state.isFinished }
         if (importInProgress) return Result.retry()
 
+        // Avant la régénération, qui lirait sinon les livres par leur
+        // ancien lien (ADR-028).
+        val copies = copyLibraryToPrivateStorage()
         val outcome = refreshStalePreAnalyses()
         // APRÈS la régénération : les longueurs de chapitres d'un EPUB se
         // lisent dans sa pré-analyse, qui vient peut-être d'être réécrite.
@@ -51,6 +56,8 @@ class PreAnalysisRefreshWorker @AssistedInject constructor(
                 KEY_FAILED to outcome.failed,
                 KEY_LENGTHS_FILLED to lengths.filled,
                 KEY_LENGTHS_FAILED to lengths.failed,
+                KEY_COPIED to copies.copied,
+                KEY_COPY_FAILED to copies.failed,
             ),
         )
     }
@@ -62,5 +69,7 @@ class PreAnalysisRefreshWorker @AssistedInject constructor(
         const val KEY_FAILED = "failed"
         const val KEY_LENGTHS_FILLED = "lengths_filled"
         const val KEY_LENGTHS_FAILED = "lengths_failed"
+        const val KEY_COPIED = "copied"
+        const val KEY_COPY_FAILED = "copy_failed"
     }
 }

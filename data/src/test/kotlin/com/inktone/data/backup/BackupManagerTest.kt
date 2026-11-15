@@ -37,6 +37,9 @@ private class InMemoryFileStorageService : FileStorageService {
     }
 
     fun rawBytes(uri: String): ByteArray? = files[uri]
+    override suspend fun copyToLibrary(uri: String, fileName: String, fileHash: String): String? = uri
+    override fun isAppOwned(uri: String): Boolean = false
+    override suspend fun deleteOwnedFile(uri: String) = Unit
 }
 
 private fun backupManager(

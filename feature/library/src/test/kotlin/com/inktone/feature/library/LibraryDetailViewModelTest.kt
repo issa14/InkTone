@@ -24,6 +24,7 @@ import org.junit.After
 import org.junit.Assert.assertEquals
 import org.junit.Before
 import org.junit.Test
+import com.inktone.core.testing.fake.FakeFileStorageService
 
 /** Lot 2a.4 — même patron que LibraryViewModelTest, filtre serveur fixé par la route. */
 @OptIn(ExperimentalCoroutinesApi::class)
@@ -49,7 +50,7 @@ class LibraryDetailViewModelTest {
         repository.insert(publication("1", seriesName = "Trilogie du Vide"))
         repository.insert(publication("2", seriesName = "Trilogie du Vide"))
         repository.insert(publication("3", seriesName = "Autre série"))
-        val viewModel = LibraryDetailViewModel(repository, FakeReadingStateRepository(), ToggleFavoriteUseCase(repository), TogglePinUseCase(repository), DeletePublicationUseCase(repository, FakePreAnalysisStore(), FakeTtsSegmentCache(), FakeRenderedPageCache(), FakePlaybackSession(), FakeSearchService()), dispatcher)
+        val viewModel = LibraryDetailViewModel(repository, FakeReadingStateRepository(), ToggleFavoriteUseCase(repository), TogglePinUseCase(repository), DeletePublicationUseCase(repository, FakePreAnalysisStore(), FakeTtsSegmentCache(), FakeRenderedPageCache(), FakePlaybackSession(), FakeSearchService(), FakeFileStorageService()), dispatcher)
 
         viewModel.onIntent(LibraryDetailIntent.Load(LibraryDetailCategory.SERIES, "Trilogie du Vide"))
         dispatcher.scheduler.advanceUntilIdle()
@@ -62,7 +63,7 @@ class LibraryDetailViewModelTest {
         val repository = FakePublicationRepository()
         repository.insert(publication("1", subjects = listOf("Fantasy")))
         repository.insert(publication("2", subjects = listOf("SF")))
-        val viewModel = LibraryDetailViewModel(repository, FakeReadingStateRepository(), ToggleFavoriteUseCase(repository), TogglePinUseCase(repository), DeletePublicationUseCase(repository, FakePreAnalysisStore(), FakeTtsSegmentCache(), FakeRenderedPageCache(), FakePlaybackSession(), FakeSearchService()), dispatcher)
+        val viewModel = LibraryDetailViewModel(repository, FakeReadingStateRepository(), ToggleFavoriteUseCase(repository), TogglePinUseCase(repository), DeletePublicationUseCase(repository, FakePreAnalysisStore(), FakeTtsSegmentCache(), FakeRenderedPageCache(), FakePlaybackSession(), FakeSearchService(), FakeFileStorageService()), dispatcher)
 
         viewModel.onIntent(LibraryDetailIntent.Load(LibraryDetailCategory.TAG, "Fantasy"))
         dispatcher.scheduler.advanceUntilIdle()
@@ -82,7 +83,7 @@ class LibraryDetailViewModelTest {
         )
         val readingStates = FakeReadingStateRepository()
         readingStates.save(ReadingState("1", Locator("page-4", chapterIndex = 4, charOffset = 0), lastReadAt = 0L))
-        val viewModel = LibraryDetailViewModel(repository, readingStates, ToggleFavoriteUseCase(repository), TogglePinUseCase(repository), DeletePublicationUseCase(repository, FakePreAnalysisStore(), FakeTtsSegmentCache(), FakeRenderedPageCache(), FakePlaybackSession(), FakeSearchService()), dispatcher)
+        val viewModel = LibraryDetailViewModel(repository, readingStates, ToggleFavoriteUseCase(repository), TogglePinUseCase(repository), DeletePublicationUseCase(repository, FakePreAnalysisStore(), FakeTtsSegmentCache(), FakeRenderedPageCache(), FakePlaybackSession(), FakeSearchService(), FakeFileStorageService()), dispatcher)
 
         viewModel.onIntent(LibraryDetailIntent.Load(LibraryDetailCategory.TAG, "Fantasy"))
         dispatcher.scheduler.advanceUntilIdle()

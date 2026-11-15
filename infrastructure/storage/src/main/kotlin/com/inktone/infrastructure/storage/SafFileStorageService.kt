@@ -5,6 +5,7 @@ import android.content.Context
 import android.content.Intent
 import android.net.Uri
 import android.provider.OpenableColumns
+import androidx.core.content.FileProvider
 import com.inktone.domain.service.FileStorageService
 import dagger.hilt.android.qualifiers.ApplicationContext
 import kotlinx.coroutines.Dispatchers
@@ -12,6 +13,7 @@ import kotlinx.coroutines.withContext
 import java.io.File
 import java.io.InputStream
 import java.security.MessageDigest
+import java.util.UUID
 import javax.inject.Inject
 
 class SafFileStorageService @Inject constructor(
@@ -86,9 +88,37 @@ class SafFileStorageService @Inject constructor(
     }
 
     /** Vrai si l'URI est servie par un provider de l'app (FileProvider app-scopé). */
-    internal fun isAppOwned(uri: String): Boolean {
+    override fun isAppOwned(uri: String): Boolean {
         val authority = Uri.parse(uri).authority ?: return false
         return authority == context.packageName || authority == "${context.packageName}.fileprovider"
+    }
+
+    override suspend fun copyToLibrary(uri: String, fileName: String, fileHash: String): String? =
+        withContext(Dispatchers.IO) {
+            if (isAppOwned(uri)) return@withContext uri
+            val directory = File(context.filesDir, LIBRARY_DIR).apply { mkdirs() }
+            val extension = fileName.substringAfterLast('.', "").lowercase().takeIf { it.isNotEmpty() }
+            val target = File(directory, if (extension != null) "$fileHash.$extension" else fileHash)
+            // Écrite à côté puis renommée : une copie interrompue (espace
+            // plein, application tuée) ne laisse jamais un livre tronqué.
+            val partial = File(directory, "${target.name}.${UUID.randomUUID()}.part")
+            val copied = runCatching {
+                resolver.openInputStream(Uri.parse(uri))?.use { input ->
+                    partial.outputStream().use { output -> input.copyTo(output) }
+                } != null
+            }.getOrDefault(false)
+            if (!copied || !partial.renameTo(target)) {
+                partial.delete()
+                return@withContext null
+            }
+            FileProvider.getUriForFile(context, "${context.packageName}.fileprovider", target).toString()
+        }
+
+    override suspend fun deleteOwnedFile(uri: String) = withContext(Dispatchers.IO) {
+        if (!isAppOwned(uri)) return@withContext
+        // FileProvider.delete supprime le fichier qu'il sert.
+        runCatching { resolver.delete(Uri.parse(uri), null, null) }
+        Unit
     }
 
     override suspend fun writeToUri(uri: String, sourceFile: File): Boolean = withContext(Dispatchers.IO) {
@@ -97,5 +127,10 @@ class SafFileStorageService @Inject constructor(
                 sourceFile.inputStream().use { input -> input.copyTo(output) }
             } != null
         }.getOrDefault(false)
+    }
+
+    private companion object {
+        /** Doit correspondre au `files-path` « library » de `file_paths.xml`. */
+        const val LIBRARY_DIR = "library"
     }
 }

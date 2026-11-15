@@ -26,6 +26,9 @@ private class LocalFileStorageService : FileStorageService {
     override suspend fun getFileName(uri: String): String? = File(uri).name
     override suspend fun persistReadPermission(uri: String) = Unit
     override suspend fun writeToUri(uri: String, sourceFile: File): Boolean = false
+    override suspend fun copyToLibrary(uri: String, fileName: String, fileHash: String): String? = uri
+    override fun isAppOwned(uri: String): Boolean = false
+    override suspend fun deleteOwnedFile(uri: String) = Unit
 }
 
 class TxtPublicationParserTest {

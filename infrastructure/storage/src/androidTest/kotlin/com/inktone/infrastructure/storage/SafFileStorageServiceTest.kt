@@ -91,4 +91,31 @@ class SafFileStorageServiceTest {
         // (URI FileProvider app-scopée, jamais une URI de picker SAF).
         service.persistReadPermission("content://${context.packageName}.fileprovider/opds_downloads/livre.epub")
     }
+
+    /** ADR-028 : la copie se relit par son URI, et disparaît avec sa suppression. */
+    @Test
+    fun copie_un_livre_dans_la_bibliotheque_puis_le_supprime() = runTest {
+        val file = tempFile("contenu du livre")
+        val copy = service.copyToLibrary(Uri.fromFile(file).toString(), fileName = "livre.epub", fileHash = "abc123")
+        file.delete()
+
+        assertNotNull(copy)
+        assertEquals(true, service.isAppOwned(copy!!))
+        assertEquals("abc123.epub", service.getFileName(copy))
+        assertEquals("contenu du livre", service.openInputStream(copy)?.bufferedReader()?.use { it.readText() })
+        assertEquals(emptyList<String>(), File(context.filesDir, "library").list()!!.filter { it.endsWith(".part") })
+
+        service.deleteOwnedFile(copy)
+
+        assertEquals(false, File(context.filesDir, "library/abc123.epub").exists())
+    }
+
+    @Test
+    fun une_source_illisible_ne_laisse_aucune_copie() = runTest {
+        val copy = service.copyToLibrary(Uri.fromFile(File(context.cacheDir, "absent.epub")).toString(), "absent.epub", "absent")
+
+        assertEquals(null, copy)
+        assertEquals(false, File(context.filesDir, "library/absent.epub").exists())
+        assertEquals(emptyList<String>(), File(context.filesDir, "library").list()!!.filter { it.endsWith(".part") })
+    }
 }

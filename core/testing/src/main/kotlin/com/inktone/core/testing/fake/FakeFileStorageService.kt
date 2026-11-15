@@ -14,6 +14,10 @@ class FakeFileStorageService(
     private val fileSize: Long = 1024L,
 ) : FileStorageService {
     val writtenUris = mutableListOf<String>()
+    val deletedUris = mutableListOf<String>()
+
+    /** Fait échouer [copyToLibrary], comme un espace disque plein. */
+    var failCopies = false
 
     override suspend fun openInputStream(uri: String): InputStream? = uri.byteInputStream()
 
@@ -29,5 +33,22 @@ class FakeFileStorageService(
     override suspend fun writeToUri(uri: String, sourceFile: File): Boolean {
         writtenUris += uri
         return true
+    }
+
+    override suspend fun copyToLibrary(uri: String, fileName: String, fileHash: String): String? = when {
+        isAppOwned(uri) -> uri
+        failCopies -> null
+        else -> "$LIBRARY_PREFIX$fileHash.${fileName.substringAfterLast('.')}"
+    }
+
+    override fun isAppOwned(uri: String): Boolean = uri.startsWith(APP_PREFIX)
+
+    override suspend fun deleteOwnedFile(uri: String) {
+        if (isAppOwned(uri)) deletedUris += uri
+    }
+
+    companion object {
+        const val APP_PREFIX = "content://app.fileprovider/"
+        const val LIBRARY_PREFIX = "${APP_PREFIX}library/"
     }
 }

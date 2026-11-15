@@ -54,6 +54,7 @@ import com.inktone.domain.usecase.ImportPublicationUseCase
 import com.inktone.domain.usecase.ObserveSyncUiStateUseCase
 import com.inktone.domain.usecase.RefreshStalePreAnalysesUseCase
 import com.inktone.domain.usecase.BackfillChapterLengthsUseCase
+import com.inktone.domain.usecase.CopyLibraryToPrivateStorageUseCase
 import com.inktone.domain.usecase.RegenerateCoversUseCase
 import com.inktone.domain.usecase.ResolvePositionConflictUseCase
 import com.inktone.domain.usecase.SynchronizeNowUseCase
@@ -152,6 +153,12 @@ object UseCaseModule {
         RefreshStalePreAnalysesUseCase(publicationRepository, publicationParser, preAnalysisBuilder, preAnalysisStore)
 
     @Provides
+    fun provideCopyLibraryToPrivateStorageUseCase(
+        publicationRepository: PublicationRepository,
+        fileStorageService: FileStorageService,
+    ): CopyLibraryToPrivateStorageUseCase = CopyLibraryToPrivateStorageUseCase(publicationRepository, fileStorageService)
+
+    @Provides
     fun provideBackfillChapterLengthsUseCase(
         publicationRepository: PublicationRepository,
         publicationParser: PublicationParser,
@@ -183,7 +190,8 @@ object UseCaseModule {
         renderedPageCache: RenderedPageCache,
         playbackSession: PlaybackSession,
         searchService: SearchService,
-    ): DeletePublicationUseCase = DeletePublicationUseCase(publicationRepository, preAnalysisStore, ttsSegmentCache, renderedPageCache, playbackSession, searchService)
+        fileStorageService: FileStorageService,
+    ): DeletePublicationUseCase = DeletePublicationUseCase(publicationRepository, preAnalysisStore, ttsSegmentCache, renderedPageCache, playbackSession, searchService, fileStorageService)
 
     @Provides
     fun provideRegenerateCoversUseCase(

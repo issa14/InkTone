@@ -13,6 +13,8 @@ import com.inktone.domain.service.PublicationMetadata
 import com.inktone.domain.service.PublicationParser
 import com.inktone.domain.service.SearchService
 import kotlinx.coroutines.CancellationException
+import kotlinx.coroutines.NonCancellable
+import kotlinx.coroutines.withContext
 import kotlinx.coroutines.sync.Mutex
 import kotlinx.coroutines.sync.withLock
 import java.util.UUID
@@ -59,13 +61,46 @@ class ImportPublicationUseCase(
             return ImportResult.Duplicate(existingPublicationId = it.id)
         }
 
+        // Le livre vit désormais dans le stockage de l'application (ADR-028,
+        // audit UX D55) : le fichier d'origine n'est plus lu qu'ici. Tout ce
+        // qui suit, analyse comprise, travaille sur la copie.
+        val fileName = fileStorageService.getFileName(fileUri) ?: fileUri
+        val storedUri = fileStorageService.copyToLibrary(fileUri, fileName, hash)
+            ?: return ImportResult.Corrupted("Impossible de copier le livre dans l'application (espace insuffisant ?)")
+        val result = try {
+            importStored(fileUri, storedUri, fileName, hash)
+        } catch (e: Throwable) {
+            withContext(NonCancellable) { discardCopy(storedUri, sourceUri = fileUri, hash = hash) }
+            throw e
+        }
+        if (result !is ImportResult.Success) discardCopy(storedUri, sourceUri = fileUri, hash = hash)
+        return result
+    }
+
+    /**
+     * Retire la copie d'un import qui n'a pas abouti. Jamais celle d'un livre
+     * en base : un import concurrent du même fichier, détecté comme doublon,
+     * a écrit la même copie (nommée par l'empreinte) que le livre trouvé.
+     */
+    private suspend fun discardCopy(storedUri: String, sourceUri: String, hash: String) {
+        if (storedUri == sourceUri) return
+        if (publicationRepository.getByFileHash(hash)?.fileUri == storedUri) return
+        fileStorageService.deleteOwnedFile(storedUri)
+    }
+
+    private suspend fun importStored(
+        sourceUri: String,
+        fileUri: String,
+        fileName: String,
+        hash: String,
+    ): ImportResult {
         // 2. Parser (gere deja DRM et extraction multi-chapitres, Phases 3/4)
         val parseResult = publicationParser.parse(fileUri)
         val publication = when (parseResult) {
             is ParseResult.DrmProtected -> return ImportResult.DrmProtected(parseResult.message)
             is ParseResult.Corrupted -> return ImportResult.Corrupted(parseResult.message)
             is ParseResult.UnsupportedFormat -> return ImportResult.UnsupportedFormat(parseResult.format)
-            is ParseResult.Success -> buildPublication(parseResult, fileUri, hash)
+            is ParseResult.Success -> buildPublication(parseResult, sourceUri, fileUri, fileName, hash)
         }
         // Sur par construction : toute branche non-Success du when ci-dessus
         // est retournee immediatement, donc parseResult est forcement
@@ -73,18 +108,16 @@ class ImportPublicationUseCase(
         val documentModel = (parseResult as ParseResult.Success).documentModel
 
         // 3. Reverification + insertion atomiques sous verrou - seule
-        // section vraiment critique. Persistance de la permission SAF
-        // AVANT insertion — si l'app est tuee entre les deux, mieux vaut
-        // une permission orpheline qu'une Publication en base pointant
-        // vers un URI inaccessible. L'indexation (couteuse, cf. commentaire
-        // du Mutex) reste HORS verrou, comme le parsing — sinon elle
-        // serialiserait tous les imports concurrents (Tache 6.3) sur une
-        // section censee ne proteger que la verification de doublon.
+        // section vraiment critique. Aucune permission durable a prendre :
+        // la publication pointe sur sa copie privee (ADR-028). L'indexation
+        // (couteuse, cf. commentaire du Mutex) reste HORS verrou, comme le
+        // parsing — sinon elle serialiserait tous les imports concurrents
+        // (Tache 6.3) sur une section censee ne proteger que la verification
+        // de doublon.
         val insertResult = duplicateCheckMutex.withLock {
             publicationRepository.getByFileHash(hash)?.let {
                 return@withLock ImportResult.Duplicate(existingPublicationId = it.id)
             }
-            fileStorageService.persistReadPermission(fileUri)
             publicationRepository.insert(publication)
             ImportResult.Success(publication)
         }
@@ -156,12 +189,13 @@ class ImportPublicationUseCase(
 
     private suspend fun buildPublication(
         result: ParseResult.Success,
+        sourceUri: String,
         fileUri: String,
+        fileName: String,
         hash: String,
     ): Publication {
         val metadata: PublicationMetadata = result.metadata
-        val size = fileStorageService.getFileSize(fileUri) ?: 0L
-        val fileName = fileStorageService.getFileName(fileUri) ?: fileUri
+        val size = fileStorageService.getFileSize(sourceUri) ?: 0L
         val format = formatOf(fileName)
         val now = System.currentTimeMillis()
 
