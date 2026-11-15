@@ -98,7 +98,7 @@ fun AboutScreen(
             VersionBadge(
                 versionName = versionName,
                 onClick = {
-                    scope.launch { snackbarHostState.showSnackbar("Version officielle") }
+                    scope.launch { snackbarHostState.showSnackbar("Maintenez pour copier le diagnostic") }
                 },
                 onLongClick = {
                     clipboardManager.setText(AnnotatedString(buildDiagnostics(versionName, ttsEngineLabel)))
@@ -135,6 +135,9 @@ fun AboutScreen(
                         putExtra(Intent.EXTRA_TEXT, buildDiagnostics(versionName, ttsEngineLabel))
                     }
                     runCatching { context.startActivity(Intent.createChooser(intent, "Signaler un problème")) }
+                        .onFailure {
+                            scope.launch { snackbarHostState.showSnackbar("Aucune application de messagerie disponible") }
+                        }
                 },
             )
 
