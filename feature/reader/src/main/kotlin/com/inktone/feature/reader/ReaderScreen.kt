@@ -766,6 +766,10 @@ fun ReaderScreen(
                 // écoulé entre deux frames, la vitesse en dp/s reste donc
                 // fidèle quelle que soit la cadence de rendu effective.
                 var lastFrameNanos = 0L
+                // Vrai dès qu'un défilement a été possible : `canScrollForward`
+                // faux signifie alors la fin du chapitre, pas une liste pas
+                // encore mesurée (audit UX B18).
+                var hasScrolled = false
                 while (isActive) {
                     // `canScrollForward` est `false` tant que la LazyColumn
                     // n'a pas encore mesuré son contenu (chapitre en
@@ -776,11 +780,16 @@ fun ReaderScreen(
                     // jamais. Une fois la boucle lancée, `false` signifie
                     // la fin du chapitre : on sort.
                     if (!scrollState.canScrollForward) {
-                        val measured = withTimeoutOrNull(2_000) {
+                        if (hasScrolled) break
+                        withTimeoutOrNull(2_000) {
                             snapshotFlow { scrollState.layoutInfo.totalItemsCount }.first { it > 0 }
                         } ?: break
-                        continue
+                        // Une frame pour que la première mesure se reflète ; un
+                        // chapitre qui tient à l'écran ne défile pas : on sort.
+                        withFrameNanos { }
+                        if (!scrollState.canScrollForward) break
                     }
+                    hasScrolled = true
                     withFrameNanos { frameNanos ->
                         if (lastFrameNanos != 0L) {
                             val deltaSeconds = (frameNanos - lastFrameNanos) / 1_000_000_000f
