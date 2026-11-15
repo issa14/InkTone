@@ -736,6 +736,10 @@ Vérification : « Appareil (adb) » = pilotée par adb sur le V2206, pas encore
 | C14 (suite) | Paramètres et champs morts de la Bibliothèque retirés | `e9742f05` | Tests JVM + compilation androidTest |
 | C10 (en partie) | Avancement du téléchargement OPDS sur la carte ; la carte n'ouvre toujours pas de fiche | `0d070194` | Compilation |
 | D24 (en partie) | PDF trop volumineux signalé comme tel ; chargement en mémoire et plan du PDF inchangés | `f0fadddc` | Compilation |
+| D32 | Série comptée seulement les jours où l'objectif quotidien est atteint (décision d'Issa) | `691e5556` | Test JVM |
+| D75 | Tap sur le quart gauche ou droit : tourne la page en mode paginé ; centre : commandes (décision d'Issa) | `813f26aa` | Appareil (adb) |
+| B17 | Panneaux et dialogues du Lecteur au thème de lecture (décision d'Issa) | `8279af0c` | Appareil (adb) pour les réglages |
+| B16 (en partie) | Luminosité : état local pendant le geste, écriture différée, libellé « Auto », action TalkBack | `312a2dcc` | Appareil (adb) : affichage seulement |
 
 **Vérifications sur appareil à faire par Issa** :
 - **B18** : mode défilement, auto-défilement jusqu'en fin de chapitre : il s'arrête.
@@ -748,11 +752,11 @@ Vérification : « Appareil (adb) » = pilotée par adb sur le V2206, pas encore
 - **D56, D19** : couverts par des tests seulement.
 
 **Reste à traiter** :
-- **Nécessitent une décision de conception** : D75 (tourner la page au tap sur les bords ou aux touches de volume : change le geste actuel du tap, qui bascule les commandes), B5 (sommaire précis, touche l'analyse EPUB), B16 et B17 (luminosité, thème des panneaux), D65 (surlignage de phrase quand le mot est inconnu).
+- **Nécessitent une décision de conception** : B5 (sommaire précis, touche l'analyse EPUB), D65 (surlignage de phrase quand le mot est inconnu), D75 (touches de volume, non traitées).
 - **Lourds** : D8 (recherche insensible aux accents : changer le tokeniseur FTS impose de réindexer toute la bibliothèque, soit plusieurs minutes pour 1,7 Go), D61 (suppressions et modifications non propagées entre appareils : tombes horodatées), D11, D4.
 - **Après implémentation d'ADR-027** (contexte textuel du `Locator`) : D12 à D17.
 - **D1** : décidé (pas de couverture ajoutée) ; demande la migration de l'index de chapitre (positions, signets, longueurs).
-- **Compléments** : C10 (fiche d'un livre OPDS), D24 (chargement en mémoire, plan du PDF), D29 (c, d, e), D43 (la clé de cache reste sensible à l'intonation), D44 (avertissement de langue), D66 (recherche des notes), D67 (mises à jour en deux temps des Réglages et préréglages), conflit de position laissé en dehors d'A19.
-- **P2/P3 non examinés** : D16, D32 (décision), D45, D50, D52, D62 ; D64 (le worker écrit tout en `.epub` : accepter les PDF demande de transmettre le type MIME jusqu'à lui) ; C3 (menu 3-points des couvertures, actions du HUD et de la barre TTS).
+- **Compléments** : B16 (barre vide en mode système), B17 (les autres panneaux n'ont pas été passés en revue un à un), C10 (fiche d'un livre OPDS), D24 (chargement en mémoire, plan du PDF), D29 (c, d, e), D43 (la clé de cache reste sensible à l'intonation), D44 (avertissement de langue), D66 (recherche des notes), D67 (mises à jour en deux temps des Réglages et préréglages), conflit de position laissé en dehors d'A19.
+- **P2/P3 non examinés** : D16, D45, D50, D52, D62 ; D64 (le worker écrit tout en `.epub` : accepter les PDF demande de transmettre le type MIME jusqu'à lui) ; C3 (menu 3-points des couvertures, actions du HUD et de la barre TTS).
 - **A7 (complément)** : le défilement automatique vers la carte de la voix n'est pas fait.
 - `scripts/audition-edge-voices.sh` : non suivi, sort à décider.
