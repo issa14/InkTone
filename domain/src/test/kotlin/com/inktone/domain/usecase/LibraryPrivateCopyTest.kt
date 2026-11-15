@@ -137,4 +137,14 @@ class LibraryPrivateCopyTest {
 
         assertEquals(listOf(cover), storage.deletedUris)
     }
+
+    /** Audit UX D23 : un fichier texte sans extension `.txt` était traité comme un EPUB. */
+    @Test
+    fun `un fichier texte sans extension est importe comme TXT`() = runTest {
+        val result = importPublication()("content://picker/Mon texte")
+
+        val publication = (result as ImportResult.Success).publication
+        assertEquals(com.inktone.domain.model.PublicationFormat.TXT, publication.format)
+        assertTrue(publication.fileUri.endsWith(".txt"))
+    }
 }

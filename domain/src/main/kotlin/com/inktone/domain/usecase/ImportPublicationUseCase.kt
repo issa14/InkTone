@@ -2,6 +2,8 @@ package com.inktone.domain.usecase
 
 import com.inktone.domain.model.Publication
 import com.inktone.domain.model.PublicationFormat
+import com.inktone.domain.model.detectPublicationFormat
+import com.inktone.domain.model.fileExtension
 import com.inktone.domain.model.Chapter
 import com.inktone.domain.model.ChapterLengths
 import com.inktone.domain.repository.PublicationRepository
@@ -64,7 +66,11 @@ class ImportPublicationUseCase(
         // Le livre vit désormais dans le stockage de l'application (ADR-028,
         // audit UX D55) : le fichier d'origine n'est plus lu qu'ici. Tout ce
         // qui suit, analyse comprise, travaille sur la copie.
-        val fileName = fileStorageService.getFileName(fileUri) ?: fileUri
+        val originalName = fileStorageService.getFileName(fileUri) ?: fileUri
+        val header = fileStorageService.openInputStream(fileUri)?.use { it.readNBytes(SNIFF_BYTES) } ?: ByteArray(0)
+        // Le format détecté donne son extension à la copie : tout le reste (analyse,
+        // lecture) choisit son parseur par elle (audit UX D23).
+        val fileName = "${originalName.substringBeforeLast('.', originalName)}.${detectPublicationFormat(originalName, header).fileExtension}"
         val storedUri = fileStorageService.copyToLibrary(fileUri, fileName, hash)
             ?: return ImportResult.Corrupted("Impossible de copier le livre dans l'application (espace insuffisant ?)")
         val result = try {
@@ -275,3 +281,6 @@ sealed interface ImportResult {
     data class Corrupted(val message: String) : ImportResult
     data class UnsupportedFormat(val format: String) : ImportResult
 }
+
+/** Octets lus au début d'un fichier pour en reconnaître le format (D23). */
+private const val SNIFF_BYTES = 512
