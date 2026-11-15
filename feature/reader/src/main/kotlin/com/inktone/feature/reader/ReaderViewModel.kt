@@ -623,13 +623,14 @@ class ReaderViewModel @Inject constructor(
     private fun setOverrides(overrides: ReadingOverrides?) {
         val publicationId = currentPublicationId ?: return
         viewModelScope.launch {
-            val existing = getReadingState(publicationId)
-            val baseState = existing ?: ReadingState(
-                publicationId = publicationId,
-                locator = Locator(resourceHref = "unknown", chapterIndex = 0, charOffset = 0),
-                lastReadAt = System.currentTimeMillis(),
-            )
-            updateReadingState(baseState.copy(overrides = overrides, lastReadAt = System.currentTimeMillis()))
+            updateReadingState.update(publicationId) { existing ->
+                val baseState = existing ?: ReadingState(
+                    publicationId = publicationId,
+                    locator = Locator(resourceHref = "unknown", chapterIndex = 0, charOffset = 0),
+                    lastReadAt = System.currentTimeMillis(),
+                )
+                baseState.copy(overrides = overrides, lastReadAt = System.currentTimeMillis())
+            }
             val effectiveSettings = EffectiveReadingSettings.resolve(overrides, preferencesRepository.get())
             _state.value = _state.value.copy(
                 currentOverrides = overrides,
@@ -1445,16 +1446,15 @@ class ReaderViewModel @Inject constructor(
             // « nu » ici écrasait silencieusement overrides/voiceProfileId
             // déjà enregistrés à chaque scroll ou phrase TTS — préserver
             // l'existant, comme setOverrides le fait déjà pour son propre champ.
-            val existing = getReadingState(publicationId)
-            updateReadingState(
+            updateReadingState.update(publicationId) { existing ->
                 ReadingState(
                     publicationId = publicationId,
                     locator = locator,
                     lastReadAt = System.currentTimeMillis(),
                     voiceProfileId = existing?.voiceProfileId,
                     overrides = existing?.overrides,
-                ),
-            )
+                )
+            }
         }
     }
 

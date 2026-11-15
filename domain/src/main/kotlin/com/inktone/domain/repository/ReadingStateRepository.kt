@@ -21,5 +21,19 @@ interface ReadingStateRepository {
 
     /** Persiste l'état de reprise. Appelée par les deux chemins K3 (TTS / manuel) — jamais simultanément. */
     suspend fun save(state: ReadingState)
+
+    /**
+     * Applique [transform] à l'état actuel de [publicationId] (`null` s'il n'existe
+     * pas encore), lecture et écriture comprises, sans qu'une autre mise à jour
+     * passée par cette méthode ne s'intercale. La narration (position, à chaque
+     * phrase) et le Lecteur (surcharges, position manuelle) lisaient puis
+     * réécrivaient la même ligne : un changement de thème pendant la narration
+     * pouvait être écrasé par l'écriture de position qui avait lu l'ancienne
+     * valeur (audit UX D20).
+     */
+    suspend fun update(publicationId: String, transform: (ReadingState?) -> ReadingState) {
+        save(transform(get(publicationId)))
+    }
+
     suspend fun delete(publicationId: String)
 }

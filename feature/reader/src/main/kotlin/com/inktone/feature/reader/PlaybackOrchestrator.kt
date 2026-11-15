@@ -987,16 +987,16 @@ class PlaybackOrchestrator @Inject constructor(
             // écrasait silencieusement overrides/voiceProfileId déjà
             // enregistrés à CHAQUE transition de phrase narrée — préserver
             // l'existant, comme le chemin manuel le fait déjà.
-            val existing = getReadingState(publicationId)
-            updateReadingState(
+            val locator = sentence.startLocator(chapterIndex = chapterIndex, resourceHref = resourceHref)
+            updateReadingState.update(publicationId) { existing ->
                 ReadingState(
                     publicationId = publicationId,
-                    locator = sentence.startLocator(chapterIndex = chapterIndex, resourceHref = resourceHref),
+                    locator = locator,
                     lastReadAt = System.currentTimeMillis(),
                     voiceProfileId = existing?.voiceProfileId,
                     overrides = existing?.overrides,
-                ),
-            )
+                )
+            }
             // Lot 22, Palier B, décision 4 — épingle le segment de la
             // position de reprise : c'est le cœur du gain, le tap sur
             // « reprendre » doit démarrer sans synthèse. Épinglé à chaque

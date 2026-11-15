@@ -17,4 +17,12 @@ class UpdateReadingStateUseCase(
     suspend operator fun invoke(state: ReadingState) {
         readingStateRepository.save(state)
     }
+
+    /**
+     * Met à jour l'état existant sans le réécrire à l'aveugle : [transform] reçoit
+     * l'état courant (`null` s'il n'y en a pas), l'écriture est atomique (audit UX D20).
+     */
+    suspend fun update(publicationId: String, transform: (ReadingState?) -> ReadingState) {
+        readingStateRepository.update(publicationId, transform)
+    }
 }

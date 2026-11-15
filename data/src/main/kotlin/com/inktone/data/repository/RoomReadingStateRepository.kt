@@ -7,6 +7,8 @@ import com.inktone.domain.repository.ReadingStateRepository
 import com.inktone.infrastructure.database.dao.ReadingStateDao
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.map
+import kotlinx.coroutines.sync.Mutex
+import kotlinx.coroutines.sync.withLock
 import javax.inject.Inject
 
 class RoomReadingStateRepository @Inject constructor(
@@ -19,5 +21,10 @@ class RoomReadingStateRepository @Inject constructor(
         dao.observeAll().map { states -> states.map { it.toDomain() } }
     override suspend fun getAll(): List<ReadingState> = dao.getAll().map { it.toDomain() }
     override suspend fun save(state: ReadingState) = dao.save(state.toEntity())
+
+    private val updateMutex = Mutex()
+
+    override suspend fun update(publicationId: String, transform: (ReadingState?) -> ReadingState) =
+        updateMutex.withLock { dao.save(transform(dao.get(publicationId)?.toDomain()).toEntity()) }
     override suspend fun delete(publicationId: String) = dao.delete(publicationId)
 }
