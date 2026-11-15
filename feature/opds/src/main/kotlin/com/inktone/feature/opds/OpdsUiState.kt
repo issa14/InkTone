@@ -29,6 +29,8 @@ sealed interface OpdsUiState {
         val error: OpdsErrorUi? = null,
         /** Catalogue courant — résout l'auth Basic Auth des couvertures, jamais affiché. */
         val catalogId: String? = null,
+        /** État du téléchargement de chaque livre, par lien d'acquisition (audit UX C10). */
+        val downloads: Map<String, OpdsBookDownload> = emptyMap(),
     ) : OpdsUiState
 }
 
@@ -69,3 +71,6 @@ sealed interface OpdsEffect {
     data class ShowMessage(val message: String) : OpdsEffect
     data class DownloadComplete(val bookTitle: String, val publicationId: String) : OpdsEffect
 }
+
+/** Avancement du téléchargement d'un livre de catalogue. */
+enum class OpdsBookDownload { IN_PROGRESS, DONE }

@@ -7,7 +7,9 @@ import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.aspectRatio
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.Spacer
+import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.lazy.grid.GridCells
@@ -147,7 +149,7 @@ private fun FeedGrid(
         itemsIndexed(state.items, key = { index, item -> "$index:${itemKey(item)}" }) { _, item ->
             when (item) {
                 is OpdsItem.Navigation -> DirectoryCard(item, onOpenNavigation)
-                is OpdsItem.Book -> BookCard(item, state.catalogId, onDownloadBook)
+                is OpdsItem.Book -> BookCard(item, state.catalogId, state.downloads[item.acquisitionHref], onDownloadBook)
             }
         }
         if (state.isLoadingMore) {
@@ -191,7 +193,12 @@ private fun DirectoryCard(
 }
 
 @Composable
-private fun BookCard(item: OpdsItem.Book, catalogId: String?, onDownloadBook: (OpdsItem.Book) -> Unit) {
+private fun BookCard(
+    item: OpdsItem.Book,
+    catalogId: String?,
+    download: OpdsBookDownload?,
+    onDownloadBook: (OpdsItem.Book) -> Unit,
+) {
     val coverUrl = item.coverUrl
     Card {
         Column(Modifier.fillMaxWidth()) {
@@ -227,8 +234,24 @@ private fun BookCard(item: OpdsItem.Book, catalogId: String?, onDownloadBook: (O
                         overflow = TextOverflow.Ellipsis,
                     )
                 }
-                androidx.compose.material3.IconButton(onClick = { onDownloadBook(item) }) {
-                    AppIcon(AppSymbol.Download, contentDescription = "Télécharger ${item.title}")
+                when (download) {
+                    OpdsBookDownload.IN_PROGRESS -> Row(
+                        modifier = Modifier.padding(top = 8.dp),
+                        verticalAlignment = Alignment.CenterVertically,
+                        horizontalArrangement = Arrangement.spacedBy(8.dp),
+                    ) {
+                        CircularProgressIndicator(modifier = Modifier.size(18.dp), strokeWidth = 2.dp)
+                        Text("Téléchargement…", style = MaterialTheme.typography.bodySmall)
+                    }
+                    OpdsBookDownload.DONE -> Text(
+                        "Téléchargé",
+                        style = MaterialTheme.typography.bodySmall,
+                        color = MaterialTheme.colorScheme.primary,
+                        modifier = Modifier.padding(top = 8.dp),
+                    )
+                    null -> androidx.compose.material3.IconButton(onClick = { onDownloadBook(item) }) {
+                        AppIcon(AppSymbol.Download, contentDescription = "Télécharger ${item.title}")
+                    }
                 }
             }
         }

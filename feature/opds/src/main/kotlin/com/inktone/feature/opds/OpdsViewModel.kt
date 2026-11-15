@@ -61,10 +61,15 @@ class OpdsViewModel @Inject constructor(
 
     private val navigation = MutableStateFlow<OpdsUiState>(OpdsUiState.Dashboard())
 
-    val state: StateFlow<OpdsUiState> = combine(navigation, catalogs) { nav, list ->
+    // Téléchargements de cette session, par lien d'acquisition ; les événements du
+    // worker ne portent que le titre, d'où la table titre -> lien (audit UX C10).
+    private val downloads = MutableStateFlow<Map<String, OpdsBookDownload>>(emptyMap())
+    private val hrefByTitle = mutableMapOf<String, String>()
+
+    val state: StateFlow<OpdsUiState> = combine(navigation, catalogs, downloads) { nav, list, dl ->
         when (nav) {
             is OpdsUiState.Dashboard -> nav.copy(catalogs = list, isLoading = false)
-            is OpdsUiState.Feed -> nav
+            is OpdsUiState.Feed -> nav.copy(downloads = dl)
         }
     }.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), OpdsUiState.Dashboard())
 
@@ -75,6 +80,13 @@ class OpdsViewModel @Inject constructor(
         // Fin de téléchargement (worker → UI) : snackbar « Lire maintenant ».
         viewModelScope.launch {
             downloadObserver.observe().collect { event ->
+                hrefByTitle.remove(event.bookTitle)?.let { href ->
+                    downloads.value = if (event.success) {
+                        downloads.value + (href to OpdsBookDownload.DONE)
+                    } else {
+                        downloads.value - href
+                    }
+                }
                 if (event.success) {
                     val publicationId = event.publicationId
                     if (publicationId != null) {
@@ -109,8 +121,11 @@ class OpdsViewModel @Inject constructor(
     private fun onDownloadBook(item: OpdsItem.Book) {
         viewModelScope.launch {
             when (val result = downloadBook(item, currentCatalogId)) {
-                is com.inktone.domain.usecase.DownloadOpdsBookResult.Scheduled ->
+                is com.inktone.domain.usecase.DownloadOpdsBookResult.Scheduled -> {
+                    hrefByTitle[item.title] = item.acquisitionHref
+                    downloads.value = downloads.value + (item.acquisitionHref to OpdsBookDownload.IN_PROGRESS)
                     _effects.emit(OpdsEffect.ShowMessage("Téléchargement de « ${item.title} » démarré"))
+                }
                 is com.inktone.domain.usecase.DownloadOpdsBookResult.Failure ->
                     _effects.emit(OpdsEffect.ShowMessage(result.message))
             }
