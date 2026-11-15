@@ -33,11 +33,22 @@ class DownloadOpdsBookUseCaseTest {
     }
 
     @Test
-    fun un_mime_non_epub_est_rejete_sans_planifier() = runTest {
+    fun un_pdf_est_accepte_et_planifie() = runTest {
         val scheduler = FakeOpdsDownloadScheduler()
         val useCase = DownloadOpdsBookUseCase(scheduler)
 
         val result = useCase(book("application/pdf"), "cat-1")
+
+        assertTrue(result is DownloadOpdsBookResult.Scheduled)
+        assertEquals(1, scheduler.enqueued.size)
+    }
+
+    @Test
+    fun un_mime_hors_epub_et_pdf_est_rejete_sans_planifier() = runTest {
+        val scheduler = FakeOpdsDownloadScheduler()
+        val useCase = DownloadOpdsBookUseCase(scheduler)
+
+        val result = useCase(book("application/x-mobipocket-ebook"), "cat-1")
 
         assertTrue(result is DownloadOpdsBookResult.Failure)
         assertEquals(OpdsFailureReason.NON_DOWNLOADABLE_ACQUISITION, (result as DownloadOpdsBookResult.Failure).reason)
