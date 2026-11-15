@@ -561,3 +561,14 @@ val MIGRATION_33_34 = object : Migration(33, 34) {
         db.execSQL("CREATE INDEX IF NOT EXISTS `index_reading_sessions_startedAt` ON `reading_sessions` (`startedAt`)")
     }
 }
+
+/**
+ * Enregistre le défilement vertical dans la page d'un PDF (audit UX D18) :
+ * `Locator.pageOffsetY` était calculé puis perdu à l'écriture, et le Lecteur
+ * et la Bibliothèque ne calculaient pas la même progression.
+ */
+val MIGRATION_34_35 = object : Migration(34, 35) {
+    override fun migrate(db: SupportSQLiteDatabase) {
+        db.execSQL("ALTER TABLE reading_states ADD COLUMN pageOffsetY REAL DEFAULT NULL")
+    }
+}

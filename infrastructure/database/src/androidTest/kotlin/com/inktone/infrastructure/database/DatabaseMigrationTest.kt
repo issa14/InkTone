@@ -1366,6 +1366,47 @@ class DatabaseMigrationTest {
         v34.close()
     }
 
+    // Défilement dans la page PDF (MIGRATION_34_35, audit UX D18) : la
+    // position existante est conservée, sans défilement, et la colonne
+    // accepte ensuite une valeur.
+    @Test
+    fun migration_34_vers_35_ajoute_le_defilement_de_page_sans_toucher_la_position() {
+        val v34 = helper.createDatabase(TEST_DB_NAME, 34)
+        v34.execSQL(
+            """
+            INSERT INTO publications (id, title, authors, format, fileUri, fileHash, fileSize, chapterCount, subjects, isFavorite, isPinned, isDrmProtected, importDate, lastOpened)
+            VALUES ('pub-1', 'Titre', '', 'PDF', 'content://pub-1', 'hash1', 1000, 12, '', 0, 0, 0, 500, 900)
+            """.trimIndent(),
+        )
+        v34.execSQL(
+            "INSERT INTO reading_states (publicationId, resourceHref, chapterIndex, paragraphIndex, charOffset, lastReadAt, voiceProfileId, overrideTheme, overrideFontSize) " +
+                "VALUES ('pub-1', 'page-7', 7, NULL, 0, 1000, NULL, NULL, NULL)",
+        )
+        v34.close()
+
+        val v35 = helper.runMigrationsAndValidate(
+            TEST_DB_NAME, 35, true,
+            MIGRATION_1_2, MIGRATION_2_3, MIGRATION_3_4, MIGRATION_4_5, MIGRATION_5_6, MIGRATION_6_7,
+            MIGRATION_7_8, MIGRATION_8_9, MIGRATION_9_10, MIGRATION_10_11, MIGRATION_11_12, MIGRATION_12_13,
+            MIGRATION_13_14, MIGRATION_14_15, MIGRATION_15_16, MIGRATION_16_17, MIGRATION_17_18, MIGRATION_18_19,
+            MIGRATION_19_20, MIGRATION_20_21, MIGRATION_21_22, MIGRATION_22_23, MIGRATION_23_24, MIGRATION_24_25,
+            MIGRATION_25_26, MIGRATION_26_27, MIGRATION_27_28, MIGRATION_28_29, MIGRATION_29_30, MIGRATION_30_31,
+            MIGRATION_31_32, MIGRATION_32_33, MIGRATION_33_34, MIGRATION_34_35,
+        )
+
+        v35.query("SELECT chapterIndex, pageOffsetY FROM reading_states WHERE publicationId = 'pub-1'").use { cursor ->
+            assertEquals(true, cursor.moveToFirst())
+            assertEquals(7, cursor.getInt(0))
+            assertEquals(true, cursor.isNull(1))
+        }
+        v35.execSQL("UPDATE reading_states SET pageOffsetY = 0.5 WHERE publicationId = 'pub-1'")
+        v35.query("SELECT pageOffsetY FROM reading_states WHERE publicationId = 'pub-1'").use { cursor ->
+            cursor.moveToFirst()
+            assertEquals(0.5f, cursor.getFloat(0), 0f)
+        }
+        v35.close()
+    }
+
     companion object {
         private const val TEST_DB_NAME = "migration-test"
     }

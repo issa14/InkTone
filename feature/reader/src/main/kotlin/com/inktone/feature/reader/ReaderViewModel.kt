@@ -1184,6 +1184,7 @@ class ReaderViewModel @Inject constructor(
         _state.value = _state.value.copy(
             currentChapterIndex = targetIndex, currentSentenceIndex = sentenceIndex,
             isTocVisible = false, isBookmarkListVisible = false,
+            pageOffsetY = locator.pageOffsetY ?: 0f,
         )
         persistPosition(chapterIndex = targetIndex, sentenceIndex = sentenceIndex)
         preloadAdjacentChapters(targetIndex)
@@ -1250,9 +1251,11 @@ class ReaderViewModel @Inject constructor(
         pausePlayback()
 
         _highlightedWordRange.value = null
+        // Une page quittée perd son zoom (FixedPageContent) : son défilement
+        // ne vaut pas pour la suivante (D18).
         _state.value = _state.value.copy(
             currentChapterIndex = targetIndex, currentSentenceIndex = 0,
-            isTocVisible = false,
+            isTocVisible = false, pageOffsetY = 0f,
         )
         persistPosition(chapterIndex = targetIndex, sentenceIndex = 0)
         // Plan v3, Palier 3.6 — charger le contenu Rich si chapitre vide

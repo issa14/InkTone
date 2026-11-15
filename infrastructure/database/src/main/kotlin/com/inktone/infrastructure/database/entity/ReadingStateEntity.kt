@@ -31,4 +31,6 @@ data class ReadingStateEntity(
     val voiceProfileId: String?,
     val overrideTheme: String?,
     val overrideFontSize: Int?,
+    /** Défilement vertical dans la page d'un PDF (`Locator.pageOffsetY`), nul ailleurs. */
+    val pageOffsetY: Float? = null,
 )

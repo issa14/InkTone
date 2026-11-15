@@ -10,6 +10,7 @@ fun ReadingState.toEntity(): ReadingStateEntity {
         publicationId = publicationId,
         resourceHref = cols.resourceHref, chapterIndex = cols.chapterIndex,
         paragraphIndex = cols.paragraphIndex, charOffset = cols.charOffset,
+        pageOffsetY = cols.pageOffsetY,
         lastReadAt = lastReadAt, voiceProfileId = voiceProfileId,
         // Lot 9 — id de thème (String), plus un enum.
         overrideTheme = overrides?.theme, overrideFontSize = overrides?.fontSize,
@@ -18,7 +19,7 @@ fun ReadingState.toEntity(): ReadingStateEntity {
 
 fun ReadingStateEntity.toDomain(): ReadingState = ReadingState(
     publicationId = publicationId,
-    locator = LocatorColumns(resourceHref, chapterIndex, paragraphIndex, charOffset).toLocator(),
+    locator = LocatorColumns(resourceHref, chapterIndex, paragraphIndex, charOffset, pageOffsetY).toLocator(),
     lastReadAt = lastReadAt, voiceProfileId = voiceProfileId,
     overrides = if (overrideTheme != null || overrideFontSize != null) {
         ReadingOverrides(
