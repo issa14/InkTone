@@ -9,7 +9,7 @@ class LinkTargetTest {
 
     @Test
     fun une_note_de_bas_de_page_mene_au_chapitre_des_notes() {
-        assertEquals(LinkTarget.Chapter(2), resolve("notes.xhtml#n3"))
+        assertEquals(LinkTarget.Chapter(2, "n3"), resolve("notes.xhtml#n3"))
     }
 
     @Test
@@ -30,7 +30,6 @@ class LinkTargetTest {
 
     @Test
     fun un_fragment_seul_ou_un_chapitre_inconnu_ne_mene_nulle_part() {
-        assertEquals(LinkTarget.None, resolve("#haut"))
         assertEquals(LinkTarget.None, resolve("absent.xhtml"))
         assertEquals(LinkTarget.None, resolve("ftp://x/y"))
         assertEquals(LinkTarget.None, resolve(""))
@@ -42,5 +41,16 @@ class LinkTargetTest {
             LinkTarget.Resource("OEBPS/Text/footnotes.xml", "footnote_1"),
             resolve("footnotes.xml#footnote_1"),
         )
+    }
+
+    @Test
+    fun un_fragment_seul_vise_une_ancre_du_chapitre_courant() {
+        assertEquals(LinkTarget.Chapter(1, "haut"), resolve("#haut"))
+        assertEquals(LinkTarget.None, resolve("#"))
+    }
+
+    @Test
+    fun un_lien_sans_fragment_n_a_pas_d_ancre() {
+        assertEquals(LinkTarget.Chapter(2, null), resolve("notes.xhtml"))
     }
 }

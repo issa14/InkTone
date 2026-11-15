@@ -874,7 +874,7 @@ fun ReaderScreen(
         val chapterHrefs = state.chapters.map { it.href }
         val onLinkTapped: (String) -> Unit = { href ->
             when (val target = resolveLinkTarget(href, currentChapterHref, chapterHrefs)) {
-                is LinkTarget.Chapter -> viewModel.onIntent(ReaderIntent.JumpToChapter(target.index))
+                is LinkTarget.Chapter -> viewModel.onIntent(ReaderIntent.OpenLink(target.index, target.fragment))
                 is LinkTarget.External -> runCatching { uriHandler.openUri(target.url) }
                 is LinkTarget.Resource -> viewModel.onIntent(ReaderIntent.OpenFootnote(target.path, target.fragment))
                 LinkTarget.None -> Unit

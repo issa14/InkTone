@@ -200,6 +200,38 @@ class ReaderViewModelNavigateToLocatorTest {
     }
 
     @Test
+    fun un_renvoi_vers_une_ancre_introuvable_du_chapitre_courant_ne_bouge_rien() = runTest {
+        val viewModel = openBook(FakeReadingStateRepository())
+        try {
+            viewModel.onIntent(ReaderIntent.OpenTocEntry(chapterIndex = 2, fragment = "suite"))
+            dispatcher.scheduler.runCurrent()
+            assertEquals(1, viewModel.state.value.currentSentenceIndex)
+
+            viewModel.onIntent(ReaderIntent.OpenLink(chapterIndex = 2, fragment = "introuvable"))
+            dispatcher.scheduler.runCurrent()
+
+            assertEquals(2, viewModel.state.value.currentChapterIndex)
+            assertEquals("la lecture n'est pas remise à zéro", 1, viewModel.state.value.currentSentenceIndex)
+        } finally {
+            stopTimers(viewModel)
+        }
+    }
+
+    @Test
+    fun un_renvoi_vers_l_ancre_d_un_autre_chapitre_y_mene() = runTest {
+        val viewModel = openBook(FakeReadingStateRepository())
+        try {
+            viewModel.onIntent(ReaderIntent.OpenLink(chapterIndex = 2, fragment = "suite"))
+            dispatcher.scheduler.runCurrent()
+
+            assertEquals(2, viewModel.state.value.currentChapterIndex)
+            assertEquals(1, viewModel.state.value.currentSentenceIndex)
+        } finally {
+            stopTimers(viewModel)
+        }
+    }
+
+    @Test
     fun une_ancre_inconnue_ou_absente_ouvre_le_debut_du_chapitre() = runTest {
         val viewModel = openBook(FakeReadingStateRepository())
         try {

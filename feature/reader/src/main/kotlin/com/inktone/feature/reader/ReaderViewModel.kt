@@ -361,6 +361,7 @@ class ReaderViewModel @Inject constructor(
             is ReaderIntent.PreviousChapter -> navigateToChapter(_state.value.currentChapterIndex - 1)
             is ReaderIntent.JumpToChapter -> navigateToChapter(intent.chapterIndex)
             is ReaderIntent.OpenTocEntry -> openTocEntry(intent.chapterIndex, intent.fragment)
+            is ReaderIntent.OpenLink -> openTocEntry(intent.chapterIndex, intent.fragment, stayIfAnchorMissingInCurrentChapter = true)
             is ReaderIntent.OpenFootnote -> openFootnote(intent.path, intent.fragment)
             ReaderIntent.DismissFootnote -> _state.value = _state.value.copy(footnote = null)
             is ReaderIntent.ToggleToc -> _state.value = _state.value.copy(isTocVisible = !_state.value.isTocVisible)
@@ -1299,7 +1300,7 @@ class ReaderViewModel @Inject constructor(
      * sinon au début du chapitre comme avant (livre dont les ancres sont absentes, ou
      * pré-analyse d'avant les ancres).
      */
-    private fun openTocEntry(chapterIndex: Int, fragment: String?) {
+    private fun openTocEntry(chapterIndex: Int, fragment: String?, stayIfAnchorMissingInCurrentChapter: Boolean = false) {
         if (fragment == null) {
             navigateToChapter(chapterIndex)
             return
@@ -1310,7 +1311,10 @@ class ReaderViewModel @Inject constructor(
             loadJob?.join()
             val offset = _state.value.chapters.getOrNull(chapterIndex)?.anchors?.get(fragment)
             if (offset == null) {
-                navigateToChapter(chapterIndex)
+                // Un renvoi cassé vers le chapitre où l'on est ne doit pas remettre sa lecture à zéro.
+                if (!(stayIfAnchorMissingInCurrentChapter && chapterIndex == _state.value.currentChapterIndex)) {
+                    navigateToChapter(chapterIndex)
+                }
             } else {
                 navigateToLocator(Locator(resourceHref = href, chapterIndex = chapterIndex, charOffset = offset))
             }

@@ -30,7 +30,8 @@ val LocalLinkTapHandler = staticCompositionLocalOf<(String) -> Unit> { {} }
 
 /** Cible d'un lien : un chapitre du livre, une adresse extérieure, ou rien de résoluble. */
 sealed interface LinkTarget {
-    data class Chapter(val index: Int) : LinkTarget
+    /** Un chapitre du livre, et son ancre [fragment] quand le lien en vise une (audit UX D15). */
+    data class Chapter(val index: Int, val fragment: String? = null) : LinkTarget
     data class External(val url: String) : LinkTarget
 
     /** Ressource du livre hors de la liste des chapitres (une note de bas de page hors lecture linéaire). */
@@ -41,17 +42,23 @@ sealed interface LinkTarget {
 /**
  * Résout [href] (tel qu'écrit dans le livre) par rapport au chapitre courant. Les adresses
  * `http`, `https` et `mailto` sont extérieures ; les autres sont des chemins relatifs à
- * [currentChapterHref], comparés aux chapitres sans fragment ni encodage pour cent. Le fragment
- * n'est pas suivi : on arrive au début du chapitre.
+ * [currentChapterHref], comparés aux chapitres sans fragment ni encodage pour cent. Le fragment est
+ * gardé : le Lecteur l'ouvre à son ancre quand le chapitre la connaît.
  */
 fun resolveLinkTarget(href: String, currentChapterHref: String, chapterHrefs: List<String>): LinkTarget {
     val raw = href.trim()
-    if (raw.isEmpty() || raw.startsWith("#")) return LinkTarget.None
+    if (raw.isEmpty()) return LinkTarget.None
     val lower = raw.lowercase()
     if (lower.startsWith("http://") || lower.startsWith("https://") || lower.startsWith("mailto:")) {
         return LinkTarget.External(raw)
     }
     if (raw.contains("://")) return LinkTarget.None
+    val fragment = percentDecode(raw.substringAfter('#', "")).takeIf { it.isNotEmpty() }
+    // Un fragment seul vise une ancre du chapitre courant.
+    if (raw.startsWith("#")) {
+        val current = chapterHrefs.indexOfFirst { percentDecode(it).substringBefore('#').trimStart('/') == percentDecode(currentChapterHref).substringBefore('#').trimStart('/') }
+        return if (current >= 0 && fragment != null) LinkTarget.Chapter(current, fragment) else LinkTarget.None
+    }
     val path = percentDecode(raw.substringBefore('#'))
     val baseDir = percentDecode(currentChapterHref).substringBeforeLast('/', "")
     val combined = if (baseDir.isEmpty() || path.startsWith("/")) path.removePrefix("/") else "$baseDir/$path"
@@ -65,11 +72,10 @@ fun resolveLinkTarget(href: String, currentChapterHref: String, chapterHrefs: Li
     }
     val target = resolved.joinToString("/")
     val index = chapterHrefs.indexOfFirst { percentDecode(it).substringBefore('#').trimStart('/') == target }
-    if (index >= 0) return LinkTarget.Chapter(index)
+    if (index >= 0) return LinkTarget.Chapter(index, fragment)
     // Hors des chapitres (ex. `footnotes.xml` en `linear="no"`) : une note ciblée par un fragment
     // s'affiche dans une fenêtre, sans changer de chapitre (audit UX D15).
-    val fragment = percentDecode(raw.substringAfter('#', ""))
-    return if (fragment.isNotEmpty() && target.isNotEmpty()) LinkTarget.Resource(target, fragment) else LinkTarget.None
+    return if (fragment != null && target.isNotEmpty()) LinkTarget.Resource(target, fragment) else LinkTarget.None
 }
 
 private fun percentDecode(value: String): String =

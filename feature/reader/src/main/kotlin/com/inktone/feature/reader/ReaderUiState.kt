@@ -344,6 +344,9 @@ sealed interface ReaderIntent {
 
     /** Entrée du sommaire : le chapitre, puis son ancre [fragment] si elle est connue (audit UX B5). */
     data class OpenTocEntry(val chapterIndex: Int, val fragment: String?) : ReaderIntent
+
+    /** Renvoi d'un lien du texte : comme [OpenTocEntry], mais une ancre introuvable dans le chapitre courant ne bouge rien. */
+    data class OpenLink(val chapterIndex: Int, val fragment: String?) : ReaderIntent
     data class OpenFootnote(val path: String, val fragment: String) : ReaderIntent
     data object DismissFootnote : ReaderIntent
     data object ToggleToc : ReaderIntent
