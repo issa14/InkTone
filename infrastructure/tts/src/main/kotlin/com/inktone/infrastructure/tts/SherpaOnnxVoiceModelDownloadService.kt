@@ -126,6 +126,8 @@ class SherpaOnnxVoiceModelDownloadService @Inject constructor(
                     val extracted = try {
                         withContext(Dispatchers.IO) {
                             TarBz2Extractor.extractAtomically(progress.modelFile, targetDir, stripRoot = true)
+                            // Posé en dernier : sans lui, l'installation n'est pas tenue pour complète (audit UX D71).
+                            InstallMarker.write(targetDir, sha256)
                             progress.modelFile.delete()
                             true
                         }
@@ -157,15 +159,13 @@ class SherpaOnnxVoiceModelDownloadService @Inject constructor(
     private companion object {
         const val VOICE_ARCHIVE_URL =
             "https://github.com/k2-fsa/sherpa-onnx/releases/download/tts-models/vits-piper-fr_FR-upmc-medium.tar.bz2"
-        const val VOICE_ARCHIVE_SHA256 =
-            "e9830a331a16f6cc5ef3116a287065e015d3495c3f56b974889a266da7f89a7f"
+        const val VOICE_ARCHIVE_SHA256 = SherpaOnnxModelPaths.ARCHIVE_SHA256
         const val VOICE_ARCHIVE_FILE_NAME = "vits-piper-fr_FR-upmc-medium.tar.bz2"
         const val VOICE_ARCHIVE_SIZE = 80_422_639L
 
         const val CTC_ARCHIVE_URL =
             "https://github.com/k2-fsa/sherpa-onnx/releases/download/asr-models/sherpa-onnx-nemo-fast-conformer-ctc-be-de-en-es-fr-hr-it-pl-ru-uk-20k-int8.tar.bz2"
-        const val CTC_ARCHIVE_SHA256 =
-            "2116eebbfc923ee3332a244e8c933ccc1b7e6783070f7bf842d0b5fc64f6ae33"
+        const val CTC_ARCHIVE_SHA256 = CtcModelPaths.ARCHIVE_SHA256
         const val CTC_ARCHIVE_FILE_NAME = "sherpa-onnx-nemo-fast-conformer-ctc-be-de-en-es-fr-hr-it-pl-ru-uk-20k-int8.tar.bz2"
         const val CTC_ARCHIVE_SIZE = 102_261_698L
     }

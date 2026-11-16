@@ -27,5 +27,11 @@ class CtcModelPaths @Inject constructor(@ApplicationContext context: Context) {
     /** Répertoire cible de l'extraction — exposé pour le service de téléchargement. */
     internal val dir: File get() = modelDir
 
-    val isReady: Boolean get() = modelFile.exists() && tokensFile.exists()
+    val isReady: Boolean
+        get() = modelFile.exists() && tokensFile.exists() && InstallMarker.matches(modelDir, ARCHIVE_SHA256)
+
+    internal companion object {
+        /** Empreinte de l'archive du modèle CTC (SHA-256 publié par la release GitHub) ; marqueur d'installation. */
+        const val ARCHIVE_SHA256 = "2116eebbfc923ee3332a244e8c933ccc1b7e6783070f7bf842d0b5fc64f6ae33"
+    }
 }

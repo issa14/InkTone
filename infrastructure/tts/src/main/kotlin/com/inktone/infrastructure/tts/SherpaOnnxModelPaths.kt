@@ -35,5 +35,11 @@ class SherpaOnnxModelPaths @Inject constructor(@ApplicationContext context: Cont
     /** Vrai seulement si la VOIX est réellement exploitable — source de
      * vérité pour l'UI (« installée ») et pour le moteur. */
     val isReady: Boolean
-        get() = modelFile.exists() && tokensFile.exists() && espeakDataDir.exists()
+        get() = modelFile.exists() && tokensFile.exists() && espeakDataDir.exists() &&
+            InstallMarker.matches(voiceDir, ARCHIVE_SHA256)
+
+    internal companion object {
+        /** Empreinte de l'archive de la voix (SHA-256 publié par la release GitHub) ; marqueur d'installation. */
+        const val ARCHIVE_SHA256 = "e9830a331a16f6cc5ef3116a287065e015d3495c3f56b974889a266da7f89a7f"
+    }
 }

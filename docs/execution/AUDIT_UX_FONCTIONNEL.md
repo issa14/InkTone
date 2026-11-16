@@ -608,7 +608,7 @@ V2206 ; « Test JVM » un test automatisé qui échoue sans la correction ;
 
 **Limites déclarées :**
 - **D10** : levée par `20fefd8d` (voir §10.1).
-- **D71** : une installation déjà tronquée avant ce correctif reste tenue pour bonne (seule l'existence des fichiers est vérifiée) ; seules les installations futures sont protégées.
+- **D71** : un modèle n'est tenu pour installé qu'avec son marqueur `.install-complete`, posé après l'extraction et portant l'empreinte de l'archive : une installation tronquée ou d'une autre version se réinstalle (`InstallMarker`).
 - **B10** : si Android détruit l'application pendant le choix de l'emplacement, le mot de passe (jamais persisté, à dessein) est perdu et le fichier choisi reste vide.
 - **D66** : la recherche de « Marque-pages et notes » reste sensible aux accents (requête SQL `LIKE` ; la rendre insensible demande une colonne normalisée, donc une migration).
 
