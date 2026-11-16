@@ -761,11 +761,12 @@ private fun LibraryContent(
  * claire, et recouvrir l'illustration va contre la raison même d'afficher
  * une couverture.
  *
- * La hauteur du bloc texte est **fixe** ([CAPTION_HEIGHT]) et non dictée par
- * le contenu : dans une `LazyVerticalGrid`, une rangée prend la hauteur de
- * sa cellule la plus haute — un titre sur deux lignes à côté d'un titre sur
- * une seule décalerait donc toute la rangée, et le pas vertical de la grille
- * changerait d'une rangée à l'autre.
+ * La hauteur du bloc texte est **constante** et non dictée par le contenu :
+ * dans une `LazyVerticalGrid`, une rangée prend la hauteur de sa cellule la
+ * plus haute — un titre sur une ligne à côté d'un titre sur deux décalerait
+ * toute la rangée. Elle est obtenue par `minLines` (titre sur deux lignes,
+ * auteur toujours présent) et non par une hauteur en dp : celle-ci rognait
+ * l'auteur dès que l'échelle de police dépassait 1.
  *
  * Deux zones cliquables distinctes (couverture, légende) plutôt qu'un
  * `clickable` sur la Column : [BookCover] pose déjà le sien sur la
@@ -797,7 +798,6 @@ private fun BookGridCell(
         Column(
             modifier = Modifier
                 .fillMaxWidth()
-                .height(CAPTION_HEIGHT)
                 .clickable(onClick = onClick)
                 .padding(top = 6.dp),
         ) {
@@ -807,29 +807,24 @@ private fun BookGridCell(
             Text(
                 text = publication.title.cleanedForDisplay(),
                 style = MaterialTheme.typography.bodySmall.copy(fontWeight = FontWeight.SemiBold),
+                minLines = 2,
                 maxLines = 2,
                 overflow = TextOverflow.Ellipsis,
                 color = MaterialTheme.colorScheme.onSurface,
             )
-            if (publication.authors.isNotEmpty()) {
-                Text(
-                    text = publication.authors.cleanedAuthorsForDisplay(),
-                    style = MaterialTheme.typography.labelSmall,
-                    maxLines = 1,
-                    overflow = TextOverflow.Ellipsis,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant,
-                )
-            }
+            // Toujours composé, même vide : sinon une cellule sans auteur
+            // serait plus basse que ses voisines.
+            Text(
+                text = if (publication.authors.isNotEmpty()) publication.authors.cleanedAuthorsForDisplay() else "",
+                style = MaterialTheme.typography.labelSmall,
+                minLines = 1,
+                maxLines = 1,
+                overflow = TextOverflow.Ellipsis,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+            )
         }
     }
 }
-
-/**
- * Hauteur fixe du bloc titre + auteur d'une cellule de « Grille détaillée » :
- * deux lignes de `bodySmall` et une de `labelSmall`, plus l'espace au-dessus.
- * Voir [BookGridCell] pour la raison du choix d'une hauteur fixe.
- */
-private val CAPTION_HEIGHT = 58.dp
 
 /**
  * Rangée compacte pour le mode Liste — couverture miniature à gauche,
