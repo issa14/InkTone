@@ -10,11 +10,11 @@ interface SentenceFtsDao {
     @Insert
     suspend fun insertAll(entities: List<SentenceFtsEntity>)
 
-    @Query("DELETE FROM sentence_fts WHERE publicationId = :publicationId")
+    @Query("DELETE FROM sentence_search WHERE publicationId = :publicationId")
     suspend fun deleteForPublication(publicationId: String)
 
     /**
-     * `text MATCH` et non `sentence_fts MATCH` : une correspondance sur la
+     * `text MATCH` et non `sentence_search MATCH` : une correspondance sur la
      * TABLE porte sur toutes ses colonnes, y compris l'identifiant du livre,
      * le chemin interne du chapitre et l'offset. Chercher « html », « text »
      * ou un nombre remontait alors toutes les phrases des livres dont un
@@ -33,7 +33,7 @@ interface SentenceFtsDao {
      */
     @Query(
         """
-        SELECT * FROM sentence_fts
+        SELECT * FROM sentence_search
         WHERE text MATCH :query
             AND publicationId IN (SELECT id FROM publications)
         ORDER BY publicationId, CAST(chapterIndex AS INTEGER), CAST(charOffset AS INTEGER)
@@ -45,7 +45,7 @@ interface SentenceFtsDao {
     /** Même requête que [searchAll], restreinte à un livre. */
     @Query(
         """
-        SELECT * FROM sentence_fts
+        SELECT * FROM sentence_search
         WHERE text MATCH :query
             AND publicationId = :publicationId
             AND publicationId IN (SELECT id FROM publications)

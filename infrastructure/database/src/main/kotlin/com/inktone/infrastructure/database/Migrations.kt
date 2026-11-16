@@ -633,18 +633,20 @@ val MIGRATION_38_39 = object : Migration(38, 39) {
 }
 
 /**
- * Audit UX D8 : l'index plein texte passe au tokeniseur `unicode61` (insensible aux accents et à la
- * casse). Un index est une donnée dérivée : il est supprimé puis recréé vide, et la régénération
- * des pré-analyses ([com.inktone.domain.usecase.RefreshStalePreAnalysesUseCase]) le reconstruit.
+ * Audit UX D8, D11 : l'index plein texte passe au tokeniseur `unicode61` (insensible aux accents et à la
+ * casse), dans une NOUVELLE table `sentence_search`. L'ancienne `sentence_fts` n'est pas supprimée ici :
+ * la libérer en une transaction (2 Go) épuise la mémoire de SQLite et fait planter l'application.
+ * [LegacySearchIndexPurger] la vide par petits lots en tâche de fond. Un index est une donnée dérivée :
+ * la nouvelle table démarre vide, et la régénération des pré-analyses
+ * ([com.inktone.domain.usecase.RefreshStalePreAnalysesUseCase]) la remplit livre par livre.
  */
 val MIGRATION_39_40 = object : Migration(39, 40) {
     override fun migrate(db: SupportSQLiteDatabase) {
         // 0 = index à refaire : tous les livres existants sont réindexés en tâche de fond (audit UX D11).
         db.execSQL("ALTER TABLE publications ADD COLUMN searchIndexVersion INTEGER NOT NULL DEFAULT 0")
-        db.execSQL("DROP TABLE IF EXISTS sentence_fts")
         db.execSQL(
             """
-            CREATE VIRTUAL TABLE IF NOT EXISTS sentence_fts USING FTS4(
+            CREATE VIRTUAL TABLE IF NOT EXISTS sentence_search USING FTS4(
                 publicationId TEXT NOT NULL, chapterIndex INTEGER NOT NULL, resourceHref TEXT NOT NULL,
                 charOffset INTEGER NOT NULL, text TEXT NOT NULL, tokenize=unicode61
             )

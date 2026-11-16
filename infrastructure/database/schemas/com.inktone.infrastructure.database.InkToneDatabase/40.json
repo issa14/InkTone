@@ -1023,7 +1023,7 @@
           "preferredOrder": "ASC"
         },
         "contentSyncTriggers": [],
-        "tableName": "sentence_fts",
+        "tableName": "sentence_search",
         "createSql": "CREATE VIRTUAL TABLE IF NOT EXISTS `${TABLE_NAME}` USING FTS4(`publicationId` TEXT NOT NULL, `chapterIndex` INTEGER NOT NULL, `resourceHref` TEXT NOT NULL, `charOffset` INTEGER NOT NULL, `text` TEXT NOT NULL, tokenize=unicode61)",
         "fields": [
           {

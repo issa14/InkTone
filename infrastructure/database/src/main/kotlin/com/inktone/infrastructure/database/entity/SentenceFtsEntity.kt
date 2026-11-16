@@ -13,9 +13,12 @@ import androidx.room.FtsOptions
  *
  * Tokeniseur `unicode61` : insensible à la casse et aux accents, « eleve » trouve « Élève »
  * (audit UX D8). Le tokeniseur par défaut n'ignore ni l'un ni l'autre.
+ *
+ * Table `sentence_search`, et non l'ancienne `sentence_fts` : supprimer cette dernière (2 Go) en une
+ * transaction épuise la mémoire de SQLite. [LegacySearchIndexPurger] la vide par lots, puis la supprime.
  */
 @Fts4(tokenizer = FtsOptions.TOKENIZER_UNICODE61)
-@Entity(tableName = "sentence_fts")
+@Entity(tableName = "sentence_search")
 data class SentenceFtsEntity(
     val publicationId: String,
     val chapterIndex: Int,

@@ -1569,7 +1569,7 @@ class DatabaseMigrationTest {
     }
 
     @Test
-    fun migration_39_vers_40_recree_l_index_plein_texte_insensible_aux_accents() {
+    fun migration_39_vers_40_cree_le_nouvel_index_sans_toucher_a_l_ancien() {
         val v39 = helper.createDatabase(TEST_DB_NAME, 39)
         v39.execSQL(
             """
@@ -1583,8 +1583,10 @@ class DatabaseMigrationTest {
         )
         v39.close()
 
+        // validateDroppedTables = false : l'ancienne table n'est PAS supprimée par la migration (2 Go),
+        // LegacySearchIndexPurger la vide par lots ensuite.
         val v40 = helper.runMigrationsAndValidate(
-            TEST_DB_NAME, 40, true,
+            TEST_DB_NAME, 40, false,
             MIGRATION_1_2, MIGRATION_2_3, MIGRATION_3_4, MIGRATION_4_5, MIGRATION_5_6, MIGRATION_6_7,
             MIGRATION_7_8, MIGRATION_8_9, MIGRATION_9_10, MIGRATION_10_11, MIGRATION_11_12, MIGRATION_12_13,
             MIGRATION_13_14, MIGRATION_14_15, MIGRATION_15_16, MIGRATION_16_17, MIGRATION_17_18, MIGRATION_18_19,
@@ -1594,18 +1596,24 @@ class DatabaseMigrationTest {
             MIGRATION_37_38, MIGRATION_38_39, MIGRATION_39_40,
         )
 
-        // Le livre existant est déclaré à réindexer.
+        // Le livre existant est déclaré à réindexer ; le nouvel index démarre vide.
         v40.query("SELECT searchIndexVersion FROM publications WHERE id = 'pub-1'").use {
             it.moveToFirst(); assertEquals(0, it.getInt(0))
         }
-        // L'index dérivé repart vide : la régénération des pré-analyses le reconstruit.
-        v40.query("SELECT count(*) FROM sentence_fts").use { it.moveToFirst(); assertEquals(0, it.getInt(0)) }
+        v40.query("SELECT count(*) FROM sentence_search").use { it.moveToFirst(); assertEquals(0, it.getInt(0)) }
         v40.execSQL(
-            "INSERT INTO sentence_fts (publicationId, chapterIndex, resourceHref, charOffset, text) " +
+            "INSERT INTO sentence_search (publicationId, chapterIndex, resourceHref, charOffset, text) " +
                 "VALUES ('pub-1', 0, 'ch1.xhtml', 0, 'Un Élève brillant.')",
         )
-        v40.query("SELECT count(*) FROM sentence_fts WHERE text MATCH 'eleve'").use {
+        v40.query("SELECT count(*) FROM sentence_search WHERE text MATCH 'eleve'").use {
             it.moveToFirst(); assertEquals(1, it.getInt(0))
+        }
+        // L'ancien index est encore là, intact, jusqu'à son nettoyage.
+        v40.query("SELECT count(*) FROM sentence_fts").use { it.moveToFirst(); assertEquals(1, it.getInt(0)) }
+
+        assertEquals(true, LegacySearchIndexPurger.purge(v40))
+        v40.query("SELECT count(*) FROM sqlite_master WHERE name LIKE 'sentence_fts%'").use {
+            it.moveToFirst(); assertEquals("l'ancien index et ses tables auxiliaires sont supprimés", 0, it.getInt(0))
         }
         v40.close()
     }

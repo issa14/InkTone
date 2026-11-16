@@ -2,7 +2,7 @@
   "formatVersion": 1,
   "database": {
     "version": 41,
-    "identityHash": "0d04fa9299da5ebf0185d9b2722b3036",
+    "identityHash": "dd4b6838425e5d9ea2299a2d4366c96a",
     "entities": [
       {
         "tableName": "publications",
@@ -1029,7 +1029,7 @@
           "preferredOrder": "ASC"
         },
         "contentSyncTriggers": [],
-        "tableName": "sentence_fts",
+        "tableName": "sentence_search",
         "createSql": "CREATE VIRTUAL TABLE IF NOT EXISTS `${TABLE_NAME}` USING FTS4(`publicationId` TEXT NOT NULL, `chapterIndex` INTEGER NOT NULL, `resourceHref` TEXT NOT NULL, `charOffset` INTEGER NOT NULL, `text` TEXT NOT NULL, tokenize=unicode61)",
         "fields": [
           {
@@ -1435,7 +1435,7 @@
     ],
     "setupQueries": [
       "CREATE TABLE IF NOT EXISTS room_master_table (id INTEGER PRIMARY KEY,identity_hash TEXT)",
-      "INSERT OR REPLACE INTO room_master_table (id,identity_hash) VALUES(42, '0d04fa9299da5ebf0185d9b2722b3036')"
+      "INSERT OR REPLACE INTO room_master_table (id,identity_hash) VALUES(42, 'dd4b6838425e5d9ea2299a2d4366c96a')"
     ]
   }
 }
