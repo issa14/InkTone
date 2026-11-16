@@ -35,17 +35,6 @@ data class SettingsUiState(
 )
 
 /**
- * Lot 6, Palier B — dossier des modèles TTS. Chemin en lecture seule :
- * `infrastructure/tts` (`SherpaOnnxModelPaths`) fixe ce chemin en dur,
- * aucune capacité de déplacement n'existe — signalé plutôt que masqué
- * par un contrôle qui suggérerait le contraire (voir tâche 6.7).
- */
-data class ModelsFolderInfo(
-    val path: String,
-    val isEditable: Boolean = false,
-)
-
-/**
  * Lot 6, Palier B — résultat d'une opération de sauvegarde/restauration,
  * à afficher explicitement (jamais jeté — c'est le défaut corrigé au lot 5
  * pour l'import de livres). `BackupManager` (module `data`) n'est pas

@@ -107,9 +107,7 @@ import com.inktone.domain.model.voiceLabel
 fun SettingsScreen(
     viewModel: SettingsViewModel = hiltViewModel(),
     focusVoiceDownload: Boolean = false,
-    onOpenAbout: () -> Unit = {},
     onBack: () -> Unit = {},
-    modelsFolderInfo: ModelsFolderInfo = ModelsFolderInfo(path = "Emplacement inconnu"),
     dataOperationResult: DataOperationResult? = null,
     onDismissDataOperationResult: () -> Unit = {},
     onExportData: () -> Unit = {},
@@ -144,8 +142,6 @@ fun SettingsScreen(
                 pitchEngines = state.pitchEngines,
                 focusVoiceDownload = focusVoiceDownload,
                 onIntent = viewModel::onIntent,
-                onOpenAbout = onOpenAbout,
-                modelsFolderInfo = modelsFolderInfo,
                 dataOperationResult = dataOperationResult,
                 onDismissDataOperationResult = onDismissDataOperationResult,
                 onExportData = onExportData,
@@ -172,8 +168,6 @@ internal fun SettingsContent(
     pitchEngines: Set<TtsEngineId> = emptySet(),
     focusVoiceDownload: Boolean = false,
     onIntent: (SettingsIntent) -> Unit,
-    onOpenAbout: () -> Unit = {},
-    modelsFolderInfo: ModelsFolderInfo = ModelsFolderInfo(path = "Emplacement inconnu"),
     dataOperationResult: DataOperationResult? = null,
     onDismissDataOperationResult: () -> Unit = {},
     onExportData: () -> Unit = {},
@@ -212,11 +206,10 @@ internal fun SettingsContent(
             preferences.reduceMotion &&
             preferences.libraryLayoutMode == "LIST"
 
-        SectionGroup("Présets rapides") {
+        SectionGroup("Préréglages") {
             PresetRow(
                 icon = { AppIcon(AppSymbol.DarkMode, contentDescription = null) },
                 title = "Mode sombre",
-                description = "Thème sombre · Interface sombre",
                 checked = isDarkPresetActive,
                 onCheckedChange = { onIntent(SettingsIntent.SetDarkModePreset(it)) },
             )
@@ -224,7 +217,7 @@ internal fun SettingsContent(
             PresetRow(
                 icon = { AppIcon(AppSymbol.Accessibility, contentDescription = null) },
                 title = "Accessibilité",
-                description = "OpenDyslexic · 24 sp · Animations réduites · Mode Liste",
+                description = "Police pour la dyslexie, grand texte, animations réduites, vue en liste",
                 checked = isAccessibilityPresetActive,
                 onCheckedChange = { onIntent(SettingsIntent.SetAccessibilityPreset(it)) },
             )
@@ -335,12 +328,12 @@ internal fun SettingsContent(
         // ── Carte 3 : Appareil ─────────────────────────────────────────────────
         var showAppThemePicker by remember { mutableStateOf(false) }
 
-        SectionGroup("Appareil") {
+        SectionGroup("Apparence") {
             // ─ Apparence ─
             // Lot 6 — thème système de l'app (SYSTEM/LIGHT/DARK).
             // Ne pas confondre avec preferences.theme (ReadingTheme de lecture).
             SettingRow(
-                label = "Thème",
+                label = "Thème de l'interface",
                 value = when (preferences.appTheme) {
                     AppTheme.SYSTEM -> "Système"
                     AppTheme.LIGHT -> "Clair"
@@ -356,7 +349,8 @@ internal fun SettingsContent(
             // aurait aucun effet.
             if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) {
                 ToggleSetting(
-                    label = "Couleurs dynamiques (Material You)",
+                    label = "Couleurs dynamiques",
+                    description = "Reprend les couleurs de votre fond d'écran.",
                     checked = preferences.dynamicColorEnabled,
                     onCheckedChange = { onIntent(SettingsIntent.SetDynamicColorEnabled(it)) },
                 )
@@ -374,9 +368,9 @@ internal fun SettingsContent(
             // la valeur n'était lue nulle part. Tous les textes (interface et
             // lecture, en sp) suivent déjà l'échelle de police du système.
 
-            HorizontalDivider(modifier = Modifier.padding(horizontal = 20.dp))
+        }
 
-            // ─ Confidentialité ─
+        SectionGroup("Confidentialité") {
             // Audit UX A1 — ligne « Langue de l'interface » retirée : aucune
             // traduction n'existe (libellés français en dur), et la valeur
             // choisie devenait la langue des profils vocaux créés ensuite.
@@ -387,7 +381,7 @@ internal fun SettingsContent(
             // d'onboarding CrashConsent (Tâche 10.3) : cette description
             // doit porter l'explication à elle seule.
             ToggleSetting(
-                label = "Rapports de crash",
+                label = "Rapports de plantage",
                 description = "Envoie uniquement la trace d'erreur, la version de l'app et le modèle d'appareil. " +
                     "Jamais le contenu de vos livres ni vos annotations.",
                 checked = preferences.crashReportingEnabled,
@@ -401,58 +395,18 @@ internal fun SettingsContent(
         var showResetConfirm by remember { mutableStateOf(false) }
 
         SectionGroup("Données") {
-            // Dossier des modèles — chemin fixe (infrastructure/tts), aucune
-            // capacité de déplacement : signalé en lecture seule plutôt que
-            // de suggérer un contrôle qui n'a pas d'effet.
-            // Le chemin (potentiellement long : chemin absolu filesDir) va
-            // sur sa propre ligne, ellipsé à une ligne — le mettre à côté du
-            // libellé sur la même Row écrase ce dernier caractère par
-            // caractère quand le chemin dépasse l'espace restant (même bug
-            // que le stepper Intervalle de pause, corrigé plus tôt : un
-            // Modifier.weight(1f) seul ne protège pas contre un voisin non
-            // borné qui grandit librement).
-            Row(
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .heightIn(min = 48.dp)
-                    .padding(horizontal = 20.dp, vertical = 12.dp),
-                horizontalArrangement = Arrangement.spacedBy(8.dp),
-                verticalAlignment = Alignment.CenterVertically,
-            ) {
-                Column(Modifier.weight(1f)) {
-                    Text("Dossier des modèles")
-                    Text(
-                        text = modelsFolderInfo.path,
-                        style = MaterialTheme.typography.bodySmall,
-                        color = MaterialTheme.colorScheme.onSurfaceVariant,
-                        maxLines = 1,
-                        overflow = TextOverflow.Ellipsis,
-                    )
-                }
-                if (!modelsFolderInfo.isEditable) {
-                    AppIcon(
-                        AppSymbol.Lock,
-                        contentDescription = "Lecture seule",
-                        modifier = Modifier.size(16.dp),
-                        tint = MaterialTheme.colorScheme.onSurfaceVariant,
-                    )
-                }
-            }
-
-            HorizontalDivider(modifier = Modifier.padding(horizontal = 20.dp))
-
             // Action directe, sans confirmation — n'écrase rien de local.
             ActionRow(
                 icon = AppSymbol.Upload,
                 title = "Exporter les données",
-                subtitle = "Signets, notes, surlignages, positions, statistiques, règles de prononciation et thèmes — sans les livres",
+                subtitle = "Signets, notes, positions, statistiques et thèmes, sans les livres.",
                 onClick = onExportData,
             )
             // Avertissement préalable — l'import écrase la configuration courante.
             ActionRow(
                 icon = AppSymbol.Download,
                 title = "Importer une sauvegarde",
-                subtitle = "Complète les données actuelles avec celles du fichier sélectionné",
+                subtitle = "Ajoute les données d'un fichier de sauvegarde.",
                 onClick = { showImportWarning = true },
             )
 
@@ -487,8 +441,8 @@ internal fun SettingsContent(
             // Couleur d'alerte + icône triangle : signale le côté destructif.
             ActionRow(
                 icon = AppSymbol.WarningAmber,
-                title = "Réinitialiser les paramètres",
-                subtitle = "Revient aux réglages par défaut — les livres et les données ne sont pas touchés",
+                title = "Réinitialiser les réglages",
+                subtitle = "Vos livres et vos données ne sont pas touchés.",
                 tint = MaterialTheme.colorScheme.error,
                 onClick = { showResetConfirm = true },
             )
@@ -497,7 +451,7 @@ internal fun SettingsContent(
         // ── Carte 5 : Performance & Bien-être ─────────────────────────────────
         var showGoalPicker by remember { mutableStateOf(false) }
 
-        SectionGroup("Performance & bien-être") {
+        SectionGroup("Habitudes de lecture") {
             SettingRow(
                 label = "Objectif quotidien de lecture",
                 value = "${preferences.dailyGoalMinutes} min",
@@ -510,7 +464,7 @@ internal fun SettingsContent(
             )
             // Stepper désactivé visuellement quand le rappel est éteint.
             StepperSetting(
-                label = "Intervalle de pause",
+                label = "Intervalle du rappel",
                 value = preferences.eyeRestReminderIntervalMinutes,
                 step = 15,
                 range = UserPreferences.EYE_REST_INTERVAL_RANGE,
@@ -522,11 +476,6 @@ internal fun SettingsContent(
 
         // ── Carte 6 : Prononciation ──────────────────────────────────────────
         PronunciationRulesSection(rules = pronunciationRules, onIntent = onIntent)
-
-        // ── Carte 7 : À propos ─────────────────────────────────────────────────
-        SectionGroup("À propos") {
-            SettingRow(label = "InkTone", value = "Voir", onClick = onOpenAbout)
-        }
 
         // ── Dialogues ──────────────────────────────────────────────────────────
         if (showEnginePicker) {
@@ -582,11 +531,8 @@ internal fun SettingsContent(
                 // n'efface rien. Signets, notes, surlignages et statistiques
                 // absents sont ajoutés, ceux déjà présents conservés ; les
                 // positions, règles et thèmes du fichier écrasent les leurs.
-                message = "L'import ajoute les signets, notes, surlignages et statistiques absents de " +
-                    "l'appareil, et remplace les positions de lecture, règles de prononciation et " +
-                    "thèmes personnalisés présents dans le fichier. Les positions remplacées ne " +
-                    "peuvent pas être récupérées. Les éléments liés à un livre absent de la " +
-                    "bibliothèque sont ignorés.",
+                message = "Les signets, notes et statistiques du fichier s'ajoutent aux vôtres. " +
+                    "Les positions de lecture, règles et thèmes du fichier remplacent ceux de l'appareil.",
                 confirmLabel = "Importer",
                 onConfirm = { showImportWarning = false; onImportData() },
                 onDismiss = { showImportWarning = false },
@@ -605,9 +551,9 @@ internal fun SettingsContent(
         }
         if (showResetConfirm) {
             ConfirmDialog(
-                title = "Réinitialiser les paramètres",
-                message = "Tous les réglages (thème, lecture, accessibilité, bien-être) reviennent à " +
-                    "leurs valeurs par défaut. Vos livres, signets et notes ne sont pas affectés.",
+                title = "Réinitialiser les réglages",
+                message = "Tous les réglages reviennent à leurs valeurs par défaut. " +
+                    "Vos livres, signets et notes ne sont pas touchés.",
                 confirmLabel = "Réinitialiser",
                 destructive = true,
                 onConfirm = { showResetConfirm = false; onIntent(SettingsIntent.ResetPreferences) },
@@ -631,9 +577,14 @@ private fun dataOperationResultText(result: DataOperationResult): Pair<String, S
     is DataOperationResult.ExportSuccess -> "Export réussi" to "La sauvegarde a été créée."
     is DataOperationResult.ExportFailed -> "Échec de l'export" to result.message
     is DataOperationResult.ImportSuccess -> "Import terminé" to buildString {
-        append("${result.restored} élément(s) restauré(s).")
-        if (result.skippedOrphans > 0) {
-            append(" ${result.skippedOrphans} ignoré(s) (référencent un livre absent de la bibliothèque).")
+        val restored = result.restored
+        append(if (restored > 1) "$restored éléments restaurés." else "$restored élément restauré.")
+        val skipped = result.skippedOrphans
+        if (skipped > 0) {
+            append(
+                if (skipped > 1) " $skipped éléments concernaient des livres absents de la bibliothèque."
+                else " 1 élément concernait un livre absent de la bibliothèque.",
+            )
         }
     }
     is DataOperationResult.ImportFailed -> "Échec de l'import" to result.message
@@ -740,7 +691,7 @@ private fun ActionRow(
 private fun PresetRow(
     icon: @Composable () -> Unit,
     title: String,
-    description: String,
+    description: String? = null,
     checked: Boolean,
     onCheckedChange: (Boolean) -> Unit,
 ) {
@@ -756,11 +707,13 @@ private fun PresetRow(
         icon()
         Column(modifier = Modifier.weight(1f)) {
             Text(title, style = MaterialTheme.typography.bodyLarge)
-            Text(
-                description,
-                style = MaterialTheme.typography.bodySmall,
-                color = MaterialTheme.colorScheme.onSurfaceVariant,
-            )
+            if (description != null) {
+                Text(
+                    description,
+                    style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                )
+            }
         }
         Switch(checked = checked, onCheckedChange = null, modifier = Modifier.align(Alignment.CenterVertically))
     }
@@ -944,7 +897,7 @@ private fun PronunciationCard(
             verticalAlignment = Alignment.CenterVertically,
         ) {
             Text(
-                text = "Dictionnaire phonétique (${rules.size})",
+                text = "Règles de prononciation (${rules.size})",
                 style = MaterialTheme.typography.titleSmall,
                 color = MaterialTheme.colorScheme.primary,
             )
@@ -1030,14 +983,14 @@ private fun PronunciationRuleDialog(
                 OutlinedTextField(
                     value = originalText,
                     onValueChange = { originalText = it },
-                    label = { Text("Texte d'origine") },
+                    label = { Text("Mot ou expression") },
                     singleLine = true,
                     modifier = Modifier.fillMaxWidth(),
                 )
                 OutlinedTextField(
                     value = replacementText,
                     onValueChange = { replacementText = it },
-                    label = { Text("Prononciation de remplacement") },
+                    label = { Text("Prononcer comme") },
                     singleLine = true,
                     modifier = Modifier.fillMaxWidth(),
                 )
@@ -1049,7 +1002,7 @@ private fun PronunciationRuleDialog(
                 ) {
                     Checkbox(checked = isRegex, onCheckedChange = null)
                     Spacer(Modifier.width(8.dp))
-                    Text("Expression régulière (Regex)")
+                    Text("Expression régulière")
                 }
                 if (problemMessage != null) {
                     Text(problemMessage, style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.error)
@@ -1179,7 +1132,7 @@ private fun GoalPickerDialog(
                 }
             }
         },
-        confirmButton = { TextButton(onClick = { onConfirm(value.toInt()) }) { Text("Valider") } },
+        confirmButton = { TextButton(onClick = { onConfirm(value.toInt()) }) { Text("Enregistrer") } },
         dismissButton = { TextButton(onClick = onDismiss) { Text("Annuler") } },
     )
 }
@@ -1221,7 +1174,7 @@ internal fun PronunciationRulesSection(rules: List<PronunciationRule>, onIntent:
     ) {
         if (rules.isEmpty()) {
             Text(
-                "Aucune règle pour l'instant.",
+                "Aucune règle. Exemple : « M. » prononcé « Monsieur ».",
                 style = MaterialTheme.typography.bodyMedium,
                 color = MaterialTheme.colorScheme.onSurfaceVariant,
                 modifier = Modifier.padding(horizontal = 20.dp, vertical = 12.dp),

@@ -392,9 +392,7 @@ fun InkToneNavHost(navController: NavHostController = rememberNavController(), s
 
             SettingsScreen(
                 focusVoiceDownload = settingsRoute.focusVoiceDownload,
-                onOpenAbout = { navController.navigate(AboutRoute) },
                 onBack = navController::popBackStack,
-                modelsFolderInfo = backupViewModel.modelsFolderInfo,
                 dataOperationResult = dataOperationResult,
                 onDismissDataOperationResult = backupViewModel::dismissResult,
                 onExportData = { isExportPasswordDialogVisible = true },
