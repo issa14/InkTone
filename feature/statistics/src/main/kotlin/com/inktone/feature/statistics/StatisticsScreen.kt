@@ -4,7 +4,6 @@ import android.content.Intent
 import android.net.Uri
 import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.clickable
-import androidx.compose.foundation.isSystemInDarkTheme
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -51,6 +50,7 @@ import androidx.compose.ui.geometry.CornerRadius
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.geometry.Size
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.luminance
 import androidx.compose.ui.graphics.StrokeCap
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.layout.ContentScale
@@ -347,7 +347,7 @@ private fun Section2Charts(activity: com.inktone.domain.usecase.ActivityChartSta
                     )
                     Spacer(Modifier.width(6.dp))
                     val isPositive = activity.variationPercent.startsWith("+")
-                    val positiveGreen = if (isSystemInDarkTheme()) Color(0xFF81C784) else Color(0xFF2E7D32)
+                    val positiveGreen = if (isAppThemeDark()) Color(0xFF81C784) else Color(0xFF2E7D32)
                     val varColor = when {
                         activity.variationPercent == "—" -> MaterialTheme.colorScheme.onSurfaceVariant
                         isPositive -> positiveGreen
@@ -517,11 +517,12 @@ private fun HistogramChart(dailyStats: List<DailyReadingStats>, isMonthView: Boo
     // distingue les deux modes par une couleur dédiée (vert lecture
     // visuelle, violet écoute TTS), contrairement à la heatmap — un seul
     // mode confondu, qui garde l'accent dynamique du thème.
-    val isDark = isSystemInDarkTheme()
+    val isDark = isAppThemeDark()
     val visualColor = if (isDark) Color(0xFF81C784) else Color(0xFF2E7D32)
     val ttsColor = if (isDark) Color(0xFFCE93D8) else Color(0xFF8E24AA)
     val markerColor = MaterialTheme.colorScheme.primary
-    val baselineColor = Color(0xFF242320)
+    // Couleur de schéma : un gris fixe quasi noir disparaissait sur fond sombre (1,04:1).
+    val baselineColor = MaterialTheme.colorScheme.outlineVariant
     val dashColor = visualColor.copy(alpha = 0.2f)
     val markerBgColor = markerColor.copy(alpha = 0.15f)
     val axisTextStyle = MaterialTheme.typography.labelSmall.copy(color = markerColor, fontWeight = FontWeight.SemiBold)
@@ -802,3 +803,10 @@ internal fun isStatisticsEmpty(kpi: com.inktone.domain.usecase.KpiState, current
         kpi.totalVisualTimeFormatted == EMPTY_DURATION && kpi.totalTtsTimeFormatted == EMPTY_DURATION
 
 private val EMPTY_DURATION = formatDurationMinutes(0)
+
+/**
+ * Le thème de l'app, pas celui du système : l'app peut être forcée en clair
+ * ou en sombre (`AppThemeMode`), et `isSystemInDarkTheme()` l'ignorait.
+ */
+@Composable
+private fun isAppThemeDark(): Boolean = MaterialTheme.colorScheme.surface.luminance() < 0.5f
