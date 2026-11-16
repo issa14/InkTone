@@ -170,7 +170,8 @@ import androidx.compose.foundation.lazy.LazyListLayoutInfo
  * caractère absolus au chapitre) est le seul état, commun aux deux modes.
  * En PAGED, un `BasicTextField` en lecture seule par page
  * (`PagedChapterContent.PageBlock`) délègue à la sélection native de Compose :
- * elle reste bornée à la page (D50, partie page, non traitée). En SCROLL,
+ * une sélection survit au changement de page et s'étend depuis une autre
+ * page par « Étendre la sélection jusqu'ici » (D50). En SCROLL,
  * moteur maison (ADR-029) : paragraphes en `Text`, poignées, loupe et défilement
  * automatique portés par `SelectionHandlesOverlay` à partir du
  * `VisibleTextRegistry` ; une sélection peut franchir les paragraphes.
