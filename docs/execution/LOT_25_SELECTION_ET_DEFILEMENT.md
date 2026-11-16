@@ -182,17 +182,17 @@ pose les bases de C sans rien qu'il faudra défaire.
 
 ## Critères de sortie du lot
 
-- [ ] Test instrumenté « appui long en défilement → menu » vert, et rouge sur `40d9c650`.
-- [ ] Appui long en défilement : poignées et menu d'actions visibles, sur appareil.
-- [ ] Glissement d'un paragraphe à l'autre, avec défilement automatique, puis surlignage
+- [x] Test instrumenté « appui long en défilement → menu » vert, et rouge sur `40d9c650`.
+- [x] Appui long en défilement : poignées et menu d'actions visibles, sur appareil.
+- [x] Glissement d'un paragraphe à l'autre, avec défilement automatique, puis surlignage
       créé aux bons offsets et retrouvé à la réouverture.
-- [ ] Défilement possible avec une sélection active ; la sélection survit à l'aller-retour
+- [x] Défilement possible avec une sélection active ; la sélection survit à l'aller-retour
       d'un paragraphe hors écran.
-- [ ] Défilement, build de benchmark : cibles fixées au 25.1 tenues (ordre de grandeur
+- [x] Défilement, build de benchmark : cibles fixées au 25.1 tenues (ordre de grandeur
       visé : moins de 5 % d'images saccadées, 99e centile sous 32 ms, Blueprint §11.2).
-- [ ] Mode paginé : sélection au moins aussi bonne qu'avant (vérifié sur appareil).
-- [ ] TalkBack : sélection atteignable et plage annoncée.
-- [ ] Tests JVM de la logique de sélection ; tests instrumentés ajoutés verts.
+- [x] Mode paginé : sélection au moins aussi bonne qu'avant (vérifié sur appareil).
+- [x] TalkBack : sélection atteignable et plage annoncée.
+- [x] Tests JVM de la logique de sélection ; tests instrumentés ajoutés verts.
 
 ## Ce que ce lot ne fait pas
 
@@ -205,3 +205,45 @@ pose les bases de C sans rien qu'il faudra défaire.
 - Pas de réécriture du rendu des blocs (images, titres) hors ce qui sert la sélection.
 - Pas de montée du BOM Compose dans ce lot.
 - Les autres freins de l'audit de réactivité (Bibliothèque, mémoire) restent hors lot.
+
+---
+
+## Bilan d'exécution (2026-11-16)
+
+| Palier | Résultat | Preuve |
+|---|---|---|
+| 25.0 | Menu d'actions rétabli en défilement, `BasicTextField` retiré ; validé sur appareil | `1445590f`, `BookBlockItemSelectionTest` |
+| 25.1 | Benchmark et procédure sûre ; mesure de référence faite au script (voir ci-dessous) | `916fa75e`, `9eb0c7a0`, `4a21664a`, `6cfe2d4c` |
+| 25.2 | ADR-029 : moteur maison, `SelectionContainer` écarté sur lecture de l'API | `47f6471a` |
+| 25.3 | Poignées, loupe, glissement entre paragraphes, défilement automatique et libre, `setSelection` ; 9 points validés sur appareil (mode paginé et TalkBack compris) | `150da8cd`, `96446a7a`, `SelectionGeometryTest` |
+| 25.4 | Aucun correctif : la mesure ne désigne plus de cause (voir ci-dessous) | — |
+| 25.5 | KDoc et suivi de l'audit (D50 fait en défilement, partie page reportée) | `e12058ce` |
+
+### Mesure de référence (V2206, build `benchmark`, au calme, après 25.3)
+
+`scripts/measure-reader-frames.sh scroll 6`, trois passages dans un chapitre long
+(Zombie Island, chapitre 8), processeur à ~92 % libre :
+
+| Passage | Images | Saccadées | p50 / p90 / p99 | > 32 ms |
+|---|---|---|---|---|
+| 1 | 105 | 3 (2,9 %) | 11 / 14 / 29 ms | 0 |
+| 2 | 109 | 3 (2,8 %) | 11 / 13 / 23 ms | 0 |
+| 3 | 111 | 3 (2,7 %) | 10 / 13 / 22 ms | 0 |
+
+Critères tenus : moins de 5 % d'images saccadées, 99e centile sous 32 ms, aucune image
+au-delà de 32 ms (Blueprint §11.2). Les 18 % du constat initial venaient d'un build debug
+mesuré pendant la réindexation : ni le build ni la charge n'étaient représentatifs. Le
+palier 25.4 n'a donc pas de cause à corriger ; les candidats lus dans le code (constat)
+restent non confirmés et ne sont pas touchés.
+
+### Écarts déclarés
+
+- `ReaderScrollBenchmark` (`FrameTimingMetric`) rend 0 image sur le V2206 alors que la
+  trace en contient : cause non trouvée. Les chiffres viennent du script `gfxinfo` sur le
+  même build `benchmark`, non débogable, avec profil de référence.
+- Trace Perfetto par cause non faite : sans saccade notable, il n'y a rien à attribuer.
+- Un appui long suivi d'un glissement sans lever le doigt n'étend pas la sélection ;
+  l'extension passe par les poignées.
+- Incident : `:benchmark:connectedBenchmarkBenchmarkAndroidTest` a désinstallé l'app de
+  l'appareil de test (bibliothèque effacée, réimportée ensuite) ; procédure sûre documentée
+  dans `ReaderScrollBenchmark`.
