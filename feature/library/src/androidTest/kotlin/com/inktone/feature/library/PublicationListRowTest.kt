@@ -80,4 +80,24 @@ class PublicationListRowTest {
 
         composeTestRule.onNodeWithText("0\u202F%").assertDoesNotExist()
     }
+
+    /** Audit UI P0-3 : la miniature ne doit pas consommer l'appui destiné à la ligne. */
+    @Test
+    fun toucher_la_miniature_ouvre_le_livre() {
+        var opened = false
+        composeTestRule.setContent {
+            MaterialTheme {
+                PublicationListRow(
+                    publication = publication(),
+                    onClick = { opened = true },
+                    onToggleFavorite = {},
+                )
+            }
+        }
+
+        composeTestRule
+            .onNodeWithContentDescription("Germinal, Non commencé", useUnmergedTree = true)
+            .performClick()
+        assertEquals(true, opened)
+    }
 }

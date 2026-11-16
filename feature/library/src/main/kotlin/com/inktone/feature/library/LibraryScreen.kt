@@ -868,7 +868,7 @@ internal fun PublicationListRow(
             Box(modifier = Modifier.size(width = 72.dp, height = 102.dp)) {
                 BookCover(
                     publication = publication,
-                    onClick = {},
+                    onClick = null,
                     onToggleFavorite = {},
                     showTitle = false,
                     showOverlays = false,
@@ -987,7 +987,7 @@ private fun ResumeReadingCard(
             ) {
                 BookCover(
                     publication = publication,
-                    onClick = {},
+                    onClick = null,
                     onToggleFavorite = {},
                     progressPercent = progressPercent ?: 0,
                     isStarted = true,

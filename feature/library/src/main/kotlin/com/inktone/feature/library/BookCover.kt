@@ -70,7 +70,9 @@ import java.io.File
 @Composable
 fun BookCover(
     publication: Publication,
-    onClick: () -> Unit,
+    // `null` quand la couverture est une simple vignette d'une ligne cliquable :
+    // un `clickable` vide consommait l'appui, la ligne ne le recevait jamais.
+    onClick: (() -> Unit)?,
     onToggleFavorite: () -> Unit,
     modifier: Modifier = Modifier,
     progressPercent: Int = 0,
@@ -124,7 +126,7 @@ fun BookCover(
         modifier = modifier
             .aspectRatio(0.7f)
             .semantics { contentDescription = a11yLabel }
-            .clickable(onClick = onClick),
+            .then(if (onClick != null) Modifier.clickable(onClick = onClick) else Modifier),
     ) {
         if (coverModel != null) {
             // AUDIT_REACTIVITE_UX §4.7 — `SubcomposeAsyncImage` subcompose
@@ -140,7 +142,8 @@ fun BookCover(
                     .data(coverModel)
                     .crossfade(true)
                     .build(),
-                contentDescription = publication.title,
+                // Le titre est déjà porté par la sémantique de la couverture.
+                contentDescription = null,
                 contentScale = ContentScale.Crop,
                 modifier = Modifier.fillMaxSize(),
             )
