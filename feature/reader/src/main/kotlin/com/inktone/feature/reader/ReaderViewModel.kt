@@ -68,6 +68,8 @@ import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.combine
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.sync.withLock
+import kotlinx.coroutines.sync.Mutex
 import java.util.UUID
 import javax.inject.Inject
 import com.inktone.domain.model.plainText
@@ -129,6 +131,9 @@ class ReaderViewModel @Inject constructor(
     @ApplicationScope
     private val applicationScope: CoroutineScope = CoroutineScope(SupervisorJob() + Dispatchers.Main.immediate),
 ) : ViewModel() {
+
+    /** Sérialise les réécritures du profil vocal actif (audit UX D67). */
+    private val voiceProfileMutex = Mutex()
 
     private val _state = MutableStateFlow(ReaderUiState())
     val state: StateFlow<ReaderUiState> = _state.asStateFlow()
@@ -691,8 +696,9 @@ class ReaderViewModel @Inject constructor(
     /** Écrit un réglage global de lecture et recalcule les réglages effectifs. */
     private fun updateGlobalReadingSettings(update: (UserPreferences) -> UserPreferences) {
         viewModelScope.launch {
-            val preferences = update(preferencesRepository.get())
-            preferencesRepository.update(preferences)
+            // Lecture, transformation et écriture d'un bloc (audit UX D67).
+            preferencesRepository.update(update)
+            val preferences = preferencesRepository.get()
             val effectiveSettings = EffectiveReadingSettings.resolve(_state.value.currentOverrides, preferences)
             _state.value = _state.value.copy(
                 effectiveSettings = effectiveSettings,
@@ -1834,11 +1840,16 @@ class ReaderViewModel @Inject constructor(
      */
     private fun setTtsSpeed(speed: Float) {
         viewModelScope.launch {
-            val prefs = preferencesRepository.get()
-            val updated = resolveVoiceProfile(prefs).copy(speed = speed)
-            voiceProfileRepository.save(updated)
-            if (prefs.activeVoiceProfileId != updated.id) {
-                preferencesRepository.update { it.copy(activeVoiceProfileId = updated.id) }
+            // Profil relu et réécrit sous verrou : deux réglages rapprochés ne
+            // repartent pas du même profil (audit UX D67).
+            val updated = voiceProfileMutex.withLock {
+                val prefs = preferencesRepository.get()
+                val profile = resolveVoiceProfile(prefs).copy(speed = speed)
+                voiceProfileRepository.save(profile)
+                if (prefs.activeVoiceProfileId != profile.id) {
+                    preferencesRepository.update { it.copy(activeVoiceProfileId = profile.id) }
+                }
+                profile
             }
             _state.value = _state.value.copy(activeVoiceProfile = updated)
             restartNarrationWithNewProfile()

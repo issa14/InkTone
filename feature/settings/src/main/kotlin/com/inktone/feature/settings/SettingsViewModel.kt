@@ -36,13 +36,15 @@ import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.sync.withLock
+import kotlinx.coroutines.sync.Mutex
 import kotlinx.coroutines.withContext
 import java.util.UUID
 import javax.inject.Inject
 
 /**
- * MVI standard (Tache 8.1) — chaque intent appelle
- * `preferencesRepository.update(current.copy(...))`. Rien de nouveau
+ * MVI standard (Tache 8.1) — chaque intent écrit par
+ * `preferencesRepository.update { it.copy(...) }` (audit UX D67). Rien de nouveau
  * cote domaine ici, uniquement le branchement UI (Phase 2, Tache 1.6/2.6
  * deja fonctionnel).
  *
@@ -78,6 +80,9 @@ class SettingsViewModel @Inject constructor(
     private val ttsCapabilityCatalog: TtsCapabilityCatalog,
     private val voiceModelDownloadScheduler: VoiceModelDownloadScheduler,
 ) : ViewModel() {
+
+    /** Sérialise les réécritures du profil vocal actif (audit UX D67). */
+    private val voiceProfileMutex = Mutex()
 
     private val _state = MutableStateFlow(
         SettingsUiState(
@@ -146,19 +151,15 @@ class SettingsViewModel @Inject constructor(
 
     fun onIntent(intent: SettingsIntent) {
         viewModelScope.launch {
-            // Lu ici, pas capture de _state.value.preferences avant le launch :
-            // deux intents lances en rafale (ex. toggle + intervalle) verraient
-            // sinon le second ecraser le premier avec un instantane perime, le
-            // temps que preferencesRepository.observe() ne fasse la ronde
-            // jusqu'a _state.value (Tache 6.6, regression trouvee par test).
-            val current = preferencesRepository.get()
+            // Chaque écriture relit les préférences au moment d'écrire (`update { }`,
+            // verrou du profil vocal) : deux intents en rafale ne s'écrasent pas (D67).
             when (intent) {
                 is SettingsIntent.SetTheme -> preferencesRepository.update { it.copy(theme = intent.themeId) }
                 is SettingsIntent.SetFontSize -> preferencesRepository.update { it.copy(fontSize = intent.fontSize) }
                 is SettingsIntent.SetFontFamily -> preferencesRepository.update { it.copy(fontFamily = intent.fontFamily) }
-                is SettingsIntent.SetDefaultTtsEngine -> setDefaultTtsEngine(current, intent.engine)
+                is SettingsIntent.SetDefaultTtsEngine -> setDefaultTtsEngine(intent.engine)
                 is SettingsIntent.SetActiveVoiceProfileVoice ->
-                    updateActiveVoiceProfile(current) { it.copy(voice = intent.voice) }
+                    updateActiveVoiceProfile { it.copy(voice = intent.voice) }
                 is SettingsIntent.SetCrashReportingEnabled ->
                     preferencesRepository.update { it.copy(crashReportingEnabled = intent.enabled) }
                 is SettingsIntent.SetReduceMotion -> preferencesRepository.update { it.copy(reduceMotion = intent.enabled) }
@@ -182,11 +183,11 @@ class SettingsViewModel @Inject constructor(
                 // bascule lecture/arrêt d'une phrase d'exemple.
                 is SettingsIntent.PlayPreview -> togglePreview()
                 // Lot 6 — vitesse et intonation : même cible VoiceProfile que setTtsSpeed() dans ReaderViewModel
-                is SettingsIntent.SetVoiceSpeed -> updateActiveVoiceProfile(current) { it.copy(speed = intent.speed) }
-                is SettingsIntent.SetVoicePitch -> updateActiveVoiceProfile(current) { it.copy(pitch = intent.pitch) }
+                is SettingsIntent.SetVoiceSpeed -> updateActiveVoiceProfile { it.copy(speed = intent.speed) }
+                is SettingsIntent.SetVoicePitch -> updateActiveVoiceProfile { it.copy(pitch = intent.pitch) }
                 // Lot 6 — présets réversibles (désapplication vers les valeurs par défaut)
-                is SettingsIntent.SetDarkModePreset -> applyDarkModePreset(intent.enabled, current)
-                is SettingsIntent.SetAccessibilityPreset -> applyAccessibilityPresetToggle(intent.enabled, current)
+                is SettingsIntent.SetDarkModePreset -> applyDarkModePreset(intent.enabled)
+                is SettingsIntent.SetAccessibilityPreset -> applyAccessibilityPresetToggle(intent.enabled)
                 // Compat — remplacé par SetAccessibilityPreset mais conservé pour les tests existants
                 is SettingsIntent.ApplyAccessibilityPreset -> applyAccessibilityPreset()
                 // Lot 6 — écouter un extrait : RETIRÉ à l'audit v1.0.0
@@ -346,16 +347,17 @@ class SettingsViewModel @Inject constructor(
      * (VoiceProfile.defaultFor) et l'enregistre. Même cible que setTtsSpeed() dans ReaderViewModel : un seul
      * champ dans la base, pas un second emplacement.
      */
-    private suspend fun updateActiveVoiceProfile(
-        prefs: UserPreferences,
-        update: (VoiceProfile) -> VoiceProfile,
-    ) {
-        val existingProfile = prefs.activeVoiceProfileId?.let { voiceProfileRepository.getById(it) }
-        val baseProfile = existingProfile ?: VoiceProfile.defaultFor(prefs)
-        val updated = update(baseProfile)
-        voiceProfileRepository.save(updated)
-        if (prefs.activeVoiceProfileId != updated.id) {
-            preferencesRepository.update { it.copy(activeVoiceProfileId = updated.id) }
+    private suspend fun updateActiveVoiceProfile(update: (VoiceProfile) -> VoiceProfile) {
+        // Relu et réécrit sous verrou : vitesse puis intonation en rafale ne
+        // repartent pas du même profil, l'une effaçant l'autre (audit UX D67).
+        voiceProfileMutex.withLock {
+            val prefs = preferencesRepository.get()
+            val existingProfile = prefs.activeVoiceProfileId?.let { voiceProfileRepository.getById(it) }
+            val updated = update(existingProfile ?: VoiceProfile.defaultFor(prefs))
+            voiceProfileRepository.save(updated)
+            if (prefs.activeVoiceProfileId != updated.id) {
+                preferencesRepository.update { it.copy(activeVoiceProfileId = updated.id) }
+            }
         }
         // Recharger les profils pour mettre à jour l'UI
         _state.value = _state.value.copy(voiceProfiles = getVoiceProfiles())
@@ -369,9 +371,9 @@ class SettingsViewModel @Inject constructor(
      * ne routerait jamais vers Edge (resolveVoiceProfile retombe sur l'ancien
      * profil ou le repli ANDROID_NATIVE).
      */
-    private suspend fun setDefaultTtsEngine(prefs: UserPreferences, engine: TtsEngineId) {
+    private suspend fun setDefaultTtsEngine(engine: TtsEngineId) {
         preferencesRepository.update { it.copy(defaultTtsEngine = engine) }
-        updateActiveVoiceProfile(preferencesRepository.get()) {
+        updateActiveVoiceProfile {
             it.copy(engine = engine, voice = defaultVoiceFor(engine))
         }
     }
@@ -383,7 +385,7 @@ class SettingsViewModel @Inject constructor(
      * l'ancien `ReadingTheme.DARK`) + AppTheme.DARK.
      * OFF : retour à l'état d'avant l'activation (audit UX A11).
      */
-    private suspend fun applyDarkModePreset(enabled: Boolean, current: UserPreferences) {
+    private suspend fun applyDarkModePreset(enabled: Boolean) {
         if (enabled) {
             // L'état d'avant est mémorisé à chaque activation : le préréglage
             // n'était pas actif, il vient d'être demandé (audit UX A11).
@@ -415,7 +417,7 @@ class SettingsViewModel @Inject constructor(
      * couverture).
      * OFF : retour à l'état d'avant l'activation (audit UX A11).
      */
-    private suspend fun applyAccessibilityPresetToggle(enabled: Boolean, current: UserPreferences) {
+    private suspend fun applyAccessibilityPresetToggle(enabled: Boolean) {
         if (enabled) {
             preferencesRepository.update {
                 it.copy(

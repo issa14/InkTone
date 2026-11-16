@@ -14,6 +14,7 @@ import com.inktone.domain.model.PronunciationRule
 import com.inktone.domain.model.ReadingTheme
 import com.inktone.domain.model.TtsEngineId
 import com.inktone.domain.model.VoiceProfile
+import com.inktone.domain.repository.VoiceProfileRepository
 import com.inktone.domain.model.UserPreferences
 import com.inktone.domain.service.AudioPlayer
 import com.inktone.domain.service.TtsCapabilityCatalog
@@ -31,6 +32,7 @@ import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.test.StandardTestDispatcher
 import kotlinx.coroutines.test.resetMain
 import kotlinx.coroutines.test.runTest
+import kotlinx.coroutines.yield
 import kotlinx.coroutines.test.setMain
 import org.junit.After
 import org.junit.Assert.assertEquals
@@ -69,7 +71,7 @@ class SettingsViewModelTest {
 
     private fun viewModel(
         preferencesRepository: FakePreferencesRepository = FakePreferencesRepository(),
-        voiceProfileRepository: FakeVoiceProfileRepository = FakeVoiceProfileRepository(),
+        voiceProfileRepository: VoiceProfileRepository = FakeVoiceProfileRepository(),
         pronunciationRuleRepository: FakePronunciationRuleRepository = FakePronunciationRuleRepository(),
         voiceModelDownloadService: VoiceModelDownloadService = FakeVoiceModelDownloadService(),
         ttsEngine: TtsEngine = FakeTtsEngine(),
@@ -298,6 +300,36 @@ class SettingsViewModelTest {
         assertEquals(1.5f, updated?.speed)
         // La vitesse reste dans VoiceProfile, pas un second emplacement dans UserPreferences.
         assertNotEquals(null, updated)
+    }
+
+    /**
+     * Audit UX D67 : vitesse puis intonation en rafale. Sans verrou, les deux
+     * coroutines lisent le même profil (le `yield` de la lecture les entrelace)
+     * et la seconde écriture efface la première.
+     */
+    @Test
+    fun `vitesse et intonation en rafale sont toutes deux conservees`() = runTest {
+        val preferencesRepository = FakePreferencesRepository()
+        val stored = FakeVoiceProfileRepository()
+        val interleaving = object : VoiceProfileRepository by stored {
+            override suspend fun getById(id: String): VoiceProfile? {
+                val profile = stored.getById(id)
+                yield()
+                return profile
+            }
+        }
+        stored.save(VoiceProfile(id = "vp-1", engine = TtsEngineId.SHERPA_ONNX, voice = "fr-1", language = "fr"))
+        preferencesRepository.update { it.copy(activeVoiceProfileId = "vp-1") }
+        val vm = viewModel(preferencesRepository, interleaving)
+        dispatcher.scheduler.advanceUntilIdle()
+
+        vm.onIntent(SettingsIntent.SetVoiceSpeed(1.5f))
+        vm.onIntent(SettingsIntent.SetVoicePitch(1.3f))
+        dispatcher.scheduler.advanceUntilIdle()
+
+        val updated = stored.getById("vp-1")
+        assertEquals(1.5f, updated?.speed)
+        assertEquals(1.3f, updated?.pitch)
     }
 
     @Test

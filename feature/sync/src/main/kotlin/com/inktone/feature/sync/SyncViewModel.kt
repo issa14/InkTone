@@ -79,17 +79,16 @@ class SyncViewModel @Inject constructor(
                 refreshDashboard()
             }
             is SyncIntent.SetAutoSyncEnabled -> viewModelScope.launch {
-                val current = preferencesRepository.get()
-                preferencesRepository.update(
-                    current.copy(
+                preferencesRepository.update {
+                    it.copy(
                         syncAutoEnabled = intent.enabled,
                         // Éteindre l'auto-sync neutralise aussi "Wi-Fi
                         // uniquement" côté planification (SyncScheduleObserver
                         // n'appelle plus schedule()) — remettre la valeur à
                         // false ici serait une perte de préférence inutile,
                         // on la laisse telle quelle, seulement grisée côté UI.
-                    ),
-                )
+                    )
+                }
             }
             is SyncIntent.SetWifiOnly -> viewModelScope.launch {
                 preferencesRepository.update { it.copy(syncWifiOnly = intent.enabled) }
