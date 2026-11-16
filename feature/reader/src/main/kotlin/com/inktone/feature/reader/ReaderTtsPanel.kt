@@ -86,7 +86,7 @@ fun ReaderTtsPanel(
                 .padding(horizontal = 24.dp, vertical = 16.dp),
         ) {
             Text(
-                "Contrôle vocal",
+                "Narration",
                 style = MaterialTheme.typography.titleMedium,
                 fontWeight = FontWeight.Bold,
             )
@@ -186,10 +186,10 @@ internal fun voiceDisplayName(profile: VoiceProfile): String =
 
 private fun engineDisplayName(engine: TtsEngineId): String = when (engine) {
     // Lot 20 — Sherpa = modèle upmc-medium (remplace Kokoro).
-    TtsEngineId.SHERPA_ONNX -> "UPMC"
-    TtsEngineId.ANDROID_NATIVE -> "Voix système"
+    TtsEngineId.SHERPA_ONNX -> "Voix naturelle"
+    TtsEngineId.ANDROID_NATIVE -> "Voix du téléphone"
     TtsEngineId.PIPER -> "Piper"
-    TtsEngineId.EDGE_TTS -> "Edge"
+    TtsEngineId.EDGE_TTS -> "Voix en ligne"
 }
 
 private fun languageDisplayName(languageCode: String): String = when {

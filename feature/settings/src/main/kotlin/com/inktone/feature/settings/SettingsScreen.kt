@@ -242,9 +242,9 @@ internal fun SettingsContent(
         // .setDefaultTtsEngine les garde alignés), sinon celui des préférences.
         val selectedEngine = activeVoiceProfile?.engine ?: preferences.defaultTtsEngine
 
-        SectionGroup("Lecture") {
+        SectionGroup("Narration") {
             SettingRow(
-                label = "Moteur de synthèse",
+                label = "Type de voix",
                 value = ttsEngineLabel(preferences.defaultTtsEngine),
                 onClick = { showEnginePicker = true },
             )
@@ -531,7 +531,7 @@ internal fun SettingsContent(
         // ── Dialogues ──────────────────────────────────────────────────────────
         if (showEnginePicker) {
             PickerDialog(
-                title = "Moteur TTS",
+                title = "Type de voix",
                 options = TtsEngineId.entries.filter { it != TtsEngineId.PIPER },
                 selected = preferences.defaultTtsEngine,
                 label = { ttsEngineLabel(it) },
@@ -792,8 +792,8 @@ private fun VoiceDownloadRow(
                 is com.inktone.domain.service.VoiceDownloadProgress.InProgress ->
                     "Téléchargement : ${formatMegabytes(progress.bytesDownloaded)} / ${formatMegabytes(progress.totalBytes)}"
                 is com.inktone.domain.service.VoiceDownloadProgress.Failed -> "Échec : ${progress.message}"
-                com.inktone.domain.service.VoiceDownloadProgress.Complete -> "Voix neuronale installée"
-                null -> "Voix neuronale locale (Jessica & Pierre). La lecture reste disponible sans cela."
+                com.inktone.domain.service.VoiceDownloadProgress.Complete -> "Voix naturelle installée"
+                null -> "Voix naturelle (Jessica et Pierre) · 183 Mo"
             },
             style = MaterialTheme.typography.bodySmall,
             color = MaterialTheme.colorScheme.onSurfaceVariant,
@@ -813,7 +813,7 @@ private fun VoiceDownloadRow(
                 OutlinedButton(onClick = { showConfirmDialog = true }) {
                     AppIcon(AppSymbol.Download, contentDescription = null)
                     Spacer(Modifier.width(8.dp))
-                    Text("Télécharger une voix neuronale")
+                    Text("Télécharger la voix naturelle")
                 }
         }
     }
@@ -821,12 +821,11 @@ private fun VoiceDownloadRow(
     if (showConfirmDialog) {
         AlertDialog(
             onDismissRequest = { showConfirmDialog = false },
-            title = { Text("Télécharger la voix neuronale ?") },
+            title = { Text("Télécharger la voix naturelle ?") },
             text = {
                 Text(
-                    "Moteur Sherpa-ONNX (voix UPMC upmc-medium — Jessica & Pierre) : " +
-                        "environ 183 Mo au total (voix 80 Mo + alignement mot à mot 102 Mo). " +
-                        "Téléchargé une seule fois, réutilisable hors ligne ensuite.",
+                    "183 Mo, une seule fois. Elle fonctionne ensuite sans connexion " +
+                        "et surligne chaque mot prononcé.",
                 )
             },
             confirmButton = {
@@ -1106,17 +1105,18 @@ private fun ConfirmDialog(
 /** Lot 14 — libellé lisible du moteur TTS (jamais `enum.name` brut, K12 : pas d'emoji). */
 private fun ttsEngineLabel(engine: TtsEngineId): String = when (engine) {
     // Lot 20 — upmc-medium remplace Kokoro.
-    TtsEngineId.SHERPA_ONNX -> "Sherpa-ONNX (UPMC)"
-    TtsEngineId.ANDROID_NATIVE -> "Voix système"
-    TtsEngineId.EDGE_TTS -> "Edge (cloud)"
+    TtsEngineId.SHERPA_ONNX -> "Voix naturelle"
+    TtsEngineId.ANDROID_NATIVE -> "Voix du téléphone"
+    TtsEngineId.EDGE_TTS -> "Voix en ligne"
     TtsEngineId.PIPER -> "Piper (indisponible)"
 }
 
 /** Lot 14 — description des capacités par moteur (§8.10 : signaler pertes/gains, jamais silencieux). */
 private fun ttsEngineDescription(engine: TtsEngineId): String = when (engine) {
-    TtsEngineId.SHERPA_ONNX -> "Voix neuronale locale · surlignage mot à mot"
-    TtsEngineId.ANDROID_NATIVE -> "Voix du système · hors ligne · surlignage mot à mot selon le moteur installé, sinon phrase par phrase"
-    TtsEngineId.EDGE_TTS -> "En ligne — nécessite une connexion. Repli automatique vers une voix locale hors connexion."
+    TtsEngineId.SHERPA_ONNX -> "Hors ligne. Chaque mot prononcé est surligné."
+    TtsEngineId.ANDROID_NATIVE -> "Hors ligne. Mot à mot si le téléphone le permet, sinon phrase par phrase."
+    // Confidentialité : dire où part le texte, pas seulement qu'il faut du réseau.
+    TtsEngineId.EDGE_TTS -> "Le texte est envoyé à Microsoft. Sans connexion, une voix hors ligne prend le relais."
     TtsEngineId.PIPER -> ""
 }
 

@@ -443,7 +443,7 @@ Petit bottomsheet, **aperçu du texte en direct** au-dessus (le vrai texte du li
 
 ### Haut-parleur — voix, volume, vitesse
 
-Bottomsheet : sélecteur de voix (parmi celles disponibles pour le moteur déjà choisi dans les Réglages généraux — affiche le nom réel de la voix, ex. « ff_siwis · Kokoro · Français », validée par écoute 8/10 en Phase 5, pas un nom inventé), puis deux sliders horizontaux (Volume, Vitesse en ×, ex. « 1,0× »).
+Bottomsheet : sélecteur de voix (parmi celles disponibles pour le moteur déjà choisi dans les Réglages généraux — affiche le nom réel de la voix, ex. « Jessica (FR) · Voix naturelle · Français », validée par écoute 8/10 en Phase 5, pas un nom inventé), puis deux sliders horizontaux (Volume, Vitesse en ×, ex. « 1,0× »).
 
 **Écart (décision D74, audit UX, 2026-11-12) :** plus de sélecteur de voix dans ce panneau — il listait des enregistrements de profil, pas les voix des moteurs. Le panneau affiche la voix active et renvoie aux Réglages pour la changer ; il garde la vitesse.
 
@@ -506,7 +506,7 @@ Deux cartes-boutons **empilées verticalement** (pas côte à côte), chacune av
 ### Carte 2 — Lecture
 
 Titre de carte en majuscules discrètes en en-tête. Contenu, dans l'ordre de la spec :
-- **Moteur de synthèse** et **Voix active** : lignes sélecteurs (libellé à gauche, valeur courante + chevron à droite), ouvrent chacune un dialogue de sélection au clic.
+- **Type de voix** et **Voix active** : lignes sélecteurs (libellé à gauche, valeur courante + chevron à droite), ouvrent chacune un dialogue de sélection au clic.
 - **Vitesse d'élocution** (0,5x–2,0x), **Gain audio** (1,0x–4,0x), **Intonation/Pitch** (0,5x–1,5x) : trois curseurs, chacun avec libellé + valeur courante affichée au-dessus de la piste, et bornes min/max affichées sous la piste.
   **Écart (audit UX, 2026-11-12) :** **Gain audio** est retiré (A15) : la valeur n'était appliquée par aucun moteur ni lecteur, et un gain au-delà de 1,0× demande une amplification PCM avec limiteur, à concevoir à part. **Intonation** n'est affichée que pour un moteur qui l'applique réellement, selon `TtsCapabilities.pitchControl` (A16, D74) : voix système (`TextToSpeech.setPitch`) et Edge (hauteur relative SSML). Pas pour Sherpa-ONNX, dont le modèle VITS ne règle que la durée.
 - **Écouter un extrait** : bouton plein largeur en bas de carte, icône + libellé.
@@ -712,7 +712,7 @@ Tableau de bord visuel et détaillé des performances et habitudes de lecture/é
 ### Section 1 — KPIs & Objectifs
 
 - **Carte objectif du jour** (jauge + streak regroupés) : jauge circulaire de progression (temps du jour / objectif configuré) avec le temps accumulé affiché au centre, à côté un compteur de jours consécutifs (streak) avec icône flamme + libellé de régularité (« Série en cours · régularité élevée »).
-- **Temps cumulé ventilé** : deux cartes égales côte à côte, Lecture visuelle et Écoute TTS, chacune avec sa durée totale.
+- **Temps cumulé ventilé** : deux cartes égales côte à côte, Lecture et Écoute, chacune avec sa durée totale.
 - **Volumes parcourus** : trois petites cartes-stats compactes côte à côte — Livres finis, Pages lues, Mots parcourus (format abrégé pour les grands nombres, ex. « 1,4M »).
 
 Mockup validé sans correction.
@@ -724,9 +724,9 @@ Deux cartes distinctes : histogramme et heatmap. Version affinée par Issa à pa
 **Carte Histogramme :**
 - **En-tête** : titre « Activité » + **total de la période affichée** (ex. « 6h 25m ») + **variation en pourcentage** vs la période équivalente précédente (semaine en cours vs semaine dernière, ou mois en cours vs mois dernier selon le sélecteur).
 - Sélecteur **Semaine/Mois** en haut à droite.
-- Barres empilées par jour, deux segments (Lecture visuelle en vert, Écoute TTS en violet), avec une **ligne de repère pointillée horizontale** pour faciliter la lecture des hauteurs relatives.
+- Barres empilées par jour, deux segments (Lecture en vert, Écoute en violet), avec une **ligne de repère pointillée horizontale** pour faciliter la lecture des hauteurs relatives.
 - **Marqueur visuel du jour courant** (libellé du jour en couleur + point, ex. « M • » pour Mercredi) pour se repérer immédiatement dans la semaine.
-- Légende Lecture visuelle / Écoute TTS en pied de carte.
+- Légende Lecture / Écoute en pied de carte.
 
 **Carte Heatmap (« Habitudes de lecture ») :**
 - **En-tête** : titre + **pic horaire affiché directement** (ex. « Pic : 20h-22h ») — évite d'avoir à scanner la grille pour trouver la conclusion.

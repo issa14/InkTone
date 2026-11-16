@@ -20,7 +20,7 @@ class SettingsVoiceFocusTest {
     @get:Rule
     val composeTestRule = createAndroidComposeRule<ComponentActivity>()
 
-    private val voiceRowText = "Voix neuronale locale (Jessica & Pierre). La lecture reste disponible sans cela."
+    private val voiceRowText = "Voix naturelle (Jessica et Pierre) · 183 Mo"
 
     private fun voiceRowTop(focusVoiceDownload: Boolean) = run {
         composeTestRule.setContent {

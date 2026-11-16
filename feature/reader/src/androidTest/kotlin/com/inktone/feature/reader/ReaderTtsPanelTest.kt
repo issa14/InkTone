@@ -89,8 +89,8 @@ class ReaderTtsPanelTest {
             )
         }
 
-        // Format cible UX_FLOW_DESIGN.md §Haut-parleur : "Jessica (FR) · UPMC · Français"
-        composeTestRule.onNodeWithText("Jessica (FR) · UPMC · Français").assertIsDisplayed()
+        // Format cible UX_FLOW_DESIGN.md §Haut-parleur : "Jessica (FR) · Voix naturelle · Français"
+        composeTestRule.onNodeWithText("Jessica (FR) · Voix naturelle · Français").assertIsDisplayed()
     }
 
     @Test

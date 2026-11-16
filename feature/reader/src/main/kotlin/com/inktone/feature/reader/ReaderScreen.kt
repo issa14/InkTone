@@ -1858,9 +1858,9 @@ AnnotationTapPopup(
         if (state.showVoiceDownloadPrompt) {
             androidx.compose.material3.AlertDialog(
                 onDismissRequest = { viewModel.onIntent(ReaderIntent.DismissVoiceDownloadPrompt) },
-                title = { Text("Voix neuronale disponible") },
+                title = { Text("Voix naturelle disponible") },
                 text = {
-                    Text("Une voix française plus naturelle (Jessica & Pierre) peut être téléchargée (environ 183 Mo, une seule fois). La lecture visuelle et la voix actuelle restent disponibles sans cela.")
+                    Text("Jessica et Pierre, deux voix françaises qui surlignent chaque mot prononcé. 183 Mo, une seule fois.")
                 },
                 confirmButton = {
                     androidx.compose.material3.TextButton(onClick = {

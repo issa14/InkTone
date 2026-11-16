@@ -211,11 +211,11 @@ private fun Section1Kpis(kpi: com.inktone.domain.usecase.KpiState) {
         // cible, inchangé depuis le palier précédent).
         Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(InkToneSpacing.md)) {
             StatCard(
-                icon = AppSymbol.VisualReading, label = "Visuel",
+                icon = AppSymbol.VisualReading, label = "Lecture",
                 value = kpi.totalVisualTimeFormatted, modifier = Modifier.weight(1f),
             )
             StatCard(
-                icon = AppSymbol.TtsListening, label = "TTS",
+                icon = AppSymbol.TtsListening, label = "Écoute",
                 value = kpi.totalTtsTimeFormatted, modifier = Modifier.weight(1f),
             )
         }
@@ -634,12 +634,12 @@ private fun HistogramChart(dailyStats: List<DailyReadingStats>, isMonthView: Boo
                 Row(verticalAlignment = Alignment.CenterVertically) {
                     Canvas(Modifier.size(10.dp)) { drawRect(visualColor) }
                     Spacer(Modifier.width(4.dp))
-                    Text("Lecture visuelle", style = MaterialTheme.typography.labelSmall)
+                    Text("Lecture", style = MaterialTheme.typography.labelSmall)
                 }
                 Row(verticalAlignment = Alignment.CenterVertically) {
                     Canvas(Modifier.size(10.dp)) { drawRect(ttsColor) }
                     Spacer(Modifier.width(4.dp))
-                    Text("Écoute TTS", style = MaterialTheme.typography.labelSmall)
+                    Text("Écoute", style = MaterialTheme.typography.labelSmall)
                 }
             }
         }
