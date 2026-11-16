@@ -10,6 +10,8 @@ import androidx.compose.animation.fadeOut
 import androidx.compose.animation.togetherWith
 import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.background
+import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.verticalScroll
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -18,6 +20,7 @@ import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.imePadding
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
@@ -198,8 +201,13 @@ private fun SyncConfigurationContent(
     val isWebDavActive = account?.provider == SyncProviderId.WEBDAV
     val isGoogleActive = account?.provider == SyncProviderId.GOOGLE_DRIVE
 
+    // Défilement et marge du clavier : la saisie WebDAV ouvre le clavier, qui
+    // masquait sinon « Tester et connecter » et la carte suivante.
     Column(
-        modifier = Modifier.padding(horizontal = 16.dp, vertical = 12.dp),
+        modifier = Modifier
+            .verticalScroll(rememberScrollState())
+            .imePadding()
+            .padding(horizontal = 16.dp, vertical = 12.dp),
         verticalArrangement = Arrangement.spacedBy(16.dp),
     ) {
         GoogleDriveCard(
