@@ -1,0 +1,11 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- Build type `benchmark` : profilable par le shell, sinon les traces Macrobenchmark
+     ne contiennent aucune image de l'app (FrameTimingMetric vide). -->
+<manifest xmlns:android="http://schemas.android.com/apk/res/android"
+    xmlns:tools="http://schemas.android.com/tools">
+    <application>
+        <profileable
+            android:shell="true"
+            tools:targetApi="29" />
+    </application>
+</manifest>
