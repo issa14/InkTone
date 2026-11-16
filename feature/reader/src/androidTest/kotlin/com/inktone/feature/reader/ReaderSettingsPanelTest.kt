@@ -189,14 +189,14 @@ class ReaderSettingsPanelTest {
         }
 
         composeTestRule.onNodeWithText("Police").assertExists()
-        // Valeur courante (DEFAULT → « Système ») affichée.
-        composeTestRule.onNodeWithText("Système").assertExists()
+        // Valeur courante (DEFAULT → « Selon le thème ») affichée.
+        composeTestRule.onNodeWithText("Selon le thème").assertExists()
         // Les autres options sont derrière le menu déroulant : on l'ouvre.
         composeTestRule.onNodeWithText("Police").performScrollTo().performClick()
-        composeTestRule.onNodeWithText("Serif").assertExists()
-        composeTestRule.onNodeWithText("Sans-serif").assertExists()
-        composeTestRule.onNodeWithText("Dyslexie").assertExists()
-        composeTestRule.onNodeWithText("Empattée FR").assertExists()
+        composeTestRule.onNodeWithText("Classique").assertExists()
+        composeTestRule.onNodeWithText("Moderne").assertExists()
+        composeTestRule.onNodeWithText("Adaptée à la dyslexie").assertExists()
+        composeTestRule.onNodeWithText("Source Serif").assertExists()
     }
 
     @Test
@@ -228,7 +228,7 @@ class ReaderSettingsPanelTest {
         }
 
         composeTestRule.onNodeWithText("Police").performScrollTo().performClick()
-        composeTestRule.onNodeWithText("Empattée FR").performClick()
+        composeTestRule.onNodeWithText("Source Serif").performClick()
         assertEquals(FontFamily.SOURCE_SERIF, chosen)
     }
 

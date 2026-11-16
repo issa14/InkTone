@@ -191,6 +191,8 @@ fun ReaderSettingsPanel(
                 label = "Police",
                 current = currentFontFamily,
                 optionLabel = { fontFamilyLabel(it) },
+                // Chaque police s'affiche en elle-même : la comparaison se fait à l'œil.
+                optionFontFamily = { if (it == DomainFontFamily.DEFAULT) null else ThemeColors.toComposeFontFamily(it) },
                 options = FONT_FAMILY_CHOICES,
                 onSelect = onFontFamilyChange,
             )
@@ -309,11 +311,13 @@ private val FONT_FAMILY_CHOICES = DomainFontFamily.entries.toList()
 
 /** Correctif Lot 21 — libellé court d'une police pour le menu déroulant. */
 private fun fontFamilyLabel(family: DomainFontFamily): String = when (family) {
-    DomainFontFamily.DEFAULT -> "Système"
-    DomainFontFamily.SERIF -> "Serif"
-    DomainFontFamily.SANS_SERIF -> "Sans-serif"
-    DomainFontFamily.OPEN_DYSLEXIC -> "Dyslexie"
-    DomainFontFamily.SOURCE_SERIF -> "Empattée FR"
+    // DEFAULT ne désigne pas la police du téléphone : il suit celle du thème
+    // de lecture (ThemeColors.effectiveFontFamily).
+    DomainFontFamily.DEFAULT -> "Selon le thème"
+    DomainFontFamily.SERIF -> "Classique"
+    DomainFontFamily.SANS_SERIF -> "Moderne"
+    DomainFontFamily.OPEN_DYSLEXIC -> "Adaptée à la dyslexie"
+    DomainFontFamily.SOURCE_SERIF -> "Source Serif"
 }
 
 /**
@@ -343,6 +347,7 @@ private fun <T> SettingsDropdown(
     options: List<T>,
     onSelect: (T) -> Unit,
     enabled: Boolean = true,
+    optionFontFamily: (T) -> androidx.compose.ui.text.font.FontFamily? = { null },
 ) {
     var expanded by remember { mutableStateOf(false) }
     ExposedDropdownMenuBox(expanded = expanded, onExpandedChange = { expanded = it }) {
@@ -374,7 +379,7 @@ private fun <T> SettingsDropdown(
         ExposedDropdownMenu(expanded = expanded, onDismissRequest = { expanded = false }) {
             options.forEach { option ->
                 DropdownMenuItem(
-                    text = { Text(optionLabel(option)) },
+                    text = { Text(optionLabel(option), fontFamily = optionFontFamily(option)) },
                     onClick = {
                         expanded = false
                         onSelect(option)
