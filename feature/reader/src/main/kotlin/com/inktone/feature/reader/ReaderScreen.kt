@@ -162,31 +162,18 @@ import androidx.compose.foundation.lazy.LazyListLayoutInfo
  *
  * Deux conséquences structurelles de la virtualisation, traitées ici :
  * un item est DÉTRUIT hors écran (l'état de sélection est donc hissé au
- * ViewModel et relu à la recomposition, voir `restoredSelection` dans
- * `ParagraphText` — la sortie de composition n'efface plus rien), et un
+ * ViewModel, en offsets absolus — la sortie de composition n'efface rien), et un
  * lazy layout n'expose aucun offset absolu de contenu (l'auto-scroll TTS
  * et la détection de position visent donc l'ITEM, plus un pixel).
  *
- * **Palier 3f.1-3f.3 — sélection libre au mot, PAGED et SCROLL.** Un
- * `BasicTextField` en lecture seule par unité adressable (une page en
- * PAGED, voir `PagedChapterContent.PageBlock` ; un `Paragraph` en SCROLL,
- * voir `ParagraphText` ci-dessous) délègue à la sélection NATIVE de
- * Compose (appui long calé au mot, poignées et loupe natives, glissement
- * caractère par caractère) plutôt que de la réimplémenter à la main —
- * mécanisme identique dans les deux modes, seul le grain de l'unité
- * adressable diffère. Sélection bornée à cette unité par construction :
- * jamais à cheval sur deux pages (PAGED) ni sur deux paragraphes (SCROLL),
- * limite structurelle plutôt qu'un choix produit séparé à instrumenter.
- * `ReaderUiState.freeSelectionRange` (offsets de caractère absolus au
- * chapitre) est le seul état, commun aux deux modes.
- *
- * **Palier 3f.3bis — grain SCROLL, phrase → paragraphe.** Un
- * `BasicTextField` par `Sentence` (grain initial de 3f.3) composait des
- * centaines d'instances simultanées sur un chapitre typique, et
- * `BasicTextField` est nettement plus lourd qu'un `Text`. Bug réel trouvé
- * sur appareil : glissement de sélection ET défilement simple saccadés.
- * Regroupé par `Paragraph` — frontière déjà utilisée pour les images EPUB
- * intercalées, et devenue depuis l'unité d'item du `LazyColumn`.
+ * **Sélection libre.** `ReaderUiState.freeSelectionRange` (offsets de
+ * caractère absolus au chapitre) est le seul état, commun aux deux modes.
+ * En PAGED, un `BasicTextField` en lecture seule par page
+ * (`PagedChapterContent.PageBlock`) délègue à la sélection native de Compose :
+ * elle reste bornée à la page (D50, partie page, non traitée). En SCROLL,
+ * moteur maison (ADR-029) : paragraphes en `Text`, poignées, loupe et défilement
+ * automatique portés par `SelectionHandlesOverlay` à partir du
+ * `VisibleTextRegistry` ; une sélection peut franchir les paragraphes.
  *
  * Pendant la lecture TTS, la vue suit la phrase lue (effet d'auto-défilement
  * plus bas, qui cède à un geste manuel).
@@ -426,7 +413,7 @@ fun ReaderScreen(
         var showGoToPage by remember { mutableStateOf(false) }
 
         // A.1 / Tache 9bis.3.6 - position Y de la phrase active, LOCALE au
-        // paragraphe qui la contient (voir ParagraphText.onCurrentLineY) —
+        // paragraphe qui la contient (voir BookBlockItem.onCurrentLineY) —
         // sert la réglette de lecture. N'est plus une cible de défilement :
         // un `LazyColumn` n'a pas d'offset absolu de contenu, l'auto-scroll
         // TTS vise désormais l'ITEM (voir ci-dessous).
@@ -634,12 +621,9 @@ fun ReaderScreen(
         // PAGED : remonté par PagedChapterContent (conversion locale →
         // fenêtre via TextLayoutResult, seul capable de la produire).
         //
-        // Bornes fenêtre de la sélection libre active, par mode — un seul
-        // Rect (pas une map à unioner) puisque la sélection libre au mot
-        // est bornée à une seule unité adressable (une page en PAGED, un
-        // paragraphe en SCROLL — voir PagedChapterContent.PageBlock /
-        // ReaderScreen.ParagraphText, doc de tête), jamais à cheval sur
-        // plusieurs à unir.
+        // Bornes fenêtre de la sélection libre active, par mode : en PAGED,
+        // celles de la page qui porte la sélection ; en SCROLL, l'union des
+        // paragraphes visibles qu'elle touche (ADR-029).
         var pagedFreeSelectionBounds by remember { mutableStateOf<SelectionPopupBounds?>(null) }
         val selectionBoundsInWindow = when (state.readingMode) {
             // Masqué pendant un glissement de poignée ou un défilement, recalculé à l'arrêt.
@@ -656,10 +640,8 @@ fun ReaderScreen(
         // synchrone : état global effacé ET popup détruit dans le même
         // callback. C'est la disparition de ces bornes (jamais une
         // réaction différée à `freeSelectionRange`) qui démonte le popup,
-        // exactement comme un `hide()` du toolbar natif ; l'unité
-        // adressable, elle, rétracte sa sélection locale à la même
-        // recomposition puisqu'elle ne possède plus l'état global (Phase 1,
-        // `PageBlock`/`ParagraphText`).
+        // exactement comme un `hide()` du toolbar natif ; la page ou les
+        // paragraphes cessent de la dessiner à la même recomposition.
         fun clearSelectionAndPopup() {
             viewModel.onIntent(ReaderIntent.ClearFreeSelection)
             pagedFreeSelectionBounds = null
@@ -1263,11 +1245,9 @@ fun ReaderScreen(
         // d'écran, Confirmer/Annuler) par le popup Copier/Surligner/Note
         // positionné près de la sélection réelle.
         //
-        // Phase 2 — le popup n'est monté QUE si l'unité adressable a
-        // remonté des bornes fenêtre depuis `TextToolbar.showMenu()`
-        // (geste de sélection terminé, doigt levé). Une sélection active
-        // sans bornes = glissement de poignée en cours : rien à l'écran,
-        // la loupe native reste dégagée.
+        // Le popup n'est monté que si des bornes existent : une sélection
+        // active sans bornes = glissement de poignée ou défilement en cours,
+        // rien à l'écran, la loupe reste dégagée.
         if (freeSelectedRange != null && selectionBoundsInWindow != null) {
             ReadingThemeScope(state.resolvedTheme) {
 SelectionActionPopup(
@@ -1897,7 +1877,7 @@ internal fun nextReadingTheme(currentId: String): String {
 internal data class SelectionPopupBounds(val ownerKey: Int, val boundsInWindow: Rect)
 
 /**
- * Arbitre une écriture de bornes venant de l'unité [ownerKey].
+ * Arbitre une écriture de bornes venant de la page [ownerKey] (mode paginé).
  *
  * - Bornes non nulles (`TextToolbar.showMenu`) : le dernier geste terminé
  *   gagne toujours, quel que soit le propriétaire précédent.
