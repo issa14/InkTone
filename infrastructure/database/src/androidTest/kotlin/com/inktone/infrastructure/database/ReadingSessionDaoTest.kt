@@ -90,6 +90,17 @@ class ReadingSessionDaoTest {
     }
 
     @Test
+    fun getRecentSessionsWithWords_ne_garde_que_les_fragments_sans_narration() = runTest {
+        insertPublication("pub-1")
+        val dao = db.readingSessionDao()
+        dao.insert(ReadingSessionEntity("pur", "pub-1", 3L, 4L, "VISUAL", 0, 0, wordsRead = 600, visualDurationMs = 120_000, ttsDurationMs = 0))
+        dao.insert(ReadingSessionEntity("mixte", "pub-1", 2L, 4L, "VISUAL", 0, 0, wordsRead = 900, visualDurationMs = 120_000, ttsDurationMs = 60_000))
+        dao.insert(ReadingSessionEntity("narre", "pub-1", 1L, 4L, "AUDIO", 0, 0, wordsRead = 600, visualDurationMs = 0, ttsDurationMs = 120_000))
+
+        assertEquals(listOf("pur"), dao.getRecentSessionsWithWords(30).map { it.id })
+    }
+
+    @Test
     fun getDistinctReadingDays_retourne_les_jours_tries_decroissants() = runTest {
         insertPublication("pub-1")
         // Deux sessions sur le même jour, une sur un jour différent

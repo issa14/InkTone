@@ -88,16 +88,16 @@ interface ReadingSessionDao {
     /**
      * Sessions servant au calcul de la vitesse de lecture.
      *
-     * `visualDurationMs > ttsDurationMs` n'est PAS une restriction arbitraire :
-     * la vitesse d'un fragment narré est celle du synthétiseur, réglée par
-     * l'utilisateur dans les préférences de voix. L'inclure ferait dire au KPI
-     * « vitesse de lecture » la vitesse du TTS — une mesure de son propre
-     * réglage. Seuls les fragments à dominante visuelle mesurent le lecteur.
+     * `ttsDurationMs = 0` n'est PAS une restriction arbitraire : la vitesse
+     * d'un fragment narré est celle du synthétiseur, réglée par l'utilisateur
+     * dans les préférences de voix. Un fragment mixte compte aussi les mots
+     * narrés, qu'on ne sait pas séparer des mots lus (audit UX D29 c). Seuls
+     * les fragments purement visuels mesurent le lecteur.
      * Ne pas retirer ce filtre sans retirer le KPI qu'il rend honnête.
      */
     @Query("""
         SELECT * FROM reading_sessions
-        WHERE wordsRead > 0 AND visualDurationMs > ttsDurationMs
+        WHERE wordsRead > 0 AND visualDurationMs > 0 AND ttsDurationMs = 0
         ORDER BY startedAt DESC
         LIMIT :limit
     """)

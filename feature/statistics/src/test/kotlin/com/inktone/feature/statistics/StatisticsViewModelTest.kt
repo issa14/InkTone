@@ -247,6 +247,33 @@ class StatisticsViewModelTest {
     }
 
     @Test
+    fun vitesse_de_lecture_ignore_les_fragments_mixtes() = runTest {
+        val readingSessionRepo = FakeReadingSessionRepository()
+        // 600 mots lus seuls en 2 min (300 mots/min) ; un fragment mixte porte les mots
+        // narrés avec les mots lus, sans qu'on puisse les séparer : il est écarté.
+        readingSessionRepo.insert(
+            session("s1", "pub-1", 0L, wordsRead = 600, visualMs = TimeUnit.MINUTES.toMillis(2)),
+        )
+        readingSessionRepo.insert(
+            session(
+                "s2", "pub-1", 1L, wordsRead = 3000,
+                visualMs = TimeUnit.MINUTES.toMillis(2), ttsMs = TimeUnit.MINUTES.toMillis(1),
+            ),
+        )
+
+        val vm = StatisticsViewModel(
+            getStatistics = GetStatisticsUseCase(readingSessionRepo, FakePublicationRepository()),
+            getCurrentBook = GetCurrentBookUseCase(readingSessionRepo, FakePublicationRepository(), FakeReadingStateRepository()),
+            preferencesRepository = FakePreferencesRepository(),
+            exportService = FakeStatisticsExportService(),
+        )
+
+        val ready = vm.state.first { it is StatisticsUiState.Ready } as StatisticsUiState.Ready
+
+        assertEquals(300, ready.kpi.averageWpm)
+    }
+
+    @Test
     fun vitesse_de_lecture_ignore_les_fragments_narres() = runTest {
         val readingSessionRepo = FakeReadingSessionRepository()
         // Écoute seule : la « vitesse » d'un fragment narré n'est que celle du
