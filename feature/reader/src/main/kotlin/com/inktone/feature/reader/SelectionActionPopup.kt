@@ -233,6 +233,15 @@ fun SelectionActionPopup(
                 }
 
                 SelectionPopupMode.NOTE_INPUT -> Column(modifier = Modifier.padding(12.dp).width(260.dp)) {
+                    // Couleur et type de la note choisis ici, sans rien créer avant
+                    // « Enregistrer » ; seul « Surligner » applique à chaque tap (audit UX D52).
+                    AnnotationColorPicker(
+                        selected = pendingColor,
+                        onApply = { color -> pendingColor = color },
+                        recentColors = recentColors,
+                        selectedKind = pendingKind,
+                        onSelectKind = { kind -> pendingKind = kind },
+                    )
                     OutlinedTextField(
                         value = noteText,
                         onValueChange = { noteText = it },

@@ -207,6 +207,30 @@ class SelectionActionPopupTest {
         assertEquals("Ma note de lecture", savedContent)
     }
 
+    /** Audit UX D52 : la couleur d'une note se choisit sans créer de surlignage. */
+    @Test
+    fun la_couleur_choisie_en_mode_note_va_a_la_note_sans_rien_surligner() {
+        var highlighted = false
+        var savedColor: AnnotationColor? = null
+        composeTestRule.setContent {
+            SelectionActionPopup(
+                selectedText = "Un passage sélectionné.",
+                selectionBoundsInWindow = someBounds,
+                onHighlight = { _, _ -> highlighted = true },
+                onSaveNote = { _, color, _ -> savedColor = color },
+                onDismiss = {},
+            )
+        }
+
+        composeTestRule.onNodeWithText("Note").performClick()
+        composeTestRule.onNodeWithContentDescription("Couleur Bleu").performClick()
+        composeTestRule.onNodeWithText("Note").performTextInput("Ma note de lecture")
+        composeTestRule.onNodeWithText("Enregistrer").performClick()
+
+        assertEquals(false, highlighted)
+        assertEquals(AnnotationColor.BLUE, savedColor)
+    }
+
     @Test
     fun aucune_borne_de_selection_n_affiche_pas_de_popup() {
         composeTestRule.setContent {
