@@ -210,6 +210,8 @@ pose les bases de C sans rien qu'il faudra défaire.
 
 ## Bilan d'exécution (2026-11-16)
 
+**Lot clos par Issa le 2026-11-16, en l'état** : critères de sortie tenus ; cause 1 du palier 25.4 sans correctif mesurable, écart déclaré ci-dessous.
+
 | Palier | Résultat | Preuve |
 |---|---|---|
 | 25.0 | Menu d'actions rétabli en défilement, `BasicTextField` retiré ; validé sur appareil | `1445590f`, `BookBlockItemSelectionTest` |
