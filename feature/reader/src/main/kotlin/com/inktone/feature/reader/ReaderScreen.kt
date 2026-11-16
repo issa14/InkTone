@@ -732,6 +732,7 @@ fun ReaderScreen(
         // celle réellement dessinée, donc déborder le texte.
         val readerMargin = readerMarginFor(state.readerMarginStep)
         val paginationPaddingPx = with(density) { readerMargin.roundToPx() }
+        val wordHighlightColor = remember(state.resolvedTheme) { ThemeColors.wordHighlight(state.resolvedTheme) }
         // 3d.2 — interligne en sp, combiné à fontSize (multiplicateur
         // global, voir UserPreferences.lineHeightMultiplier) : seul point de
         // calcul, consommé par la mesure de pagination (mode paginé) ET par le
@@ -1151,6 +1152,7 @@ fun ReaderScreen(
                                         chapterIndex = state.currentChapterIndex,
                                         annotations = state.annotations,
                                         highlightedRange = scrollHighlightedRangeState,
+                                        wordHighlightColor = wordHighlightColor,
                                         freeSelectedRange = scrollFreeSelectedRangeState,
                                         onFreeSelectionChanged = { anchor, focus ->
                                             viewModel.onIntent(ReaderIntent.SetFreeSelection(anchor, focus))
@@ -1212,6 +1214,7 @@ fun ReaderScreen(
                             currentChapterIndex = state.currentChapterIndex,
                             chapterCount = state.chapters.size,
                             textColor = ThemeColors.text(state.resolvedTheme),
+                            wordHighlightColor = wordHighlightColor,
                             isReadingRulerEnabled = state.isReadingRulerEnabled,
                             contentPadding = readerMargin,
                             publicationId = state.publicationId.takeIf { state.epubResourceResolver != null },

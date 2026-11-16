@@ -46,7 +46,6 @@ import com.inktone.domain.model.Annotation
 import com.inktone.domain.model.BookBlock
 import com.inktone.domain.service.EpubResourceResolver
 import com.inktone.feature.reader.SelectionHighlightColor
-import com.inktone.feature.reader.WordHighlightColor
 import com.inktone.feature.reader.absoluteRangePath
 import com.inktone.feature.reader.annotationSpanStyle
 import com.inktone.feature.reader.rangeBoundsInWindow
@@ -75,8 +74,7 @@ import com.inktone.feature.reader.toComposeColor
  * Tous les paragraphes rendent par `Text` ([ParagraphBlockText]) : la
  * sélection est une plage absolue du chapitre, dessinée dans chaque bloc
  * qu'elle touche. Fonctions partagées avec `PageBlock` (`PagedChapterContent.kt`) :
- * [rangeBoundsInWindow], [absoluteRangePath], [WordHighlightColor],
- * [SelectionHighlightColor].
+ * [rangeBoundsInWindow], [absoluteRangePath], [SelectionHighlightColor].
  *
  * @param block Le bloc à rendre.
  * @param baseTextStyle Style de texte de base (taille, police, couleur du thème).
@@ -100,6 +98,8 @@ fun BookBlockItem(
     chapterIndex: Int = 0,
     annotations: List<Annotation> = emptyList(),
     highlightedRange: State<IntRange?> = rememberUpdatedState(null),
+    /** Couleur du mot prononcé, dérivée du thème : `ThemeColors.wordHighlight`. */
+    wordHighlightColor: Color,
     freeSelectedRange: State<IntRange?> = rememberUpdatedState(null),
     onFreeSelectionChanged: (anchorOffset: Int, focusOffset: Int) -> Unit = { _, _ -> },
     onFreeSelectionCleared: () -> Unit = {},
@@ -128,6 +128,7 @@ fun BookBlockItem(
                 annotations = annotations,
                 chapterIndex = chapterIndex,
                 highlightedRange = highlightedRange,
+                wordHighlightColor = wordHighlightColor,
                 freeSelectedRange = freeSelectedRange,
                 onFreeSelectionChanged = onFreeSelectionChanged,
                 onFreeSelectionCleared = onFreeSelectionCleared,
@@ -276,6 +277,7 @@ private fun ParagraphBlockText(
     annotations: List<Annotation>,
     chapterIndex: Int,
     highlightedRange: State<IntRange?>,
+    wordHighlightColor: Color,
     freeSelectedRange: State<IntRange?>,
     onFreeSelectionChanged: (anchorOffset: Int, focusOffset: Int) -> Unit,
     onFreeSelectionCleared: () -> Unit,
@@ -394,7 +396,7 @@ private fun ParagraphBlockText(
                 }
                 onDrawBehind {
                     selectionPath?.let { drawPath(it, SelectionHighlightColor) }
-                    wordPath?.let { drawPath(it, WordHighlightColor) }
+                    wordPath?.let { drawPath(it, wordHighlightColor) }
                 }
             },
     )

@@ -127,6 +127,8 @@ fun PagedChapterContent(
     currentChapterIndex: Int,
     chapterCount: Int = currentChapterIndex + 1,
     textColor: Color,
+    /** Couleur du mot prononcé, dérivée du thème : [ThemeColors.wordHighlight]. */
+    wordHighlightColor: Color,
     isReadingRulerEnabled: Boolean,
     /**
      * P4 — marge de page. Doit être la MÊME valeur que le `paddingPx` remis à
@@ -516,6 +518,7 @@ fun PagedChapterContent(
                         pageOffsetRange = pageOffsetRange,
                         textStyle = renderTextStyle,
                         highlightedRange = highlightedRangeState,
+                        wordHighlightColor = wordHighlightColor,
                         // `settledPage` : la page affichée change une fois la
                         // page posée, pas à mi-geste (trois pages recomposées
                         // pendant l'animation sinon).
@@ -611,6 +614,7 @@ private fun PageBlock(
     pageOffsetRange: IntRange,
     textStyle: TextStyle,
     highlightedRange: State<IntRange?>,
+    wordHighlightColor: Color,
     isDisplayedPage: Boolean,
     isReadingRulerEnabled: Boolean,
     onCurrentLineY: (Dp) -> Unit,
@@ -906,7 +910,7 @@ private fun PageBlock(
                     }
                     onDrawBehind {
                         selectionPath?.let { drawPath(it, SelectionHighlightColor) }
-                        wordPath?.let { drawPath(it, WordHighlightColor) }
+                        wordPath?.let { drawPath(it, wordHighlightColor) }
                     }
                 },
         )
@@ -954,7 +958,6 @@ internal fun DrawScope.drawAbsoluteRangeHighlight(path: Path?, color: Color) {
     drawPath(path, color = color)
 }
 
-internal val WordHighlightColor = Color(0xFFFFEB3B)
 internal val SelectionHighlightColor = Color(0x664FC3F7)
 
 internal fun buildPageAnnotatedString(

@@ -63,7 +63,7 @@ private const val MAX_RECENT_ANNOTATION_COLORS = 3
  * Style de rendu d'une annotation selon son [AnnotationKind] (Lot 22,
  * tâche 10). Trois canaux visuels restent séparés — jamais mélangés :
  * - l'annotation : fond (surlignage) ou décoration de texte (souligné/barré) ;
- * - le surlignage TTS : [WordHighlightColor] ;
+ * - le surlignage TTS : `ThemeColors.wordHighlight` ;
  * - la sélection : [SelectionHighlightColor].
  */
 fun annotationSpanStyle(kind: AnnotationKind, color: AnnotationColor): SpanStyle = when (kind) {

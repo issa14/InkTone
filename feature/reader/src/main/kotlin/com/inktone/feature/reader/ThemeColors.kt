@@ -4,6 +4,7 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.text.font.FontFamily as ComposeFontFamily
 import com.inktone.core.designsystem.OpenDyslexicFamily
 import com.inktone.core.designsystem.SourceSerifFamily
+import com.inktone.core.designsystem.calculateContrastRatio
 import com.inktone.core.designsystem.toColor
 import com.inktone.domain.model.EffectiveReadingSettings
 import com.inktone.domain.model.FontFamily as DomainFontFamily
@@ -22,6 +23,29 @@ object ThemeColors {
     fun text(theme: ReadingTheme): Color = theme.textColorHex.toColor()
     fun accent(theme: ReadingTheme): Color = theme.accentColorHex.toColor()
     fun highlight(theme: ReadingTheme): Color = theme.highlightColorHex.toColor()
+
+    /**
+     * Surlignage du mot prononcé : la couleur du thème à la plus forte opacité
+     * qui laisse le texte très lisible (7:1). Un jaune opaque fixe tombait à
+     * 1,2:1 sous du texte blanc ; une opacité fixe basse rendait le mot
+     * invisible sur fond clair. Les thèmes clairs restent donc pleins.
+     */
+    fun wordHighlight(theme: ReadingTheme): Color {
+        val background = background(theme)
+        val text = text(theme)
+        val highlight = highlight(theme)
+        var alpha = 1f
+        while (alpha > MIN_WORD_HIGHLIGHT_ALPHA &&
+            calculateContrastRatio(androidx.compose.ui.graphics.lerp(background, highlight, alpha), text) < WORD_HIGHLIGHT_MIN_CONTRAST
+        ) {
+            alpha -= WORD_HIGHLIGHT_ALPHA_STEP
+        }
+        return highlight.copy(alpha = alpha.coerceAtLeast(MIN_WORD_HIGHLIGHT_ALPHA))
+    }
+
+    internal const val WORD_HIGHLIGHT_MIN_CONTRAST = 7.0
+    private const val WORD_HIGHLIGHT_ALPHA_STEP = 0.05f
+    private const val MIN_WORD_HIGHLIGHT_ALPHA = 0.2f
 
     /**
      * Couleur des barres HUD (topbar, panneau de contrôle), dérivée du

@@ -6,6 +6,7 @@ import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.rememberUpdatedState
 import androidx.compose.runtime.setValue
+import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.test.click
 import androidx.compose.ui.test.junit4.createComposeRule
@@ -51,6 +52,7 @@ class BookBlockItemSelectionTest {
                 BookBlockItem(
                     block = block,
                     baseTextStyle = TextStyle(fontSize = 20.sp),
+                    wordHighlightColor = Color.Yellow,
                     freeSelectedRange = rememberUpdatedState(selection),
                     onFreeSelectionChanged = { anchor, focus -> selection = minOf(anchor, focus)..maxOf(anchor, focus) },
                 )
@@ -76,8 +78,8 @@ class BookBlockItemSelectionTest {
         composeTestRule.setContent {
             CompositionLocalProvider(LocalVisibleTextRegistry provides registry) {
                 Column {
-                    BookBlockItem(block = block, baseTextStyle = TextStyle(fontSize = 20.sp))
-                    BookBlockItem(block = secondBlock, baseTextStyle = TextStyle(fontSize = 20.sp))
+                    BookBlockItem(block = block, baseTextStyle = TextStyle(fontSize = 20.sp), wordHighlightColor = Color.Yellow)
+                    BookBlockItem(block = secondBlock, baseTextStyle = TextStyle(fontSize = 20.sp), wordHighlightColor = Color.Yellow)
                 }
             }
         }
@@ -104,6 +106,7 @@ class BookBlockItemSelectionTest {
             BookBlockItem(
                 block = block,
                 baseTextStyle = TextStyle(fontSize = 20.sp),
+                wordHighlightColor = Color.Yellow,
                 freeSelectedRange = rememberUpdatedState(selection),
                 onFreeSelectionChanged = { anchor, focus -> selection = minOf(anchor, focus)..maxOf(anchor, focus) },
                 onFreeSelectionCleared = {

@@ -116,6 +116,7 @@ class PagedChapterContentTest {
                 annotations = emptyList<Annotation>(),
                 currentChapterIndex = 0,
                 textColor = Color.Black,
+                wordHighlightColor = Color.Yellow,
                 surfaceColor = Color.White,
                 isReadingRulerEnabled = false,
                 onClick = onClick,

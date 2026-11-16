@@ -4,11 +4,13 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.text.font.FontFamily as ComposeFontFamily
 import com.inktone.core.designsystem.OpenDyslexicFamily
 import com.inktone.core.designsystem.SourceSerifFamily
+import com.inktone.core.designsystem.calculateContrastRatio
 import com.inktone.domain.model.EffectiveReadingSettings
 import com.inktone.domain.model.FontFamily
 import com.inktone.domain.model.ReadingTheme
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertNotEquals
+import org.junit.Assert.assertTrue
 import org.junit.Test
 
 /** Lot 9 — ThemeColors dérive désormais du ReadingTheme résolu (couleurs hex), plus d'un enum fermé. */
@@ -78,5 +80,27 @@ class ThemeColorTest {
         assertEquals(SourceSerifFamily, ThemeColors.toComposeFontFamily(FontFamily.SOURCE_SERIF))
         // La police embarquée est distincte du Serif système générique.
         assertNotEquals(ComposeFontFamily.Serif, ThemeColors.toComposeFontFamily(FontFamily.SOURCE_SERIF))
+    }
+
+    /** Audit UI P0-1 : le mot prononcé reste lisible dans chaque thème intégré. */
+    @Test
+    fun le_texte_reste_tres_lisible_sur_le_surlignage_du_mot_prononce() {
+        for (theme in ReadingTheme.BUILT_IN) {
+            val highlight = ThemeColors.wordHighlight(theme)
+            val composed = androidx.compose.ui.graphics.lerp(
+                ThemeColors.background(theme),
+                highlight.copy(alpha = 1f),
+                highlight.alpha,
+            )
+            val contrast = calculateContrastRatio(composed, ThemeColors.text(theme))
+            assertTrue("${theme.id} : $contrast", contrast >= ThemeColors.WORD_HIGHLIGHT_MIN_CONTRAST)
+        }
+    }
+
+    /** Une opacité basse rendrait le mot presque invisible sur fond clair. */
+    @Test
+    fun les_themes_clairs_gardent_un_surlignage_plein() {
+        assertEquals(1f, ThemeColors.wordHighlight(ReadingTheme.PAPIER_CLAIR).alpha)
+        assertEquals(1f, ThemeColors.wordHighlight(ReadingTheme.SEPIA_VINTAGE).alpha)
     }
 }
