@@ -57,6 +57,7 @@ class AndroidNativeTtsEngine @Inject constructor(
 
     override val capabilities = TtsCapabilities(
         offline = true,
+        // Vrai si le moteur installé émet onRangeStart ; sinon la liste est vide et la lecture surligne la phrase (D45, D65).
         wordTimestamps = true,
         sentenceTimestamps = true,
         languages = listOf("fr"),

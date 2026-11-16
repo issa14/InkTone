@@ -1090,7 +1090,7 @@ private fun ttsEngineLabel(engine: TtsEngineId): String = when (engine) {
 /** Lot 14 — description des capacités par moteur (§8.10 : signaler pertes/gains, jamais silencieux). */
 private fun ttsEngineDescription(engine: TtsEngineId): String = when (engine) {
     TtsEngineId.SHERPA_ONNX -> "Voix neuronale locale · surlignage mot à mot"
-    TtsEngineId.ANDROID_NATIVE -> "Voix du système · hors ligne · surlignage mot à mot"
+    TtsEngineId.ANDROID_NATIVE -> "Voix du système · hors ligne · surlignage mot à mot selon le moteur installé, sinon phrase par phrase"
     TtsEngineId.EDGE_TTS -> "En ligne — nécessite une connexion. Repli automatique vers une voix locale hors connexion."
     TtsEngineId.PIPER -> ""
 }
