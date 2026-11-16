@@ -28,10 +28,11 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.text.AnnotatedString
 import androidx.compose.ui.text.SpanStyle
 import androidx.compose.ui.text.buildAnnotatedString
-import androidx.compose.ui.text.withStyle
 import androidx.compose.ui.unit.dp
 import androidx.hilt.navigation.compose.hiltViewModel
 import com.inktone.domain.service.SearchResult
+import java.text.Normalizer
+import java.util.Locale
 
 /**
  * `onNavigateToReader` décomposé en primitifs, pas un `Locator` — `app`
@@ -136,7 +137,15 @@ private fun SearchResultItem(result: SearchResult, bookTitle: String?, query: St
             Text(bookTitle, style = MaterialTheme.typography.labelMedium, color = MaterialTheme.colorScheme.primary)
         }
         Text(
-            text = highlightSnippet(result.snippet, query),
+            // Couleur du schéma : un jaune fixe tombait à 4,3:1 sous le texte en thème sombre.
+            text = highlightSnippet(
+                result.snippet,
+                query,
+                SpanStyle(
+                    background = MaterialTheme.colorScheme.tertiaryContainer,
+                    color = MaterialTheme.colorScheme.onTertiaryContainer,
+                ),
+            ),
             color = MaterialTheme.colorScheme.onSurface,
             style = MaterialTheme.typography.bodyMedium,
         )
@@ -144,24 +153,45 @@ private fun SearchResultItem(result: SearchResult, bookTitle: String?, query: St
 }
 
 /**
- * D.6 — Surligne toutes les occurrences de [query] dans [snippet]
- * (insensible à la casse).
+ * Surligne dans [snippet] chaque occurrence de [query], sans tenir compte
+ * de la casse ni des accents — comme le moteur de recherche : chercher
+ * « eleve » trouve « élève », il doit donc aussi le surligner.
  */
-private fun highlightSnippet(snippet: String, query: String): AnnotatedString {
-    if (query.length < 2) return AnnotatedString(snippet)
-    return buildAnnotatedString {
-        val lower = snippet.lowercase()
-        val q = query.lowercase()
-        var start = 0
-        var idx = lower.indexOf(q, start)
-        while (idx >= 0) {
-            append(snippet.substring(start, idx))
-            withStyle(SpanStyle(background = androidx.compose.ui.graphics.Color(0x66FFEB3B))) {
-                append(snippet.substring(idx, idx + q.length))
-            }
-            start = idx + q.length
-            idx = lower.indexOf(q, start)
-        }
-        append(snippet.substring(start))
+private fun highlightSnippet(snippet: String, query: String, highlight: SpanStyle): AnnotatedString =
+    buildAnnotatedString {
+        append(snippet)
+        matchRanges(snippet, query).forEach { addStyle(highlight, it.first, it.last + 1) }
     }
+
+/** Plages de [text] (indices d'origine) où [query] apparaît, accents et casse ignorés. */
+internal fun matchRanges(text: String, query: String): List<IntRange> {
+    val needle = foldForMatch(query.trim())
+    if (needle.length < 2) return emptyList()
+    // Chaîne repliée + indice d'origine de chacun de ses caractères : une
+    // lettre accentuée peut se décomposer, la correspondance doit retomber
+    // sur le texte affiché.
+    val folded = StringBuilder()
+    val origin = ArrayList<Int>(text.length)
+    text.forEachIndexed { index, char ->
+        foldForMatch(char.toString()).forEach {
+            folded.append(it)
+            origin.add(index)
+        }
+    }
+    val ranges = mutableListOf<IntRange>()
+    var from = folded.indexOf(needle)
+    while (from >= 0) {
+        val end = from + needle.length - 1
+        // Un accent combinant qui suit la dernière lettre en fait partie : ne pas l'en séparer.
+        var last = origin[end]
+        while (last + 1 < text.length && Character.getType(text[last + 1]) == Character.NON_SPACING_MARK.toInt()) last++
+        ranges += origin[from]..last
+        from = folded.indexOf(needle, end + 1)
+    }
+    return ranges
 }
+
+private val combiningMarks = Regex("\\p{Mn}+")
+
+private fun foldForMatch(value: String): String =
+    combiningMarks.replace(Normalizer.normalize(value, Normalizer.Form.NFD), "").lowercase(Locale.FRENCH)
