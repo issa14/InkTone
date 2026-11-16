@@ -326,6 +326,29 @@ class ReaderViewModelNarrationOwnershipTest {
         }
     }
 
+    /**
+     * Dette de test de l'audit UX (§10.1) : sans ce test, la branche `Pause` du
+     * `when` de `onIntent` pouvait disparaître sans erreur de compilation ni de test.
+     */
+    @Test
+    fun l_intent_pause_arrete_la_narration_du_lecteur() = runTest {
+        val viewModel = openBook("pub")
+        try {
+            viewModel.onIntent(ReaderIntent.PlayCurrentSentence)
+            dispatcher.scheduler.runCurrent()
+            awaitRealTime { ttsEngine.requestedSpeeds.isNotEmpty() }
+            assertTrue("narration lancée", viewModel.state.value.isPlaying)
+
+            viewModel.onIntent(ReaderIntent.Pause)
+            dispatcher.scheduler.runCurrent()
+
+            assertFalse("le Lecteur n'affiche plus la lecture", viewModel.state.value.isPlaying)
+            awaitRealTime { orchestrator.state.value is PlaybackOrchestrator.PlaybackStatus.Idle }
+        } finally {
+            cleanUp(viewModel)
+        }
+    }
+
     /** La synthèse tourne sur un vrai dispatcher : attente en temps réel, bornée. */
     private fun awaitRealTime(condition: () -> Boolean) {
         val deadline = System.currentTimeMillis() + 5_000
