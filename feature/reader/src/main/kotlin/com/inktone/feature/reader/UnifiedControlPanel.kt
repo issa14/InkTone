@@ -2,6 +2,7 @@ package com.inktone.feature.reader
 
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.defaultMinSize
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
@@ -210,12 +211,13 @@ private fun SecondaryAction(
 ) {
     // Libellés retirés (lot HUD) : l'icône seule porte l'action, le
     // `contentDescription` reste complet pour TalkBack. Padding vertical
-    // légèrement augmenté pour conserver une cible tactile ~44dp.
+    // légèrement augmenté pour atteindre la cible tactile de 48 dp (audit UX C3).
     Box(
         contentAlignment = Alignment.Center,
         modifier = Modifier
             .clip(RoundedCornerShape(8.dp))
             .clickable(onClick = onClick)
+            .defaultMinSize(minWidth = 48.dp, minHeight = 48.dp)
             .padding(horizontal = 10.dp, vertical = 10.dp),
     ) {
         AppIcon(

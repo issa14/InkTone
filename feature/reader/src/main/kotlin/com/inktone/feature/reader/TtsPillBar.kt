@@ -268,7 +268,7 @@ private fun PillAction(
     IconButton(
         onClick = onClick,
         enabled = enabled,
-        modifier = Modifier.size(44.dp),
+        modifier = Modifier.size(48.dp), // cible tactile minimale (audit UX C3)
         colors = IconButtonDefaults.iconButtonColors(
             contentColor = tint.copy(alpha = 0.7f),
             disabledContentColor = tint.copy(alpha = 0.25f),

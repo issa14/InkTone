@@ -174,20 +174,26 @@ fun BookCover(
         // Retour UX : plus de fond circulaire — icône blanche seule,
         // une shadow légère assure le contraste sur couverture claire.
         if (showOverlays) {
+            // Zone tactile de 48 dp (audit UX C3) ; l'ombre reste sur le disque de 32 dp.
             IconButton(
                 onClick = { showActionsSheet = true },
                 modifier = Modifier
                     .align(Alignment.BottomStart)
-                    .padding(4.dp)
-                    .size(32.dp)
-                    .shadow(
-                        elevation = 6.dp,
-                        shape = CircleShape,
-                        clip = false,
-                        spotColor = Color.Black.copy(alpha = 0.7f),
-                    ),
+                    .size(48.dp),
             ) {
-                AppIcon(AppSymbol.MoreActions,  contentDescription = "Actions sur « ${publication.title} »", tint = Color.White)
+                Box(
+                    contentAlignment = Alignment.Center,
+                    modifier = Modifier
+                        .size(32.dp)
+                        .shadow(
+                            elevation = 6.dp,
+                            shape = CircleShape,
+                            clip = false,
+                            spotColor = Color.Black.copy(alpha = 0.7f),
+                        ),
+                ) {
+                    AppIcon(AppSymbol.MoreActions,  contentDescription = "Actions sur « ${publication.title} »", tint = Color.White)
+                }
             }
         }
 
