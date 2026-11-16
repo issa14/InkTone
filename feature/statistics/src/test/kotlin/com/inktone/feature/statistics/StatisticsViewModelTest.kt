@@ -182,7 +182,7 @@ class StatisticsViewModelTest {
         val ready = state as StatisticsUiState.Ready
 
         assertEquals("1\u202Fh\u202F00", ready.kpi.totalVisualTimeFormatted)
-        assertEquals("0h 30m", ready.kpi.totalTtsTimeFormatted)
+        assertEquals("30\u202Fmin", ready.kpi.totalTtsTimeFormatted)
     }
 
     // ───── Tache 7.1 — objectif quotidien branché sur les préférences ─────
