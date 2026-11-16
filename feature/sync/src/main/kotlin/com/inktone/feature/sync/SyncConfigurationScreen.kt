@@ -669,9 +669,16 @@ private fun DeviceRow(entry: DeviceFleetEntry, isCurrent: Boolean, onRemove: () 
             Modifier.size(8.dp).clip(CircleShape)
                 .background(if (isFresh) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.outline),
         )
-        Spacer(Modifier.width(8.dp))
-        IconButton(onClick = { showRemoveConfirm = true }) {
-            AppIcon(AppSymbol.Delete, contentDescription = "Retirer ${entry.displayName} de la liste")
+        // Retirer l'appareil courant n'aurait aucun sens : il réapparaîtrait
+        // à la prochaine synchronisation.
+        if (!isCurrent) {
+            Spacer(Modifier.width(8.dp))
+            IconButton(onClick = { showRemoveConfirm = true }) {
+                AppIcon(AppSymbol.Delete, contentDescription = "Retirer ${entry.displayName} de la liste")
+            }
+        } else {
+            // Garde les points de fraîcheur alignés d'une ligne à l'autre.
+            Spacer(Modifier.width(56.dp))
         }
     }
 
