@@ -104,7 +104,7 @@ fun CatalogDashboardScreen(
                     Text(
                         when (val s = state) {
                             is OpdsUiState.Feed -> s.title
-                            is OpdsUiState.Dashboard -> "Catalogues OPDS"
+                            is OpdsUiState.Dashboard -> "Catalogues en ligne"
                         },
                     )
                 },
@@ -236,7 +236,7 @@ private fun CatalogDashboardContent(
             horizontalAlignment = Alignment.CenterHorizontally,
         ) {
             Text(
-                "Aucun catalogue.\nAjoutez-en un avec le bouton +, ou partez d'un catalogue suggéré.",
+                "Aucun catalogue. Ajoutez-en un avec le bouton +, ou choisissez une suggestion.",
                 style = MaterialTheme.typography.bodyLarge,
                 textAlign = androidx.compose.ui.text.style.TextAlign.Center,
                 color = MaterialTheme.colorScheme.onSurfaceVariant,
@@ -430,21 +430,23 @@ private fun AddCatalogBottomSheet(
             OutlinedTextField(
                 value = rootUrl,
                 onValueChange = { rootUrl = it },
-                label = { Text("URL racine") },
+                label = { Text("Adresse du catalogue") },
                 singleLine = true,
                 modifier = Modifier.fillMaxWidth(),
             )
             OutlinedTextField(
                 value = username,
                 onValueChange = { username = it },
-                label = { Text(if (isEdit) "Nom d'utilisateur (laisser vide pour conserver)" else "Nom d'utilisateur (optionnel)") },
+                label = { Text("Nom d'utilisateur") },
+                supportingText = { Text(if (isEdit) "Laisser vide pour ne pas le changer" else "Facultatif") },
                 singleLine = true,
                 modifier = Modifier.fillMaxWidth(),
             )
             OutlinedTextField(
                 value = password,
                 onValueChange = { password = it },
-                label = { Text(if (isEdit) "Mot de passe (laisser vide pour conserver)" else "Mot de passe (optionnel)") },
+                label = { Text("Mot de passe") },
+                supportingText = { Text(if (isEdit) "Laisser vide pour ne pas le changer" else "Facultatif") },
                 singleLine = true,
                 visualTransformation = if (passwordVisible) VisualTransformation.None else PasswordVisualTransformation(),
                 trailingIcon = {
@@ -461,7 +463,7 @@ private fun AddCatalogBottomSheet(
             // Avertissement cleartext — non désactivable (décision actée §10).
             if (rootUrl.trim().startsWith("http://")) {
                 Text(
-                    "Ce catalogue n'est pas chiffré — à réserver à un serveur de confiance sur votre réseau local.",
+                    "Connexion non chiffrée : à réserver à un serveur de confiance sur votre réseau local.",
                     style = MaterialTheme.typography.bodySmall,
                     color = MaterialTheme.colorScheme.error,
                 )

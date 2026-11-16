@@ -192,7 +192,7 @@ class LibraryDrawerContentTest {
         composeTestRule.onNodeWithText("Récents").assertIsNotSelected()
         composeTestRule.onNodeWithText("Signets et notes").assertIsNotSelected()
         composeTestRule.onNodeWithText("Synchronisation").assertIsNotSelected()
-        composeTestRule.onNodeWithText("Catalogues OPDS").assertIsNotSelected()
+        composeTestRule.onNodeWithText("Catalogues en ligne").assertIsNotSelected()
     }
 
     @Test
@@ -201,7 +201,7 @@ class LibraryDrawerContentTest {
             DrawerDestination.RECENTS to "Récents",
             DrawerDestination.LIBRARY to "Bibliothèque",
             DrawerDestination.BOOKMARKS to "Signets et notes",
-            DrawerDestination.OPDS to "Catalogues OPDS",
+            DrawerDestination.OPDS to "Catalogues en ligne",
             DrawerDestination.SYNC to "Synchronisation",
             DrawerDestination.STATISTICS to "Statistiques",
         )

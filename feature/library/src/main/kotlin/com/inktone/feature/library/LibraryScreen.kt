@@ -315,11 +315,6 @@ fun LibraryDrawerContent(
                     fontWeight = FontWeight.SemiBold,
                     color = MaterialTheme.colorScheme.onSurface,
                 )
-                Text(
-                    "Votre compagnon de voyage",
-                    style = MaterialTheme.typography.labelSmall,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant,
-                )
             }
         }
         // Symétrique du séparateur qui coiffe déjà le pied de drawer : sans
@@ -361,7 +356,7 @@ fun LibraryDrawerContent(
         // `AppSymbol.Article` (bibliothèque de sources), pas un ajout ad hoc
         // hors du registre Material Symbols.
         NavigationDrawerItem(
-            label = { Text("Catalogues OPDS") },
+            label = { Text("Catalogues en ligne") },
             icon = { AppIcon(AppSymbol.Article,  contentDescription = null) },
             selected = selected == DrawerDestination.OPDS,
             onClick = onOpenOpds,
@@ -1010,11 +1005,8 @@ private fun ResumeReadingCard(
                     modifier = Modifier.padding(bottom = 6.dp)
                 ) {
                     Text(
-                        text = "REPRENDRE LA LECTURE",
-                        style = MaterialTheme.typography.labelSmall.copy(
-                            fontWeight = FontWeight.Bold,
-                            letterSpacing = 0.8.sp
-                        ),
+                        text = "Reprendre la lecture",
+                        style = MaterialTheme.typography.labelMedium,
                         color = MaterialTheme.colorScheme.onPrimaryContainer,
                         modifier = Modifier.padding(horizontal = 8.dp, vertical = 4.dp)
                     )
@@ -1189,18 +1181,22 @@ private fun EmptyState(
                 style = MaterialTheme.typography.titleMedium,
                 modifier = Modifier.padding(top = 16.dp),
             )
-            Text(
-                when {
-                    hasActiveImport -> "Vos livres apparaîtront ici une fois l'import terminé."
-                    isSearchNoResult -> "Aucun livre ne correspond à « $searchQuery »."
-                    isFilterNoResult -> "Aucun livre de votre bibliothèque ne correspond au filtre choisi."
-                    else -> "Importez votre premier livre pour commencer à lire et écouter avec InkTone."
-                },
-                style = MaterialTheme.typography.bodyMedium,
-                color = MaterialTheme.colorScheme.onSurfaceVariant,
-                textAlign = TextAlign.Center,
-                modifier = Modifier.padding(horizontal = 32.dp, vertical = 8.dp),
-            )
+            val message = when {
+                hasActiveImport -> "Vos livres apparaîtront ici une fois l'import terminé."
+                isSearchNoResult -> "Aucun livre ne correspond à « $searchQuery »."
+                // Le titre et le bouton « Afficher tous les livres » suffisent.
+                isFilterNoResult -> null
+                else -> "EPUB, PDF ou TXT, depuis votre téléphone."
+            }
+            if (message != null) {
+                Text(
+                    message,
+                    style = MaterialTheme.typography.bodyMedium,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    textAlign = TextAlign.Center,
+                    modifier = Modifier.padding(horizontal = 32.dp, vertical = 8.dp),
+                )
+            }
             if (isFilterNoResult) {
                 Button(onClick = onShowAllBooks, modifier = Modifier.padding(top = 16.dp)) {
                     Text("Afficher tous les livres")

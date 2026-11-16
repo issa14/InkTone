@@ -147,7 +147,7 @@ class ReaderSettingsPanelTest {
             )
         }
 
-        composeTestRule.onNodeWithText("Auto-scroll").assertExists()
+        composeTestRule.onNodeWithText("Défilement automatique").assertExists()
         composeTestRule.onNodeWithText("Vitesse").assertExists()
         // Valeur courante (autoScrollSpeed = 2 → « Moyenne ») affichée.
         composeTestRule.onNodeWithText("Moyenne").assertExists()
@@ -265,7 +265,7 @@ class ReaderSettingsPanelTest {
             )
         }
 
-        composeTestRule.onNodeWithText("Taille et thème s'appliquent à tous les livres.").assertExists()
+        composeTestRule.onNodeWithText("Taille et thème propres à ce livre.").assertExists()
         composeTestRule.onNodeWithText("Pour ce livre uniquement").performClick()
 
         assertEquals(true, bookSpecific)

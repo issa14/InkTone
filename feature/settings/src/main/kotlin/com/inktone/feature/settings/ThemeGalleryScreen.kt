@@ -74,14 +74,7 @@ fun ThemeGalleryScreen(
         topBar = {
             TopAppBar(
                 title = {
-                    Column {
-                        Text("Galerie de thèmes", style = MaterialTheme.typography.titleLarge)
-                        Text(
-                            "Personnalisation du rendu du livre",
-                            style = MaterialTheme.typography.bodySmall,
-                            color = MaterialTheme.colorScheme.onSurfaceVariant,
-                        )
-                    }
+                    Text("Galerie de thèmes", style = MaterialTheme.typography.titleLarge)
                 },
                 navigationIcon = {
                     IconButton(onClick = onBack) {

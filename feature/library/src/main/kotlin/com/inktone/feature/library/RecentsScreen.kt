@@ -114,7 +114,7 @@ private fun RecentsEmptyState() {
                 tint = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.4f),
             )
             Text(
-                "Vous n'avez aucune lecture récente, ouvrez un livre pour commencer.",
+                "Aucune lecture récente. Les livres que vous ouvrez apparaîtront ici.",
                 style = MaterialTheme.typography.bodyMedium,
                 color = MaterialTheme.colorScheme.onSurfaceVariant,
                 textAlign = TextAlign.Center,

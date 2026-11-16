@@ -70,8 +70,13 @@ fun SearchScreen(
         TextField(
             value = state.query,
             onValueChange = { viewModel.onIntent(SearchIntent.QueryChanged(it)) },
-            placeholder = { Text("Rechercher...") },
-            label = { Text(if (state.isBookScoped) "Rechercher dans ce livre" else "Rechercher dans les livres") },
+            // Le titre de la barre dit déjà où l'on cherche : pas d'étiquette qui le répète.
+            placeholder = { Text("Mot ou expression") },
+            supportingText = if (state.query.length == 1) {
+                { Text("Au moins 2 caractères") }
+            } else {
+                null
+            },
             trailingIcon = {
                 if (state.query.isNotEmpty()) {
                     IconButton(onClick = { viewModel.onIntent(SearchIntent.QueryChanged("")) }) {

@@ -59,6 +59,7 @@ import androidx.compose.ui.unit.dp
 import androidx.hilt.navigation.compose.hiltViewModel
 import android.text.format.DateUtils
 import com.inktone.domain.model.DeviceFleetEntry
+import com.inktone.domain.model.SyncAccount
 import com.inktone.domain.model.SyncActivityEvent
 import com.inktone.domain.model.SyncActivityEventType
 import com.inktone.domain.model.SyncProviderId
@@ -99,7 +100,7 @@ fun SyncConfigurationScreen(
     Scaffold(
         topBar = {
             TopAppBar(
-                title = { Text(if (showOperational) "Synchronisation" else "Configuration Sync") },
+                title = { Text("Synchronisation") },
                 navigationIcon = {
                     IconButton(onClick = onMenuClick) {
                         AppIcon(AppSymbol.Menu, contentDescription = "Ouvrir le menu")
@@ -176,7 +177,7 @@ private fun AuthenticatingContent() {
     ) {
         CircularProgressIndicator()
         Spacer(Modifier.height(16.dp))
-        Text("Connexion au service cloud...")
+        Text("Connexion…")
     }
 }
 
@@ -259,8 +260,6 @@ private fun GoogleDriveCard(
                 )
                 Spacer(Modifier.width(6.dp))
                 Text("Google Drive", style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.Bold)
-                Spacer(Modifier.weight(1f))
-                StatusBadge(isActive)
             }
             if (isActive && account != null) {
                 Spacer(Modifier.height(12.dp))
@@ -308,9 +307,9 @@ private fun GoogleDriveCard(
                     // sont un prérequis hors périmètre de Claude Code, pris
                     // en charge par Issa (docs/execution/LOT_11_SYNCHRONISATION.md).
                     Text(
-                        "La connexion à Google Drive n'est pas disponible dans cette version de l'application.",
+                        "Google Drive n'est pas disponible dans cette version.",
                         style = MaterialTheme.typography.bodySmall,
-                        color = MaterialTheme.colorScheme.error,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
                     )
                     Spacer(Modifier.height(8.dp))
                 }
@@ -379,8 +378,6 @@ private fun WebDavCard(
         Column(Modifier.padding(16.dp)) {
             Row(verticalAlignment = Alignment.CenterVertically) {
                 Text("WebDAV", style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.Bold)
-                Spacer(Modifier.weight(1f))
-                StatusBadge(isActive)
             }
 
             if (isActive) {
@@ -409,7 +406,7 @@ private fun WebDavCard(
                 OutlinedTextField(
                     value = url,
                     onValueChange = { url = it },
-                    label = { Text("URL") },
+                    label = { Text("Adresse du serveur") },
                     placeholder = { Text("https://exemple.com/webdav/") },
                     singleLine = true,
                     enabled = !isOtherProviderActive,
@@ -474,32 +471,17 @@ private fun LocalBackupCard(onOpenLocalBackup: () -> Unit) {
         Column(Modifier.padding(16.dp)) {
             Row(verticalAlignment = Alignment.CenterVertically) {
                 Text("Fichier local", style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.Bold)
-                Spacer(Modifier.weight(1f))
-                Text(
-                    "AUTONOME",
-                    style = MaterialTheme.typography.labelSmall,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant,
-                )
             }
             Spacer(Modifier.height(4.dp))
             Text(
-                "Export/import chiffré, indépendant du cloud — géré depuis Réglages.",
+                "Sauvegarde chiffrée dans un fichier, sans compte en ligne.",
                 style = MaterialTheme.typography.bodyMedium,
                 color = MaterialTheme.colorScheme.onSurfaceVariant,
             )
             Spacer(Modifier.height(12.dp))
-            OutlinedButton(onClick = onOpenLocalBackup, modifier = Modifier.fillMaxWidth()) { Text("Gérer dans Réglages") }
+            OutlinedButton(onClick = onOpenLocalBackup, modifier = Modifier.fillMaxWidth()) { Text("Ouvrir dans les Réglages") }
         }
     }
-}
-
-@Composable
-private fun StatusBadge(isActive: Boolean) {
-    Text(
-        if (isActive) "ACTIF" else "INACTIF",
-        style = MaterialTheme.typography.labelSmall,
-        color = if (isActive) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurfaceVariant,
-    )
 }
 
 /**
@@ -526,7 +508,7 @@ private fun SyncOperationalContent(state: SyncScreenState, onIntent: (SyncIntent
         if (account.lastAutoSyncFailed) {
             item { AutoSyncFailedBanner() }
         }
-        item { ProfileHeader(account.accountLabel) }
+        item { ProfileHeader(account) }
         item {
             QuickSyncAction(
                 lastSyncAt = account.lastSyncAt,
@@ -560,7 +542,7 @@ private fun AutoSyncFailedBanner() {
             AppIcon(AppSymbol.Error, contentDescription = null, tint = MaterialTheme.colorScheme.onErrorContainer)
             Spacer(Modifier.width(12.dp))
             Text(
-                "La dernière synchronisation automatique a échoué. Réessayez manuellement ci-dessous.",
+                "La synchronisation automatique a échoué.",
                 style = MaterialTheme.typography.bodyMedium,
                 color = MaterialTheme.colorScheme.onErrorContainer,
             )
@@ -569,24 +551,25 @@ private fun AutoSyncFailedBanner() {
 }
 
 @Composable
-private fun ProfileHeader(accountLabel: String) {
+private fun ProfileHeader(account: SyncAccount) {
+    // Le libellé Google est une phrase fixe (portée drive.appdata, pas d'e-mail) :
+    // on nomme le fournisseur, et l'hôte seulement pour WebDAV.
+    val (providerName, detail) = when (account.provider) {
+        SyncProviderId.GOOGLE_DRIVE -> "Google Drive" to "Connecté"
+        SyncProviderId.WEBDAV -> "WebDAV" to "Connecté à ${account.accountLabel}"
+    }
     Row(verticalAlignment = Alignment.CenterVertically) {
         Box(
             Modifier.size(48.dp).clip(CircleShape).background(MaterialTheme.colorScheme.primaryContainer),
             contentAlignment = Alignment.Center,
         ) {
-            Text(
-                accountLabel.take(1).uppercase(),
-                style = MaterialTheme.typography.titleMedium,
-                color = MaterialTheme.colorScheme.onPrimaryContainer,
-                fontWeight = FontWeight.Bold,
-            )
+            AppIcon(AppSymbol.CloudConnected, contentDescription = null, tint = MaterialTheme.colorScheme.onPrimaryContainer)
         }
         Spacer(Modifier.width(12.dp))
         Column {
-            Text(accountLabel, style = MaterialTheme.typography.bodyLarge, fontWeight = FontWeight.Bold)
+            Text(providerName, style = MaterialTheme.typography.bodyLarge, fontWeight = FontWeight.Bold)
             Text(
-                "Google Drive actif",
+                detail,
                 style = MaterialTheme.typography.bodySmall,
                 color = MaterialTheme.colorScheme.onSurfaceVariant,
             )
@@ -598,7 +581,7 @@ private fun ProfileHeader(accountLabel: String) {
 private fun QuickSyncAction(lastSyncAt: Long?, isSyncing: Boolean, onSynchronizeNow: () -> Unit) {
     Column {
         Text(
-            lastSyncAt?.let { "Dernière synchro : ${relativeTime(it)}" } ?: "Aucune synchronisation encore effectuée",
+            lastSyncAt?.let { "Dernière synchronisation : ${relativeTime(it)}" } ?: "Jamais synchronisé",
             style = MaterialTheme.typography.bodySmall,
             color = MaterialTheme.colorScheme.onSurfaceVariant,
         )
@@ -610,7 +593,7 @@ private fun QuickSyncAction(lastSyncAt: Long?, isSyncing: Boolean, onSynchronize
             if (isSyncing) {
                 CircularProgressIndicator(modifier = Modifier.size(18.dp), strokeWidth = 2.dp)
                 Spacer(Modifier.width(8.dp))
-                Text("Synchronisation en cours...")
+                Text("Synchronisation…")
             } else {
                 Text("Synchroniser maintenant")
             }
@@ -707,7 +690,7 @@ private fun SyncTogglesCard(autoEnabled: Boolean, wifiOnly: Boolean, onSetAutoEn
     Card {
         Column(Modifier.padding(vertical = 8.dp)) {
             ToggleRow(
-                label = "Synchro automatique en arrière-plan",
+                label = "Synchronisation automatique",
                 checked = autoEnabled,
                 enabled = true,
                 onCheckedChange = onSetAutoEnabled,

@@ -149,11 +149,8 @@ fun ReaderSettingsPanel(
 
             SettingSwitchRow(
                 label = "Pour ce livre uniquement",
-                supporting = if (isBookSpecific) {
-                    "Taille et thème propres à ce livre. Désactiver pour revenir aux réglages généraux."
-                } else {
-                    "Taille et thème s'appliquent à tous les livres."
-                },
+                // Décrit l'option, pas son état : le texte ne change pas de sens à la bascule.
+                supporting = "Taille et thème propres à ce livre.",
                 checked = isBookSpecific,
                 onCheckedChange = onBookSpecificChange,
             )
@@ -274,7 +271,7 @@ fun ReaderSettingsPanel(
             // SCROLL uniquement, jamais quand reduceMotion est actif. Menu
             // déroulant (les 4 segments débordaient aussi du panneau) ──
             Text(
-                "Auto-scroll",
+                "Défilement automatique",
                 style = MaterialTheme.typography.labelLarge,
             )
             Spacer(Modifier.height(4.dp))
