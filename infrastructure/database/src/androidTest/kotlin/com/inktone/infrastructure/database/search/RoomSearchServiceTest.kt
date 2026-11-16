@@ -125,6 +125,28 @@ class RoomSearchServiceTest {
         assertTrue(searchService.search("imaginaire", publicationId = "pub-3").isEmpty())
     }
 
+    /**
+     * Audit UX D10 : supprimer un livre purge réellement ses phrases de l'index
+     * (`DELETE` sur `sentence_search`), sans toucher aux autres livres. Le test
+     * précédent ne vérifie que leur exclusion par la jointure.
+     */
+    @Test
+    fun supprimer_un_livre_retire_ses_phrases_de_l_index() = runTest {
+        assertTrue(indexedSentenceCount("pub-3") > 0)
+        val otherBefore = indexedSentenceCount("pub-4")
+
+        searchService.deletePublication("pub-3")
+
+        assertEquals(0, indexedSentenceCount("pub-3"))
+        assertEquals(otherBefore, indexedSentenceCount("pub-4"))
+    }
+
+    private fun indexedSentenceCount(publicationId: String): Int =
+        db.query("SELECT COUNT(*) FROM sentence_search WHERE publicationId = ?", arrayOf(publicationId)).use { cursor ->
+            cursor.moveToFirst()
+            cursor.getInt(0)
+        }
+
     @Test
     fun les_resultats_sont_bornes() = runTest {
         // Le terme figure dans les 5000 phrases du corpus.
