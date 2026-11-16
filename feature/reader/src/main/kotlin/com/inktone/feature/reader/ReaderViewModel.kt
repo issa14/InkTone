@@ -823,6 +823,15 @@ class ReaderViewModel @Inject constructor(
                     // ───── Fin Lot Sessions ─────
 
                     val activeVoiceProfile = resolveVoiceProfile(prefs)
+                    // Structure lue différente de celle enregistrée (audit UX D4) : les index de
+                    // chapitre, longueurs et index de recherche du livre sont à refaire. Le travail
+                    // de fond reprend ce livre, ses positions suivent leur fichier.
+                    if (publication.format == PublicationFormat.EPUB &&
+                        result.documentModel.chapters.size != publication.chapterCount
+                    ) {
+                        publicationRepository.setSearchIndexVersion(publicationId, 0)
+                        publicationRepository.setLocatorAnchorVersion(publicationId, 0)
+                    }
                     _state.value = ReaderUiState(
                         // 3b.3 — barre du haut (ReaderTopBar) : source
                         // unique, jamais rechargé depuis un repository

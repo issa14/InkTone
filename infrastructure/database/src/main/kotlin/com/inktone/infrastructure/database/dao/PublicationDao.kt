@@ -75,6 +75,10 @@ interface PublicationDao {
     @Query("UPDATE publications SET chapterLengths = :chapterLengths WHERE id = :id")
     suspend fun setChapterLengths(id: String, chapterLengths: String)
 
+    /** Nombre de chapitres et leurs longueurs, écrits ensemble : l'un ne va pas sans l'autre (audit UX D1, D4). */
+    @Query("UPDATE publications SET chapterCount = :chapterCount, chapterLengths = :chapterLengths WHERE id = :id")
+    suspend fun setChapterStructure(id: String, chapterCount: Int, chapterLengths: String)
+
     // ───── Lot 19 : couvertures ─────
 
     @Query("UPDATE publications SET coverUri = :coverUri WHERE id = :id")

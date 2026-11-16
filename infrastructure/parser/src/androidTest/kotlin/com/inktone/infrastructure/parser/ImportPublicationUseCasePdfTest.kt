@@ -44,6 +44,8 @@ private class InMemoryPublicationRepository : PublicationRepository {
     override suspend fun setPinned(id: String, isPinned: Boolean) = Unit
     override suspend fun setFileUri(id: String, fileUri: String) = Unit
     override suspend fun setLocatorAnchorVersion(id: String, version: Int) = Unit
+    override suspend fun setSearchIndexVersion(id: String, version: Int) = Unit
+    override suspend fun setChapterStructure(id: String, chapterCount: Int, chapterLengths: com.inktone.domain.model.ChapterLengths) = Unit
     // Sans effet, comme les deux precedentes : ce test porte sur l'import
     // d'un PDF, aucun de ces champs n'y est lu.
     override suspend fun setLastOpened(id: String, lastOpened: Long) = Unit

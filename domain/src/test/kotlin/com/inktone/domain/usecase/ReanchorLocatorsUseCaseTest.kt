@@ -80,6 +80,21 @@ class ReanchorLocatorsUseCaseTest {
     }
 
     @Test
+    fun `une position suit son fichier quand la structure du livre decale les index`() = runTest {
+        // Avant : couverture ajoutée en tête, ch1 au rang 1. Après : couverture retirée, ch1 au rang 0.
+        book(version = 3)
+        store.save("pub", "h", listOf(chapterWith(oldText)))
+        bookmarks.insert(Bookmark("b1", "pub", Locator("ch1.xhtml", 1, charOffset = 40), createdAt = 0L))
+        states.save(ReadingState("pub", Locator("ch1.xhtml", 1, charOffset = 25), lastReadAt = 0L))
+
+        useCase(version = 4)()
+
+        assertEquals(0, bookmarks.observeForPublication("pub").first().single().locator.chapterIndex)
+        assertEquals(0, states.get("pub")!!.locator.chapterIndex)
+        assertEquals(40, bookmarks.observeForPublication("pub").first().single().locator.charOffset)
+    }
+
+    @Test
     fun `un livre deja ancre ou a pre-analyse perimee n'est pas touche`() = runTest {
         book(version = 4)
         store.save("pub", "h", listOf(chapterWith(oldText)))

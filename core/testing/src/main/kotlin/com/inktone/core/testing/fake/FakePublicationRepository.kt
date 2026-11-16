@@ -92,6 +92,12 @@ class FakePublicationRepository : PublicationRepository {
         state.value = state.value.map { if (it.id == id) it.copy(chapterLengths = chapterLengths) else it }
     }
 
+    override suspend fun setChapterStructure(id: String, chapterCount: Int, chapterLengths: ChapterLengths) {
+        state.value = state.value.map {
+            if (it.id == id) it.copy(chapterCount = chapterCount, chapterLengths = chapterLengths) else it
+        }
+    }
+
     override suspend fun resetAllCoversToDefault() {
         state.value = state.value.map { it.copy(coverUri = null) }
     }

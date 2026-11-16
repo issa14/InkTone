@@ -241,23 +241,24 @@ class ReadiumPublicationParser @Inject constructor(
     }
 
     /**
-     * Identifie le href de la page/image de couverture, même quand elle
-     * est absente de `readingOrder` (linear="no" ou repérable uniquement
-     * via `<guide>` EPUB2).
+     * Identifie le href de la PAGE de couverture, même quand elle est
+     * absente de `readingOrder` (linear="no" ou repérable uniquement via
+     * `<guide>` EPUB2).
      *
-     * 1. `Publication.linkWithRel("cover")` : couvre déjà `properties=
-     *    "cover-image"` du manifeste ET `<meta name="cover">` EPUB2 —
-     *    `ResourceAdapter` (Readium) calcule ce rel à partir des deux
-     *    (vérifié par décompilation du jar `readium-streamer-3.0.0`),
-     *    et `Manifest.linkWithRel` cherche dans `readingOrder`,
-     *    `resources` PUIS `links` — donc déjà robuste au linear="no".
-     * 2. [EpubGuideCoverResolver] : seul repli nécessaire, pour le cas où
-     *    Readium ne peut rien déduire (`<guide><reference type="cover">`
-     *    seul, sans marqueur manifeste).
+     * 1. `Publication.linkWithRel("cover")` : couvre `properties=
+     *    "cover-image"` du manifeste ET `<meta name="cover">` EPUB2, mais
+     *    désigne l'IMAGE de couverture, que le Lecteur ne peut pas lire comme
+     *    un chapitre. Elle n'est retenue que si c'est une page (XHTML, HTML) ;
+     *    sinon la couverture reste dans la bibliothèque et la fiche du livre,
+     *    sans chapitre ajouté (audit UX D1).
+     * 2. [EpubGuideCoverResolver] : repli pour une page de couverture que
+     *    Readium ne peut pas déduire (`<guide><reference type="cover">`).
      */
     @OptIn(ExperimentalReadiumApi::class)
     private fun resolveCoverHref(publication: org.readium.r2.shared.publication.Publication, fileUri: String): String? {
-        publication.linkWithRel("cover")?.let { return it.href.toString() }
+        publication.linkWithRel("cover")
+            ?.takeIf { it.mediaType?.isHtml == true || it.href.toString().isPageHref() }
+            ?.let { return it.href.toString() }
         return EpubGuideCoverResolver.findCoverHref(context, fileUri)
     }
 
@@ -367,3 +368,7 @@ class ReadiumPublicationParser @Inject constructor(
     private fun String.sameHrefAs(other: String): Boolean =
         substringBefore('#').equals(other.substringBefore('#'), ignoreCase = true)
 }
+
+/** Vrai pour une adresse de page de livre (XHTML, HTML), faux pour une image ou tout autre fichier. */
+private fun String.isPageHref(): Boolean =
+    substringBefore('#').substringBefore('?').lowercase().let { it.endsWith(".xhtml") || it.endsWith(".html") || it.endsWith(".htm") }

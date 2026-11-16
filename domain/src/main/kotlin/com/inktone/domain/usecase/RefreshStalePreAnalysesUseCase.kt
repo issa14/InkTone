@@ -59,7 +59,11 @@ class RefreshStalePreAnalysesUseCase(
                 // Un parseur qui évolue peut déplacer les offsets des phrases :
                 // les longueurs de chapitres (progression) suivent la même
                 // analyse que celle que le Lecteur relira.
-                if (chapters.size == publication.chapterCount) {
+                // La structure peut avoir changé (page de couverture ajoutée ou retirée,
+                // audit UX D1, D4) : le nombre de chapitres suit la même analyse.
+                if (chapters.size == shells.size) {
+                    publicationRepository.setChapterStructure(publication.id, shells.size, ChapterLengths.of(chapters))
+                } else if (chapters.size == publication.chapterCount) {
                     publicationRepository.setChapterLengths(publication.id, ChapterLengths.of(chapters))
                 }
                 // L'index de recherche est adressé par les mêmes offsets : il suit la

@@ -57,6 +57,11 @@ class RoomPublicationRepository @Inject constructor(
     override suspend fun setSearchIndexVersion(id: String, version: Int) = dao.setSearchIndexVersion(id, version)
     override suspend fun setChapterLengths(id: String, chapterLengths: ChapterLengths) =
         dao.setChapterLengths(id, chapterLengths.toColumn())
+
+    override suspend fun setChapterStructure(id: String, chapterCount: Int, chapterLengths: ChapterLengths) {
+        require(chapterLengths.values.size == chapterCount) { "chapterLengths doit compter exactement chapterCount chapitres" }
+        dao.setChapterStructure(id, chapterCount, chapterLengths.toColumn())
+    }
     override suspend fun resetAllCoversToDefault() = dao.resetAllCovers()
 
     // ───── Audit fix : COUNT pour le dashboard ─────

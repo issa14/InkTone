@@ -71,6 +71,22 @@ class RefreshStalePreAnalysesUseCaseTest {
     }
 
     @Test
+    fun `une structure qui change met a jour le nombre de chapitres et leurs longueurs`() = runTest {
+        // Le livre avait 3 chapitres (couverture ajoutée) ; la structure actuelle en compte 2.
+        val repository = FakePublicationRepository().apply {
+            insert(publication("pub-1").copy(chapterCount = 3, searchIndexVersion = 0))
+        }
+
+        RefreshStalePreAnalysesUseCase(
+            repository, parserWithTwoChapters(), FakePreAnalysisBuilder(), FakePreAnalysisStore(), FakeSearchService(),
+        )()
+
+        val stored = repository.observeAll().first().single()
+        assertEquals(2, stored.chapterCount)
+        assertEquals(2, stored.chapterLengths?.values?.size)
+    }
+
+    @Test
     fun `une pre-analyse a jour n'est jamais refaite`() = runTest {
         val repository = FakePublicationRepository().apply { insert(publication("pub-1")) }
         val store = FakePreAnalysisStore().apply { save("pub-1", "hash-pub-1", listOf(shell("chap1.xhtml"))) }

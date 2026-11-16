@@ -143,7 +143,9 @@ class FilePreAnalysisStore @Inject constructor(
          *     par CSS (audit UX D16).
          * 9 : ancres des chapitres (audit UX B5), texte et offsets inchangés.
          * 10 : blocs centrés par le livre (audit UX D16), texte et offsets inchangés.
+         * 11 : plus de chapitre ajouté pour une image de couverture (audit UX D1) : les index
+         *     de chapitre changent, les positions suivent leur fichier.
          */
-        const val PARSER_VERSION = 10
+        const val PARSER_VERSION = 11
     }
 }

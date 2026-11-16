@@ -142,6 +142,49 @@ class ReadiumPublicationParserCoverFallbackTest {
         )
     }
 
+    /** Audit UX D1 : l'image de couverture du manifeste n'est pas une page, aucun chapitre n'est ajouté. */
+    @Test
+    fun image_de_couverture_seule_n_ajoute_aucun_chapitre() = runTest {
+        val context = ApplicationProvider.getApplicationContext<Context>()
+        val opf = """<?xml version="1.0" encoding="UTF-8"?>
+<package xmlns="http://www.idpf.org/2007/opf" version="3.0" unique-identifier="BookId">
+  <metadata xmlns:dc="http://purl.org/dc/elements/1.1/">
+    <dc:title>Test Image Couverture</dc:title>
+    <dc:identifier id="BookId">urn:uuid:test-cover-image-only</dc:identifier>
+    <dc:language>fr</dc:language>
+  </metadata>
+  <manifest>
+    <item id="cover-image" href="cover.jpg" media-type="image/jpeg" properties="cover-image"/>
+    <item id="chapter1" href="chapter1.xhtml" media-type="application/xhtml+xml"/>
+    <item id="chapter2" href="chapter2.xhtml" media-type="application/xhtml+xml"/>
+  </manifest>
+  <spine>
+    <itemref idref="chapter1"/>
+    <itemref idref="chapter2"/>
+  </spine>
+</package>"""
+        val epubFile = TestEpubBuilder.writeToCache(
+            context,
+            "fixture-cover-image-only.epub",
+            mapOf(
+                "mimetype" to TestEpubBuilder.text(TestEpubBuilder.MIMETYPE),
+                "META-INF/container.xml" to TestEpubBuilder.text(TestEpubBuilder.CONTAINER_XML),
+                "OEBPS/content.opf" to TestEpubBuilder.text(opf),
+                "OEBPS/chapter1.xhtml" to TestEpubBuilder.text("$xhtmlHeader<p>Un.</p>$xhtmlFooter"),
+                "OEBPS/chapter2.xhtml" to TestEpubBuilder.text("$xhtmlHeader<p>Deux.</p>$xhtmlFooter"),
+                "OEBPS/cover.jpg" to TestEpubBuilder.MINIMAL_JPEG_BYTES,
+            ),
+        )
+
+        val result = ReadiumPublicationParser(context, CoverStorage(context)).parse(epubFile.absolutePath)
+        val success = result as ParseResult.Success
+
+        assertEquals(
+            listOf("OEBPS/chapter1.xhtml", "OEBPS/chapter2.xhtml"),
+            success.documentModel.chapters.map { it.href.removePrefix("/") },
+        )
+    }
+
     /**
      * Bug réel trouvé sur appareil (rapporté par Issa, verification manuelle) :
      * chaque entrée de la TOC ouvrait le chapitre PRÉCÉDENT le sien, et la

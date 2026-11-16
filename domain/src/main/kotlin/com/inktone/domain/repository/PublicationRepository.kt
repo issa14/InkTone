@@ -46,6 +46,13 @@ interface PublicationRepository {
      */
     suspend fun setChapterLengths(id: String, chapterLengths: ChapterLengths)
 
+    /**
+     * Remplace d'un seul geste le nombre de chapitres et leurs longueurs, quand la structure du livre
+     * a changé (page de couverture ajoutée ou retirée, audit UX D1, D4). [chapterLengths] compte
+     * exactement [chapterCount] chapitres.
+     */
+    suspend fun setChapterStructure(id: String, chapterCount: Int, chapterLengths: ChapterLengths)
+
     /** Remet TOUTES les couvertures à la valeur par défaut (`null`). */
     suspend fun resetAllCoversToDefault()
 

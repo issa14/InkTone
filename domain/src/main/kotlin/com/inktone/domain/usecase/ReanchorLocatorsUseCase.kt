@@ -54,16 +54,21 @@ class ReanchorLocatorsUseCase(
                 continue
             }
             try {
-                val texts = HashMap<String, String?>()
-                suspend fun textOf(href: String): String? = texts.getOrPut(href) {
-                    preAnalysisStore.loadChapter(publication.id, publication.fileHash, href)?.plainText()
+                val chapters = HashMap<String, Pair<Int, String?>?>()
+                suspend fun chapterOf(href: String): Pair<Int, String?>? = chapters.getOrPut(href) {
+                    preAnalysisStore.loadChapter(publication.id, publication.fileHash, href)
+                        ?.let { it.index to it.plainText() }
                 }
                 suspend fun fix(locator: Locator): Locator {
-                    val text = textOf(locator.resourceHref) ?: return locator
-                    return if (locator.text == null) {
-                        locator.copy(text = LocatorText.capture(text, locator.charOffset))
+                    val (index, text) = chapterOf(locator.resourceHref) ?: return locator
+                    // Le fichier fait foi, pas le rang : une page de couverture ajoutée ou retirée
+                    // décale tous les index d'un livre (audit UX D1, D4).
+                    val located = if (locator.chapterIndex == index) locator else locator.copy(chapterIndex = index)
+                    if (text == null) return located
+                    return if (located.text == null) {
+                        located.copy(text = LocatorText.capture(text, located.charOffset))
                     } else {
-                        val result = LocatorReanchoring.reanchor(locator, text)
+                        val result = LocatorReanchoring.reanchor(located, text)
                         if (result.anchored) reanchored++ else notReanchored++
                         result.locator
                     }
