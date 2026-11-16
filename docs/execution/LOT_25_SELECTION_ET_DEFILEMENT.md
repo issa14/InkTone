@@ -213,10 +213,10 @@ pose les bases de C sans rien qu'il faudra défaire.
 | Palier | Résultat | Preuve |
 |---|---|---|
 | 25.0 | Menu d'actions rétabli en défilement, `BasicTextField` retiré ; validé sur appareil | `1445590f`, `BookBlockItemSelectionTest` |
-| 25.1 | Benchmark et procédure sûre ; mesure de référence faite au script (voir ci-dessous) | `916fa75e`, `9eb0c7a0`, `4a21664a`, `6cfe2d4c` |
+| 25.1 | Benchmark, procédure sûre, mesures de référence (script et `FrameTimingMetric`) et trace des images longues (voir ci-dessous) | `916fa75e`, `9eb0c7a0`, `4a21664a`, `6cfe2d4c`, commit de ce bilan |
 | 25.2 | ADR-029 : moteur maison, `SelectionContainer` écarté sur lecture de l'API | `47f6471a` |
 | 25.3 | Poignées, loupe, glissement entre paragraphes, défilement automatique et libre, `setSelection` ; 9 points validés sur appareil (mode paginé et TalkBack compris) | `150da8cd`, `96446a7a`, `SelectionGeometryTest` |
-| 25.4 | Aucun correctif : la mesure ne désigne plus de cause (voir ci-dessous) | — |
+| 25.4 | Aucun correctif : 0,6 % d'images longues, sous les critères ; causes nommées mais pas corrigées (voir ci-dessous) | — |
 | 25.5 | KDoc et suivi de l'audit (D50 fait en défilement, partie page reportée) | `e12058ce` |
 
 ### Mesure de référence (V2206, build `benchmark`, au calme, après 25.3)
@@ -230,6 +230,17 @@ pose les bases de C sans rien qu'il faudra défaire.
 | 2 | 109 | 3 (2,8 %) | 11 / 13 / 23 ms | 0 |
 | 3 | 111 | 3 (2,7 %) | 10 / 13 / 22 ms | 0 |
 
+`ReaderScrollBenchmark` (même build, trois itérations de 5 balayages vers le bas puis 5
+vers le haut) : 579 images par itération ; durée CPU par image p50 7,7 ms, p90 11,8 ms,
+p99 20,3 ms ; dépassement d'échéance p99 5,1 ms.
+
+Trace Perfetto (itération 1) : 4 images sur 639 au-delà de 16,6 ms (0,6 %), la plus longue
+à 21,2 ms. Causes :
+
+1. Composition des paragraphes qui entrent à l'écran : phase « animation » de 11 à 15 ms
+   (`Recomposer:recompose`), puis tracé (`Record View#draw()`), dans 3 images.
+2. Premier toucher d'un geste : `AndroidOwner:onTouch` à 13 ms, dans 1 image.
+
 Critères tenus : moins de 5 % d'images saccadées, 99e centile sous 32 ms, aucune image
 au-delà de 32 ms (Blueprint §11.2). Les 18 % du constat initial venaient d'un build debug
 mesuré pendant la réindexation : ni le build ni la charge n'étaient représentatifs. Le
@@ -238,10 +249,9 @@ restent non confirmés et ne sont pas touchés.
 
 ### Écarts déclarés
 
-- `ReaderScrollBenchmark` (`FrameTimingMetric`) rend 0 image sur le V2206 alors que la
-  trace en contient : cause non trouvée. Les chiffres viennent du script `gfxinfo` sur le
-  même build `benchmark`, non débogable, avec profil de référence.
-- Trace Perfetto par cause non faite : sans saccade notable, il n'y a rien à attribuer.
+- Palier 25.4 : les deux causes ci-dessus ne sont pas corrigées. À 0,6 % d'images longues,
+  aucun correctif ne serait mesurable avec ces outils ; elles restent les premières pistes
+  si un livre ou un appareil plus lent fait réapparaître des saccades.
 - Un appui long suivi d'un glissement sans lever le doigt n'étend pas la sélection ;
   l'extension passe par les poignées.
 - Incident : `:benchmark:connectedBenchmarkBenchmarkAndroidTest` a désinstallé l'app de
