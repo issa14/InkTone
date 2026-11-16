@@ -23,6 +23,7 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
+import androidx.compose.ui.text.style.TextOverflow
 import com.inktone.core.designsystem.AppIcon
 import com.inktone.core.designsystem.AppSymbol
 import com.inktone.domain.service.ImportResultEntry
@@ -177,6 +178,7 @@ private fun ImportResultRow(
                 text = entry.fileName,
                 style = MaterialTheme.typography.bodyMedium,
                 maxLines = 1,
+                overflow = TextOverflow.Ellipsis,
             )
             if (entry.message != null) {
                 Text(
@@ -184,6 +186,7 @@ private fun ImportResultRow(
                     style = MaterialTheme.typography.bodySmall,
                     color = MaterialTheme.colorScheme.onSurfaceVariant,
                     maxLines = 2,
+                    overflow = TextOverflow.Ellipsis,
                 )
             }
         }

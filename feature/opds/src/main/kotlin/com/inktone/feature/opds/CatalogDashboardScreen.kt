@@ -12,6 +12,7 @@ import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
+import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.material3.AlertDialog
@@ -255,7 +256,10 @@ private fun CatalogDashboardContent(
             )
         }
         else -> LazyColumn(
-            modifier = Modifier.fillMaxSize().padding(12.dp),
+            // contentPadding et non padding : les cartes défilent jusqu'au bord
+            // au lieu d'être coupées 12 dp avant.
+            modifier = Modifier.fillMaxSize(),
+            contentPadding = PaddingValues(12.dp),
             verticalArrangement = Arrangement.spacedBy(12.dp),
         ) {
             items(state.catalogs, key = { it.id }) { catalog ->
