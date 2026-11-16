@@ -43,6 +43,8 @@ import kotlinx.coroutines.test.runTest
 import kotlinx.coroutines.test.setMain
 import org.junit.After
 import org.junit.Assert.assertEquals
+import org.junit.Assert.assertNotNull
+import org.junit.Assert.assertNull
 import org.junit.Assert.assertTrue
 import org.junit.Before
 import org.junit.Test
@@ -226,6 +228,45 @@ class ReaderViewModelNavigateToLocatorTest {
 
             assertEquals(2, viewModel.state.value.currentChapterIndex)
             assertEquals(1, viewModel.state.value.currentSentenceIndex)
+        } finally {
+            stopTimers(viewModel)
+        }
+    }
+
+    @Test
+    fun le_retour_d_un_renvoi_ramene_a_la_position_quittee() = runTest {
+        val viewModel = openBook(FakeReadingStateRepository())
+        try {
+            val startChapter = viewModel.state.value.currentChapterIndex
+            val startSentence = viewModel.state.value.currentSentenceIndex
+
+            viewModel.onIntent(ReaderIntent.OpenLink(chapterIndex = 2, fragment = "suite"))
+            dispatcher.scheduler.runCurrent()
+            assertEquals(2, viewModel.state.value.currentChapterIndex)
+            assertNotNull(viewModel.state.value.linkReturn)
+
+            viewModel.onIntent(ReaderIntent.ReturnFromLink)
+            dispatcher.scheduler.runCurrent()
+
+            assertEquals(startChapter, viewModel.state.value.currentChapterIndex)
+            assertEquals(startSentence, viewModel.state.value.currentSentenceIndex)
+            assertNull(viewModel.state.value.linkReturn)
+        } finally {
+            stopTimers(viewModel)
+        }
+    }
+
+    @Test
+    fun un_renvoi_qui_ne_bouge_rien_ne_propose_pas_de_retour() = runTest {
+        val viewModel = openBook(FakeReadingStateRepository())
+        try {
+            viewModel.onIntent(ReaderIntent.OpenTocEntry(chapterIndex = 2, fragment = "suite"))
+            dispatcher.scheduler.runCurrent()
+
+            viewModel.onIntent(ReaderIntent.OpenLink(chapterIndex = 2, fragment = "introuvable"))
+            dispatcher.scheduler.runCurrent()
+
+            assertNull(viewModel.state.value.linkReturn)
         } finally {
             stopTimers(viewModel)
         }

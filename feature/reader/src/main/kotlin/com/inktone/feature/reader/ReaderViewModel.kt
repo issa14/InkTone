@@ -361,7 +361,17 @@ class ReaderViewModel @Inject constructor(
             is ReaderIntent.PreviousChapter -> navigateToChapter(_state.value.currentChapterIndex - 1)
             is ReaderIntent.JumpToChapter -> navigateToChapter(intent.chapterIndex)
             is ReaderIntent.OpenTocEntry -> openTocEntry(intent.chapterIndex, intent.fragment)
-            is ReaderIntent.OpenLink -> openTocEntry(intent.chapterIndex, intent.fragment, stayIfAnchorMissingInCurrentChapter = true)
+            is ReaderIntent.OpenLink -> {
+                val origin = currentLocatorOrNull()
+                openTocEntry(intent.chapterIndex, intent.fragment, stayIfAnchorMissingInCurrentChapter = true) {
+                    _state.value = _state.value.copy(linkReturn = origin)
+                }
+            }
+            ReaderIntent.ReturnFromLink -> _state.value.linkReturn?.let { origin ->
+                _state.value = _state.value.copy(linkReturn = null)
+                navigateToLocator(origin)
+            }
+            ReaderIntent.DismissLinkReturn -> _state.value = _state.value.copy(linkReturn = null)
             is ReaderIntent.OpenFootnote -> openFootnote(intent.path, intent.fragment)
             ReaderIntent.DismissFootnote -> _state.value = _state.value.copy(footnote = null)
             is ReaderIntent.ToggleToc -> _state.value = _state.value.copy(isTocVisible = !_state.value.isTocVisible)
@@ -1300,9 +1310,15 @@ class ReaderViewModel @Inject constructor(
      * sinon au début du chapitre comme avant (livre dont les ancres sont absentes, ou
      * pré-analyse d'avant les ancres).
      */
-    private fun openTocEntry(chapterIndex: Int, fragment: String?, stayIfAnchorMissingInCurrentChapter: Boolean = false) {
+    private fun openTocEntry(
+        chapterIndex: Int,
+        fragment: String?,
+        stayIfAnchorMissingInCurrentChapter: Boolean = false,
+        onArrived: () -> Unit = {},
+    ) {
         if (fragment == null) {
             navigateToChapter(chapterIndex)
+            onArrived()
             return
         }
         val href = _state.value.chapters.getOrNull(chapterIndex)?.href ?: return
@@ -1314,11 +1330,24 @@ class ReaderViewModel @Inject constructor(
                 // Un renvoi cassé vers le chapitre où l'on est ne doit pas remettre sa lecture à zéro.
                 if (!(stayIfAnchorMissingInCurrentChapter && chapterIndex == _state.value.currentChapterIndex)) {
                     navigateToChapter(chapterIndex)
+                    onArrived()
                 }
             } else {
                 navigateToLocator(Locator(resourceHref = href, chapterIndex = chapterIndex, charOffset = offset))
+                onArrived()
             }
         }
+    }
+
+    /** Position de lecture courante (phrase affichée), ou null si le chapitre n'a pas de phrase. */
+    private fun currentLocatorOrNull(): Locator? {
+        val chapterIndex = _state.value.currentChapterIndex
+        val chapter = _state.value.chapters.getOrNull(chapterIndex) ?: return null
+        val sentence = chapter.sentences.getOrNull(_state.value.currentSentenceIndex) ?: return null
+        return sentence.startLocator(
+            chapterIndex = chapterIndex, resourceHref = chapter.href,
+            chapterText = contextTextOf(chapter),
+        )
     }
 
     private fun navigateToChapter(targetIndex: Int) {

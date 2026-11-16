@@ -45,6 +45,7 @@ import androidx.compose.material3.Button
 import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedTextField
+import androidx.compose.material3.SnackbarDuration
 import androidx.compose.material3.SnackbarHost
 import androidx.compose.material3.SnackbarHostState
 import androidx.compose.material3.SnackbarResult
@@ -279,6 +280,19 @@ fun ReaderScreen(
             // Ignoré ou expiré : le signet reste sans note, comme avant.
             viewModel.onIntent(ReaderIntent.DismissBookmarkNotePrompt)
         }
+    }
+
+    // Audit UX D15 — après un renvoi interne, « Retour » ramène à l'endroit quitté.
+    LaunchedEffect(state.linkReturn) {
+        if (state.linkReturn == null) return@LaunchedEffect
+        val result = snackbarHostState.showSnackbar(
+            message = "Renvoi suivi",
+            actionLabel = "Retour",
+            duration = SnackbarDuration.Long,
+        )
+        viewModel.onIntent(
+            if (result == SnackbarResult.ActionPerformed) ReaderIntent.ReturnFromLink else ReaderIntent.DismissLinkReturn,
+        )
     }
 
     // Audit UX D40 — échec de la narration : message passager, la page reste.

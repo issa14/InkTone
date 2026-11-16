@@ -104,6 +104,8 @@ data class ReaderUiState(
     val narrationError: String? = null,
     /** Texte de la note de bas de page affichée en fenêtre (audit UX D15), ou null. */
     val footnote: String? = null,
+    /** Position quittée en suivant un renvoi interne, proposée par « Retour » (audit UX D15), ou null. */
+    val linkReturn: Locator? = null,
     // B.1 — Mode de lecture actif (scroll vertical ou paginé horizontal).
     val readingMode: ReadingMode = ReadingMode.SCROLL,
     // 3d.1 — profil vocal actif résolu (même repli que playCurrentSentence,
@@ -347,6 +349,10 @@ sealed interface ReaderIntent {
 
     /** Renvoi d'un lien du texte : comme [OpenTocEntry], mais une ancre introuvable dans le chapitre courant ne bouge rien. */
     data class OpenLink(val chapterIndex: Int, val fragment: String?) : ReaderIntent
+
+    /** Revient à la position d'où un renvoi interne a été suivi. */
+    data object ReturnFromLink : ReaderIntent
+    data object DismissLinkReturn : ReaderIntent
     data class OpenFootnote(val path: String, val fragment: String) : ReaderIntent
     data object DismissFootnote : ReaderIntent
     data object ToggleToc : ReaderIntent
