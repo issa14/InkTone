@@ -22,8 +22,16 @@ import org.junit.runner.RunWith
  * Autant de balayages vers le haut que vers le bas : la position de lecture
  * revient à peu près à son point de départ.
  *
- * `./gradlew :benchmark:connectedBenchmarkAndroidTest
- *   -Pandroid.testInstrumentationRunnerArguments.class=com.inktone.benchmark.ReaderScrollBenchmark`
+ * Ne JAMAIS passer par `:benchmark:connected*AndroidTest` sur un appareil qui porte
+ * de vraies données : la tâche désinstalle l'app cible en fin de test, donc efface
+ * sa bibliothèque. Procédure sûre, l'app installée en mise à jour :
+ *
+ * ```
+ * ./gradlew :app:installBenchmark :benchmark:assembleBenchmarkBenchmark
+ * adb install -r -t benchmark/build/outputs/apk/benchmarkBenchmark/benchmark-benchmarkBenchmark.apk
+ * adb shell am instrument -w -e class com.inktone.benchmark.ReaderScrollBenchmark \
+ *   com.inktone.benchmark/androidx.test.runner.AndroidJUnitRunner
+ * ```
  */
 @RunWith(AndroidJUnit4::class)
 class ReaderScrollBenchmark {

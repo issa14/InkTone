@@ -3,20 +3,28 @@ package com.inktone.benchmark
 import androidx.benchmark.macro.MacrobenchmarkScope
 import androidx.test.uiautomator.By
 import androidx.test.uiautomator.Until
+import java.util.regex.Pattern
 
 internal const val PACKAGE_NAME = "com.inktone.app"
 internal const val TIMEOUT_MS = 10_000L
 
 /**
+ * Couverture d'un livre dans la bibliothèque, reconnue à la fin de son libellé
+ * d'accessibilité (`BookCover` : « … % lu », « Commencé » ou « Non commencé »).
+ * Jamais « le premier élément cliquable » : sur une bibliothèque vide, c'est le
+ * bouton d'import, qui ouvre le sélecteur de fichiers.
+ */
+private val BOOK_COVER = By.desc(Pattern.compile(".*(% lu|Commencé|Non commencé)(, épinglé)?"))
+
+/**
  * Ouvre le premier livre de la bibliothèque. Retourne `false` si aucun n'est
- * trouvé : l'absence de livre est un état d'appareil, pas un défaut de l'app.
+ * trouvé ou si le Lecteur ne remplace pas la bibliothèque : l'absence de livre
+ * est un état d'appareil, pas un défaut de l'app.
  */
 internal fun MacrobenchmarkScope.openFirstBook(): Boolean {
-    val candidate = device.findObject(By.clickable(true).longClickable(true))
-        ?: device.findObject(By.clickable(true))
-        ?: return false
-    candidate.click()
-    return device.wait(Until.hasObject(By.pkg(PACKAGE_NAME).depth(0)), TIMEOUT_MS)
+    val cover = device.wait(Until.findObject(BOOK_COVER), TIMEOUT_MS) ?: return false
+    cover.click()
+    return device.wait(Until.gone(BOOK_COVER), TIMEOUT_MS) == true
 }
 
 /**
