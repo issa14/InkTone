@@ -3,7 +3,6 @@ package com.inktone.feature.reader
 import androidx.compose.ui.test.junit4.createComposeRule
 import androidx.compose.ui.test.onNodeWithContentDescription
 import androidx.compose.ui.test.onNodeWithText
-import androidx.compose.ui.test.onRoot
 import androidx.compose.ui.test.performClick
 import androidx.compose.ui.test.performTouchInput
 import androidx.compose.ui.test.swipeLeft
@@ -100,7 +99,8 @@ class BookmarkPanelTest {
         composeTestRule.onNodeWithText("Une vraie note").assertExists()
 
         // Swipe vers la gauche : avance vers l'onglet suivant (Surlignages).
-        composeTestRule.onRoot().performTouchInput { swipeLeft() }
+        // Dans le contenu du panneau : sa partie droite de l'écran est le voile qui le ferme.
+        composeTestRule.onNodeWithText("Une vraie note").performTouchInput { swipeLeft() }
         composeTestRule.waitForIdle()
         composeTestRule.onNodeWithText("Chapitre 2").assertExists() // startLocator.chapterIndex 1 + 1
     }
@@ -128,7 +128,8 @@ class BookmarkPanelTest {
             )
         }
 
-        composeTestRule.onRoot().performTouchInput { swipeLeft() }
+        // Dans le contenu du panneau : sa partie droite de l'écran est le voile qui le ferme.
+        composeTestRule.onNodeWithText("Une vraie note").performTouchInput { swipeLeft() }
         composeTestRule.waitForIdle()
         composeTestRule.onNodeWithText("Chapitre 2").assertExists() // Surlignages, après swipe
 
