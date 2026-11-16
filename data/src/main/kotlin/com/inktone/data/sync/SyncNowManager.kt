@@ -95,13 +95,24 @@ class SyncNowManager @Inject constructor(
         try {
             val device = deviceIdentityRepository.getOrCreate()
             val payload = backupManager.buildPayloadForSync()
-            val json = backupJson.encodeToString(payload)
-            val result = syncProvider.upload("$SNAPSHOT_PREFIX${device.id}$SNAPSHOT_SUFFIX", json.encodeToByteArray())
+            val ownFileName = "$SNAPSHOT_PREFIX${device.id}$SNAPSHOT_SUFFIX"
+            val remoteFiles = syncProvider.list()
+            // Un instantané identique au dernier téléversé, dont le fichier est toujours là, n'est pas
+            // renvoyé : la date de création ne compte pas (audit UX D62).
+            val hash = sha256Hex(backupJson.encodeToString(payload.copy(createdAt = 0L)))
+            val unchanged = hash == lastUploadedHash && remoteFiles.any { it.name == ownFileName }
+            val result = if (unchanged) {
+                SyncOperationResult.Success
+            } else {
+                syncProvider.upload(ownFileName, backupJson.encodeToString(payload).encodeToByteArray()).also {
+                    if (it is SyncOperationResult.Success) lastUploadedHash = hash
+                }
+            }
             val now = System.currentTimeMillis()
 
             when (result) {
                 is SyncOperationResult.Success -> {
-                    mergeRemoteSnapshots(currentDeviceId = device.id, currentDeviceLabel = device.displayName)
+                    mergeRemoteSnapshots(remoteFiles, currentDeviceId = device.id, currentDeviceLabel = device.displayName)
                     syncFleetRepository.touchCurrentDevice(
                         DeviceFleetEntry(deviceId = device.id, displayName = device.displayName, lastActiveAt = now),
                     )
@@ -123,9 +134,18 @@ class SyncNowManager @Inject constructor(
         }
     }
 
-    private suspend fun mergeRemoteSnapshots(currentDeviceId: String, currentDeviceLabel: String) {
+    /** Empreinte du dernier instantané téléversé, ou null avant le premier envoi de ce processus. */
+    @Volatile private var lastUploadedHash: String? = null
+
+    /** Version (date, taille) de chaque instantané distant déjà fusionné : inchangé, il n'est ni retéléchargé ni refusionné. */
+    private val mergedRemoteVersions = java.util.concurrent.ConcurrentHashMap<String, Pair<Long, Long>>()
+
+    private fun sha256Hex(text: String): String =
+        java.security.MessageDigest.getInstance("SHA-256").digest(text.encodeToByteArray()).joinToString("") { "%02x".format(it) }
+
+    private suspend fun mergeRemoteSnapshots(listed: List<com.inktone.domain.service.SyncRemoteFile>, currentDeviceId: String, currentDeviceLabel: String) {
         val ownFileName = "$SNAPSHOT_PREFIX$currentDeviceId$SNAPSHOT_SUFFIX"
-        val remoteFiles = syncProvider.list().filter {
+        val remoteFiles = listed.filter {
             it.name.startsWith(SNAPSHOT_PREFIX) && it.name.endsWith(SNAPSHOT_SUFFIX) && it.name != ownFileName
         }
         if (remoteFiles.isEmpty()) return
@@ -145,6 +165,8 @@ class SyncNowManager @Inject constructor(
         val lastSyncAt = syncAccountRepository.get()?.lastSyncAt ?: 0L
 
         for (file in remoteFiles) {
+            val version = file.modifiedAt to file.sizeBytes
+            if (mergedRemoteVersions[file.name] == version) continue
             val bytes = syncProvider.download(file.name) ?: continue
             val payload = runCatching { backupJson.decodeFromString(BackupPayload.serializer(), bytes.decodeToString()) }.getOrNull() ?: continue
             val remoteDeviceId = file.name.removePrefix(SNAPSHOT_PREFIX).removeSuffix(SNAPSHOT_SUFFIX)
@@ -219,6 +241,8 @@ class SyncNowManager @Inject constructor(
                     }
                 }
             }
+            // Fusionné en entier : tant que ce fichier ne change pas, il n'est plus retéléchargé (audit UX D62).
+            mergedRemoteVersions[file.name] = version
         }
 
         // Les tombes assez anciennes ont eu le temps de se propager à tous les appareils.

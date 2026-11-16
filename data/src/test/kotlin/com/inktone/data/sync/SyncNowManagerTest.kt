@@ -229,6 +229,11 @@ class SyncNowManagerTest {
         readingStates = emptyList(), readingSessions = emptyList(), annotations = annotations, deletions = deletions,
     )
 
+    private companion object {
+        const val OWN_SNAPSHOT = "snapshot-device-a.json"
+        const val REMOTE_SNAPSHOT = "snapshot-device-b.json"
+    }
+
     private suspend fun upload(provider: FakeSyncProvider, payload: com.inktone.data.backup.BackupPayload) =
         provider.upload("snapshot-device-b.json", backupJson.encodeToString(payload).encodeToByteArray())
 
@@ -248,6 +253,47 @@ class SyncNowManagerTest {
             endLocator = com.inktone.data.backup.LocatorBackup("ch1.xhtml", 0, null, 10),
             color = color, content = content, createdAt = 0L, updatedAt = updatedAt,
         )
+
+    @Test
+    fun une_seconde_synchronisation_sans_changement_ne_transfere_rien() = runTest {
+        val provider = FakeSyncProvider()
+        val publications = FakePublicationRepository().apply { insert(publication("pub-1")) }
+        upload(provider, payloadOf(bookmarks = listOf(bookmarkBackup("bm-1", createdAt = 100L, updatedAt = 100L))))
+        val fixture = Fixture(syncProvider = provider, publicationRepository = publications)
+
+        // La première fusion ajoute le signet distant : l'instantané local change une fois, normalement.
+        fixture.manager.synchronizeNow()
+        fixture.manager.synchronizeNow()
+        val uploads = provider.uploadedNames.count { it == OWN_SNAPSHOT }
+        val downloads = provider.downloadedNames.count { it == REMOTE_SNAPSHOT }
+        fixture.manager.synchronizeNow()
+
+        assertEquals("instantané local identique : pas de nouvel envoi", uploads, provider.uploadedNames.count { it == OWN_SNAPSHOT })
+        assertEquals("instantané distant inchangé : pas de nouveau téléchargement", downloads, provider.downloadedNames.count { it == REMOTE_SNAPSHOT })
+        assertEquals(listOf("bm-1"), fixture.bookmarkRepository.observeAll().first().map { it.id })
+    }
+
+    @Test
+    fun un_changement_local_ou_distant_relance_le_transfert() = runTest {
+        val provider = FakeSyncProvider()
+        val publications = FakePublicationRepository().apply { insert(publication("pub-1")) }
+        upload(provider, payloadOf())
+        val fixture = Fixture(syncProvider = provider, publicationRepository = publications)
+        fixture.manager.synchronizeNow()
+        val uploads = provider.uploadedNames.count { it == OWN_SNAPSHOT }
+        val downloads = provider.downloadedNames.count { it == REMOTE_SNAPSHOT }
+
+        // Un signet local : l'instantané change, il est renvoyé.
+        fixture.bookmarkRepository.insert(localBookmark("bm-2", createdAt = 200L))
+        fixture.manager.synchronizeNow()
+        assertEquals(uploads + 1, provider.uploadedNames.count { it == OWN_SNAPSHOT })
+
+        // L'autre appareil publie une nouvelle version : elle est retéléchargée et fusionnée.
+        upload(provider, payloadOf(bookmarks = listOf(bookmarkBackup("bm-3", createdAt = 300L, updatedAt = 300L))))
+        fixture.manager.synchronizeNow()
+        assertTrue(provider.downloadedNames.count { it == REMOTE_SNAPSHOT } > downloads)
+        assertTrue(fixture.bookmarkRepository.observeAll().first().any { it.id == "bm-3" })
+    }
 
     @Test
     fun une_suppression_distante_supprime_le_signet_local_et_garde_sa_tombe() = runTest {

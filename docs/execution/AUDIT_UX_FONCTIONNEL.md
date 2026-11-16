@@ -757,7 +757,7 @@ Vérification : « Appareil (adb) » = pilotée par adb sur le V2206, pas encore
 - **B4** : PDF, bouton à gauche du panneau : saisir un numéro de page.
 - **D56, D19** : couverts par des tests seulement.
 
-**Niveaux de lourdeur utilisés pour le reste des P2** (2026-11-16) : *légers* (D43, D64, D66, D29, C3), faits ; *moyens* (D15, D67, D45, D16), faits ; *lourds* : D8 et D11 faits, D1/D4, D50, D62 non commencés ; D44 attend une vérification à l'écran par Issa.
+**Niveaux de lourdeur utilisés pour le reste des P2** (2026-11-16) : *légers* (D43, D64, D66, D29, C3), faits ; *moyens* (D15, D67, D45, D16), faits ; *lourds* : D8, D11, D1/D4 et D62 faits, D50 non commencé ; D62 : l'instantané local n'est renvoyé que s'il a changé (empreinte sans la date de création) et un instantané distant inchangé (date, taille) n'est ni retéléchargé ni refusionné, par processus (mémoire), sans changement de format ; D44 attend une vérification à l'écran par Issa.
 
 **Reste à traiter** :
 - **Nécessitent une décision de conception** : B5 (fait : le sommaire mène à l'ancre de la section et une seule entrée est en cours ; `PARSER_VERSION` 9 ; validé sur appareil), D65 (fait en affichage texte : la phrase entière est surlignée quand le moteur ne renvoie aucun repère par mot ; les pages PDF, rendues en image, ne peuvent rien surligner), 
