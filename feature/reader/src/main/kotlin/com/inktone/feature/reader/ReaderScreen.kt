@@ -627,6 +627,17 @@ fun ReaderScreen(
         // celles de la page qui porte la sélection ; en SCROLL, l'union des
         // paragraphes visibles qu'elle touche (ADR-029).
         var pagedFreeSelectionBounds by remember { mutableStateOf<SelectionPopupBounds?>(null) }
+        // Audit UX D50 (partie page) : sélection laissée sur une autre page, que le
+        // mot choisi ici peut prolonger ; puis plage étendue et bornes du popup
+        // gardées, la page n'ayant plus de sélection native à elle seule.
+        var pagedExtendFrom by remember { mutableStateOf<IntRange?>(null) }
+        var pagedExtended by remember { mutableStateOf<Pair<IntRange, Rect>?>(null) }
+        LaunchedEffect(freeSelectedRange) {
+            if (freeSelectedRange == null) {
+                pagedExtendFrom = null
+                pagedExtended = null
+            }
+        }
         val selectionBoundsInWindow = when (state.readingMode) {
             // Masqué pendant un glissement de poignée ou un défilement, recalculé à l'arrêt.
             ReadingMode.SCROLL -> freeSelectedRange
@@ -636,6 +647,7 @@ fun ReaderScreen(
                     selectionRegistry.boundsInWindow(range)
                 }
             ReadingMode.PAGED -> pagedFreeSelectionBounds?.boundsInWindow
+                ?: pagedExtended?.takeIf { it.first == freeSelectedRange }?.second
         }
 
         // Phase 4 — purge complète de l'état transitoire de sélection,
@@ -647,6 +659,8 @@ fun ReaderScreen(
         fun clearSelectionAndPopup() {
             viewModel.onIntent(ReaderIntent.ClearFreeSelection)
             pagedFreeSelectionBounds = null
+            pagedExtendFrom = null
+            pagedExtended = null
         }
         val selectedText = remember(freeSelectedRange, state.currentChapter) {
             val freeRange = freeSelectedRange ?: return@remember ""
@@ -1221,6 +1235,7 @@ fun ReaderScreen(
                                 viewModel.onIntent(ReaderIntent.SetFreeSelection(anchor, focus))
                             },
                             onFreeSelectionCleared = { viewModel.onIntent(ReaderIntent.ClearFreeSelection) },
+                            onSelectionStartedAwayFrom = { previous -> pagedExtendFrom = previous },
                             onFreeSelectionBoundsInWindow = { ownerKey, bounds ->
                                 pagedFreeSelectionBounds = resolveSelectionPopupBounds(
                                     current = pagedFreeSelectionBounds,
@@ -1283,6 +1298,14 @@ SelectionActionPopup(
                     isPdf = isPdf,
                 ),
                 recentColors = state.recentAnnotationColors,
+                onExtend = pagedExtendFrom?.takeIf { state.readingMode == ReadingMode.PAGED }?.let { previous ->
+                    {
+                        val extended = minOf(previous.first, freeSelectedRange.first)..maxOf(previous.last, freeSelectedRange.last)
+                        pagedExtended = extended to selectionBoundsInWindow
+                        pagedExtendFrom = null
+                        viewModel.onIntent(ReaderIntent.SetFreeSelection(extended.first, extended.last))
+                    }
+                },
             )
 }
         }

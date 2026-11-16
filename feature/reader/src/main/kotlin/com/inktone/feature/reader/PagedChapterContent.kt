@@ -159,6 +159,9 @@ fun PagedChapterContent(
     // le popup qu'une AUTRE page vient d'ouvrir. Arbitrage :
     // `resolveSelectionPopupBounds` (ReaderScreen).
     onFreeSelectionBoundsInWindow: (ownerKey: Int, bounds: Rect?) -> Unit = { _, _ -> },
+    // Audit UX D50 (partie page) : appui long sur une page alors qu'une sélection
+    // reste sur une autre ; le Lecteur propose de l'étendre jusqu'au mot visé.
+    onSelectionStartedAwayFrom: (previous: IntRange) -> Unit = {},
     /** Demandes de changement de page venues d'ailleurs (touches de volume) : +1 suivante, -1 précédente. */
     pageTurnRequests: kotlinx.coroutines.flow.Flow<Int> = kotlinx.coroutines.flow.emptyFlow(),
     /** Publication ouverte, pour charger les images EPUB (`EpubImageKey`) ; `null` hors EPUB. */
@@ -528,6 +531,7 @@ fun PagedChapterContent(
                         onFreeSelectionBoundsInWindow = { bounds ->
                             onFreeSelectionBoundsInWindow(pageOffsetRange.first, bounds)
                         },
+                        onSelectionStartedAwayFrom = onSelectionStartedAwayFrom,
                         onClick = {
                             // Un tap sur un bord tourne la page, le centre garde l'affichage
                             // des commandes (audit UX D75). Position lue avant que le champ
@@ -614,6 +618,7 @@ private fun PageBlock(
     onFreeSelectionChanged: (anchorOffset: Int, focusOffset: Int) -> Unit,
     onFreeSelectionCleared: () -> Unit,
     onFreeSelectionBoundsInWindow: (Rect?) -> Unit,
+    onSelectionStartedAwayFrom: (IntRange) -> Unit,
     onClick: () -> Unit,
 ) {
     val onLinkTapped = LocalLinkTapHandler.current
@@ -655,9 +660,9 @@ private fun PageBlock(
     // `getWordBoundary`, poignées de glissement caractère par caractère,
     // aucune réimplémentation gestuelle) — la seule source qui produit
     // un `TextRange` réellement exact.
-    // Offsets LOCAUX à la page ; réinitialisée à chaque page (la
-    // sélection ne survit pas un changement de page — bornée à la page,
-    // jamais à cheval sur deux, limite structurelle du découpage).
+    // Offsets LOCAUX à la page ; réinitialisée à chaque page. La sélection
+    // globale, elle, survit au changement de page pour pouvoir être étendue
+    // depuis une autre page (audit UX D50).
     var localSelection by remember(pageOffsetRange) { mutableStateOf(TextRange.Zero) }
 
     // Phase 1 — état local strictement SUBORDONNÉ à l'appartenance
@@ -705,23 +710,15 @@ private fun PageBlock(
 
     // Phase 3 — départ d'écran (page adjacente gardée montée par
     // `beyondViewportPageCount = 1`, jamais détruite par un simple
-    // swipe) : nettoyage SILENCIEUX complet — popup détruit, sélection
-    // locale rétractée, état global purgé si cette page en était
-    // propriétaire. Corrige la « sélection fantôme » : sans ceci,
-    // `localSelection` restait non-collapsed indéfiniment sur cette
-    // instance conservée montée hors écran, ce qui bloquait tout tap
-    // ultérieur sur cette page et pouvait faire réapparaître l'ancien
-    // surlignage SANS popup en reswipant vers elle.
+    // swipe) : popup détruit et sélection locale rétractée, sinon
+    // `localSelection` restait active sur cette instance hors écran et
+    // bloquait tout tap ultérieur. La sélection GLOBALE est conservée,
+    // toujours dessinée, pour être étendue depuis une autre page (D50) ;
+    // un tap la referme.
     LaunchedEffect(isDisplayedPage) {
         if (!isDisplayedPage) {
             hidePopup()
             localSelection = TextRange.Zero
-            // Purge de l'état GLOBAL uniquement si cette page en était
-            // encore propriétaire : après une action du popup (Phase 4),
-            // `localSelection` peut rester non-collapsed alors que la
-            // sélection globale appartient déjà à une autre unité — s'y
-            // fier ici effacerait la sélection de quelqu'un d'autre.
-            if (ownsGlobalSelectionState.value) onFreeSelectionCleared()
         }
     }
 
@@ -821,11 +818,18 @@ private fun PageBlock(
                 // fait que basculer le HUD.
                 val wasSelecting = !selection.collapsed
                 val selectionChanged = newValue.selection != selection
+                val selectionElsewhere = freeSelectedRange.value.takeIf { !ownsGlobalSelectionState.value }
                 localSelection = newValue.selection
                 if (newValue.selection.collapsed) {
                     if (wasSelecting) {
                         onFreeSelectionCleared()
                         hidePopup()
+                    }
+                    // Sélection conservée d'un changement de page ou étendue jusqu'ici,
+                    // sans sélection native sur cette page : un tap la referme (D50).
+                    if (!wasSelecting && freeSelectedRange.value != null) {
+                        onFreeSelectionCleared()
+                        return@BasicTextField
                     }
                     // Un tap sur un lien le suit ; ailleurs, il bascule le HUD (audit UX D15).
                     val link = pageText.linkAt(newValue.selection.start)
@@ -849,6 +853,7 @@ private fun PageBlock(
                     // évènements qui existent réellement plutôt que sur
                     // ceux que l'API laisse supposer.
                     if (selectionChanged) hidePopup()
+                    if (!wasSelecting && selectionElsewhere != null) onSelectionStartedAwayFrom(selectionElsewhere)
                     val min = newValue.selection.min
                     val max = newValue.selection.max
                     onFreeSelectionChanged(pageOffsetRange.first + min, pageOffsetRange.first + max - 1)

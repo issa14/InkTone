@@ -95,6 +95,9 @@ fun SelectionActionPopup(
     // Lot 22, tâche 12 — couleurs récemment utilisées, transmises telles
     // quelles à AnnotationColorPicker.
     recentColors: List<AnnotationColor> = emptyList(),
+    // Audit UX D50 (partie page) : non nul quand une sélection laissée sur une
+    // autre page peut être étendue jusqu'au mot qui vient d'être choisi.
+    onExtend: (() -> Unit)? = null,
 ) {
     if (selectionBoundsInWindow == null) return
 
@@ -165,24 +168,29 @@ fun SelectionActionPopup(
             shadowElevation = 6.dp,
         ) {
             when (mode) {
-                SelectionPopupMode.ACTIONS -> Row(modifier = Modifier.padding(4.dp)) {
-                    PopupActionButton(icon = AppSymbol.Copy, label = "Copier") {
-                        clipboardManager.setText(AnnotatedString(selectedText))
-                        Toast.makeText(context, "Texte copié", Toast.LENGTH_SHORT).show()
-                        onDismiss()
+                SelectionPopupMode.ACTIONS -> Column {
+                    if (onExtend != null) {
+                        PopupActionButton(icon = AppSymbol.Highlight, label = "Étendre la sélection jusqu'ici", onClick = onExtend)
                     }
-                    PopupActionButton(icon = AppSymbol.Highlight, label = "Surligner") {
-                        mode = SelectionPopupMode.COLOR_PICKER
-                    }
-                    PopupActionButton(icon = AppSymbol.Note, label = "Note") {
-                        mode = SelectionPopupMode.NOTE_INPUT
-                    }
-                    // Lot 21, tâche 7 — « Partager » derrière un overflow
-                    // « ⋮ » : quatre actions en premier niveau élargiraient
-                    // la barre au-delà du raisonnable. L'action secondaire
-                    // reste à un geste (un tap), jamais « Tout sélectionner ».
-                    TextButton(onClick = { mode = SelectionPopupMode.MORE }) {
-                        AppIcon(AppSymbol.MoreActions, contentDescription = "Plus d'actions")
+                    Row(modifier = Modifier.padding(4.dp)) {
+                        PopupActionButton(icon = AppSymbol.Copy, label = "Copier") {
+                            clipboardManager.setText(AnnotatedString(selectedText))
+                            Toast.makeText(context, "Texte copié", Toast.LENGTH_SHORT).show()
+                            onDismiss()
+                        }
+                        PopupActionButton(icon = AppSymbol.Highlight, label = "Surligner") {
+                            mode = SelectionPopupMode.COLOR_PICKER
+                        }
+                        PopupActionButton(icon = AppSymbol.Note, label = "Note") {
+                            mode = SelectionPopupMode.NOTE_INPUT
+                        }
+                        // Lot 21, tâche 7 — « Partager » derrière un overflow
+                        // « ⋮ » : quatre actions en premier niveau élargiraient
+                        // la barre au-delà du raisonnable. L'action secondaire
+                        // reste à un geste (un tap), jamais « Tout sélectionner ».
+                        TextButton(onClick = { mode = SelectionPopupMode.MORE }) {
+                            AppIcon(AppSymbol.MoreActions, contentDescription = "Plus d'actions")
+                        }
                     }
                 }
 

@@ -1,5 +1,8 @@
 package com.inktone.feature.reader
 
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.geometry.Rect
 import androidx.compose.ui.test.junit4.createComposeRule
 import androidx.compose.ui.test.onNodeWithContentDescription
@@ -229,6 +232,29 @@ class SelectionActionPopupTest {
 
         assertEquals(false, highlighted)
         assertEquals(AnnotationColor.BLUE, savedColor)
+    }
+
+    /** Audit UX D50 (partie page) : l'action n'apparaît que lorsqu'une extension est possible. */
+    @Test
+    fun etendre_la_selection_n_apparait_que_si_proposee_et_la_declenche() {
+        var extended = false
+        var onExtend: (() -> Unit)? by mutableStateOf(null)
+        composeTestRule.setContent {
+            SelectionActionPopup(
+                selectedText = "mot",
+                selectionBoundsInWindow = someBounds,
+                onHighlight = { _, _ -> },
+                onSaveNote = { _, _, _ -> },
+                onDismiss = {},
+                onExtend = onExtend,
+            )
+        }
+        composeTestRule.onNodeWithText("Étendre la sélection jusqu'ici").assertDoesNotExist()
+
+        onExtend = { extended = true }
+        composeTestRule.onNodeWithText("Étendre la sélection jusqu'ici").performClick()
+
+        assertTrue(extended)
     }
 
     @Test

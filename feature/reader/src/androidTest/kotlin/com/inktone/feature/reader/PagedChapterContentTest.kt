@@ -17,6 +17,7 @@ import androidx.compose.ui.semantics.SemanticsProperties
 import androidx.compose.ui.semantics.getOrNull
 import androidx.compose.ui.test.SemanticsMatcher
 import androidx.compose.ui.test.isDisplayed
+import androidx.compose.ui.test.isRoot
 import androidx.compose.ui.test.junit4.createComposeRule
 import androidx.compose.ui.test.longClick
 import androidx.compose.ui.test.onAllNodesWithText
@@ -35,6 +36,7 @@ import com.inktone.domain.model.BookBlock
 import com.inktone.domain.model.StyledText
 import com.inktone.domain.model.Sentence
 import com.inktone.feature.reader.pagination.rememberChapterPaginationState
+import org.junit.Assert.assertEquals
 import org.junit.Assert.assertNotEquals
 import org.junit.Assert.assertTrue
 import org.junit.Rule
@@ -88,6 +90,9 @@ class PagedChapterContentTest {
         highlightedWordRange: IntRange?,
         onClick: () -> Unit,
         onFreeSelectionChanged: (anchorOffset: Int, focusOffset: Int) -> Unit = { _, _ -> },
+        freeSelectedRange: IntRange? = null,
+        onFreeSelectionCleared: () -> Unit = {},
+        onSelectionStartedAwayFrom: (IntRange) -> Unit = {},
     ) {
         var areaSize by remember { mutableStateOf(IntSize.Zero) }
         Box(
@@ -117,6 +122,9 @@ class PagedChapterContentTest {
                 onNextChapter = {},
                 onCurrentLineY = {},
                 onFreeSelectionChanged = onFreeSelectionChanged,
+                freeSelectedRange = freeSelectedRange,
+                onFreeSelectionCleared = onFreeSelectionCleared,
+                onSelectionStartedAwayFrom = onSelectionStartedAwayFrom,
             )
         }
     }
@@ -261,6 +269,59 @@ class PagedChapterContentTest {
                 "recommençant près de 0 — c'est le bug O(n²) corrigé en 3a.2",
             freeSelection!!.first >= minimumAbsoluteOffset,
         )
+    }
+
+    /**
+     * Audit UX D50 (partie page) : la sélection survit au changement de page, et
+     * un appui long sur la page suivante signale la sélection à étendre.
+     */
+    @Test
+    fun une_selection_survit_a_la_page_suivante_et_peut_y_etre_etendue() {
+        val (chapter, _) = manyShortSentencesChapter()
+        var freeSelection by mutableStateOf<IntRange?>(null)
+        var cleared = false
+        var extendFrom: IntRange? = null
+
+        composeTestRule.setContent {
+            PagedChapterContentHarness(
+                chapter = chapter,
+                fontSizeSp = 32,
+                currentSentenceIndex = 0,
+                highlightedWordRange = null,
+                onClick = {},
+                onFreeSelectionChanged = { anchor, focus -> freeSelection = minOf(anchor, focus)..maxOf(anchor, focus) },
+                freeSelectedRange = freeSelection,
+                onFreeSelectionCleared = {
+                    cleared = true
+                    freeSelection = null
+                },
+                onSelectionStartedAwayFrom = { extendFrom = it },
+            )
+        }
+
+        composeTestRule.waitUntil(timeoutMillis = 5_000) { displayedTextNodes().isNotEmpty() }
+        val page1Node = displayedTextNodes().first()
+        val page1Text = page1Node.renderedText()
+        composeTestRule.onNode(SemanticsMatcher("page1") { it.id == page1Node.id })
+            .performTouchInput { longClick(topLeft + Offset(4f, 4f)) }
+        composeTestRule.waitUntil(timeoutMillis = 3_000) { freeSelection != null }
+        val firstSelection = freeSelection!!
+
+        // Les poignées natives de la sélection ajoutent deux racines (popups) :
+        // viser la racine de l'écran, la première.
+        composeTestRule.onAllNodes(isRoot())[0].performTouchInput { swipeLeft() }
+        composeTestRule.waitUntil(timeoutMillis = 5_000) { displayedTextNodes().any { it.renderedText() != page1Text } }
+        composeTestRule.waitForIdle()
+        assertEquals("la sélection de la page 1 survit au changement de page", firstSelection, freeSelection)
+        assertTrue("aucun effacement au changement de page", !cleared)
+
+        val page2Node = displayedTextNodes().first { it.renderedText() != page1Text }
+        composeTestRule.onNode(SemanticsMatcher("page2") { it.id == page2Node.id })
+            .performTouchInput { longClick(topLeft + Offset(4f, 4f)) }
+        composeTestRule.waitUntil(timeoutMillis = 3_000) { freeSelection != firstSelection }
+
+        assertEquals("la sélection de la page 1 est proposée à l'extension", firstSelection, extendFrom)
+        assertTrue("le mot choisi est sur la page 2", freeSelection!!.first > firstSelection.last)
     }
 
     @Test
