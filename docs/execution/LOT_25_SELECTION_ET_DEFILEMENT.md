@@ -216,7 +216,7 @@ pose les bases de C sans rien qu'il faudra défaire.
 | 25.1 | Benchmark, procédure sûre, mesures de référence (script et `FrameTimingMetric`) et trace des images longues (voir ci-dessous) | `916fa75e`, `9eb0c7a0`, `4a21664a`, `6cfe2d4c`, commit de ce bilan |
 | 25.2 | ADR-029 : moteur maison, `SelectionContainer` écarté sur lecture de l'API | `47f6471a` |
 | 25.3 | Poignées, loupe, glissement entre paragraphes, défilement automatique et libre, `setSelection` ; 9 points validés sur appareil (mode paginé et TalkBack compris) | `150da8cd`, `96446a7a`, `SelectionGeometryTest` |
-| 25.4 | Aucun correctif : 0,6 % d'images longues, sous les critères ; causes nommées mais pas corrigées (voir ci-dessous) | — |
+| 25.4 | Cause 2 corrigée (profil embarqué dans le build mesuré, profil régénéré) ; cause 1 essayée sans gain, retirée (voir ci-dessous) | `e948fd66` et commits suivants |
 | 25.5 | KDoc et suivi de l'audit (D50 fait en défilement, partie page reportée) | `e12058ce` |
 
 ### Mesure de référence (V2206, build `benchmark`, au calme, après 25.3)
@@ -252,9 +252,15 @@ restent non confirmés et ne sont pas touchés.
 - Palier 25.4, cause 1 : `contentType` par type de bloc sur les items de la `LazyColumn`
   (réutilisation de la composition d'un paragraphe sorti) essayé puis retiré, faute de gain
   mesuré — p99 CPU 20,3 → 20,8 ms, dépassement p99 5,1 → 5,5 ms, dans le bruit.
-  Cause 2 (premier toucher, une image) non corrigée : sans traçage de composition, la trace
-  ne dit pas quel code s'exécute dans ces 13 ms. À 0,6 % d'images longues, les deux restent
-  les premières pistes si un livre ou un appareil plus lent fait réapparaître des saccades.
+  Cause 2 (premier toucher, 13 ms) : du code non compilé d'avance. Le build `benchmark`
+  n'embarquait pas le Baseline Profile de la release (`src/release/generated/…`) ; corrigé,
+  il mesure désormais ce que l'app publiée exécute : CPU p99 20,3 → 16,2 ms, dépassement p99
+  5,1 → 1,9 ms, images longues 4 → 1 sur 640, plus aucune image d'entrée longue. Pour l'app
+  publiée, qui avait déjà ce profil, c'était donc un artefact de mesure, pas un défaut.
+  Profil ensuite régénéré avec le défilement du Lecteur (4 109 entrées InkTone contre 2 303,
+  sélection du lot 25 comprise) : pas de gain mesurable sur ce scénario (p99 17,3 ms, dans
+  le bruit), conservé parce que l'ancien ne couvrait plus le code actuel du Lecteur.
+  Reste une image longue sur 640 (composition, cause 1).
 - Un appui long suivi d'un glissement sans lever le doigt n'étend pas la sélection ;
   l'extension passe par les poignées.
 - Incident : `:benchmark:connectedBenchmarkBenchmarkAndroidTest` a désinstallé l'app de
