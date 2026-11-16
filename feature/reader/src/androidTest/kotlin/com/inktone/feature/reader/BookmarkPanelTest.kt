@@ -157,8 +157,8 @@ class BookmarkPanelTest {
             )
         }
 
-        composeTestRule.onNodeWithText("Marquer cette page").assertExists()
-        composeTestRule.onNodeWithText("Marquer cette page").performClick()
+        composeTestRule.onNodeWithText("Ajouter un signet").assertExists()
+        composeTestRule.onNodeWithText("Ajouter un signet").performClick()
         assertEquals(true, toggled)
     }
 
@@ -180,8 +180,8 @@ class BookmarkPanelTest {
             )
         }
 
-        composeTestRule.onNodeWithText("Page marquée — retirer").assertExists()
-        composeTestRule.onNodeWithText("Marquer cette page").assertDoesNotExist()
+        composeTestRule.onNodeWithText("Retirer le signet").assertExists()
+        composeTestRule.onNodeWithText("Ajouter un signet").assertDoesNotExist()
     }
 
     @Test
@@ -203,8 +203,8 @@ class BookmarkPanelTest {
             )
         }
 
-        composeTestRule.onNodeWithText("Marque-pages et notes").assertExists()
-        composeTestRule.onNodeWithContentDescription("Fermer les marque-pages").performClick()
+        composeTestRule.onNodeWithText("Signets et notes").assertExists()
+        composeTestRule.onNodeWithContentDescription("Fermer les signets").performClick()
         assertEquals(true, closed)
     }
 
@@ -305,9 +305,9 @@ class BookmarkPanelTest {
         }
 
         composeTestRule.onNodeWithText("Signets").performClick()
-        composeTestRule.onNodeWithContentDescription("Supprimer le marque-page").performClick()
+        composeTestRule.onNodeWithContentDescription("Supprimer le signet").performClick()
         assertEquals(null, deletedId)
-        composeTestRule.onNodeWithText("Supprimer ce marque-page ?").assertExists()
+        composeTestRule.onNodeWithText("Supprimer ce signet ?").assertExists()
         composeTestRule.onNodeWithText("Supprimer").performClick()
         assertEquals("bookmark-1", deletedId)
     }

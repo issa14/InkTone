@@ -239,7 +239,7 @@ private fun CustomDurationWheel(onConfirm: (totalMinutes: Int) -> Unit) {
         TextButton(
             onClick = { onConfirm((hours * 60 + minutes).coerceAtLeast(1)) },
             enabled = hours > 0 || minutes > 0,
-        ) { Text("Valider") }
+        ) { Text("Démarrer") }
     }
 }
 

@@ -350,7 +350,7 @@ fun LibraryDrawerContent(
             onClick = onSelectLibrary,
         )
         NavigationDrawerItem(
-            label = { Text("Marque-pages et Notes") },
+            label = { Text("Signets et notes") },
             icon = { AppIcon(AppSymbol.Bookmark,  contentDescription = null) },
             selected = selected == DrawerDestination.BOOKMARKS,
             onClick = onOpenBookmarks,
@@ -378,7 +378,7 @@ fun LibraryDrawerContent(
             onClick = onOpenSync,
         )
         NavigationDrawerItem(
-            label = { Text("Statistiques de lecture") },
+            label = { Text("Statistiques") },
             icon = { AppIcon(AppSymbol.Stats,  contentDescription = null) },
             selected = selected == DrawerDestination.STATISTICS,
             onClick = onOpenStats,
@@ -391,7 +391,7 @@ fun LibraryDrawerContent(
             modifier = Modifier.fillMaxWidth().padding(vertical = 12.dp),
             horizontalArrangement = Arrangement.SpaceEvenly,
         ) {
-            DrawerFooterItem("Paramètres", AppSymbol.Settings) { onOpenSettings() }
+            DrawerFooterItem("Réglages", AppSymbol.Settings) { onOpenSettings() }
             // Lot 9 — "Thèmes" réactivé, 3e des 4 destinations masquées au
             // lot 1 (aucune destination affichée sans écran derrière).
             DrawerFooterItem("Thèmes", AppSymbol.Theme) { onOpenThemes() }
@@ -480,7 +480,7 @@ internal fun LibraryTopBar(
                     value = searchQuery,
                     onValueChange = onSearchQueryChange,
                     modifier = Modifier.fillMaxWidth().focusRequester(searchFocusRequester),
-                    placeholder = { Text("Titre, auteur, série, tag…") },
+                    placeholder = { Text("Titre, auteur, série, étiquette…") },
                     singleLine = true,
                 )
             },
@@ -602,7 +602,7 @@ internal fun LibraryTopBar(
                     modifier = Modifier.padding(horizontal = 24.dp, vertical = 8.dp),
                     color = MaterialTheme.colorScheme.primary)
                 ActionSheetItem("Importer", AppSymbol.Data) { showActionsSheet = false; onImportClick() }
-                ActionSheetItem("Rechercher dans le texte des livres", AppSymbol.Search) { showActionsSheet = false; onOpenTextSearch() }
+                ActionSheetItem("Rechercher dans les livres", AppSymbol.Search) { showActionsSheet = false; onOpenTextSearch() }
                 ActionSheetItem("Couverture par défaut", AppSymbol.CoverOnly) {
                     showActionsSheet = false
                     showResetCoversConfirm = true

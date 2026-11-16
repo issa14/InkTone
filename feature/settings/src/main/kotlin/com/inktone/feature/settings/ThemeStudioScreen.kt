@@ -91,7 +91,7 @@ fun ThemeStudioScreen(
                 },
                 actions = {
                     TextButton(onClick = { viewModel.onIntent(ThemeStudioIntent.Save) }) {
-                        Text("Sauvegarder")
+                        Text("Enregistrer")
                     }
                 },
             )

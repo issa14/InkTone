@@ -125,7 +125,7 @@ fun UnifiedControlPanel(
                     }
                 }
                 Box(Modifier.weight(1f), contentAlignment = Alignment.Center) {
-                    SecondaryAction(symbol = AppSymbol.Bookmark, contentDescription = "Marque-pages", tint = iconTint, onClick = onBookmarksClick)
+                    SecondaryAction(symbol = AppSymbol.Bookmark, contentDescription = "Signets", tint = iconTint, onClick = onBookmarksClick)
                 }
                 Box(Modifier.weight(1f), contentAlignment = Alignment.Center) {
                     if (showTtsControls) {

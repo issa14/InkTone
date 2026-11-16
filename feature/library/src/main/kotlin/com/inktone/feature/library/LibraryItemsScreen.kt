@@ -121,7 +121,7 @@ fun LibraryItemsScreen(
                             singleLine = true,
                         )
                     } else {
-                        Text("Marque-pages et notes")
+                        Text("Signets et notes")
                     }
                 },
                 navigationIcon = {
@@ -227,13 +227,13 @@ private fun LibraryItemsEmptyState(isFiltered: Boolean) {
             )
             Spacer(Modifier.height(16.dp))
             Text(
-                if (isFiltered) "Aucun résultat" else "Aucun marque-page ni note",
+                if (isFiltered) "Aucun résultat" else "Aucun signet ni note",
                 style = MaterialTheme.typography.titleMedium,
                 fontWeight = androidx.compose.ui.text.font.FontWeight.Bold,
             )
             Spacer(Modifier.height(8.dp))
             Text(
-                if (isFiltered) "Essayez un autre filtre ou une autre recherche." else "Vos marque-pages et notes apparaîtront ici.",
+                if (isFiltered) "Essayez un autre filtre ou une autre recherche." else "Vos signets et notes apparaîtront ici.",
                 style = MaterialTheme.typography.bodyMedium,
                 color = MaterialTheme.colorScheme.onSurfaceVariant,
                 textAlign = androidx.compose.ui.text.style.TextAlign.Center,
@@ -387,7 +387,7 @@ private fun LibraryItemRow(
                     // Ligne 2 — titre de l'ouvrage, seul sur sa ligne : peut
                     // être tronqué sans jamais pousser le chapitre hors champ.
                     Text(
-                        item.publicationTitle?.cleanedForDisplay() ?: "Ouvrage supprimé",
+                        item.publicationTitle?.cleanedForDisplay() ?: "Livre supprimé",
                         style = MaterialTheme.typography.bodySmall,
                         color = MaterialTheme.colorScheme.onSurfaceVariant,
                         maxLines = 1,
@@ -442,7 +442,7 @@ private fun colorFor(item: LibraryItem): Color? = item.color?.let {
 @Composable
 private fun DeleteLibraryItemDialog(item: LibraryItem, onConfirm: () -> Unit, onDismiss: () -> Unit) {
     val label = when (item.type) {
-        LibraryItemType.BOOKMARK -> "ce marque-page"
+        LibraryItemType.BOOKMARK -> "ce signet"
         LibraryItemType.HIGHLIGHT -> "ce surlignage"
         LibraryItemType.NOTE -> "cette note"
     }

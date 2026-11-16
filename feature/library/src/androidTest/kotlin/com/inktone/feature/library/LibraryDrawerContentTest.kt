@@ -77,7 +77,7 @@ class LibraryDrawerContentTest {
             }
         }
 
-        composeTestRule.onNodeWithText("Marque-pages et Notes").performClick()
+        composeTestRule.onNodeWithText("Signets et notes").performClick()
 
         assertEquals(true, clicked)
     }
@@ -94,7 +94,7 @@ class LibraryDrawerContentTest {
             }
         }
 
-        composeTestRule.onNodeWithText("Statistiques de lecture").performClick()
+        composeTestRule.onNodeWithText("Statistiques").performClick()
 
         assertEquals(true, clicked)
     }
@@ -112,7 +112,7 @@ class LibraryDrawerContentTest {
             }
         }
 
-        composeTestRule.onNodeWithText("Paramètres").performClick()
+        composeTestRule.onNodeWithText("Réglages").performClick()
 
         assertEquals(true, clicked)
     }
@@ -153,7 +153,7 @@ class LibraryDrawerContentTest {
         composeTestRule.onAllNodesWithText("Thème").assertCountEquals(0)
         composeTestRule.onAllNodesWithText("Favoris").assertCountEquals(0)
         composeTestRule.onAllNodesWithText("Séries").assertCountEquals(0)
-        composeTestRule.onAllNodesWithText("Tags").assertCountEquals(0)
+        composeTestRule.onAllNodesWithText("Étiquettes").assertCountEquals(0)
     }
 
     @Test
@@ -169,8 +169,8 @@ class LibraryDrawerContentTest {
 
         composeTestRule.onNodeWithText("Bibliothèque").assertIsSelected()
         composeTestRule.onNodeWithText("Récents").assertIsNotSelected()
-        composeTestRule.onNodeWithText("Marque-pages et Notes").assertIsNotSelected()
-        composeTestRule.onNodeWithText("Statistiques de lecture").assertIsNotSelected()
+        composeTestRule.onNodeWithText("Signets et notes").assertIsNotSelected()
+        composeTestRule.onNodeWithText("Statistiques").assertIsNotSelected()
     }
 
     // Lot 18 — le surlignage suit la destination active passée en
@@ -187,10 +187,10 @@ class LibraryDrawerContentTest {
             }
         }
 
-        composeTestRule.onNodeWithText("Statistiques de lecture").assertIsSelected()
+        composeTestRule.onNodeWithText("Statistiques").assertIsSelected()
         composeTestRule.onNodeWithText("Bibliothèque").assertIsNotSelected()
         composeTestRule.onNodeWithText("Récents").assertIsNotSelected()
-        composeTestRule.onNodeWithText("Marque-pages et Notes").assertIsNotSelected()
+        composeTestRule.onNodeWithText("Signets et notes").assertIsNotSelected()
         composeTestRule.onNodeWithText("Synchronisation").assertIsNotSelected()
         composeTestRule.onNodeWithText("Catalogues OPDS").assertIsNotSelected()
     }
@@ -200,10 +200,10 @@ class LibraryDrawerContentTest {
         val labelParDestination = mapOf(
             DrawerDestination.RECENTS to "Récents",
             DrawerDestination.LIBRARY to "Bibliothèque",
-            DrawerDestination.BOOKMARKS to "Marque-pages et Notes",
+            DrawerDestination.BOOKMARKS to "Signets et notes",
             DrawerDestination.OPDS to "Catalogues OPDS",
             DrawerDestination.SYNC to "Synchronisation",
-            DrawerDestination.STATISTICS to "Statistiques de lecture",
+            DrawerDestination.STATISTICS to "Statistiques",
         )
         // `setContent` ne peut être appelé qu'une fois par test : la
         // destination est pilotée par un état, comme le fera le NavHost.

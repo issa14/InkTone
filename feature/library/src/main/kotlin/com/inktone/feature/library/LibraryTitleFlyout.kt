@@ -60,7 +60,7 @@ fun LibraryTitleFlyout(
                     selected = activeCategory == FlyoutCategory.SERIES,
                 ) { activeCategory = FlyoutCategory.SERIES }
                 FlyoutCategoryRow(
-                    label = "Tags",
+                    label = "Étiquettes",
                     selected = activeCategory == FlyoutCategory.TAGS,
                 ) { activeCategory = FlyoutCategory.TAGS }
             }

@@ -23,6 +23,9 @@ Voir Blueprint §12.5 : nommage par concepts métier, Use Cases en verbe à
 l'infinitif, aucun emoji dans le code de production, messages de commit
 en français à l'impératif ("Corrige…", "Ajoute…", "Initialise…").
 
+Tout texte visible suit `docs/design/GLOSSAIRE_INTERFACE.md` : un objet,
+un mot (« Signet », « Réglages », « Narration »…), sans jargon technique.
+
 ## Sauvegarde locale (`BackupManager`) : chiffrée de bout en bout
 
 Le fichier exporté (signets, règles de prononciation, progression de

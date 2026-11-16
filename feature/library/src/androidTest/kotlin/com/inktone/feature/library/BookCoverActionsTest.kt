@@ -174,7 +174,7 @@ class BookCoverActionsTest {
         }
 
         composeTestRule.onNodeWithText(
-            "Cette action est irréversible. Les marque-pages et notes associés à ce livre seront également supprimés.",
+            "Ses signets et ses notes seront aussi supprimés. Le fichier d'origine reste sur votre téléphone.",
         ).assertExists()
     }
 }

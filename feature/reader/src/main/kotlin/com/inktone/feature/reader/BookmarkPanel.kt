@@ -174,9 +174,9 @@ fun BookmarkPanel(
                         verticalAlignment = Alignment.CenterVertically,
                     ) {
                         IconButton(onClick = onClose) {
-                            AppIcon(AppSymbol.Back,  contentDescription = "Fermer les marque-pages")
+                            AppIcon(AppSymbol.Back,  contentDescription = "Fermer les signets")
                         }
-                        Text("Marque-pages et notes", style = MaterialTheme.typography.titleMedium)
+                        Text("Signets et notes", style = MaterialTheme.typography.titleMedium)
                     }
 
                     TabRow(selectedTabIndex = pagerState.currentPage) {
@@ -221,12 +221,12 @@ fun BookmarkPanel(
                                 colors = ButtonDefaults.buttonColors(containerColor = MaterialTheme.colorScheme.primary),
                             ) {
                                 AppIcon(AppSymbol.Pin,  contentDescription = null, modifier = Modifier.padding(end = 8.dp))
-                                Text("Page marquée — retirer")
+                                Text("Retirer le signet")
                             }
                         } else {
                             OutlinedButton(onClick = onToggleBookmark, modifier = Modifier.fillMaxWidth()) {
                                 AppIcon(AppSymbol.Pin,  contentDescription = null, modifier = Modifier.padding(end = 8.dp))
-                                Text("Marquer cette page")
+                                Text("Ajouter un signet")
                             }
                         }
                     }
@@ -347,7 +347,7 @@ private fun BookmarksTab(
     onEdit: (Bookmark) -> Unit,
 ) {
     if (bookmarks.isEmpty()) {
-        EmptyTabMessage("Aucun marque-page pour ce livre.")
+        EmptyTabMessage("Aucun signet pour ce livre.")
         return
     }
     LazyColumn(modifier = Modifier.fillMaxSize()) {
@@ -401,7 +401,7 @@ private fun BookmarksTab(
                     AppIcon(AppSymbol.Edit, contentDescription = "Modifier la note")
                 }
                 IconButton(onClick = { onDelete(bookmark) }) {
-                    AppIcon(AppSymbol.Delete, contentDescription = "Supprimer le marque-page")
+                    AppIcon(AppSymbol.Delete, contentDescription = "Supprimer le signet")
                 }
             }
         }
@@ -417,7 +417,7 @@ private sealed interface PendingDeletion {
     }
 
     data class OfBookmark(val bookmark: Bookmark) : PendingDeletion {
-        override val label: String get() = "ce marque-page"
+        override val label: String get() = "ce signet"
     }
 }
 

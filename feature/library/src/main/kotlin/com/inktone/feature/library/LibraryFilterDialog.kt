@@ -48,9 +48,9 @@ private val StatusFilterOptions = listOf(FilterMode.ALL, FilterMode.UNREAD, Filt
 
 private fun FilterMode.statusLabel() = when (this) {
     FilterMode.ALL -> "Tous"
-    FilterMode.UNREAD -> "Non lu"
+    FilterMode.UNREAD -> "Non lus"
     FilterMode.IN_PROGRESS -> "En cours"
-    FilterMode.READ -> "Terminé"
+    FilterMode.READ -> "Terminés"
     else -> name
 }
 

@@ -778,7 +778,7 @@ class ReaderViewModel @Inject constructor(
         viewModelScope.launch {
             val publication = publicationRepository.getById(publicationId) ?: run {
                 Log.w("ReaderViewModel", "openPublication: publication introuvable ($publicationId)")
-                _state.value = _state.value.copy(errorMessage = "Publication introuvable.")
+                _state.value = _state.value.copy(errorMessage = "Livre introuvable.")
                 return@launch
             }
 

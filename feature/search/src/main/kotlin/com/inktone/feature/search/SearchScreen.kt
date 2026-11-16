@@ -71,7 +71,7 @@ fun SearchScreen(
             value = state.query,
             onValueChange = { viewModel.onIntent(SearchIntent.QueryChanged(it)) },
             placeholder = { Text("Rechercher...") },
-            label = { Text(if (state.isBookScoped) "Rechercher dans ce livre" else "Rechercher dans vos livres") },
+            label = { Text(if (state.isBookScoped) "Rechercher dans ce livre" else "Rechercher dans les livres") },
             trailingIcon = {
                 if (state.query.isNotEmpty()) {
                     IconButton(onClick = { viewModel.onIntent(SearchIntent.QueryChanged("")) }) {
