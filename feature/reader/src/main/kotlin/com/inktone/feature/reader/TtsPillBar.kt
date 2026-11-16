@@ -22,16 +22,15 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.vector.ImageVector
-import androidx.compose.ui.hapticfeedback.HapticFeedbackType
 import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.platform.LocalDensity
-import androidx.compose.ui.platform.LocalHapticFeedback
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.semantics.clearAndSetSemantics
 import androidx.compose.ui.unit.dp
 import com.inktone.core.designsystem.AppIcon
 import com.inktone.core.designsystem.AppSymbol
 import com.inktone.core.designsystem.InkToneShapes
+import com.inktone.core.designsystem.rememberAppHaptics
 
 /**
  * Tâche 3e.1 — barre pilule flottante affichée à la place du panneau
@@ -69,7 +68,7 @@ fun TtsPillBar(
     contentColor: Color = MaterialTheme.colorScheme.onSurface,
     onAccentColor: Color = MaterialTheme.colorScheme.onPrimary,
 ) {
-    val haptic = LocalHapticFeedback.current
+    val haptics = rememberAppHaptics()
     val density = LocalDensity.current
     val swipeThresholdPx = with(density) { 48.dp.toPx() }
 
@@ -115,7 +114,7 @@ fun TtsPillBar(
             Box(Modifier.padding(horizontal = 4.dp)) {
                 FilledIconButton(
                     onClick = {
-                        haptic.performHapticFeedback(HapticFeedbackType.LongPress)
+                        haptics.confirm()
                         onPlayPause()
                     },
                     modifier = Modifier.size(56.dp),

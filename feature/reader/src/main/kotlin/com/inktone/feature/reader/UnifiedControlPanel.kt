@@ -21,12 +21,11 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
-import androidx.compose.ui.hapticfeedback.HapticFeedbackType
-import androidx.compose.ui.platform.LocalHapticFeedback
 import androidx.compose.ui.unit.dp
 import com.inktone.core.designsystem.AppIcon
 import com.inktone.core.designsystem.AppSymbol
 import com.inktone.core.designsystem.InkToneShapes
+import com.inktone.core.designsystem.rememberAppHaptics
 
 /**
  * Tâche 3b.6 — panneau de contrôle unifié, trois rangées :
@@ -91,7 +90,7 @@ fun UnifiedControlPanel(
     contentColor: Color = MaterialTheme.colorScheme.onSurface,
     onAccentColor: Color = MaterialTheme.colorScheme.onPrimary,
 ) {
-    val haptic = LocalHapticFeedback.current
+    val haptics = rememberAppHaptics()
     // Couleur du texte du thème (lisible par construction) : l'accent atténué
     // tombait sous 3:1 dans les thèmes clairs. L'accent reste aux états actifs.
     val iconTint = contentColor.copy(alpha = 0.87f)
@@ -135,7 +134,7 @@ fun UnifiedControlPanel(
                     if (showTtsControls) {
                         FilledIconButton(
                             onClick = {
-                                haptic.performHapticFeedback(HapticFeedbackType.LongPress)
+                                haptics.confirm()
                                 onPlayPause()
                             },
                             modifier = Modifier.size(56.dp),
