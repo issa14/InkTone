@@ -1,5 +1,6 @@
 package com.inktone.data.backup
 
+import com.inktone.data.sync.BookmarkAnnotationMerger
 import com.inktone.domain.repository.AnnotationRepository
 import com.inktone.domain.repository.BookmarkRepository
 import com.inktone.domain.repository.PronunciationRuleRepository
@@ -136,20 +137,14 @@ class BackupManager @Inject constructor(
         // faisait donc planter l'application. Ce qui existe déjà est
         // conservé, jamais réinséré — même règle que la fusion de
         // synchronisation (SyncNowManager).
-        val existingBookmarkIds = bookmarkRepository.observeAll().first().mapTo(HashSet()) { it.id }
-        val existingAnnotationIds = annotationRepository.getAll().mapTo(HashSet()) { it.id }
         val existingSessionIds = readingSessionRepository.getAll().mapTo(HashSet()) { it.id }
 
-        payload.bookmarks.forEach { backup ->
-            if (backup.id in existingBookmarkIds) return@forEach
-            val publicationId = matcher.localIdOf(backup.publicationId)
-            if (publicationId != null) {
-                bookmarkRepository.insert(backup.toDomain().copy(publicationId = publicationId))
-                restored++
-            } else {
-                skippedOrphans++
-            }
-        }
+        // Signets et annotations : même règle que la synchronisation (audit UX D61) — les suppressions
+        // de la sauvegarde s'appliquent, un élément déjà connu prend la version la plus récente.
+        val merger = BookmarkAnnotationMerger(bookmarkRepository, annotationRepository, syncTombstoneRepository)
+        val merged = merger.merge(merger.load(), payload, matcher)
+        restored += merged.changed
+        skippedOrphans += merged.skippedOrphans
         payload.pronunciationRules.forEach { backup ->
             pronunciationRuleRepository.save(backup.toDomain())
             restored++
@@ -161,8 +156,13 @@ class BackupManager @Inject constructor(
         payload.readingStates.forEach { backup ->
             val publicationId = matcher.localIdOf(backup.publicationId)
             if (publicationId != null) {
-                readingStateRepository.save(backup.toDomain().copy(publicationId = publicationId))
-                restored++
+                // La lecture la plus récente fait foi : restaurer une vieille sauvegarde ne ramène pas en arrière.
+                val incoming = backup.toDomain().copy(publicationId = publicationId)
+                val local = readingStateRepository.get(publicationId)
+                if (local == null || incoming.lastReadAt > local.lastReadAt) {
+                    readingStateRepository.save(incoming)
+                    restored++
+                }
             } else {
                 skippedOrphans++
             }
@@ -172,16 +172,6 @@ class BackupManager @Inject constructor(
             val publicationId = matcher.localIdOf(backup.publicationId)
             if (publicationId != null) {
                 readingSessionRepository.insert(backup.toDomain().copy(publicationId = publicationId))
-                restored++
-            } else {
-                skippedOrphans++
-            }
-        }
-        payload.annotations.forEach { backup ->
-            if (backup.id in existingAnnotationIds) return@forEach
-            val publicationId = matcher.localIdOf(backup.publicationId)
-            if (publicationId != null) {
-                annotationRepository.insert(backup.toDomain().copy(publicationId = publicationId))
                 restored++
             } else {
                 skippedOrphans++

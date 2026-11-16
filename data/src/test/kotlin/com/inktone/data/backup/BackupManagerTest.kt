@@ -240,6 +240,75 @@ class BackupManagerTest {
         assertEquals(listOf("s1"), readingSessionRepository.getAll().map { it.id })
     }
 
+    private fun pub1(repository: FakePublicationRepository) = kotlinx.coroutines.runBlocking {
+        repository.insert(
+            Publication(
+                id = "pub-1", title = "Existe", format = PublicationFormat.EPUB,
+                fileUri = "content://x", fileHash = "hash", fileSize = 10, chapterCount = 1, importDate = 0L,
+            ),
+        )
+    }
+
+    private fun bookmark(id: String, note: String?, updatedAt: Long) = com.inktone.domain.model.Bookmark(
+        id = id, publicationId = "pub-1",
+        locator = Locator(resourceHref = "ch1.xhtml", chapterIndex = 0, charOffset = 0),
+        note = note, createdAt = 0L, updatedAt = updatedAt,
+    )
+
+    @Test
+    fun restaurer_une_sauvegarde_plus_recente_met_a_jour_la_note_et_une_plus_ancienne_n_ecrase_rien() = runTest {
+        val storage = InMemoryFileStorageService()
+        val bookmarks = FakeBookmarkRepository()
+        val publications = FakePublicationRepository().also(::pub1)
+        val manager = backupManager(storage, bookmarkRepository = bookmarks, publicationRepository = publications)
+        bookmarks.insert(bookmark("b1", note = "version sauvegardée", updatedAt = 100L))
+        assertTrue(manager.exportTo("backup://notes", appVersion = "1.0", password = "secret-1234"))
+
+        // Plus ancienne que la sauvegarde : la sauvegarde l'emporte.
+        bookmarks.update(bookmark("b1", note = "ancienne version locale", updatedAt = 50L))
+        manager.importFrom("backup://notes", "secret-1234")
+        assertEquals("version sauvegardée", bookmarks.observeAll().first().single().note)
+
+        // Plus récente que la sauvegarde : elle est conservée.
+        bookmarks.update(bookmark("b1", note = "retouchée depuis", updatedAt = 200L))
+        manager.importFrom("backup://notes", "secret-1234")
+        assertEquals("retouchée depuis", bookmarks.observeAll().first().single().note)
+    }
+
+    @Test
+    fun une_suppression_posterieure_a_la_sauvegarde_n_est_pas_defaite_par_la_restauration() = runTest {
+        val storage = InMemoryFileStorageService()
+        val bookmarks = FakeBookmarkRepository()
+        val tombstones = com.inktone.core.testing.fake.FakeSyncTombstoneRepository()
+        val publications = FakePublicationRepository().also(::pub1)
+        val manager = backupManager(
+            storage, bookmarkRepository = bookmarks, publicationRepository = publications, syncTombstoneRepository = tombstones,
+        )
+        bookmarks.insert(bookmark("b1", note = null, updatedAt = 100L))
+        assertTrue(manager.exportTo("backup://suppression", appVersion = "1.0", password = "secret-1234"))
+
+        bookmarks.delete("b1")
+        tombstones.record(com.inktone.domain.model.SyncTombstone("b1", com.inktone.domain.model.TombstoneKind.BOOKMARK, deletedAt = 500L))
+        manager.importFrom("backup://suppression", "secret-1234")
+
+        assertTrue("le signet supprimé ne revient pas", bookmarks.observeAll().first().isEmpty())
+    }
+
+    @Test
+    fun une_position_plus_ancienne_que_la_locale_n_est_pas_restauree() = runTest {
+        val storage = InMemoryFileStorageService()
+        val states = FakeReadingStateRepository()
+        val publications = FakePublicationRepository().also(::pub1)
+        val manager = backupManager(storage, readingStateRepository = states, publicationRepository = publications)
+        states.save(com.inktone.domain.model.ReadingState("pub-1", Locator("ch1.xhtml", 0, charOffset = 10), lastReadAt = 100L))
+        assertTrue(manager.exportTo("backup://position", appVersion = "1.0", password = "secret-1234"))
+
+        states.save(com.inktone.domain.model.ReadingState("pub-1", Locator("ch1.xhtml", 0, charOffset = 90), lastReadAt = 300L))
+        manager.importFrom("backup://position", "secret-1234")
+
+        assertEquals(90, states.get("pub-1")!!.locator.charOffset)
+    }
+
     @Test
     fun import_avec_un_mauvais_mot_de_passe_echoue_sans_rien_ecraser() = runTest {
         val fileStorageService = InMemoryFileStorageService()

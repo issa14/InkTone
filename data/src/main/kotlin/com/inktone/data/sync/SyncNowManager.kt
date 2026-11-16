@@ -131,9 +131,8 @@ class SyncNowManager @Inject constructor(
         if (remoteFiles.isEmpty()) return
 
         val fleetLabels = syncFleetRepository.listDevices().associate { it.deviceId to it.displayName }
-        val localBookmarks = bookmarkRepository.observeAll().first().associateBy { it.id }.toMutableMap()
-        val localAnnotations = annotationRepository.getAll().associateBy { it.id }.toMutableMap()
-        val localTombstones = syncTombstoneRepository.getAll().associateBy { it.id }.toMutableMap()
+        val merger = BookmarkAnnotationMerger(bookmarkRepository, annotationRepository, syncTombstoneRepository)
+        val mergeState = merger.load()
         // Lot 22, tâche 13 — union des sessions par clé primaire (id stable),
         // idempotente par construction : on ne réinsère jamais un id déjà
         // local, d'où aucune agrégation à écrire.
@@ -154,72 +153,9 @@ class SyncNowManager @Inject constructor(
             // sont retrouvés par l'empreinte de leur fichier (audit UX D57).
             val matcher = PublicationMatcher(payload, publicationRepository)
 
-            // Suppressions d'abord : elles s'appliquent avant que les éléments de cet instantané
-            // ne soient recréés (audit UX D61).
-            payload.deletions.mapNotNull { it.toDomain() }.forEach { tombstone ->
-                val known = localTombstones[tombstone.id]
-                if (known == null || known.deletedAt < tombstone.deletedAt) {
-                    syncTombstoneRepository.record(tombstone)
-                    localTombstones[tombstone.id] = tombstone
-                }
-                when (tombstone.kind) {
-                    TombstoneKind.BOOKMARK -> localBookmarks[tombstone.id]?.let { local ->
-                        // Modifié après sa suppression ailleurs : la modification l'emporte.
-                        if (local.updatedAt <= tombstone.deletedAt) {
-                            bookmarkRepository.delete(tombstone.id)
-                            localBookmarks.remove(tombstone.id)
-                        }
-                    }
-                    TombstoneKind.ANNOTATION -> localAnnotations[tombstone.id]?.let { local ->
-                        if (local.updatedAt <= tombstone.deletedAt) {
-                            annotationRepository.delete(tombstone.id)
-                            localAnnotations.remove(tombstone.id)
-                        }
-                    }
-                }
-            }
-
             // Signets et annotations : jamais de question posée. Un élément supprimé ne revient pas ;
-            // un élément déjà connu prend la version la plus récente.
-            payload.bookmarks.forEach { backup ->
-                val remote = backup.toDomain()
-                if (isDeletedSince(localTombstones[backup.id], remote.updatedAt)) return@forEach
-                val local = localBookmarks[backup.id]
-                if (local != null) {
-                    if (remote.updatedAt > local.updatedAt) {
-                        val merged = local.copy(title = remote.title, note = remote.note, updatedAt = remote.updatedAt)
-                        bookmarkRepository.update(merged)
-                        localBookmarks[backup.id] = merged
-                    }
-                    return@forEach
-                }
-                val publicationId = matcher.localIdOf(backup.publicationId) ?: return@forEach
-                forgetTombstone(localTombstones, backup.id)
-                val inserted = remote.copy(publicationId = publicationId)
-                bookmarkRepository.insert(inserted)
-                localBookmarks[backup.id] = inserted
-            }
-            payload.annotations.forEach { backup ->
-                val remote = backup.toDomain()
-                if (isDeletedSince(localTombstones[backup.id], remote.updatedAt)) return@forEach
-                val local = localAnnotations[backup.id]
-                if (local != null) {
-                    if (remote.updatedAt > local.updatedAt) {
-                        val merged = local.copy(
-                            color = remote.color, kind = remote.kind, content = remote.content,
-                            excerpt = remote.excerpt, updatedAt = remote.updatedAt,
-                        )
-                        annotationRepository.update(merged)
-                        localAnnotations[backup.id] = merged
-                    }
-                    return@forEach
-                }
-                val publicationId = matcher.localIdOf(backup.publicationId) ?: return@forEach
-                forgetTombstone(localTombstones, backup.id)
-                val inserted = remote.copy(publicationId = publicationId)
-                annotationRepository.insert(inserted)
-                localAnnotations[backup.id] = inserted
-            }
+            // un élément déjà connu prend la version la plus récente (audit UX D61).
+            merger.merge(mergeState, payload, matcher)
             // Réglages/thèmes : dernier écrit gagne (REPLACE au niveau DAO).
             payload.pronunciationRules.forEach { pronunciationRuleRepository.save(it.toDomain()) }
             payload.customThemes.forEach { themeRepository.saveCustom(it.toDomain()) }
@@ -301,13 +237,5 @@ class SyncNowManager @Inject constructor(
                 ),
             )
         }
-    }
-    /** Vrai si [tombstone] supprime un élément dont la dernière modification ([updatedAt]) ne la dépasse pas. */
-    private fun isDeletedSince(tombstone: SyncTombstone?, updatedAt: Long): Boolean =
-        tombstone != null && tombstone.deletedAt >= updatedAt
-
-    /** Un élément modifié après sa suppression ailleurs est recréé : sa tombe n'a plus lieu d'être. */
-    private suspend fun forgetTombstone(localTombstones: MutableMap<String, SyncTombstone>, id: String) {
-        if (localTombstones.remove(id) != null) syncTombstoneRepository.remove(id)
     }
 }
