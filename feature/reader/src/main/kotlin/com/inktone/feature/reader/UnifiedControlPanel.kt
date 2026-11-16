@@ -22,6 +22,7 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.unit.dp
+import androidx.compose.ui.semantics.Role
 import com.inktone.core.designsystem.AppIcon
 import com.inktone.core.designsystem.AppSymbol
 import com.inktone.core.designsystem.InkToneShapes
@@ -150,7 +151,7 @@ fun UnifiedControlPanel(
                     }
                 }
                 Box(Modifier.weight(1f), contentAlignment = Alignment.Center) {
-                    SecondaryAction(symbol = AppSymbol.Theme, contentDescription = "Thème", tint = iconTint, onClick = onThemeCycle)
+                    SecondaryAction(symbol = AppSymbol.Theme, contentDescription = "Thème suivant", tint = iconTint, onClick = onThemeCycle)
                 }
                 Box(Modifier.weight(1f), contentAlignment = Alignment.Center) {
                     SecondaryAction(symbol = AppSymbol.FormatSize, contentDescription = "Réglages du texte", tint = iconTint, onClick = onAaClick)
@@ -173,28 +174,29 @@ fun UnifiedControlPanel(
                     // (demi-lune) n'évoquait pas un minuteur.
                     SecondaryAction(
                         symbol = AppSymbol.Timer,
-                        contentDescription = "Minuteur",
+                        contentDescription = "Minuteur de sommeil",
                         tint = if (sleepTimerActive) accentColor else iconTint,
                         onClick = onSleepTimerClick,
                     )
                 }
                 Box(Modifier.weight(1f), contentAlignment = Alignment.Center) {
                     if (showTtsControls) {
-                        SecondaryAction(symbol = AppSymbol.Speaking, contentDescription = "Haut-parleur", tint = iconTint, onClick = onTtsClick)
+                        SecondaryAction(symbol = AppSymbol.Speaking, contentDescription = "Voix et vitesse", tint = iconTint, onClick = onTtsClick)
                     }
                 }
                 Box(Modifier.weight(1f), contentAlignment = Alignment.Center) {
                     if (showReadingModeToggle) {
                         SecondaryAction(
                             symbol = if (readingMode == ReadingMode.PAGED) AppSymbol.ReadingModePaged else AppSymbol.ReadingModeScroll,
-                            contentDescription = if (readingMode == ReadingMode.PAGED) "Mode pages" else "Mode défilement",
+                            // L'icône montre le mode actif ; le libellé dit ce que fait l'appui.
+                            contentDescription = if (readingMode == ReadingMode.PAGED) "Passer en mode défilement" else "Passer en mode pages",
                             tint = iconTint,
                             onClick = onReadingModeClick,
                         )
                     }
                 }
                 Box(Modifier.weight(1f), contentAlignment = Alignment.Center) {
-                    SecondaryAction(symbol = AppSymbol.Search, contentDescription = "Recherche", tint = iconTint, onClick = onSearchClick)
+                    SecondaryAction(symbol = AppSymbol.Search, contentDescription = "Rechercher dans ce livre", tint = iconTint, onClick = onSearchClick)
                 }
                 Box(Modifier.weight(1f), contentAlignment = Alignment.Center) {
                     SecondaryAction(symbol = AppSymbol.Brightness, contentDescription = "Luminosité", tint = iconTint, onClick = onBrightnessClick)
@@ -219,7 +221,8 @@ private fun SecondaryAction(
         contentAlignment = Alignment.Center,
         modifier = Modifier
             .clip(RoundedCornerShape(8.dp))
-            .clickable(onClick = onClick)
+            // Sans rôle, TalkBack lisait le libellé sans dire « bouton ».
+            .clickable(role = Role.Button, onClick = onClick)
             .defaultMinSize(minWidth = 48.dp, minHeight = 48.dp)
             .padding(horizontal = 10.dp, vertical = 10.dp),
     ) {

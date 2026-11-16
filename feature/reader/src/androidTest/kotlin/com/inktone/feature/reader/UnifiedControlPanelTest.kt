@@ -3,6 +3,10 @@ package com.inktone.feature.reader
 import androidx.compose.ui.test.junit4.createComposeRule
 import androidx.compose.ui.test.onNodeWithContentDescription
 import androidx.compose.ui.test.performClick
+import androidx.compose.ui.semantics.Role
+import androidx.compose.ui.semantics.SemanticsProperties
+import androidx.compose.ui.test.SemanticsMatcher
+import androidx.compose.ui.test.assert
 import org.junit.Assert.assertEquals
 import org.junit.Rule
 import org.junit.Test
@@ -45,8 +49,8 @@ class UnifiedControlPanelTest {
         }
 
         val expectedActions = listOf(
-            "Sommaire", "Signets", "Lire", "Thème", "Réglages du texte",
-            "Minuteur", "Haut-parleur", "Mode pages", "Recherche", "Luminosité",
+            "Sommaire", "Signets", "Lire", "Thème suivant", "Réglages du texte",
+            "Minuteur de sommeil", "Voix et vitesse", "Passer en mode défilement", "Rechercher dans ce livre", "Luminosité",
         )
         for (action in expectedActions) {
             composeTestRule.onNodeWithContentDescription(action).performClick()
@@ -80,5 +84,26 @@ class UnifiedControlPanelTest {
         composeTestRule.onNodeWithContentDescription("Chapitre suivant").assertDoesNotExist()
         composeTestRule.onNodeWithContentDescription("Pas de chapitre precedent").assertDoesNotExist()
         composeTestRule.onNodeWithContentDescription("Pas de chapitre suivant").assertDoesNotExist()
+    }
+
+    /** Audit UI P0-8 : TalkBack annonce les icônes du panneau comme des boutons. */
+    @Test
+    fun les_actions_secondaires_sont_annoncees_comme_boutons() {
+        composeTestRule.setContent {
+            UnifiedControlPanel(
+                isPlaying = false,
+                sleepTimerActive = false,
+                bookProgression = 0.5f,
+                onPlayPause = {},
+                onSleepTimerClick = {},
+                onSearchClick = {},
+                onBookmarksClick = {},
+                onTocClick = {},
+                onThemeCycle = {},
+            )
+        }
+
+        composeTestRule.onNodeWithContentDescription("Signets")
+            .assert(SemanticsMatcher.expectValue(SemanticsProperties.Role, Role.Button))
     }
 }
