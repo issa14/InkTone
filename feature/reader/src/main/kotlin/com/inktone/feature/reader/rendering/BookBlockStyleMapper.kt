@@ -7,6 +7,7 @@ import androidx.compose.ui.text.buildAnnotatedString
 import androidx.compose.ui.text.font.FontStyle
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.BaselineShift
+import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextDecoration
 import androidx.compose.ui.text.withStyle
 import androidx.compose.ui.unit.TextUnit
@@ -62,10 +63,13 @@ object BookBlockStyleMapper {
      * @param baseStyle Le style de base (taille de police, police, couleur
      *   du thème de lecture).
      */
-    fun textStyleFor(block: BookBlock, baseStyle: TextStyle): TextStyle = when {
-        block is BookBlock.HeadingBlock -> headingStyle(block.level, baseStyle)
-        block is BookBlock.ParagraphBlock && block.isBlockquote -> baseStyle.copy(fontStyle = FontStyle.Italic)
-        else -> baseStyle
+    fun textStyleFor(block: BookBlock, baseStyle: TextStyle): TextStyle {
+        val styled = when {
+            block is BookBlock.HeadingBlock -> headingStyle(block.level, baseStyle)
+            block is BookBlock.ParagraphBlock && block.isBlockquote -> baseStyle.copy(fontStyle = FontStyle.Italic)
+            else -> baseStyle
+        }
+        return if (block.isCentered) styled.copy(textAlign = TextAlign.Center) else styled
     }
 
     /** Agrandissement d'un titre de niveau [level] ; partagé avec le mode paginé. */

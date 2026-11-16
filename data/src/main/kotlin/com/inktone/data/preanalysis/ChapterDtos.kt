@@ -56,6 +56,7 @@ internal data class BookBlockDto(
     val globalOffsetStart: Int? = null,
     val globalOffsetEnd: Int? = null,
     val isBlockquote: Boolean = false,
+    val isCentered: Boolean = false,
     val level: Int? = null,
     val href: String? = null,
     val alt: String? = null,
@@ -115,12 +116,14 @@ private fun BookBlock.toDto(): BookBlockDto = when (this) {
         globalOffsetStart = globalOffsetRange.first,
         globalOffsetEnd = globalOffsetRange.last,
         isBlockquote = isBlockquote,
+        isCentered = isCentered,
     )
     is BookBlock.HeadingBlock -> BookBlockDto(
         type = "heading",
         richText = richText.toDto(),
         globalOffsetStart = globalOffsetRange.first,
         globalOffsetEnd = globalOffsetRange.last,
+        isCentered = isCentered,
         level = level,
     )
     is BookBlock.ImageBlock -> BookBlockDto(
@@ -138,11 +141,13 @@ private fun BookBlockDto.toDomain(): BookBlock = when (type) {
         richText = requireNotNull(richText) { "paragraph sans richText" }.toDomain(),
         globalOffsetRange = range(),
         isBlockquote = isBlockquote,
+        isCentered = isCentered,
     )
     "heading" -> BookBlock.HeadingBlock(
         level = requireNotNull(level) { "heading sans level" },
         richText = requireNotNull(richText) { "heading sans richText" }.toDomain(),
         globalOffsetRange = range(),
+        isCentered = isCentered,
     )
     "image" -> BookBlock.ImageBlock(
         href = requireNotNull(href) { "image sans href" },

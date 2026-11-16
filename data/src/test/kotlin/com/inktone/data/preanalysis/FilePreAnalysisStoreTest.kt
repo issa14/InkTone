@@ -60,6 +60,19 @@ class FilePreAnalysisStoreTest {
     }
 
     @Test
+    fun `le centrage d'un bloc survit au round-trip`() = runTest {
+        val store = tempStore()
+        val base = chapter(0, "chap1.xhtml", "Bonjour monde.")
+        val block = (base.content as ChapterContent.Rich).blocks.single() as BookBlock.ParagraphBlock
+        val centered = base.copy(content = ChapterContent.Rich(listOf(block.copy(isCentered = true))))
+
+        store.save("pub-1", "hash-abc", listOf(centered))
+
+        val reloaded = store.loadChapter("pub-1", "hash-abc", "chap1.xhtml")?.content as ChapterContent.Rich
+        assertEquals(true, reloaded.blocks.single().isCentered)
+    }
+
+    @Test
     fun `un chapitre sans ancres se relit avec une table vide`() = runTest {
         val store = tempStore()
         store.save("pub-1", "hash-abc", listOf(chapter(0, "chap1.xhtml", "Bonjour monde.")))

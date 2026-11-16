@@ -43,6 +43,13 @@ class CssStylingTest {
     }
 
     @Test
+    fun le_centrage_est_reconnu_et_tout_autre_alignement_le_defait() {
+        assertEquals(true, parseDeclarations("text-align: center").centered)
+        assertEquals(false, parseDeclarations("text-align: justify").centered)
+        assertEquals(true, effect(".c { text-align:center }", "<p class=\"c\">x</p>").centered)
+    }
+
+    @Test
     fun l_attribut_style_est_lu() {
         assertEquals(CssEffect(italic = true, bold = true), parseDeclarations("font-style:italic; font-weight:bold; color:red"))
     }

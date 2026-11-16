@@ -106,6 +106,21 @@ class JsoupChapterParserTest {
         assertTrue(blocks[0].richText.spans.any { SpanStyles.EMPHASIS in it.styles })
     }
 
+    @Test
+    fun `un bloc centre par une classe, une balise ou un conteneur est marque`() {
+        val html = "<html><head><style>.c { text-align: center } h1 { text-align: center }</style></head><body>" +
+            "<h1>Titre</h1><p class=\"c\">Vers</p><center><p>Deux</p></center>" +
+            "<div class=\"c\"><p>Trois</p><p style=\"text-align: left\">Quatre</p></div><p>Cinq</p></body></html>"
+        val blocks = richBlocks(parseWithCss(html))
+        fun centered(text: String) = blocks.first { (it as? BookBlock.ParagraphBlock)?.richText?.plainText == text }.isCentered
+        assertTrue(blocks.first { it is BookBlock.HeadingBlock }.isCentered)
+        assertTrue(centered("Vers"))
+        assertTrue(centered("Deux"))
+        assertTrue(centered("Trois"))
+        assertEquals("un enfant qui précise un autre alignement le reprend", false, centered("Quatre"))
+        assertEquals(false, centered("Cinq"))
+    }
+
     // ---- Audit UX D13 : listes, tableaux et citations n'étaient plus fondus en un paragraphe ----
 
     @Test

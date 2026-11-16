@@ -110,7 +110,8 @@ class JsoupChapterParser {
      * Applique au DOM ce que le CSS (blocs `<style>`, feuilles liées, attribut `style`) dit de
      * l'italique, du gras et du contenu masqué : l'italique et le gras deviennent des balises
      * `<i>` et `<b>` autour du contenu, le contenu masqué est retiré (audit UX D16). Le centrage
-     * et le reste du CSS sont ignorés : le modèle de texte ne les porte pas.
+     * (`text-align`, `<center>`, `align`) est noté sur l'élément ([ALIGN_ATTRIBUTE]) et hérité par
+     * ses descendants ; le reste du CSS est ignoré : le modèle de texte ne le porte pas.
      */
     private fun applyStyles(document: org.jsoup.nodes.Document, chapterHref: String, loadStyleSheet: ((String) -> String?)?) {
         val css = StringBuilder()
@@ -133,6 +134,12 @@ class JsoupChapterParser {
                 continue
             }
             val name = element.normalName()
+            val centered = effect.centered ?: when {
+                name == "center" -> true
+                element.attr("align").equals("center", ignoreCase = true) -> true
+                else -> null
+            }
+            if (centered != null) element.attr(ALIGN_ATTRIBUTE, if (centered) "center" else "start")
             if (effect.bold == true && name !in BOLD_TAGS) wrapContents(element, "b")
             if (effect.italic == true && name !in ITALIC_TAGS) wrapContents(element, "i")
         }
@@ -337,6 +344,24 @@ class JsoupChapterParser {
      * voir cette méthode pour la continuité des [BookBlock.globalOffsetRange].
      */
     private fun extractBlocksFromElement(element: Element, runningOffset: Int, chapterHref: String): List<BookBlock> {
+        val blocks = extractBlocksFromElementUncentered(element, runningOffset, chapterHref)
+        // Un conteneur laisse le centrage à ses enfants, qui le lisent chacun sur leurs ancêtres.
+        if (blocks.isEmpty() || !isCentered(element) || element.normalName() in STRUCTURAL_TAGS || hasBlockLevelChild(element)) return blocks
+        return blocks.map {
+            when (it) {
+                is BookBlock.ParagraphBlock -> it.copy(isCentered = true)
+                is BookBlock.HeadingBlock -> it.copy(isCentered = true)
+                else -> it
+            }
+        }
+    }
+
+    /** Centré par lui-même ou par l'ancêtre le plus proche qui précise un alignement. */
+    private fun isCentered(element: Element): Boolean =
+        generateSequence(element) { it.parent() }.firstOrNull { it.hasAttr(ALIGN_ATTRIBUTE) }
+            ?.attr(ALIGN_ATTRIBUTE) == "center"
+
+    private fun extractBlocksFromElementUncentered(element: Element, runningOffset: Int, chapterHref: String): List<BookBlock> {
         val tagName = element.normalName()
 
         return when (tagName) {
@@ -384,7 +409,7 @@ class JsoupChapterParser {
             // un <div> (motif courant des EPUB du commerce) était aplati en
             // UN SEUL ParagraphBlock — gelant le compteur de page du mode
             // SCROLL (qui dérive la position du premier bloc visible).
-            "div", "section", "article", "main" -> {
+            "div", "section", "article", "main", "center" -> {
                 if (hasBlockLevelChild(element)) {
                     extractContainerBlocks(element, runningOffset, chapterHref)
                 } else if (element.selectFirst("img, svg") != null) {
@@ -937,5 +962,11 @@ class JsoupChapterParser {
 
         private val BOLD_TAGS = setOf("b", "strong", "h1", "h2", "h3", "h4", "h5", "h6")
         private val ITALIC_TAGS = setOf("i", "em")
+
+        /** Attribut posé par [applyStyles] : `center`, ou `start` pour tout autre alignement. */
+        private const val ALIGN_ATTRIBUTE = "data-inktone-align"
+
+        /** Conteneurs dont les enfants deviennent des blocs distincts : ils lisent leur centrage eux-mêmes. */
+        private val STRUCTURAL_TAGS = setOf("ul", "ol", "dl", "table", "thead", "tbody", "tfoot", "tr")
     }
 }

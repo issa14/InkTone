@@ -26,6 +26,9 @@ sealed class BookBlock {
     abstract val approxByteSize: Int
     abstract val globalOffsetRange: IntRange?
 
+    /** Centré par le livre ; faux pour les blocs sans texte (audit UX D16). */
+    open val isCentered: Boolean get() = false
+
     /**
      * Paragraphe de texte avec styles inline.
      *
@@ -35,11 +38,14 @@ sealed class BookBlock {
      * @param isBlockquote `true` pour un `<blockquote>` — seule distinction
      *   sémantique de bloc conservée face à un `<p>`/`<div>` ordinaire
      *   (mise en italique par [com.inktone.feature.reader.rendering.BookBlockStyleMapper]).
+     * @param isCentered `true` si le livre centre ce texte (CSS `text-align: center`, `<center>`,
+     *   `align="center"`) ; seul alignement conservé, le reste se lit à gauche (audit UX D16).
      */
     data class ParagraphBlock(
         val richText: StyledText,
         override val globalOffsetRange: IntRange,
         val isBlockquote: Boolean = false,
+        override val isCentered: Boolean = false,
     ) : BookBlock() {
         override val approxByteSize: Int
             get() = richText.approxByteSize + 16
@@ -57,11 +63,13 @@ sealed class BookBlock {
      * @param level Niveau hiérarchique (1 = titre principal, 2 = sous-titre, etc.)
      * @param richText Texte enrichi du titre.
      * @param globalOffsetRange Offsets dans le texte concaténé du chapitre.
+     * @param isCentered `true` si le livre centre ce titre (audit UX D16).
      */
     data class HeadingBlock(
         val level: Int,
         val richText: StyledText,
         override val globalOffsetRange: IntRange,
+        override val isCentered: Boolean = false,
     ) : BookBlock() {
         override val approxByteSize: Int
             get() = richText.approxByteSize + 20

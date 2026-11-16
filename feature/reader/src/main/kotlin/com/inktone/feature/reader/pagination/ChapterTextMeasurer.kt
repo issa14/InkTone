@@ -9,6 +9,7 @@ import androidx.compose.ui.unit.em
 import androidx.compose.ui.text.TextMeasurer
 import androidx.compose.ui.text.TextStyle
 import androidx.compose.ui.text.buildAnnotatedString
+import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.withStyle
 import androidx.compose.ui.unit.Constraints
 import com.inktone.domain.model.BookBlock
@@ -405,9 +406,11 @@ class ChapterTextMeasurer(private val textMeasurer: TextMeasurer) {
                     // chevauchent pas.
                     val scale = BookBlockStyleMapper.headingScale(block.level)
                     val lineHeight = if (baseStyle.lineHeight.isSp) baseStyle.lineHeight * scale else TextUnit.Unspecified
-                    withStyle(ParagraphStyle(lineHeight = lineHeight)) {
+                    withStyle(ParagraphStyle(lineHeight = lineHeight, textAlign = if (block.isCentered) TextAlign.Center else TextAlign.Unspecified)) {
                         withStyle(SpanStyle(fontSize = scale.em, fontWeight = FontWeight.Bold)) { appendRichText() }
                     }
+                } else if (block.isCentered) {
+                    withStyle(ParagraphStyle(textAlign = TextAlign.Center)) { appendRichText() }
                 } else {
                     appendRichText()
                 }

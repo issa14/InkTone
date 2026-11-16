@@ -3,18 +3,25 @@ package com.inktone.infrastructure.parser
 import org.jsoup.nodes.Element
 
 /**
- * Effet du CSS sur un élément, limité à ce que le modèle de texte sait rendre : italique, gras et
- * contenu masqué (audit UX D16). `null` = non précisé.
+ * Effet du CSS sur un élément, limité à ce que le modèle de texte sait rendre : italique, gras,
+ * centrage et contenu masqué (audit UX D16). `null` = non précisé.
  */
-internal data class CssEffect(val italic: Boolean? = null, val bold: Boolean? = null, val hidden: Boolean? = null) {
+internal data class CssEffect(
+    val italic: Boolean? = null,
+    val bold: Boolean? = null,
+    val hidden: Boolean? = null,
+    /** `text-align` : vrai pour `center`, faux pour toute autre valeur (le modèle ne porte que le centrage). */
+    val centered: Boolean? = null,
+) {
     /** [other] l'emporte là où il précise quelque chose. */
     fun overriddenBy(other: CssEffect) = CssEffect(
         italic = other.italic ?: italic,
         bold = other.bold ?: bold,
         hidden = other.hidden ?: hidden,
+        centered = other.centered ?: centered,
     )
 
-    val isEmpty get() = italic == null && bold == null && hidden == null
+    val isEmpty get() = italic == null && bold == null && hidden == null && centered == null
 }
 
 private data class CssRule(val tag: String?, val classes: Set<String>, val id: String?, val effect: CssEffect)
@@ -117,6 +124,7 @@ internal fun parseDeclarations(block: String): CssEffect {
                     else -> CssEffect()
                 }
                 "display" -> if (value == "none") CssEffect(hidden = true) else CssEffect(hidden = false)
+                "text-align" -> CssEffect(centered = value == "center" || value == "-webkit-center")
                 "visibility" -> if (value == "hidden") CssEffect(hidden = true) else CssEffect()
                 else -> CssEffect()
             },
