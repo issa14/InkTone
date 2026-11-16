@@ -22,7 +22,10 @@ private val BOOK_COVER = By.desc(Pattern.compile(".*(% lu|Commencé|Non commenc�
  * est un état d'appareil, pas un défaut de l'app.
  */
 internal fun MacrobenchmarkScope.openFirstBook(): Boolean {
-    val cover = device.wait(Until.findObject(BOOK_COVER), TIMEOUT_MS) ?: return false
+    if (device.wait(Until.hasObject(BOOK_COVER), TIMEOUT_MS) != true) return false
+    // La vignette de la carte « Reprendre la lecture » porte le même libellé mais
+    // ne réagit pas au tap : viser une couverture de la grille, plus grande.
+    val cover = device.findObjects(BOOK_COVER).maxByOrNull { it.visibleBounds.height() } ?: return false
     cover.click()
     return device.wait(Until.gone(BOOK_COVER), TIMEOUT_MS) == true
 }
