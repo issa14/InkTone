@@ -169,8 +169,7 @@ class LibraryViewModel @Inject constructor(
             is LibraryIntent.SetLayoutMode -> {
                 _state.value = _state.value.copy(layoutMode = intent.mode)
                 viewModelScope.launch {
-                    val current = preferencesRepository.observe().first()
-                    preferencesRepository.update(current.copy(libraryLayoutMode = intent.mode.name))
+                    preferencesRepository.update { it.copy(libraryLayoutMode = intent.mode.name) }
                 }
             }
             is LibraryIntent.ToggleFileFormat -> _state.value = _state.value.copy(

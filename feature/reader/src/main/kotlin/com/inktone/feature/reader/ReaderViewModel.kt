@@ -1746,7 +1746,7 @@ class ReaderViewModel @Inject constructor(
             val prefs = preferencesRepository.get()
             if (!prefs.hasPromptedVoiceDownload) {
                 _state.value = _state.value.copy(showVoiceDownloadPrompt = true)
-                preferencesRepository.update(prefs.copy(hasPromptedVoiceDownload = true))
+                preferencesRepository.update { it.copy(hasPromptedVoiceDownload = true) }
             }
         }
     }
@@ -1829,7 +1829,7 @@ class ReaderViewModel @Inject constructor(
             val updated = resolveVoiceProfile(prefs).copy(speed = speed)
             voiceProfileRepository.save(updated)
             if (prefs.activeVoiceProfileId != updated.id) {
-                preferencesRepository.update(prefs.copy(activeVoiceProfileId = updated.id))
+                preferencesRepository.update { it.copy(activeVoiceProfileId = updated.id) }
             }
             _state.value = _state.value.copy(activeVoiceProfile = updated)
             restartNarrationWithNewProfile()

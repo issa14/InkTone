@@ -355,7 +355,7 @@ class SettingsViewModel @Inject constructor(
         val updated = update(baseProfile)
         voiceProfileRepository.save(updated)
         if (prefs.activeVoiceProfileId != updated.id) {
-            preferencesRepository.update(prefs.copy(activeVoiceProfileId = updated.id))
+            preferencesRepository.update { it.copy(activeVoiceProfileId = updated.id) }
         }
         // Recharger les profils pour mettre à jour l'UI
         _state.value = _state.value.copy(voiceProfiles = getVoiceProfiles())
@@ -370,8 +370,8 @@ class SettingsViewModel @Inject constructor(
      * profil ou le repli ANDROID_NATIVE).
      */
     private suspend fun setDefaultTtsEngine(prefs: UserPreferences, engine: TtsEngineId) {
-        preferencesRepository.update(prefs.copy(defaultTtsEngine = engine))
-        updateActiveVoiceProfile(prefs.copy(defaultTtsEngine = engine)) {
+        preferencesRepository.update { it.copy(defaultTtsEngine = engine) }
+        updateActiveVoiceProfile(preferencesRepository.get()) {
             it.copy(engine = engine, voice = defaultVoiceFor(engine))
         }
     }
@@ -387,21 +387,21 @@ class SettingsViewModel @Inject constructor(
         if (enabled) {
             // L'état d'avant est mémorisé à chaque activation : le préréglage
             // n'était pas actif, il vient d'être demandé (audit UX A11).
-            preferencesRepository.update(
-                current.copy(
+            preferencesRepository.update {
+                it.copy(
                     theme = ReadingTheme.OBSIDIENNE.id,
                     appTheme = AppTheme.DARK,
-                    darkModePresetBackup = DarkModePresetBackup(current.theme, current.appTheme),
-                ),
-            )
+                    darkModePresetBackup = DarkModePresetBackup(it.theme, it.appTheme),
+                )
+            }
         } else {
             // Retour à l'état d'avant ; les valeurs par défaut seulement si
             // aucun n'est mémorisé (préréglage activé avant A11).
-            val previous = current.darkModePresetBackup
-                ?: DarkModePresetBackup(UserPreferences().theme, AppTheme.SYSTEM)
-            preferencesRepository.update(
-                current.copy(theme = previous.theme, appTheme = previous.appTheme, darkModePresetBackup = null),
-            )
+            preferencesRepository.update {
+                val previous = it.darkModePresetBackup
+                    ?: DarkModePresetBackup(UserPreferences().theme, AppTheme.SYSTEM)
+                it.copy(theme = previous.theme, appTheme = previous.appTheme, darkModePresetBackup = null)
+            }
         }
     }
 
@@ -417,8 +417,8 @@ class SettingsViewModel @Inject constructor(
      */
     private suspend fun applyAccessibilityPresetToggle(enabled: Boolean, current: UserPreferences) {
         if (enabled) {
-            preferencesRepository.update(
-                current.copy(
+            preferencesRepository.update {
+                it.copy(
                     fontSize = 24,
                     theme = ReadingTheme.PAPIER_CLAIR.id,
                     fontFamily = FontFamily.OPEN_DYSLEXIC,
@@ -426,27 +426,27 @@ class SettingsViewModel @Inject constructor(
                     readingRulerEnabled = true,
                     libraryLayoutMode = "LIST",
                     accessibilityPresetBackup = AccessibilityPresetBackup(
-                        fontSize = current.fontSize,
-                        theme = current.theme,
-                        fontFamily = current.fontFamily,
-                        reduceMotion = current.reduceMotion,
-                        readingRulerEnabled = current.readingRulerEnabled,
-                        libraryLayoutMode = current.libraryLayoutMode,
+                        fontSize = it.fontSize,
+                        theme = it.theme,
+                        fontFamily = it.fontFamily,
+                        reduceMotion = it.reduceMotion,
+                        readingRulerEnabled = it.readingRulerEnabled,
+                        libraryLayoutMode = it.libraryLayoutMode,
                     ),
-                ),
-            )
+                )
+            }
         } else {
             val defaults = UserPreferences()
-            val previous = current.accessibilityPresetBackup ?: AccessibilityPresetBackup(
-                fontSize = defaults.fontSize,
-                theme = defaults.theme,
-                fontFamily = defaults.fontFamily,
-                reduceMotion = defaults.reduceMotion,
-                readingRulerEnabled = defaults.readingRulerEnabled,
-                libraryLayoutMode = defaults.libraryLayoutMode,
-            )
-            preferencesRepository.update(
-                current.copy(
+            preferencesRepository.update {
+                val previous = it.accessibilityPresetBackup ?: AccessibilityPresetBackup(
+                    fontSize = defaults.fontSize,
+                    theme = defaults.theme,
+                    fontFamily = defaults.fontFamily,
+                    reduceMotion = defaults.reduceMotion,
+                    readingRulerEnabled = defaults.readingRulerEnabled,
+                    libraryLayoutMode = defaults.libraryLayoutMode,
+                )
+                it.copy(
                     fontSize = previous.fontSize,
                     theme = previous.theme,
                     fontFamily = previous.fontFamily,
@@ -454,8 +454,8 @@ class SettingsViewModel @Inject constructor(
                     readingRulerEnabled = previous.readingRulerEnabled,
                     libraryLayoutMode = previous.libraryLayoutMode,
                     accessibilityPresetBackup = null,
-                ),
-            )
+                )
+            }
         }
     }
 }

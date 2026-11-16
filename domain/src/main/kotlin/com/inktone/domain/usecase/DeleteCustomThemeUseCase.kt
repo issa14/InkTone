@@ -29,10 +29,7 @@ class DeleteCustomThemeUseCase(
     private val readingStateRepository: ReadingStateRepository,
 ) {
     suspend operator fun invoke(themeId: String) {
-        val prefs = preferencesRepository.get()
-        if (prefs.theme == themeId) {
-            preferencesRepository.update(prefs.copy(theme = ReadingTheme.DEFAULT.id))
-        }
+        preferencesRepository.update { if (it.theme == themeId) it.copy(theme = ReadingTheme.DEFAULT.id) else it }
 
         readingStateRepository.getAll()
             .filter { it.overrides?.theme == themeId }

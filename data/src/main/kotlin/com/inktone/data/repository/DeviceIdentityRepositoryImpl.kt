@@ -29,8 +29,10 @@ class DeviceIdentityRepositoryImpl @Inject constructor(
 
         val id = existingId ?: UUID.randomUUID().toString()
         val name = existingName ?: defaultDisplayName()
-        preferencesRepository.update(current.copy(deviceId = id, deviceDisplayName = name))
-        return DeviceIdentity(id, name)
+        // Deux premiers appels simultanés : le premier identifiant écrit l'emporte, l'autre le relit.
+        preferencesRepository.update { it.copy(deviceId = it.deviceId ?: id, deviceDisplayName = it.deviceDisplayName ?: name) }
+        val stored = preferencesRepository.get()
+        return DeviceIdentity(stored.deviceId ?: id, stored.deviceDisplayName ?: name)
     }
 
     private fun defaultDisplayName(): String = Build.MODEL?.takeIf { it.isNotBlank() } ?: "Appareil inconnu"
