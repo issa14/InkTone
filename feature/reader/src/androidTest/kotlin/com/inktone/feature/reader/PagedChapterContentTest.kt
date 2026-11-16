@@ -14,6 +14,7 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.layout.onGloballyPositioned
 import androidx.compose.ui.semantics.SemanticsNode
 import androidx.compose.ui.semantics.SemanticsProperties
+import androidx.compose.ui.semantics.getOrNull
 import androidx.compose.ui.test.SemanticsMatcher
 import androidx.compose.ui.test.isDisplayed
 import androidx.compose.ui.test.junit4.createComposeRule
@@ -120,11 +121,17 @@ class PagedChapterContentTest {
         }
     }
 
-    /** N'importe quel nœud portant du texte Compose (`SemanticsProperties.Text`), sans exiger un contenu précis. */
-    private val hasAnyText = SemanticsMatcher("hasAnyText") { it.config.contains(SemanticsProperties.Text) }
+    /**
+     * N'importe quel nœud portant du texte : une page est un `BasicTextField`, qui
+     * expose `EditableText`, un titre un `Text` (`SemanticsProperties.Text`).
+     */
+    private val hasAnyText = SemanticsMatcher("hasAnyText") {
+        it.config.contains(SemanticsProperties.EditableText) || it.config.contains(SemanticsProperties.Text)
+    }
 
     private fun SemanticsNode.renderedText(): String =
-        config[SemanticsProperties.Text].joinToString(separator = "") { it.text }
+        config.getOrNull(SemanticsProperties.EditableText)?.text
+            ?: config[SemanticsProperties.Text].joinToString(separator = "") { it.text }
 
     /** Nœuds portant du texte actuellement visibles à l'écran — exclut les pages voisines préchargées hors-viewport (`beyondViewportPageCount`). */
     private fun displayedTextNodes(): List<SemanticsNode> =
@@ -177,7 +184,10 @@ class PagedChapterContentTest {
         val node = composeTestRule.onAllNodesWithText(headingText, substring = true)
             .fetchSemanticsNodes().first()
 
-        val hasBoldSpanOverHeading = node.config[SemanticsProperties.Text].any { annotated: AnnotatedString ->
+        // Page rendue par un `BasicTextField` : son texte est `EditableText`, pas `Text`.
+        val texts = node.config.getOrNull(SemanticsProperties.EditableText)?.let { listOf(it) }
+            ?: node.config[SemanticsProperties.Text]
+        val hasBoldSpanOverHeading = texts.any { annotated: AnnotatedString ->
             annotated.spanStyles.any { range: AnnotatedString.Range<SpanStyle> ->
                 range.item.fontWeight == FontWeight.Bold && range.start < headingText.length
             }
