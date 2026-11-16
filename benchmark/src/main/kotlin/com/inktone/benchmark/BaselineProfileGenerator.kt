@@ -94,29 +94,24 @@ class BaselineProfileGenerator {
                 )
                 device.waitForIdle()
             }
+            // Défilement vertical : sans effet en mode paginé, il fait entrer
+            // le rendu des paragraphes en mode défilement dans le profil (lot 25).
+            repeat(READER_SWIPES) {
+                readingSwipe(down = true)
+                device.waitForIdle()
+            }
+            repeat(READER_SWIPES) {
+                readingSwipe(down = false)
+                device.waitForIdle()
+            }
             device.pressBack()
             device.waitForIdle()
         }
     }
 
-    /**
-     * Ouvre le premier livre de la bibliothèque. Retourne `false` si aucun
-     * n'est trouvé — la collecte se poursuit alors sur le seul démarrage,
-     * plutôt que d'échouer : un profil partiel reste meilleur qu'aucun profil,
-     * et l'absence de livre est un état d'appareil, pas un défaut de l'app.
-     */
-    private fun androidx.benchmark.macro.MacrobenchmarkScope.openFirstBook(): Boolean {
-        val candidate = device.findObject(By.clickable(true).longClickable(true))
-            ?: device.findObject(By.clickable(true))
-            ?: return false
-        candidate.click()
-        return device.wait(Until.hasObject(By.pkg(PACKAGE_NAME).depth(0)), TIMEOUT_MS)
-    }
-
     private companion object {
-        const val PACKAGE_NAME = "com.inktone.app"
-        const val TIMEOUT_MS = 10_000L
         const val PAGE_TURNS = 3
+        const val READER_SWIPES = 3
         const val SCROLL_PERCENT = 0.8f
         const val GESTURE_MARGIN_DIVISOR = 5
         const val SWIPE_FROM_X = 8
