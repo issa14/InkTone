@@ -150,7 +150,7 @@ fun InkToneNavHost(navController: NavHostController = rememberNavController(), s
                     // actée, plan du Lot 18) : pas de `popUpTo`.
                     onOpenSettings = {
                         scope.launch { drawerState.close() }
-                        navController.navigate(SettingsRoute)
+                        navController.navigate(SettingsRoute())
                     },
                     onOpenThemes = {
                         scope.launch { drawerState.close() }
@@ -311,7 +311,8 @@ fun InkToneNavHost(navController: NavHostController = rememberNavController(), s
                 onSearchClick = { navController.navigate(SearchRoute(publicationId = route.publicationId)) },
                 onBack = { navController.leaveReader() },
                 onOpenPronunciationRules = { navController.navigate(PronunciationRulesRoute) },
-                onOpenSettings = { navController.navigate(SettingsRoute) },
+                onOpenSettings = { navController.navigate(SettingsRoute()) },
+                onOpenVoiceDownload = { navController.navigate(SettingsRoute(focusVoiceDownload = true)) },
                 // Cible de la transition de CET écran : `Visible` dès sa
                 // première frame, `PostExit` dès le DÉBUT d'une transition
                 // sortante — alors que ce composable reste affiché jusqu'à sa
@@ -350,7 +351,8 @@ fun InkToneNavHost(navController: NavHostController = rememberNavController(), s
                 )
             }
         }
-        composable<SettingsRoute> {
+        composable<SettingsRoute> { backStackEntry ->
+            val settingsRoute = backStackEntry.toRoute<SettingsRoute>()
             // Tache 9bis.5 : SettingsScreen possede desormais son propre
             // Scaffold/LargeTopAppBar (effet de collapse), pas de BackScaffold
             // generique ici contrairement aux autres destinations.
@@ -389,6 +391,7 @@ fun InkToneNavHost(navController: NavHostController = rememberNavController(), s
             ) { uri -> pendingImportUri = uri }
 
             SettingsScreen(
+                focusVoiceDownload = settingsRoute.focusVoiceDownload,
                 onOpenAbout = { navController.navigate(AboutRoute) },
                 onBack = navController::popBackStack,
                 modelsFolderInfo = backupViewModel.modelsFolderInfo,
@@ -450,7 +453,7 @@ fun InkToneNavHost(navController: NavHostController = rememberNavController(), s
 
             SyncConfigurationScreen(
                 onMenuClick = openDrawer,
-                onOpenLocalBackup = { navController.navigate(SettingsRoute) },
+                onOpenLocalBackup = { navController.navigate(SettingsRoute()) },
                 isGoogleAuthenticating = isAuthenticating,
                 isGoogleConfigured = syncAuthViewModel.isGoogleConfigured,
                 onConnectGoogle = { authLauncher.launch(syncAuthViewModel.buildAuthorizationIntent()) },

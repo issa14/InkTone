@@ -45,8 +45,9 @@ object RecentsRoute
 @Serializable
 data class SearchRoute(val publicationId: String? = null)
 
+/** [focusVoiceDownload] : arrivée depuis la proposition du Lecteur, page défilée jusqu'à la voix (audit UX A7). */
 @Serializable
-object SettingsRoute
+data class SettingsRoute(val focusVoiceDownload: Boolean = false)
 
 /** Lot 11, tâche 11.6 — dernière des 4 destinations masquées au lot 1 (drawer). */
 @Serializable

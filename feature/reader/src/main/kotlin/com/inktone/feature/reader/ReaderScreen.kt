@@ -196,6 +196,8 @@ fun ReaderScreen(
     onBack: () -> Unit = {},
     onOpenPronunciationRules: () -> Unit = {},
     onOpenSettings: () -> Unit = {},
+    /** Réglages ouverts sur la carte de la voix neuronale (audit UX A7). */
+    onOpenVoiceDownload: () -> Unit = onOpenSettings,
     isForeground: Boolean = true,
 ) {
     // État du ViewModel, gardé en `State` : les champs VIVANTS (phrase
@@ -1839,7 +1841,7 @@ AnnotationTapPopup(
                 confirmButton = {
                     androidx.compose.material3.TextButton(onClick = {
                         viewModel.onIntent(ReaderIntent.DismissVoiceDownloadPrompt)
-                        onOpenSettings()
+                        onOpenVoiceDownload()
                     }) { Text("Télécharger") }
                 },
                 dismissButton = {

@@ -22,6 +22,10 @@ import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.layout.wrapContentWidth
 import androidx.compose.foundation.rememberScrollState
+import androidx.compose.ui.layout.LayoutCoordinates
+import androidx.compose.ui.layout.onGloballyPositioned
+import androidx.compose.ui.geometry.Offset
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.foundation.selection.toggleable
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
@@ -102,6 +106,7 @@ import com.inktone.domain.model.voiceLabel
 @Composable
 fun SettingsScreen(
     viewModel: SettingsViewModel = hiltViewModel(),
+    focusVoiceDownload: Boolean = false,
     onOpenAbout: () -> Unit = {},
     onBack: () -> Unit = {},
     modelsFolderInfo: ModelsFolderInfo = ModelsFolderInfo(path = "Emplacement inconnu"),
@@ -137,6 +142,7 @@ fun SettingsScreen(
                 isPreviewing = state.isPreviewing,
                 previewError = state.previewError,
                 pitchEngines = state.pitchEngines,
+                focusVoiceDownload = focusVoiceDownload,
                 onIntent = viewModel::onIntent,
                 onOpenAbout = onOpenAbout,
                 modelsFolderInfo = modelsFolderInfo,
@@ -164,6 +170,7 @@ internal fun SettingsContent(
     isPreviewing: Boolean = false,
     previewError: String? = null,
     pitchEngines: Set<TtsEngineId> = emptySet(),
+    focusVoiceDownload: Boolean = false,
     onIntent: (SettingsIntent) -> Unit,
     onOpenAbout: () -> Unit = {},
     modelsFolderInfo: ModelsFolderInfo = ModelsFolderInfo(path = "Emplacement inconnu"),
@@ -176,7 +183,23 @@ internal fun SettingsContent(
     // Tâche 9bis suite) : sans verticalScroll ici, le contenu qui déborde
     // de l'écran était inatteignable — ET le LargeTopAppBar (Tâche 9bis.5)
     // n'avait rien à quoi accrocher son effet de collapse.
-    Column(modifier = Modifier.padding(horizontal = 16.dp).verticalScroll(rememberScrollState())) {
+    val scrollState = rememberScrollState()
+    // Arrivée depuis la proposition du Lecteur : la page défile jusqu'à la voix
+    // neuronale au lieu de s'ouvrir en haut (audit UX A7).
+    val scrolledContent = remember { arrayOfNulls<LayoutCoordinates>(1) }
+    var voiceDownloadRow by remember { mutableStateOf<LayoutCoordinates?>(null) }
+    LaunchedEffect(focusVoiceDownload, voiceDownloadRow != null) {
+        if (!focusVoiceDownload) return@LaunchedEffect
+        val row = voiceDownloadRow ?: return@LaunchedEffect
+        val content = scrolledContent[0] ?: return@LaunchedEffect
+        scrollState.animateScrollTo(content.localPositionOf(row, Offset.Zero).y.toInt())
+    }
+    Column(
+        modifier = Modifier
+            .padding(horizontal = 16.dp)
+            .verticalScroll(scrollState)
+            .onGloballyPositioned { scrolledContent[0] = it },
+    ) {
 
         // ── Carte 1 : Présets rapides ──────────────────────────────────────────
         // Le toggle reflète l'état réel : si un réglage du préset est modifié
@@ -245,11 +268,13 @@ internal fun SettingsContent(
             // modèle CTC câblés, AUDIT_CONSOLIDATION_V1.md B2 corrigé).
             // La voix du système reste le repli tant que le modèle n'est
             // pas installé (FallbackTtsEngine) — jamais bloquant.
-            VoiceDownloadRow(
-                progress = voiceDownloadProgress,
-                onStart = { onIntent(SettingsIntent.StartVoiceDownload) },
-                onCancel = { onIntent(SettingsIntent.CancelVoiceDownload) },
-            )
+            Box(Modifier.onGloballyPositioned { if (voiceDownloadRow == null) voiceDownloadRow = it }) {
+                VoiceDownloadRow(
+                    progress = voiceDownloadProgress,
+                    onStart = { onIntent(SettingsIntent.StartVoiceDownload) },
+                    onCancel = { onIntent(SettingsIntent.CancelVoiceDownload) },
+                )
+            }
             // Lot 6 — vitesse : même cible VoiceProfile.speed que le panneau Voix du lecteur (Tâche 3d).
             InkToneSlider(
                 modifier = Modifier.padding(horizontal = 20.dp, vertical = 12.dp),
