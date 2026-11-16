@@ -37,6 +37,7 @@ import coil.compose.AsyncImage
 import coil.request.ImageRequest
 import com.inktone.core.designsystem.AppIcon
 import com.inktone.core.designsystem.AppSymbol
+import com.inktone.core.designsystem.formatPercent
 import com.inktone.domain.model.Publication
 import java.io.File
 
@@ -156,11 +157,11 @@ fun BookCover(
                     .size(32.dp)
                     .clip(CircleShape)
                     .background(Color.Black.copy(alpha = 0.55f))
-                    .semantics { contentDescription = "Progression $progressPercent%" },
+                    .semantics { contentDescription = "Progression ${formatPercent(progressPercent)}" },
                 contentAlignment = Alignment.Center,
             ) {
                 Text(
-                    text = "$progressPercent%",
+                    text = formatPercent(progressPercent),
                     color = Color.White,
                     fontSize = 10.sp,
                     fontWeight = FontWeight.Bold,

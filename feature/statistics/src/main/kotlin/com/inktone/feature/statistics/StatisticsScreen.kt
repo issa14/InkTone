@@ -71,6 +71,7 @@ import com.inktone.domain.model.cleanedForDisplay
 import com.inktone.core.designsystem.AppIcon
 import com.inktone.core.designsystem.AppSymbol
 import com.inktone.core.designsystem.InkToneSpacing
+import com.inktone.core.designsystem.formatPercent
 import com.inktone.domain.model.DailyReadingStats
 import com.inktone.domain.service.ExportFormat
 import com.inktone.domain.usecase.StatsPeriod
@@ -683,7 +684,7 @@ private fun Section3CurrentBook(book: com.inktone.domain.usecase.CurrentBookStat
                     val remaining = book.remainingTimeFormatted
                     val remainingLabel = if (remaining != null) "encore ≈ $remaining estimées" else "—"
                     Text(
-                        if (progress != null) "${progressionPercent(progress)}% · $remainingLabel" else remainingLabel,
+                        if (progress != null) "${formatPercent(progressionPercent(progress))} · $remainingLabel" else remainingLabel,
                         style = MaterialTheme.typography.bodySmall,
                         color = MaterialTheme.colorScheme.onSurfaceVariant,
                     )

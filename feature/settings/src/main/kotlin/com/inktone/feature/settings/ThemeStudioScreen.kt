@@ -83,7 +83,7 @@ fun ThemeStudioScreen(
     Scaffold(
         topBar = {
             TopAppBar(
-                title = { Text("Studio de Thème") },
+                title = { Text("Studio de thème") },
                 navigationIcon = {
                     IconButton(onClick = onBack) {
                         AppIcon(AppSymbol.Back, contentDescription = "Retour")
@@ -121,7 +121,7 @@ fun ThemeStudioScreen(
                     ColorSelectorRow("Texte principal", state.textColorHex) { colorFieldBeingEdited = ColorField.TEXT }
                 }
                 item {
-                    ColorSelectorRow("Accent & Progression", state.accentColorHex) { colorFieldBeingEdited = ColorField.ACCENT }
+                    ColorSelectorRow("Couleur d'accent", state.accentColorHex) { colorFieldBeingEdited = ColorField.ACCENT }
                 }
                 item {
                     ColorSelectorRow("Surlignage d'annotation", state.highlightColorHex) { colorFieldBeingEdited = ColorField.HIGHLIGHT }
@@ -256,7 +256,7 @@ private fun StudioLivePreview(state: ThemeStudioUiState) {
         )
         Spacer(Modifier.height(4.dp))
         Text(
-            "35% · Page 42",
+            "35\u202F% · Page 42",
             style = MaterialTheme.typography.labelSmall,
             color = state.textColorHex.toColor().copy(alpha = 0.7f),
         )

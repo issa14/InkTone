@@ -46,7 +46,7 @@ import androidx.hilt.navigation.compose.hiltViewModel
 import com.inktone.core.designsystem.toColor
 import com.inktone.domain.model.ReadingTheme
 
-private const val PREVIEW_EXCERPT = "La lumière filtrait doucement à travers les persiennes..."
+private const val PREVIEW_EXCERPT = "La lumière filtrait doucement à travers les persiennes…"
 
 /**
  * Lot 9, Tâche 9.4 — Galerie de thèmes (UX §Galerie de thèmes). Pas de
@@ -110,7 +110,7 @@ fun ThemeGalleryScreen(
 
             item {
                 Text(
-                    "Confort & Accessibilité",
+                    "Confort et accessibilité",
                     style = MaterialTheme.typography.titleMedium,
                     modifier = Modifier.padding(top = 16.dp),
                 )
@@ -125,7 +125,7 @@ fun ThemeGalleryScreen(
 
             item {
                 Text(
-                    "Mes Thèmes Personnalisés",
+                    "Mes thèmes personnalisés",
                     style = MaterialTheme.typography.titleMedium,
                     modifier = Modifier.padding(top = 16.dp),
                 )
@@ -296,7 +296,7 @@ private fun CreateThemeCard(modifier: Modifier = Modifier, onClick: () -> Unit) 
 private fun AccessibilityRow(theme: ReadingTheme, isActive: Boolean, onClick: () -> Unit) {
     val subtitle = when (theme.id) {
         ReadingTheme.OPEN_DYSLEXIC_ESPACEMENT.id -> "Police adaptée aux troubles de la lecture"
-        ReadingTheme.NOIR_ABSOLU_AMOLED.id -> "Contraste maximal & économie d'énergie"
+        ReadingTheme.NOIR_ABSOLU_AMOLED.id -> "Contraste maximal et économie d'énergie"
         else -> null
     }
     Row(
@@ -362,7 +362,7 @@ private fun ThemePreviewOverlay(theme: ReadingTheme) {
             )
             Spacer(Modifier.height(8.dp))
             Text(
-                "42% · Page 12",
+                "42\u202F% · Page 12",
                 style = MaterialTheme.typography.labelMedium,
                 color = theme.textColorHex.toColor().copy(alpha = 0.7f),
             )

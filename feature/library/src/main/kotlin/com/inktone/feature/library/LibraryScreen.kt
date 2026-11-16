@@ -76,6 +76,7 @@ import com.inktone.core.designsystem.AppSymbol
 import com.inktone.core.designsystem.InkToneBrandMark
 import com.inktone.core.designsystem.NarrativeAccentFamily
 import com.inktone.core.designsystem.InkToneShapes
+import com.inktone.core.designsystem.formatPercent
 import com.inktone.domain.model.FilterMode
 import com.inktone.domain.model.Publication
 import com.inktone.domain.model.cleanedAuthorsForDisplay
@@ -914,7 +915,7 @@ internal fun PublicationListRow(
                     modifier = Modifier.weight(1f),
                 )
                 Text(
-                    "$progressPercent%",
+                    formatPercent(progressPercent),
                     style = MaterialTheme.typography.labelSmall,
                     color = MaterialTheme.colorScheme.onSurfaceVariant,
                     modifier = Modifier.padding(start = 8.dp),
@@ -1046,7 +1047,7 @@ private fun ResumeReadingCard(
                     )
                     Spacer(Modifier.width(8.dp))
                     Text(
-                        text = "$progressPercent%",
+                        text = formatPercent(progressPercent),
                         style = MaterialTheme.typography.labelSmall.copy(fontWeight = FontWeight.Bold),
                         color = MaterialTheme.colorScheme.primary,
                     )

@@ -10,10 +10,10 @@ class StatusLineBarTest {
     fun `formatProgressionFr suit le pourcentage partage avec la Bibliotheque`() {
         // Audit UX A19 : une décimale ici, l'entier ailleurs — trois arrondis
         // pour une même position.
-        assertEquals("35%", formatProgressionFr(0.347f))
-        assertEquals("0%", formatProgressionFr(0f))
-        assertEquals("un livre terminé affiche 100 %", "100%", formatProgressionFr(0.985f))
-        assertEquals("100%", formatProgressionFr(1f))
+        assertEquals("35\u202F%", formatProgressionFr(0.347f))
+        assertEquals("0\u202F%", formatProgressionFr(0f))
+        assertEquals("un livre terminé affiche 100 %", "100\u202F%", formatProgressionFr(0.985f))
+        assertEquals("100\u202F%", formatProgressionFr(1f))
     }
 
     @Test

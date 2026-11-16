@@ -4,6 +4,7 @@ import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
+import com.inktone.core.designsystem.NARROW_NBSP
 
 /**
  * 3d.5 — popup déclenché à l'échéance du rappel de repos oculaire
@@ -27,7 +28,7 @@ fun EyeRestReminderDialog(
     AlertDialog(
         onDismissRequest = onResume,
         title = { Text("Pensez à reposer vos yeux") },
-        text = { Text("Cela fait un moment que vous lisez. Reprise automatique dans ${countdownSeconds}s.") },
+        text = { Text("Cela fait un moment que vous lisez. Reprise automatique dans $countdownSeconds${NARROW_NBSP}s.") },
         confirmButton = {
             TextButton(onClick = onResume) { Text("Reprendre") }
         },

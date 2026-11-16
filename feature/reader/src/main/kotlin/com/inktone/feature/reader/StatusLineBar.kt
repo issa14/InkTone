@@ -1,5 +1,6 @@
 package com.inktone.feature.reader
 
+import com.inktone.core.designsystem.formatPercent
 import com.inktone.domain.model.progressionPercent
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Arrangement
@@ -166,4 +167,4 @@ private fun formatClock24h(epochMillis: Long): String = clockFormatter.format(ep
 internal fun alignedDelayToNextMinuteMillis(nowMillis: Long): Long = 60_000 - nowMillis % 60_000
 
 /** Même pourcentage que la Bibliothèque et les statistiques ([progressionPercent], audit UX A19). */
-internal fun formatProgressionFr(progression: Float): String = "${progressionPercent(progression)}%"
+internal fun formatProgressionFr(progression: Float): String = formatPercent(progressionPercent(progression))

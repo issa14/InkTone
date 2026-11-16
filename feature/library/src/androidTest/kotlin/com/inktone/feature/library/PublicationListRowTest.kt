@@ -62,7 +62,7 @@ class PublicationListRowTest {
             }
         }
 
-        composeTestRule.onNodeWithText("42%").assertExists()
+        composeTestRule.onNodeWithText("42\u202F%").assertExists()
     }
 
     @Test
@@ -78,6 +78,6 @@ class PublicationListRowTest {
             }
         }
 
-        composeTestRule.onNodeWithText("0%").assertDoesNotExist()
+        composeTestRule.onNodeWithText("0\u202F%").assertDoesNotExist()
     }
 }

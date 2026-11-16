@@ -28,6 +28,6 @@ class StatusLineBarComposeTest {
         }
 
         composeTestRule.onNodeWithText("Chapitre 3 (12/47)").assertExists()
-        composeTestRule.onNodeWithText("34,7%").assertExists()
+        composeTestRule.onNodeWithText("35\u202F%").assertExists()
     }
 }

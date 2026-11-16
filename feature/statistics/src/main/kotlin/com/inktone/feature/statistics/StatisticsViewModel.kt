@@ -2,6 +2,7 @@ package com.inktone.feature.statistics
 
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
+import com.inktone.core.designsystem.formatPercent
 import com.inktone.domain.model.estimatedRemainingReadingMs
 import com.inktone.domain.model.DailyReadingStats
 import com.inktone.domain.repository.PreferencesRepository
@@ -160,7 +161,7 @@ class StatisticsViewModel @Inject constructor(
         val previous = dense.dropLast(windowDays).takeLast(windowDays).sumOf { it.visualMs + it.ttsMs }
         if (previous == 0L) return "—"
         val pct = ((current - previous) * 100.0 / previous).toInt()
-        return "${if (pct >= 0) "+" else ""}$pct%"
+        return "${if (pct >= 0) "+" else ""}${formatPercent(pct)}"
     }
 
     // ───── Livre en cours (formatage, pas de query) ─────
