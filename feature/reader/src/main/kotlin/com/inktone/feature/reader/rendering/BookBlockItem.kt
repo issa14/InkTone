@@ -9,6 +9,7 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.State
 import androidx.compose.runtime.getValue
@@ -32,6 +33,7 @@ import androidx.compose.ui.semantics.heading
 import androidx.compose.ui.semantics.invisibleToUser
 import androidx.compose.ui.semantics.onClick
 import androidx.compose.ui.semantics.semantics
+import androidx.compose.ui.semantics.setSelection
 import androidx.compose.ui.text.AnnotatedString
 import androidx.compose.ui.text.SpanStyle
 import androidx.compose.ui.text.TextLayoutResult
@@ -48,6 +50,8 @@ import com.inktone.feature.reader.WordHighlightColor
 import com.inktone.feature.reader.absoluteRangePath
 import com.inktone.feature.reader.annotationSpanStyle
 import com.inktone.feature.reader.rangeBoundsInWindow
+import com.inktone.feature.reader.selection.LocalVisibleTextRegistry
+import com.inktone.feature.reader.selection.VisibleTextRegistry
 import com.inktone.feature.reader.toComposeColor
 
 /**
@@ -84,8 +88,6 @@ import com.inktone.feature.reader.toComposeColor
  * @param freeSelectedRange Offset absolu (chapitre) de la sélection libre active, ou null.
  * @param onFreeSelectionChanged Sélection libre modifiée (offsets absolus inclusifs).
  * @param onFreeSelectionCleared Sélection libre annulée explicitement par l'utilisateur.
- * @param onFreeSelectionBoundsInWindow Bornes fenêtre du popup d'action (null = masqué),
- *   identifiées par [BookBlock.globalOffsetRange]`.first` comme clé de propriétaire.
  * @param onClick Bascule HUD/topbar — tap hors sélection.
  * @param isReadingRulerEnabled Si vrai, remonte [onCurrentLineY] pour ce bloc quand il porte le mot actif.
  */
@@ -101,7 +103,6 @@ fun BookBlockItem(
     freeSelectedRange: State<IntRange?> = rememberUpdatedState(null),
     onFreeSelectionChanged: (anchorOffset: Int, focusOffset: Int) -> Unit = { _, _ -> },
     onFreeSelectionCleared: () -> Unit = {},
-    onFreeSelectionBoundsInWindow: (ownerKey: Int, bounds: Rect?) -> Unit = { _, _ -> },
     onClick: () -> Unit = {},
     // Lot 23, tâche 11 — un tap qui tombe DANS une annotation déjà posée
     // déclenche ce callback avec ses bornes fenêtre plutôt que [onClick]
@@ -130,9 +131,6 @@ fun BookBlockItem(
                 freeSelectedRange = freeSelectedRange,
                 onFreeSelectionChanged = onFreeSelectionChanged,
                 onFreeSelectionCleared = onFreeSelectionCleared,
-                onFreeSelectionBoundsInWindow = { bounds ->
-                    onFreeSelectionBoundsInWindow(block.globalOffsetRange.first, bounds)
-                },
                 onClick = onClick,
                 onAnnotationTapped = onAnnotationTapped,
                 isReadingRulerEnabled = isReadingRulerEnabled,
@@ -265,9 +263,9 @@ internal fun annotationAtOffset(annotations: List<Annotation>, chapterIndex: Int
  * sélection libre, tap sur lien ou annotation.
  *
  * La sélection est dessinée depuis la plage absolue du chapitre, qu'elle tienne
- * ou non dans ce bloc. Un appui long la démarre au mot et publie lui-même les
- * bornes du popup d'actions : aucun `BasicTextField`, coûteux au défilement
- * (audit réactivité §4.1) et muet sur une sélection programmatique (lot 25).
+ * ou non dans ce bloc ; un appui long la démarre au mot. Aucun `BasicTextField`,
+ * coûteux au défilement (audit réactivité §4.1) : poignées, loupe et popup sont
+ * portés par le Lecteur à partir du [VisibleTextRegistry] (ADR-029).
  */
 @Composable
 private fun ParagraphBlockText(
@@ -281,7 +279,6 @@ private fun ParagraphBlockText(
     freeSelectedRange: State<IntRange?>,
     onFreeSelectionChanged: (anchorOffset: Int, focusOffset: Int) -> Unit,
     onFreeSelectionCleared: () -> Unit,
-    onFreeSelectionBoundsInWindow: (Rect?) -> Unit,
     onClick: () -> Unit,
     onAnnotationTapped: (Annotation, Rect?) -> Unit,
     isReadingRulerEnabled: Boolean,
@@ -292,6 +289,13 @@ private fun ParagraphBlockText(
     var textLayoutResult by remember(blockOffsetRange) { mutableStateOf<TextLayoutResult?>(null) }
     var textCoordinates by remember(blockOffsetRange) { mutableStateOf<LayoutCoordinates?>(null) }
     val density = LocalDensity.current
+    val registry = LocalVisibleTextRegistry.current
+    if (registry != null) {
+        DisposableEffect(registry, blockOffsetRange) {
+            registry.register(blockOffsetRange)
+            onDispose { registry.unregister(blockOffsetRange) }
+        }
+    }
 
     // Le mot prononcé est COLLECTÉ (`snapshotFlow`), jamais lu en clé d'effet :
     // lu pendant la composition, il recomposait ce bloc à chaque mot (audit
@@ -312,15 +316,29 @@ private fun ParagraphBlockText(
     Text(
         text = blockText,
         style = textStyle,
-        onTextLayout = { layout -> textLayoutResult = layout },
+        onTextLayout = { layout ->
+            textLayoutResult = layout
+            registry?.updateLayout(blockOffsetRange, layout)
+        },
         modifier = modifier
             .fillMaxWidth()
             .padding(vertical = 2.dp)
-            .onGloballyPositioned { textCoordinates = it }
+            .onGloballyPositioned {
+                textCoordinates = it
+                registry?.updateCoordinates(blockOffsetRange, it)
+            }
             .semantics {
                 contentDescription = plainText
                 onClick(label = "Afficher ou masquer les commandes") {
                     onClick()
+                    true
+                }
+                setSelection(label = "Sélectionner") { start, end, _ ->
+                    if (start == end) return@setSelection false
+                    onFreeSelectionChanged(
+                        blockOffsetRange.first + minOf(start, end),
+                        blockOffsetRange.first + maxOf(start, end) - 1,
+                    )
                     true
                 }
             }
@@ -358,10 +376,9 @@ private fun ParagraphBlockText(
                         val layout = textLayoutResult ?: return@detectTapGestures
                         val boundary = layout.getWordBoundary(layout.getOffsetForPosition(position))
                         if (boundary.collapsed) return@detectTapGestures
-                        val absolute = (blockOffsetRange.first + boundary.start)..(blockOffsetRange.first + boundary.end - 1)
-                        onFreeSelectionChanged(absolute.first, absolute.last)
-                        onFreeSelectionBoundsInWindow(
-                            rangeBoundsInWindow(layout, textCoordinates, blockOffsetRange, absolute),
+                        onFreeSelectionChanged(
+                            blockOffsetRange.first + boundary.start,
+                            blockOffsetRange.first + boundary.end - 1,
                         )
                     },
                 )

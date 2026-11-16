@@ -125,6 +125,9 @@ import com.inktone.feature.reader.rendering.resolveLinkTarget
 import com.inktone.feature.reader.rendering.BookBlockItem
 import com.inktone.feature.reader.rendering.BookBlockStyleMapper
 import com.inktone.feature.reader.rendering.EpubImageFetcher
+import com.inktone.feature.reader.selection.LocalVisibleTextRegistry
+import com.inktone.feature.reader.selection.SelectionHandlesOverlay
+import com.inktone.feature.reader.selection.VisibleTextRegistry
 import kotlinx.coroutines.delay
 import kotlin.math.roundToInt
 import androidx.compose.ui.unit.Density
@@ -413,6 +416,9 @@ fun ReaderScreen(
         // mode SCROLL est désormais un `LazyListState` — un paragraphe = un
         // item, jamais plus tout le chapitre composé d'un coup.
         val scrollState = rememberLazyListState()
+        // ADR-029 — paragraphes composés et leur mise en page, pour les poignées et le popup.
+        val selectionRegistry = remember(state.currentChapterIndex) { VisibleTextRegistry() }
+        var isDraggingSelectionHandle by remember { mutableStateOf(false) }
 
         val freeSelectedRange = state.freeSelectionRange
 
@@ -635,9 +641,14 @@ fun ReaderScreen(
         // ReaderScreen.ParagraphText, doc de tête), jamais à cheval sur
         // plusieurs à unir.
         var pagedFreeSelectionBounds by remember { mutableStateOf<SelectionPopupBounds?>(null) }
-        var scrollFreeSelectionBounds by remember(state.currentChapterIndex) { mutableStateOf<SelectionPopupBounds?>(null) }
         val selectionBoundsInWindow = when (state.readingMode) {
-            ReadingMode.SCROLL -> scrollFreeSelectionBounds?.boundsInWindow
+            // Masqué pendant un glissement de poignée ou un défilement, recalculé à l'arrêt.
+            ReadingMode.SCROLL -> freeSelectedRange
+                ?.takeUnless { isDraggingSelectionHandle || scrollState.isScrollInProgress }
+                ?.let { range ->
+                    selectionRegistry.version
+                    selectionRegistry.boundsInWindow(range)
+                }
             ReadingMode.PAGED -> pagedFreeSelectionBounds?.boundsInWindow
         }
 
@@ -652,7 +663,6 @@ fun ReaderScreen(
         fun clearSelectionAndPopup() {
             viewModel.onIntent(ReaderIntent.ClearFreeSelection)
             pagedFreeSelectionBounds = null
-            scrollFreeSelectionBounds = null
         }
         val selectedText = remember(freeSelectedRange, state.currentChapter) {
             val freeRange = freeSelectedRange ?: return@remember ""
@@ -1098,6 +1108,7 @@ fun ReaderScreen(
                     }
 
                     Box(modifier = Modifier.fillMaxSize()) {
+                        CompositionLocalProvider(LocalVisibleTextRegistry provides selectionRegistry) {
                         LazyColumn(
                                 state = scrollState,
                                 modifier = Modifier
@@ -1117,7 +1128,6 @@ fun ReaderScreen(
                                             }
                                         }
                                     },
-                                userScrollEnabled = freeSelectedRange == null,
                                 // P4 — même marge qu'en mode paginé : un
                                 // réglage de lecture ne doit pas dépendre du
                                 // mode choisi. Cette valeur était en dur, si
@@ -1147,13 +1157,6 @@ fun ReaderScreen(
                                             viewModel.onIntent(ReaderIntent.SetFreeSelection(anchor, focus))
                                         },
                                         onFreeSelectionCleared = { clearSelectionAndPopup() },
-                                        onFreeSelectionBoundsInWindow = { ownerKey, bounds ->
-                                            scrollFreeSelectionBounds = resolveSelectionPopupBounds(
-                                                current = scrollFreeSelectionBounds,
-                                                ownerKey = ownerKey,
-                                                bounds = bounds,
-                                            )
-                                        },
                                         onClick = { chrome.onReadingAreaTap(state.isPlaying) },
                                         onAnnotationTapped = { annotation, bounds ->
                                             if (bounds != null) chrome.showAnnotationMenu(annotation, bounds)
@@ -1164,6 +1167,17 @@ fun ReaderScreen(
                                     )
                                 }
                             }
+                        }
+
+                        SelectionHandlesOverlay(
+                            registry = selectionRegistry,
+                            listState = scrollState,
+                            selection = freeSelectedRange,
+                            onSelectionChanged = { anchor, focus ->
+                                viewModel.onIntent(ReaderIntent.SetFreeSelection(anchor, focus))
+                            },
+                            onDraggingChanged = { isDraggingSelectionHandle = it },
+                        )
 
                         val transitionDirection = chapterTransition.direction
                         if (transitionDirection != null) {
