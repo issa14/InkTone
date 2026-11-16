@@ -139,9 +139,9 @@ class StatisticsViewModelTest {
     fun livre_en_cours_affiche_titre_et_progression() = runTest {
         val readingSessionRepo = FakeReadingSessionRepository()
         val publicationRepo = FakePublicationRepository()
-        publicationRepo.insert(publication("pub-1", chapterCount = 5))
+        // Livre en cours = dernier ouvert, comme la carte « Reprendre » (audit UX D33).
+        publicationRepo.insert(publication("pub-1", chapterCount = 5).copy(lastOpened = 1L))
 
-        // Une session récente pour désigner pub-1 comme livre en cours
         readingSessionRepo.insert(
             ReadingSession("s1", "pub-1", System.currentTimeMillis(), System.currentTimeMillis() + 60_000,
                 ReadingMode.VISUAL, visualDurationMs = 30_000),

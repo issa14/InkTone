@@ -10,15 +10,10 @@ import kotlinx.coroutines.flow.map
  * Livre de REPRISE : le dernier ouvert (`lastOpened` le plus récent).
  *
  * C'est celui que porte la carte « Reprendre la lecture » de la
- * Bibliothèque. À ne pas confondre avec les deux autres notions de « livre
- * courant » déjà présentes dans le dépôt, qui répondent à d'autres
- * questions et n'ont pas de raison de coïncider :
- *
- * - le livre **narré** (`PlaybackMetadata.publicationId`) — celui que la
- *   session TTS joue, qui survit à l'ouverture d'un autre livre ;
- * - le livre de [GetCurrentBookUseCase]
- *   (`ReadingSessionRepository.getLastReadPublicationId`) — le dernier à
- *   avoir une session de lecture enregistrée, pour les Statistiques.
+ * Bibliothèque et le « livre en cours » des Statistiques ([GetCurrentBookUseCase],
+ * audit UX D33). À ne pas confondre avec le livre **narré**
+ * (`PlaybackMetadata.publicationId`) : celui que la session TTS joue, qui survit
+ * à l'ouverture d'un autre livre.
  *
  * La règle elle-même vit dans [resumePublication] pour rester unique :
  * `LibraryUiState` la dérive de la liste qu'il observe déjà (aucune
