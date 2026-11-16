@@ -10,6 +10,7 @@ import com.inktone.domain.model.fileExtension
 import com.inktone.domain.service.OpdsDownloadEvent
 import com.inktone.domain.service.OpdsDownloadObserver
 import com.inktone.domain.service.OpdsDownloadResult
+import com.inktone.domain.service.OpdsFailureReason
 import com.inktone.domain.service.OpdsHttpClient
 import com.inktone.domain.usecase.ImportPublicationUseCase
 import com.inktone.domain.usecase.ImportResult
@@ -52,7 +53,7 @@ class OpdsDownloadWorker @AssistedInject constructor(
         // 1. Téléchargement (annulable de façon coopérative via `isStopped`).
         val download = httpClient.download(href, catalogId)
         if (download is OpdsDownloadResult.Failure) {
-            downloadObserver.publish(OpdsDownloadEvent(bookTitle, null, false))
+            downloadObserver.publish(OpdsDownloadEvent(bookTitle, null, false, causeOf(download.reason)))
             return Result.failure()
         }
         if (isStopped) return Result.failure()
@@ -100,13 +101,29 @@ class OpdsDownloadWorker @AssistedInject constructor(
             else -> {
                 // Échec (DRM, corrompu, non supporté) : on purge l'orphelin.
                 file.delete()
-                downloadObserver.publish(OpdsDownloadEvent(bookTitle, null, false))
+                downloadObserver.publish(OpdsDownloadEvent(bookTitle, null, false, causeOf(result)))
                 Result.failure()
             }
         }
     }
 
     companion object {
+        /** Cause lisible d'un échec de téléchargement (audit UX D64). */
+        internal fun causeOf(reason: OpdsFailureReason): String? = when (reason) {
+            OpdsFailureReason.UNAUTHORIZED -> "le catalogue a refusé les identifiants"
+            OpdsFailureReason.NOT_FOUND -> "fichier introuvable sur le catalogue"
+            OpdsFailureReason.NETWORK -> "réseau indisponible"
+            else -> null
+        }
+
+        /** Cause lisible d'un échec d'import d'un fichier téléchargé (audit UX D64). */
+        internal fun causeOf(result: ImportResult): String? = when (result) {
+            is ImportResult.DrmProtected -> "livre protégé par DRM, InkTone ne peut pas le lire"
+            is ImportResult.Corrupted -> "fichier invalide ou corrompu"
+            is ImportResult.UnsupportedFormat -> "format non pris en charge"
+            else -> null
+        }
+
         const val KEY_ACQUISITION_HREF = "acquisition_href"
         const val KEY_CATALOG_ID = "catalog_id"
         const val KEY_BOOK_TITLE = "book_title"

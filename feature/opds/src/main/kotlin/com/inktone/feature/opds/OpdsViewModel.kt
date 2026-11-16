@@ -93,7 +93,8 @@ class OpdsViewModel @Inject constructor(
                         _effects.emit(OpdsEffect.DownloadComplete(event.bookTitle, publicationId))
                     }
                 } else {
-                    _effects.emit(OpdsEffect.ShowMessage("Échec du téléchargement de « ${event.bookTitle} »"))
+                    val cause = event.failureCause?.let { " : $it" }.orEmpty()
+                    _effects.emit(OpdsEffect.ShowMessage("Échec du téléchargement de « ${event.bookTitle} »$cause"))
                 }
             }
         }

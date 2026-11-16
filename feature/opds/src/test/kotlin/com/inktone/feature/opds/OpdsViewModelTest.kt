@@ -7,6 +7,7 @@ import com.inktone.core.testing.fake.FakeOpdsDownloadScheduler
 import com.inktone.core.testing.fake.FakeOpdsFeedParser
 import com.inktone.core.testing.fake.FakeOpdsHttpClient
 import com.inktone.domain.model.OpdsCatalog
+import com.inktone.domain.service.OpdsDownloadEvent
 import com.inktone.domain.usecase.AddCatalogUseCase
 import com.inktone.domain.usecase.BrowseOpdsFeedUseCase
 import com.inktone.domain.usecase.DownloadOpdsBookUseCase
@@ -42,7 +43,10 @@ class OpdsViewModelTest {
         searchTemplateUrl = null, hasCredentials = false,
     )
 
-    private fun viewModel(repo: FakeOpdsCatalogRepository) = OpdsViewModel(
+    private fun viewModel(
+        repo: FakeOpdsCatalogRepository,
+        observer: FakeOpdsDownloadObserver = FakeOpdsDownloadObserver(),
+    ) = OpdsViewModel(
         getCatalogsUseCase = GetCatalogsUseCase(repo),
         addCatalog = AddCatalogUseCase(repo, FakeOpdsCredentialsStore()),
         removeCatalog = RemoveCatalogUseCase(repo, FakeOpdsCredentialsStore()),
@@ -50,7 +54,7 @@ class OpdsViewModelTest {
         browse = BrowseOpdsFeedUseCase(FakeOpdsHttpClient(), FakeOpdsFeedParser(), repo),
         search = SearchOpdsFeedUseCase(BrowseOpdsFeedUseCase(FakeOpdsHttpClient(), FakeOpdsFeedParser(), repo)),
         downloadBook = DownloadOpdsBookUseCase(FakeOpdsDownloadScheduler()),
-        downloadObserver = FakeOpdsDownloadObserver(),
+        downloadObserver = observer,
         httpClient = FakeOpdsHttpClient(),
     )
 
@@ -108,6 +112,32 @@ class OpdsViewModelTest {
         dispatcher.scheduler.advanceUntilIdle()
 
         assertEquals(OpdsEffect.CloseScreen, effect)
+        effectJob.cancel()
+        job.cancel()
+    }
+
+    @Test
+    fun l_echec_d_un_telechargement_dit_sa_cause() = runTest {
+        val observer = FakeOpdsDownloadObserver()
+        val vm = viewModel(FakeOpdsCatalogRepository(), observer)
+        val job = collectState(vm)
+        dispatcher.scheduler.advanceUntilIdle()
+
+        val effects = mutableListOf<OpdsEffect>()
+        val effectJob = launch(dispatcher) { vm.effects.collect { effects += it } }
+        dispatcher.scheduler.advanceUntilIdle()
+
+        observer.publish(OpdsDownloadEvent("Dune", null, false, "livre protégé par DRM"))
+        observer.publish(OpdsDownloadEvent("Emma", null, false))
+        dispatcher.scheduler.advanceUntilIdle()
+
+        assertEquals(
+            listOf(
+                OpdsEffect.ShowMessage("Échec du téléchargement de « Dune » : livre protégé par DRM"),
+                OpdsEffect.ShowMessage("Échec du téléchargement de « Emma »"),
+            ),
+            effects,
+        )
         effectJob.cancel()
         job.cancel()
     }
