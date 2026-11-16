@@ -2,7 +2,6 @@ package com.inktone.benchmark
 
 import androidx.benchmark.macro.CompilationMode
 import androidx.benchmark.macro.FrameTimingMetric
-import androidx.benchmark.macro.StartupMode
 import androidx.benchmark.macro.junit4.MacrobenchmarkRule
 import androidx.test.ext.junit.runners.AndroidJUnit4
 import androidx.test.uiautomator.By
@@ -44,9 +43,13 @@ class ReaderScrollBenchmark {
         packageName = PACKAGE_NAME,
         metrics = listOf(FrameTimingMetric()),
         compilationMode = CompilationMode.DEFAULT,
-        startupMode = StartupMode.COLD,
+        // Pas de mode de démarrage : avec COLD, l'app est tuée APRÈS `setupBlock`,
+        // et les balayages tombaient sur l'écran d'accueil.
+        startupMode = null,
         iterations = ITERATIONS,
         setupBlock = {
+            // Repartir de la bibliothèque à chaque itération, le Lecteur fermé.
+            killProcess()
             pressHome()
             startActivityAndWait()
             device.wait(Until.hasObject(By.pkg(PACKAGE_NAME).depth(0)), TIMEOUT_MS)
