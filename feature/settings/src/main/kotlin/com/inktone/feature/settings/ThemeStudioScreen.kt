@@ -271,9 +271,9 @@ private fun StudioLivePreview(state: ThemeStudioUiState) {
 @Composable
 private fun WcagBadge(state: ThemeStudioUiState) {
     val (label, color, icon) = when (state.wcagLevel) {
-        WcagLevel.AAA -> Triple("WCAG AAA (%.1f:1)".format(state.contrastRatio), Color4Ok, AppSymbol.Success)
-        WcagLevel.AA -> Triple("WCAG AA (%.1f:1)".format(state.contrastRatio), Color4Ok, AppSymbol.Success)
-        WcagLevel.BELOW_THRESHOLD -> Triple("Contraste faible (%.1f:1)".format(state.contrastRatio), MaterialTheme.colorScheme.error, AppSymbol.Warning)
+        WcagLevel.AAA -> Triple("Très lisible (%.1f:1)".format(state.contrastRatio), Color4Ok, AppSymbol.Success)
+        WcagLevel.AA -> Triple("Lisible (%.1f:1)".format(state.contrastRatio), Color4Ok, AppSymbol.Success)
+        WcagLevel.BELOW_THRESHOLD -> Triple("Peu lisible (%.1f:1)".format(state.contrastRatio), MaterialTheme.colorScheme.error, AppSymbol.Warning)
     }
     Surface(color = color.copy(alpha = 0.15f), shape = RoundedCornerShape(8.dp)) {
         Row(Modifier.padding(horizontal = 10.dp, vertical = 6.dp), verticalAlignment = Alignment.CenterVertically) {

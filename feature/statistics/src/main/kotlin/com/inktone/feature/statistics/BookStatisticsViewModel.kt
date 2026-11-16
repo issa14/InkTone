@@ -1,5 +1,6 @@
 package com.inktone.feature.statistics
 
+import com.inktone.core.designsystem.formatDurationMinutes
 import androidx.lifecycle.SavedStateHandle
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
@@ -186,9 +187,5 @@ class BookStatisticsViewModel @Inject constructor(
         return if (totalMinutes > 0) (totalWords / totalMinutes).toInt() else 0
     }
 
-    private fun formatDuration(ms: Long): String {
-        val hours = TimeUnit.MILLISECONDS.toHours(ms)
-        val minutes = TimeUnit.MILLISECONDS.toMinutes(ms) % 60
-        return if (hours > 0) "${hours}h ${minutes}min" else "${minutes} min"
-    }
+    private fun formatDuration(ms: Long): String = formatDurationMinutes(TimeUnit.MILLISECONDS.toMinutes(ms))
 }

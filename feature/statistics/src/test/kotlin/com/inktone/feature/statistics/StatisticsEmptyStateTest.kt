@@ -8,7 +8,7 @@ import org.junit.Test
 
 class StatisticsEmptyStateTest {
 
-    private fun kpi(visual: String = "0h 0m", tts: String = "0h 0m", finished: Int = 0, todayMinutes: Long = 0L) = KpiState(
+    private fun kpi(visual: String = "0\u202Fmin", tts: String = "0\u202Fmin", finished: Int = 0, todayMinutes: Long = 0L) = KpiState(
         totalVisualTimeFormatted = visual, totalTtsTimeFormatted = tts, booksFinished = finished,
         currentStreakDays = 0, maxStreakDays = 0, averageWpm = 0, todayReadingMinutes = todayMinutes,
         dailyGoalMinutes = 30, regularityLabel = "Pas de série en cours",
@@ -21,8 +21,8 @@ class StatisticsEmptyStateTest {
 
     @Test
     fun `la moindre lecture rend les statistiques non vides`() {
-        assertFalse(isStatisticsEmpty(kpi(visual = "0h 5m"), null))
-        assertFalse(isStatisticsEmpty(kpi(tts = "1h 0m"), null))
+        assertFalse(isStatisticsEmpty(kpi(visual = "5\u202Fmin"), null))
+        assertFalse(isStatisticsEmpty(kpi(tts = "1\u202Fh\u202F00"), null))
         assertFalse(isStatisticsEmpty(kpi(finished = 1), null))
         assertFalse(isStatisticsEmpty(kpi(todayMinutes = 3L), null))
         assertFalse(

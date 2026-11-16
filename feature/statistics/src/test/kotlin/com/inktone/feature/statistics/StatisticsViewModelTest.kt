@@ -115,8 +115,8 @@ class StatisticsViewModelTest {
         val ready = state as StatisticsUiState.Ready
 
         // Les durées brutes sont transformées en Strings formatées
-        assertEquals("0h 0m", ready.kpi.totalVisualTimeFormatted)
-        assertEquals("0h 0m", ready.kpi.totalTtsTimeFormatted)
+        assertEquals("0\u202Fmin", ready.kpi.totalVisualTimeFormatted)
+        assertEquals("0\u202Fmin", ready.kpi.totalTtsTimeFormatted)
         assertTrue(ready.kpi.currentStreakDays >= 0)
         assertTrue(ready.kpi.averageWpm >= 0)
     }
@@ -181,7 +181,7 @@ class StatisticsViewModelTest {
         val state = vm.state.first { it is StatisticsUiState.Ready }
         val ready = state as StatisticsUiState.Ready
 
-        assertEquals("1h 0m", ready.kpi.totalVisualTimeFormatted)
+        assertEquals("1\u202Fh\u202F00", ready.kpi.totalVisualTimeFormatted)
         assertEquals("0h 30m", ready.kpi.totalTtsTimeFormatted)
     }
 

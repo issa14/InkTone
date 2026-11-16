@@ -227,7 +227,7 @@ class ReaderViewModelBookmarkToggleTest {
         dispatcher.scheduler.runCurrent()
         assertEquals(1, viewModel.state.value.bookmarks.size)
 
-        // « Plus tard » : la proposition se ferme sans note, le signet reste.
+        // « Passer » : la proposition se ferme sans note, le signet reste.
         viewModel.onIntent(ReaderIntent.DismissBookmarkNotePrompt)
         dispatcher.scheduler.runCurrent()
         assertNull(viewModel.state.value.pendingBookmarkNoteId)

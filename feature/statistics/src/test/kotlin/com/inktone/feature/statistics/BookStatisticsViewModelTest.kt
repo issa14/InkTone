@@ -166,6 +166,6 @@ class BookStatisticsViewModelTest {
 
         val state = vm.state.first { it is BookDetailUiState.Ready } as BookDetailUiState.Ready
 
-        assertEquals("1h 0min", state.remainingTimeFormatted)
+        assertEquals("1\u202Fh\u202F00", state.remainingTimeFormatted)
     }
 }

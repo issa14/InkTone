@@ -279,7 +279,7 @@ fun ReaderScreen(
     LaunchedEffect(state.linkReturn) {
         if (state.linkReturn == null) return@LaunchedEffect
         val result = snackbarHostState.showSnackbar(
-            message = "Renvoi suivi",
+            message = "Note de bas de page ouverte",
             actionLabel = "Retour",
             duration = SnackbarDuration.Long,
         )
@@ -1815,7 +1815,7 @@ AnnotationTapPopup(
         // Lot 21, tâche 5 (corrigé) — saisie de note OPTIONNELLE : n'apparaît
         // que si l'utilisateur a explicitement demandé « Ajouter une note »
         // depuis le Snackbar ci-dessus, jamais imposée au geste de créer un
-        // signet. Fermer (« Plus tard », tap hors champ) laisse le signet
+        // signet. Fermer (« Passer », tap hors champ) laisse le signet
         // sans note ; la note vide est enregistrée comme `null`.
         ReadingThemeScope(state.resolvedTheme) {
         if (chrome.showBookmarkNoteDialog && state.pendingBookmarkNoteId != null) {
@@ -1967,7 +1967,7 @@ private fun ErrorState(message: String, onRetry: () -> Unit, onBack: () -> Unit)
             onClick = onBack,
             modifier = Modifier.padding(top = 4.dp),
         ) {
-            Text("Retour à la bibliothèque")
+            Text("Bibliothèque")
         }
     }
 }
@@ -2008,7 +2008,7 @@ private fun EditNoteDialog(
 /**
  * Lot 21, tâche 5 — saisie de note OPTIONNELLE d'un signet venant d'être
  * créé. Le signet existe déjà (le toggle l'a créé) : ce dialogue ne
- * bloque jamais le geste — fermer (« Plus tard », tap hors champ) laisse
+ * bloque jamais le geste — fermer (« Passer », tap hors champ) laisse
  * le signet sans note. La note vide est enregistrée comme `null`.
  */
 @Composable
@@ -2023,7 +2023,7 @@ private fun BookmarkNoteDialog(
         text = {
             Column(modifier = Modifier.fillMaxWidth()) {
                 Text(
-                    "Facultatif : ajoutez une note à ce signet pour le retrouver plus facilement.",
+                    "Pour retrouver ce signet plus facilement.",
                     style = MaterialTheme.typography.bodyMedium,
                     color = MaterialTheme.colorScheme.onSurfaceVariant,
                 )
@@ -2039,7 +2039,7 @@ private fun BookmarkNoteDialog(
             TextButton(onClick = { onSave(note) }) { Text("Enregistrer") }
         },
         dismissButton = {
-            TextButton(onClick = onDismiss) { Text("Plus tard") }
+            TextButton(onClick = onDismiss) { Text("Passer") }
         },
     )
 }

@@ -154,7 +154,7 @@ private fun WelcomeCard(accent: Color) {
     ) {
         Image(
             painter = painterResource(com.inktone.core.designsystem.R.drawable.app_icon_monochrome),
-            contentDescription = "Icône InkTone",
+            contentDescription = null,
             modifier = Modifier.size(180.dp),
             contentScale = ContentScale.Fit,
             colorFilter = ColorFilter.tint(accent),
@@ -162,7 +162,7 @@ private fun WelcomeCard(accent: Color) {
         Spacer(Modifier.height(32.dp))
         Text("Bienvenue sur InkTone", style = MaterialTheme.typography.headlineMedium, fontFamily = NarrativeAccentFamily, fontWeight = FontWeight.Bold, textAlign = TextAlign.Center)
         Spacer(Modifier.height(16.dp))
-        BodyText("Lisez avec les yeux, continuez avec les oreilles. Une expérience de lecture unifiée qui s'adapte à votre rythme.")
+        BodyText("Lisez vos livres ou écoutez-les : la voix reprend là où vous en étiez.")
     }
 }
 
@@ -179,7 +179,7 @@ private fun FeaturesCard(accent: Color) {
         verticalArrangement = Arrangement.Center,
     ) {
         Text(
-            "Conçu pour votre confort",
+            "Lire et écouter",
             style = MaterialTheme.typography.headlineMedium,
             fontFamily = NarrativeAccentFamily,
             fontWeight = FontWeight.Bold,
@@ -191,14 +191,14 @@ private fun FeaturesCard(accent: Color) {
             FeatureRow(
                 accent = accent,
                 icon = AppSymbol.Reading,
-                title = "Lecture sur mesure",
-                body = "Thèmes, typographie et mise en page entièrement personnalisables pour un confort visuel absolu.",
+                title = "Votre mise en page",
+                body = "Thème, police, taille et marges, réglables sans quitter le livre.",
             )
             FeatureRow(
                 accent = accent,
                 icon = AppSymbol.Speaking,
-                title = "Narration naturelle",
-                body = "Une voix de synthèse lit vos livres à voix haute, hors ligne. Ajustez la vitesse et laissez-vous porter par l'histoire.",
+                title = "Une voix qui lit pour vous",
+                body = "Hors ligne, à la vitesse de votre choix. Avec la voix naturelle, chaque mot prononcé est surligné.",
             )
         }
     }
@@ -251,14 +251,14 @@ private fun ReadyCard(accent: Color, onStart: () -> Unit) {
         }
         Spacer(Modifier.height(32.dp))
         Text(
-            "Votre prochaine histoire vous attend",
+            "Ajoutez votre premier livre",
             style = MaterialTheme.typography.headlineMedium,
             fontFamily = NarrativeAccentFamily,
             fontWeight = FontWeight.Bold,
             textAlign = TextAlign.Center,
         )
         Spacer(Modifier.height(12.dp))
-        BodyText("Importez vos livres et commencez l'expérience InkTone.")
+        BodyText("EPUB, PDF ou TXT, depuis votre téléphone ou un catalogue en ligne.")
         Spacer(Modifier.height(32.dp))
         // Contraste force explicitement (retour Issa) : le bouton plein
         // reste sur le bordeaux standard (pas la variante claire) avec un

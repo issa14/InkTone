@@ -71,6 +71,7 @@ import com.inktone.domain.model.cleanedForDisplay
 import com.inktone.core.designsystem.AppIcon
 import com.inktone.core.designsystem.AppSymbol
 import com.inktone.core.designsystem.InkToneSpacing
+import com.inktone.core.designsystem.formatDurationMinutes
 import com.inktone.core.designsystem.formatPercent
 import com.inktone.domain.model.DailyReadingStats
 import com.inktone.domain.service.ExportFormat
@@ -756,8 +757,8 @@ private fun ExportButton(viewModel: StatisticsViewModel) {
                 modifier = Modifier.padding(horizontal = InkToneSpacing.screenHorizontal, vertical = 12.dp),
             )
             ListItem(
-                headlineContent = { Text("Format CSV") },
-                supportingContent = { Text("Récapitulatif des sessions") },
+                headlineContent = { Text("Tableur (CSV)") },
+                supportingContent = { Text("Une ligne par séance de lecture") },
                 leadingContent = { AppIcon(AppSymbol.Stats, contentDescription = null) },
                 modifier = Modifier.clickable {
                     showSheet = false
@@ -765,8 +766,8 @@ private fun ExportButton(viewModel: StatisticsViewModel) {
                 },
             )
             ListItem(
-                headlineContent = { Text("Format JSON") },
-                supportingContent = { Text("Données brutes d'événements") },
+                headlineContent = { Text("Données complètes (JSON)") },
+                supportingContent = { Text("Pour un traitement automatique") },
                 leadingContent = { AppIcon(AppSymbol.ReadingModeScroll, contentDescription = null) },
                 modifier = Modifier.clickable {
                     showSheet = false
@@ -800,4 +801,4 @@ internal fun isStatisticsEmpty(kpi: com.inktone.domain.usecase.KpiState, current
     currentBook == null && kpi.booksFinished == 0 && kpi.todayReadingMinutes == 0L &&
         kpi.totalVisualTimeFormatted == EMPTY_DURATION && kpi.totalTtsTimeFormatted == EMPTY_DURATION
 
-private const val EMPTY_DURATION = "0h 0m"
+private val EMPTY_DURATION = formatDurationMinutes(0)

@@ -98,30 +98,26 @@ fun AboutScreen(
             VersionBadge(
                 versionName = versionName,
                 onClick = {
-                    scope.launch { snackbarHostState.showSnackbar("Maintenez pour copier le diagnostic") }
+                    scope.launch { snackbarHostState.showSnackbar("Appui long pour copier les informations de diagnostic") }
                 },
                 onLongClick = {
                     clipboardManager.setText(AnnotatedString(buildDiagnostics(versionName, ttsEngineLabel)))
-                    scope.launch { snackbarHostState.showSnackbar("Diagnostic copié dans le presse-papier") }
+                    scope.launch { snackbarHostState.showSnackbar("Informations de diagnostic copiées") }
                 },
             )
 
             Spacer(Modifier.height(20.dp))
 
             InfoCard(
-                "InkTone est un lecteur EPUB et PDF avec narration TTS neuronale synchronisée " +
-                    "mot à mot, conçu pour transformer vos livres numériques en expérience " +
-                    "d'écoute fluide et accessible, directement sur votre appareil. La lecture " +
-                    "et la synthèse vocale fonctionnent hors ligne ; les services en ligne " +
-                    "(synchronisation, catalogues OPDS, voix cloud) restent optionnels et " +
-                    "désactivés par défaut.",
+                "Lisez et écoutez vos livres sur votre téléphone, sans compte. " +
+                    "La synchronisation, les catalogues en ligne et la voix en ligne sont facultatifs.",
             )
 
             Spacer(Modifier.height(16.dp))
             EngagementsGrid()
 
             Spacer(Modifier.height(12.dp))
-            SectionHeader("Ressources & Support")
+            SectionHeader("Aide et ressources")
             PrivacyPolicyCard()
             Spacer(Modifier.height(8.dp))
             GitHubCard()
@@ -194,20 +190,20 @@ private fun EngagementsGrid() {
     ) {
         EngagementPillar(
             icon = AppSymbol.Device,
-            title = "Local par défaut",
-            subtitle = "Inférence CPU",
+            title = "Sans compte",
+            subtitle = "Aucune inscription",
             modifier = Modifier.weight(1f),
         )
         EngagementPillar(
             icon = AppSymbol.Lock,
-            title = "Vie Privée",
-            subtitle = "Stockage isolé",
+            title = "Vie privée",
+            subtitle = "Par défaut, rien n'est envoyé",
             modifier = Modifier.weight(1f),
         )
         EngagementPillar(
             icon = AppSymbol.CloudDisconnected,
-            title = "Hors-Ligne",
-            subtitle = "Services en ligne optionnels",
+            title = "Hors ligne",
+            subtitle = "Aucune connexion requise",
             modifier = Modifier.weight(1f),
         )
     }
@@ -303,7 +299,7 @@ private fun ReportProblemCard(onClick: () -> Unit) {
             Spacer(Modifier.width(12.dp))
             Column(Modifier.weight(1f)) {
                 Text("Signaler un problème", color = MaterialTheme.colorScheme.onSurface, fontWeight = FontWeight.SemiBold, fontSize = 14.sp)
-                Text("Email pré-rempli avec le diagnostic système", color = MaterialTheme.colorScheme.onSurfaceVariant, fontSize = 12.sp)
+                Text("E-mail prérempli avec les informations de diagnostic", color = MaterialTheme.colorScheme.onSurfaceVariant, fontSize = 12.sp)
             }
         }
     }
@@ -319,7 +315,7 @@ private fun ArchitectureAccordion() {
     ) {
         Column {
             SectionHeader(
-                text = "Architecture Tech & Licences",
+                text = "Licences",
                 trailing = {
                     AppIcon(
                         if (expanded) AppSymbol.KeyboardArrowUp else AppSymbol.KeyboardArrowDown,

@@ -2,6 +2,7 @@ package com.inktone.feature.statistics
 
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
+import com.inktone.core.designsystem.formatDurationMinutes
 import com.inktone.core.designsystem.formatPercent
 import com.inktone.domain.model.estimatedRemainingReadingMs
 import com.inktone.domain.model.DailyReadingStats
@@ -93,7 +94,7 @@ class StatisticsViewModel @Inject constructor(
         averageWpm = averageWpm,
         todayReadingMinutes = todayReadingMinutes,
         dailyGoalMinutes = dailyGoalMinutes,
-        regularityLabel = regularityLabelFor(currentStreakDays),
+        regularityLabel = regularityLabelFor(currentStreakDays, maxStreakDays),
     )
 
     private fun StatisticsResult.toActivityState(period: StatsPeriod): ActivityChartState {
@@ -132,21 +133,17 @@ class StatisticsViewModel @Inject constructor(
         }
     }
 
-    private fun formatDuration(ms: Long): String {
-        val hours = TimeUnit.MILLISECONDS.toHours(ms)
-        val minutes = TimeUnit.MILLISECONDS.toMinutes(ms) % 60
-        return "${hours}h ${minutes}m"
-    }
+    private fun formatDuration(ms: Long): String = formatDurationMinutes(TimeUnit.MILLISECONDS.toMinutes(ms))
 
     /**
      * Libellé de régularité de la carte objectif du jour (Tache 7.2),
      * dérivé de la série en cours — jamais un texte constant.
      */
-    private fun regularityLabelFor(currentStreakDays: Int): String = when {
-        currentStreakDays <= 0 -> "Pas de série en cours"
-        currentStreakDays < 3 -> "Série en cours · régularité en construction"
-        currentStreakDays < 7 -> "Série en cours · régularité modérée"
-        else -> "Série en cours · régularité élevée"
+    private fun regularityLabelFor(currentStreakDays: Int, maxStreakDays: Int): String {
+        if (currentStreakDays <= 0) return "Lisez aujourd'hui pour commencer une série"
+        if (currentStreakDays >= maxStreakDays) return "Votre meilleure série"
+        val toBeat = maxStreakDays - currentStreakDays + 1
+        return if (toBeat > 1) "Encore $toBeat jours pour battre votre record" else "Encore 1 jour pour battre votre record"
     }
 
     /**
