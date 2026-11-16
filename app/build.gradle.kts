@@ -80,6 +80,10 @@ android {
         }
     }
 
+    // Le build `benchmark` embarque le même Baseline Profile que la release : sans lui,
+    // les mesures portent sur du code interprété que l'app publiée n'exécute pas.
+    sourceSets.getByName("benchmark").baselineProfiles.srcDir("src/release/generated/baselineProfiles")
+
     // Tache 9.3 : trouve par la mesure reelle de la taille de l'AAB
     // (196 Mo, tres au-dessus du budget Blueprint §11.2 <= 60 Mo) -
     // libonnxruntime.so pese ~20-33 Mo PAR ABI et etait embarque pour
