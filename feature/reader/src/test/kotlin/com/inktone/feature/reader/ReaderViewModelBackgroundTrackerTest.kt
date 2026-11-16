@@ -34,6 +34,8 @@ import com.inktone.domain.usecase.UpdateReadingStateUseCase
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.test.StandardTestDispatcher
+import androidx.lifecycle.viewModelScope
+import kotlinx.coroutines.cancel
 import kotlinx.coroutines.test.resetMain
 import kotlinx.coroutines.test.runTest
 import kotlinx.coroutines.test.setMain
@@ -172,8 +174,12 @@ class ReaderViewModelBackgroundTrackerTest {
         assertEquals(false, viewModel.isSessionTrackerPausedForTest())
 
         viewModel.cancelCheckpointTimerForTest()
-        // Pause explicite pour vider l'état avant la fin du test.
         viewModel.onIntent(ReaderIntent.Pause)
+        // La coroutine mise en file par PlayCurrentSentence lancerait la vraie
+        // synthèse sur Dispatchers.IO si le planificateur avançait : elle courait
+        // alors contre `resetMain` (« Dispatchers.Main is used concurrently with
+        // setting it »). La portée est annulée d'abord, comme par `onCleared`.
+        viewModel.viewModelScope.cancel()
         dispatcher.scheduler.runCurrent()
     }
 }
