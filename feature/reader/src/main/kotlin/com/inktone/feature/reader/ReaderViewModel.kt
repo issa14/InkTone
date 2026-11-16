@@ -2239,6 +2239,7 @@ class ReaderViewModel @Inject constructor(
                     else DomainReadingMode.VISUAL,
                     sentencesRead = snapshot.sentences,
                     wordsRead = snapshot.words,
+                    visualWordsRead = snapshot.visualWords,
                     visualDurationMs = snapshot.visualMs,
                     ttsDurationMs = snapshot.ttsMs,
                 )

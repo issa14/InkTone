@@ -171,17 +171,17 @@ class BookStatisticsViewModel @Inject constructor(
         .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), BookDetailUiState.Loading)
 
     /**
-     * Vitesse de lecture, sur les seuls fragments **sans narration** (même
-     * règle que `ReadingSessionDao.getRecentSessionsWithWords`, et pour la
-     * même raison) : la vitesse d'un fragment narré n'est que celle du
-     * synthétiseur, réglée par l'utilisateur — la mesurer ne lui apprend rien.
+     * Vitesse de lecture, sur les seuls mots lus à l'écran (même règle que
+     * `ReadingSessionDao.getRecentSessionsWithWords`, et pour la même raison) :
+     * la vitesse d'un fragment narré n'est que celle du synthétiseur, réglée par
+     * l'utilisateur — la mesurer ne lui apprend rien.
      */
     private fun computeWpm(sessions: List<ReadingSession>): Int {
         val visualSessions = sessions.filter {
-            it.wordsRead > 0 && it.visualDurationMs > 0 && it.ttsDurationMs == 0L
+            it.visualWordsRead > 0 && it.visualDurationMs > 0
         }
         if (visualSessions.isEmpty()) return 0
-        val totalWords = visualSessions.sumOf { it.wordsRead }
+        val totalWords = visualSessions.sumOf { it.visualWordsRead }
         val totalMinutes = visualSessions.sumOf { it.visualDurationMs } / 60_000.0
         return if (totalMinutes > 0) (totalWords / totalMinutes).toInt() else 0
     }

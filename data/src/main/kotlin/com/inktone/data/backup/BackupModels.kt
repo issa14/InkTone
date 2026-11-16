@@ -146,6 +146,8 @@ data class ReadingSessionBackup(
     val wordsRead: Int = 0,
     val visualDurationMs: Long = 0,
     val ttsDurationMs: Long = 0,
+    // Absent des sauvegardes d'avant D29 : voir toDomain.
+    val visualWordsRead: Int = 0,
     // Compatibilité ascendante (Lot 22, tâche 13) : les exports antérieurs ne
     // portaient que `durationMs` (total calculé), sans distinguer visuel/TTS.
     // Conservé en lecture pour ne rien perdre d'une sauvegarde préexistante.
@@ -215,6 +217,7 @@ fun ReadingSession.toBackup(): ReadingSessionBackup =
         id = id, publicationId = publicationId, startedAt = startedAt, endedAt = endedAt,
         mode = mode.name, sentencesRead = sentencesRead, wordsRead = wordsRead,
         visualDurationMs = visualDurationMs, ttsDurationMs = ttsDurationMs, durationMs = durationMs,
+        visualWordsRead = visualWordsRead,
     )
 fun ReadingSessionBackup.toDomain(): ReadingSession = ReadingSession(
     id = id, publicationId = publicationId, startedAt = startedAt, endedAt = endedAt,
@@ -224,4 +227,6 @@ fun ReadingSessionBackup.toDomain(): ReadingSession = ReadingSession(
     // le reporter en visuel évite de perdre la durée des sessions existantes.
     visualDurationMs = if (visualDurationMs == 0L && ttsDurationMs == 0L && durationMs > 0) durationMs else visualDurationMs,
     ttsDurationMs = ttsDurationMs,
+    // Une sauvegarde d'avant la séparation n'a pas ce champ : un fragment sans narration était lu à l'écran.
+    visualWordsRead = if (visualWordsRead == 0 && ttsDurationMs == 0L) wordsRead else visualWordsRead.coerceAtMost(wordsRead),
 )

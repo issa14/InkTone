@@ -71,12 +71,15 @@ class StatisticsViewModelTest {
         chapterCount = chapterCount, importDate = 0L,
     )
 
-    private fun session(id: String, publicationId: String, startedAt: Long, wordsRead: Int = 0, visualMs: Long = 0, ttsMs: Long = 0) =
-        ReadingSession(
-            id = id, publicationId = publicationId, startedAt = startedAt, endedAt = startedAt + visualMs + ttsMs,
-            mode = if (ttsMs > 0) ReadingMode.AUDIO else ReadingMode.VISUAL,
-            wordsRead = wordsRead, visualDurationMs = visualMs, ttsDurationMs = ttsMs,
-        )
+    /** [visualWords] : part des mots lue à l'écran ; par défaut tous sans narration, aucun avec. */
+    private fun session(
+        id: String, publicationId: String, startedAt: Long, wordsRead: Int = 0, visualMs: Long = 0, ttsMs: Long = 0,
+        visualWords: Int = if (ttsMs == 0L) wordsRead else 0,
+    ) = ReadingSession(
+        id = id, publicationId = publicationId, startedAt = startedAt, endedAt = startedAt + visualMs + ttsMs,
+        mode = if (ttsMs > 0) ReadingMode.AUDIO else ReadingMode.VISUAL,
+        wordsRead = wordsRead, visualDurationMs = visualMs, ttsDurationMs = ttsMs, visualWordsRead = visualWords,
+    )
 
     @Test
     fun etat_initial_est_Loading() = runTest {
@@ -247,16 +250,16 @@ class StatisticsViewModelTest {
     }
 
     @Test
-    fun vitesse_de_lecture_ignore_les_fragments_mixtes() = runTest {
+    fun vitesse_de_lecture_ne_garde_que_la_part_visuelle_d_un_fragment_mixte() = runTest {
         val readingSessionRepo = FakeReadingSessionRepository()
-        // 600 mots lus seuls en 2 min (300 mots/min) ; un fragment mixte porte les mots
-        // narrés avec les mots lus, sans qu'on puisse les séparer : il est écarté.
+        // 600 mots lus seuls en 2 min ; un fragment mixte compte 3000 mots dont 600 lus à l'écran
+        // en 2 min : seule sa part visuelle entre dans la vitesse (1200 mots en 4 min).
         readingSessionRepo.insert(
             session("s1", "pub-1", 0L, wordsRead = 600, visualMs = TimeUnit.MINUTES.toMillis(2)),
         )
         readingSessionRepo.insert(
             session(
-                "s2", "pub-1", 1L, wordsRead = 3000,
+                "s2", "pub-1", 1L, wordsRead = 3000, visualWords = 600,
                 visualMs = TimeUnit.MINUTES.toMillis(2), ttsMs = TimeUnit.MINUTES.toMillis(1),
             ),
         )

@@ -60,6 +60,8 @@ data class ReadingSession(
     // qui en est une propriété calculée et doit les voir déclarées).
     val visualDurationMs: Long = 0,
     val ttsDurationMs: Long = 0,
+    /** Part de [wordsRead] lue à l'écran, hors narration : base de la vitesse de lecture (audit UX D29 c). */
+    val visualWordsRead: Int = 0,
 ) {
     /** Propriété calculée — total = visuel + TTS (compatibilité ascendante). */
     val durationMs: Long get() = visualDurationMs + ttsDurationMs
@@ -67,6 +69,7 @@ data class ReadingSession(
     init {
         require(publicationId.isNotBlank()) { "publicationId ne peut pas être vide" }
         require(sentencesRead >= 0) { "sentencesRead doit être positif ou nul" }
+        require(visualWordsRead in 0..wordsRead) { "visualWordsRead doit être compris entre 0 et wordsRead" }
         require(durationMs >= 0) { "durationMs doit être positif ou nul" }
         require(visualDurationMs >= 0) { "visualDurationMs doit être positif ou nul" }
         require(ttsDurationMs >= 0) { "ttsDurationMs doit être positif ou nul" }

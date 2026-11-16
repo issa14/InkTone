@@ -33,4 +33,6 @@ data class ReadingSessionEntity(
     // Lot Statistiques Palier 1 — métriques séparées
     val visualDurationMs: Long = 0,
     val ttsDurationMs: Long = 0,
+    // Mots lus à l'écran, hors narration (MIGRATION_40_41) : base de la vitesse de lecture.
+    val visualWordsRead: Int = 0,
 )

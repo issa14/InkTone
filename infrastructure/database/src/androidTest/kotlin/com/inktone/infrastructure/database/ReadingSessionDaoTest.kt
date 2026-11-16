@@ -90,14 +90,14 @@ class ReadingSessionDaoTest {
     }
 
     @Test
-    fun getRecentSessionsWithWords_ne_garde_que_les_fragments_sans_narration() = runTest {
+    fun getRecentSessionsWithWords_ne_garde_que_les_fragments_avec_des_mots_lus_a_l_ecran() = runTest {
         insertPublication("pub-1")
         val dao = db.readingSessionDao()
-        dao.insert(ReadingSessionEntity("pur", "pub-1", 3L, 4L, "VISUAL", 0, 0, wordsRead = 600, visualDurationMs = 120_000, ttsDurationMs = 0))
-        dao.insert(ReadingSessionEntity("mixte", "pub-1", 2L, 4L, "VISUAL", 0, 0, wordsRead = 900, visualDurationMs = 120_000, ttsDurationMs = 60_000))
-        dao.insert(ReadingSessionEntity("narre", "pub-1", 1L, 4L, "AUDIO", 0, 0, wordsRead = 600, visualDurationMs = 0, ttsDurationMs = 120_000))
+        dao.insert(ReadingSessionEntity("pur", "pub-1", 3L, 4L, "VISUAL", 0, 0, wordsRead = 600, visualDurationMs = 120_000, ttsDurationMs = 0, visualWordsRead = 600))
+        dao.insert(ReadingSessionEntity("mixte", "pub-1", 2L, 4L, "VISUAL", 0, 0, wordsRead = 900, visualDurationMs = 120_000, ttsDurationMs = 60_000, visualWordsRead = 300))
+        dao.insert(ReadingSessionEntity("narre", "pub-1", 1L, 4L, "AUDIO", 0, 0, wordsRead = 600, visualDurationMs = 0, ttsDurationMs = 120_000, visualWordsRead = 0))
 
-        assertEquals(listOf("pur"), dao.getRecentSessionsWithWords(30).map { it.id })
+        assertEquals(listOf("pur", "mixte"), dao.getRecentSessionsWithWords(30).map { it.id })
     }
 
     @Test

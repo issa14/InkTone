@@ -652,3 +652,15 @@ val MIGRATION_39_40 = object : Migration(39, 40) {
         )
     }
 }
+
+/**
+ * Audit UX D29 (c) : `visualWordsRead`, la part des mots lue à l'écran, hors narration, base de la vitesse
+ * de lecture. Un fragment sans narration était lu à l'écran : il garde tous ses mots ; un fragment
+ * narré ou mixte, dont la part visuelle est inconnue, repart à 0.
+ */
+val MIGRATION_40_41 = object : Migration(40, 41) {
+    override fun migrate(db: SupportSQLiteDatabase) {
+        db.execSQL("ALTER TABLE reading_sessions ADD COLUMN visualWordsRead INTEGER NOT NULL DEFAULT 0")
+        db.execSQL("UPDATE reading_sessions SET visualWordsRead = wordsRead WHERE ttsDurationMs = 0")
+    }
+}

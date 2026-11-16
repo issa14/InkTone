@@ -14,6 +14,8 @@ data class TrackerSnapshot(
     val ttsMs: Long,
     val words: Int,
     val sentences: Int,
+    /** Part de [words] parcourue à l'écran, hors narration : seule base de la vitesse de lecture. */
+    val visualWords: Int = 0,
 ) {
     /** Durée totale de l'instantané — le seuil de persistance porte sur elle. */
     val totalMs: Long get() = visualMs + ttsMs
@@ -75,6 +77,10 @@ class ReadingSessionTracker(
 
     /** Mots parcourus depuis le dernier [reset] (tous chemins confondus). */
     var wordsRead: Int = 0
+        private set
+
+    /** Part de [wordsRead] parcourue en lecture visuelle (le tracker étant en mode visuel). */
+    var visualWordsRead: Int = 0
         private set
 
     /** Phrases parcourues depuis le dernier [reset]. */
@@ -151,6 +157,7 @@ class ReadingSessionTracker(
     fun addProgress(words: Int, sentences: Int = 1) {
         if (words <= 0) return
         wordsRead += words
+        if (mode == ReadingMode.VISUAL) visualWordsRead += words
         if (sentences > 0) sentencesRead += sentences
     }
 
@@ -166,6 +173,7 @@ class ReadingSessionTracker(
             ttsMs = ttsDurationMs,
             words = wordsRead,
             sentences = sentencesRead,
+            visualWords = visualWordsRead,
         )
     }
 
@@ -174,6 +182,7 @@ class ReadingSessionTracker(
         visualDurationMs = 0
         ttsDurationMs = 0
         wordsRead = 0
+        visualWordsRead = 0
         sentencesRead = 0
     }
 

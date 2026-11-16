@@ -107,12 +107,12 @@ class GetStatisticsUseCase(
             val streak = computeStreak(streakDays, today)
             val maxStreak = computeMaxStreak(streakDays)
 
-            // Le repository ne remonte ici que des fragments purement visuels
-            // (voir `ReadingSessionDao.getRecentSessionsWithWords`) : mots et
-            // temps sont ceux du LECTEUR, sans mots narrés.
+            // Le repository ne remonte que les fragments qui ont des mots lus à
+            // l'écran (voir `ReadingSessionDao.getRecentSessionsWithWords`) : mots
+            // visuels et temps visuel sont ceux du LECTEUR, sans mots narrés.
             val sessionsWithWords = readingSessionRepository.getRecentSessionsWithWords(30)
             val averageWpm = if (sessionsWithWords.isNotEmpty()) {
-                val totalWords = sessionsWithWords.sumOf { it.wordsRead }
+                val totalWords = sessionsWithWords.sumOf { it.visualWordsRead }
                 val totalMinutes = sessionsWithWords.sumOf { it.visualDurationMs } / 60_000.0
                 if (totalMinutes > 0) (totalWords / totalMinutes).toInt() else 0
             } else 0

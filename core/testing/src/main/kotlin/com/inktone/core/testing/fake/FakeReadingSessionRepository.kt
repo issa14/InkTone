@@ -77,7 +77,7 @@ class FakeReadingSessionRepository : ReadingSessionRepository {
     /** Miroir exact du filtre SQL de `ReadingSessionDao` : fragments à dominante visuelle. */
     override suspend fun getRecentSessionsWithWords(limit: Int): List<ReadingSession> =
         getAll()
-            .filter { it.wordsRead > 0 && it.visualDurationMs > 0 && it.ttsDurationMs == 0L }
+            .filter { it.visualWordsRead > 0 && it.visualDurationMs > 0 }
             .sortedByDescending { it.startedAt }
             .take(limit)
 

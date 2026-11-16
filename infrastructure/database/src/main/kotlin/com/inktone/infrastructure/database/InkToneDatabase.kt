@@ -44,7 +44,7 @@ import com.inktone.infrastructure.database.entity.VoiceProfileEntity
         CatalogEntity::class, SyncTombstoneEntity::class,
     ],
     views = [LibraryItemView::class],
-    version = 40, // Index plein texte insensible aux accents (MIGRATION_39_40, D8)
+    version = 41, // Mots lus à l'écran séparés des mots narrés (MIGRATION_40_41, D29)
     exportSchema = true, // condition du harnais de migration — Tâche 2.4
 )
 @TypeConverters(StringListConverter::class)

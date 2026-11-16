@@ -1610,6 +1610,42 @@ class DatabaseMigrationTest {
         v40.close()
     }
 
+    @Test
+    fun migration_40_vers_41_garde_les_mots_des_fragments_sans_narration() {
+        val v40 = helper.createDatabase(TEST_DB_NAME, 40)
+        v40.execSQL(
+            """
+            INSERT INTO publications (id, title, authors, format, fileUri, fileHash, fileSize, chapterCount, subjects, isFavorite, isPinned, isDrmProtected, importDate, lastOpened, locatorAnchorVersion, searchIndexVersion)
+            VALUES ('pub-1', 'Titre', '', 'EPUB', 'content://pub-1', 'hash1', 1000, 3, '', 0, 0, 0, 500, 900, 0, 0)
+            """.trimIndent(),
+        )
+        v40.execSQL(
+            "INSERT INTO reading_sessions (id, publicationId, startedAt, endedAt, mode, sentencesRead, durationMs, wordsRead, visualDurationMs, ttsDurationMs) " +
+                "VALUES ('pur', 'pub-1', 0, 100, 'VISUAL', 5, 120000, 600, 120000, 0), " +
+                "('mixte', 'pub-1', 0, 100, 'VISUAL', 5, 180000, 900, 120000, 60000)",
+        )
+        v40.close()
+
+        val v41 = helper.runMigrationsAndValidate(
+            TEST_DB_NAME, 41, true,
+            MIGRATION_1_2, MIGRATION_2_3, MIGRATION_3_4, MIGRATION_4_5, MIGRATION_5_6, MIGRATION_6_7,
+            MIGRATION_7_8, MIGRATION_8_9, MIGRATION_9_10, MIGRATION_10_11, MIGRATION_11_12, MIGRATION_12_13,
+            MIGRATION_13_14, MIGRATION_14_15, MIGRATION_15_16, MIGRATION_16_17, MIGRATION_17_18, MIGRATION_18_19,
+            MIGRATION_19_20, MIGRATION_20_21, MIGRATION_21_22, MIGRATION_22_23, MIGRATION_23_24, MIGRATION_24_25,
+            MIGRATION_25_26, MIGRATION_26_27, MIGRATION_27_28, MIGRATION_28_29, MIGRATION_29_30, MIGRATION_30_31,
+            MIGRATION_31_32, MIGRATION_32_33, MIGRATION_33_34, MIGRATION_34_35, MIGRATION_35_36, MIGRATION_36_37,
+            MIGRATION_37_38, MIGRATION_38_39, MIGRATION_39_40, MIGRATION_40_41,
+        )
+
+        v41.query("SELECT id, visualWordsRead FROM reading_sessions ORDER BY id").use { cursor ->
+            assertEquals(true, cursor.moveToFirst())
+            assertEquals("mixte", cursor.getString(0)); assertEquals(0, cursor.getInt(1))
+            assertEquals(true, cursor.moveToNext())
+            assertEquals("pur", cursor.getString(0)); assertEquals(600, cursor.getInt(1))
+        }
+        v41.close()
+    }
+
     companion object {
         private const val TEST_DB_NAME = "migration-test"
     }

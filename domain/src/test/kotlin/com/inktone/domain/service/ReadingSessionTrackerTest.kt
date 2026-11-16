@@ -31,6 +31,21 @@ class ReadingSessionTrackerTest {
     }
 
     @Test
+    fun les_mots_lus_a_l_ecran_sont_comptes_a_part_des_mots_narres() {
+        val tracker = ReadingSessionTracker("pub1", TestClock())
+
+        tracker.addProgress(words = 12) // lecture visuelle (mode par défaut)
+        tracker.switchMode(ReadingMode.AUDIO)
+        tracker.addProgress(words = 30)
+        tracker.switchMode(ReadingMode.VISUAL)
+        tracker.addProgress(words = 8)
+
+        assertEquals(50, tracker.wordsRead)
+        assertEquals(20, tracker.visualWordsRead)
+        assertEquals(20, tracker.snapshot().visualWords)
+    }
+
+    @Test
     fun un_recul_de_position_ne_retire_jamais_de_mots_deja_lus() {
         val tracker = ReadingSessionTracker("pub1", TestClock())
         tracker.addProgress(words = 30)
