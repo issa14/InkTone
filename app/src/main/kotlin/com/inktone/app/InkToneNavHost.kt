@@ -309,7 +309,7 @@ fun InkToneNavHost(navController: NavHostController = rememberNavController(), s
             ReaderScreen(
                 viewModel = readerViewModel,
                 onSearchClick = { navController.navigate(SearchRoute(publicationId = route.publicationId)) },
-                onBack = { navController.popBackStack() },
+                onBack = { navController.leaveReader() },
                 onOpenPronunciationRules = { navController.navigate(PronunciationRulesRoute) },
                 onOpenSettings = { navController.navigate(SettingsRoute) },
                 // Cible de la transition de CET écran : `Visible` dès sa
@@ -639,3 +639,16 @@ private fun BackScaffold(title: String, onBack: () -> Unit, content: @Composable
 
 /** Cible de recherche transmise au Lecteur : « chapitre|offset|href ». */
 private const val SEARCH_TARGET_KEY = "searchTarget"
+
+/**
+ * Quitte le Lecteur vers l'écran précédent ; sans écran précédent (Lecteur ouvert seul, par exemple
+ * depuis une notification ou après une restauration), ouvre la Bibliothèque en vidant la pile :
+ * `popBackStack()` seul laisserait un écran vide.
+ */
+private fun NavHostController.leaveReader() {
+    if (previousBackStackEntry != null) {
+        popBackStack()
+    } else {
+        navigate(LibraryRoute) { popUpTo(graph.id) { inclusive = true } }
+    }
+}
