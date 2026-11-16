@@ -757,6 +757,8 @@ Vérification : « Appareil (adb) » = pilotée par adb sur le V2206, pas encore
 - **B4** : PDF, bouton à gauche du panneau : saisir un numéro de page.
 - **D56, D19** : couverts par des tests seulement.
 
+**Niveaux de lourdeur utilisés pour le reste des P2** (2026-11-16) : *légers* (D43, D64, D66, D29, C3), faits ; *moyens* (D15, D67, D45, D16), faits ; *lourds* (D8, D11, D1/D4, D50, D62), non commencés ; D44 attend une vérification à l'écran par Issa.
+
 **Reste à traiter** :
 - **Nécessitent une décision de conception** : B5 (fait : le sommaire mène à l'ancre de la section et une seule entrée est en cours ; `PARSER_VERSION` 9 ; validé sur appareil), D65 (fait en affichage texte : la phrase entière est surlignée quand le moteur ne renvoie aucun repère par mot ; les pages PDF, rendues en image, ne peuvent rien surligner), 
 - **Lourds** : D8 (NON FAIT : le changement de tokeniseur `unicode61` par une première version de la migration 38 vers 39 (`DROP TABLE sentence_fts`) fait abandonner SQLite sur une base de 1,7 Go et laissait l'application en échec au démarrage ; annulé. Une table voisine est refusée par Room (« Unexpected table »). Reste la réindexation par la régénération des pré-analyses, avec l'ancien tokeniseur. Piste : vider la table par lots avant de la recréer, hors de la transaction de migration), D61 (fait : tombes de suppression horodatées, `MIGRATION_38_39`, dernière modification gagnante pour signets et annotations ; le chemin d'import manuel d'une sauvegarde reste additif), D11, D4.
