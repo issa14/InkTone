@@ -6,13 +6,9 @@ import androidx.compose.foundation.layout.aspectRatio
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.padding
-import androidx.compose.foundation.text.BasicTextField
-import androidx.compose.foundation.text.selection.LocalTextSelectionColors
-import androidx.compose.foundation.text.selection.TextSelectionColors
 import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
-import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.State
 import androidx.compose.runtime.getValue
@@ -31,9 +27,6 @@ import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.layout.LayoutCoordinates
 import androidx.compose.ui.layout.onGloballyPositioned
 import androidx.compose.ui.platform.LocalDensity
-import androidx.compose.ui.platform.LocalTextToolbar
-import androidx.compose.ui.platform.TextToolbar
-import androidx.compose.ui.platform.TextToolbarStatus
 import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.heading
 import androidx.compose.ui.semantics.invisibleToUser
@@ -42,10 +35,8 @@ import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.AnnotatedString
 import androidx.compose.ui.text.SpanStyle
 import androidx.compose.ui.text.TextLayoutResult
-import androidx.compose.ui.text.TextRange
 import androidx.compose.ui.text.TextStyle
 import androidx.compose.ui.text.buildAnnotatedString
-import androidx.compose.ui.text.input.TextFieldValue
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import coil.compose.AsyncImage
@@ -68,7 +59,7 @@ import com.inktone.feature.reader.toComposeColor
  * 1. Trouver le bloc contenant cet offset via recherche dichotomique
  *    sur `blocks.map { it.globalOffsetRange!!.start }`.
  * 2. `val localOffset = charOffset - block.globalOffsetRange!!.start`.
- * 3. Appliquer le surlignage dans le [BasicTextField] de CE bloc uniquement.
+ * 3. Appliquer le surlignage dans le `Text` de CE bloc uniquement.
  *
  * Cette recherche est faite UNE FOIS par `ReaderScreen` (offset absolu →
  * `IntRange` absolu, cf. `absoluteHighlightedRange` du mode SCROLL) ; ce
@@ -77,16 +68,11 @@ import com.inktone.feature.reader.toComposeColor
  *
  * ## Sélection libre + popup d'action
  *
- * Sélection non inter-bloc (limite connue, identique au mode PAGED par
- * page — voir Plan v3 § « Limites connues »). AUDIT_REACTIVITE_UX §4.1 :
- * seul le [BookBlock.ParagraphBlock] qui possède la sélection libre en
- * cours monte un [BasicTextField] indépendant ([ParagraphBlockField]) ; les
- * autres rendent par `Text` ([ParagraphBlockDisplay]), qui démarre la
- * sélection par un appui long. La logique de sélection/toolbar/surlignage
- * du bloc sélectionné est le pendant, à l'échelle du BLOC, de `PageBlock`
- * dans `PagedChapterContent.kt` (mêmes fonctions partagées :
+ * Tous les paragraphes rendent par `Text` ([ParagraphBlockText]) : la
+ * sélection est une plage absolue du chapitre, dessinée dans chaque bloc
+ * qu'elle touche. Fonctions partagées avec `PageBlock` (`PagedChapterContent.kt`) :
  * [rangeBoundsInWindow], [absoluteRangePath], [WordHighlightColor],
- * [SelectionHighlightColor]).
+ * [SelectionHighlightColor].
  *
  * @param block Le bloc à rendre.
  * @param baseTextStyle Style de texte de base (taille, police, couleur du thème).
@@ -275,19 +261,13 @@ internal fun annotationAtOffset(annotations: List<Annotation>, chapterIndex: Int
     }
 
 /**
- * Point d'entrée pour un [BookBlock.ParagraphBlock] : dispatche entre
- * [ParagraphBlockDisplay] (rendu `Text`, par défaut) et [ParagraphBlockField]
- * (`BasicTextField`, sélection native) selon que CE bloc possède ou non la
- * sélection libre en cours.
+ * Rendu par `Text` d'un [BookBlock.ParagraphBlock] : surlignage mot-à-mot TTS,
+ * sélection libre, tap sur lien ou annotation.
  *
- * AUDIT_REACTIVITE_UX §4.1 — un `BasicTextField` en lecture seule (focus,
- * session d'entrée, poignées de sélection, sémantique éditable) coûte
- * nettement plus qu'un `Text`. Avant cette correction, CHAQUE bloc visible
- * en était un, même sans sélection en cours : en défilement rapide, c'était
- * le prix payé par chaque paragraphe qui entrait dans la fenêtre visible.
- * Il n'y a jamais qu'une sélection libre à la fois, et jamais inter-bloc
- * (limite déjà documentée) : au plus UN bloc a donc besoin d'un
- * `BasicTextField` à un instant donné — celui qui la possède.
+ * La sélection est dessinée depuis la plage absolue du chapitre, qu'elle tienne
+ * ou non dans ce bloc. Un appui long la démarre au mot et publie lui-même les
+ * bornes du popup d'actions : aucun `BasicTextField`, coûteux au défilement
+ * (audit réactivité §4.1) et muet sur une sélection programmatique (lot 25).
  */
 @Composable
 private fun ParagraphBlockText(
@@ -308,90 +288,14 @@ private fun ParagraphBlockText(
     onCurrentLineY: (Dp) -> Unit,
     modifier: Modifier = Modifier,
 ) {
-    val globalSelection = freeSelectedRange.value
-    val ownsGlobalSelection = globalSelection != null &&
-        globalSelection.first >= blockOffsetRange.first &&
-        globalSelection.last <= blockOffsetRange.last
-
-    if (ownsGlobalSelection) {
-        ParagraphBlockField(
-            blockText = blockText,
-            blockOffsetRange = blockOffsetRange,
-            plainText = plainText,
-            textStyle = textStyle,
-            annotations = annotations,
-            chapterIndex = chapterIndex,
-            highlightedRange = highlightedRange,
-            freeSelectedRange = freeSelectedRange,
-            onFreeSelectionChanged = onFreeSelectionChanged,
-            onFreeSelectionCleared = onFreeSelectionCleared,
-            onFreeSelectionBoundsInWindow = onFreeSelectionBoundsInWindow,
-            onClick = onClick,
-            onAnnotationTapped = onAnnotationTapped,
-            isReadingRulerEnabled = isReadingRulerEnabled,
-            onCurrentLineY = onCurrentLineY,
-            modifier = modifier,
-        )
-    } else {
-        ParagraphBlockDisplay(
-            blockText = blockText,
-            blockOffsetRange = blockOffsetRange,
-            plainText = plainText,
-            textStyle = textStyle,
-            annotations = annotations,
-            chapterIndex = chapterIndex,
-            highlightedRange = highlightedRange,
-            onFreeSelectionChanged = onFreeSelectionChanged,
-            onClick = onClick,
-            onAnnotationTapped = onAnnotationTapped,
-            isReadingRulerEnabled = isReadingRulerEnabled,
-            onCurrentLineY = onCurrentLineY,
-            modifier = modifier,
-        )
-    }
-}
-
-/**
- * Rendu léger par `Text` d'un [BookBlock.ParagraphBlock] qui ne possède pas
- * la sélection libre en cours — le cas de la quasi-totalité des blocs à
- * tout instant. Surlignage mot-à-mot TTS et détection de tap sur annotation
- * conservés à l'identique de [ParagraphBlockField] ; la sélection démarre
- * ici par un appui long, qui calcule la limite de mot ([TextLayoutResult.getWordBoundary])
- * et la publie via [onFreeSelectionChanged] — ce bloc devient alors
- * propriétaire de la sélection globale et [ParagraphBlockText] le remonte
- * en [ParagraphBlockField] au prochain recomposition, poignées déjà
- * positionnées sur le mot visé (voir la valeur initiale de `localSelection`
- * dans [ParagraphBlockField]).
- */
-@Composable
-private fun ParagraphBlockDisplay(
-    blockText: AnnotatedString,
-    blockOffsetRange: IntRange,
-    plainText: String,
-    textStyle: TextStyle,
-    annotations: List<Annotation>,
-    chapterIndex: Int,
-    highlightedRange: State<IntRange?>,
-    onFreeSelectionChanged: (anchorOffset: Int, focusOffset: Int) -> Unit,
-    onClick: () -> Unit,
-    onAnnotationTapped: (Annotation, Rect?) -> Unit,
-    isReadingRulerEnabled: Boolean,
-    onCurrentLineY: (Dp) -> Unit,
-    modifier: Modifier = Modifier,
-) {
     val onLinkTapped = LocalLinkTapHandler.current
     var textLayoutResult by remember(blockOffsetRange) { mutableStateOf<TextLayoutResult?>(null) }
     var textCoordinates by remember(blockOffsetRange) { mutableStateOf<LayoutCoordinates?>(null) }
     val density = LocalDensity.current
 
-    // Même mécanisme que ParagraphBlockField (§4.2 de l'audit) : lecture de
-    // highlightedRange et écriture de onCurrentLineY hors de la phase de
-    // layout, dérivées dans un effet à partir du TextLayoutResult capturé.
-    // Le mot prononcé est COLLECTÉ (`snapshotFlow`), jamais lu en clé
-    // d'effet : `highlightedRange.value` en argument de `LaunchedEffect` se
-    // lit pendant la composition, ce qui recomposait ce bloc à chaque mot
-    // (3 à 5 fois par seconde pendant le TTS) — précisément ce que le
-    // passage par un `State` devait éviter.
+    // Le mot prononcé est COLLECTÉ (`snapshotFlow`), jamais lu en clé d'effet :
+    // lu pendant la composition, il recomposait ce bloc à chaque mot (audit
+    // réactivité §4.2). Même raison pour la sortie de `onTextLayout`.
     LaunchedEffect(textLayoutResult, isReadingRulerEnabled, blockOffsetRange) {
         if (!isReadingRulerEnabled) return@LaunchedEffect
         val layout = textLayoutResult ?: return@LaunchedEffect
@@ -423,16 +327,23 @@ private fun ParagraphBlockDisplay(
             .pointerInput(blockOffsetRange) {
                 detectTapGestures(
                     onTap = { position ->
+                        // Un tap n'importe où dans le texte ferme la sélection en
+                        // cours (le popup ne se ferme pas sur un tap extérieur).
+                        if (freeSelectedRange.value != null) {
+                            onFreeSelectionCleared()
+                            return@detectTapGestures
+                        }
                         val layout = textLayoutResult ?: run {
                             onClick()
                             return@detectTapGestures
                         }
-                        val globalOffset = blockOffsetRange.first + layout.getOffsetForPosition(position)
-                        val link = blockText.linkAt(layout.getOffsetForPosition(position))
+                        val localOffset = layout.getOffsetForPosition(position)
+                        val link = blockText.linkAt(localOffset)
                         if (link != null) {
                             onLinkTapped(link)
                             return@detectTapGestures
                         }
+                        val globalOffset = blockOffsetRange.first + localOffset
                         val tappedAnnotation = annotationAtOffset(annotations, chapterIndex, globalOffset)
                         if (tappedAnnotation != null) {
                             val absolute = maxOf(tappedAnnotation.startLocator.charOffset, blockOffsetRange.first)..
@@ -445,239 +356,29 @@ private fun ParagraphBlockDisplay(
                     },
                     onLongPress = { position ->
                         val layout = textLayoutResult ?: return@detectTapGestures
-                        val localOffset = layout.getOffsetForPosition(position)
-                        val boundary = layout.getWordBoundary(localOffset)
+                        val boundary = layout.getWordBoundary(layout.getOffsetForPosition(position))
                         if (boundary.collapsed) return@detectTapGestures
-                        onFreeSelectionChanged(
-                            blockOffsetRange.first + boundary.start,
-                            blockOffsetRange.first + boundary.end - 1,
+                        val absolute = (blockOffsetRange.first + boundary.start)..(blockOffsetRange.first + boundary.end - 1)
+                        onFreeSelectionChanged(absolute.first, absolute.last)
+                        onFreeSelectionBoundsInWindow(
+                            rangeBoundsInWindow(layout, textCoordinates, blockOffsetRange, absolute),
                         )
                     },
                 )
             }
             .drawWithCache {
+                // `Path` recalculé seulement quand la plage ou le layout changent (§4.2).
                 val layout = textLayoutResult
+                val selectionPath = layout?.let { l ->
+                    freeSelectedRange.value?.let { absoluteRangePath(l, blockOffsetRange, it) }
+                }
                 val wordPath = layout?.let { l ->
                     highlightedRange.value?.let { absoluteRangePath(l, blockOffsetRange, it) }
                 }
                 onDrawBehind {
+                    selectionPath?.let { drawPath(it, SelectionHighlightColor) }
                     wordPath?.let { drawPath(it, WordHighlightColor) }
                 }
             },
     )
-}
-
-/**
- * `BasicTextField` en lecture seule d'un [BookBlock.ParagraphBlock], avec
- * sélection native, popup d'action et surlignage mot-à-mot TTS — pendant
- * de `PageBlock` (`PagedChapterContent.kt`) à l'échelle du bloc plutôt
- * que de la page. Voir les commentaires de `PageBlock` pour la
- * justification détaillée de chaque choix (repris à l'identique ici).
- *
- * Monté uniquement pour le bloc qui possède la sélection libre en cours —
- * voir [ParagraphBlockText] (audit §4.1). `freeSelectedRange` n'est donc
- * plus consulté ici que pour amorcer `localSelection` à la sélection déjà
- * publiée (le mot visé par l'appui long dans [ParagraphBlockDisplay]), pas
- * pour décider du mode de rendu.
- */
-@Composable
-private fun ParagraphBlockField(
-    blockText: AnnotatedString,
-    blockOffsetRange: IntRange,
-    plainText: String,
-    textStyle: TextStyle,
-    annotations: List<Annotation>,
-    chapterIndex: Int,
-    highlightedRange: State<IntRange?>,
-    freeSelectedRange: State<IntRange?>,
-    onFreeSelectionChanged: (anchorOffset: Int, focusOffset: Int) -> Unit,
-    onFreeSelectionCleared: () -> Unit,
-    onFreeSelectionBoundsInWindow: (Rect?) -> Unit,
-    onClick: () -> Unit,
-    onAnnotationTapped: (Annotation, Rect?) -> Unit,
-    isReadingRulerEnabled: Boolean,
-    onCurrentLineY: (Dp) -> Unit,
-    modifier: Modifier = Modifier,
-) {
-    val onLinkTapped = LocalLinkTapHandler.current
-    var textLayoutResult by remember(blockOffsetRange) { mutableStateOf<TextLayoutResult?>(null) }
-    var textCoordinates by remember(blockOffsetRange) { mutableStateOf<LayoutCoordinates?>(null) }
-    val density = LocalDensity.current
-
-    // §4.2 (audit réactivité) — lecture de `highlightedRange` + écriture de
-    // `onCurrentLineY` sorties de `onTextLayout` : lire un état pendant la
-    // phase de layout y abonne la mise en page (chaque mot prononcé
-    // invalidait le layout de tous les blocs visibles), et écrire pendant le
-    // layout déclenche une passe aval. Dérivé ici, dans un effet, à partir
-    // du `TextLayoutResult` déjà capturé.
-    // Le mot prononcé est COLLECTÉ (`snapshotFlow`), jamais lu en clé
-    // d'effet : `highlightedRange.value` en argument de `LaunchedEffect` se
-    // lit pendant la composition, ce qui recomposait ce bloc à chaque mot
-    // (3 à 5 fois par seconde pendant le TTS) — précisément ce que le
-    // passage par un `State` devait éviter.
-    LaunchedEffect(textLayoutResult, isReadingRulerEnabled, blockOffsetRange) {
-        if (!isReadingRulerEnabled) return@LaunchedEffect
-        val layout = textLayoutResult ?: return@LaunchedEffect
-        snapshotFlow { highlightedRange.value }.collect { absRange ->
-            if (absRange == null) return@collect
-            val local = absRange.first - blockOffsetRange.first
-            if (local in 0 until layout.layoutInput.text.length) {
-                val line = layout.getLineForOffset(local)
-                onCurrentLineY(with(density) { layout.getLineTop(line).toDp() })
-            }
-        }
-    }
-
-    // Amorcée à la sélection déjà publiée : ce composable n'est monté que
-    // pour le bloc qui possède `freeSelectedRange` (voir ParagraphBlockText),
-    // le plus souvent parce qu'un appui long dans ParagraphBlockDisplay
-    // vient de calculer un mot et de le publier — les poignées doivent
-    // apparaître directement dessus, pas à `TextRange.Zero`.
-    var localSelection by remember(blockOffsetRange) {
-        val initial = freeSelectedRange.value?.let { g ->
-            if (g.first >= blockOffsetRange.first && g.last <= blockOffsetRange.last) {
-                TextRange(g.first - blockOffsetRange.first, g.last - blockOffsetRange.first + 1)
-            } else {
-                null
-            }
-        } ?: TextRange.Zero
-        mutableStateOf(initial)
-    }
-
-    val globalSelection = freeSelectedRange.value
-    val ownsGlobalSelection = globalSelection != null &&
-        globalSelection.first >= blockOffsetRange.first &&
-        globalSelection.last <= blockOffsetRange.last
-    val selection = if (ownsGlobalSelection) localSelection else TextRange.Zero
-    val selectionState = rememberUpdatedState(selection)
-
-    val fieldValue = remember(blockText, selection) { TextFieldValue(blockText, selection) }
-
-    var popupBoundsInWindow by remember(blockOffsetRange) { mutableStateOf<Rect?>(null) }
-    val currentOnBoundsInWindow by rememberUpdatedState(onFreeSelectionBoundsInWindow)
-    val ownsGlobalSelectionState = rememberUpdatedState(ownsGlobalSelection)
-
-    fun hidePopup() {
-        if (popupBoundsInWindow == null) return
-        popupBoundsInWindow = null
-        currentOnBoundsInWindow(null)
-    }
-
-    // Contrairement à PageBlock (page hors écran gardée montée par le
-    // pager), un bloc scrollé hors du LazyColumn est simplement décomposé
-    // — pas de LaunchedEffect(isDisplayedPage) équivalent à porter ici.
-
-    val selectionColors = LocalTextSelectionColors.current
-    val handlesOnlySelectionColors = remember(selectionColors) {
-        TextSelectionColors(handleColor = selectionColors.handleColor, backgroundColor = Color.Transparent)
-    }
-
-    val toolbar = remember(blockOffsetRange) {
-        object : TextToolbar {
-            override val status: TextToolbarStatus = TextToolbarStatus.Hidden
-
-            override fun showMenu(
-                rect: Rect,
-                onCopyRequested: (() -> Unit)?,
-                onPasteRequested: (() -> Unit)?,
-                onCutRequested: (() -> Unit)?,
-                onSelectAllRequested: (() -> Unit)?,
-            ) {
-                val currentSelection = selectionState.value
-                val absolute = if (currentSelection.collapsed) {
-                    null
-                } else {
-                    (blockOffsetRange.first + currentSelection.min)..(blockOffsetRange.first + currentSelection.max - 1)
-                }
-                val windowRect = rangeBoundsInWindow(textLayoutResult, textCoordinates, blockOffsetRange, absolute)
-                popupBoundsInWindow = windowRect
-                currentOnBoundsInWindow(windowRect)
-            }
-
-            override fun hide() {
-                if (popupBoundsInWindow == null) return
-                popupBoundsInWindow = null
-                currentOnBoundsInWindow(null)
-            }
-        }
-    }
-
-    CompositionLocalProvider(
-        LocalTextSelectionColors provides handlesOnlySelectionColors,
-        LocalTextToolbar provides toolbar,
-    ) {
-        BasicTextField(
-            value = fieldValue,
-            onValueChange = { newValue ->
-                val wasSelecting = !selection.collapsed
-                val selectionChanged = newValue.selection != selection
-                localSelection = newValue.selection
-                if (newValue.selection.collapsed) {
-                    if (wasSelecting) {
-                        onFreeSelectionCleared()
-                        hidePopup()
-                    }
-                    // Lot 23, tâche 11 — un tap qui tombe dans une
-                    // annotation déjà posée ouvre son menu contextuel au
-                    // lieu de basculer le HUD (comportement inchangé
-                    // ailleurs dans le texte).
-                    val globalOffset = blockOffsetRange.first + newValue.selection.start
-                    val link = blockText.linkAt(newValue.selection.start)
-                    val tappedAnnotation = if (link != null) null else annotationAtOffset(annotations, chapterIndex, globalOffset)
-                    if (link != null) {
-                        onLinkTapped(link)
-                    } else if (tappedAnnotation != null) {
-                        val absolute = maxOf(tappedAnnotation.startLocator.charOffset, blockOffsetRange.first)..
-                            (minOf(tappedAnnotation.endLocator.charOffset, blockOffsetRange.last + 1) - 1)
-                        val bounds = rangeBoundsInWindow(textLayoutResult, textCoordinates, blockOffsetRange, absolute)
-                        onAnnotationTapped(tappedAnnotation, bounds)
-                    } else {
-                        onClick()
-                    }
-                } else {
-                    if (selectionChanged) hidePopup()
-                    val min = newValue.selection.min
-                    val max = newValue.selection.max
-                    onFreeSelectionChanged(blockOffsetRange.first + min, blockOffsetRange.first + max - 1)
-                }
-            },
-            readOnly = true,
-            textStyle = textStyle,
-            onTextLayout = { layout ->
-                // §4.2 (audit réactivité) — capture seule du résultat : plus
-                // aucune lecture d'état ni écriture pendant la phase de
-                // layout (voir le `LaunchedEffect` dédié plus haut).
-                textLayoutResult = layout
-            },
-            modifier = modifier
-                .fillMaxWidth()
-                .padding(vertical = 2.dp)
-                .onGloballyPositioned { textCoordinates = it }
-                .semantics {
-                    contentDescription = plainText
-                    onClick(label = "Afficher ou masquer les commandes") {
-                        if (!selection.collapsed) return@onClick false
-                        onClick()
-                        true
-                    }
-                }
-                .drawWithCache {
-                    // §4.2 (audit réactivité) — `Path` de surlignage calculé
-                    // une fois par changement de plage/layout, puis mis en
-                    // cache par `drawWithCache` : plus d'allocation de `Path`
-                    // à chaque frame via `getPathForRange`.
-                    val layout = textLayoutResult
-                    val selectionPath = layout?.let { l ->
-                        freeSelectedRange.value?.let { absoluteRangePath(l, blockOffsetRange, it) }
-                    }
-                    val wordPath = layout?.let { l ->
-                        highlightedRange.value?.let { absoluteRangePath(l, blockOffsetRange, it) }
-                    }
-                    onDrawBehind {
-                        selectionPath?.let { drawPath(it, SelectionHighlightColor) }
-                        wordPath?.let { drawPath(it, WordHighlightColor) }
-                    }
-                },
-        )
-    }
 }

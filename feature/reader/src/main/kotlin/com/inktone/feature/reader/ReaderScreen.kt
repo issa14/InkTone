@@ -1146,7 +1146,7 @@ fun ReaderScreen(
                                         onFreeSelectionChanged = { anchor, focus ->
                                             viewModel.onIntent(ReaderIntent.SetFreeSelection(anchor, focus))
                                         },
-                                        onFreeSelectionCleared = { viewModel.onIntent(ReaderIntent.ClearFreeSelection) },
+                                        onFreeSelectionCleared = { clearSelectionAndPopup() },
                                         onFreeSelectionBoundsInWindow = { ownerKey, bounds ->
                                             scrollFreeSelectionBounds = resolveSelectionPopupBounds(
                                                 current = scrollFreeSelectionBounds,
