@@ -1393,6 +1393,10 @@ SelectionActionPopup(
                                         // passage à isPlaying=false referme déjà la barre
                                         // et fait revenir le panneau unifié.
                                         onSwipeDown = { viewModel.onIntent(ReaderIntent.Pause) },
+                                        surfaceColor = ThemeColors.barSurface(state.resolvedTheme),
+                                        accentColor = ThemeColors.accent(state.resolvedTheme),
+                                        contentColor = ThemeColors.barContent(state.resolvedTheme),
+                                        onAccentColor = ThemeColors.onAccent(state.resolvedTheme),
                                     )
                                 }
                             }
@@ -1403,6 +1407,8 @@ SelectionActionPopup(
                                         isAudioActive = live,
                                         onExpand = { chrome.expandPill() },
                                         onSwipeDown = { viewModel.onIntent(ReaderIntent.Pause) },
+                                        accentColor = ThemeColors.accent(state.resolvedTheme),
+                                        onAccentColor = ThemeColors.onAccent(state.resolvedTheme),
                                     )
                                 }
                             }
@@ -1442,6 +1448,8 @@ SelectionActionPopup(
                                 tocContentDescription = if (isPdf) "Aller à une page" else "Sommaire",
                                 surfaceColor = ThemeColors.barSurface(state.resolvedTheme),
                                 accentColor = ThemeColors.accent(state.resolvedTheme),
+                                contentColor = ThemeColors.barContent(state.resolvedTheme),
+                                onAccentColor = ThemeColors.onAccent(state.resolvedTheme),
                                 onBrightnessClick = {
                                     // Bug réel corrigé (vérification device, lot 3d) : masque le
                                     // HUD au lieu de le garder visible — la barre prend sa place

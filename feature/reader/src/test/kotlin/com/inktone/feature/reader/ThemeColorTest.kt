@@ -103,4 +103,17 @@ class ThemeColorTest {
         assertEquals(1f, ThemeColors.wordHighlight(ReadingTheme.PAPIER_CLAIR).alpha)
         assertEquals(1f, ThemeColors.wordHighlight(ReadingTheme.SEPIA_VINTAGE).alpha)
     }
+
+    /** Audit UI P0-2 : commandes du HUD lisibles dans chaque thème intégré (3:1, élément d'interface). */
+    @Test
+    fun les_commandes_du_hud_restent_lisibles_dans_chaque_theme() {
+        for (theme in ReadingTheme.BUILT_IN) {
+            val bar = ThemeColors.barSurface(theme)
+            val icon = androidx.compose.ui.graphics.lerp(bar, ThemeColors.barContent(theme), 0.87f)
+            val accent = ThemeColors.accent(theme)
+            assertTrue("${theme.id} icônes", calculateContrastRatio(icon, bar) >= 3.0)
+            assertTrue("${theme.id} accent", calculateContrastRatio(accent, bar) >= 3.0)
+            assertTrue("${theme.id} icône Lecture", calculateContrastRatio(ThemeColors.onAccent(theme), accent) >= 3.0)
+        }
+    }
 }

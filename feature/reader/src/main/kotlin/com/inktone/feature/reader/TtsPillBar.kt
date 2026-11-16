@@ -62,9 +62,14 @@ fun TtsPillBar(
     onNextChapter: () -> Unit,
     onSwipeDown: () -> Unit,
     modifier: Modifier = Modifier,
+    // Couleurs du thème de lecture, comme le panneau unifié : les deux états
+    // du même HUD partagent une palette (ThemeColors.barSurface/accent…).
+    surfaceColor: Color = MaterialTheme.colorScheme.surface,
+    accentColor: Color = MaterialTheme.colorScheme.primary,
+    contentColor: Color = MaterialTheme.colorScheme.onSurface,
+    onAccentColor: Color = MaterialTheme.colorScheme.onPrimary,
 ) {
     val haptic = LocalHapticFeedback.current
-    val accentColor = MaterialTheme.colorScheme.primary
     val density = LocalDensity.current
     val swipeThresholdPx = with(density) { 48.dp.toPx() }
 
@@ -85,7 +90,7 @@ fun TtsPillBar(
                     },
                 )
             },
-        color = MaterialTheme.colorScheme.surface.copy(alpha = 0.95f),
+        color = surfaceColor.copy(alpha = 0.95f),
         shape = CircleShape,
         tonalElevation = 3.dp,
     ) {
@@ -97,14 +102,14 @@ fun TtsPillBar(
                 icon = AppSymbol.ChapterPrevious,
                 contentDescription = "Chapitre précédent",
                 enabled = hasPreviousChapter,
-                tint = accentColor,
+                tint = contentColor,
                 onClick = onPreviousChapter,
             )
             PillAction(
                 icon = AppSymbol.SentencePrevious,
                 contentDescription = "Phrase précédente",
                 enabled = true,
-                tint = accentColor,
+                tint = contentColor,
                 onClick = onPreviousSentence,
             )
             Box(Modifier.padding(horizontal = 4.dp)) {
@@ -120,7 +125,7 @@ fun TtsPillBar(
                     AppIcon(
                         if (isPlaying) AppSymbol.Pause else AppSymbol.Play,
                         contentDescription = if (isPlaying) "Pause" else "Lire",
-                        tint = MaterialTheme.colorScheme.surface,
+                        tint = onAccentColor,
                     )
                 }
             }
@@ -128,14 +133,14 @@ fun TtsPillBar(
                 icon = AppSymbol.SentenceNext,
                 contentDescription = "Phrase suivante",
                 enabled = true,
-                tint = accentColor,
+                tint = contentColor,
                 onClick = onNextSentence,
             )
             PillAction(
                 icon = AppSymbol.ChapterNext,
                 contentDescription = "Chapitre suivant",
                 enabled = hasNextChapter,
-                tint = accentColor,
+                tint = contentColor,
                 onClick = onNextChapter,
             )
             Box(Modifier.padding(start = 4.dp), contentAlignment = Alignment.Center) {
@@ -169,8 +174,9 @@ fun TtsPillBarCollapsed(
     onExpand: () -> Unit,
     onSwipeDown: () -> Unit,
     modifier: Modifier = Modifier,
+    accentColor: Color = MaterialTheme.colorScheme.primary,
+    onAccentColor: Color = MaterialTheme.colorScheme.onPrimary,
 ) {
-    val accentColor = MaterialTheme.colorScheme.primary
     val density = LocalDensity.current
     val swipeThresholdPx = with(density) { 48.dp.toPx() }
 
@@ -198,7 +204,7 @@ fun TtsPillBarCollapsed(
             AppIcon(
                 AppSymbol.Speaking,
                 contentDescription = "Afficher les contrôles de lecture",
-                tint = MaterialTheme.colorScheme.surface,
+                tint = onAccentColor,
             )
         }
         Box(
@@ -207,7 +213,7 @@ fun TtsPillBarCollapsed(
         ) {
             TtsSoundWave(
                 isActive = isAudioActive,
-                tint = MaterialTheme.colorScheme.surface,
+                tint = onAccentColor,
                 barCount = 2,
             )
         }
@@ -270,8 +276,8 @@ private fun PillAction(
         enabled = enabled,
         modifier = Modifier.size(48.dp), // cible tactile minimale (audit UX C3)
         colors = IconButtonDefaults.iconButtonColors(
-            contentColor = tint.copy(alpha = 0.7f),
-            disabledContentColor = tint.copy(alpha = 0.25f),
+            contentColor = tint.copy(alpha = 0.87f),
+            disabledContentColor = tint.copy(alpha = 0.38f),
         ),
     ) {
         AppIcon(icon, contentDescription = contentDescription)

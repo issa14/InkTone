@@ -68,6 +68,16 @@ object ThemeColors {
     fun barContent(theme: ReadingTheme): Color = text(theme)
 
     /**
+     * Icône posée sur un bouton plein de couleur [accent] (Lecture/Pause) :
+     * la surface de barre tant qu'elle reste lisible (3:1, élément
+     * d'interface), sinon le texte du thème.
+     */
+    fun onAccent(theme: ReadingTheme): Color {
+        val surface = barSurface(theme)
+        return if (calculateContrastRatio(accent(theme), surface) >= 3.0) surface else text(theme)
+    }
+
+    /**
      * Police effectivement rendue (Tâche 9.2) : la préférence globale
      * explicite gagne quand elle est définie (ex. OpenDyslexic imposé par
      * le préréglage d'accessibilité) ; `FontFamily.DEFAULT` signifie

@@ -60,7 +60,8 @@ data class ReadingTheme(
         val SAUGE_OLIVE = ReadingTheme(
             id = "sauge_olive", displayName = "Sauge & Olive", isBuiltIn = true,
             backgroundColorHex = "#E8ECD7", textColorHex = "#33402D",
-            accentColorHex = "#7C9070", highlightColorHex = "#D9C36A",
+            // Assez foncé pour 3:1 sur la barre HUD (bouton Lecture, état actif).
+            accentColorHex = "#5E7252", highlightColorHex = "#D9C36A",
             fontFamily = FontFamily.SANS_SERIF,
         )
 

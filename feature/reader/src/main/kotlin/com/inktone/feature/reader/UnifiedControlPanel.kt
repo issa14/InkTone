@@ -88,9 +88,13 @@ fun UnifiedControlPanel(
     // servent qu'aux previews/tests qui n'ont pas de ReadingTheme.
     surfaceColor: Color = MaterialTheme.colorScheme.surface,
     accentColor: Color = MaterialTheme.colorScheme.primary,
+    contentColor: Color = MaterialTheme.colorScheme.onSurface,
+    onAccentColor: Color = MaterialTheme.colorScheme.onPrimary,
 ) {
     val haptic = LocalHapticFeedback.current
-    val iconTint = accentColor.copy(alpha = 0.7f)
+    // Couleur du texte du thème (lisible par construction) : l'accent atténué
+    // tombait sous 3:1 dans les thèmes clairs. L'accent reste aux états actifs.
+    val iconTint = contentColor.copy(alpha = 0.87f)
 
     Surface(
         modifier = Modifier.fillMaxWidth(),
@@ -141,7 +145,7 @@ fun UnifiedControlPanel(
                             AppIcon(
                                 if (isPlaying) AppSymbol.Pause else AppSymbol.Play,
                                 contentDescription = if (isPlaying) "Pause" else "Lire",
-                                tint = surfaceColor,
+                                tint = onAccentColor,
                             )
                         }
                     }
