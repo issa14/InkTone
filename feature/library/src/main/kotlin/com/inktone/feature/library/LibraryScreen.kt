@@ -806,7 +806,7 @@ private fun BookGridCell(
             // mêmes métadonnées.
             Text(
                 text = publication.title.cleanedForDisplay(),
-                style = MaterialTheme.typography.bodySmall.copy(fontWeight = FontWeight.SemiBold),
+                style = MaterialTheme.typography.titleSmall,
                 minLines = 2,
                 maxLines = 2,
                 overflow = TextOverflow.Ellipsis,
@@ -1011,7 +1011,7 @@ private fun ResumeReadingCard(
                 // Titre — nettoyage des artefacts EPUB (tiret, espaces en tête)
                 Text(
                     text = publication.title.cleanedForDisplay(),
-                    style = MaterialTheme.typography.titleMedium.copy(fontWeight = FontWeight.Bold),
+                    style = MaterialTheme.typography.titleMedium,
                     maxLines = 1,
                     overflow = TextOverflow.Ellipsis
                 )
