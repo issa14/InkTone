@@ -601,13 +601,12 @@ V2206 ; « Test JVM » un test automatisé qui échoue sans la correction ;
 | C1 | Accents rétablis | `7fce12a5` | Lecture |
 | C5 | Choix de voix : toute la ligne cliquable | — | Sans objet : la liste de voix du Lecteur est retirée (D74, `b039cd47`) |
 
-`BookmarkPanelTest` : les deux tests de balayage d'onglet
-(`un_swipe_horizontal_change_l_onglet_affiche`,
-`tap_sur_un_onglet_apres_un_swipe_reste_synchronise`) échouent aussi sur
-`03b6a336`, avant toute correction : défaut préexistant, à traiter à part.
+`BookmarkPanelTest` : les deux tests de balayage d'onglet échouaient depuis
+leur écriture (balayage parti du voile qui ferme le panneau, pas du pager) ;
+rétablis par `140b178e`, 12 tests verts sur appareil.
 
 **Limites déclarées :**
-- **D10** : levée par `20fefd8d` (voir §10.1).
+- **D10** : levée par `20fefd8d` (voir §10.1) ; test instrumenté de la purge par `f1af8d11`.
 - **D71** : un modèle n'est tenu pour installé qu'avec son marqueur `.install-complete`, posé après l'extraction et portant l'empreinte de l'archive : une installation tronquée ou d'une autre version se réinstalle (`InstallMarker`).
 - **B10** : si Android détruit l'application pendant le choix de l'emplacement, le mot de passe (jamais persisté, à dessein) est perdu et le fichier choisi reste vide.
 - **D66** : la recherche de « Marque-pages et notes » reste sensible aux accents (requête SQL `LIKE` ; la rendre insensible demande une colonne normalisée, donc une migration).
@@ -647,7 +646,7 @@ Avant de pousser les deux dernières : `./gradlew build` complet vert sur `HEAD`
 | B2, D31 | « Terminé » et « En cours » fondés sur la progression affichée (seuil 0,98, dernière page PDF) | `13d4edb2` | Appareil |
 | A19 (reste) | Même pourcentage partout, 100 % compris ; « Commencé » sous 1 % | `85517349` | Appareil |
 | A7 | Voix neuronale téléchargée par WorkManager en service de premier plan | `14287c8a` | Compilation + tests JVM — **appareil en attente** (voix déjà installée sur le V2206) |
-| D10 | Phrases d'un livre supprimé purgées de l'index | `20fefd8d` | Test JVM ; aucun test instrumenté |
+| D10 | Phrases d'un livre supprimé purgées de l'index | `20fefd8d` | Test JVM + instrumenté (`f1af8d11`) |
 | D21 | Livre TXT découpé en paragraphes | `5fc78df4` | Appareil + tests JVM |
 | D53 | Import d'un seul fichier visible du début au résumé | `48eec69e` | Appareil + tests JVM |
 | D47 | Pause plus longue entre deux paragraphes narrés | `bc41222b` | Test JVM |
@@ -672,7 +671,7 @@ Le second essai, tracé, n'a montré ni pause ni arrêt.
 
 **Restent à faire avant de pousser `audit-narration`** :
 - **A7** (voix absente seulement) : lancer le téléchargement, quitter les Réglages : la notification reste et le téléchargement aboutit. Vérifié par Issa le 2026-11-16.
-- Aucun test ne vérifie que l'intent `Pause` du Lecteur est traité : sa branche peut disparaître du `when` sans erreur de compilation ni de test.
+- Intent `Pause` du Lecteur : testé par `efb878af` (le test échoue si la branche ne fait plus rien).
 
 **Changement de comportement à connaître (D73)** : sans profil vocal
 enregistré, la voix par défaut suit désormais le moteur des préférences
@@ -693,7 +692,7 @@ pas encore par Issa.
 
 Vérifications sur appareil faites par Issa le 2026-11-15 (D18 avec zoom, D48, D55 avec un nouvel import).
 
-**Instabilité constatée** : `ReaderViewModelBackgroundTrackerTest.onAppBackground_pendant_ecoute_tts_laisse_le_tracker_actif` a échoué une fois dans la suite complète (« Dispatchers.Main is used concurrently with setting it », dans `resetMain`), puis passé trois fois seul et dans la suite complète suivante. Non qualifiée plus avant.
+**Instabilité constatée** : `ReaderViewModelBackgroundTrackerTest.onAppBackground_pendant_ecoute_tts_laisse_le_tracker_actif` a échoué une fois dans la suite complète (« Dispatchers.Main is used concurrently with setting it », dans `resetMain`). Cause : le `runCurrent` final lançait la vraie synthèse sur `Dispatchers.IO` juste avant `resetMain`. Corrigé par `69e9fbc4` (portée annulée avant d'avancer le planificateur ; douze exécutions vertes).
 
 **Rectificatif** : A11 et A17 sont des **P1** (§3). Ce suivi les rangeait par erreur avec les P2/P3 ; ils étaient donc restés ouverts après le lot des derniers P1. Traités en §10.3.
 
