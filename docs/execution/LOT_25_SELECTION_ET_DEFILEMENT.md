@@ -249,9 +249,12 @@ restent non confirmés et ne sont pas touchés.
 
 ### Écarts déclarés
 
-- Palier 25.4 : les deux causes ci-dessus ne sont pas corrigées. À 0,6 % d'images longues,
-  aucun correctif ne serait mesurable avec ces outils ; elles restent les premières pistes
-  si un livre ou un appareil plus lent fait réapparaître des saccades.
+- Palier 25.4, cause 1 : `contentType` par type de bloc sur les items de la `LazyColumn`
+  (réutilisation de la composition d'un paragraphe sorti) essayé puis retiré, faute de gain
+  mesuré — p99 CPU 20,3 → 20,8 ms, dépassement p99 5,1 → 5,5 ms, dans le bruit.
+  Cause 2 (premier toucher, une image) non corrigée : sans traçage de composition, la trace
+  ne dit pas quel code s'exécute dans ces 13 ms. À 0,6 % d'images longues, les deux restent
+  les premières pistes si un livre ou un appareil plus lent fait réapparaître des saccades.
 - Un appui long suivi d'un glissement sans lever le doigt n'étend pas la sélection ;
   l'extension passe par les poignées.
 - Incident : `:benchmark:connectedBenchmarkBenchmarkAndroidTest` a désinstallé l'app de
