@@ -7,6 +7,7 @@ import com.inktone.domain.service.ParseResult
 import com.inktone.domain.service.PreAnalysisBuilder
 import com.inktone.domain.service.PreAnalysisStore
 import com.inktone.domain.service.PublicationParser
+import com.inktone.domain.service.SEARCH_INDEX_VERSION
 import com.inktone.domain.service.SearchService
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.flow.first
@@ -42,7 +43,7 @@ class RefreshStalePreAnalysesUseCase(
         var failed = 0
         for (publication in publicationRepository.observeAll().first()) {
             if (publication.format != PublicationFormat.EPUB) continue
-            if (preAnalysisStore.isFresh(publication.id, publication.fileHash)) {
+            if (publication.searchIndexVersion >= SEARCH_INDEX_VERSION && preAnalysisStore.isFresh(publication.id, publication.fileHash)) {
                 alreadyFresh++
                 continue
             }
@@ -68,6 +69,9 @@ class RefreshStalePreAnalysesUseCase(
                 chapters.forEachIndexed { position, chapter ->
                     searchService.indexSentences(publication.id, position, chapter.href, chapter.sentences)
                 }
+                // Posé seulement une fois tous les chapitres indexés : un index interrompu ou partiel
+                // reste à refaire à la passe suivante (audit UX D11).
+                if (chapters.size == shells.size) publicationRepository.setSearchIndexVersion(publication.id, SEARCH_INDEX_VERSION)
                 preAnalysisBuilder.onPreAnalysisRewritten(publication.id)
                 refreshed++
             } catch (e: CancellationException) {

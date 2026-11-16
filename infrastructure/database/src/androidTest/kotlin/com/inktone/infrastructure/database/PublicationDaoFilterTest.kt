@@ -80,18 +80,4 @@ class PublicationDaoFilterTest {
 
         assertEquals(listOf("pub-2"), result.map { it.id })
     }
-
-    @Test
-    fun en_cours_exclut_le_dernier_chapitre() = runTest {
-        db.publicationDao().insert(publication("pub-1", chapterCount = 5))
-        db.publicationDao().insert(publication("pub-2", chapterCount = 5))
-        db.readingStateDao().save(readingState("pub-1", chapterIndex = 2)) // en cours
-        db.readingStateDao().save(readingState("pub-2", chapterIndex = 4)) // dernier chapitre (index 4 = chapterCount-1)
-
-        val inProgress = db.publicationDao().observeFiltered("IN_PROGRESS", null).first()
-        val read = db.publicationDao().observeFiltered("READ", null).first()
-
-        assertEquals(listOf("pub-1"), inProgress.map { it.id })
-        assertEquals(listOf("pub-2"), read.map { it.id })
-    }
 }

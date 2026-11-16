@@ -11,6 +11,8 @@ import com.inktone.domain.model.DocumentModel
 import com.inktone.domain.model.Publication
 import com.inktone.domain.model.PublicationFormat
 import com.inktone.domain.service.ParseResult
+import com.inktone.domain.service.SEARCH_INDEX_VERSION
+import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.test.runTest
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertTrue
@@ -23,10 +25,14 @@ import org.junit.Test
  */
 class RefreshStalePreAnalysesUseCaseTest {
 
-    private fun publication(id: String, format: PublicationFormat = PublicationFormat.EPUB) = Publication(
+    private fun publication(
+        id: String,
+        format: PublicationFormat = PublicationFormat.EPUB,
+        searchIndexVersion: Int = SEARCH_INDEX_VERSION,
+    ) = Publication(
         id = id, title = "Titre $id", format = format,
         fileUri = "content://fake/$id", fileHash = "hash-$id", fileSize = 100L,
-        chapterCount = 2, importDate = 0L,
+        chapterCount = 2, importDate = 0L, searchIndexVersion = searchIndexVersion,
     )
 
     private fun shell(href: String) =
@@ -74,6 +80,23 @@ class RefreshStalePreAnalysesUseCaseTest {
 
         assertEquals(RefreshStalePreAnalysesUseCase.Outcome(refreshed = 0, alreadyFresh = 1, failed = 0), outcome)
         assertTrue(builder.analyzedFileUris.isEmpty())
+    }
+
+    @Test
+    fun `un index a refaire est reconstruit meme si la pre-analyse est a jour`() = runTest {
+        val repository = FakePublicationRepository().apply { insert(publication("pub-1", searchIndexVersion = 0)) }
+        val store = FakePreAnalysisStore().apply { save("pub-1", "hash-pub-1", listOf(shell("chap1.xhtml"))) }
+        val search = FakeSearchService()
+
+        val outcome = RefreshStalePreAnalysesUseCase(repository, parserWithTwoChapters(), FakePreAnalysisBuilder(), store, search)()
+
+        assertEquals(RefreshStalePreAnalysesUseCase.Outcome(refreshed = 1, alreadyFresh = 0, failed = 0), outcome)
+        assertEquals(listOf(0 to "cover.xhtml", 1 to "chap1.xhtml"), search.indexedChapters)
+        assertEquals(
+            "l'index complet est déclaré à jour",
+            SEARCH_INDEX_VERSION,
+            repository.observeAll().first().single().searchIndexVersion,
+        )
     }
 
     @Test

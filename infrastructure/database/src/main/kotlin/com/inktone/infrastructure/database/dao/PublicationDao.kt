@@ -14,16 +14,11 @@ interface PublicationDao {
 
     /**
      * Filtre structurel (Tâche 6.5) — `mode` reçoit le nom de [FilterMode]
-     * (`FAVORITES`, `SERIES`, `UNREAD`, `IN_PROGRESS`, `READ`) ; `TAG` et
-     * `BY_AUTHOR` ne passent pas par cette requête (listes sérialisées en
-     * colonne, filtrées côté Kotlin par `RoomPublicationRepository` sur le
-     * résultat d'`observeAll()` — une seule requête au total, pas de N+1,
-     * K8). Jointure `reading_states` unique (§6.5.3) : pas une requête par
-     * publication pour connaître son état de lecture.
-     *
-     * `READ` = dernier chapitre atteint (`rs.chapterIndex >= p.chapterCount
-     * - 1`) — définition documentée et volontairement limitée, voir
-     * [com.inktone.domain.model.FilterMode].
+     * (`FAVORITES`, `SERIES`, `UNREAD`) ; `TAG`, `BY_AUTHOR`, `IN_PROGRESS` et
+     * `READ` ne passent pas par cette requête : listes sérialisées en colonne
+     * ou progression calculée, filtrées côté Kotlin par `RoomPublicationRepository`
+     * (audit UX B2). Jointure `reading_states` unique (§6.5.3) : pas une requête
+     * par publication pour connaître son état de lecture.
      */
     @Query(
         """
@@ -87,6 +82,9 @@ interface PublicationDao {
 
     @Query("UPDATE publications SET locatorAnchorVersion = :version WHERE id = :id")
     suspend fun setLocatorAnchorVersion(id: String, version: Int)
+
+    @Query("UPDATE publications SET searchIndexVersion = :version WHERE id = :id")
+    suspend fun setSearchIndexVersion(id: String, version: Int)
 
     @Query("UPDATE publications SET fileUri = :fileUri WHERE id = :id")
     suspend fun setFileUri(id: String, fileUri: String)

@@ -40,4 +40,6 @@ data class PublicationEntity(
     // Version du parseur pour laquelle les positions de ce livre ont été ancrées
     // (ADR-027, MIGRATION_37_38) ; 0 = pas encore.
     val locatorAnchorVersion: Int = 0,
+    // Version de l'index plein texte complet du livre (MIGRATION_39_40) ; 0 = incomplet ou à refaire.
+    val searchIndexVersion: Int = 0,
 )

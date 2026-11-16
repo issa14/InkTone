@@ -33,6 +33,9 @@ interface PublicationRepository {
     /** Enregistre la version du parseur pour laquelle les positions du livre sont ancrées (ADR-027). */
     suspend fun setLocatorAnchorVersion(id: String, version: Int)
 
+    /** Enregistre la version de l'index plein texte complet du livre ; 0 le déclare à refaire (audit UX D11). */
+    suspend fun setSearchIndexVersion(id: String, version: Int)
+
     /** Fait pointer une publication sur un autre fichier du même livre (copie privée, ADR-028). */
     suspend fun setFileUri(id: String, fileUri: String)
 

@@ -631,3 +631,24 @@ val MIGRATION_38_39 = object : Migration(38, 39) {
         )
     }
 }
+
+/**
+ * Audit UX D8 : l'index plein texte passe au tokeniseur `unicode61` (insensible aux accents et à la
+ * casse). Un index est une donnée dérivée : il est supprimé puis recréé vide, et la régénération
+ * des pré-analyses ([com.inktone.domain.usecase.RefreshStalePreAnalysesUseCase]) le reconstruit.
+ */
+val MIGRATION_39_40 = object : Migration(39, 40) {
+    override fun migrate(db: SupportSQLiteDatabase) {
+        // 0 = index à refaire : tous les livres existants sont réindexés en tâche de fond (audit UX D11).
+        db.execSQL("ALTER TABLE publications ADD COLUMN searchIndexVersion INTEGER NOT NULL DEFAULT 0")
+        db.execSQL("DROP TABLE IF EXISTS sentence_fts")
+        db.execSQL(
+            """
+            CREATE VIRTUAL TABLE IF NOT EXISTS sentence_fts USING FTS4(
+                publicationId TEXT NOT NULL, chapterIndex INTEGER NOT NULL, resourceHref TEXT NOT NULL,
+                charOffset INTEGER NOT NULL, text TEXT NOT NULL, tokenize=unicode61
+            )
+            """.trimIndent(),
+        )
+    }
+}

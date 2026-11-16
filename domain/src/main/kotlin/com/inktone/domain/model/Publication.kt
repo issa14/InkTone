@@ -49,6 +49,8 @@ data class Publication(
     val lastOpened: Long? = null,
     /** Version du parseur pour laquelle les positions de ce livre sont ancrées (ADR-027) ; 0 = pas encore. */
     val locatorAnchorVersion: Int = 0,
+    /** Version de l'index plein texte complet de ce livre ; 0 = incomplet ou à refaire (audit UX D11). */
+    val searchIndexVersion: Int = 0,
 ) {
     init {
         require(title.isNotBlank()) { "title ne peut pas être vide" }

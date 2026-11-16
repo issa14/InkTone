@@ -13,6 +13,7 @@ import com.inktone.domain.service.ParseResult
 import com.inktone.domain.service.PreAnalysisStore
 import com.inktone.domain.service.PublicationMetadata
 import com.inktone.domain.service.PublicationParser
+import com.inktone.domain.service.SEARCH_INDEX_VERSION
 import com.inktone.domain.service.SearchService
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.NonCancellable
@@ -162,6 +163,8 @@ class ImportPublicationUseCase(
                 // Longueurs à la position de chaque chapitre : un chapitre
                 // illisible compte pour 0 plutôt que de décaler les suivants.
                 val lengthChapters = mutableListOf<Chapter>()
+                // Index complet seulement si chaque chapitre a été lu puis indexé (audit UX D11).
+                var indexComplete = true
                 documentModel.chapters.forEachIndexed { position, shell ->
                     // Un chapitre illisible n'interrompt plus l'indexation, la
                     // pré-analyse ni les longueurs du reste du livre (audit UX
@@ -178,6 +181,7 @@ class ImportPublicationUseCase(
                         null
                     }
                     if (chapter == null) {
+                        indexComplete = false
                         lengthChapters += shell.copy(index = position)
                         return@forEachIndexed
                     }
@@ -188,9 +192,11 @@ class ImportPublicationUseCase(
                     } catch (e: CancellationException) {
                         throw e
                     } catch (e: Exception) {
-                        // Ce chapitre seul manque à l'index.
+                        // Ce chapitre seul manque à l'index : le livre reste à réindexer.
+                        indexComplete = false
                     }
                 }
+                if (indexComplete) publicationRepository.setSearchIndexVersion(publication.id, SEARCH_INDEX_VERSION)
                 // Le PDF est géré par son propre chemin page-à-page
                 // (Palier C) : la pré-analyse de chapitres/sentences ne
                 // concerne que l'EPUB reflowable.
@@ -204,6 +210,7 @@ class ImportPublicationUseCase(
                 chapterParser.invalidate(publication.id)
             } else {
                 searchService.indexPublication(publication.id, documentModel)
+                publicationRepository.setSearchIndexVersion(publication.id, SEARCH_INDEX_VERSION)
                 // TXT : chapitres peuplés d'emblée par son parseur.
                 publicationRepository.setChapterLengths(publication.id, ChapterLengths.of(documentModel.chapters))
             }

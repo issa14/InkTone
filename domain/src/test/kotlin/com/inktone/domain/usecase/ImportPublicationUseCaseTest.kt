@@ -87,6 +87,7 @@ class ImportPublicationUseCaseTest {
         check(result is ImportResult.Success)
         val stored = publicationRepository.getById(result.publication.id)
         assertEquals("une longueur par chapitre, couverture comprise", 3, stored?.chapterLengths?.values?.size)
+        assertEquals("tous les chapitres indexés : index complet", com.inktone.domain.service.SEARCH_INDEX_VERSION, stored?.searchIndexVersion)
     }
 
     @Test
@@ -191,5 +192,7 @@ class ImportPublicationUseCaseTest {
         // Longueurs alignées sur les positions : 0 pour le chapitre cassé.
         val lengths = publicationRepository.getById(publication.id)?.chapterLengths
         assertEquals(listOf(11, 0, 11), lengths?.values)
+        // Un chapitre manque à l'index : le livre reste à réindexer en tâche de fond (audit UX D11).
+        assertEquals(0, publicationRepository.getById(publication.id)?.searchIndexVersion)
     }
 }

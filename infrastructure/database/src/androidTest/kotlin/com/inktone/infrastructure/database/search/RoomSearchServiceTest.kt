@@ -105,6 +105,16 @@ class RoomSearchServiceTest {
     }
 
     @Test
+    fun la_recherche_ignore_les_accents_et_la_casse() = runTest {
+        db.sentenceFtsDao().insertAll(
+            listOf(SentenceFtsEntity("pub-1", 0, "c.xhtml", 5000, "À l'École, un Élève rêve de forêts.")),
+        )
+        listOf("eleve", "ÉLÈVE", "ecole", "foret", "reve").forEach { query ->
+            assertTrue("« $query » doit trouver la phrase accentuée", searchService.search(query).any { it.locator.charOffset == 5000 })
+        }
+    }
+
+    @Test
     fun les_phrases_d_un_livre_retire_de_la_bibliotheque_ne_sont_plus_proposees() = runTest {
         db.publicationDao().delete("pub-3")
 

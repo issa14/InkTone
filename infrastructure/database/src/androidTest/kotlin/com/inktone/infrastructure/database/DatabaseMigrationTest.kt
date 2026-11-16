@@ -1568,6 +1568,48 @@ class DatabaseMigrationTest {
         v39.close()
     }
 
+    @Test
+    fun migration_39_vers_40_recree_l_index_plein_texte_insensible_aux_accents() {
+        val v39 = helper.createDatabase(TEST_DB_NAME, 39)
+        v39.execSQL(
+            """
+            INSERT INTO publications (id, title, authors, format, fileUri, fileHash, fileSize, chapterCount, subjects, isFavorite, isPinned, isDrmProtected, importDate, lastOpened, locatorAnchorVersion)
+            VALUES ('pub-1', 'Titre', '', 'EPUB', 'content://pub-1', 'hash1', 1000, 3, '', 0, 0, 0, 500, 900, 0)
+            """.trimIndent(),
+        )
+        v39.execSQL(
+            "INSERT INTO sentence_fts (publicationId, chapterIndex, resourceHref, charOffset, text) " +
+                "VALUES ('pub-1', 0, 'ch1.xhtml', 0, 'Un Élève brillant.')",
+        )
+        v39.close()
+
+        val v40 = helper.runMigrationsAndValidate(
+            TEST_DB_NAME, 40, true,
+            MIGRATION_1_2, MIGRATION_2_3, MIGRATION_3_4, MIGRATION_4_5, MIGRATION_5_6, MIGRATION_6_7,
+            MIGRATION_7_8, MIGRATION_8_9, MIGRATION_9_10, MIGRATION_10_11, MIGRATION_11_12, MIGRATION_12_13,
+            MIGRATION_13_14, MIGRATION_14_15, MIGRATION_15_16, MIGRATION_16_17, MIGRATION_17_18, MIGRATION_18_19,
+            MIGRATION_19_20, MIGRATION_20_21, MIGRATION_21_22, MIGRATION_22_23, MIGRATION_23_24, MIGRATION_24_25,
+            MIGRATION_25_26, MIGRATION_26_27, MIGRATION_27_28, MIGRATION_28_29, MIGRATION_29_30, MIGRATION_30_31,
+            MIGRATION_31_32, MIGRATION_32_33, MIGRATION_33_34, MIGRATION_34_35, MIGRATION_35_36, MIGRATION_36_37,
+            MIGRATION_37_38, MIGRATION_38_39, MIGRATION_39_40,
+        )
+
+        // Le livre existant est déclaré à réindexer.
+        v40.query("SELECT searchIndexVersion FROM publications WHERE id = 'pub-1'").use {
+            it.moveToFirst(); assertEquals(0, it.getInt(0))
+        }
+        // L'index dérivé repart vide : la régénération des pré-analyses le reconstruit.
+        v40.query("SELECT count(*) FROM sentence_fts").use { it.moveToFirst(); assertEquals(0, it.getInt(0)) }
+        v40.execSQL(
+            "INSERT INTO sentence_fts (publicationId, chapterIndex, resourceHref, charOffset, text) " +
+                "VALUES ('pub-1', 0, 'ch1.xhtml', 0, 'Un Élève brillant.')",
+        )
+        v40.query("SELECT count(*) FROM sentence_fts WHERE text MATCH 'eleve'").use {
+            it.moveToFirst(); assertEquals(1, it.getInt(0))
+        }
+        v40.close()
+    }
+
     companion object {
         private const val TEST_DB_NAME = "migration-test"
     }

@@ -4,6 +4,12 @@ import com.inktone.domain.model.DocumentModel
 import com.inktone.domain.model.Sentence
 import com.inktone.domain.valueobject.Locator
 
+/**
+ * Version de l'index plein texte (tokeniseur, contenu indexé). Un livre dont `searchIndexVersion` est
+ * plus petite est réindexé en tâche de fond (audit UX D8, D11).
+ */
+const val SEARCH_INDEX_VERSION = 1
+
 /** Contrat implémenté par la recherche FTS (Blueprint §6.9, Phase 7). */
 interface SearchService {
     suspend fun search(query: String, publicationId: String? = null): List<SearchResult>

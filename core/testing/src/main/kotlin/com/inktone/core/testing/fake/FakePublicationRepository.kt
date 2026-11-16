@@ -84,6 +84,10 @@ class FakePublicationRepository : PublicationRepository {
         state.value = state.value.map { if (it.id == id) it.copy(fileUri = fileUri) else it }
     }
 
+    override suspend fun setSearchIndexVersion(id: String, version: Int) {
+        state.value = state.value.map { if (it.id == id) it.copy(searchIndexVersion = version) else it }
+    }
+
     override suspend fun setChapterLengths(id: String, chapterLengths: ChapterLengths) {
         state.value = state.value.map { if (it.id == id) it.copy(chapterLengths = chapterLengths) else it }
     }
