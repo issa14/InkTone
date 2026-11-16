@@ -1,5 +1,6 @@
 package com.inktone.infrastructure.parser
 
+import com.inktone.domain.model.BlockAlignment
 import com.inktone.domain.model.BookBlock
 import com.inktone.domain.model.Chapter
 import com.inktone.domain.model.ChapterContent
@@ -110,8 +111,9 @@ class JsoupChapterParser {
      * Applique au DOM ce que le CSS (blocs `<style>`, feuilles liées, attribut `style`) dit de
      * l'italique, du gras et du contenu masqué : l'italique et le gras deviennent des balises
      * `<i>` et `<b>` autour du contenu, le contenu masqué est retiré (audit UX D16). Le centrage
-     * (`text-align`, `<center>`, `align`) est noté sur l'élément ([ALIGN_ATTRIBUTE]) et hérité par
-     * ses descendants ; le reste du CSS est ignoré : le modèle de texte ne le porte pas.
+     * (`text-align`, `<center>`, `align`) et le retrait de première ligne (`text-indent`) sont notés
+     * sur l'élément ([ALIGN_ATTRIBUTE], [INDENT_ATTRIBUTE]) et hérités par ses descendants ; le reste
+     * du CSS est ignoré : le modèle de texte ne le porte pas.
      */
     private fun applyStyles(document: org.jsoup.nodes.Document, chapterHref: String, loadStyleSheet: ((String) -> String?)?) {
         val css = StringBuilder()
@@ -134,12 +136,14 @@ class JsoupChapterParser {
                 continue
             }
             val name = element.normalName()
-            val centered = effect.centered ?: when {
-                name == "center" -> true
-                element.attr("align").equals("center", ignoreCase = true) -> true
+            val align = effect.align ?: when {
+                name == "center" -> BlockAlignment.CENTER
+                element.attr("align").equals("center", ignoreCase = true) -> BlockAlignment.CENTER
+                element.attr("align").equals("right", ignoreCase = true) -> BlockAlignment.END
                 else -> null
             }
-            if (centered != null) element.attr(ALIGN_ATTRIBUTE, if (centered) "center" else "start")
+            if (align != null) element.attr(ALIGN_ATTRIBUTE, align.name)
+            effect.indentEm?.let { element.attr(INDENT_ATTRIBUTE, it.toString()) }
             if (effect.bold == true && name !in BOLD_TAGS) wrapContents(element, "b")
             if (effect.italic == true && name !in ITALIC_TAGS) wrapContents(element, "i")
         }
@@ -344,24 +348,33 @@ class JsoupChapterParser {
      * voir cette méthode pour la continuité des [BookBlock.globalOffsetRange].
      */
     private fun extractBlocksFromElement(element: Element, runningOffset: Int, chapterHref: String): List<BookBlock> {
-        val blocks = extractBlocksFromElementUncentered(element, runningOffset, chapterHref)
-        // Un conteneur laisse le centrage à ses enfants, qui le lisent chacun sur leurs ancêtres.
-        if (blocks.isEmpty() || !isCentered(element) || element.normalName() in STRUCTURAL_TAGS || hasBlockLevelChild(element)) return blocks
+        val blocks = extractBlocksFromElementUnaligned(element, runningOffset, chapterHref)
+        // Un conteneur laisse alignement et retrait à ses enfants, qui les lisent chacun sur leurs ancêtres.
+        if (blocks.isEmpty() || element.normalName() in STRUCTURAL_TAGS || hasBlockLevelChild(element)) return blocks
+        val alignment = alignmentOf(element)
+        val indent = indentOf(element)
+        if (alignment == BlockAlignment.START && indent == 0f) return blocks
         return blocks.map {
             when (it) {
-                is BookBlock.ParagraphBlock -> it.copy(isCentered = true)
-                is BookBlock.HeadingBlock -> it.copy(isCentered = true)
+                is BookBlock.ParagraphBlock -> it.copy(alignment = alignment, firstLineIndentEm = indent)
+                is BookBlock.HeadingBlock -> it.copy(alignment = alignment)
                 else -> it
             }
         }
     }
 
-    /** Centré par lui-même ou par l'ancêtre le plus proche qui précise un alignement. */
-    private fun isCentered(element: Element): Boolean =
+    /** Alignement de [element] : le sien, ou celui de l'ancêtre le plus proche qui en précise un. */
+    private fun alignmentOf(element: Element): BlockAlignment =
         generateSequence(element) { it.parent() }.firstOrNull { it.hasAttr(ALIGN_ATTRIBUTE) }
-            ?.attr(ALIGN_ATTRIBUTE) == "center"
+            ?.let { node -> BlockAlignment.entries.firstOrNull { it.name == node.attr(ALIGN_ATTRIBUTE) } }
+            ?: BlockAlignment.START
 
-    private fun extractBlocksFromElementUncentered(element: Element, runningOffset: Int, chapterHref: String): List<BookBlock> {
+    /** Retrait de première ligne de [element], en em : le sien, ou celui de l'ancêtre le plus proche. */
+    private fun indentOf(element: Element): Float =
+        generateSequence(element) { it.parent() }.firstOrNull { it.hasAttr(INDENT_ATTRIBUTE) }
+            ?.attr(INDENT_ATTRIBUTE)?.toFloatOrNull() ?: 0f
+
+    private fun extractBlocksFromElementUnaligned(element: Element, runningOffset: Int, chapterHref: String): List<BookBlock> {
         val tagName = element.normalName()
 
         return when (tagName) {
@@ -963,8 +976,11 @@ class JsoupChapterParser {
         private val BOLD_TAGS = setOf("b", "strong", "h1", "h2", "h3", "h4", "h5", "h6")
         private val ITALIC_TAGS = setOf("i", "em")
 
-        /** Attribut posé par [applyStyles] : `center`, ou `start` pour tout autre alignement. */
+        /** Attribut posé par [applyStyles] : le nom d'un [BlockAlignment]. */
         private const val ALIGN_ATTRIBUTE = "data-inktone-align"
+
+        /** Attribut posé par [applyStyles] : retrait de première ligne en em. */
+        private const val INDENT_ATTRIBUTE = "data-inktone-indent"
 
         /** Conteneurs dont les enfants deviennent des blocs distincts : ils lisent leur centrage eux-mêmes. */
         private val STRUCTURAL_TAGS = setOf("ul", "ol", "dl", "table", "thead", "tbody", "tfoot", "tr")

@@ -26,8 +26,11 @@ sealed class BookBlock {
     abstract val approxByteSize: Int
     abstract val globalOffsetRange: IntRange?
 
-    /** Centré par le livre ; faux pour les blocs sans texte (audit UX D16). */
-    open val isCentered: Boolean get() = false
+    /** Alignement posé par le livre ; [BlockAlignment.START] pour les blocs sans texte (audit UX D16). */
+    open val alignment: BlockAlignment get() = BlockAlignment.START
+
+    /** Retrait de première ligne posé par le livre, en em ; 0 = aucun (audit UX D16). */
+    open val firstLineIndentEm: Float get() = 0f
 
     /**
      * Paragraphe de texte avec styles inline.
@@ -38,14 +41,16 @@ sealed class BookBlock {
      * @param isBlockquote `true` pour un `<blockquote>` — seule distinction
      *   sémantique de bloc conservée face à un `<p>`/`<div>` ordinaire
      *   (mise en italique par [com.inktone.feature.reader.rendering.BookBlockStyleMapper]).
-     * @param isCentered `true` si le livre centre ce texte (CSS `text-align: center`, `<center>`,
-     *   `align="center"`) ; seul alignement conservé, le reste se lit à gauche (audit UX D16).
+     * @param alignment centrage ou alignement à droite posé par le livre (CSS `text-align`,
+     *   `<center>`, `align`) ; le reste suit le réglage « Texte justifié » du Lecteur (audit UX D16).
+     * @param firstLineIndentEm retrait de première ligne posé par `text-indent`, en em.
      */
     data class ParagraphBlock(
         val richText: StyledText,
         override val globalOffsetRange: IntRange,
         val isBlockquote: Boolean = false,
-        override val isCentered: Boolean = false,
+        override val alignment: BlockAlignment = BlockAlignment.START,
+        override val firstLineIndentEm: Float = 0f,
     ) : BookBlock() {
         override val approxByteSize: Int
             get() = richText.approxByteSize + 16
@@ -63,13 +68,13 @@ sealed class BookBlock {
      * @param level Niveau hiérarchique (1 = titre principal, 2 = sous-titre, etc.)
      * @param richText Texte enrichi du titre.
      * @param globalOffsetRange Offsets dans le texte concaténé du chapitre.
-     * @param isCentered `true` si le livre centre ce titre (audit UX D16).
+     * @param alignment centrage ou alignement à droite posé par le livre (audit UX D16).
      */
     data class HeadingBlock(
         val level: Int,
         val richText: StyledText,
         override val globalOffsetRange: IntRange,
-        override val isCentered: Boolean = false,
+        override val alignment: BlockAlignment = BlockAlignment.START,
     ) : BookBlock() {
         override val approxByteSize: Int
             get() = richText.approxByteSize + 20
@@ -108,3 +113,9 @@ sealed class BookBlock {
         override val globalOffsetRange: IntRange? = null
     }
 }
+
+/**
+ * Alignement d'un bloc de texte posé par le livre. Le justifié n'y figure pas : il relève du réglage
+ * « Texte justifié » du lecteur, qui s'applique à tout le texte courant ([START]).
+ */
+enum class BlockAlignment { START, CENTER, END }

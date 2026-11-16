@@ -1,5 +1,6 @@
 package com.inktone.infrastructure.parser
 
+import com.inktone.domain.model.BlockAlignment
 import org.jsoup.Jsoup
 import org.junit.Assert.assertEquals
 import org.junit.Test
@@ -43,10 +44,20 @@ class CssStylingTest {
     }
 
     @Test
-    fun le_centrage_est_reconnu_et_tout_autre_alignement_le_defait() {
-        assertEquals(true, parseDeclarations("text-align: center").centered)
-        assertEquals(false, parseDeclarations("text-align: justify").centered)
-        assertEquals(true, effect(".c { text-align:center }", "<p class=\"c\">x</p>").centered)
+    fun l_alignement_est_reconnu_et_le_justifie_revient_au_reglage_du_lecteur() {
+        assertEquals(BlockAlignment.CENTER, parseDeclarations("text-align: center").align)
+        assertEquals(BlockAlignment.END, parseDeclarations("text-align: right").align)
+        assertEquals(BlockAlignment.START, parseDeclarations("text-align: justify").align)
+        assertEquals(BlockAlignment.CENTER, effect(".c { text-align:center }", "<p class=\"c\">x</p>").align)
+    }
+
+    @Test
+    fun le_retrait_de_premiere_ligne_est_converti_en_em() {
+        assertEquals(1.5f, parseDeclarations("text-indent: 1.5em").indentEm)
+        assertEquals(1f, parseDeclarations("text-indent: 16px").indentEm)
+        assertEquals(0f, parseDeclarations("text-indent: 0").indentEm)
+        assertEquals("un pourcentage n'est pas un retrait de paragraphe", null, parseDeclarations("text-indent: 5%").indentEm)
+        assertEquals(3f, parseDeclarations("text-indent: 40em").indentEm)
     }
 
     @Test

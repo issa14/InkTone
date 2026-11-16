@@ -9,6 +9,8 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.BaselineShift
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextDecoration
+import androidx.compose.ui.text.style.TextIndent
+import com.inktone.domain.model.BlockAlignment
 import androidx.compose.ui.text.withStyle
 import androidx.compose.ui.unit.TextUnit
 import androidx.compose.ui.unit.em
@@ -69,7 +71,16 @@ object BookBlockStyleMapper {
             block is BookBlock.ParagraphBlock && block.isBlockquote -> baseStyle.copy(fontStyle = FontStyle.Italic)
             else -> baseStyle
         }
-        return if (block.isCentered) styled.copy(textAlign = TextAlign.Center) else styled
+        val aligned = when (block.alignment) {
+            BlockAlignment.CENTER -> styled.copy(textAlign = TextAlign.Center)
+            BlockAlignment.END -> styled.copy(textAlign = TextAlign.End)
+            BlockAlignment.START -> styled
+        }
+        return if (block.firstLineIndentEm > 0f) {
+            aligned.copy(textIndent = TextIndent(firstLine = block.firstLineIndentEm.em))
+        } else {
+            aligned
+        }
     }
 
     /** Agrandissement d'un titre de niveau [level] ; partagé avec le mode paginé. */

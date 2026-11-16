@@ -1,5 +1,6 @@
 package com.inktone.data.preanalysis
 
+import com.inktone.domain.model.BlockAlignment
 import com.inktone.domain.model.BookBlock
 import com.inktone.domain.model.Chapter
 import com.inktone.domain.model.ChapterContent
@@ -56,7 +57,8 @@ internal data class BookBlockDto(
     val globalOffsetStart: Int? = null,
     val globalOffsetEnd: Int? = null,
     val isBlockquote: Boolean = false,
-    val isCentered: Boolean = false,
+    val alignment: String = "START",
+    val firstLineIndentEm: Float = 0f,
     val level: Int? = null,
     val href: String? = null,
     val alt: String? = null,
@@ -116,14 +118,15 @@ private fun BookBlock.toDto(): BookBlockDto = when (this) {
         globalOffsetStart = globalOffsetRange.first,
         globalOffsetEnd = globalOffsetRange.last,
         isBlockquote = isBlockquote,
-        isCentered = isCentered,
+        alignment = alignment.name,
+        firstLineIndentEm = firstLineIndentEm,
     )
     is BookBlock.HeadingBlock -> BookBlockDto(
         type = "heading",
         richText = richText.toDto(),
         globalOffsetStart = globalOffsetRange.first,
         globalOffsetEnd = globalOffsetRange.last,
-        isCentered = isCentered,
+        alignment = alignment.name,
         level = level,
     )
     is BookBlock.ImageBlock -> BookBlockDto(
@@ -141,13 +144,14 @@ private fun BookBlockDto.toDomain(): BookBlock = when (type) {
         richText = requireNotNull(richText) { "paragraph sans richText" }.toDomain(),
         globalOffsetRange = range(),
         isBlockquote = isBlockquote,
-        isCentered = isCentered,
+        alignment = alignmentOrStart(),
+        firstLineIndentEm = firstLineIndentEm,
     )
     "heading" -> BookBlock.HeadingBlock(
         level = requireNotNull(level) { "heading sans level" },
         richText = requireNotNull(richText) { "heading sans richText" }.toDomain(),
         globalOffsetRange = range(),
-        isCentered = isCentered,
+        alignment = alignmentOrStart(),
     )
     "image" -> BookBlock.ImageBlock(
         href = requireNotNull(href) { "image sans href" },
@@ -171,3 +175,7 @@ private fun StyledText.toDto(): StyledTextDto =
 
 private fun StyledTextDto.toDomain(): StyledText =
     StyledText(plainText, spans.map { Span(SpanStyles(it.stylesMask), it.start, it.end, it.href) })
+
+/** Alignement relu ; une valeur inconnue (fichier d'une version plus récente) se lit comme le début. */
+private fun BookBlockDto.alignmentOrStart(): BlockAlignment =
+    BlockAlignment.entries.firstOrNull { it.name == alignment } ?: BlockAlignment.START

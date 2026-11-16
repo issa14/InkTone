@@ -10,6 +10,8 @@ import androidx.compose.ui.text.TextMeasurer
 import androidx.compose.ui.text.TextStyle
 import androidx.compose.ui.text.buildAnnotatedString
 import androidx.compose.ui.text.style.TextAlign
+import androidx.compose.ui.text.style.TextIndent
+import com.inktone.domain.model.BlockAlignment
 import androidx.compose.ui.text.withStyle
 import androidx.compose.ui.unit.Constraints
 import com.inktone.domain.model.BookBlock
@@ -406,17 +408,24 @@ class ChapterTextMeasurer(private val textMeasurer: TextMeasurer) {
                     // chevauchent pas.
                     val scale = BookBlockStyleMapper.headingScale(block.level)
                     val lineHeight = if (baseStyle.lineHeight.isSp) baseStyle.lineHeight * scale else TextUnit.Unspecified
-                    withStyle(ParagraphStyle(lineHeight = lineHeight, textAlign = if (block.isCentered) TextAlign.Center else TextAlign.Unspecified)) {
+                    withStyle(ParagraphStyle(lineHeight = lineHeight, textAlign = block.alignment.toTextAlign())) {
                         withStyle(SpanStyle(fontSize = scale.em, fontWeight = FontWeight.Bold)) { appendRichText() }
                     }
-                } else if (block.isCentered) {
-                    withStyle(ParagraphStyle(textAlign = TextAlign.Center)) { appendRichText() }
+                } else if (block.alignment != BlockAlignment.START || block.firstLineIndentEm > 0f) {
+                    val indent = if (block.firstLineIndentEm > 0f) TextIndent(firstLine = block.firstLineIndentEm.em) else null
+                    withStyle(ParagraphStyle(textAlign = block.alignment.toTextAlign(), textIndent = indent)) { appendRichText() }
                 } else {
                     appendRichText()
                 }
             }
         }
         return annotatedString to sentenceStartOffsets
+    }
+
+    private fun BlockAlignment.toTextAlign(): TextAlign = when (this) {
+        BlockAlignment.CENTER -> TextAlign.Center
+        BlockAlignment.END -> TextAlign.End
+        BlockAlignment.START -> TextAlign.Unspecified
     }
 
     private companion object {

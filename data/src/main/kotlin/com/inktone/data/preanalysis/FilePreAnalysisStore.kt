@@ -145,7 +145,9 @@ class FilePreAnalysisStore @Inject constructor(
          * 10 : blocs centrés par le livre (audit UX D16), texte et offsets inchangés.
          * 11 : plus de chapitre ajouté pour une image de couverture (audit UX D1) : les index
          *     de chapitre changent, les positions suivent leur fichier.
+         * 12 : alignement à droite et retrait de première ligne posés par le livre (audit UX D16),
+         *     texte et offsets inchangés.
          */
-        const val PARSER_VERSION = 11
+        const val PARSER_VERSION = 12
     }
 }

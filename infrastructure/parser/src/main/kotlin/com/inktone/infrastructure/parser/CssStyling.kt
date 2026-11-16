@@ -1,5 +1,6 @@
 package com.inktone.infrastructure.parser
 
+import com.inktone.domain.model.BlockAlignment
 import org.jsoup.nodes.Element
 
 /**
@@ -10,18 +11,21 @@ internal data class CssEffect(
     val italic: Boolean? = null,
     val bold: Boolean? = null,
     val hidden: Boolean? = null,
-    /** `text-align` : vrai pour `center`, faux pour toute autre valeur (le modèle ne porte que le centrage). */
-    val centered: Boolean? = null,
+    /** `text-align` : centre, fin (droite), début pour tout autre valeur (le justifié relève du réglage du lecteur). */
+    val align: BlockAlignment? = null,
+    /** `text-indent` en em ; `null` = non précisé, 0 = aucun retrait. */
+    val indentEm: Float? = null,
 ) {
     /** [other] l'emporte là où il précise quelque chose. */
     fun overriddenBy(other: CssEffect) = CssEffect(
         italic = other.italic ?: italic,
         bold = other.bold ?: bold,
         hidden = other.hidden ?: hidden,
-        centered = other.centered ?: centered,
+        align = other.align ?: align,
+        indentEm = other.indentEm ?: indentEm,
     )
 
-    val isEmpty get() = italic == null && bold == null && hidden == null && centered == null
+    val isEmpty get() = italic == null && bold == null && hidden == null && align == null && indentEm == null
 }
 
 private data class CssRule(val tag: String?, val classes: Set<String>, val id: String?, val effect: CssEffect)
@@ -124,11 +128,33 @@ internal fun parseDeclarations(block: String): CssEffect {
                     else -> CssEffect()
                 }
                 "display" -> if (value == "none") CssEffect(hidden = true) else CssEffect(hidden = false)
-                "text-align" -> CssEffect(centered = value == "center" || value == "-webkit-center")
+                "text-align" -> CssEffect(
+                    align = when (value) {
+                        "center", "-webkit-center" -> BlockAlignment.CENTER
+                        "right", "end", "-webkit-right" -> BlockAlignment.END
+                        else -> BlockAlignment.START
+                    },
+                )
+                "text-indent" -> parseEmLength(value)?.let { CssEffect(indentEm = it.coerceIn(0f, MAX_INDENT_EM)) } ?: CssEffect()
                 "visibility" -> if (value == "hidden") CssEffect(hidden = true) else CssEffect()
                 else -> CssEffect()
             },
         )
     }
     return effect
+}
+
+/** Plus grand retrait de première ligne retenu : au-delà, c'est une mise en page, pas un retrait de paragraphe. */
+private const val MAX_INDENT_EM = 3f
+
+/** Longueur CSS en em (`1.5em`, `1rem`, `16px`, `12pt`) ; `null` pour un pourcentage, un mot-clé ou un format inconnu. */
+internal fun parseEmLength(value: String): Float? {
+    val match = Regex("^(-?[0-9]*\\.?[0-9]+)\\s*(em|rem|px|pt|)$").matchEntire(value.trim()) ?: return null
+    val number = match.groupValues[1].toFloatOrNull() ?: return null
+    return when (match.groupValues[2]) {
+        "em", "rem" -> number
+        "px" -> number / 16f
+        "pt" -> number / 12f
+        else -> if (number == 0f) 0f else null
+    }
 }

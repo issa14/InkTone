@@ -1,5 +1,6 @@
 package com.inktone.data.preanalysis
 
+import com.inktone.domain.model.BlockAlignment
 import com.inktone.domain.model.BookBlock
 import com.inktone.domain.model.Chapter
 import com.inktone.domain.model.ChapterContent
@@ -60,16 +61,17 @@ class FilePreAnalysisStoreTest {
     }
 
     @Test
-    fun `le centrage d'un bloc survit au round-trip`() = runTest {
+    fun `l'alignement et le retrait d'un bloc survivent au round-trip`() = runTest {
         val store = tempStore()
         val base = chapter(0, "chap1.xhtml", "Bonjour monde.")
         val block = (base.content as ChapterContent.Rich).blocks.single() as BookBlock.ParagraphBlock
-        val centered = base.copy(content = ChapterContent.Rich(listOf(block.copy(isCentered = true))))
+        val centered = base.copy(content = ChapterContent.Rich(listOf(block.copy(alignment = BlockAlignment.CENTER, firstLineIndentEm = 1.5f))))
 
         store.save("pub-1", "hash-abc", listOf(centered))
 
         val reloaded = store.loadChapter("pub-1", "hash-abc", "chap1.xhtml")?.content as ChapterContent.Rich
-        assertEquals(true, reloaded.blocks.single().isCentered)
+        assertEquals(BlockAlignment.CENTER, reloaded.blocks.single().alignment)
+        assertEquals(1.5f, reloaded.blocks.single().firstLineIndentEm)
     }
 
     @Test

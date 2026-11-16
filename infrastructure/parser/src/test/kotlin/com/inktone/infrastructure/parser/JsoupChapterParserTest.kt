@@ -1,5 +1,6 @@
 package com.inktone.infrastructure.parser
 
+import com.inktone.domain.model.BlockAlignment
 import com.inktone.domain.model.BookBlock
 import com.inktone.domain.model.Chapter
 import com.inktone.domain.model.ChapterContent
@@ -112,13 +113,24 @@ class JsoupChapterParserTest {
             "<h1>Titre</h1><p class=\"c\">Vers</p><center><p>Deux</p></center>" +
             "<div class=\"c\"><p>Trois</p><p style=\"text-align: left\">Quatre</p></div><p>Cinq</p></body></html>"
         val blocks = richBlocks(parseWithCss(html))
-        fun centered(text: String) = blocks.first { (it as? BookBlock.ParagraphBlock)?.richText?.plainText == text }.isCentered
-        assertTrue(blocks.first { it is BookBlock.HeadingBlock }.isCentered)
-        assertTrue(centered("Vers"))
-        assertTrue(centered("Deux"))
-        assertTrue(centered("Trois"))
-        assertEquals("un enfant qui précise un autre alignement le reprend", false, centered("Quatre"))
-        assertEquals(false, centered("Cinq"))
+        fun alignmentOf(text: String) = blocks.first { (it as? BookBlock.ParagraphBlock)?.richText?.plainText == text }.alignment
+        assertEquals(BlockAlignment.CENTER, blocks.first { it is BookBlock.HeadingBlock }.alignment)
+        assertEquals(BlockAlignment.CENTER, alignmentOf("Vers"))
+        assertEquals(BlockAlignment.CENTER, alignmentOf("Deux"))
+        assertEquals(BlockAlignment.CENTER, alignmentOf("Trois"))
+        assertEquals("un enfant qui précise un autre alignement le reprend", BlockAlignment.START, alignmentOf("Quatre"))
+        assertEquals(BlockAlignment.START, alignmentOf("Cinq"))
+    }
+
+    @Test
+    fun `l'alignement a droite et le retrait de premiere ligne sont conserves`() {
+        val html = "<html><head><style>p { text-indent: 1.5em } p.sans { text-indent: 0 } .droite { text-align: right }</style></head><body>" +
+            "<p>Un</p><p class=\"sans\">Deux</p><p class=\"droite\">Trois</p><p style=\"text-align: justify\">Quatre</p></body></html>"
+        val blocks = richBlocks(parseWithCss(html)).filterIsInstance<BookBlock.ParagraphBlock>().associateBy { it.richText.plainText }
+        assertEquals(1.5f, blocks.getValue("Un").firstLineIndentEm)
+        assertEquals(0f, blocks.getValue("Deux").firstLineIndentEm)
+        assertEquals(BlockAlignment.END, blocks.getValue("Trois").alignment)
+        assertEquals("le justifié du livre suit le réglage du lecteur", BlockAlignment.START, blocks.getValue("Quatre").alignment)
     }
 
     // ---- Audit UX D13 : listes, tableaux et citations n'étaient plus fondus en un paragraphe ----
