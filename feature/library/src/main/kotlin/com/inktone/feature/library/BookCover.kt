@@ -3,6 +3,7 @@ package com.inktone.feature.library
 import android.net.Uri
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
+import androidx.compose.foundation.interaction.MutableInteractionSource
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.aspectRatio
 import androidx.compose.foundation.layout.fillMaxSize
@@ -10,7 +11,7 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.material3.Icon
-import androidx.compose.material3.IconButton
+import androidx.compose.material3.ripple
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
@@ -26,6 +27,7 @@ import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.font.FontWeight
@@ -175,26 +177,33 @@ fun BookCover(
         // Retour UX : plus de fond circulaire — icône blanche seule,
         // une shadow légère assure le contraste sur couverture claire.
         if (showOverlays) {
-            // Zone tactile de 48 dp (audit UX C3) ; l'ombre reste sur le disque de 32 dp.
-            IconButton(
-                onClick = { showActionsSheet = true },
+            // Zone tactile de 48 dp (audit UX C3), mais icône calée dans le coin :
+            // centrée dans la zone, le glyphe fin flottait à 24 dp du bord.
+            Box(
+                contentAlignment = Alignment.BottomStart,
                 modifier = Modifier
                     .align(Alignment.BottomStart)
-                    .size(48.dp),
+                    .size(48.dp)
+                    .clickable(
+                        interactionSource = remember { MutableInteractionSource() },
+                        indication = ripple(bounded = false, radius = 20.dp),
+                        role = Role.Button,
+                        onClick = { showActionsSheet = true },
+                    ),
             ) {
-                Box(
-                    contentAlignment = Alignment.Center,
+                AppIcon(
+                    AppSymbol.MoreActions,
+                    contentDescription = "Actions sur « ${publication.title} »",
+                    tint = Color.White,
                     modifier = Modifier
-                        .size(32.dp)
+                        .padding(start = 2.dp, bottom = 4.dp)
                         .shadow(
                             elevation = 6.dp,
                             shape = CircleShape,
                             clip = false,
                             spotColor = Color.Black.copy(alpha = 0.7f),
                         ),
-                ) {
-                    AppIcon(AppSymbol.MoreActions,  contentDescription = "Actions sur « ${publication.title} »", tint = Color.White)
-                }
+                )
             }
         }
 
