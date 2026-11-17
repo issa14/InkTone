@@ -59,7 +59,7 @@ class MiniPlayerContentTest {
             }
         }
 
-        composeTestRule.onNodeWithContentDescription("Reprendre la lecture").assertIsDisplayed()
+        composeTestRule.onNodeWithContentDescription("Écouter").assertIsDisplayed()
     }
 
     @Test

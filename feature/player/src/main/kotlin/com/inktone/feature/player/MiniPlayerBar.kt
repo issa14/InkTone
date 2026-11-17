@@ -27,6 +27,10 @@ import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.inktone.core.designsystem.AppIcon
 import com.inktone.core.designsystem.AppSymbol
+import androidx.compose.foundation.shape.CircleShape
+import androidx.compose.material3.LocalContentColor
+import androidx.compose.ui.graphics.Color
+import com.inktone.core.designsystem.NarrationPlayButton
 import com.inktone.core.designsystem.reducedMotionDuration
 import com.inktone.domain.service.PlaybackSessionState
 
@@ -147,12 +151,14 @@ internal fun MiniPlayerContent(
                 IconButton(onClick = { onIntent(MiniPlayerIntent.PreviousSentence) }) {
                     AppIcon(AppSymbol.SentencePrevious, contentDescription = "Phrase précédente")
                 }
-                IconButton(onClick = { onIntent(MiniPlayerIntent.PlayPause) }) {
-                    AppIcon(
-                        symbol = if (isPlaying) AppSymbol.Pause else AppSymbol.Play,
-                        contentDescription = if (isPlaying) "Mettre en pause" else "Reprendre la lecture",
-                    )
-                }
+                NarrationPlayButton(
+                    isPlaying = isPlaying,
+                    onClick = { onIntent(MiniPlayerIntent.PlayPause) },
+                    containerColor = Color.Transparent,
+                    contentColor = LocalContentColor.current,
+                    size = 48.dp,
+                    shape = CircleShape,
+                )
                 IconButton(onClick = { onIntent(MiniPlayerIntent.NextSentence) }) {
                     AppIcon(AppSymbol.SentenceNext, contentDescription = "Phrase suivante")
                 }

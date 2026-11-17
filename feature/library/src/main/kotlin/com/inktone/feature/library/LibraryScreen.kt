@@ -33,7 +33,6 @@ import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.LinearProgressIndicator
 import androidx.compose.material3.MaterialTheme
-import androidx.compose.material3.minimumInteractiveComponentSize
 import androidx.compose.material3.ModalBottomSheet
 import androidx.compose.material3.NavigationDrawerItem
 import androidx.compose.material3.Scaffold
@@ -70,6 +69,7 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.hilt.navigation.compose.hiltViewModel
 import com.inktone.core.designsystem.AppIcon
+import com.inktone.core.designsystem.NarrationPlayButton
 import com.inktone.core.designsystem.AppSymbol
 import com.inktone.core.designsystem.InkToneBrandMark
 import com.inktone.core.designsystem.NarrativeAccentFamily
@@ -1045,33 +1045,14 @@ private fun ResumeReadingCard(
             // Bouton Lecture/Pause — pilote la NARRATION seule, sans ouvrir
             // le Lecteur : écouter n'oblige plus à quitter la Bibliothèque.
             // L'ouverture du livre reste le tap sur la carte elle-même.
-            // Zone tactile de 48 dp autour du disque de 36 dp (audit UX C3).
-            Box(
-                modifier = Modifier
-                    .minimumInteractiveComponentSize()
-                    .clip(CircleShape)
-                    .clickable(onClick = onTogglePlayback),
-                contentAlignment = Alignment.Center,
-            ) {
-            Box(
-                modifier = Modifier
-                    .size(36.dp)
-                    .clip(CircleShape)
-                    .background(MaterialTheme.colorScheme.primaryContainer),
-                contentAlignment = Alignment.Center
-            ) {
-                AppIcon(
-                    symbol = if (isNarrating) AppSymbol.Pause else AppSymbol.Play,
-                    contentDescription = if (isNarrating) {
-                        "Mettre la narration en pause"
-                    } else {
-                        "Écouter la narration"
-                    },
-                    tint = MaterialTheme.colorScheme.onPrimaryContainer,
-                    modifier = Modifier.size(20.dp)
-                )
-            }
-            }
+            NarrationPlayButton(
+                isPlaying = isNarrating,
+                onClick = onTogglePlayback,
+                containerColor = MaterialTheme.colorScheme.primaryContainer,
+                contentColor = MaterialTheme.colorScheme.onPrimaryContainer,
+                size = 36.dp,
+                shape = CircleShape,
+            )
         }
     }
 }

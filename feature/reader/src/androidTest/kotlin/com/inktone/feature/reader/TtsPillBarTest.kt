@@ -44,7 +44,7 @@ class TtsPillBarTest {
         }
 
         val expectedActions = listOf(
-            "Chapitre précédent", "Phrase précédente", "Lire", "Phrase suivante", "Chapitre suivant",
+            "Chapitre précédent", "Phrase précédente", "Écouter", "Phrase suivante", "Chapitre suivant",
         )
         for (action in expectedActions) {
             composeTestRule.onNodeWithContentDescription(action).performClick()
@@ -73,8 +73,8 @@ class TtsPillBarTest {
             )
         }
 
-        composeTestRule.onNodeWithContentDescription("Pause").assertExists()
-        composeTestRule.onNodeWithContentDescription("Lire").assertDoesNotExist()
+        composeTestRule.onNodeWithContentDescription("Mettre en pause").assertExists()
+        composeTestRule.onNodeWithContentDescription("Écouter").assertDoesNotExist()
     }
 
     @Test

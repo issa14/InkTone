@@ -49,7 +49,7 @@ class UnifiedControlPanelTest {
         }
 
         val expectedActions = listOf(
-            "Sommaire", "Signets", "Lire", "Thème suivant", "Réglages du texte",
+            "Sommaire", "Signets", "Écouter", "Thème suivant", "Réglages du texte",
             "Minuteur de sommeil", "Voix et vitesse", "Passer en mode défilement", "Rechercher dans ce livre", "Luminosité",
         )
         for (action in expectedActions) {

@@ -1,6 +1,7 @@
 package com.inktone.feature.reader
 
 import com.inktone.core.designsystem.formatMultiplier
+import com.inktone.core.designsystem.NarrationPlayButton
 import com.inktone.core.designsystem.AppIcon
 import com.inktone.core.designsystem.AppSymbol
 import androidx.compose.foundation.layout.Arrangement
@@ -11,14 +12,11 @@ import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
-import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.ExperimentalMaterial3Api
-import androidx.compose.material3.FilledIconButton
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
-import androidx.compose.material3.IconButtonDefaults
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.ModalBottomSheet
 import androidx.compose.material3.OutlinedButton
@@ -37,7 +35,6 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
-import com.inktone.core.designsystem.InkToneShapes
 import com.inktone.domain.model.TtsEngineId
 import com.inktone.domain.model.VoiceProfile
 import com.inktone.domain.model.voiceLabel
@@ -118,18 +115,12 @@ fun ReaderTtsPanel(
                 horizontalArrangement = Arrangement.Center,
                 verticalAlignment = Alignment.CenterVertically,
             ) {
-                FilledIconButton(
+                NarrationPlayButton(
+                    isPlaying = isPlaying,
                     onClick = onPlayPause,
-                    modifier = Modifier.size(56.dp),
-                    colors = IconButtonDefaults.filledIconButtonColors(containerColor = MaterialTheme.colorScheme.primary),
-                    shape = InkToneShapes.large,
-                ) {
-                    AppIcon(
-                        if (isPlaying) AppSymbol.Pause else AppSymbol.Play,
-                        contentDescription = if (isPlaying) "Pause" else "Lire",
-                        tint = MaterialTheme.colorScheme.surface,
-                    )
-                }
+                    containerColor = MaterialTheme.colorScheme.primary,
+                    contentColor = MaterialTheme.colorScheme.surface,
+                )
             }
 
             Spacer(Modifier.height(20.dp))

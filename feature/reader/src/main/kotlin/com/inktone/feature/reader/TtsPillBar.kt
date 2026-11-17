@@ -28,9 +28,9 @@ import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.semantics.clearAndSetSemantics
 import androidx.compose.ui.unit.dp
 import com.inktone.core.designsystem.AppIcon
+import com.inktone.core.designsystem.NarrationPlayButton
 import com.inktone.core.designsystem.AppSymbol
 import com.inktone.core.designsystem.InkToneShapes
-import com.inktone.core.designsystem.rememberAppHaptics
 
 /**
  * Tâche 3e.1 — barre pilule flottante affichée à la place du panneau
@@ -68,7 +68,6 @@ fun TtsPillBar(
     contentColor: Color = MaterialTheme.colorScheme.onSurface,
     onAccentColor: Color = MaterialTheme.colorScheme.onPrimary,
 ) {
-    val haptics = rememberAppHaptics()
     val density = LocalDensity.current
     val swipeThresholdPx = with(density) { 48.dp.toPx() }
 
@@ -112,21 +111,12 @@ fun TtsPillBar(
                 onClick = onPreviousSentence,
             )
             Box(Modifier.padding(horizontal = 4.dp)) {
-                FilledIconButton(
-                    onClick = {
-                        haptics.confirm()
-                        onPlayPause()
-                    },
-                    modifier = Modifier.size(56.dp),
-                    colors = IconButtonDefaults.filledIconButtonColors(containerColor = accentColor),
-                    shape = InkToneShapes.large,
-                ) {
-                    AppIcon(
-                        if (isPlaying) AppSymbol.Pause else AppSymbol.Play,
-                        contentDescription = if (isPlaying) "Pause" else "Lire",
-                        tint = onAccentColor,
-                    )
-                }
+                NarrationPlayButton(
+                    isPlaying = isPlaying,
+                    onClick = onPlayPause,
+                    containerColor = accentColor,
+                    contentColor = onAccentColor,
+                )
             }
             PillAction(
                 icon = AppSymbol.SentenceNext,

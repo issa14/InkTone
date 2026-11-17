@@ -11,9 +11,7 @@ import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.shape.RoundedCornerShape
-import androidx.compose.material3.FilledIconButton
 import androidx.compose.material3.HorizontalDivider
-import androidx.compose.material3.IconButtonDefaults
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Surface
 import androidx.compose.runtime.Composable
@@ -24,9 +22,8 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.semantics.Role
 import com.inktone.core.designsystem.AppIcon
+import com.inktone.core.designsystem.NarrationPlayButton
 import com.inktone.core.designsystem.AppSymbol
-import com.inktone.core.designsystem.InkToneShapes
-import com.inktone.core.designsystem.rememberAppHaptics
 
 /**
  * Tâche 3b.6 — panneau de contrôle unifié, trois rangées :
@@ -91,7 +88,6 @@ fun UnifiedControlPanel(
     contentColor: Color = MaterialTheme.colorScheme.onSurface,
     onAccentColor: Color = MaterialTheme.colorScheme.onPrimary,
 ) {
-    val haptics = rememberAppHaptics()
     // Couleur du texte du thème (lisible par construction) : l'accent atténué
     // tombait sous 3:1 dans les thèmes clairs. L'accent reste aux états actifs.
     val iconTint = contentColor.copy(alpha = 0.87f)
@@ -133,21 +129,12 @@ fun UnifiedControlPanel(
                 }
                 Box(Modifier.weight(1f), contentAlignment = Alignment.Center) {
                     if (showTtsControls) {
-                        FilledIconButton(
-                            onClick = {
-                                haptics.confirm()
-                                onPlayPause()
-                            },
-                            modifier = Modifier.size(56.dp),
-                            colors = IconButtonDefaults.filledIconButtonColors(containerColor = accentColor),
-                            shape = InkToneShapes.large,
-                        ) {
-                            AppIcon(
-                                if (isPlaying) AppSymbol.Pause else AppSymbol.Play,
-                                contentDescription = if (isPlaying) "Pause" else "Lire",
-                                tint = onAccentColor,
-                            )
-                        }
+                        NarrationPlayButton(
+                            isPlaying = isPlaying,
+                            onClick = onPlayPause,
+                            containerColor = accentColor,
+                            contentColor = onAccentColor,
+                        )
                     }
                 }
                 Box(Modifier.weight(1f), contentAlignment = Alignment.Center) {
