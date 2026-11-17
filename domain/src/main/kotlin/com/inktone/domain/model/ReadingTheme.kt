@@ -37,13 +37,16 @@ data class ReadingTheme(
 
         val PAPIER_CLAIR = ReadingTheme(
             id = "papier_clair", displayName = "Papier Clair", isBuiltIn = true,
-            backgroundColorHex = "#FFFFFF", textColorHex = "#000000",
+            // Ni blanc ni noir purs (≈ 17:1) : 21:1 fatigue en lecture longue.
+            backgroundColorHex = "#FBFAF7", textColorHex = "#1C1B1A",
             accentColorHex = "#1976D2", highlightColorHex = "#FFEB3B",
             fontFamily = FontFamily.SERIF,
         )
         val OBSIDIENNE = ReadingTheme(
             id = "obsidienne", displayName = "Obsidienne", isBuiltIn = true,
-            backgroundColorHex = "#000000", textColorHex = "#FFFFFF",
+            // Texte cassé (≈ 16:1) : le blanc pur sur noir pur bave sur OLED.
+            // Noir Absolu AMOLED reste le choix du contraste maximal.
+            backgroundColorHex = "#000000", textColorHex = "#E6E3DE",
             accentColorHex = "#90CAF9", highlightColorHex = "#FFD54F",
             fontFamily = FontFamily.SANS_SERIF,
         )

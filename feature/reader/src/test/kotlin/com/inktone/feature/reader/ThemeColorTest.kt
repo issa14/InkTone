@@ -17,9 +17,9 @@ import org.junit.Test
 class ThemeColorTest {
 
     @Test
-    fun theme_obsidienne_utilise_un_fond_noir_et_un_texte_blanc() {
+    fun theme_obsidienne_a_un_fond_noir_et_un_texte_clair_adouci() {
         assertEquals(Color.Black, ThemeColors.background(ReadingTheme.OBSIDIENNE))
-        assertEquals(Color.White, ThemeColors.text(ReadingTheme.OBSIDIENNE))
+        assertContrasteAdouci(ReadingTheme.OBSIDIENNE)
     }
 
     @Test
@@ -29,9 +29,14 @@ class ThemeColorTest {
     }
 
     @Test
-    fun theme_papier_clair_a_un_fond_blanc_et_un_texte_noir() {
-        assertEquals(Color.White, ThemeColors.background(ReadingTheme.PAPIER_CLAIR))
-        assertEquals(Color.Black, ThemeColors.text(ReadingTheme.PAPIER_CLAIR))
+    fun theme_papier_clair_a_un_fond_clair_et_un_texte_sombre_adoucis() {
+        assertContrasteAdouci(ReadingTheme.PAPIER_CLAIR)
+    }
+
+    /** Audit UI P1-10 : très lisible (≥ 15:1) sans le 21:1 du noir et blanc purs. */
+    private fun assertContrasteAdouci(theme: ReadingTheme) {
+        val ratio = calculateContrastRatio(ThemeColors.background(theme), ThemeColors.text(theme))
+        assertTrue("${theme.id} : $ratio", ratio in 15.0..20.0)
     }
 
     @Test
