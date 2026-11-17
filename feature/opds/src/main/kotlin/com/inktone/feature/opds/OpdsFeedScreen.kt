@@ -24,7 +24,6 @@ import androidx.compose.foundation.lazy.grid.GridCells
 import androidx.compose.foundation.lazy.grid.LazyVerticalGrid
 import androidx.compose.foundation.lazy.grid.itemsIndexed
 import androidx.compose.foundation.lazy.grid.rememberLazyGridState
-import androidx.compose.material3.Button
 import androidx.compose.material3.Card
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.MaterialTheme
@@ -47,6 +46,8 @@ import coil.compose.LocalImageLoader
 import coil.memory.MemoryCache
 import com.inktone.core.designsystem.AppIcon
 import com.inktone.core.designsystem.AppSymbol
+import com.inktone.core.designsystem.InkToneEmptyState
+import com.inktone.core.designsystem.InkToneErrorState
 import com.inktone.domain.model.OpdsItem
 import com.inktone.domain.service.OpdsHttpClient
 
@@ -85,14 +86,10 @@ fun OpdsFeedScreen(
             state.isLoading && state.items.isEmpty() -> Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
                 CircularProgressIndicator()
             }
-            state.error != null && state.items.isEmpty() -> FeedError(state.error.message ?: "", onRetry)
-            state.items.isEmpty() -> Box(Modifier.fillMaxSize().padding(24.dp), contentAlignment = Alignment.Center) {
-                Text(
-                    "Ce dossier est vide.",
-                    style = MaterialTheme.typography.bodyLarge,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant,
-                )
-            }
+            // Un flux qui échoue est le plus souvent une coupure réseau : sans
+            // « Réessayer », il fallait quitter le catalogue et y revenir.
+            state.error != null && state.items.isEmpty() -> InkToneErrorState(state.error.message ?: "", onRetry)
+            state.items.isEmpty() -> InkToneEmptyState(icon = AppSymbol.Library, title = "Ce dossier est vide")
             else -> FeedGrid(
                 state = state,
                 onOpenNavigation = onOpenNavigation,
@@ -100,27 +97,6 @@ fun OpdsFeedScreen(
                 onDownloadBook = onDownloadBook,
             )
         }
-    }
-}
-
-@Composable
-private fun FeedError(message: String, onRetry: () -> Unit) {
-    Column(
-        Modifier.fillMaxSize().padding(24.dp),
-        verticalArrangement = Arrangement.Center,
-        horizontalAlignment = Alignment.CenterHorizontally,
-    ) {
-        AppIcon(AppSymbol.Error, contentDescription = null)
-        Text(
-            message,
-            style = MaterialTheme.typography.bodyLarge,
-            color = MaterialTheme.colorScheme.error,
-        )
-        // Un flux qui echoue est le plus souvent une coupure reseau ou un
-        // serveur momentanement indisponible : sans cette action, le seul
-        // recours etait de quitter le catalogue et d'y revenir.
-        Spacer(Modifier.height(16.dp))
-        Button(onClick = onRetry) { Text("Réessayer") }
     }
 }
 

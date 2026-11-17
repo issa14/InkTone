@@ -36,7 +36,6 @@ import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.minimumInteractiveComponentSize
 import androidx.compose.material3.ModalBottomSheet
 import androidx.compose.material3.NavigationDrawerItem
-import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.SnackbarDuration
 import androidx.compose.material3.SnackbarHost
@@ -64,7 +63,6 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.text.font.FontWeight
-import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.draw.shadow
@@ -78,6 +76,8 @@ import com.inktone.core.designsystem.NarrativeAccentFamily
 import com.inktone.core.designsystem.InkToneShapes
 import com.inktone.core.designsystem.formatPercent
 import com.inktone.core.designsystem.InkToneTopBar
+import com.inktone.core.designsystem.InkToneEmptyState
+import com.inktone.core.designsystem.InkToneErrorState
 import com.inktone.domain.model.FilterMode
 import com.inktone.domain.model.Publication
 import com.inktone.domain.model.cleanedAuthorsForDisplay
@@ -1140,61 +1140,30 @@ private fun EmptyState(
     isFiltered: Boolean = false,
     onShowAllBooks: () -> Unit = {},
 ) {
-    Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
-        Column(horizontalAlignment = Alignment.CenterHorizontally) {
-            // Audit v1.0.0 (AUDIT_CONSOLIDATION_V1.md, M1) : une recherche
-            // sans résultat n'est PAS une bibliothèque vide — avant le fix,
-            // l'écran affichait « Votre bibliothèque est vide / Importez
-            // votre premier livre » alors que la bibliothèque était pleine,
-            // avec un CTA d'import trompeur.
-            val isSearchNoResult = searchQuery.isNotBlank() && !hasActiveImport
-            // Même faute pour un filtre (Favoris, Non lus, format…) : la
-            // bibliothèque n'est pas vide, le filtre n'a rien retenu.
-            val isFilterNoResult = isFiltered && !hasActiveImport && !isSearchNoResult
-            AppIcon(
-                AppSymbol.LibraryShelf,
-                contentDescription = null, // décoratif : le texte juste dessous porte le sens
-                tint = MaterialTheme.colorScheme.onSurfaceVariant,
-                modifier = Modifier.size(96.dp),
-            )
-            Spacer(Modifier.height(8.dp))
-            Text(
-                when {
-                    hasActiveImport -> "Import en cours…"
-                    isSearchNoResult -> "Aucun résultat"
-                    isFilterNoResult -> "Aucun livre dans ce filtre"
-                    else -> "Votre bibliothèque est vide"
-                },
-                style = MaterialTheme.typography.titleMedium,
-                modifier = Modifier.padding(top = 16.dp),
-            )
-            val message = when {
-                hasActiveImport -> "Vos livres apparaîtront ici une fois l'import terminé."
-                isSearchNoResult -> "Aucun livre ne correspond à « $searchQuery »."
-                // Le titre et le bouton « Afficher tous les livres » suffisent.
-                isFilterNoResult -> null
-                else -> "EPUB, PDF ou TXT, depuis votre téléphone."
-            }
-            if (message != null) {
-                Text(
-                    message,
-                    style = MaterialTheme.typography.bodyMedium,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant,
-                    textAlign = TextAlign.Center,
-                    modifier = Modifier.padding(horizontal = 32.dp, vertical = 8.dp),
-                )
-            }
-            if (isFilterNoResult) {
-                Button(onClick = onShowAllBooks, modifier = Modifier.padding(top = 16.dp)) {
-                    Text("Afficher tous les livres")
-                }
-            } else if (!hasActiveImport && !isSearchNoResult) {
-                Button(onClick = onImportClick, modifier = Modifier.padding(top = 16.dp)) {
-                    Text("Importer votre premier livre")
-                }
-            }
-        }
-    }
+    // Une recherche ou un filtre sans résultat n'est pas une bibliothèque
+    // vide : ni le même titre, ni l'invitation à importer.
+    val isSearchNoResult = searchQuery.isNotBlank() && !hasActiveImport
+    val isFilterNoResult = isFiltered && !hasActiveImport && !isSearchNoResult
+    InkToneEmptyState(
+        icon = AppSymbol.LibraryShelf,
+        title = when {
+            hasActiveImport -> "Import en cours…"
+            isSearchNoResult -> "Aucun résultat"
+            isFilterNoResult -> "Aucun livre dans ce filtre"
+            else -> "Votre bibliothèque est vide"
+        },
+        message = when {
+            hasActiveImport -> "Vos livres apparaîtront ici une fois l'import terminé."
+            isSearchNoResult -> "Aucun livre ne correspond à « $searchQuery »."
+            isFilterNoResult -> null
+            else -> "EPUB, PDF ou TXT, depuis votre téléphone."
+        },
+        action = when {
+            isFilterNoResult -> { { Button(onClick = onShowAllBooks) { Text("Afficher tous les livres") } } }
+            !hasActiveImport && !isSearchNoResult -> { { Button(onClick = onImportClick) { Text("Importer votre premier livre") } } }
+            else -> null
+        },
+    )
 }
 
 /**
@@ -1203,33 +1172,12 @@ private fun EmptyState(
  */
 @Composable
 private fun ErrorState(message: String, onRetry: () -> Unit, onDismiss: () -> Unit) {
-    Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
-        Column(horizontalAlignment = Alignment.CenterHorizontally) {
-            AppIcon(
-                AppSymbol.Error,
-                contentDescription = null,
-                modifier = Modifier.size(48.dp),
-                tint = MaterialTheme.colorScheme.error,
-            )
-            Text(
-                "Erreur",
-                style = MaterialTheme.typography.titleMedium,
-                color = MaterialTheme.colorScheme.error,
-                modifier = Modifier.padding(top = 12.dp),
-            )
-            Text(
-                message,
-                style = MaterialTheme.typography.bodyMedium,
-                color = MaterialTheme.colorScheme.onSurfaceVariant,
-                textAlign = TextAlign.Center,
-                modifier = Modifier.padding(horizontal = 32.dp, vertical = 8.dp),
-            )
-            Row(horizontalArrangement = Arrangement.spacedBy(12.dp), modifier = Modifier.padding(top = 16.dp)) {
-                OutlinedButton(onClick = onDismiss) { Text("Ignorer") }
-                Button(onClick = onRetry) { Text("Réessayer") }
-            }
-        }
-    }
+    InkToneErrorState(
+        message = message,
+        onRetry = onRetry,
+        secondaryActionLabel = "Ignorer",
+        onSecondaryAction = onDismiss,
+    )
 }
 
 /** Message du résultat d'une synchronisation manuelle, avec le motif d'un échec. */

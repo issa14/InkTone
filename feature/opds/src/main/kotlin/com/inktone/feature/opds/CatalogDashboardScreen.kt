@@ -54,6 +54,7 @@ import androidx.hilt.navigation.compose.hiltViewModel
 import com.inktone.core.designsystem.AppIcon
 import com.inktone.core.designsystem.AppSymbol
 import com.inktone.core.designsystem.InkToneTopBar
+import com.inktone.core.designsystem.InkToneEmptyState
 import com.inktone.domain.model.OpdsCatalog
 
 /**
@@ -227,18 +228,11 @@ private fun CatalogDashboardContent(
         state.isLoading -> Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
             CircularProgressIndicator()
         }
-        state.catalogs.isEmpty() -> Column(
-            Modifier.fillMaxSize().padding(24.dp),
-            verticalArrangement = Arrangement.Center,
-            horizontalAlignment = Alignment.CenterHorizontally,
+        state.catalogs.isEmpty() -> InkToneEmptyState(
+            icon = AppSymbol.Library,
+            title = "Aucun catalogue",
+            message = "Ajoutez-en un avec le bouton +, ou choisissez une suggestion.",
         ) {
-            Text(
-                "Aucun catalogue. Ajoutez-en un avec le bouton +, ou choisissez une suggestion.",
-                style = MaterialTheme.typography.bodyLarge,
-                textAlign = androidx.compose.ui.text.style.TextAlign.Center,
-                color = MaterialTheme.colorScheme.onSurfaceVariant,
-            )
-            Spacer(Modifier.height(16.dp))
             DefaultCatalogSuggestion(
                 label = DefaultCatalogs.EBOOKS_GRATUITS.first,
                 url = DefaultCatalogs.EBOOKS_GRATUITS.second,

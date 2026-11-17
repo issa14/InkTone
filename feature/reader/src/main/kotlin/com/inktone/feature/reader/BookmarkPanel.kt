@@ -20,7 +20,6 @@ import androidx.compose.foundation.layout.navigationBarsPadding
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.statusBarsPadding
 import androidx.compose.foundation.layout.width
-import androidx.compose.foundation.layout.wrapContentSize
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.pager.HorizontalPager
@@ -51,6 +50,7 @@ import androidx.compose.ui.unit.dp
 import com.inktone.core.designsystem.AppIcon
 import com.inktone.core.designsystem.Motion
 import com.inktone.core.designsystem.AppSymbol
+import com.inktone.core.designsystem.InkToneEmptyState
 import com.inktone.domain.model.Annotation
 import com.inktone.domain.model.AnnotationColor
 import com.inktone.domain.model.Bookmark
@@ -244,7 +244,7 @@ private fun NotesTab(
     onEdit: (Annotation) -> Unit,
 ) {
     if (notes.isEmpty()) {
-        EmptyTabMessage("Aucune note pour ce livre.")
+        EmptyTabMessage(AppSymbol.Note, "Aucune note pour ce livre")
         return
     }
     LazyColumn(modifier = Modifier.fillMaxSize()) {
@@ -293,7 +293,7 @@ private fun NotesTab(
 @Composable
 private fun HighlightsTab(highlights: List<Annotation>, onClick: (Annotation) -> Unit, onDelete: (Annotation) -> Unit) {
     if (highlights.isEmpty()) {
-        EmptyTabMessage("Aucun surlignage pour ce livre.")
+        EmptyTabMessage(AppSymbol.Highlight, "Aucun surlignage pour ce livre")
         return
     }
     LazyColumn(modifier = Modifier.fillMaxSize()) {
@@ -347,7 +347,7 @@ private fun BookmarksTab(
     onEdit: (Bookmark) -> Unit,
 ) {
     if (bookmarks.isEmpty()) {
-        EmptyTabMessage("Aucun signet pour ce livre.")
+        EmptyTabMessage(AppSymbol.Bookmark, "Aucun signet pour ce livre")
         return
     }
     LazyColumn(modifier = Modifier.fillMaxSize()) {
@@ -439,10 +439,8 @@ internal fun DeleteItemDialog(label: String, onConfirm: () -> Unit, onDismiss: (
 }
 
 @Composable
-private fun EmptyTabMessage(message: String) {
-    Box(modifier = Modifier.fillMaxSize().wrapContentSize(Alignment.Center)) {
-        Text(message, color = MaterialTheme.colorScheme.onSurfaceVariant)
-    }
+private fun EmptyTabMessage(icon: AppSymbol, title: String) {
+    InkToneEmptyState(icon = icon, title = title)
 }
 
 /** Format cible confirmé (`UX_FLOW_DESIGN.md` § Surlignages) : `25 déc. 2025`. */

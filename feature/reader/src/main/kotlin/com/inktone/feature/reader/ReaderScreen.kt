@@ -25,7 +25,6 @@ import androidx.compose.foundation.ExperimentalFoundationApi
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.interaction.MutableInteractionSource
-import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.ExperimentalLayoutApi
@@ -43,7 +42,6 @@ import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.text.BasicTextField
 import androidx.compose.foundation.text.selection.LocalTextSelectionColors
 import androidx.compose.foundation.text.selection.TextSelectionColors
-import androidx.compose.material3.Button
 import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedTextField
@@ -106,6 +104,7 @@ import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.lifecycle.Lifecycle
 import androidx.lifecycle.LifecycleEventObserver
 import com.inktone.core.designsystem.AppSymbol
+import com.inktone.core.designsystem.InkToneErrorState
 import com.inktone.core.designsystem.reducedMotionDuration
 import com.inktone.core.designsystem.WindowBackgroundColorEffect
 import com.inktone.core.designsystem.SystemBarIconsEffect
@@ -1968,28 +1967,12 @@ internal fun buildShareContext(
 
 @Composable
 private fun ErrorState(message: String, onRetry: () -> Unit, onBack: () -> Unit) {
-    Column(
-        modifier = Modifier.fillMaxSize().padding(32.dp),
-        verticalArrangement = Arrangement.Center,
-    ) {
-        Text(
-            text = message,
-            style = MaterialTheme.typography.bodyLarge,
-            color = MaterialTheme.colorScheme.error,
-        )
-        Button(
-            onClick = onRetry,
-            modifier = Modifier.padding(top = 16.dp),
-        ) {
-            Text("Réessayer")
-        }
-        TextButton(
-            onClick = onBack,
-            modifier = Modifier.padding(top = 4.dp),
-        ) {
-            Text("Bibliothèque")
-        }
-    }
+    InkToneErrorState(
+        message = message,
+        onRetry = onRetry,
+        secondaryActionLabel = "Bibliothèque",
+        onSecondaryAction = onBack,
+    )
 }
 
 /**

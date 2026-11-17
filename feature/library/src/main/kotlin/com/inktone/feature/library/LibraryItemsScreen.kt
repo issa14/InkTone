@@ -7,10 +7,8 @@ import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
-import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
-import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.lazy.LazyColumn
@@ -65,6 +63,7 @@ import com.inktone.core.designsystem.AppIcon
 import com.inktone.core.designsystem.rememberAppHaptics
 import com.inktone.core.designsystem.AppSymbol
 import com.inktone.core.designsystem.InkToneTopBar
+import com.inktone.core.designsystem.InkToneEmptyState
 import com.inktone.domain.model.cleanedForDisplay
 import com.inktone.domain.model.AnnotationColor
 import com.inktone.domain.model.LibraryItem
@@ -213,30 +212,11 @@ fun LibraryItemsScreen(
  */
 @Composable
 private fun LibraryItemsEmptyState(isFiltered: Boolean) {
-    Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
-        Column(horizontalAlignment = Alignment.CenterHorizontally) {
-            AppIcon(
-                AppSymbol.Bookmark,
-                contentDescription = null,
-                modifier = Modifier.size(64.dp),
-                tint = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.5f),
-            )
-            Spacer(Modifier.height(16.dp))
-            Text(
-                if (isFiltered) "Aucun résultat" else "Aucun signet ni note",
-                style = MaterialTheme.typography.titleMedium,
-                fontWeight = androidx.compose.ui.text.font.FontWeight.Bold,
-            )
-            Spacer(Modifier.height(8.dp))
-            Text(
-                if (isFiltered) "Essayez un autre filtre ou une autre recherche." else "Vos signets et notes apparaîtront ici.",
-                style = MaterialTheme.typography.bodyMedium,
-                color = MaterialTheme.colorScheme.onSurfaceVariant,
-                textAlign = androidx.compose.ui.text.style.TextAlign.Center,
-                modifier = Modifier.padding(horizontal = 32.dp),
-            )
-        }
-    }
+    InkToneEmptyState(
+        icon = AppSymbol.Bookmark,
+        title = if (isFiltered) "Aucun résultat" else "Aucun signet ni note",
+        message = if (isFiltered) "Essayez un autre filtre ou une autre recherche." else "Vos signets et notes apparaîtront ici.",
+    )
 }
 
 @Composable
