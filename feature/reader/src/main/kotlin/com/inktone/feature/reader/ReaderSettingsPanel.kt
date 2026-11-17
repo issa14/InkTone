@@ -166,7 +166,6 @@ fun ReaderSettingsPanel(
                 range = 12f..32f,
                 onValueChange = { fontSizeDraft = it },
                 onValueChangeFinished = { onFontSizeChange(fontSizeDraft.roundToInt()) },
-                displayFormatter = { "${it.roundToInt()} sp" },
             )
 
             Spacer(Modifier.height(20.dp))

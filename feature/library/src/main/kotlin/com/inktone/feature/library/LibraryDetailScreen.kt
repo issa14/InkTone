@@ -32,7 +32,6 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
-import androidx.compose.ui.unit.sp
 import androidx.hilt.navigation.compose.hiltViewModel
 import com.inktone.core.designsystem.AppIcon
 import com.inktone.core.designsystem.AppSymbol
@@ -101,9 +100,8 @@ fun LibraryDetailScreen(
                     title = {
                         Column {
                             Text(
-                                if (category == LibraryDetailCategory.SERIES) "SÉRIES" else "TAGS",
-                                style = MaterialTheme.typography.labelSmall,
-                                letterSpacing = 1.5.sp,
+                                if (category == LibraryDetailCategory.SERIES) "Série" else "Étiquette",
+                                style = MaterialTheme.typography.labelMedium,
                                 color = MaterialTheme.colorScheme.onSurfaceVariant,
                             )
                             Text(
