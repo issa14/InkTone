@@ -354,9 +354,8 @@ fun InkToneNavHost(navController: NavHostController = rememberNavController(), s
         }
         composable<SettingsRoute> { backStackEntry ->
             val settingsRoute = backStackEntry.toRoute<SettingsRoute>()
-            // Tache 9bis.5 : SettingsScreen possede desormais son propre
-            // Scaffold/LargeTopAppBar (effet de collapse), pas de BackScaffold
-            // generique ici contrairement aux autres destinations.
+            // SettingsScreen porte son propre Scaffold et sa barre : pas de
+            // BackScaffold générique ici.
             //
             // Lot 6, Palier B — carte Données : BackupManager vit dans :data,
             // invisible depuis feature/settings (Blueprint §12.4). Ce
@@ -584,8 +583,9 @@ fun InkToneNavHost(navController: NavHostController = rememberNavController(), s
  * la hauteur de page), et l'onboarding, où aucune narration ne peut exister.
  */
 /**
- * Destinations dont la `TopAppBar` est peinte en `colorScheme.primary`, et
- * dont la barre de statut doit donc prendre la même couleur.
+ * Destinations du tiroir : leur barre est `InkToneTopBar` (violet de marque),
+ * et la barre de statut doit prendre la même couleur. Les écrans ouverts par
+ * Retour ont une barre neutre (audit UI P1-2).
  *
  * À tenir en phase avec le `containerColor` réel de ces écrans — c'est le
  * prix de la centralisation (voir le commentaire de `InkToneNavHost`). Les
@@ -598,9 +598,7 @@ private fun NavDestination.usesPrimaryTopBar(): Boolean =
     hasRoute<LibraryRoute>() ||
         hasRoute<RecentsRoute>() ||
         hasRoute<BookmarksRoute>() ||
-        hasRoute<LibraryDetailRoute>() ||
         hasRoute<StatisticsRoute>() ||
-        hasRoute<BookStatisticsRoute>() ||
         hasRoute<SyncRoute>() ||
         hasRoute<OpdsRoute>()
 

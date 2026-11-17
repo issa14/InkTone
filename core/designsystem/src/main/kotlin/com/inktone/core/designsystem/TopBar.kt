@@ -10,7 +10,9 @@ import androidx.compose.ui.graphics.luminance
 
 /**
  * Couleurs des barres d'application, définies à un seul endroit (audit UI
- * DS-18 : la même recette était copiée dans chaque écran).
+ * DS-18 : la même recette était copiée dans chaque écran). Réservée aux
+ * destinations du tiroir ; un écran ouvert par Retour garde la `TopAppBar`
+ * neutre par défaut (P1-2).
  *
  * En clair, la barre est peinte en `primary`. En sombre, `primary` est un
  * lavande clair, lisible comme couleur de texte : la barre prend alors

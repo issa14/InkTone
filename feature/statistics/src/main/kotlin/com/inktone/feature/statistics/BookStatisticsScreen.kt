@@ -21,7 +21,7 @@ import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.shape.RoundedCornerShape
-import androidx.compose.material3.CenterAlignedTopAppBar
+import androidx.compose.material3.TopAppBar
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.DropdownMenuItem
 import androidx.compose.material3.ElevatedCard
@@ -34,7 +34,6 @@ import androidx.compose.material3.ListItem
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Text
-import androidx.compose.material3.TopAppBarDefaults
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
@@ -68,7 +67,7 @@ fun BookStatisticsScreen(
 
     Scaffold(
         topBar = {
-            CenterAlignedTopAppBar(
+            TopAppBar(
                 title = {
                     when (val s = state) {
                         is BookDetailUiState.Loading -> Text("Chargement…")
@@ -84,7 +83,6 @@ fun BookStatisticsScreen(
                         AppIcon(AppSymbol.Back, contentDescription = "Retour")
                     }
                 },
-                colors = TopAppBarDefaults.centerAlignedTopAppBarColors(),
             )
         },
     ) { innerPadding ->

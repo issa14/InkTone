@@ -38,7 +38,7 @@ import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
-import androidx.compose.material3.LargeTopAppBar
+import androidx.compose.material3.TopAppBar
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.OutlinedTextField
@@ -49,7 +49,6 @@ import androidx.compose.material3.SliderDefaults
 import androidx.compose.material3.Switch
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
-import androidx.compose.material3.TopAppBarDefaults
 import androidx.compose.runtime.Composable
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.compose.runtime.getValue
@@ -59,7 +58,6 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.vector.ImageVector
-import androidx.compose.ui.input.nestedscroll.nestedScroll
 import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.semantics
@@ -114,19 +112,16 @@ fun SettingsScreen(
     onImportData: () -> Unit = {},
 ) {
     val state by viewModel.state.collectAsStateWithLifecycle()
-    val scrollBehavior = TopAppBarDefaults.exitUntilCollapsedScrollBehavior()
 
     Scaffold(
-        modifier = Modifier.nestedScroll(scrollBehavior.nestedScrollConnection),
         topBar = {
-            LargeTopAppBar(
+            TopAppBar(
                 title = { Text("Réglages") },
                 navigationIcon = {
                     IconButton(onClick = onBack) {
                         AppIcon(AppSymbol.Back, contentDescription = "Retour")
                     }
                 },
-                scrollBehavior = scrollBehavior,
             )
         },
     ) { innerPadding ->
@@ -173,10 +168,6 @@ internal fun SettingsContent(
     onExportData: () -> Unit = {},
     onImportData: () -> Unit = {},
 ) {
-    // Bug réel trouvé en testant sur device (vérification manuelle,
-    // Tâche 9bis suite) : sans verticalScroll ici, le contenu qui déborde
-    // de l'écran était inatteignable — ET le LargeTopAppBar (Tâche 9bis.5)
-    // n'avait rien à quoi accrocher son effet de collapse.
     val scrollState = rememberScrollState()
     // Arrivée depuis la proposition du Lecteur : la page défile jusqu'à la voix
     // neuronale au lieu de s'ouvrir en haut (audit UX A7).

@@ -17,7 +17,6 @@ import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextField
 import androidx.compose.material3.TopAppBar
-import androidx.compose.material3.TopAppBarDefaults
 import androidx.activity.compose.BackHandler
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
@@ -37,7 +36,6 @@ import androidx.compose.ui.unit.sp
 import androidx.hilt.navigation.compose.hiltViewModel
 import com.inktone.core.designsystem.AppIcon
 import com.inktone.core.designsystem.AppSymbol
-import com.inktone.core.designsystem.InkToneTopBar
 
 /**
  * Écran de détail Séries/Tags (UX §Menu déroulant du titre, écran de
@@ -97,7 +95,6 @@ fun LibraryDetailScreen(
                             AppIcon(AppSymbol.Back, contentDescription = "Fermer")
                         }
                     },
-                    colors = InkToneTopBar.colors(),
                 )
             } else {
                 TopAppBar(
@@ -107,7 +104,7 @@ fun LibraryDetailScreen(
                                 if (category == LibraryDetailCategory.SERIES) "SÉRIES" else "TAGS",
                                 style = MaterialTheme.typography.labelSmall,
                                 letterSpacing = 1.5.sp,
-                                color = InkToneTopBar.contentColor().copy(alpha = 0.7f),
+                                color = MaterialTheme.colorScheme.onSurfaceVariant,
                             )
                             Text(
                                 value,
@@ -115,7 +112,6 @@ fun LibraryDetailScreen(
                                 fontWeight = FontWeight.Bold,
                                 maxLines = 1,
                                 overflow = TextOverflow.Ellipsis,
-                                color = InkToneTopBar.contentColor(),
                             )
                         }
                     },
@@ -132,7 +128,6 @@ fun LibraryDetailScreen(
                             AppIcon(AppSymbol.Filter,  contentDescription = "Filtrer")
                         }
                     },
-                    colors = InkToneTopBar.colors(),
                 )
             }
         },
