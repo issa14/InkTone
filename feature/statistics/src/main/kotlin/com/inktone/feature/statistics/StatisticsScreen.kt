@@ -61,6 +61,11 @@ import androidx.compose.ui.text.rememberTextMeasurer
 import androidx.compose.ui.text.style.TextAlign
 import android.widget.Toast
 import androidx.compose.ui.unit.dp
+import androidx.compose.ui.unit.max
+import androidx.compose.ui.semantics.contentDescription
+import androidx.compose.ui.semantics.semantics
+import androidx.compose.ui.platform.LocalDensity
+import androidx.compose.foundation.layout.IntrinsicSize
 import androidx.core.content.FileProvider
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.hilt.navigation.compose.hiltViewModel
@@ -392,10 +397,9 @@ private val SLOT_NAMES = listOf("6h", "10h", "14h", "18h", "22h")
 
 // ───── Heatmap Canvas ─────
 
-// Grille de la heatmap : hauteur totale et hauteur par ligne partagées entre
-// le Canvas et l'axe des créneaux horaires pour qu'ils restent alignés.
-private val HEATMAP_GRID_HEIGHT = 150.dp
-private val HEATMAP_ROW_HEIGHT = HEATMAP_GRID_HEIGHT / SLOT_NAMES.size
+// Hauteur minimale d'une ligne de la heatmap ; elle grandit avec la taille
+// du texte pour que l'étiquette d'heure tienne dans sa ligne.
+private val HEATMAP_MIN_ROW_HEIGHT = 30.dp
 
 // Légende d'intensité à 5 paliers ; le premier (le plus faible) est aussi
 // la teinte par défaut des cases sans aucune activité — sans quoi une case
@@ -412,6 +416,10 @@ private fun HeatmapChart(slots: List<com.inktone.domain.usecase.HeatmapSlot>, pe
     // Intensité par case (dayOfWeek SQL, slotIndex) — absente si aucune
     // activité, auquel cas la case est peinte avec HEATMAP_INACTIVE_ALPHA.
     val intensityByCell = remember(slots) { slots.associate { (it.dayOfWeek to it.slotIndex) to it.intensity } }
+    // Grille et axe des heures partagent cette hauteur de ligne : ils restent alignés.
+    val labelLineHeight = with(LocalDensity.current) { MaterialTheme.typography.labelSmall.lineHeight.toDp() }
+    val rowHeight = max(HEATMAP_MIN_ROW_HEIGHT, labelLineHeight + 4.dp)
+    val gridHeight = rowHeight * SLOT_NAMES.size
 
     ElevatedCard(shape = RoundedCornerShape(16.dp), modifier = Modifier.fillMaxWidth()) {
         Column(modifier = Modifier.padding(InkToneSpacing.cardPadding)) {
@@ -428,16 +436,21 @@ private fun HeatmapChart(slots: List<com.inktone.domain.usecase.HeatmapSlot>, pe
             Row(modifier = Modifier.fillMaxWidth()) {
                 // Axe des créneaux horaires — une ligne de texte par ligne de
                 // grille, alignée via la même hauteur (HEATMAP_ROW_HEIGHT).
-                Column(modifier = Modifier.width(28.dp)) {
+                Column(modifier = Modifier.width(IntrinsicSize.Max)) {
                     SLOT_NAMES.forEach { name ->
-                        Box(modifier = Modifier.height(HEATMAP_ROW_HEIGHT).fillMaxWidth(), contentAlignment = Alignment.CenterStart) {
+                        Box(modifier = Modifier.height(rowHeight).fillMaxWidth(), contentAlignment = Alignment.CenterStart) {
                             Text(name, style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
                         }
                     }
                 }
                 Spacer(Modifier.width(4.dp))
                 Column(modifier = Modifier.weight(1f)) {
-                    Canvas(modifier = Modifier.fillMaxWidth().height(HEATMAP_GRID_HEIGHT)) {
+                    Canvas(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .height(gridHeight)
+                            .semantics { contentDescription = heatmapDescription(peakSlotIndex) },
+                    ) {
                         val cols = 7
                         val rows = SLOT_NAMES.size
                         val cellW = size.width / cols
@@ -499,11 +512,9 @@ private fun dayShortLabel(date: LocalDate): String = DAY_LABELS[date.dayOfWeek.v
 
 private data class HistogramAxisLabel(val index: Int, val text: String)
 
-// Zone des barres et zone réservée aux repères de l'axe X (dessinés dans le
-// même Canvas via TextMeasurer) — hauteurs disjointes pour ne jamais
-// tronquer ni les barres ni le texte.
+// Zone des barres ; celle des repères de l'axe X, dessinés dans le même
+// Canvas, suit la taille du texte (calculée dans HistogramChart).
 private val HISTOGRAM_BAR_AREA_HEIGHT = 140.dp
-private val HISTOGRAM_LABEL_AREA_HEIGHT = 18.dp
 private val HISTOGRAM_BASELINE_HEIGHT = 3.dp
 
 @Composable
@@ -566,7 +577,13 @@ private fun HistogramChart(dailyStats: List<DailyReadingStats>, isMonthView: Boo
                 axisLabels.map { it to textMeasurer.measure(it.text, style = axisTextStyle) }
             }
 
-            Canvas(modifier = Modifier.fillMaxWidth().height(HISTOGRAM_BAR_AREA_HEIGHT + HISTOGRAM_LABEL_AREA_HEIGHT)) {
+            val labelAreaHeight = with(LocalDensity.current) { axisTextStyle.lineHeight.toDp() } + 4.dp
+            Canvas(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .height(HISTOGRAM_BAR_AREA_HEIGHT + labelAreaHeight)
+                    .semantics { contentDescription = histogramDescription(dailyStats) },
+            ) {
                 if (barCount == 0) return@Canvas
                 val barAreaHeight = HISTOGRAM_BAR_AREA_HEIGHT.toPx()
                 val baselineHeightPx = HISTOGRAM_BASELINE_HEIGHT.toPx()
@@ -643,6 +660,26 @@ private fun HistogramChart(dailyStats: List<DailyReadingStats>, isMonthView: Boo
                 }
             }
         }
+    }
+}
+
+/** Ce que TalkBack lit pour la heatmap, muette sinon (audit UI P1-8). */
+internal fun heatmapDescription(peakSlotIndex: Int?): String =
+    if (peakSlotIndex == null) {
+        "Habitudes de lecture : aucune activité sur la période."
+    } else {
+        "Habitudes de lecture : moment le plus actif vers ${SLOT_NAMES[peakSlotIndex]}."
+    }
+
+/** Résumé de l'histogramme pour TalkBack : durée totale et part d'écoute. */
+internal fun histogramDescription(dailyStats: List<DailyReadingStats>): String {
+    val totalMinutes = dailyStats.sumOf { it.visualMs + it.ttsMs } / 60_000
+    val listeningMinutes = dailyStats.sumOf { it.ttsMs } / 60_000
+    val period = if (dailyStats.size == 1) "Aujourd'hui" else "${dailyStats.size} derniers jours"
+    return if (listeningMinutes > 0) {
+        "$period : ${formatDurationMinutes(totalMinutes)}, dont ${formatDurationMinutes(listeningMinutes)} d'écoute."
+    } else {
+        "$period : ${formatDurationMinutes(totalMinutes)}."
     }
 }
 
