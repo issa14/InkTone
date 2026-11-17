@@ -1,5 +1,8 @@
 package com.inktone.feature.reader
 
+import androidx.compose.material3.LocalTextStyle
+import com.inktone.core.designsystem.emphasized
+import com.inktone.core.designsystem.InkToneSectionHeader
 import com.inktone.domain.model.UserPreferences
 import com.inktone.core.designsystem.AppIcon
 import com.inktone.core.designsystem.AppSymbol
@@ -39,7 +42,6 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.testTag
-import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 
 /**
@@ -86,7 +88,6 @@ fun SleepTimerPanel(
                 Text(
                     "Minuteur de sommeil",
                     style = MaterialTheme.typography.titleMedium,
-                    fontWeight = FontWeight.Bold,
                 )
                 Spacer(Modifier.height(4.dp))
 
@@ -129,7 +130,7 @@ fun SleepTimerPanel(
                 modifier = Modifier.fillMaxWidth(),
                 horizontalArrangement = Arrangement.SpaceBetween,
             ) {
-                Text("Rappel de repos oculaire", style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.Bold)
+                InkToneSectionHeader("Rappel de repos oculaire")
                 Switch(checked = eyeRestReminderEnabled, onCheckedChange = onSetEyeRestReminderEnabled)
             }
 
@@ -302,7 +303,7 @@ private fun WheelColumn(
             ) {
                 Text(
                     "%02d".format(value),
-                    fontWeight = if (value == selected) FontWeight.Bold else FontWeight.Normal,
+                    style = if (value == selected) LocalTextStyle.current.emphasized() else LocalTextStyle.current,
                     color = if (value == selected) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurfaceVariant,
                 )
             }

@@ -58,7 +58,6 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.semantics.Role
 import androidx.compose.foundation.selection.toggleable
-import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.hilt.navigation.compose.hiltViewModel
 import android.text.format.DateUtils
@@ -262,7 +261,7 @@ private fun GoogleDriveCard(
                     tint = if (isActive) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurfaceVariant,
                 )
                 Spacer(Modifier.width(6.dp))
-                Text("Google Drive", style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.Bold)
+                Text("Google Drive", style = MaterialTheme.typography.titleMedium)
             }
             if (isActive && account != null) {
                 Spacer(Modifier.height(12.dp))
@@ -380,7 +379,7 @@ private fun WebDavCard(
     ) {
         Column(Modifier.padding(16.dp)) {
             Row(verticalAlignment = Alignment.CenterVertically) {
-                Text("WebDAV", style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.Bold)
+                Text("WebDAV", style = MaterialTheme.typography.titleMedium)
             }
 
             if (isActive) {
@@ -473,7 +472,7 @@ private fun LocalBackupCard(onOpenLocalBackup: () -> Unit) {
     Card {
         Column(Modifier.padding(16.dp)) {
             Row(verticalAlignment = Alignment.CenterVertically) {
-                Text("Fichier local", style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.Bold)
+                Text("Fichier local", style = MaterialTheme.typography.titleMedium)
             }
             Spacer(Modifier.height(4.dp))
             Text(
@@ -570,7 +569,7 @@ private fun ProfileHeader(account: SyncAccount) {
         }
         Spacer(Modifier.width(12.dp))
         Column {
-            Text(providerName, style = MaterialTheme.typography.bodyLarge, fontWeight = FontWeight.Bold)
+            Text(providerName, style = MaterialTheme.typography.titleMedium)
             Text(
                 detail,
                 style = MaterialTheme.typography.bodySmall,
@@ -611,7 +610,6 @@ private fun DeviceFleetCard(fleet: List<DeviceFleetEntry>, currentDeviceId: Stri
             Text(
                 "Appareils (${fleet.size})",
                 style = MaterialTheme.typography.titleMedium,
-                fontWeight = FontWeight.Bold,
             )
             Spacer(Modifier.height(8.dp))
             if (fleet.isEmpty()) {
@@ -738,7 +736,7 @@ private fun ToggleRow(label: String, checked: Boolean, enabled: Boolean, onCheck
 private fun ActivityLogCard(events: List<SyncActivityEvent>) {
     Card {
         Column(Modifier.padding(16.dp)) {
-            Text("Journal d'activité", style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.Bold)
+            Text("Journal d'activité", style = MaterialTheme.typography.titleMedium)
             Spacer(Modifier.height(8.dp))
             if (events.isEmpty()) {
                 Text(

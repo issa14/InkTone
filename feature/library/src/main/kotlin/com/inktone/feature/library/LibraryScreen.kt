@@ -1,5 +1,6 @@
 package com.inktone.feature.library
 
+import com.inktone.core.designsystem.emphasized
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
@@ -58,7 +59,6 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.Brush
-import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.draw.shadow
@@ -297,9 +297,8 @@ fun LibraryDrawerContent(
             Column(modifier = Modifier.padding(start = 14.dp)) {
                 Text(
                     "InkTone",
-                    style = MaterialTheme.typography.headlineSmall,
+                    style = MaterialTheme.typography.headlineSmall.emphasized(),
                     fontFamily = NarrativeAccentFamily,
-                    fontWeight = FontWeight.SemiBold,
                     color = MaterialTheme.colorScheme.onSurface,
                 )
             }
@@ -957,7 +956,7 @@ private fun ResumeReadingCard(
                     Spacer(Modifier.width(8.dp))
                     Text(
                         text = formatPercent(progressPercent),
-                        style = MaterialTheme.typography.labelSmall.copy(fontWeight = FontWeight.Bold),
+                        style = MaterialTheme.typography.labelSmall.emphasized(),
                         color = MaterialTheme.colorScheme.primary,
                     )
                 }

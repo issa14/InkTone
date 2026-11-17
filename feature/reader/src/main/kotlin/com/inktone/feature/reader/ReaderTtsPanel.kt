@@ -33,7 +33,6 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import com.inktone.domain.model.TtsEngineId
 import com.inktone.domain.model.VoiceProfile
@@ -85,7 +84,6 @@ fun ReaderTtsPanel(
             Text(
                 "Narration",
                 style = MaterialTheme.typography.titleMedium,
-                fontWeight = FontWeight.Bold,
             )
             Spacer(Modifier.height(16.dp))
 

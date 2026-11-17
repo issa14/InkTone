@@ -1,5 +1,7 @@
 package com.inktone.feature.statistics
 
+import com.inktone.core.designsystem.emphasized
+import com.inktone.core.designsystem.InkToneSectionHeader
 import com.inktone.domain.model.cleanedForDisplay
 import com.inktone.core.designsystem.AppIcon
 import com.inktone.core.designsystem.AppSymbol
@@ -43,7 +45,6 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.semantics.clearAndSetSemantics
 import androidx.compose.ui.semantics.contentDescription
-import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.hilt.navigation.compose.hiltViewModel
@@ -123,10 +124,8 @@ fun BookStatisticsScreen(
 
                     // Historique
                     item {
-                        Text(
+                        InkToneSectionHeader(
                             "Historique des sessions",
-                            style = MaterialTheme.typography.titleMedium,
-                            fontWeight = FontWeight.SemiBold,
                             modifier = Modifier.padding(top = 8.dp),
                         )
                     }
@@ -201,7 +200,7 @@ private fun KpiCard(
         ) {
             AppIcon(icon, contentDescription = null, tint = MaterialTheme.colorScheme.primary, modifier = Modifier.size(20.dp))
             Spacer(Modifier.height(4.dp))
-            Text(value, style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.SemiBold)
+            Text(value, style = MaterialTheme.typography.titleMedium.emphasized())
             Text(label, style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
         }
     }

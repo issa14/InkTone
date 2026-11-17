@@ -1,5 +1,6 @@
 package com.inktone.feature.statistics
 
+import com.inktone.core.designsystem.emphasized
 import android.content.Intent
 import android.net.Uri
 import androidx.compose.foundation.Canvas
@@ -56,7 +57,6 @@ import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.drawText
-import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.rememberTextMeasurer
 import androidx.compose.ui.text.style.TextAlign
 import android.widget.Toast
@@ -262,7 +262,7 @@ private fun DailyGoalGauge(kpi: com.inktone.domain.usecase.KpiState) {
             modifier = Modifier.padding(InkToneSpacing.cardPadding).fillMaxWidth(),
             horizontalAlignment = Alignment.CenterHorizontally,
         ) {
-            Text("Objectif du jour", style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.SemiBold)
+            Text("Objectif du jour", style = MaterialTheme.typography.titleMedium)
             Spacer(Modifier.height(12.dp))
             Box(contentAlignment = Alignment.Center, modifier = Modifier.size(120.dp)) {
                 CircularProgressIndicator(
@@ -287,8 +287,7 @@ private fun DailyGoalGauge(kpi: com.inktone.domain.usecase.KpiState) {
                 Column(horizontalAlignment = Alignment.CenterHorizontally) {
                     Text(
                         "${kpi.todayReadingMinutes}",
-                        style = MaterialTheme.typography.headlineMedium,
-                        fontWeight = FontWeight.Bold,
+                        style = MaterialTheme.typography.headlineMedium.emphasized(),
                         maxLines = 1,
                     )
                     Text(
@@ -320,7 +319,7 @@ private fun GoalStreakItem(icon: AppSymbol, label: String, value: String) {
         AppIcon(icon, contentDescription = null, tint = MaterialTheme.colorScheme.primary, modifier = Modifier.size(18.dp))
         Spacer(Modifier.width(6.dp))
         Column {
-            Text(value, style = MaterialTheme.typography.titleSmall, fontWeight = FontWeight.SemiBold)
+            Text(value, style = MaterialTheme.typography.titleSmall.emphasized())
             Text(label, style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
         }
     }
@@ -340,7 +339,7 @@ private fun Section2Charts(activity: com.inktone.domain.usecase.ActivityChartSta
             verticalAlignment = Alignment.CenterVertically,
         ) {
             Column {
-                Text("Activité", style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.SemiBold)
+                Text("Activité", style = MaterialTheme.typography.titleMedium)
                 Row(verticalAlignment = Alignment.CenterVertically) {
                     Text(
                         activity.periodTotalFormatted,
@@ -424,7 +423,7 @@ private fun HeatmapChart(slots: List<com.inktone.domain.usecase.HeatmapSlot>, pe
     ElevatedCard(shape = RoundedCornerShape(16.dp), modifier = Modifier.fillMaxWidth()) {
         Column(modifier = Modifier.padding(InkToneSpacing.cardPadding)) {
             Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
-                Text("Habitudes de lecture", style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.SemiBold)
+                Text("Habitudes de lecture", style = MaterialTheme.typography.titleMedium)
                 if (peakLabel.isNotEmpty()) {
                     Text(peakLabel, style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.primary)
                 }
@@ -533,7 +532,7 @@ private fun HistogramChart(dailyStats: List<DailyReadingStats>, isMonthView: Boo
     val baselineColor = MaterialTheme.colorScheme.outlineVariant
     val dashColor = visualColor.copy(alpha = 0.2f)
     val markerBgColor = markerColor.copy(alpha = 0.15f)
-    val axisTextStyle = MaterialTheme.typography.labelSmall.copy(color = markerColor, fontWeight = FontWeight.SemiBold)
+    val axisTextStyle = MaterialTheme.typography.labelSmall.emphasized().copy(color = markerColor)
 
     ElevatedCard(shape = RoundedCornerShape(16.dp), modifier = Modifier.fillMaxWidth()) {
         Column(modifier = Modifier.padding(InkToneSpacing.cardPadding)) {
@@ -691,7 +690,7 @@ internal fun histogramDescription(dailyStats: List<DailyReadingStats>): String {
 @Composable
 private fun Section3CurrentBook(book: com.inktone.domain.usecase.CurrentBookState, onNavigate: (String) -> Unit) {
     Column(verticalArrangement = Arrangement.spacedBy(InkToneSpacing.md)) {
-        Text("Livre en cours", style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.SemiBold)
+        Text("Livre en cours", style = MaterialTheme.typography.titleMedium)
 
         ElevatedCard(
             onClick = { onNavigate(book.id) },
@@ -825,7 +824,7 @@ private fun StatCard(icon: AppSymbol, label: String, value: String, modifier: Mo
         ) {
             AppIcon(icon, contentDescription = null, tint = MaterialTheme.colorScheme.primary, modifier = Modifier.size(20.dp))
             Spacer(Modifier.height(4.dp))
-            Text(value, style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.SemiBold, textAlign = TextAlign.Center)
+            Text(value, style = MaterialTheme.typography.titleMedium.emphasized(), textAlign = TextAlign.Center)
             Text(label, style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.onSurfaceVariant, textAlign = TextAlign.Center)
         }
     }

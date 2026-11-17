@@ -1,5 +1,7 @@
 package com.inktone.feature.library
 
+import androidx.compose.material3.LocalTextStyle
+import com.inktone.core.designsystem.emphasized
 import android.net.Uri
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
@@ -30,7 +32,6 @@ import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.semantics
-import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
@@ -169,7 +170,7 @@ fun BookCover(
                     text = formatPercent(progressPercent),
                     color = Color.White,
                     fontSize = 10.sp,
-                    fontWeight = FontWeight.Bold,
+                    style = LocalTextStyle.current.emphasized(),
                     textAlign = TextAlign.Center,
                 )
             }

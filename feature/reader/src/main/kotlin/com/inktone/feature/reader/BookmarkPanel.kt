@@ -44,7 +44,6 @@ import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import com.inktone.core.designsystem.AppIcon
@@ -260,7 +259,6 @@ private fun NotesTab(
                     Text(
                         annotation.content.orEmpty(),
                         style = MaterialTheme.typography.bodyMedium,
-                        fontWeight = FontWeight.Bold,
                     )
                     annotation.excerpt?.takeIf { it.isNotBlank() }?.let { excerpt ->
                         Spacer(Modifier.height(4.dp))

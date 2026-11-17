@@ -224,7 +224,7 @@ private fun StudioLivePreview(state: ThemeStudioUiState) {
         Text(
             "Chapitre 3 — L'Arrivée",
             style = MaterialTheme.typography.titleMedium,
-            fontWeight = FontWeight.Bold,
+            fontWeight = FontWeight.Bold, // texte du livre : aperçu d'un titre de chapitre
             color = state.textColorHex.toColor(),
         )
         Spacer(Modifier.height(8.dp))

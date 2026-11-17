@@ -78,6 +78,13 @@ val InkToneTypography = Typography(
 )
 
 /**
+ * Mise en relief : chiffre clé, élément courant d'une liste, titre de marque.
+ * Seul poids de texte permis hors de l'échelle dans les écrans (audit UI
+ * P1-18, vérifié par `scripts/check-no-font-weight.sh`).
+ */
+fun TextStyle.emphasized(): TextStyle = copy(fontWeight = FontWeight.Bold)
+
+/**
  * Amélioration Tâche 9bis.1.3 — échelle séparée du chrome UI, appliquée
  * uniquement au texte du livre dans `ReaderScreen`. `lineHeight`/
  * `letterSpacing` plus généreux que `InkToneTypography.bodyLarge` :

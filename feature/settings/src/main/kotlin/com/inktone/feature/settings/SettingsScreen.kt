@@ -1,5 +1,6 @@
 package com.inktone.feature.settings
 
+import com.inktone.core.designsystem.InkToneSectionHeader
 import android.os.Build
 import com.inktone.core.designsystem.formatMultiplier
 import com.inktone.core.designsystem.AppIcon
@@ -636,12 +637,7 @@ private fun formatBytes(bytes: Long): String = when {
 @Composable
 private fun SectionGroup(title: String, content: @Composable ColumnScope.() -> Unit) {
     Column(modifier = Modifier.fillMaxWidth().padding(vertical = 8.dp)) {
-        Text(
-            text = title,
-            style = MaterialTheme.typography.titleSmall,
-            color = MaterialTheme.colorScheme.primary,
-            modifier = Modifier.padding(start = 4.dp, top = 8.dp, bottom = 8.dp),
-        )
+        InkToneSectionHeader(title)
         ElevatedCard(
             shape = RoundedCornerShape(16.dp),
             modifier = Modifier.fillMaxWidth(),

@@ -1,5 +1,6 @@
 package com.inktone.feature.onboarding
 
+import com.inktone.core.designsystem.emphasized
 import kotlinx.coroutines.launch
 import androidx.compose.foundation.Image
 import androidx.compose.foundation.Canvas
@@ -46,7 +47,6 @@ import androidx.compose.ui.graphics.drawscope.Stroke
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.res.painterResource
-import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
@@ -160,7 +160,7 @@ private fun WelcomeCard(accent: Color) {
             colorFilter = ColorFilter.tint(accent),
         )
         Spacer(Modifier.height(32.dp))
-        Text("Bienvenue sur InkTone", style = MaterialTheme.typography.headlineMedium, fontFamily = NarrativeAccentFamily, fontWeight = FontWeight.Bold, textAlign = TextAlign.Center)
+        Text("Bienvenue sur InkTone", style = MaterialTheme.typography.headlineMedium.emphasized(), fontFamily = NarrativeAccentFamily, textAlign = TextAlign.Center)
         Spacer(Modifier.height(16.dp))
         BodyText("Lisez vos livres ou écoutez-les : la voix reprend là où vous en étiez.")
     }
@@ -180,9 +180,8 @@ private fun FeaturesCard(accent: Color) {
     ) {
         Text(
             "Lire et écouter",
-            style = MaterialTheme.typography.headlineMedium,
+            style = MaterialTheme.typography.headlineMedium.emphasized(),
             fontFamily = NarrativeAccentFamily,
-            fontWeight = FontWeight.Bold,
             textAlign = TextAlign.Center,
             modifier = Modifier.fillMaxWidth(),
         )
@@ -216,7 +215,7 @@ private fun FeatureRow(accent: Color, icon: AppSymbol, title: String, body: Stri
         }
         Spacer(Modifier.width(12.dp))
         Column(Modifier.weight(1f)) {
-            Text(title, style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.Bold)
+            Text(title, style = MaterialTheme.typography.titleMedium)
             Spacer(Modifier.height(4.dp))
             Text(
                 body,
@@ -252,9 +251,8 @@ private fun ReadyCard(accent: Color, onStart: () -> Unit) {
         Spacer(Modifier.height(32.dp))
         Text(
             "Ajoutez votre premier livre",
-            style = MaterialTheme.typography.headlineMedium,
+            style = MaterialTheme.typography.headlineMedium.emphasized(),
             fontFamily = NarrativeAccentFamily,
-            fontWeight = FontWeight.Bold,
             textAlign = TextAlign.Center,
         )
         Spacer(Modifier.height(12.dp))

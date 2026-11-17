@@ -1,5 +1,7 @@
 package com.inktone.feature.reader
 
+import androidx.compose.material3.LocalTextStyle
+import com.inktone.core.designsystem.emphasized
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Row
@@ -20,7 +22,6 @@ import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.remember
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import com.inktone.core.designsystem.AppIcon
 import com.inktone.core.designsystem.AppSymbol
@@ -120,7 +121,7 @@ private fun TableOfContentsSheetContent(
             val isCurrent = position == currentFlatIndex
             Text(
                 text = flat.entry.title,
-                fontWeight = if (isCurrent) FontWeight.Bold else FontWeight.Normal,
+                style = if (isCurrent) LocalTextStyle.current.emphasized() else LocalTextStyle.current,
                 color = if (isCurrent) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurface,
                 modifier = Modifier
                     .fillMaxWidth()

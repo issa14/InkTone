@@ -47,6 +47,9 @@ jobs:
       - name: Vérifier l'absence de MANAGE_EXTERNAL_STORAGE
         run: bash scripts/check-no-manage-external-storage.sh
 
+      - name: Vérifier que le poids du texte vient de l'échelle typographique
+        run: bash scripts/check-no-font-weight.sh
+
       - name: Vérifier l'unicité de la famille d'icônes
         run: bash scripts/check-icon-family.sh
 

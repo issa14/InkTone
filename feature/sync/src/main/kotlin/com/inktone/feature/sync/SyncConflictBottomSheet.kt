@@ -19,7 +19,6 @@ import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.compose.runtime.getValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.hilt.navigation.compose.hiltViewModel
 import android.text.format.DateUtils
@@ -61,7 +60,7 @@ fun SyncConflictBottomSheet(
             Row(verticalAlignment = Alignment.CenterVertically) {
                 AppIcon(AppSymbol.Warning, contentDescription = null, tint = MaterialTheme.colorScheme.error)
                 Row(Modifier.padding(start = 8.dp)) {
-                    Text("Conflit de synchronisation", style = MaterialTheme.typography.titleLarge, fontWeight = FontWeight.Bold)
+                    Text("Conflit de synchronisation", style = MaterialTheme.typography.titleLarge)
                 }
             }
             Text(conflict.bookTitle, style = MaterialTheme.typography.titleMedium)
@@ -94,7 +93,7 @@ private fun PositionOption(originLabel: String, snapshot: ReadingPositionSnapsho
     // parmi d'autres, pas un choix par défaut.
     Card(colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.4f))) {
         Column(Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(4.dp)) {
-            Text(originLabel, style = MaterialTheme.typography.titleSmall, fontWeight = FontWeight.Bold)
+            Text(originLabel, style = MaterialTheme.typography.titleSmall)
             Text(
                 DateUtils.getRelativeTimeSpanString(snapshot.at, System.currentTimeMillis(), DateUtils.MINUTE_IN_MILLIS).toString(),
                 style = MaterialTheme.typography.bodySmall,

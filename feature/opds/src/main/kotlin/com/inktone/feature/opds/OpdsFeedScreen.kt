@@ -45,7 +45,6 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.LocalContext
-import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import coil.ImageLoader
@@ -318,7 +317,7 @@ private fun BookDetailSheet(
                     )
                 }
                 Column(verticalArrangement = Arrangement.spacedBy(4.dp)) {
-                    Text(item.title, style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.Medium)
+                    Text(item.title, style = MaterialTheme.typography.titleMedium)
                     if (item.authors.isNotEmpty()) {
                         Text(
                             item.authors.joinToString(", "),

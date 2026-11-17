@@ -45,7 +45,6 @@ import androidx.compose.ui.focus.FocusRequester
 import androidx.compose.ui.focus.focusRequester
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.input.PasswordVisualTransformation
 import androidx.compose.ui.text.input.VisualTransformation
 import androidx.compose.ui.text.style.TextOverflow
@@ -279,7 +278,6 @@ private fun DefaultCatalogSuggestion(
                 Text(
                     label,
                     style = MaterialTheme.typography.titleMedium,
-                    fontWeight = FontWeight.Medium,
                 )
             }
             Text(
@@ -310,7 +308,6 @@ private fun CatalogCard(
                 Text(
                     catalog.name,
                     style = MaterialTheme.typography.titleMedium,
-                    fontWeight = FontWeight.Bold,
                     maxLines = 2,
                     overflow = TextOverflow.Ellipsis,
                     modifier = Modifier.weight(1f),
@@ -396,7 +393,6 @@ private fun AddCatalogBottomSheet(
             Text(
                 if (isEdit) "Modifier le catalogue" else "Ajouter un catalogue",
                 style = MaterialTheme.typography.titleLarge,
-                fontWeight = FontWeight.Bold,
             )
 
             if (!isEdit) {
