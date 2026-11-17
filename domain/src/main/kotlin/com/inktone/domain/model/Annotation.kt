@@ -49,7 +49,7 @@ fun AnnotationColor.toHex(): String = "#%08X".format(argb)
  * surlignage, souligné, barré. Le [HIGHLIGHT] couvre l'existant (toute
  * annotation créée avant ce lot est un surlignage) ; les deux autres
  * étendent la parité avec les lecteurs top-tier sans jamais mélanger les
- * canaux visuels : annotation, surlignage TTS (`WordHighlightColor`) et
+ * canaux visuels : annotation, surlignage du mot prononcé (dérivé du thème) et
  * sélection (`SelectionHighlightColor`) restent trois canaux séparés.
  */
 enum class AnnotationKind { HIGHLIGHT, UNDERLINE, STRIKETHROUGH }
