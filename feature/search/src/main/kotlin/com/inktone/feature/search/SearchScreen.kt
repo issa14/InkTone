@@ -9,7 +9,9 @@ import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
-import androidx.compose.material3.CircularProgressIndicator
+import androidx.compose.material3.HorizontalDivider
+import androidx.compose.material3.LinearProgressIndicator
+import androidx.compose.material3.ListItem
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
@@ -27,6 +29,10 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.text.AnnotatedString
 import androidx.compose.ui.text.SpanStyle
+import androidx.compose.ui.text.style.TextOverflow
+import androidx.compose.ui.semantics.LiveRegionMode
+import androidx.compose.ui.semantics.liveRegion
+import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.buildAnnotatedString
 import androidx.compose.ui.unit.dp
 import androidx.hilt.navigation.compose.hiltViewModel
@@ -89,8 +95,9 @@ fun SearchScreen(
             singleLine = true,
         )
 
+        // Barre fine sous le champ : elle ne décale pas la liste, contrairement à un disque.
         if (state.isSearching) {
-            CircularProgressIndicator(modifier = Modifier.padding(16.dp))
+            LinearProgressIndicator(Modifier.fillMaxWidth())
         }
 
         // D.6 — État vide quand la recherche ne donne rien
@@ -107,6 +114,17 @@ fun SearchScreen(
                     color = MaterialTheme.colorScheme.onSurfaceVariant,
                 )
             }
+        }
+
+        if (!state.isSearching && state.results.isNotEmpty()) {
+            Text(
+                resultCountLabel(state.results.size),
+                style = MaterialTheme.typography.labelLarge,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                modifier = Modifier
+                    .padding(top = 16.dp, bottom = 4.dp)
+                    .semantics { liveRegion = LiveRegionMode.Polite },
+            )
         }
 
         LazyColumn {
@@ -127,30 +145,35 @@ fun SearchScreen(
  */
 @Composable
 private fun SearchResultItem(result: SearchResult, bookTitle: String?, query: String, onClick: () -> Unit) {
-    Column(
-        modifier = Modifier
-            .fillMaxWidth()
-            .clickable(onClick = onClick)
-            .padding(vertical = 8.dp),
-    ) {
-        if (!bookTitle.isNullOrBlank()) {
-            Text(bookTitle, style = MaterialTheme.typography.labelMedium, color = MaterialTheme.colorScheme.primary)
-        }
-        Text(
-            // Couleur du schéma : un jaune fixe tombait à 4,3:1 sous le texte en thème sombre.
-            text = highlightSnippet(
-                result.snippet,
-                query,
-                SpanStyle(
-                    background = MaterialTheme.colorScheme.tertiaryContainer,
-                    color = MaterialTheme.colorScheme.onTertiaryContainer,
+    // La position distingue des résultats dont les extraits se ressemblent.
+    ListItem(
+        overlineContent = { Text("Chapitre ${result.locator.chapterIndex + 1}") },
+        headlineContent = {
+            Text(
+                // Couleur du schéma : un jaune fixe tombait à 4,3:1 sous le texte en thème sombre.
+                text = highlightSnippet(
+                    result.snippet,
+                    query,
+                    SpanStyle(
+                        background = MaterialTheme.colorScheme.tertiaryContainer,
+                        color = MaterialTheme.colorScheme.onTertiaryContainer,
+                    ),
                 ),
-            ),
-            color = MaterialTheme.colorScheme.onSurface,
-            style = MaterialTheme.typography.bodyMedium,
-        )
-    }
+                style = MaterialTheme.typography.bodyMedium,
+            )
+        },
+        supportingContent = if (!bookTitle.isNullOrBlank()) {
+            { Text(bookTitle, maxLines = 1, overflow = TextOverflow.Ellipsis) }
+        } else {
+            null
+        },
+        modifier = Modifier.clickable(onClick = onClick),
+    )
+    HorizontalDivider()
 }
+
+/** En-tête de la liste, annoncé par TalkBack quand il change. */
+internal fun resultCountLabel(count: Int): String = if (count == 1) "1 résultat" else "$count résultats"
 
 /**
  * Surligne dans [snippet] chaque occurrence de [query], sans tenir compte
