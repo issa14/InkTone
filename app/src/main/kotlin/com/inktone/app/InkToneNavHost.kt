@@ -46,6 +46,7 @@ import androidx.navigation.compose.currentBackStackEntryAsState
 import androidx.navigation.compose.rememberNavController
 import androidx.navigation.toRoute
 import com.inktone.core.designsystem.Motion
+import com.inktone.core.designsystem.InkToneTopBar
 import com.inktone.core.designsystem.SystemBarIconsEffect
 import com.inktone.core.designsystem.reducedMotionDuration
 import com.inktone.core.ui.AboutScreen
@@ -188,7 +189,7 @@ fun InkToneNavHost(navController: NavHostController = rememberNavController(), s
     // haut qu'elle recouvre.
     val systemBarBackground = when {
         drawerState.isOpen -> MaterialTheme.colorScheme.surface
-        currentDestination?.usesPrimaryTopBar() == true -> MaterialTheme.colorScheme.primary
+        currentDestination?.usesPrimaryTopBar() == true -> InkToneTopBar.containerColor()
         else -> MaterialTheme.colorScheme.surface
     }
     SystemBarIconsEffect(systemBarBackground)

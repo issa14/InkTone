@@ -64,6 +64,7 @@ import androidx.hilt.navigation.compose.hiltViewModel
 import com.inktone.core.designsystem.AppIcon
 import com.inktone.core.designsystem.rememberAppHaptics
 import com.inktone.core.designsystem.AppSymbol
+import com.inktone.core.designsystem.InkToneTopBar
 import com.inktone.domain.model.cleanedForDisplay
 import com.inktone.domain.model.AnnotationColor
 import com.inktone.domain.model.LibraryItem
@@ -143,12 +144,7 @@ fun LibraryItemsScreen(
                         onSortOrderSelected = { viewModel.onIntent(LibraryItemsIntent.SetSortOrder(it)) },
                     )
                 },
-                colors = TopAppBarDefaults.topAppBarColors(
-                    containerColor = MaterialTheme.colorScheme.primary,
-                    titleContentColor = MaterialTheme.colorScheme.onPrimary,
-                    actionIconContentColor = MaterialTheme.colorScheme.onPrimary,
-                    navigationIconContentColor = MaterialTheme.colorScheme.onPrimary,
-                ),
+                colors = InkToneTopBar.colors(),
             )
         },
     ) { innerPadding ->

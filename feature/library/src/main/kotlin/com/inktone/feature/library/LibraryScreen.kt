@@ -77,6 +77,7 @@ import com.inktone.core.designsystem.InkToneBrandMark
 import com.inktone.core.designsystem.NarrativeAccentFamily
 import com.inktone.core.designsystem.InkToneShapes
 import com.inktone.core.designsystem.formatPercent
+import com.inktone.core.designsystem.InkToneTopBar
 import com.inktone.domain.model.FilterMode
 import com.inktone.domain.model.Publication
 import com.inktone.domain.model.cleanedAuthorsForDisplay
@@ -485,11 +486,7 @@ internal fun LibraryTopBar(
                     AppIcon(AppSymbol.Back, contentDescription = "Fermer")
                 }
             },
-            colors = TopAppBarDefaults.topAppBarColors(
-                containerColor = MaterialTheme.colorScheme.primary,
-                titleContentColor = MaterialTheme.colorScheme.onPrimary,
-                navigationIconContentColor = MaterialTheme.colorScheme.onPrimary,
-            ),
+            colors = InkToneTopBar.colors(),
         )
     } else {
         // C.4 — Titre cliquable avec le filtre actif
@@ -512,7 +509,7 @@ internal fun LibraryTopBar(
                             // titre paraissait d'un quart plus petit (16 sp
                             // contre 20) alors qu'il est de même rang.
                             style = MaterialTheme.typography.titleLarge,
-                            color = MaterialTheme.colorScheme.onPrimary,
+                            color = InkToneTopBar.contentColor(),
                         )
                         // Unique indice que le titre ouvre un menu : il doit se
                         // voir. Un chevron à 16 dp et 50 % d'opacité se
@@ -527,7 +524,7 @@ internal fun LibraryTopBar(
                         AppIcon(
                             AppSymbol.ArrowDropDown,
                             contentDescription = "Changer de vue",
-                            tint = MaterialTheme.colorScheme.onPrimary,
+                            tint = InkToneTopBar.contentColor(),
                             modifier = Modifier.size(24.dp),
                         )
                     }
@@ -561,12 +558,7 @@ internal fun LibraryTopBar(
                     AppIcon(AppSymbol.MoreActions, contentDescription = "Actions")
                 }
             },
-            colors = TopAppBarDefaults.topAppBarColors(
-                containerColor = MaterialTheme.colorScheme.primary,
-                titleContentColor = MaterialTheme.colorScheme.onPrimary,
-                actionIconContentColor = MaterialTheme.colorScheme.onPrimary,
-                navigationIconContentColor = MaterialTheme.colorScheme.onPrimary,
-            ),
+            colors = InkToneTopBar.colors(),
         )
     }
 
@@ -595,8 +587,7 @@ internal fun LibraryTopBar(
         ) {
             Column(Modifier.padding(bottom = 32.dp)) {
                 Text("Bibliothèque", style = MaterialTheme.typography.labelLarge,
-                    modifier = Modifier.padding(horizontal = 24.dp, vertical = 8.dp),
-                    color = MaterialTheme.colorScheme.primary)
+                    modifier = Modifier.padding(horizontal = 24.dp, vertical = 8.dp))
                 ActionSheetItem("Importer", AppSymbol.Data) { showActionsSheet = false; onImportClick() }
                 ActionSheetItem("Rechercher dans les livres", AppSymbol.Search) { showActionsSheet = false; onOpenTextSearch() }
                 ActionSheetItem("Couverture par défaut", AppSymbol.CoverOnly) {

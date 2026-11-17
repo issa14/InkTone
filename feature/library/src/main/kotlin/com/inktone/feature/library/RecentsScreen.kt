@@ -27,6 +27,7 @@ import androidx.compose.ui.unit.dp
 import androidx.hilt.navigation.compose.hiltViewModel
 import com.inktone.core.designsystem.AppIcon
 import com.inktone.core.designsystem.AppSymbol
+import com.inktone.core.designsystem.InkToneTopBar
 
 /**
  * Lot 8 — écran Récents (UX §Récents). Topbar simplifiée (flèche de
@@ -65,11 +66,7 @@ fun RecentsScreen(
                         AppIcon(AppSymbol.Menu, contentDescription = "Ouvrir le menu")
                     }
                 },
-                colors = TopAppBarDefaults.topAppBarColors(
-                    containerColor = MaterialTheme.colorScheme.primary,
-                    titleContentColor = MaterialTheme.colorScheme.onPrimary,
-                    navigationIconContentColor = MaterialTheme.colorScheme.onPrimary,
-                ),
+                colors = InkToneTopBar.colors(),
             )
         },
     ) { innerPadding ->

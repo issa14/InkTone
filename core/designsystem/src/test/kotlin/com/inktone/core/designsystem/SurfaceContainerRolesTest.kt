@@ -38,4 +38,15 @@ class SurfaceContainerRolesTest {
             assertNotEquals(name, baseline.getValue(name), color)
         }
     }
+
+    /** Audit UI P0-10 : `primary` sert de couleur de texte (boutons texte, liens), il doit tenir 4,5:1. */
+    @Test
+    fun primary_reste_lisible_comme_texte_sur_les_surfaces() {
+        for (scheme in listOf(InkToneLightColorScheme, InkToneDarkColorScheme)) {
+            for (surface in listOf(scheme.background, scheme.surface, scheme.surfaceContainerHigh)) {
+                val ratio = calculateContrastRatio(surface, scheme.primary)
+                org.junit.Assert.assertTrue("primary sur $surface : $ratio", ratio >= 4.5)
+            }
+        }
+    }
 }

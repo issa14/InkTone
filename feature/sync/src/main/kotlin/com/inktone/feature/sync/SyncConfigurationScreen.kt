@@ -2,6 +2,7 @@ package com.inktone.feature.sync
 
 import com.inktone.core.designsystem.AppIcon
 import com.inktone.core.designsystem.AppSymbol
+import com.inktone.core.designsystem.InkToneTopBar
 import androidx.compose.animation.AnimatedContent
 import androidx.compose.animation.EnterTransition
 import androidx.compose.animation.ExitTransition
@@ -110,12 +111,11 @@ fun SyncConfigurationScreen(
                     }
                 },
                 actions = {
-                    // Lot 18 — la barre est peinte en `primary` : sans
-                    // couleur explicite, un TextButton rendrait son
-                    // libellé en `primary` sur `primary`, donc invisible.
+                    // Sans couleur explicite, un TextButton prendrait `primary`,
+                    // proche de la couleur de la barre : libellé invisible.
                     val barButtonColors = ButtonDefaults.textButtonColors(
-                        contentColor = MaterialTheme.colorScheme.onPrimary,
-                        disabledContentColor = MaterialTheme.colorScheme.onPrimary.copy(alpha = 0.38f),
+                        contentColor = InkToneTopBar.contentColor(),
+                        disabledContentColor = InkToneTopBar.contentColor().copy(alpha = 0.38f),
                     )
                     // Rien n'est à enregistrer ici : une connexion prend effet
                     // dès qu'elle réussit. L'ancien « Enregistrer » renvoyait à
@@ -128,12 +128,7 @@ fun SyncConfigurationScreen(
                         TextButton(onClick = { manualShowConfig = false }, colors = barButtonColors) { Text("Terminé") }
                     }
                 },
-                colors = TopAppBarDefaults.topAppBarColors(
-                    containerColor = MaterialTheme.colorScheme.primary,
-                    titleContentColor = MaterialTheme.colorScheme.onPrimary,
-                    actionIconContentColor = MaterialTheme.colorScheme.onPrimary,
-                    navigationIconContentColor = MaterialTheme.colorScheme.onPrimary,
-                ),
+                colors = InkToneTopBar.colors(),
             )
         },
     ) { innerPadding ->

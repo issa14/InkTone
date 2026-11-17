@@ -73,6 +73,7 @@ import com.inktone.core.designsystem.AppSymbol
 import com.inktone.core.designsystem.InkToneSpacing
 import com.inktone.core.designsystem.formatDurationMinutes
 import com.inktone.core.designsystem.formatPercent
+import com.inktone.core.designsystem.InkToneTopBar
 import com.inktone.domain.model.DailyReadingStats
 import com.inktone.domain.service.ExportFormat
 import com.inktone.domain.usecase.StatsPeriod
@@ -140,11 +141,7 @@ fun StatisticsScreen(
                         AppIcon(AppSymbol.Menu, contentDescription = "Ouvrir le menu")
                     }
                 },
-                colors = TopAppBarDefaults.topAppBarColors(
-                    containerColor = MaterialTheme.colorScheme.primary,
-                    titleContentColor = MaterialTheme.colorScheme.onPrimary,
-                    navigationIconContentColor = MaterialTheme.colorScheme.onPrimary,
-                ),
+                colors = InkToneTopBar.colors(),
             )
         },
     ) { innerPadding ->

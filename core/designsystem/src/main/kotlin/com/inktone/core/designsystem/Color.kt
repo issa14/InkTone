@@ -8,9 +8,11 @@ import androidx.compose.ui.graphics.Color
 /**
  * Palette de marque "Deadly Depths" (Sous-lot 2a) — violet signature
  * InkTone, remplace le bleu legacy. Contraste vérifié WCAG 2.x sur les
- * fonds réels (#FFFBF5 / #0F1419). L'accent-texte sombre est déporté sur
- * onPrimaryContainer (Cont.300) car primary sombre (#7661D1) est en
- * dessous du seuil WCAG AA texte (3.88:1).
+ * fonds réels (#FFFBF5 / #0F1419). En sombre, `primary` est un lavande
+ * clair : Material l'emploie comme couleur de texte (boutons texte, liens,
+ * onglets), il doit tenir 4,5:1 sur les surfaces. Le violet profond de la
+ * marque y passe en `primaryContainer`, que prennent les barres
+ * (`InkToneTopBar`).
  */
 val InkToneLightColorScheme = lightColorScheme(
     primary = Color(0xFF2C1E67),
@@ -54,10 +56,11 @@ val InkToneLightColorScheme = lightColorScheme(
 
 /** Variante sombre optimisée OLED (fond quasi noir). */
 val InkToneDarkColorScheme = darkColorScheme(
-    primary = Color(0xFF7661D1),
-    onPrimary = Color.White,
+    primary = Color(0xFFC8BFFF),
+    onPrimary = Color(0xFF2C1E67),
     primaryContainer = Color(0xFF2C1E67),
-    onPrimaryContainer = Color(0xFFA698E1),
+    // Blanc : le lavande (#A698E1) paraissait terne sur le violet profond.
+    onPrimaryContainer = Color.White,
     secondary = Color(0xFFFF8C5A),
     onSecondary = Color(0xFF3D0D00),
     secondaryContainer = Color(0xFF5C1A00),

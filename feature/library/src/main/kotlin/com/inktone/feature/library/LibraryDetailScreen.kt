@@ -37,6 +37,7 @@ import androidx.compose.ui.unit.sp
 import androidx.hilt.navigation.compose.hiltViewModel
 import com.inktone.core.designsystem.AppIcon
 import com.inktone.core.designsystem.AppSymbol
+import com.inktone.core.designsystem.InkToneTopBar
 
 /**
  * Écran de détail Séries/Tags (UX §Menu déroulant du titre, écran de
@@ -96,11 +97,7 @@ fun LibraryDetailScreen(
                             AppIcon(AppSymbol.Back, contentDescription = "Fermer")
                         }
                     },
-                    colors = TopAppBarDefaults.topAppBarColors(
-                        containerColor = MaterialTheme.colorScheme.primary,
-                        titleContentColor = MaterialTheme.colorScheme.onPrimary,
-                        navigationIconContentColor = MaterialTheme.colorScheme.onPrimary,
-                    ),
+                    colors = InkToneTopBar.colors(),
                 )
             } else {
                 TopAppBar(
@@ -110,7 +107,7 @@ fun LibraryDetailScreen(
                                 if (category == LibraryDetailCategory.SERIES) "SÉRIES" else "TAGS",
                                 style = MaterialTheme.typography.labelSmall,
                                 letterSpacing = 1.5.sp,
-                                color = MaterialTheme.colorScheme.onPrimary.copy(alpha = 0.7f),
+                                color = InkToneTopBar.contentColor().copy(alpha = 0.7f),
                             )
                             Text(
                                 value,
@@ -118,7 +115,7 @@ fun LibraryDetailScreen(
                                 fontWeight = FontWeight.Bold,
                                 maxLines = 1,
                                 overflow = TextOverflow.Ellipsis,
-                                color = MaterialTheme.colorScheme.onPrimary,
+                                color = InkToneTopBar.contentColor(),
                             )
                         }
                     },
@@ -135,12 +132,7 @@ fun LibraryDetailScreen(
                             AppIcon(AppSymbol.Filter,  contentDescription = "Filtrer")
                         }
                     },
-                    colors = TopAppBarDefaults.topAppBarColors(
-                        containerColor = MaterialTheme.colorScheme.primary,
-                        titleContentColor = MaterialTheme.colorScheme.onPrimary,
-                        actionIconContentColor = MaterialTheme.colorScheme.onPrimary,
-                        navigationIconContentColor = MaterialTheme.colorScheme.onPrimary,
-                    ),
+                    colors = InkToneTopBar.colors(),
                 )
             }
         },

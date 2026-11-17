@@ -63,7 +63,6 @@ fun BookActionsSheet(
                 publication.title,
                 style = MaterialTheme.typography.labelLarge,
                 modifier = Modifier.padding(horizontal = 24.dp, vertical = 8.dp),
-                color = MaterialTheme.colorScheme.primary,
                 maxLines = 1,
             )
             // Retour UX : le favori (cœur) a été retiré de la couverture et
