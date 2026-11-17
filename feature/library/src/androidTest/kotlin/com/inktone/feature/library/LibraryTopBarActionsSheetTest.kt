@@ -11,13 +11,9 @@ import org.junit.Rule
 import org.junit.Test
 
 /**
- * Lot 2a.5/2a.7 puis Lot 19 — non-régression : « Régénérer/Réinitialiser
- * les couvertures » avaient un corps de méthode vide côté ViewModel
- * (contrôles décoratifs, critère 2). Le Lot 19 réintroduit les cinq
- * actions de la cible UX avec leur logique réelle, sous les libellés
- * « Couverture par défaut » et « Reconstruire les couvertures » — ce
- * test échoue si les anciens libellés réapparaissent ou si une action
- * de la cible manque.
+ * Non-régression du menu 3-points : les actions de la cible UX y sont, et la
+ * maintenance des couvertures n'y revient pas — elle vit dans Réglages ›
+ * Données depuis l'audit UI P1-17.
  */
 class LibraryTopBarActionsSheetTest {
 
@@ -25,7 +21,7 @@ class LibraryTopBarActionsSheetTest {
     val composeTestRule = createAndroidComposeRule<ComponentActivity>()
 
     @Test
-    fun le_menu_3_points_expose_les_cinq_actions_de_la_cible() {
+    fun le_menu_3_points_expose_les_actions_de_la_cible() {
         composeTestRule.setContent {
             MaterialTheme {
                 LibraryTopBar(
@@ -49,15 +45,15 @@ class LibraryTopBarActionsSheetTest {
         composeTestRule.onNodeWithContentDescription("Actions").performClick()
 
         composeTestRule.onNodeWithText("Importer").assertExists()
-        composeTestRule.onNodeWithText("Couverture par défaut").assertExists()
-        composeTestRule.onNodeWithText("Reconstruire les couvertures").assertExists()
+        composeTestRule.onNodeWithText("Rechercher dans les livres").assertExists()
         composeTestRule.onNodeWithText("Ouvrir un livre au hasard").assertExists()
         composeTestRule.onNodeWithText("Synchroniser avec le cloud").assertExists()
 
-        // Libellés legacy — jamais réintroduits.
+        // Maintenance des couvertures : dans les Réglages, plus ici.
+        composeTestRule.onNodeWithText("Couverture par défaut").assertDoesNotExist()
+        composeTestRule.onNodeWithText("Reconstruire les couvertures").assertDoesNotExist()
         composeTestRule.onNodeWithText("Régénérer les couvertures").assertDoesNotExist()
-        composeTestRule.onNodeWithText("Réinitialiser les couvertures").assertDoesNotExist()
-        // « Actualiser » n'est pas dans les cinq actions de la cible.
+        // « Actualiser » n'est pas dans les actions de la cible.
         composeTestRule.onNodeWithText("Actualiser").assertDoesNotExist()
     }
 }

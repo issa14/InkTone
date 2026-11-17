@@ -6,7 +6,6 @@ import com.inktone.core.testing.fake.FakeImportResultsStore
 import com.inktone.core.testing.fake.FakePlaybackSession
 import com.inktone.core.testing.fake.FakePreAnalysisStore
 import com.inktone.core.testing.fake.FakePreferencesRepository
-import com.inktone.core.testing.fake.FakePublicationParser
 import com.inktone.core.testing.fake.FakePublicationRepository
 import com.inktone.core.testing.fake.FakeReadingStateRepository
 import com.inktone.core.testing.fake.FakeRenderedPageCache
@@ -17,7 +16,6 @@ import com.inktone.domain.model.Publication
 import com.inktone.domain.model.PublicationFormat
 import com.inktone.domain.service.ImportSessionStore
 import com.inktone.domain.usecase.DeletePublicationUseCase
-import com.inktone.domain.usecase.RegenerateCoversUseCase
 import com.inktone.domain.usecase.SynchronizeNowUseCase
 import com.inktone.domain.usecase.ToggleFavoriteUseCase
 import com.inktone.domain.usecase.TogglePinUseCase
@@ -72,7 +70,6 @@ class LibraryViewModelSearchTest {
         FakePreferencesRepository(),
         SynchronizeNowUseCase(FakeSyncNowService()),
         FakeSyncAccountRepository(),
-        RegenerateCoversUseCase(publicationRepository, FakePublicationParser()),
         FakePlaybackSession(),
         dispatcher,
     )

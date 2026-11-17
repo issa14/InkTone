@@ -7,7 +7,6 @@ import com.inktone.domain.usecase.resumePublication
 import com.inktone.domain.service.ImportProgress
 import com.inktone.domain.service.ImportResultEntry
 import com.inktone.domain.service.SyncOperationResult
-import com.inktone.domain.usecase.CoverRegenerationResult
 import java.text.Collator
 import java.text.Normalizer
 import java.util.Locale
@@ -52,10 +51,6 @@ data class LibraryUiState(
     val importResults: List<ImportResultEntry> = emptyList(),
     val showImportDetails: Boolean = false,
     val importSessionId: String? = null,
-    // Lot 19 — progression live de la reconstruction des couvertures
-    // (menu 3-points « Reconstruire les couvertures »).
-    val isRegeneratingCovers: Boolean = false,
-    val coverRegeneration: CoverRegenerationProgress? = null,
     /**
      * Publication actuellement narrée par la session TTS, et si elle joue —
      * alimentent le bouton Lecture/Pause de la carte « Reprendre la lecture ».
@@ -203,9 +198,6 @@ enum class LibrarySortOrder { RECENTLY_ADDED, TITLE, AUTHOR, RECENTLY_OPENED }
  */
 enum class LibraryLayoutMode { LIST, GRID_COVERS, GRID_DETAILED }
 
-/** Lot 19 — progression X/Y de la reconstruction des couvertures (menu legacy « progression live »). */
-data class CoverRegenerationProgress(val processed: Int, val total: Int)
-
 sealed interface LibraryIntent {
     data class OpenPublication(val publicationId: String, val autoStartTts: Boolean = false) : LibraryIntent
 
@@ -233,8 +225,6 @@ sealed interface LibraryIntent {
     // Lot 19 — actions du menu 3-points
     data object OpenRandomBook : LibraryIntent
     data object SyncNow : LibraryIntent
-    data object RegenerateCovers : LibraryIntent
-    data object ResetCovers : LibraryIntent
 }
 
 /**
@@ -247,10 +237,7 @@ sealed interface LibraryEffect {
     // Lot 19 — « Synchroniser avec le cloud » non configuré : bascule
     // vers l'écran de configuration, jamais un bouton désactivé.
     data object NavigateToSync : LibraryEffect
-    data class CoversRegenerated(val result: CoverRegenerationResult) : LibraryEffect
-    data object CoversReset : LibraryEffect
-    // Retours des actions du menu 3-points — mêmes règles que les
-    // couvertures : un retour utilisateur, jamais un no-op muet.
+    // Retours des actions du menu 3-points : un retour utilisateur, jamais un no-op muet.
     data object RandomBookUnavailable : LibraryEffect
     /** La synchronisation manuelle démarre : l'écran l'affiche jusqu'à [SyncCompleted] (audit UX B15). */
     data object SyncStarted : LibraryEffect

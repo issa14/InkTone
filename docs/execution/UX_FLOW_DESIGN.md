@@ -111,8 +111,7 @@ Onboarding câblé au premier lancement (`OnboardingRoute`, `startDestination` d
 
 **Bottom sheet du menu 3-points (icône a4) :**
 - Importer des livres
-- Couverture par défaut
-- Reconstruire les couvertures
+- ~~Couverture par défaut~~ / ~~Reconstruire les couvertures~~ — **déplacées dans Réglages › Données** (« Rétablir les couvertures d'origine », « Régénérer les couvertures ») : opérations de maintenance rares, pas au rang de l'import (audit UI 2026-11-16, P1-17)
 - Ouvrir un livre au hasard
 - Synchroniser avec le cloud — **action ponctuelle, fonctionne uniquement si un service de sync est déjà configuré** — **tranché plus loin** (§ Bottom sheet du menu 3-points) : si non configuré, le tap déclenche directement l'écran de configuration, pas un bouton désactivé.
 
@@ -217,12 +216,11 @@ Un seul écran réutilisable pour les deux cas — seul le contenu de l'étiquet
 
 ## Écran : Bottom sheet du menu 3-points (icône a4 de la barre du haut)
 
-Cinq actions, dans l'ordre :
+Actions, dans l'ordre (la maintenance des couvertures est passée dans Réglages › Données, audit UI P1-17) :
 1. Importer des livres
-2. Couverture par défaut
-3. Reconstruire les couvertures
-4. Ouvrir un livre au hasard
-5. Synchroniser avec le cloud — **action ponctuelle**, fonctionne uniquement si un service de sync est déjà configuré. **Si non configuré : le tap déclenche directement l'écran de configuration de la sync** (tranché) — pas un bouton désactivé.
+2. Rechercher dans les livres
+3. Ouvrir un livre au hasard
+4. Synchroniser avec le cloud — **action ponctuelle**, fonctionne uniquement si un service de sync est déjà configuré. **Si non configuré : le tap déclenche directement l'écran de configuration de la sync** (tranché) — pas un bouton désactivé.
 
 ---
 

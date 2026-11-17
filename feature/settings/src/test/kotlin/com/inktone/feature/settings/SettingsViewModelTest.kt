@@ -1,5 +1,10 @@
 package com.inktone.feature.settings
 
+import com.inktone.domain.usecase.RegenerateCoversUseCase
+import com.inktone.domain.model.PublicationFormat
+import com.inktone.domain.model.Publication
+import com.inktone.core.testing.fake.FakePublicationRepository
+import com.inktone.core.testing.fake.FakePublicationParser
 import androidx.test.core.app.ApplicationProvider
 import com.inktone.core.testing.fake.FakePreferencesRepository
 import com.inktone.core.testing.fake.FakePronunciationRuleRepository
@@ -78,6 +83,8 @@ class SettingsViewModelTest {
         audioPlayer: AudioPlayer = FakeAudioPlayer(),
         ttsCapabilityCatalog: TtsCapabilityCatalog = FakeTtsCapabilityCatalog(),
         voiceModelDownloadScheduler: FakeVoiceModelDownloadScheduler = FakeVoiceModelDownloadScheduler(),
+        publicationRepository: FakePublicationRepository = FakePublicationRepository(),
+        publicationParser: FakePublicationParser = FakePublicationParser(),
     ) = SettingsViewModel(
         preferencesRepository,
         ApplyAccessibilityPresetUseCase(preferencesRepository),
@@ -96,6 +103,8 @@ class SettingsViewModelTest {
         audioPlayer,
         ttsCapabilityCatalog,
         voiceModelDownloadScheduler,
+        RegenerateCoversUseCase(publicationRepository, publicationParser),
+        publicationRepository,
     )
 
     @Test
@@ -659,5 +668,44 @@ class SettingsViewModelTest {
         override fun stop() { stopCount++; _state.value = PlayerState.Stopped }
         override fun release() {}
         override fun setVolume(volume: Float) {}
+    }
+
+    // ───── Maintenance des couvertures (audit UI P1-17, venue de la Bibliothèque) ─────
+
+    private fun publication(id: String) = Publication(
+        id = id, title = "Titre $id", format = PublicationFormat.EPUB,
+        fileUri = "content://fake/$id", fileHash = "hash-$id", fileSize = 100L,
+        chapterCount = 1, importDate = 0L, coverUri = "cover-$id.jpg",
+    )
+
+    @Test
+    fun `retablir les couvertures remet toutes les couvertures a defaut`() = runTest {
+        val repository = FakePublicationRepository()
+        repository.insert(publication("pub-1"))
+        val vm = viewModel(publicationRepository = repository)
+        dispatcher.scheduler.advanceUntilIdle()
+
+        vm.onIntent(SettingsIntent.RestoreDefaultCovers)
+        dispatcher.scheduler.advanceUntilIdle()
+
+        assertEquals(null, repository.getById("pub-1")?.coverUri)
+        assertEquals("Couvertures d'origine rétablies.", vm.state.value.coverStatus)
+    }
+
+    @Test
+    fun `regenerer les couvertures ecrit la couverture extraite et dresse le bilan`() = runTest {
+        val repository = FakePublicationRepository()
+        repository.insert(publication("pub-1"))
+        val parser = FakePublicationParser()
+        parser.setCoverResult("cover-reconstruit.jpg")
+        val vm = viewModel(publicationRepository = repository, publicationParser = parser)
+        dispatcher.scheduler.advanceUntilIdle()
+
+        vm.onIntent(SettingsIntent.RegenerateCovers)
+        dispatcher.scheduler.advanceUntilIdle()
+
+        assertEquals("cover-reconstruit.jpg", repository.getById("pub-1")?.coverUri)
+        assertEquals(null, vm.state.value.coverRegeneration)
+        assertEquals("Couvertures régénérées : 1 sur 1.", vm.state.value.coverStatus)
     }
 }

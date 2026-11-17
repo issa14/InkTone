@@ -5,7 +5,6 @@ import com.inktone.core.testing.fake.FakeImportProgressObserver
 import com.inktone.core.testing.fake.FakeImportResultsStore
 import com.inktone.core.testing.fake.FakePreferencesRepository
 import com.inktone.core.testing.fake.FakePlaybackSession
-import com.inktone.core.testing.fake.FakePublicationParser
 import com.inktone.core.testing.fake.FakePublicationRepository
 import com.inktone.core.testing.fake.FakePreAnalysisStore
 import com.inktone.core.testing.fake.FakeRenderedPageCache
@@ -26,7 +25,6 @@ import com.inktone.domain.service.PlaybackMetadata
 import com.inktone.domain.service.PlaybackSessionState
 import com.inktone.domain.service.ImportSessionStore
 import com.inktone.domain.usecase.DeletePublicationUseCase
-import com.inktone.domain.usecase.RegenerateCoversUseCase
 import com.inktone.domain.usecase.SynchronizeNowUseCase
 import com.inktone.domain.usecase.ToggleFavoriteUseCase
 import com.inktone.domain.usecase.TogglePinUseCase
@@ -71,7 +69,6 @@ class LibraryViewModelTest {
         importProgressObserver: FakeImportProgressObserver = FakeImportProgressObserver(),
         syncAccountRepository: FakeSyncAccountRepository = FakeSyncAccountRepository(),
         syncNowService: FakeSyncNowService = FakeSyncNowService(),
-        publicationParser: FakePublicationParser = FakePublicationParser(),
         // Audit v1.0.0 (P5) : même StandardTestDispatcher que setMain,
         // sinon advanceUntilIdle ne voit pas le calcul de progression.
         defaultDispatcher: CoroutineDispatcher = dispatcher,
@@ -91,7 +88,6 @@ class LibraryViewModelTest {
         preferencesRepository,
         SynchronizeNowUseCase(syncNowService),
         syncAccountRepository,
-        RegenerateCoversUseCase(publicationRepository, publicationParser),
         playbackSession,
         defaultDispatcher,
     )
@@ -342,40 +338,6 @@ class LibraryViewModelTest {
             "Échec de la synchronisation",
             syncResultMessage(SyncOperationResult.Failed(SyncFailureReason.UNKNOWN, " ")),
         )
-    }
-
-    @Test
-    fun `reinitialiser les couvertures remet toutes les couvertures a defaut`() = runTest {
-        val repository = FakePublicationRepository()
-        repository.insert(publication("pub-1"))
-        val viewModel = viewModel(publicationRepository = repository)
-        dispatcher.scheduler.advanceUntilIdle()
-
-        viewModel.onIntent(LibraryIntent.ResetCovers)
-        dispatcher.scheduler.advanceUntilIdle()
-
-        assertNull(repository.getById("pub-1")?.coverUri)
-    }
-
-    @Test
-    fun `reconstruire les couvertures ecrit la couverture extraite et emet un effet`() = runTest {
-        val repository = FakePublicationRepository()
-        repository.insert(publication("pub-1"))
-        val parser = FakePublicationParser()
-        parser.setCoverResult("cover-reconstruit.jpg")
-        val viewModel = viewModel(publicationRepository = repository, publicationParser = parser)
-        dispatcher.scheduler.advanceUntilIdle()
-
-        var effect: LibraryEffect? = null
-        val job = launch(dispatcher) { viewModel.effects.collect { effect = it } }
-        dispatcher.scheduler.advanceUntilIdle()
-
-        viewModel.onIntent(LibraryIntent.RegenerateCovers)
-        dispatcher.scheduler.advanceUntilIdle()
-        job.cancel()
-
-        assertEquals("cover-reconstruit.jpg", repository.getById("pub-1")?.coverUri)
-        assertTrue(effect is LibraryEffect.CoversRegenerated)
     }
 
     // ───── Bouton Lecture/Pause de la carte « Reprendre la lecture » ─────

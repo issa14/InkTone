@@ -135,6 +135,8 @@ fun SettingsScreen(
                 isPreviewing = state.isPreviewing,
                 previewError = state.previewError,
                 pitchEngines = state.pitchEngines,
+                coverRegeneration = state.coverRegeneration,
+                coverStatus = state.coverStatus,
                 focusVoiceDownload = focusVoiceDownload,
                 onIntent = viewModel::onIntent,
                 dataOperationResult = dataOperationResult,
@@ -161,6 +163,8 @@ internal fun SettingsContent(
     isPreviewing: Boolean = false,
     previewError: String? = null,
     pitchEngines: Set<TtsEngineId> = emptySet(),
+    coverRegeneration: CoverProgress? = null,
+    coverStatus: String? = null,
     focusVoiceDownload: Boolean = false,
     onIntent: (SettingsIntent) -> Unit,
     dataOperationResult: DataOperationResult? = null,
@@ -384,6 +388,7 @@ internal fun SettingsContent(
         var showImportWarning by remember { mutableStateOf(false) }
         var showClearCacheConfirm by remember { mutableStateOf(false) }
         var showResetConfirm by remember { mutableStateOf(false) }
+        var showRestoreCoversConfirm by remember { mutableStateOf(false) }
 
         SectionGroup("Données") {
             // Action directe, sans confirmation — n'écrase rien de local.
@@ -426,6 +431,25 @@ internal fun SettingsContent(
                     Text("Vider")
                 }
             }
+
+            HorizontalDivider(modifier = Modifier.padding(horizontal = 20.dp))
+
+            // Maintenance des couvertures : opérations rares, rangées ici plutôt
+            // qu'au même rang qu'« Importer » dans la Bibliothèque (P1-17).
+            ActionRow(
+                icon = AppSymbol.Refresh,
+                title = "Régénérer les couvertures",
+                subtitle = coverRegeneration?.let { "En cours… ${it.processed} sur ${it.total}" }
+                    ?: coverStatus
+                    ?: "Extrait de nouveau la couverture de chaque livre.",
+                onClick = { if (coverRegeneration == null) onIntent(SettingsIntent.RegenerateCovers) },
+            )
+            ActionRow(
+                icon = AppSymbol.CoverOnly,
+                title = "Rétablir les couvertures d'origine",
+                subtitle = "Remplace les couvertures par leur version par défaut.",
+                onClick = { showRestoreCoversConfirm = true },
+            )
 
             HorizontalDivider(modifier = Modifier.padding(horizontal = 20.dp))
 
@@ -538,6 +562,16 @@ internal fun SettingsContent(
                 destructive = true,
                 onConfirm = { showClearCacheConfirm = false; onIntent(SettingsIntent.ClearCache) },
                 onDismiss = { showClearCacheConfirm = false },
+            )
+        }
+        if (showRestoreCoversConfirm) {
+            ConfirmDialog(
+                title = "Rétablir les couvertures d'origine ?",
+                message = "Chaque livre reprend sa couverture par défaut. Vous pourrez les régénérer à tout moment.",
+                confirmLabel = "Rétablir",
+                destructive = true,
+                onConfirm = { showRestoreCoversConfirm = false; onIntent(SettingsIntent.RestoreDefaultCovers) },
+                onDismiss = { showRestoreCoversConfirm = false },
             )
         }
         if (showResetConfirm) {

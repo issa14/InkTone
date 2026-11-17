@@ -25,8 +25,6 @@ import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.material3.ElevatedCard
 import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.Surface
-import androidx.compose.material3.AlertDialog
-import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.Icon
@@ -44,7 +42,6 @@ import androidx.compose.material3.TextField
 import androidx.compose.material3.TopAppBar
 import androidx.compose.material3.TopAppBarDefaults
 import androidx.compose.material3.Button
-import androidx.compose.material3.TextButton
 import androidx.compose.material3.rememberModalBottomSheetState
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
@@ -136,15 +133,6 @@ fun LibraryScreen(
             when (effect) {
                 is LibraryEffect.NavigateToReader -> onNavigateToReader(effect.publicationId, effect.autoStartTts)
                 is LibraryEffect.NavigateToSync -> onOpenSync()
-                is LibraryEffect.CoversRegenerated -> {
-                    val succeeded = effect.result.processed - effect.result.failed
-                    scope.launch {
-                        snackbarHostState.showSnackbar("Couvertures reconstruites ($succeeded/${effect.result.processed})")
-                    }
-                }
-                is LibraryEffect.CoversReset -> scope.launch {
-                    snackbarHostState.showSnackbar("Couvertures réinitialisées")
-                }
                 is LibraryEffect.RandomBookUnavailable -> scope.launch {
                     snackbarHostState.showSnackbar("Aucun livre à ouvrir")
                 }
@@ -196,10 +184,6 @@ fun LibraryScreen(
                 onOpenRandomBook = { viewModel.onIntent(LibraryIntent.OpenRandomBook) },
                 onOpenTextSearch = onOpenTextSearch,
                 onSyncNow = { viewModel.onIntent(LibraryIntent.SyncNow) },
-                onResetCovers = { viewModel.onIntent(LibraryIntent.ResetCovers) },
-                onRegenerateCovers = { viewModel.onIntent(LibraryIntent.RegenerateCovers) },
-                isRegeneratingCovers = state.isRegeneratingCovers,
-                coverRegeneration = state.coverRegeneration,
             )
         },
     ) { innerPadding ->
@@ -443,25 +427,10 @@ internal fun LibraryTopBar(
     onOpenRandomBook: () -> Unit = {},
     onOpenTextSearch: () -> Unit = {},
     onSyncNow: () -> Unit = {},
-    onResetCovers: () -> Unit = {},
-    onRegenerateCovers: () -> Unit = {},
-    isRegeneratingCovers: Boolean = false,
-    coverRegeneration: CoverRegenerationProgress? = null,
 ) {
     var showFilterDialog by remember { mutableStateOf(false) }
     var showActionsSheet by remember { mutableStateOf(false) }
     var showNavPopup by remember { mutableStateOf(false) }
-    var showResetCoversConfirm by remember { mutableStateOf(false) }
-    // Lot 19 — la reconstruction garde le bottom sheet OUVERT pour que la
-    // progression X/Y soit réellement visible ; il se referme à la fin.
-    var regenerationRequested by remember { mutableStateOf(false) }
-
-    LaunchedEffect(isRegeneratingCovers) {
-        if (!isRegeneratingCovers && regenerationRequested) {
-            showActionsSheet = false
-            regenerationRequested = false
-        }
-    }
 
     if (isSearchActive) {
         // Clavier ouvert à l'ouverture de la recherche, pas quand la barre
@@ -591,41 +560,10 @@ internal fun LibraryTopBar(
                     modifier = Modifier.padding(horizontal = 24.dp, vertical = 8.dp))
                 ActionSheetItem("Importer", AppSymbol.Data) { showActionsSheet = false; onImportClick() }
                 ActionSheetItem("Rechercher dans les livres", AppSymbol.Search) { showActionsSheet = false; onOpenTextSearch() }
-                ActionSheetItem("Couverture par défaut", AppSymbol.CoverOnly) {
-                    showActionsSheet = false
-                    showResetCoversConfirm = true
-                }
-                if (isRegeneratingCovers) {
-                    ActionSheetProgress("Reconstruire les couvertures", coverRegeneration)
-                } else {
-                    ActionSheetItem("Reconstruire les couvertures", AppSymbol.Refresh) {
-                        // Le sheet reste ouvert : la progression X/Y est
-                        // visible dans l'item, refermé à la fin par
-                        // LaunchedEffect(isRegeneratingCovers).
-                        regenerationRequested = true
-                        onRegenerateCovers()
-                    }
-                }
                 ActionSheetItem("Ouvrir un livre au hasard", AppSymbol.Reading) { showActionsSheet = false; onOpenRandomBook() }
                 ActionSheetItem("Synchroniser avec le cloud", AppSymbol.Sync) { showActionsSheet = false; onSyncNow() }
             }
         }
-    }
-
-    if (showResetCoversConfirm) {
-        AlertDialog(
-            onDismissRequest = { showResetCoversConfirm = false },
-            title = { Text("Réinitialiser les couvertures ?") },
-            text = { Text("Toutes les couvertures reviendront à leur apparence par défaut. Vous pourrez les reconstruire à tout moment.") },
-            confirmButton = {
-                TextButton(onClick = { showResetCoversConfirm = false; onResetCovers() }) {
-                    Text("Réinitialiser", color = MaterialTheme.colorScheme.error)
-                }
-            },
-            dismissButton = {
-                TextButton(onClick = { showResetCoversConfirm = false }) { Text("Annuler") }
-            },
-        )
     }
 }
 
@@ -638,22 +576,6 @@ private fun ActionSheetItem(label: String, icon: AppSymbol, onClick: () -> Unit)
         AppIcon(icon, contentDescription = null, modifier = Modifier.size(22.dp))
         Spacer(Modifier.width(16.dp))
         Text(label, style = MaterialTheme.typography.bodyLarge)
-    }
-}
-
-/** Lot 19 — item non cliquable affichant la progression live X/Y pendant la reconstruction. */
-@Composable
-private fun ActionSheetProgress(label: String, progress: CoverRegenerationProgress?) {
-    Row(
-        modifier = Modifier.fillMaxWidth().padding(horizontal = 24.dp, vertical = 14.dp),
-        verticalAlignment = Alignment.CenterVertically,
-    ) {
-        CircularProgressIndicator(modifier = Modifier.size(22.dp), strokeWidth = 2.dp)
-        Spacer(Modifier.width(16.dp))
-        Text(
-            if (progress != null) "$label (${progress.processed}/${progress.total})" else label,
-            style = MaterialTheme.typography.bodyLarge,
-        )
     }
 }
 

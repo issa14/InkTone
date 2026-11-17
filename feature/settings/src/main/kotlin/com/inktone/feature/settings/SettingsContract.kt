@@ -32,7 +32,14 @@ data class SettingsUiState(
     // Moteurs qui appliquent réellement l'intonation (TtsCapabilities
     // .pitchControl) : le curseur ne s'affiche que pour eux.
     val pitchEngines: Set<TtsEngineId> = emptySet(),
+    // Maintenance des couvertures (audit UI P1-17, venue de la Bibliothèque) :
+    // progression pendant la reconstruction, puis bilan de la dernière opération.
+    val coverRegeneration: CoverProgress? = null,
+    val coverStatus: String? = null,
 )
+
+/** Avancement de la reconstruction des couvertures. */
+data class CoverProgress(val processed: Int, val total: Int)
 
 /**
  * Lot 6, Palier B — résultat d'une opération de sauvegarde/restauration,
@@ -98,6 +105,8 @@ sealed interface SettingsIntent {
     object ClearCache : SettingsIntent
     /** Réinitialise UserPreferences aux valeurs par défaut — n'est envoyé qu'après confirmation explicite côté UI. */
     object ResetPreferences : SettingsIntent
+    object RegenerateCovers : SettingsIntent
+    object RestoreDefaultCovers : SettingsIntent
 
     // Lot 6, Palier B — carte Prononciation inline
     /** `id` null = nouvelle règle, non-null = édition d'une règle existante. */

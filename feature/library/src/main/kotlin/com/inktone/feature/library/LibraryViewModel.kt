@@ -14,7 +14,6 @@ import com.inktone.domain.service.PlaybackSessionState
 import com.inktone.domain.service.ImportResultsStore
 import com.inktone.domain.service.ImportSessionStore
 import com.inktone.domain.usecase.DeletePublicationUseCase
-import com.inktone.domain.usecase.RegenerateCoversUseCase
 import com.inktone.domain.usecase.SynchronizeNowUseCase
 import com.inktone.domain.usecase.ToggleFavoriteUseCase
 import com.inktone.domain.usecase.TogglePinUseCase
@@ -49,7 +48,6 @@ class LibraryViewModel @Inject constructor(
     // Lot 19 — actions du menu 3-points
     private val synchronizeNow: SynchronizeNowUseCase,
     private val syncAccountRepository: SyncAccountRepository,
-    private val regenerateCovers: RegenerateCoversUseCase,
     // Bouton Lecture/Pause de la carte « Reprendre la lecture » : la
     // narration se pilote par le contrat domaine, jamais en ouvrant le
     // Lecteur (celui-ci n'est plus qu'un consommateur de la même session).
@@ -213,19 +211,6 @@ class LibraryViewModel @Inject constructor(
                     val result = synchronizeNow()
                     _effects.send(LibraryEffect.SyncCompleted(result))
                 }
-            }
-            LibraryIntent.RegenerateCovers -> viewModelScope.launch {
-                if (_state.value.isRegeneratingCovers) return@launch
-                _state.value = _state.value.copy(isRegeneratingCovers = true, coverRegeneration = CoverRegenerationProgress(0, 0))
-                val result = regenerateCovers { processed, total ->
-                    _state.value = _state.value.copy(coverRegeneration = CoverRegenerationProgress(processed, total))
-                }
-                _state.value = _state.value.copy(isRegeneratingCovers = false, coverRegeneration = null)
-                _effects.send(LibraryEffect.CoversRegenerated(result))
-            }
-            LibraryIntent.ResetCovers -> viewModelScope.launch {
-                publicationRepository.resetAllCoversToDefault()
-                _effects.send(LibraryEffect.CoversReset)
             }
         }
     }

@@ -4,6 +4,8 @@ import android.content.Context
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.inktone.domain.model.AppTheme
+import com.inktone.domain.repository.PublicationRepository
+import com.inktone.domain.usecase.RegenerateCoversUseCase
 import com.inktone.domain.model.FontFamily
 import com.inktone.domain.model.PronunciationRule
 import com.inktone.domain.model.ReadingTheme
@@ -79,6 +81,8 @@ class SettingsViewModel @Inject constructor(
     private val audioPlayer: AudioPlayer,
     private val ttsCapabilityCatalog: TtsCapabilityCatalog,
     private val voiceModelDownloadScheduler: VoiceModelDownloadScheduler,
+    private val regenerateCovers: RegenerateCoversUseCase,
+    private val publicationRepository: PublicationRepository,
 ) : ViewModel() {
 
     /** Sérialise les réécritures du profil vocal actif (audit UX D67). */
@@ -205,6 +209,11 @@ class SettingsViewModel @Inject constructor(
                 is SettingsIntent.RefreshCacheSize -> refreshCacheSize()
                 is SettingsIntent.ClearCache -> clearCache()
                 is SettingsIntent.ResetPreferences -> preferencesRepository.update { it.withSettingsReset() }
+                is SettingsIntent.RegenerateCovers -> regenerateAllCovers()
+                is SettingsIntent.RestoreDefaultCovers -> {
+                    publicationRepository.resetAllCoversToDefault()
+                    _state.value = _state.value.copy(coverStatus = "Couvertures d'origine rétablies.")
+                }
 
                 // Lot 6, Palier B — carte Prononciation inline
                 is SettingsIntent.SavePronunciationRule -> savePronunciationRule(intent)
@@ -309,6 +318,19 @@ class SettingsViewModel @Inject constructor(
     }
 
     /** Lot 6, Palier B — n'est appelé qu'après confirmation côté UI (aucune action destructive sans elle). */
+    private suspend fun regenerateAllCovers() {
+        if (_state.value.coverRegeneration != null) return
+        _state.value = _state.value.copy(coverRegeneration = CoverProgress(0, 0), coverStatus = null)
+        val result = regenerateCovers { processed, total ->
+            _state.value = _state.value.copy(coverRegeneration = CoverProgress(processed, total))
+        }
+        val succeeded = result.processed - result.failed
+        _state.value = _state.value.copy(
+            coverRegeneration = null,
+            coverStatus = "Couvertures régénérées : $succeeded sur ${result.processed}.",
+        )
+    }
+
     private suspend fun clearCache() {
         _state.value = _state.value.copy(isClearingCache = true)
         withContext(ioDispatcher) {
