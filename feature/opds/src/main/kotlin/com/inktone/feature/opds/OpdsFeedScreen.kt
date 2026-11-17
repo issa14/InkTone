@@ -11,6 +11,14 @@ import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.setValue
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
+import androidx.compose.ui.semantics.onClick
+import androidx.compose.ui.semantics.semantics
+import androidx.compose.ui.text.style.TextAlign
+import androidx.compose.ui.graphics.Color
+import androidx.compose.material3.TextButton
+import androidx.compose.material3.ListItemDefaults
+import androidx.compose.material3.ListItem
+import androidx.compose.foundation.lazy.grid.GridItemSpan
 import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.aspectRatio
 import androidx.compose.foundation.layout.fillMaxSize
@@ -112,10 +120,12 @@ private fun FeedGrid(
     var detail by remember { mutableStateOf<OpdsItem.Book?>(null) }
 
     // Pagination — déclenche le chargement de la page suivante quand le
-    // dernier élément visible approche de la fin de la grille.
-    LaunchedEffect(gridState, state.items.size, state.nextPageUrl, state.isLoadingMore) {
+    // dernier élément visible approche de la fin de la grille. Après un
+    // échec, plus rien d'automatique : sinon chaque échec relance aussitôt
+    // la requête, en boucle tant que le réseau manque.
+    LaunchedEffect(gridState, state.items.size, state.nextPageUrl, state.isLoadingMore, state.error) {
         val nextPageUrl = state.nextPageUrl ?: return@LaunchedEffect
-        if (state.isLoadingMore) return@LaunchedEffect
+        if (state.isLoadingMore || state.error != null) return@LaunchedEffect
         snapshotFlow {
             val last = gridState.layoutInfo.visibleItemsInfo.lastOrNull()?.index ?: -1
             last >= gridState.layoutInfo.totalItemsCount - 3
@@ -132,16 +142,39 @@ private fun FeedGrid(
         verticalArrangement = Arrangement.spacedBy(12.dp),
         horizontalArrangement = Arrangement.spacedBy(12.dp),
     ) {
-        itemsIndexed(state.items, key = { index, item -> "$index:${itemKey(item)}" }) { _, item ->
+        itemsIndexed(
+            state.items,
+            key = { index, item -> "$index:${itemKey(item)}" },
+            // Un dossier mêlé aux couvertures flottait dans une rangée haute
+            // comme un livre : il prend toute la largeur, en ligne de liste.
+            span = { _, item -> GridItemSpan(if (item is OpdsItem.Navigation) maxLineSpan else 1) },
+        ) { _, item ->
             when (item) {
                 is OpdsItem.Navigation -> DirectoryCard(item, onOpenNavigation)
                 is OpdsItem.Book -> BookCard(item, state.catalogId, state.downloads[item.acquisitionHref], onDownloadBook, onOpenDetail = { detail = item })
             }
         }
         if (state.isLoadingMore) {
-            item(span = { androidx.compose.foundation.lazy.grid.GridItemSpan(maxLineSpan) }) {
+            item(span = { GridItemSpan(maxLineSpan) }) {
                 Box(Modifier.fillMaxWidth().padding(16.dp), contentAlignment = Alignment.Center) {
                     CircularProgressIndicator()
+                }
+            }
+        }
+        val nextPageUrl = state.nextPageUrl
+        if (state.error != null && nextPageUrl != null && !state.isLoadingMore) {
+            item(span = { GridItemSpan(maxLineSpan) }) {
+                Column(
+                    Modifier.fillMaxWidth().padding(16.dp),
+                    horizontalAlignment = Alignment.CenterHorizontally,
+                ) {
+                    Text(
+                        "La suite de la liste n'a pas pu être chargée.",
+                        style = MaterialTheme.typography.bodyMedium,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                        textAlign = TextAlign.Center,
+                    )
+                    TextButton(onClick = { onLoadNextPage(nextPageUrl) }) { Text("Réessayer") }
                 }
             }
         }
@@ -169,22 +202,12 @@ private fun DirectoryCard(
     onOpenNavigation: (OpdsItem.Navigation) -> Unit,
 ) {
     Card(onClick = { onOpenNavigation(item) }) {
-        Column(
-            Modifier.fillMaxWidth().padding(16.dp),
-            horizontalAlignment = Alignment.CenterHorizontally,
-            verticalArrangement = Arrangement.Center,
-        ) {
-            AppIcon(AppSymbol.Article, contentDescription = null)
-            Text(
-                item.title,
-                style = MaterialTheme.typography.titleSmall,
-                fontWeight = FontWeight.Medium,
-                maxLines = 2,
-                overflow = TextOverflow.Ellipsis,
-                textAlign = androidx.compose.ui.text.style.TextAlign.Center,
-                modifier = Modifier.padding(top = 8.dp),
-            )
-        }
+        ListItem(
+            headlineContent = { Text(item.title, maxLines = 2, overflow = TextOverflow.Ellipsis) },
+            leadingContent = { AppIcon(AppSymbol.Article, contentDescription = null) },
+            trailingContent = { AppIcon(AppSymbol.ChevronRight, contentDescription = null) },
+            colors = ListItemDefaults.colors(containerColor = Color.Transparent),
+        )
     }
 }
 
@@ -197,7 +220,12 @@ private fun BookCard(
     onOpenDetail: () -> Unit,
 ) {
     val coverUrl = item.coverUrl
-    Card(modifier = Modifier.clickable(onClickLabel = "Voir la fiche de ${item.title}", onClick = onOpenDetail)) {
+    // Card(onClick) et non clickable posé dessus : l'ondulation suit les coins
+    // arrondis et la carte réagit à l'appui.
+    Card(
+        onClick = onOpenDetail,
+        modifier = Modifier.semantics { onClick(label = "Voir la fiche de ${item.title}", action = null) },
+    ) {
         Column(Modifier.fillMaxWidth()) {
             if (coverUrl != null) {
                 AsyncImage(
@@ -215,23 +243,26 @@ private fun BookCard(
                 }
             }
             Column(Modifier.padding(12.dp)) {
+                // Hauteurs fixes en lignes : les cartes d'une rangée restent alignées
+                // quels que soient la longueur du titre et l'état du téléchargement.
                 Text(
                     item.title,
                     style = MaterialTheme.typography.titleSmall,
-                    fontWeight = FontWeight.Medium,
+                    minLines = 2,
                     maxLines = 2,
                     overflow = TextOverflow.Ellipsis,
                 )
-                if (item.authors.isNotEmpty()) {
-                    Text(
-                        item.authors.joinToString(", "),
-                        style = MaterialTheme.typography.bodySmall,
-                        color = MaterialTheme.colorScheme.onSurfaceVariant,
-                        maxLines = 1,
-                        overflow = TextOverflow.Ellipsis,
-                    )
+                Text(
+                    item.authors.joinToString(", "),
+                    style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    minLines = 1,
+                    maxLines = 1,
+                    overflow = TextOverflow.Ellipsis,
+                )
+                Box(Modifier.height(48.dp), contentAlignment = Alignment.CenterStart) {
+                    DownloadControl(item, download, onDownloadBook)
                 }
-                DownloadControl(item, download, onDownloadBook)
             }
         }
     }
@@ -245,7 +276,6 @@ private fun DownloadControl(
 ) {
     when (download) {
                     OpdsBookDownload.IN_PROGRESS -> Row(
-                        modifier = Modifier.padding(top = 8.dp),
                         verticalAlignment = Alignment.CenterVertically,
                         horizontalArrangement = Arrangement.spacedBy(8.dp),
                     ) {
@@ -256,7 +286,6 @@ private fun DownloadControl(
                         "Téléchargé",
                         style = MaterialTheme.typography.bodySmall,
                         color = MaterialTheme.colorScheme.primary,
-                        modifier = Modifier.padding(top = 8.dp),
                     )
                     null -> androidx.compose.material3.IconButton(onClick = { onDownloadBook(item) }) {
                         AppIcon(AppSymbol.Download, contentDescription = "Télécharger ${item.title}")

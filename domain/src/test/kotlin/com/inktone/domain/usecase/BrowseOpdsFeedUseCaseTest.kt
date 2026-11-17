@@ -4,6 +4,7 @@ import com.inktone.core.testing.fake.FakeOpdsCatalogRepository
 import com.inktone.domain.model.OpdsFeed
 import com.inktone.domain.service.OpdsDownloadResult
 import com.inktone.domain.service.OpdsFeedParser
+import com.inktone.domain.service.OpdsFailureReason
 import com.inktone.domain.service.OpdsFetchResult
 import com.inktone.domain.service.OpdsHttpClient
 import com.inktone.domain.service.OpdsParseResult
@@ -15,9 +16,9 @@ import org.junit.Test
 /** Lot 13, tâche 13.2.8 — non-régression du garde-fou anti-boucle de pagination (décision actée §14). */
 class BrowseOpdsFeedUseCaseTest {
 
-    private class FakeHttpClient : OpdsHttpClient {
+    private class FakeHttpClient(var failing: Boolean = false) : OpdsHttpClient {
         override suspend fun fetch(url: String, catalogId: String?): OpdsFetchResult =
-            OpdsFetchResult.Success("<feed/>", url)
+            if (failing) OpdsFetchResult.Failure(OpdsFailureReason.NOT_FOUND, "404") else OpdsFetchResult.Success("<feed/>", url)
 
         override suspend fun download(url: String, catalogId: String?): OpdsDownloadResult =
             OpdsDownloadResult.Success(ByteArray(0))
@@ -49,5 +50,17 @@ class BrowseOpdsFeedUseCaseTest {
 
         assertTrue(useCase("https://ex.com/a", null) is OpdsBrowseResult.Success)
         assertTrue(useCase("https://ex.com/a", null) is OpdsBrowseResult.Success)
+    }
+
+    @Test
+    fun loadNextPage_peut_reessayer_une_page_en_echec() = runTest {
+        val http = FakeHttpClient(failing = true)
+        val useCase = BrowseOpdsFeedUseCase(http, FakeParser(), FakeOpdsCatalogRepository())
+        useCase.resetSession()
+
+        assertTrue(useCase.loadNextPage("https://ex.com/page2", null) is OpdsBrowseResult.Failure)
+
+        http.failing = false
+        assertTrue(useCase.loadNextPage("https://ex.com/page2", null) is OpdsBrowseResult.Success)
     }
 }

@@ -212,7 +212,7 @@ class OpdsViewModel @Inject constructor(
     private fun loadNextPage(nextPageUrl: String) {
         val current = navigation.value as? OpdsUiState.Feed ?: return
         if (current.isLoadingMore) return
-        navigation.value = current.copy(isLoadingMore = true)
+        navigation.value = current.copy(isLoadingMore = true, error = null)
         viewModelScope.launch {
             when (val result = browse.loadNextPage(nextPageUrl, currentCatalogId)) {
                 is OpdsBrowseResult.Success -> {

@@ -43,7 +43,8 @@ class BrowseOpdsFeedUseCase(
     /** Pagination — un `nextPageUrl` déjà visité interrompt la pagination. */
     suspend fun loadNextPage(url: String, catalogId: String?): OpdsBrowseResult {
         if (!visitedUrls.add(url)) return OpdsBrowseResult.LoopDetected
-        return browse(url, catalogId)
+        // Une page en échec n'a pas été vue : la réessayer n'est pas une boucle.
+        return browse(url, catalogId).also { if (it is OpdsBrowseResult.Failure) visitedUrls.remove(url) }
     }
 
     private suspend fun browse(url: String, catalogId: String?): OpdsBrowseResult {

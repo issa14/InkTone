@@ -7,6 +7,11 @@ import com.inktone.core.testing.fake.FakeOpdsDownloadScheduler
 import com.inktone.core.testing.fake.FakeOpdsFeedParser
 import com.inktone.core.testing.fake.FakeOpdsHttpClient
 import com.inktone.domain.model.OpdsCatalog
+import com.inktone.domain.service.OpdsParseResult
+import com.inktone.domain.service.OpdsFailureReason
+import com.inktone.domain.service.OpdsFetchResult
+import com.inktone.domain.model.OpdsItem
+import com.inktone.domain.model.OpdsFeed
 import com.inktone.domain.service.OpdsDownloadEvent
 import com.inktone.domain.usecase.AddCatalogUseCase
 import com.inktone.domain.usecase.BrowseOpdsFeedUseCase
@@ -46,13 +51,15 @@ class OpdsViewModelTest {
     private fun viewModel(
         repo: FakeOpdsCatalogRepository,
         observer: FakeOpdsDownloadObserver = FakeOpdsDownloadObserver(),
+        http: FakeOpdsHttpClient = FakeOpdsHttpClient(),
+        parser: FakeOpdsFeedParser = FakeOpdsFeedParser(),
     ) = OpdsViewModel(
         getCatalogsUseCase = GetCatalogsUseCase(repo),
         addCatalog = AddCatalogUseCase(repo, FakeOpdsCredentialsStore()),
         removeCatalog = RemoveCatalogUseCase(repo, FakeOpdsCredentialsStore()),
         updateCatalog = UpdateCatalogUseCase(repo, FakeOpdsCredentialsStore()),
-        browse = BrowseOpdsFeedUseCase(FakeOpdsHttpClient(), FakeOpdsFeedParser(), repo),
-        search = SearchOpdsFeedUseCase(BrowseOpdsFeedUseCase(FakeOpdsHttpClient(), FakeOpdsFeedParser(), repo)),
+        browse = BrowseOpdsFeedUseCase(http, parser, repo),
+        search = SearchOpdsFeedUseCase(BrowseOpdsFeedUseCase(http, parser, repo)),
         downloadBook = DownloadOpdsBookUseCase(FakeOpdsDownloadScheduler()),
         downloadObserver = observer,
         httpClient = FakeOpdsHttpClient(),
@@ -140,5 +147,47 @@ class OpdsViewModelTest {
         )
         effectJob.cancel()
         job.cancel()
+    }
+
+    /** Audit UI P1-7 : un nouvel essai efface l'erreur, qui suspend la pagination automatique. */
+    @Test
+    fun un_nouvel_essai_de_page_suivante_efface_l_erreur_du_precedent() = runTest {
+        val repo = FakeOpdsCatalogRepository()
+        repo.add(catalog("cat-1"))
+        var nextPageFails = true
+        val http = FakeOpdsHttpClient(onFetch = { url, _ ->
+            if (url == NEXT_PAGE && nextPageFails) {
+                OpdsFetchResult.Failure(OpdsFailureReason.NOT_FOUND, "404")
+            } else {
+                OpdsFetchResult.Success(url, url)
+            }
+        })
+        val parser = FakeOpdsFeedParser(onParse = { body, _ ->
+            val item = OpdsItem.Navigation(title = body, href = "$body/item")
+            OpdsParseResult.Success(
+                OpdsFeed(title = "t", items = listOf(item), nextPageUrl = NEXT_PAGE.takeIf { body != NEXT_PAGE }, searchTemplateUrl = null),
+            )
+        })
+        val vm = viewModel(repo, http = http, parser = parser)
+        val job = collectState(vm)
+        vm.onIntent(OpdsIntent.OpenCatalog(catalog("cat-1")))
+        dispatcher.scheduler.advanceUntilIdle()
+
+        vm.onIntent(OpdsIntent.LoadNextPage(NEXT_PAGE))
+        dispatcher.scheduler.advanceUntilIdle()
+        assertTrue((vm.state.value as OpdsUiState.Feed).error != null)
+
+        nextPageFails = false
+        vm.onIntent(OpdsIntent.LoadNextPage(NEXT_PAGE))
+        dispatcher.scheduler.advanceUntilIdle()
+        val feed = vm.state.value as OpdsUiState.Feed
+        assertEquals(null, feed.error)
+        assertEquals(2, feed.items.size)
+
+        job.cancel()
+    }
+
+    private companion object {
+        const val NEXT_PAGE = "https://example.com/page2"
     }
 }
