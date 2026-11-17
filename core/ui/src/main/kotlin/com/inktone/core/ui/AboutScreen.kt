@@ -41,10 +41,8 @@ import androidx.compose.ui.platform.LocalClipboardManager
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalUriHandler
 import androidx.compose.ui.text.AnnotatedString
-import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
-import androidx.compose.ui.unit.sp
 import com.inktone.core.designsystem.AppIcon
 import com.inktone.core.designsystem.AppSymbol
 import com.inktone.core.designsystem.InkToneBrandMark
@@ -93,7 +91,7 @@ fun AboutScreen(
                 modifier = Modifier.size(64.dp),
             )
             Spacer(Modifier.height(12.dp))
-            Text("InkTone", color = MaterialTheme.colorScheme.onSurface, fontWeight = FontWeight.Bold, fontSize = 26.sp)
+            Text("InkTone", color = MaterialTheme.colorScheme.onSurface, style = MaterialTheme.typography.headlineMedium)
             Spacer(Modifier.height(6.dp))
             VersionBadge(
                 versionName = versionName,
@@ -141,7 +139,7 @@ fun AboutScreen(
             ArchitectureAccordion()
 
             Spacer(Modifier.height(16.dp))
-            Text("© ${java.time.Year.now().value} InkTone.", color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.6f), fontSize = 11.sp, textAlign = TextAlign.Center)
+            Text("© ${java.time.Year.now().value} InkTone.", color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.6f), style = MaterialTheme.typography.labelSmall, textAlign = TextAlign.Center)
             Spacer(Modifier.height(32.dp))
         }
 
@@ -174,7 +172,7 @@ private fun VersionBadge(
         Text(
             "v$versionName",
             color = MaterialTheme.colorScheme.onPrimaryContainer,
-            fontSize = 13.sp,
+            style = MaterialTheme.typography.bodySmall,
             modifier = Modifier
                 .combinedClickable(onClick = onClick, onLongClick = onLongClick)
                 .padding(horizontal = 14.dp, vertical = 6.dp),
@@ -222,8 +220,8 @@ private fun EngagementPillar(icon: AppSymbol, title: String, subtitle: String, m
         ) {
             AppIcon(icon, null, tint = MaterialTheme.colorScheme.primary, modifier = Modifier.size(22.dp))
             Spacer(Modifier.height(6.dp))
-            Text(title, color = MaterialTheme.colorScheme.onSurface, fontWeight = FontWeight.SemiBold, fontSize = 12.sp, textAlign = TextAlign.Center)
-            Text(subtitle, color = MaterialTheme.colorScheme.onSurfaceVariant, fontSize = 10.sp, textAlign = TextAlign.Center)
+            Text(title, color = MaterialTheme.colorScheme.onSurface, style = MaterialTheme.typography.labelLarge, textAlign = TextAlign.Center)
+            Text(subtitle, color = MaterialTheme.colorScheme.onSurfaceVariant, style = MaterialTheme.typography.labelSmall, textAlign = TextAlign.Center)
         }
     }
 }
@@ -252,8 +250,8 @@ private fun PrivacyPolicyCard() {
             AppIcon(AppSymbol.Lock, null, tint = MaterialTheme.colorScheme.onSurfaceVariant, modifier = Modifier.size(22.dp))
             Spacer(Modifier.width(12.dp))
             Column(Modifier.weight(1f)) {
-                Text("Politique de confidentialité", color = MaterialTheme.colorScheme.onSurface, fontWeight = FontWeight.SemiBold, fontSize = 14.sp)
-                Text("Ce qui reste sur l'appareil, et ce qui en sort", color = MaterialTheme.colorScheme.onSurfaceVariant, fontSize = 12.sp)
+                Text("Politique de confidentialité", color = MaterialTheme.colorScheme.onSurface, style = MaterialTheme.typography.titleSmall)
+                Text("Ce qui reste sur l'appareil, et ce qui en sort", color = MaterialTheme.colorScheme.onSurfaceVariant, style = MaterialTheme.typography.bodySmall)
             }
         }
     }
@@ -275,8 +273,8 @@ private fun GitHubCard() {
             AppIcon(AppSymbol.Article, null, tint = MaterialTheme.colorScheme.onSurfaceVariant, modifier = Modifier.size(22.dp))
             Spacer(Modifier.width(12.dp))
             Column(Modifier.weight(1f)) {
-                Text("Dépôt GitHub officiel", color = MaterialTheme.colorScheme.onSurface, fontWeight = FontWeight.SemiBold, fontSize = 14.sp)
-                Text("github.com/issa14/InkTone", color = MaterialTheme.colorScheme.onSurfaceVariant, fontSize = 12.sp)
+                Text("Dépôt GitHub officiel", color = MaterialTheme.colorScheme.onSurface, style = MaterialTheme.typography.titleSmall)
+                Text("github.com/issa14/InkTone", color = MaterialTheme.colorScheme.onSurfaceVariant, style = MaterialTheme.typography.bodySmall)
             }
         }
     }
@@ -298,8 +296,8 @@ private fun ReportProblemCard(onClick: () -> Unit) {
             AppIcon(AppSymbol.WarningAmber, null, tint = MaterialTheme.colorScheme.primary, modifier = Modifier.size(22.dp))
             Spacer(Modifier.width(12.dp))
             Column(Modifier.weight(1f)) {
-                Text("Signaler un problème", color = MaterialTheme.colorScheme.onSurface, fontWeight = FontWeight.SemiBold, fontSize = 14.sp)
-                Text("E-mail prérempli avec les informations de diagnostic", color = MaterialTheme.colorScheme.onSurfaceVariant, fontSize = 12.sp)
+                Text("Signaler un problème", color = MaterialTheme.colorScheme.onSurface, style = MaterialTheme.typography.titleSmall)
+                Text("E-mail prérempli avec les informations de diagnostic", color = MaterialTheme.colorScheme.onSurfaceVariant, style = MaterialTheme.typography.bodySmall)
             }
         }
     }
@@ -348,7 +346,7 @@ private fun ArchitectureAccordion() {
 @Composable
 private fun SectionHeader(text: String) {
     Row(modifier = Modifier.fillMaxWidth().padding(vertical = 6.dp)) {
-        Text(text, color = MaterialTheme.colorScheme.onSurface, fontWeight = FontWeight.SemiBold, fontSize = 14.sp)
+        Text(text, color = MaterialTheme.colorScheme.onSurface, style = MaterialTheme.typography.titleSmall)
     }
 }
 
@@ -365,7 +363,7 @@ private fun SectionHeader(
             .padding(horizontal = 20.dp, vertical = 14.dp),
         verticalAlignment = Alignment.CenterVertically,
     ) {
-        Text(text, color = MaterialTheme.colorScheme.onSurface, fontWeight = FontWeight.SemiBold, fontSize = 14.sp, modifier = Modifier.weight(1f))
+        Text(text, color = MaterialTheme.colorScheme.onSurface, style = MaterialTheme.typography.titleSmall, modifier = Modifier.weight(1f))
         trailing()
     }
 }
@@ -373,14 +371,14 @@ private fun SectionHeader(
 @Composable
 private fun InfoCard(text: String) {
     Card(colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface), shape = RoundedCornerShape(12.dp), modifier = Modifier.fillMaxWidth().padding(vertical = 3.dp)) {
-        Text(text, color = MaterialTheme.colorScheme.onSurfaceVariant, fontSize = 12.sp, lineHeight = 18.sp, textAlign = TextAlign.Justify, modifier = Modifier.padding(14.dp))
+        Text(text, color = MaterialTheme.colorScheme.onSurfaceVariant, style = MaterialTheme.typography.bodySmall, textAlign = TextAlign.Justify, modifier = Modifier.padding(14.dp))
     }
 }
 
 @Composable
 private fun LicenseRow(label: String, license: String, badgeColor: Color) {
     Row(modifier = Modifier.fillMaxWidth().padding(vertical = 6.dp), verticalAlignment = Alignment.CenterVertically) {
-        Text(label, color = MaterialTheme.colorScheme.onSurface, fontSize = 13.sp, modifier = Modifier.weight(1f))
+        Text(label, color = MaterialTheme.colorScheme.onSurface, style = MaterialTheme.typography.bodySmall, modifier = Modifier.weight(1f))
         Spacer(Modifier.width(8.dp))
         Box(
             modifier = Modifier
@@ -388,7 +386,7 @@ private fun LicenseRow(label: String, license: String, badgeColor: Color) {
                 .background(badgeColor)
                 .padding(horizontal = 8.dp, vertical = 3.dp),
         ) {
-            Text(license, color = Color.White, fontSize = 11.sp)
+            Text(license, color = Color.White, style = MaterialTheme.typography.labelSmall)
         }
     }
 }
