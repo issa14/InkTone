@@ -31,6 +31,12 @@ fun readerMarginFor(step: Int): Dp = when (step.coerceIn(UserPreferences.MARGIN_
     else -> 16.dp
 }
 
+/**
+ * Largeur maximale d'une ligne de texte, hors marges : à 18 sp, environ
+ * 70 caractères, dans la plage de confort de 45 à 75 (audit UI P1-5).
+ */
+val ReaderMaxMeasure: Dp = 640.dp
+
 /** Libellé du cran de marge, pour le panneau de réglages. */
 fun readerMarginLabel(step: Int): String = when (step.coerceIn(UserPreferences.MARGIN_STEP_RANGE)) {
     0 -> "Étroites"

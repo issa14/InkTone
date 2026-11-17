@@ -32,6 +32,8 @@ import androidx.compose.foundation.layout.ExperimentalLayoutApi
 import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.widthIn
+import androidx.compose.foundation.layout.wrapContentWidth
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.lazy.itemsIndexed
@@ -908,9 +910,16 @@ fun ReaderScreen(
             LocalImageLoader provides (epubImageLoader ?: LocalImageLoader.current),
             LocalLinkTapHandler provides onLinkTapped,
         ) {
+        // Colonne bornée et centrée sur écran large (audit UI P1-5). La borne
+        // s'applique à la zone mesurée elle-même : pagination et rendu en
+        // déduisent la même largeur. Une page PDF garde toute la largeur.
+        val maxAreaWidth = if (isPdf) Dp.Unspecified else ReaderMaxMeasure + readerMargin * 2
         Box(
             modifier = Modifier
                 .fillMaxSize()
+                .wrapContentWidth()
+                .widthIn(max = maxAreaWidth)
+                .fillMaxWidth()
                 .onGloballyPositioned { coordinates -> measuredAreaSize = coordinates.size },
         ) {
             // Pendant la narration seulement : la position vient du mot prononcé,
