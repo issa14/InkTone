@@ -83,6 +83,7 @@ import com.inktone.domain.model.Publication
 import com.inktone.domain.model.cleanedAuthorsForDisplay
 import com.inktone.domain.model.cleanedForDisplay
 import com.inktone.domain.service.ImportProgress
+import com.inktone.domain.service.SyncFailureReason
 import com.inktone.domain.service.SyncOperationResult
 import kotlinx.coroutines.launch
 
@@ -1161,9 +1162,17 @@ private fun ErrorState(message: String, onRetry: () -> Unit, onDismiss: () -> Un
     )
 }
 
-/** Message du résultat d'une synchronisation manuelle, avec le motif d'un échec. */
+/**
+ * Message du résultat d'une synchronisation manuelle. Le motif vient du type
+ * d'échec, jamais du texte technique du fournisseur (audit UI P1-13).
+ */
 internal fun syncResultMessage(result: SyncOperationResult): String = when (result) {
     is SyncOperationResult.Success -> "Synchronisation terminée"
-    is SyncOperationResult.Failed ->
-        if (result.message.isBlank()) "Échec de la synchronisation" else "Échec de la synchronisation : ${result.message}"
+    is SyncOperationResult.Failed -> when (result.reason) {
+        SyncFailureReason.INVALID_TOKEN -> "Échec de la synchronisation : reconnectez votre compte."
+        SyncFailureReason.QUOTA_EXCEEDED -> "Échec de la synchronisation : l'espace du compte est plein."
+        SyncFailureReason.NETWORK -> "Échec de la synchronisation : serveur injoignable."
+        SyncFailureReason.NOT_FOUND -> "Échec de la synchronisation : données introuvables sur le serveur."
+        SyncFailureReason.UNKNOWN -> "Échec de la synchronisation"
+    }
 }

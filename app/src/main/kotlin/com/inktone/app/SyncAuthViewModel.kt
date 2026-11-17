@@ -60,7 +60,7 @@ class SyncAuthViewModel @Inject constructor(
         viewModelScope.launch {
             when (val result = googleAuthRepository.handleAuthorizationResponse(intent)) {
                 is GoogleAuthResult.Success -> googleSyncLinker.link(accountLabel = "Compte Google connecté")
-                is GoogleAuthResult.Failed -> _authError.value = result.message
+                is GoogleAuthResult.Failed -> _authError.value = "La connexion à Google a échoué. Réessayez."
             }
             _isAuthenticating.value = false
         }
@@ -79,7 +79,7 @@ class SyncAuthViewModel @Inject constructor(
         viewModelScope.launch {
             when (val result = webDavSyncLinker.connect(url, username, password)) {
                 is WebDavSyncLinkResult.Success -> _webDavError.value = null
-                is WebDavSyncLinkResult.Failed -> _webDavError.value = result.message
+                is WebDavSyncLinkResult.Failed -> _webDavError.value = "La connexion au serveur WebDAV a échoué. Vérifiez l'adresse et les identifiants."
             }
             _isWebDavConnecting.value = false
         }

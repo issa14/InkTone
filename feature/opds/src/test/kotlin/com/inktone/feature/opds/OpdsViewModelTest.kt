@@ -175,7 +175,8 @@ class OpdsViewModelTest {
 
         vm.onIntent(OpdsIntent.LoadNextPage(NEXT_PAGE))
         dispatcher.scheduler.advanceUntilIdle()
-        assertTrue((vm.state.value as OpdsUiState.Feed).error != null)
+        // Message fermé, dérivé du motif : jamais le texte du client HTTP (P1-13).
+        assertEquals("Cette page du catalogue est introuvable.", (vm.state.value as OpdsUiState.Feed).error?.message)
 
         nextPageFails = false
         vm.onIntent(OpdsIntent.LoadNextPage(NEXT_PAGE))

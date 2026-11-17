@@ -332,11 +332,11 @@ class LibraryViewModelTest {
     }
 
     @Test
-    fun `le message d'une synchronisation en echec donne le motif`() {
+    fun `le message d'une synchronisation en echec donne le motif sans le texte technique`() {
         assertEquals("Synchronisation terminée", syncResultMessage(SyncOperationResult.Success))
         assertEquals(
-            "Échec de la synchronisation : Hors ligne",
-            syncResultMessage(SyncOperationResult.Failed(SyncFailureReason.NETWORK, "Hors ligne")),
+            "Échec de la synchronisation : serveur injoignable.",
+            syncResultMessage(SyncOperationResult.Failed(SyncFailureReason.NETWORK, "java.net.UnknownHostException: dav.example")),
         )
         assertEquals(
             "Échec de la synchronisation",

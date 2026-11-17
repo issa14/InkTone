@@ -93,6 +93,7 @@ class OpdsViewModel @Inject constructor(
                         _effects.emit(OpdsEffect.DownloadComplete(event.bookTitle, publicationId))
                     }
                 } else {
+                    // Cause déjà fermée et lisible (OpdsDownloadWorker.causeOf).
                     val cause = event.failureCause?.let { " : $it" }.orEmpty()
                     _effects.emit(OpdsEffect.ShowMessage("Échec du téléchargement de « ${event.bookTitle} »$cause"))
                 }
@@ -128,7 +129,7 @@ class OpdsViewModel @Inject constructor(
                     _effects.emit(OpdsEffect.ShowMessage("Téléchargement de « ${item.title} » démarré"))
                 }
                 is com.inktone.domain.usecase.DownloadOpdsBookResult.Failure ->
-                    _effects.emit(OpdsEffect.ShowMessage(result.message))
+                    _effects.emit(OpdsEffect.ShowMessage(opdsFailureMessage(result.reason)))
             }
         }
     }
@@ -199,7 +200,7 @@ class OpdsViewModel @Inject constructor(
                 }
                 is OpdsBrowseResult.Failure -> {
                     val s = navigation.value as? OpdsUiState.Feed ?: return@launch
-                    navigation.value = s.copy(isLoading = false, error = OpdsErrorUi(result.reason, result.message))
+                    navigation.value = s.copy(isLoading = false, error = OpdsErrorUi(result.reason, opdsFailureMessage(result.reason)))
                 }
                 OpdsBrowseResult.LoopDetected -> {
                     val s = navigation.value as? OpdsUiState.Feed ?: return@launch
@@ -229,7 +230,7 @@ class OpdsViewModel @Inject constructor(
                 }
                 is OpdsBrowseResult.Failure -> {
                     val s = navigation.value as? OpdsUiState.Feed ?: return@launch
-                    navigation.value = s.copy(isLoadingMore = false, error = OpdsErrorUi(result.reason, result.message))
+                    navigation.value = s.copy(isLoadingMore = false, error = OpdsErrorUi(result.reason, opdsFailureMessage(result.reason)))
                 }
             }
         }
@@ -263,7 +264,7 @@ class OpdsViewModel @Inject constructor(
                 }
                 is OpdsBrowseResult.Failure -> {
                     val s = navigation.value as? OpdsUiState.Feed ?: return@launch
-                    navigation.value = s.copy(isLoading = false, error = OpdsErrorUi(result.reason, result.message))
+                    navigation.value = s.copy(isLoading = false, error = OpdsErrorUi(result.reason, opdsFailureMessage(result.reason)))
                 }
             }
         }

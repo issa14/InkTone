@@ -275,7 +275,7 @@ class SettingsViewModel @Inject constructor(
             } catch (e: Exception) {
                 _state.value = _state.value.copy(
                     isPreviewing = false,
-                    previewError = e.message ?: "Impossible de lire l'extrait.",
+                    previewError = "L'extrait n'a pas pu être lu.",
                 )
             }
         }

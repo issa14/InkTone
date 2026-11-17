@@ -735,7 +735,7 @@ private fun VoiceDownloadRow(
             when (progress) {
                 is com.inktone.domain.service.VoiceDownloadProgress.InProgress ->
                     "Téléchargement : ${formatMegabytes(progress.bytesDownloaded)} / ${formatMegabytes(progress.totalBytes)}"
-                is com.inktone.domain.service.VoiceDownloadProgress.Failed -> "Échec : ${progress.message}"
+                is com.inktone.domain.service.VoiceDownloadProgress.Failed -> "Le téléchargement a échoué. Vérifiez la connexion et réessayez."
                 com.inktone.domain.service.VoiceDownloadProgress.Complete -> "Voix naturelle installée"
                 null -> "Voix naturelle (Jessica et Pierre) · 183 Mo"
             },

@@ -40,6 +40,20 @@ data class OpdsErrorUi(
     val message: String,
 )
 
+/**
+ * Message montré pour un échec OPDS : dérivé du motif, jamais du texte
+ * technique du client HTTP ou du parseur (audit UI P1-13).
+ */
+internal fun opdsFailureMessage(reason: OpdsFailureReason): String = when (reason) {
+    OpdsFailureReason.UNAUTHORIZED -> "Ce catalogue demande un nom d'utilisateur et un mot de passe valides."
+    OpdsFailureReason.NOT_FOUND -> "Cette page du catalogue est introuvable."
+    OpdsFailureReason.MALFORMED_FEED -> "Le catalogue a renvoyé une page illisible."
+    OpdsFailureReason.UNSUPPORTED_FORMAT -> "Ce format de livre n'est pas pris en charge."
+    OpdsFailureReason.NON_DOWNLOADABLE_ACQUISITION -> "Ce livre ne peut pas être téléchargé directement."
+    OpdsFailureReason.NETWORK -> "Le catalogue est injoignable. Vérifiez la connexion."
+    OpdsFailureReason.UNKNOWN -> "Le catalogue n'a pas pu être chargé."
+}
+
 sealed interface OpdsIntent {
     data class OpenCatalog(val catalog: OpdsCatalog) : OpdsIntent
     data class OpenNavigation(val item: OpdsItem.Navigation) : OpdsIntent

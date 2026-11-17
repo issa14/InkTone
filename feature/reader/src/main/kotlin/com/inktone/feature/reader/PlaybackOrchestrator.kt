@@ -683,7 +683,8 @@ class PlaybackOrchestrator @Inject constructor(
             throw e
         } catch (e: Exception) {
             if (isCurrent(generation)) {
-                _state.value = PlaybackStatus.Error(e.message ?: "Erreur de lecture")
+                Log.w("PlaybackOrchestrator", "narration interrompue", e)
+                _state.value = PlaybackStatus.Error("La narration s'est interrompue.")
             }
         } finally {
             producer.cancel()

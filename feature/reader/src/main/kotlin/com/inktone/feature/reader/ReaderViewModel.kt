@@ -966,17 +966,17 @@ class ReaderViewModel @Inject constructor(
                             }
                             is FixedPageOpenResult.Failed -> {
                                 Log.w("ReaderViewModel", "openPublication: echec ouverture rendu PDF (${openResult.reason})")
-                                _state.value = _state.value.copy(errorMessage = openResult.reason)
+                                _state.value = _state.value.copy(errorMessage = "Ce PDF n'a pas pu être ouvert.")
                             }
                         }
                     }
                 }
                 else -> {
+                    // Le détail technique va au journal ci-dessous, jamais à l'écran (audit UI P1-13).
                     val message = when (result) {
-                        is ParseResult.DrmProtected -> result.message
-                        is ParseResult.Corrupted -> result.message
-                        is ParseResult.UnsupportedFormat -> "Format non supporté : ${result.format}"
-                        else -> "Erreur de parsing inconnue."
+                        is ParseResult.DrmProtected -> "Ce livre est protégé par DRM : il ne peut pas être ouvert."
+                        is ParseResult.UnsupportedFormat -> "Ce format de fichier n'est pas pris en charge."
+                        else -> "Ce livre n'a pas pu être ouvert. Le fichier est peut-être endommagé."
                     }
                     Log.w("ReaderViewModel", "openPublication: echec de parsing ($result)")
                     _state.value = _state.value.copy(errorMessage = message)

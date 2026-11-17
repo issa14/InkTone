@@ -190,7 +190,7 @@ class StatisticsViewModel @Inject constructor(
                 }
                 _effects.send(ExportEvent.Share(file, format))
             } catch (e: Exception) {
-                _effects.send(ExportEvent.Error(e.localizedMessage ?: "Erreur d'exportation"))
+                _effects.send(ExportEvent.Error("L'export n'a pas pu être créé."))
             }
         }
     }

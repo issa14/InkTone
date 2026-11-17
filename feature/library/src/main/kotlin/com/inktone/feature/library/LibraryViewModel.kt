@@ -299,7 +299,7 @@ class LibraryViewModel @Inject constructor(
                 .catch { e ->
                     _state.value = _state.value.copy(
                         isLoading = false,
-                        errorMessage = e.message ?: "Erreur de chargement de la bibliothèque",
+                        errorMessage = "La bibliothèque n'a pas pu être chargée.",
                     )
                 }
                 .collect { (publications, readingStates) ->

@@ -637,7 +637,7 @@ class SettingsViewModelTest {
         dispatcher.scheduler.advanceUntilIdle()
 
         assertEquals(false, vm.state.value.isPreviewing)
-        assertEquals("moteur indisponible", vm.state.value.previewError)
+        assertEquals("L'extrait n'a pas pu être lu.", vm.state.value.previewError)
     }
 
     /** Faux lecteur gapless — enregistre les appels, aucun matériel audio. */

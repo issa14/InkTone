@@ -180,9 +180,10 @@ private fun ImportResultRow(
                 maxLines = 1,
                 overflow = TextOverflow.Ellipsis,
             )
-            if (entry.message != null) {
+            val reason = importFailureReason(entry.resultType)
+            if (reason != null) {
                 Text(
-                    text = entry.message!!,
+                    text = reason,
                     style = MaterialTheme.typography.bodySmall,
                     color = MaterialTheme.colorScheme.onSurfaceVariant,
                     maxLines = 2,
@@ -200,4 +201,15 @@ private fun ImportResultRow(
             }
         }
     }
+}
+
+/**
+ * Motif d'échec d'un fichier importé, lisible par tous : le message stocké
+ * vient du parseur (chemin, exception) et ne s'affiche pas (audit UI P1-13).
+ */
+internal fun importFailureReason(resultType: String): String? = when (resultType) {
+    "drm_protected" -> "Protégé par DRM : ne peut pas être ouvert."
+    "corrupted" -> "Fichier endommagé ou illisible."
+    "unsupported_format" -> "Format non pris en charge."
+    else -> null
 }
