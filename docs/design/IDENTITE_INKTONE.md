@@ -165,6 +165,7 @@ décroissantes dans chaque famille (vérifié par test) :
 |---|---|---|
 | Titre d'écran (barre d'application) | `titleLarge` | défaut |
 | Titre de feuille, de panneau | `titleLarge` | défaut |
+| En-tête d'une feuille d'actions (menu sur un objet) | `titleMedium` | défaut |
 | Titre de section | `InkToneSectionHeader` (`titleSmall`) | `primary` |
 | Titre de carte | `titleMedium` | défaut |
 | Titre d'une ligne de liste (livre, réglage) | `titleSmall`, ou `bodyLarge` dans un `ListItem` | défaut |

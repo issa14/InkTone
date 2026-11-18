@@ -114,9 +114,9 @@ Relevé (`grep` du rôle par appel `Text`, 2026-11-18) :
   `BookmarkPanel.kt:177` (Signets et notes), `SleepTimerPanel.kt:100`
   (Minuteur de sommeil), `TableOfContentsSheet.kt:111` (Table des matières).
   Déjà en `titleLarge` : conflit de synchro, édition de catalogue, fiche livre.
-- **En-têtes de feuille en `labelLarge`** : `LibraryScreen.kt:592`
-  (« Bibliothèque », feuille Actions), `BookActionsSheet.kt:66` (titre du livre,
-  feuille d'actions) — à aligner sur la règle (titre de feuille).
+- **En-têtes de feuille d'actions en `labelLarge` → `titleMedium`** :
+  `LibraryScreen.kt:592` (« Bibliothèque », feuille Actions),
+  `BookActionsSheet.kt:66` (titre du livre).
 - **Titres de section hors `InkToneSectionHeader`** :
   `ThemeGalleryScreen.kt:95,108,123` (Ambiances de lecture, Confort et
   accessibilité, Mes thèmes personnalisés), `SettingsScreen.kt` en-tête
@@ -183,5 +183,6 @@ passe en police système maximale.
 ## Écarts et décisions à confirmer par Issa
 
 - ~~Emplacement de la règle~~ : `IDENTITE_INKTONE.md` § 3.3 (tranché par Issa).
-- Titre de la feuille d'actions d'un livre : `titleLarge` (règle) ou garder
-  un en-tête plus discret, la feuille étant courte.
+- ~~Titre de la feuille d'actions d'un livre~~ : `titleMedium`, rôle d'en-tête
+  de feuille d'actions ajouté à la règle (Issa a délégué la décision) — une
+  feuille de menu nomme l'objet, elle ne titre pas un contenu.
