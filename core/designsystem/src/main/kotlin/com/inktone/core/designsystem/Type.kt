@@ -57,20 +57,25 @@ val NarrativeAccentFamily = FontFamily(
 
 // --- Typographie chrome ---
 
-/** Typographie du chrome de l'app (Sous-lot 2b — Work Sans intégral). */
+/**
+ * Typographie du chrome de l'app (Sous-lot 2b — Work Sans intégral). Tailles
+ * Material 3 : l'échelle de corps recopiée de celle de la lecture (16/16/14)
+ * écrasait la hiérarchie, un titre de ligne passant sous le texte courant
+ * (IDENTITE_INKTONE.md § 3.3, TypographyScaleTest).
+ */
 val InkToneTypography = Typography(
     displayLarge = TextStyle(fontFamily = WorkSansFamily, fontWeight = FontWeight.Bold, fontSize = 32.sp, lineHeight = 40.sp),
     displayMedium = TextStyle(fontFamily = WorkSansFamily, fontWeight = FontWeight.Bold, fontSize = 28.sp, lineHeight = 36.sp),
     displaySmall = TextStyle(fontFamily = WorkSansFamily, fontWeight = FontWeight.Bold, fontSize = 24.sp, lineHeight = 32.sp),
-    headlineLarge = TextStyle(fontFamily = WorkSansFamily, fontWeight = FontWeight.SemiBold, fontSize = 28.sp, lineHeight = 36.sp),
-    headlineMedium = TextStyle(fontFamily = WorkSansFamily, fontWeight = FontWeight.SemiBold, fontSize = 24.sp, lineHeight = 32.sp),
-    headlineSmall = TextStyle(fontFamily = WorkSansFamily, fontWeight = FontWeight.SemiBold, fontSize = 20.sp, lineHeight = 28.sp),
-    titleLarge = TextStyle(fontFamily = WorkSansFamily, fontWeight = FontWeight.Medium, fontSize = 20.sp, lineHeight = 28.sp),
+    headlineLarge = TextStyle(fontFamily = WorkSansFamily, fontWeight = FontWeight.SemiBold, fontSize = 32.sp, lineHeight = 40.sp),
+    headlineMedium = TextStyle(fontFamily = WorkSansFamily, fontWeight = FontWeight.SemiBold, fontSize = 28.sp, lineHeight = 36.sp),
+    headlineSmall = TextStyle(fontFamily = WorkSansFamily, fontWeight = FontWeight.SemiBold, fontSize = 24.sp, lineHeight = 32.sp),
+    titleLarge = TextStyle(fontFamily = WorkSansFamily, fontWeight = FontWeight.Medium, fontSize = 22.sp, lineHeight = 28.sp),
     titleMedium = TextStyle(fontFamily = WorkSansFamily, fontWeight = FontWeight.Medium, fontSize = 16.sp, lineHeight = 24.sp),
     titleSmall = TextStyle(fontFamily = WorkSansFamily, fontWeight = FontWeight.Medium, fontSize = 14.sp, lineHeight = 20.sp),
     bodyLarge = TextStyle(fontFamily = WorkSansFamily, fontWeight = FontWeight.Normal, fontSize = 16.sp, lineHeight = 24.sp, letterSpacing = 0.15.sp),
-    bodyMedium = TextStyle(fontFamily = WorkSansFamily, fontWeight = FontWeight.Normal, fontSize = 16.sp, lineHeight = 24.sp, letterSpacing = 0.25.sp),
-    bodySmall = TextStyle(fontFamily = WorkSansFamily, fontWeight = FontWeight.Normal, fontSize = 14.sp, lineHeight = 20.sp, letterSpacing = 0.4.sp),
+    bodyMedium = TextStyle(fontFamily = WorkSansFamily, fontWeight = FontWeight.Normal, fontSize = 14.sp, lineHeight = 20.sp, letterSpacing = 0.25.sp),
+    bodySmall = TextStyle(fontFamily = WorkSansFamily, fontWeight = FontWeight.Normal, fontSize = 12.sp, lineHeight = 16.sp, letterSpacing = 0.4.sp),
     labelLarge = TextStyle(fontFamily = WorkSansFamily, fontWeight = FontWeight.Medium, fontSize = 14.sp, lineHeight = 20.sp),
     labelMedium = TextStyle(fontFamily = WorkSansFamily, fontWeight = FontWeight.Medium, fontSize = 12.sp, lineHeight = 16.sp),
     // 11 sp : minimum Material 3 ; ce style porte la ligne de statut et les axes des graphiques.
