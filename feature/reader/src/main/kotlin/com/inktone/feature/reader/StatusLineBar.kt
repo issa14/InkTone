@@ -27,6 +27,7 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.layout.onSizeChanged
 import androidx.compose.ui.platform.LocalLifecycleOwner
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.Lifecycle
@@ -59,6 +60,9 @@ fun StatusLineBar(
     isFixedPage: Boolean = false,
     contentColor: Color = MaterialTheme.colorScheme.onSurface,
     backgroundColor: Color = Color.Transparent,
+    // Hauteur de la bande hors barre de navigation : le Lecteur la retire de
+    // la zone de lecture (audit UI P1-4).
+    onBandHeightChanged: (Int) -> Unit = {},
 ) {
     val timeText by rememberAlignedClockText()
 
@@ -72,6 +76,9 @@ fun StatusLineBar(
             // posée en BAS : ~44 px de vide au-dessus du texte, soit une
             // bande deux fois trop haute.
             .windowInsetsPadding(WindowInsets.displayCutout.only(WindowInsetsSides.Horizontal))
+            // Mesurée sous les insets : la barre de navigation, qui n'apparaît
+            // que le temps d'un balayage, ne doit pas relancer la pagination.
+            .onSizeChanged { onBandHeightChanged(it.height) }
             .padding(horizontal = 16.dp, vertical = 6.dp),
         horizontalArrangement = Arrangement.SpaceBetween,
         verticalAlignment = Alignment.CenterVertically,

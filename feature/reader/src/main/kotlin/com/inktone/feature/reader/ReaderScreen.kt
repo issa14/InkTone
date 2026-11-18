@@ -26,6 +26,11 @@ import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.interaction.MutableInteractionSource
 import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.windowInsetsPadding
+import androidx.compose.foundation.layout.only
+import androidx.compose.foundation.layout.displayCutout
+import androidx.compose.foundation.layout.WindowInsetsSides
+import androidx.compose.foundation.layout.WindowInsets
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.ExperimentalLayoutApi
 import androidx.compose.foundation.layout.PaddingValues
@@ -725,6 +730,10 @@ fun ReaderScreen(
         // zéro si la première mesure tombait avant que le Lecteur soit
         // reconnu au premier plan — mode paginé vide jusqu'à la relayout
         // suivante (masquage du HUD, ~4 s).
+        // Bande de la ligne de statut, superposée en bas : retirée de la zone
+        // de lecture pour que la dernière ligne d'une page ne passe pas
+        // dessous (audit UI P1-4).
+        var statusLineHeightPx by remember { mutableIntStateOf(0) }
         val frozenAreaSize = remember(isForeground) { if (isForeground) null else measuredAreaSize }
         val readingAreaSize = frozenAreaSize ?: measuredAreaSize
         // P4 — marge latérale réglable. UNE seule valeur, consommée à la fois
@@ -919,6 +928,13 @@ fun ReaderScreen(
                 .wrapContentWidth()
                 .widthIn(max = maxAreaWidth)
                 .fillMaxWidth()
+                // Encoche : le mode immersif masque la barre système, pas la
+                // caméra. Réserves prises avant la mesure, donc communes à la
+                // pagination et au rendu (audit UI P1-4).
+                .windowInsetsPadding(
+                    WindowInsets.displayCutout.only(WindowInsetsSides.Top + WindowInsetsSides.Horizontal),
+                )
+                .padding(bottom = with(density) { statusLineHeightPx.toDp() })
                 .onGloballyPositioned { coordinates -> measuredAreaSize = coordinates.size },
         ) {
             // Pendant la narration seulement : la position vient du mot prononcé,
@@ -1568,6 +1584,7 @@ SelectionActionPopup(
                             isFixedPage = isPdf,
                             contentColor = ThemeColors.barContent(state.resolvedTheme),
                             backgroundColor = ThemeColors.barSurface(state.resolvedTheme),
+                            onBandHeightChanged = { statusLineHeightPx = it },
                         )
                     }
                 }

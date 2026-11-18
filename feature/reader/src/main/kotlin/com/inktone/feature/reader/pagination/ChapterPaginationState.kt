@@ -206,9 +206,8 @@ fun paginationStyleKeyFrom(
  * `hauteurViewport − paddingHaut − paddingBas`, appliquée à la **même**
  * mesure (le `Box` partagé sous `ReaderScreen`, capturé une seule fois
  * au même endroit de l'arborescence pour scroll et pagé). La ligne de
- * statut persistante (3b.4) étant un sibling de ce `Box` dans la
- * `Column`, elle réduit déjà sa hauteur mesurée avant même que ce calcul
- * s'exécute — pas de soustraction supplémentaire à faire ici pour elle.
+ * statut superposée et l'encoche sont retirées de ce `Box` par padding
+ * avant sa mesure : pas de soustraction supplémentaire à faire ici.
  */
 @Composable
 fun rememberChapterPaginationState(
