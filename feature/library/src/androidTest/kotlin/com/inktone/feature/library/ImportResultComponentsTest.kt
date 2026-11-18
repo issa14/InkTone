@@ -121,7 +121,9 @@ class ImportResultComponentsTest {
 
         composeTestRule.onNodeWithText("mon-livre.epub").assertIsDisplayed()
         composeTestRule.onNodeWithText("autre.epub").assertIsDisplayed()
-        composeTestRule.onNodeWithText("Echec de lecture").assertIsDisplayed()
+        // Motif fermé, jamais le message brut du parseur (audit UI P1-13).
+        composeTestRule.onNodeWithText("Fichier endommagé ou illisible.").assertIsDisplayed()
+        composeTestRule.onNodeWithText("Echec de lecture").assertDoesNotExist()
     }
 
     @Test
@@ -161,6 +163,6 @@ class ImportResultComponentsTest {
         composeTestRule.onNodeWithText("Réessayer").assertDoesNotExist()
 
         // La raison reste lisible même sur un cas non réessayable
-        composeTestRule.onNodeWithText("Format non pris en charge : XYZ").assertIsDisplayed()
+        composeTestRule.onNodeWithText("Format non pris en charge.").assertIsDisplayed()
     }
 }

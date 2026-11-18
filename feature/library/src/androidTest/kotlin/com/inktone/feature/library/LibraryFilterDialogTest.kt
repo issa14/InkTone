@@ -64,7 +64,8 @@ class LibraryFilterDialogTest {
             }
         }
 
-        composeTestRule.onNodeWithContentDescription("Liste").performClick()
+        // Le libellé porte le choix ; l'icône voisine n'a pas de description.
+        composeTestRule.onNodeWithText("Liste").performClick()
 
         assertEquals(LibraryLayoutMode.LIST, received)
     }
