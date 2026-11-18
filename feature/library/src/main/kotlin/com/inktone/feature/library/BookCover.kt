@@ -24,6 +24,7 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import android.graphics.Bitmap
 import com.inktone.core.designsystem.rememberAppHaptics
 import androidx.compose.foundation.combinedClickable
 import androidx.compose.foundation.shape.RoundedCornerShape
@@ -34,6 +35,7 @@ import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.semantics
@@ -41,6 +43,7 @@ import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import coil.compose.AsyncImage
+import coil.compose.AsyncImagePainter
 import coil.request.ImageRequest
 import com.inktone.core.designsystem.AppIcon
 import com.inktone.core.designsystem.AppSymbol
@@ -95,6 +98,11 @@ fun BookCover(
     var showDeleteConfirm by remember { mutableStateOf(false) }
 
     val context = LocalContext.current
+    val density = LocalDensity.current
+    val coverDecodeSize = remember(density) {
+        val width = with(density) { CoverDecodeWidth.roundToPx() }
+        width to (width / 0.7f).toInt()
+    }
     // E.3 — Support content:// URI (SAF) en plus de file://
     //
     // AUDIT_REACTIVITE_UX §4.6 — `File(...).exists()` était évalué en
@@ -150,27 +158,35 @@ fun BookCover(
                 },
             ),
     ) {
-        if (coverModel != null) {
-            // AUDIT_REACTIVITE_UX §4.7 — `SubcomposeAsyncImage` subcompose
-            // ses emplacements `loading`/`error`, coût payé par vignette ;
-            // ici les deux affichaient de toute façon le même
-            // `CoverPlaceholder`, qui n'achetait rien. Le dégradé de repli
-            // reste dessous en permanence (chargement ET erreur, y compris
-            // le fichier absent de §4.6 ci-dessus) ; `AsyncImage` le
-            // recouvre seulement une fois l'image effectivement décodée.
+        // Dégradé titré seulement pour un livre sans couverture lisible : pendant
+        // un chargement il passait pour une autre couverture, qui « disparaissait »
+        // au défilement. Un fond uni attend l'image, qui s'y pose en fondu.
+        var coverFailed by remember(coverModel) { mutableStateOf(false) }
+        if (coverModel == null || coverFailed) {
             CoverPlaceholder(title = publication.title, showTitle = !showTitle)
+        } else {
+            Box(Modifier.fillMaxSize().background(MaterialTheme.colorScheme.surfaceVariant))
             AsyncImage(
                 model = ImageRequest.Builder(context)
                     .data(coverModel)
+                    // Taille connue d'avance : sans elle, Coil attend la mise en
+                    // page pour consulter son cache, et une couverture déjà en
+                    // mémoire laissait voir le fond une image (≈ 15 ms) à chaque
+                    // retour à l'écran. Celle d'une cellule, pas plus.
+                    .size(coverDecodeSize.first, coverDecodeSize.second)
+                    // Sans transparence, une couverture tient en RGB 565 : deux
+                    // fois plus de couvertures dans le cache mémoire, donc moins
+                    // de relectures de fichier au retour d'un défilement.
+                    .bitmapConfig(Bitmap.Config.RGB_565)
+                    .allowHardware(false)
                     .crossfade(true)
                     .build(),
                 // Le titre est déjà porté par la sémantique de la couverture.
                 contentDescription = null,
                 contentScale = ContentScale.Crop,
                 modifier = Modifier.fillMaxSize(),
+                onState = { st -> if (st is AsyncImagePainter.State.Error) coverFailed = true },
             )
-        } else {
-            CoverPlaceholder(title = publication.title, showTitle = !showTitle)
         }
 
         // Badge de progression — coin inférieur droit
@@ -365,6 +381,9 @@ private val CoverGradientPalette = listOf(
     Color(0xFF283593) to Color(0xFF3949AB), // Indigo
     Color(0xFF4E342E) to Color(0xFF6D4C41), // Brun
 )
+
+/** Largeur de décodage : celle d'une cellule de grille (`GridCells.Adaptive(120.dp)`). */
+private val CoverDecodeWidth = 120.dp
 
 private val PlaceholderVeil = Brush.verticalGradient(listOf(Color.Transparent, Color.Black.copy(alpha = 0.35f)))
 
