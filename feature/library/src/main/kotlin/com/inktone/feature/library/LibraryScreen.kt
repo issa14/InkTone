@@ -2,6 +2,7 @@ package com.inktone.feature.library
 
 import com.inktone.core.designsystem.InkToneSpacing
 
+import com.inktone.core.designsystem.InkToneTextField
 import com.inktone.core.designsystem.emphasized
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
@@ -477,6 +478,8 @@ internal fun LibraryTopBar(
         TopAppBar(
             title = {
                 TextField(
+                    shape = InkToneTextField.searchShape,
+                    colors = InkToneTextField.searchColors(),
                     value = searchQuery,
                     onValueChange = onSearchQueryChange,
                     modifier = Modifier.fillMaxWidth().focusRequester(searchFocusRequester),

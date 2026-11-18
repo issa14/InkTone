@@ -21,7 +21,7 @@ import androidx.compose.material3.FilterChip
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
-import androidx.compose.material3.TextField
+import androidx.compose.material3.OutlinedTextField
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableFloatStateOf
@@ -43,6 +43,7 @@ import androidx.compose.ui.unit.dp
 import com.inktone.core.designsystem.AppIcon
 import com.inktone.core.designsystem.AppSymbol
 import com.inktone.core.designsystem.InkToneSlider
+import com.inktone.core.designsystem.InkToneTextField
 import com.inktone.domain.model.AnnotationColor
 import com.inktone.domain.model.AnnotationKind
 
@@ -238,7 +239,8 @@ private fun CustomColorDialog(onConfirm: (AnnotationColor) -> Unit, onDismiss: (
                 // Lot 23 (corrigé) — chemin avancé optionnel : une saisie
                 // hex valide met à jour les curseurs, jamais l'inverse (les
                 // curseurs restent la seule source de vérité affichée).
-                TextField(
+                OutlinedTextField(
+                    shape = InkToneTextField.shape,
                     value = hex,
                     onValueChange = { typed ->
                         hex = typed

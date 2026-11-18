@@ -38,6 +38,7 @@ import androidx.compose.ui.unit.dp
 import androidx.hilt.navigation.compose.hiltViewModel
 import com.inktone.core.designsystem.AppIcon
 import com.inktone.core.designsystem.AppSymbol
+import com.inktone.core.designsystem.InkToneTextField
 
 /**
  * Écran de détail Séries/Tags (UX §Menu déroulant du titre, écran de
@@ -85,6 +86,8 @@ fun LibraryDetailScreen(
                 TopAppBar(
                     title = {
                         TextField(
+                            shape = InkToneTextField.searchShape,
+                            colors = InkToneTextField.searchColors(),
                             value = state.searchQuery,
                             onValueChange = { viewModel.onIntent(LibraryDetailIntent.SetSearchQuery(it)) },
                             modifier = Modifier.fillMaxWidth().focusRequester(searchFocusRequester),

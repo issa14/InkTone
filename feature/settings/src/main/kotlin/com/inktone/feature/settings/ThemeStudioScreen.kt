@@ -37,7 +37,6 @@ import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
-import androidx.compose.material3.TextField
 import androidx.compose.material3.TopAppBar
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
@@ -52,6 +51,7 @@ import androidx.compose.ui.draw.clip
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.hilt.navigation.compose.hiltViewModel
+import com.inktone.core.designsystem.InkToneTextField
 import com.inktone.core.designsystem.toColor
 
 /**
@@ -109,6 +109,7 @@ fun ThemeStudioScreen(
             ) {
                 item {
                     OutlinedTextField(
+                        shape = InkToneTextField.shape,
                         value = state.name,
                         onValueChange = { viewModel.onIntent(ThemeStudioIntent.SetName(it)) },
                         label = { Text("Nom du thème") },
@@ -356,7 +357,8 @@ private fun ColorPickerDialog(initialHex: String, onDismiss: () -> Unit, onConfi
                     }
                 }
                 Spacer(Modifier.height(InkToneSpacing.lg))
-                TextField(
+                OutlinedTextField(
+                    shape = InkToneTextField.shape,
                     value = draft,
                     onValueChange = { draft = it },
                     label = { Text("Valeur hexadécimale") },

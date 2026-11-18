@@ -38,6 +38,7 @@ import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.buildAnnotatedString
 import androidx.compose.ui.unit.dp
 import androidx.hilt.navigation.compose.hiltViewModel
+import com.inktone.core.designsystem.InkToneTextField
 import com.inktone.domain.service.SearchResult
 import java.text.Normalizer
 import java.util.Locale
@@ -77,6 +78,8 @@ fun SearchScreen(
     Column(Modifier.fillMaxSize().padding(InkToneSpacing.lg)) {
         // D.6 / E.2 — champ de recherche avec bouton effacer et label accessible
         TextField(
+            shape = InkToneTextField.searchShape,
+            colors = InkToneTextField.searchColors(),
             value = state.query,
             onValueChange = { viewModel.onIntent(SearchIntent.QueryChanged(it)) },
             // Le titre de la barre dit déjà où l'on cherche : pas d'étiquette qui le répète.

@@ -6,6 +6,7 @@ import com.inktone.core.designsystem.InkToneSectionHeader
 
 import com.inktone.core.designsystem.AppIcon
 import com.inktone.core.designsystem.AppSymbol
+import com.inktone.core.designsystem.InkToneTextField
 import com.inktone.core.designsystem.InkToneTopBar
 import androidx.compose.animation.AnimatedContent
 import androidx.compose.animation.EnterTransition
@@ -388,6 +389,7 @@ private fun WebDavCard(
                     Spacer(Modifier.height(InkToneSpacing.sm))
                 }
                 OutlinedTextField(
+                    shape = InkToneTextField.shape,
                     value = url,
                     onValueChange = { url = it },
                     label = { Text("Adresse du serveur") },
@@ -398,6 +400,7 @@ private fun WebDavCard(
                 )
                 Spacer(Modifier.height(InkToneSpacing.sm))
                 OutlinedTextField(
+                    shape = InkToneTextField.shape,
                     value = username,
                     onValueChange = { username = it },
                     label = { Text("Identifiant") },
@@ -407,6 +410,7 @@ private fun WebDavCard(
                 )
                 Spacer(Modifier.height(InkToneSpacing.sm))
                 OutlinedTextField(
+                    shape = InkToneTextField.shape,
                     value = password,
                     onValueChange = { password = it },
                     label = { Text("Mot de passe") },

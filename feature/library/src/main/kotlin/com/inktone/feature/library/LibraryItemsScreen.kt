@@ -2,6 +2,7 @@ package com.inktone.feature.library
 
 import com.inktone.core.designsystem.InkToneSpacing
 
+import com.inktone.core.designsystem.InkToneTextField
 import com.inktone.core.designsystem.annotationMarkerColor
 
 import androidx.compose.foundation.ExperimentalFoundationApi
@@ -117,6 +118,8 @@ fun LibraryItemsScreen(
                             if (state.searchQuery.isEmpty()) searchFocusRequester.requestFocus()
                         }
                         TextField(
+                            shape = InkToneTextField.searchShape,
+                            colors = InkToneTextField.searchColors(),
                             value = state.searchQuery,
                             onValueChange = { viewModel.onIntent(LibraryItemsIntent.SetSearchQuery(it)) },
                             modifier = Modifier.fillMaxWidth().focusRequester(searchFocusRequester),

@@ -19,6 +19,7 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.text.input.PasswordVisualTransformation
 import androidx.compose.ui.text.input.VisualTransformation
+import com.inktone.core.designsystem.InkToneTextField
 
 /**
  * Invite de mot de passe pour l'export/import chiffré du fichier local
@@ -44,6 +45,7 @@ fun BackupPasswordDialog(
         text = {
             Column {
                 OutlinedTextField(
+                    shape = InkToneTextField.shape,
                     value = password,
                     onValueChange = { password = it },
                     label = { Text("Mot de passe") },

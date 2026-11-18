@@ -56,6 +56,7 @@ import androidx.compose.ui.unit.dp
 import androidx.hilt.navigation.compose.hiltViewModel
 import com.inktone.core.designsystem.AppIcon
 import com.inktone.core.designsystem.AppSymbol
+import com.inktone.core.designsystem.InkToneTextField
 import com.inktone.core.designsystem.InkToneTopBar
 import com.inktone.core.designsystem.InkToneEmptyState
 import com.inktone.domain.model.OpdsCatalog
@@ -195,6 +196,7 @@ fun CatalogDashboardScreen(
             title = { Text("Rechercher") },
             text = {
                 OutlinedTextField(
+                    shape = InkToneTextField.shape,
                     value = searchQuery,
                     onValueChange = { searchQuery = it },
                     singleLine = true,
@@ -429,6 +431,7 @@ private fun AddCatalogBottomSheet(
             }
 
             OutlinedTextField(
+                shape = InkToneTextField.shape,
                 value = name,
                 onValueChange = { name = it },
                 label = { Text("Nom") },
@@ -436,6 +439,7 @@ private fun AddCatalogBottomSheet(
                 modifier = Modifier.fillMaxWidth(),
             )
             OutlinedTextField(
+                shape = InkToneTextField.shape,
                 value = rootUrl,
                 onValueChange = { rootUrl = it },
                 label = { Text("Adresse du catalogue") },
@@ -443,6 +447,7 @@ private fun AddCatalogBottomSheet(
                 modifier = Modifier.fillMaxWidth(),
             )
             OutlinedTextField(
+                shape = InkToneTextField.shape,
                 value = username,
                 onValueChange = { username = it },
                 label = { Text("Nom d'utilisateur") },
@@ -451,6 +456,7 @@ private fun AddCatalogBottomSheet(
                 modifier = Modifier.fillMaxWidth(),
             )
             OutlinedTextField(
+                shape = InkToneTextField.shape,
                 value = password,
                 onValueChange = { password = it },
                 label = { Text("Mot de passe") },

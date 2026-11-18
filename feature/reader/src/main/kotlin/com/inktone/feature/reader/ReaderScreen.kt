@@ -11,6 +11,7 @@ import androidx.compose.runtime.snapshotFlow
 import androidx.compose.runtime.withFrameNanos
 import androidx.compose.ui.input.nestedscroll.nestedScroll
 import androidx.compose.ui.input.pointer.pointerInput
+import com.inktone.core.designsystem.InkToneTextField
 import com.inktone.feature.reader.transition.ChapterTransitionConnection
 import com.inktone.feature.reader.transition.ChapterTransitionDirection
 import com.inktone.feature.reader.transition.ChapterTransitionIndicator
@@ -2009,6 +2010,7 @@ private fun EditNoteDialog(
         title = { Text(title) },
         text = {
             OutlinedTextField(
+                shape = InkToneTextField.shape,
                 value = note,
                 onValueChange = { note = it },
                 modifier = Modifier.fillMaxWidth(),
@@ -2046,6 +2048,7 @@ private fun BookmarkNoteDialog(
                     color = MaterialTheme.colorScheme.onSurfaceVariant,
                 )
                 OutlinedTextField(
+                    shape = InkToneTextField.shape,
                     value = note,
                     onValueChange = { note = it },
                     modifier = Modifier.fillMaxWidth().padding(top = InkToneSpacing.md),

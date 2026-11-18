@@ -44,6 +44,7 @@ import androidx.compose.ui.window.PopupPositionProvider
 import androidx.compose.ui.window.PopupProperties
 import com.inktone.core.designsystem.AppIcon
 import com.inktone.core.designsystem.AppSymbol
+import com.inktone.core.designsystem.InkToneTextField
 import com.inktone.domain.model.AnnotationColor
 import com.inktone.domain.model.AnnotationKind
 
@@ -253,6 +254,7 @@ fun SelectionActionPopup(
                         onSelectKind = { kind -> pendingKind = kind },
                     )
                     OutlinedTextField(
+                        shape = InkToneTextField.shape,
                         value = noteText,
                         onValueChange = { noteText = it },
                         label = { Text("Note") },

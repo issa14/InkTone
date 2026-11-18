@@ -4,6 +4,7 @@ import com.inktone.core.designsystem.InkToneSpacing
 
 import com.inktone.core.designsystem.InkToneSectionHeader
 import android.os.Build
+import com.inktone.core.designsystem.InkToneTextField
 import com.inktone.core.designsystem.formatMultiplier
 import com.inktone.core.designsystem.AppIcon
 import com.inktone.core.designsystem.AppSymbol
@@ -844,6 +845,7 @@ private fun PronunciationRuleDialog(
         text = {
             Column(verticalArrangement = Arrangement.spacedBy(InkToneSpacing.md)) {
                 OutlinedTextField(
+                    shape = InkToneTextField.shape,
                     value = originalText,
                     onValueChange = { originalText = it },
                     label = { Text("Mot ou expression") },
@@ -851,6 +853,7 @@ private fun PronunciationRuleDialog(
                     modifier = Modifier.fillMaxWidth(),
                 )
                 OutlinedTextField(
+                    shape = InkToneTextField.shape,
                     value = replacementText,
                     onValueChange = { replacementText = it },
                     label = { Text("Prononcer comme") },

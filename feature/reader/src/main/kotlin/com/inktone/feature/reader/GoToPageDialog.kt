@@ -11,6 +11,7 @@ import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.text.input.KeyboardType
+import com.inktone.core.designsystem.InkToneTextField
 
 /**
  * Saisie d'un numéro de page pour un PDF, où le sommaire n'existe pas : un livre
@@ -31,6 +32,7 @@ fun GoToPageDialog(
         title = { Text("Aller à la page") },
         text = {
             OutlinedTextField(
+                shape = InkToneTextField.shape,
                 value = input,
                 onValueChange = { input = it.filter(Char::isDigit).take(6) },
                 singleLine = true,
