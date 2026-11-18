@@ -589,7 +589,7 @@ internal fun LibraryTopBar(
             sheetState = sheetState,
         ) {
             Column(Modifier.padding(bottom = InkToneSpacing.xxl)) {
-                Text("Bibliothèque", style = MaterialTheme.typography.labelLarge,
+                Text("Bibliothèque", style = MaterialTheme.typography.titleMedium,
                     modifier = Modifier.padding(horizontal = InkToneSpacing.xl, vertical = InkToneSpacing.sm))
                 ActionSheetItem("Rechercher dans les livres", AppSymbol.Search) { showActionsSheet = false; onOpenTextSearch() }
                 ActionSheetItem("Ouvrir un livre au hasard", AppSymbol.Reading) { showActionsSheet = false; onOpenRandomBook() }

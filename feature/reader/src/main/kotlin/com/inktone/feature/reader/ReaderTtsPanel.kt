@@ -71,7 +71,7 @@ fun ReaderTtsPanel(
         ) {
             Text(
                 "Narration",
-                style = MaterialTheme.typography.titleMedium,
+                style = MaterialTheme.typography.titleLarge,
             )
             Spacer(Modifier.height(InkToneSpacing.lg))
 

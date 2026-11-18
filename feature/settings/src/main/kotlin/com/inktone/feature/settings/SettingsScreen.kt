@@ -758,16 +758,12 @@ private fun PronunciationCard(
     content: @Composable ColumnScope.() -> Unit,
 ) {
     Column(modifier = Modifier.fillMaxWidth().padding(vertical = InkToneSpacing.sm)) {
+        // Même titre de section que partout, son bouton d'ajout à sa droite.
         Row(
-            modifier = Modifier.fillMaxWidth().padding(start = InkToneSpacing.xs, top = InkToneSpacing.sm, bottom = InkToneSpacing.sm),
-            horizontalArrangement = Arrangement.SpaceBetween,
-            verticalAlignment = Alignment.CenterVertically,
+            modifier = Modifier.fillMaxWidth(),
+            verticalAlignment = Alignment.Bottom,
         ) {
-            Text(
-                text = "Règles de prononciation (${rules.size})",
-                style = MaterialTheme.typography.titleSmall,
-                color = MaterialTheme.colorScheme.primary,
-            )
+            InkToneSectionHeader("Règles de prononciation (${rules.size})", modifier = Modifier.weight(1f))
             IconButton(onClick = onAddClick) {
                 AppIcon(AppSymbol.Add, contentDescription = "Ajouter une règle de prononciation")
             }

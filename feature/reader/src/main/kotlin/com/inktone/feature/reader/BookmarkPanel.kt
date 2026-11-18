@@ -174,7 +174,7 @@ fun BookmarkPanel(
                         IconButton(onClick = onClose) {
                             AppIcon(AppSymbol.Back,  contentDescription = "Fermer les signets")
                         }
-                        Text("Signets et notes", style = MaterialTheme.typography.titleMedium)
+                        Text("Signets et notes", style = MaterialTheme.typography.titleLarge)
                     }
 
                     TabRow(selectedTabIndex = pagerState.currentPage) {

@@ -1,5 +1,7 @@
 package com.inktone.feature.settings
 
+import com.inktone.core.designsystem.InkToneSectionHeader
+
 import com.inktone.core.designsystem.InkToneSpacing
 import com.inktone.core.designsystem.AppIcon
 import com.inktone.core.designsystem.AppSymbol
@@ -92,7 +94,8 @@ fun ThemeGalleryScreen(
             verticalArrangement = Arrangement.spacedBy(InkToneSpacing.sm),
         ) {
             item {
-                Text("Ambiances de lecture", style = MaterialTheme.typography.titleMedium)
+                // Les vignettes partent de la marge d'écran : titre aligné sur elles.
+                InkToneSectionHeader("Ambiances de lecture", startPadding = 0.dp)
             }
             items(state.ambiances.chunked(2)) { row ->
                 ThemeCardRow(
@@ -103,11 +106,7 @@ fun ThemeGalleryScreen(
             }
 
             item {
-                Text(
-                    "Confort et accessibilité",
-                    style = MaterialTheme.typography.titleMedium,
-                    modifier = Modifier.padding(top = InkToneSpacing.lg),
-                )
+                InkToneSectionHeader("Confort et accessibilité", startPadding = 0.dp)
             }
             items(state.accessibility, key = { it.id }) { theme ->
                 AccessibilityRow(
@@ -118,11 +117,7 @@ fun ThemeGalleryScreen(
             }
 
             item {
-                Text(
-                    "Mes thèmes personnalisés",
-                    style = MaterialTheme.typography.titleMedium,
-                    modifier = Modifier.padding(top = InkToneSpacing.lg),
-                )
+                InkToneSectionHeader("Mes thèmes personnalisés", startPadding = 0.dp)
             }
             items((listOf<ReadingTheme?>(null) + state.customThemes).chunked(2)) { row ->
                 Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(InkToneSpacing.sm)) {

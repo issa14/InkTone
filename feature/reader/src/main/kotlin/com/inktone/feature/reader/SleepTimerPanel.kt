@@ -97,7 +97,7 @@ fun SleepTimerPanel(
             if (showSleepTimer) {
                 Text(
                     "Minuteur de sommeil",
-                    style = MaterialTheme.typography.titleMedium,
+                    style = MaterialTheme.typography.titleLarge,
                 )
                 Spacer(Modifier.height(InkToneSpacing.xs))
 

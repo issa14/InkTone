@@ -108,7 +108,7 @@ private fun TableOfContentsSheetContent(
         IconButton(onClick = onClose) {
             AppIcon(AppSymbol.Back,  contentDescription = "Fermer le sommaire")
         }
-        Text("Table des matières", style = MaterialTheme.typography.titleMedium)
+        Text("Table des matières", style = MaterialTheme.typography.titleLarge)
     }
 
     LazyColumn(state = listState, modifier = Modifier.fillMaxWidth()) {

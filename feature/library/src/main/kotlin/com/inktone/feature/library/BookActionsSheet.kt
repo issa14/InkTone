@@ -27,6 +27,7 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.text.AnnotatedString
 import androidx.compose.ui.text.fromHtml
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
@@ -63,9 +64,10 @@ fun BookActionsSheet(
         Column(Modifier.padding(bottom = InkToneSpacing.xxl)) {
             Text(
                 publication.title,
-                style = MaterialTheme.typography.labelLarge,
+                style = MaterialTheme.typography.titleMedium,
                 modifier = Modifier.padding(horizontal = InkToneSpacing.xl, vertical = InkToneSpacing.sm),
                 maxLines = 1,
+                overflow = TextOverflow.Ellipsis,
             )
             // Retour UX : le favori (cœur) a été retiré de la couverture et
             // déplacé ici — une action de plus dans le menu, jamais un

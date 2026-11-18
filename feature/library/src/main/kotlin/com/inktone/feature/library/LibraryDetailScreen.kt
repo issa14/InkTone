@@ -1,5 +1,7 @@
 package com.inktone.feature.library
 
+import com.inktone.core.designsystem.InkToneEmptyState
+
 import com.inktone.core.designsystem.InkToneSpacing
 
 import androidx.compose.foundation.layout.Box
@@ -138,16 +140,10 @@ fun LibraryDetailScreen(
                 state.isLoading -> Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
                     CircularProgressIndicator()
                 }
-                state.displayedPublications.isEmpty() -> Box(
-                    Modifier.fillMaxSize(),
-                    contentAlignment = Alignment.Center,
-                ) {
-                    Text(
-                        "Aucun livre dans cette sélection",
-                        style = MaterialTheme.typography.bodyLarge,
-                        color = MaterialTheme.colorScheme.onSurfaceVariant,
-                    )
-                }
+                state.displayedPublications.isEmpty() -> InkToneEmptyState(
+                    icon = AppSymbol.LibraryShelf,
+                    title = "Aucun livre dans cette sélection",
+                )
                 else -> LazyColumn(contentPadding = PaddingValues(InkToneSpacing.sm)) {
                     items(state.displayedPublications, key = { it.id }) { publication ->
                         PublicationListRow(

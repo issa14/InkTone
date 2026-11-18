@@ -130,7 +130,7 @@ fun ReaderSettingsPanel(
         ) {
             Text(
                 "Réglages du texte",
-                style = MaterialTheme.typography.titleMedium,
+                style = MaterialTheme.typography.titleLarge,
             )
             Spacer(Modifier.height(InkToneSpacing.lg))
 
