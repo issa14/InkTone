@@ -30,13 +30,7 @@ class ReaderTtsPanelTest {
     fun aucun_bouton_arreter_dans_le_panneau_voix() {
         composeTestRule.setContent {
             ReaderTtsPanel(
-                isPlaying = false,
-                currentSentenceIndex = 0,
-                totalSentences = 10,
                 activeVoiceProfile = activeProfile,
-                onPlayPause = {},
-                onPreviousSentence = {},
-                onNextSentence = {},
                 onSpeedChange = {},
                 onOpenVoiceSettings = {},
                 onOpenPronunciationRules = {},
@@ -51,13 +45,7 @@ class ReaderTtsPanelTest {
     fun le_curseur_de_vitesse_n_affiche_plus_la_valeur_decorative_1_0x() {
         composeTestRule.setContent {
             ReaderTtsPanel(
-                isPlaying = false,
-                currentSentenceIndex = 0,
-                totalSentences = 10,
                 activeVoiceProfile = activeProfile,
-                onPlayPause = {},
-                onPreviousSentence = {},
-                onNextSentence = {},
                 onSpeedChange = {},
                 onOpenVoiceSettings = {},
                 onOpenPronunciationRules = {},
@@ -75,13 +63,7 @@ class ReaderTtsPanelTest {
     fun le_nom_de_voix_affiche_suit_le_format_cible() {
         composeTestRule.setContent {
             ReaderTtsPanel(
-                isPlaying = false,
-                currentSentenceIndex = 0,
-                totalSentences = 10,
                 activeVoiceProfile = activeProfile,
-                onPlayPause = {},
-                onPreviousSentence = {},
-                onNextSentence = {},
                 onSpeedChange = {},
                 onOpenVoiceSettings = {},
                 onOpenPronunciationRules = {},
@@ -100,13 +82,7 @@ class ReaderTtsPanelTest {
         var opened = false
         composeTestRule.setContent {
             ReaderTtsPanel(
-                isPlaying = false,
-                currentSentenceIndex = 0,
-                totalSentences = 10,
                 activeVoiceProfile = activeProfile,
-                onPlayPause = {},
-                onPreviousSentence = {},
-                onNextSentence = {},
                 onSpeedChange = {},
                 onOpenVoiceSettings = { opened = true },
                 onOpenPronunciationRules = {},
@@ -116,5 +92,23 @@ class ReaderTtsPanelTest {
 
         composeTestRule.onNodeWithText("Changer de voix dans les Réglages").performClick()
         org.junit.Assert.assertTrue(opened)
+    }
+
+    /** Audit UI P1-6 : la pilule et le panneau unifié portent déjà ces commandes. */
+    @Test
+    fun ni_lecture_ni_navigation_par_phrase_dans_le_panneau_voix() {
+        composeTestRule.setContent {
+            ReaderTtsPanel(
+                activeVoiceProfile = activeProfile,
+                onSpeedChange = {},
+                onOpenVoiceSettings = {},
+                onOpenPronunciationRules = {},
+                onDismiss = {},
+            )
+        }
+
+        composeTestRule.onNodeWithContentDescription("Écouter").assertDoesNotExist()
+        composeTestRule.onNodeWithContentDescription("Phrase précédente").assertDoesNotExist()
+        composeTestRule.onNodeWithContentDescription("Phrase suivante").assertDoesNotExist()
     }
 }

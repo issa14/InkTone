@@ -15,7 +15,6 @@ import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
 import com.inktone.core.designsystem.InkToneLevelBar
-import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.DisposableEffect
@@ -73,14 +72,13 @@ fun ReaderBrightnessEffect(value: Float?) {
 private const val MIN_BRIGHTNESS = 0.01f
 
 /**
- * 3d.3 — Barre flottante fine, overlay au-dessus du panneau unifié (pas un
- * panneau séparé, voir `UX_FLOW_DESIGN.md` §Luminosité). `value = null`
- * signifie "valeur système" : le bouton soleil à gauche y ramène
- * explicitement, plutôt que de forcer l'utilisateur à glisser le curseur
- * jusqu'au minimum pour retrouver le comportement par défaut.
+ * Réglage de luminosité du lecteur, rangé dans le panneau « Réglages du
+ * texte » (audit UI P1-6 : une barre flottante de plus dans le HUD pour un
+ * réglage rare). `value = null` signifie "valeur système" : « Auto » y
+ * ramène, plutôt que de forcer l'utilisateur à glisser jusqu'au minimum.
  */
 @Composable
-fun ReaderBrightnessBar(value: Float?, onValueChange: (Float?) -> Unit, onAdjusting: () -> Unit = {}) {
+fun ReaderBrightnessControl(value: Float?, onValueChange: (Float?) -> Unit, modifier: Modifier = Modifier) {
     // État local pendant le geste : l'écran et la barre bougent aussitôt, la base
     // n'est écrite qu'une fois le geste posé (audit UX B16). Chaque échantillon
     // faisait une lecture et une écriture en base, et recomposait tout l'écran.
@@ -94,51 +92,45 @@ fun ReaderBrightnessBar(value: Float?, onValueChange: (Float?) -> Unit, onAdjust
             onValueChange(live)
         }
     }
-    Surface(
-        modifier = Modifier.fillMaxWidth().padding(horizontal = 20.dp, vertical = 4.dp),
-        color = MaterialTheme.colorScheme.surface.copy(alpha = 0.95f),
-        shape = RoundedCornerShape(20.dp),
+    Row(
+        modifier = modifier.fillMaxWidth(),
+        verticalAlignment = Alignment.CenterVertically,
     ) {
-        Row(
-            modifier = Modifier.fillMaxWidth().padding(horizontal = 16.dp, vertical = 8.dp),
-            verticalAlignment = Alignment.CenterVertically,
-        ) {
-            // Retour au réglage du système : un libellé « Auto », distinct du soleil
-            // de droite (luminosité maximale) qui lui ressemblait trait pour trait.
-            Text(
-                "Auto",
-                style = MaterialTheme.typography.labelLarge,
-                color = if (live == null) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurfaceVariant,
-                modifier = Modifier
-                    .semantics { contentDescription = "Luminosité du système" }
-                    .combinedClickable(onClick = { live = null; onAdjusting() })
-                    .background(
-                        if (live == null) MaterialTheme.colorScheme.primary.copy(alpha = 0.15f) else Color.Transparent,
-                        RoundedCornerShape(8.dp),
-                    )
-                    .padding(horizontal = 8.dp, vertical = 6.dp),
-            )
-            Spacer(Modifier.width(8.dp))
-            // Rail sans pouce plutôt qu'un curseur : ce réglage se manipule au
-            // pouce, en pleine page et souvent dans le noir — une cible pleine
-            // largeur se trouve sans regarder, et le chiffre exact n'apprend
-            // rien au lecteur, seul le résultat à l'écran compte.
-            InkToneLevelBar(
-                // En mode « Auto », la barre montre la luminosité réelle du système plutôt que d'être vide.
-                value = live ?: systemBrightness,
-                // Le plancher est conservé : à zéro l'écran serait noir, et
-                // l'utilisateur n'aurait plus de quoi viser pour remonter.
-                onValueChange = { live = it.coerceAtLeast(MIN_BRIGHTNESS); onAdjusting() },
-                contentDescription = "Luminosité",
-                modifier = Modifier.weight(1f),
-            )
-            Spacer(Modifier.width(8.dp))
-            AppIcon(
-                AppSymbol.Brightness,
-                contentDescription = "Luminosité maximale",
-                tint = MaterialTheme.colorScheme.onSurfaceVariant,
-            )
-        }
+        // Retour au réglage du système : un libellé « Auto », distinct du soleil
+        // de droite (luminosité maximale) qui lui ressemblait trait pour trait.
+        Text(
+            "Auto",
+            style = MaterialTheme.typography.labelLarge,
+            color = if (live == null) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurfaceVariant,
+            modifier = Modifier
+                .semantics { contentDescription = "Luminosité du système" }
+                .combinedClickable(onClick = { live = null })
+                .background(
+                    if (live == null) MaterialTheme.colorScheme.primary.copy(alpha = 0.15f) else Color.Transparent,
+                    RoundedCornerShape(8.dp),
+                )
+                .padding(horizontal = 8.dp, vertical = 6.dp),
+        )
+        Spacer(Modifier.width(8.dp))
+        // Rail sans pouce plutôt qu'un curseur : ce réglage se manipule au
+        // pouce, en pleine page et souvent dans le noir — une cible pleine
+        // largeur se trouve sans regarder, et le chiffre exact n'apprend
+        // rien au lecteur, seul le résultat à l'écran compte.
+        InkToneLevelBar(
+            // En mode « Auto », la barre montre la luminosité réelle du système plutôt que d'être vide.
+            value = live ?: systemBrightness,
+            // Le plancher est conservé : à zéro l'écran serait noir, et
+            // l'utilisateur n'aurait plus de quoi viser pour remonter.
+            onValueChange = { live = it.coerceAtLeast(MIN_BRIGHTNESS) },
+            contentDescription = "Luminosité",
+            modifier = Modifier.weight(1f),
+        )
+        Spacer(Modifier.width(8.dp))
+        AppIcon(
+            AppSymbol.Brightness,
+            contentDescription = "Luminosité maximale",
+            tint = MaterialTheme.colorScheme.onSurfaceVariant,
+        )
     }
 }
 

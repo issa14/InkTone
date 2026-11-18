@@ -52,19 +52,6 @@ class ReaderChromeStateTest {
     }
 
     @Test
-    fun un_appui_pendant_le_reglage_de_luminosite_ferme_la_barre_sans_rouvrir_le_bandeau() {
-        val chrome = ReaderChromeState()
-        chrome.openBrightnessBar()
-        assertTrue(chrome.showBrightnessBar)
-        assertFalse("la barre de luminosité prend la place du bandeau", chrome.isHudVisible)
-
-        chrome.onReadingAreaTap(isPlaying = false)
-
-        assertFalse(chrome.showBrightnessBar)
-        assertFalse(chrome.isHudVisible)
-    }
-
-    @Test
     fun l_inactivite_replie_la_barre_pilule_pendant_la_lecture_et_masque_le_bandeau_sinon() {
         val reading = ReaderChromeState()
         reading.onHudAutoHide(isPlaying = true)

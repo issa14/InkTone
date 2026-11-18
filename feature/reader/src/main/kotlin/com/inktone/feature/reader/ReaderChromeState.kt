@@ -69,19 +69,6 @@ internal class ReaderChromeState {
     var tappedAnnotationBounds by mutableStateOf<Rect?>(null)
         private set
 
-    // 3d.3 — visibilité locale de la barre de luminosité
-    // (ReaderUiState.readerBrightness porte la vraie donnée).
-    //
-    // Bug réel trouvé à la vérification device (lot 3d) : la barre ne
-    // disparaissait plus jamais une fois ouverte, y compris aux
-    // réapparitions ultérieures du HUD. Corrigé : ouvrir la barre masque
-    // le HUD (au lieu de le garder visible) et démarre un délai
-    // d'auto-masquage, relancé à chaque ajustement
-    // (brightnessBarActivityTick).
-    var showBrightnessBar by mutableStateOf(false)
-    var brightnessBarActivityTick by mutableIntStateOf(0)
-        private set
-
     // 3e.1 (point A5) — pendant la lecture TTS, le panneau unifié est
     // remplacé par la barre pilule ; ce drapeau rappelle le panneau complet
     // par-dessus la barre le temps d'un appui, pour atteindre
@@ -102,16 +89,9 @@ internal class ReaderChromeState {
         hudActivityTick++
     }
 
-    /**
-     * Appui sur la zone de lecture. Ferme la barre de luminosité si elle
-     * est ouverte, sinon applique le basculement HUD habituel — un appui
-     * pendant l'ajustement de luminosité doit fermer la barre, pas rouvrir
-     * le HUD par-dessus dans le même geste.
-     */
+    /** Appui sur la zone de lecture : basculement du HUD. */
     fun onReadingAreaTap(isPlaying: Boolean) {
-        if (showBrightnessBar) {
-            showBrightnessBar = false
-        } else if (isPlaying) {
+        if (isPlaying) {
             // Pendant le TTS, la barre pilule remplace le panneau unifié
             // (retiré du HUD standard) : un premier appui rappelle le
             // panneau complet, un second referme tout, un troisième
@@ -158,22 +138,6 @@ internal class ReaderChromeState {
     fun expandPill() {
         isPillCollapsed = false
         keepHudVisible()
-    }
-
-    /**
-     * Bug réel corrigé (vérification device, lot 3d) : ouvrir la barre de
-     * luminosité masque le HUD au lieu de le garder visible — la barre prend
-     * sa place plutôt que de s'empiler dessous.
-     */
-    fun openBrightnessBar() {
-        isHudVisible = false
-        showBrightnessBar = true
-        brightnessBarActivityTick++
-    }
-
-    /** Ajustement de luminosité : relance le délai d'auto-masquage de la barre. */
-    fun onBrightnessAdjusted() {
-        brightnessBarActivityTick++
     }
 
     fun showAnnotationMenu(annotation: Annotation, boundsInWindow: Rect) {

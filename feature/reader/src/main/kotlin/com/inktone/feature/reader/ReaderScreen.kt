@@ -301,14 +301,6 @@ fun ReaderScreen(
         viewModel.onIntent(ReaderIntent.DismissNarrationError)
     }
 
-    // 3d.3 — auto-masquage de la barre de luminosité, relancé à chaque
-    // ajustement (voir ReaderChromeState.showBrightnessBar).
-    LaunchedEffect(chrome.showBrightnessBar, chrome.brightnessBarActivityTick) {
-        if (chrome.showBrightnessBar) {
-            delay(3000)
-            chrome.showBrightnessBar = false
-        }
-    }
 
     LaunchedEffect(state.isPlaying) {
         if (!state.isPlaying) chrome.onPlaybackStopped()
@@ -1474,29 +1466,9 @@ SelectionActionPopup(
                                 accentColor = ThemeColors.accent(state.resolvedTheme),
                                 contentColor = ThemeColors.barContent(state.resolvedTheme),
                                 onAccentColor = ThemeColors.onAccent(state.resolvedTheme),
-                                onBrightnessClick = {
-                                    // Bug réel corrigé (vérification device, lot 3d) : masque le
-                                    // HUD au lieu de le garder visible — la barre prend sa place
-                                    // plutôt que de s'empiler dessous.
-                                    chrome.openBrightnessBar()
-                                },
                             )
                         }
                     }
-                }
-
-                // 3d.3 — barre flottante à la place du panneau unifié (HUD masqué
-                // pendant l'ajustement), pas un panneau séparé (UX_FLOW_DESIGN.md
-                // §Luminosité). S'auto-masque après 3s d'inactivité (voir
-                // LaunchedEffect ci-dessus), relancé à chaque ajustement.
-                ReadingThemeScope(state.resolvedTheme) {
-                if (chrome.showBrightnessBar) {
-                    ReaderBrightnessBar(
-                        value = state.readerBrightness,
-                        onValueChange = { value -> viewModel.onIntent(ReaderIntent.SetReaderBrightness(value)) },
-                        onAdjusting = { chrome.onBrightnessAdjusted() },
-                    )
-                }
                 }
 
                 // 3b.4/3c.1 — ligne de statut persistante, hors HUD : visible en
@@ -1648,6 +1620,8 @@ SelectionActionPopup(
                 onReadingRulerChange = { enabled -> viewModel.onIntent(ReaderIntent.SetReadingRulerEnabled(enabled)) },
                 volumeKeysTurnPages = state.volumeKeysTurnPages,
                 onVolumeKeysChange = { enabled -> viewModel.onIntent(ReaderIntent.SetVolumeKeysTurnPages(enabled)) },
+                brightness = state.readerBrightness,
+                onBrightnessChange = { value -> viewModel.onIntent(ReaderIntent.SetReaderBrightness(value)) },
                 showPdfInversion = isPdf,
                 forcePdfInversion = state.forcePdfInversion,
                 onForcePdfInversionChange = { viewModel.onIntent(ReaderIntent.ToggleForcePdfInversion) },
@@ -1666,17 +1640,8 @@ SelectionActionPopup(
         // B.3 — Panneau TTS in-reader
         ReadingThemeScope(state.resolvedTheme) {
         if (chrome.showTtsPanel) {
-            val sentences = state.currentChapter?.sentences ?: emptyList()
             ReaderTtsPanel(
-                isPlaying = state.isPlaying,
-                currentSentenceIndex = uiState.value.currentSentenceIndex,
-                totalSentences = sentences.size,
                 activeVoiceProfile = state.activeVoiceProfile,
-                onPlayPause = {
-                    togglePlayback()
-                },
-                onPreviousSentence = { viewModel.onIntent(ReaderIntent.SkipToPreviousSentence) },
-                onNextSentence = { viewModel.onIntent(ReaderIntent.SkipToNextSentence) },
                 onSpeedChange = { speed -> viewModel.onIntent(ReaderIntent.SetTtsSpeed(speed)) },
                 onOpenVoiceSettings = {
                     chrome.showTtsPanel = false

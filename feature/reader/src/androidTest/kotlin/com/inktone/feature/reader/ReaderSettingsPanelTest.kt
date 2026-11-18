@@ -6,6 +6,7 @@ import androidx.compose.ui.semantics.SemanticsProperties
 import androidx.compose.ui.test.SemanticsMatcher
 import androidx.compose.ui.test.assertIsDisplayed
 import androidx.compose.ui.test.junit4.createComposeRule
+import androidx.compose.ui.test.onNodeWithContentDescription
 import androidx.compose.ui.test.onNodeWithText
 import androidx.compose.ui.test.performClick
 import androidx.compose.ui.test.performScrollTo
@@ -269,5 +270,42 @@ class ReaderSettingsPanelTest {
         composeTestRule.onNodeWithText("Pour ce livre uniquement").performClick()
 
         assertEquals(true, bookSpecific)
+    }
+
+    /** Audit UI P1-6 : la luminosité quitte le HUD pour ce panneau ; « Auto » rend la main au système. */
+    @Test
+    fun la_luminosite_se_regle_dans_le_panneau_et_auto_rend_la_main_au_systeme() {
+        var brightness: Float? = 0.4f
+        composeTestRule.setContent {
+            ReaderSettingsPanel(
+                currentFontSize = 18,
+                currentLineHeightMultiplier = 1.4f,
+                previewText = "Extrait du chapitre en cours de lecture.",
+                previewTextColor = Color.Black,
+                previewBackgroundColor = Color.White,
+                onFontSizeChange = {},
+                onLineHeightChange = {},
+                currentMarginStep = 1,
+                isTextJustified = false,
+                keepScreenOn = false,
+                autoScrollSpeed = 0,
+                reduceMotion = false,
+                isScrollMode = true,
+                onMarginStepChange = {},
+                onTextJustifiedChange = {},
+                onKeepScreenOnChange = {},
+                onAutoScrollSpeedChange = {},
+                brightness = brightness,
+                onBrightnessChange = { brightness = it },
+                onDismiss = {},
+            )
+        }
+
+        composeTestRule.onNodeWithContentDescription("Luminosité").assertIsDisplayed()
+        composeTestRule.onNodeWithContentDescription("Luminosité du système").performClick()
+        // L'écriture en base attend la fin du geste (BRIGHTNESS_PERSIST_DELAY_MS).
+        composeTestRule.mainClock.advanceTimeBy(1_000)
+        composeTestRule.waitForIdle()
+        assertEquals(null, brightness)
     }
 }

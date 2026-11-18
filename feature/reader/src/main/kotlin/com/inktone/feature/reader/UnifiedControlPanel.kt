@@ -32,9 +32,8 @@ import com.inktone.core.designsystem.AppSymbol
  *    porte désormais l'information permanente).
  * 2. 5 icônes, Play central proéminent : Sommaire · Marque-pages · Play ·
  *    Thème · TT.
- * 3. 5 icônes : Minuteur · Haut-parleur · Mode · Recherche · Luminosité
- *    (3d.3 — dernière icône ajoutée avec son action, jamais avant :
- *    laissée vide depuis le lot 3b faute d'action existante).
+ * 3. 4 icônes : Minuteur · Haut-parleur · Mode · Recherche. La
+ *    Luminosité est rangée dans « Réglages du texte » (audit UI P1-6).
  *
  * Navigation par chapitre retirée de ce panneau (chevrons précédent/
  * suivant) — la cible les place dans la barre de contrôle TTS (lot 3d) ;
@@ -57,7 +56,6 @@ fun UnifiedControlPanel(
     onAaClick: () -> Unit = {},
     onTtsClick: () -> Unit = {},
     onReadingModeClick: () -> Unit = {},
-    onBrightnessClick: () -> Unit = {},
     // Indicateur du mode d'affichage courant (lot HUD) : l'icône « Mode »
     // reflète le mode ACTIF (pages vs défilement), contrairement à
     // l'ancienne version qui affichait toujours « pages ».
@@ -184,9 +182,6 @@ fun UnifiedControlPanel(
                 }
                 Box(Modifier.weight(1f), contentAlignment = Alignment.Center) {
                     SecondaryAction(symbol = AppSymbol.Search, contentDescription = "Rechercher dans ce livre", tint = iconTint, onClick = onSearchClick)
-                }
-                Box(Modifier.weight(1f), contentAlignment = Alignment.Center) {
-                    SecondaryAction(symbol = AppSymbol.Brightness, contentDescription = "Luminosité", tint = iconTint, onClick = onBrightnessClick)
                 }
             }
         }

@@ -100,6 +100,9 @@ fun ReaderSettingsPanel(
     // Audit UX D75 — touches de volume pour tourner la page, mode paginé.
     volumeKeysTurnPages: Boolean = false,
     onVolumeKeysChange: (Boolean) -> Unit = {},
+    // Luminosité du lecteur, `null` = celle du système (audit UI P1-6).
+    brightness: Float? = null,
+    onBrightnessChange: (Float?) -> Unit = {},
     onDismiss: () -> Unit,
 ) {
     val sheetState = rememberModalBottomSheetState(skipPartiallyExpanded = true)
@@ -121,7 +124,7 @@ fun ReaderSettingsPanel(
                 .padding(horizontal = 24.dp, vertical = 16.dp),
         ) {
             Text(
-                "Typographie",
+                "Réglages du texte",
                 style = MaterialTheme.typography.titleMedium,
             )
             Spacer(Modifier.height(16.dp))
@@ -142,6 +145,13 @@ fun ReaderSettingsPanel(
                 textAlign = if (isTextJustified) TextAlign.Justify else TextAlign.Unspecified,
                 maxLines = 5,
             )
+
+            Spacer(Modifier.height(16.dp))
+
+            // En tête : le seul réglage qu'on retouche au fil de la lumière ambiante.
+            Text("Luminosité", style = MaterialTheme.typography.labelLarge)
+            Spacer(Modifier.height(4.dp))
+            ReaderBrightnessControl(value = brightness, onValueChange = onBrightnessChange)
 
             Spacer(Modifier.height(16.dp))
 

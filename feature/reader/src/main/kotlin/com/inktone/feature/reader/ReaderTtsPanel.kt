@@ -1,13 +1,11 @@
 package com.inktone.feature.reader
 
 import com.inktone.core.designsystem.formatMultiplier
-import com.inktone.core.designsystem.NarrationPlayButton
-import com.inktone.core.designsystem.AppIcon
 import com.inktone.core.designsystem.AppSymbol
-import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.verticalScroll
 import androidx.compose.foundation.layout.ExperimentalLayoutApi
-import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
@@ -16,7 +14,6 @@ import androidx.compose.foundation.layout.width
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.Icon
-import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.ModalBottomSheet
 import androidx.compose.material3.OutlinedButton
@@ -31,7 +28,6 @@ import androidx.compose.runtime.mutableFloatStateOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
-import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.unit.dp
 import com.inktone.domain.model.TtsEngineId
@@ -39,16 +35,10 @@ import com.inktone.domain.model.VoiceProfile
 import com.inktone.domain.model.voiceLabel
 
 /**
- * 3d.1 — Panneau de contrôle vocal accessible depuis le Reader. Navigation
- * phrase à phrase, play/pause, vitesse (branchée sur le profil vocal actif,
- * plus de curseur décoratif), sélecteur de voix, lien vers l'ajout d'une
- * règle de prononciation.
- *
- * Le bouton Stop du B.3 d'origine est retiré : `ReaderViewModel.pausePlayback()`
- * coupe déjà entièrement l'audio et vide la file du lecteur (Lot 15 :
- * `PlaybackOrchestrator.stop()`). Le bouton Pause reste un arrêt complet —
- * le `pause()`/`resume()` réel de l'ordonnanceur est réservé à l'intégration
- * MediaSession/notification, hors périmètre (ADR-025).
+ * 3d.1 — Panneau Voix et vitesse du Lecteur : voix active, vitesse (branchée
+ * sur le profil vocal actif), lien vers l'ajout d'une règle de prononciation.
+ * Lecture/Pause et phrase précédente/suivante n'y figurent pas : la pilule et
+ * le panneau unifié les portent déjà (audit UI P1-6).
  *
  * Les puces de minuteur de sommeil, présentes ici avant ce lot, sont
  * retirées : elles vivent désormais dans le panneau Minuteur dédié
@@ -57,13 +47,7 @@ import com.inktone.domain.model.voiceLabel
 @OptIn(ExperimentalMaterial3Api::class, ExperimentalLayoutApi::class)
 @Composable
 fun ReaderTtsPanel(
-    isPlaying: Boolean,
-    currentSentenceIndex: Int,
-    totalSentences: Int,
     activeVoiceProfile: VoiceProfile?,
-    onPlayPause: () -> Unit,
-    onPreviousSentence: () -> Unit,
-    onNextSentence: () -> Unit,
     onSpeedChange: (Float) -> Unit,
     onOpenVoiceSettings: () -> Unit,
     onOpenPronunciationRules: () -> Unit,
@@ -79,6 +63,8 @@ fun ReaderTtsPanel(
         Column(
             modifier = Modifier
                 .fillMaxWidth()
+                // Grande police sur petit écran : le lien des règles sortait de la feuille.
+                .verticalScroll(rememberScrollState())
                 .padding(horizontal = 24.dp, vertical = 16.dp),
         ) {
             Text(
@@ -86,42 +72,6 @@ fun ReaderTtsPanel(
                 style = MaterialTheme.typography.titleMedium,
             )
             Spacer(Modifier.height(16.dp))
-
-            // ── Navigation phrase ──
-            Row(
-                modifier = Modifier.fillMaxWidth(),
-                horizontalArrangement = Arrangement.Center,
-                verticalAlignment = Alignment.CenterVertically,
-            ) {
-                IconButton(onClick = onPreviousSentence) {
-                    AppIcon(AppSymbol.SentencePrevious, contentDescription = "Phrase précédente")
-                }
-                Text(
-                    "Phrase ${currentSentenceIndex + 1} / $totalSentences",
-                    style = MaterialTheme.typography.bodyMedium,
-                )
-                IconButton(onClick = onNextSentence) {
-                    AppIcon(AppSymbol.SentenceNext, contentDescription = "Phrase suivante")
-                }
-            }
-
-            Spacer(Modifier.height(12.dp))
-
-            // ── Play/Pause ──
-            Row(
-                modifier = Modifier.fillMaxWidth(),
-                horizontalArrangement = Arrangement.Center,
-                verticalAlignment = Alignment.CenterVertically,
-            ) {
-                NarrationPlayButton(
-                    isPlaying = isPlaying,
-                    onClick = onPlayPause,
-                    containerColor = MaterialTheme.colorScheme.primary,
-                    contentColor = MaterialTheme.colorScheme.surface,
-                )
-            }
-
-            Spacer(Modifier.height(20.dp))
 
             // ── Voix — choisie dans les Réglages (décision D74) : ce bouton
             // listait des enregistrements de profil, pas les voix des moteurs.
