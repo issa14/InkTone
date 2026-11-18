@@ -9,34 +9,19 @@ import com.inktone.domain.model.ReadingTheme
  * [activeThemeId] varient, observés en continu (`ThemeRepository`/
  * `PreferencesRepository`).
  *
- * [previewThemeId] porte l'appui long en cours (Tâche 9.4 — « Appui long
- * pour tester ») : un état d'aperçu ponctuel, jamais persisté, distinct
- * de [activeThemeId]. Écart déclaré (contrat point 5) — la
- * prévisualisation est un recouvrement plein écran DANS la Galerie
- * (mockup de page agrandi), pas une poussée en direct dans un Reader
- * déjà ouvert ailleurs : `ReaderViewModel` ne réobserve pas en continu
- * `UserPreferences.theme` (seulement à l'ouverture/`SetOverrides`), et
- * ajouter cette réobservation aurait débordé largement le périmètre de
- * ce lot pour un gain marginal (aucun Reader n'est visible pendant qu'on
- * parcourt la Galerie).
+ * Plus d'aperçu par appui long (audit UI P2-15) : geste caché qu'un texte
+ * permanent devait annoncer. Chaque carte montre déjà une page dans le
+ * thème, et un toucher l'applique, réversible d'un autre toucher.
  */
 data class ThemeGalleryUiState(
     val ambiances: List<ReadingTheme> = ReadingTheme.AMBIANCES,
     val accessibility: List<ReadingTheme> = ReadingTheme.ACCESSIBILITY,
     val customThemes: List<ReadingTheme> = emptyList(),
     val activeThemeId: String = ReadingTheme.DEFAULT.id,
-    val previewThemeId: String? = null,
-) {
-    /** Ce que la carte doit afficher comme « Actif » — la prévisualisation prime visuellement, sans jamais être persistée. */
-    val displayedActiveId: String get() = previewThemeId ?: activeThemeId
-    val previewedTheme: ReadingTheme?
-        get() = previewThemeId?.let { id -> (ambiances + accessibility + customThemes).firstOrNull { it.id == id } }
-}
+)
 
 sealed interface ThemeGalleryIntent {
     data class SelectTheme(val themeId: String) : ThemeGalleryIntent
-    data class StartPreview(val themeId: String) : ThemeGalleryIntent
-    data object EndPreview : ThemeGalleryIntent
     data class DeleteCustomTheme(val themeId: String) : ThemeGalleryIntent
     data class OpenStudio(val themeId: String?) : ThemeGalleryIntent
 }

@@ -43,8 +43,6 @@ class ThemeGalleryViewModel @Inject constructor(
             is ThemeGalleryIntent.SelectTheme -> viewModelScope.launch {
                 preferencesRepository.update { it.copy(theme = intent.themeId) }
             }
-            is ThemeGalleryIntent.StartPreview -> _state.value = _state.value.copy(previewThemeId = intent.themeId)
-            is ThemeGalleryIntent.EndPreview -> _state.value = _state.value.copy(previewThemeId = null)
             is ThemeGalleryIntent.DeleteCustomTheme -> viewModelScope.launch { deleteCustomTheme(intent.themeId) }
             is ThemeGalleryIntent.OpenStudio -> viewModelScope.launch {
                 _effects.send(ThemeGalleryEffect.NavigateToStudio(intent.themeId))

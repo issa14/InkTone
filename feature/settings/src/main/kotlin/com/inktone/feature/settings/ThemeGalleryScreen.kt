@@ -3,7 +3,6 @@ import com.inktone.core.designsystem.AppIcon
 import com.inktone.core.designsystem.AppSymbol
 
 import androidx.compose.foundation.background
-import androidx.compose.foundation.gestures.detectTapGestures
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.BoxScope
@@ -38,8 +37,10 @@ import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.compose.runtime.getValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.foundation.layout.heightIn
+import androidx.compose.ui.semantics.Role
+import androidx.compose.foundation.selection.selectable
 import androidx.compose.ui.draw.clip
-import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.hilt.navigation.compose.hiltViewModel
@@ -89,22 +90,13 @@ fun ThemeGalleryScreen(
             verticalArrangement = Arrangement.spacedBy(8.dp),
         ) {
             item {
-                Column {
-                    Text("Ambiances de lecture", style = MaterialTheme.typography.titleMedium)
-                    Text(
-                        "Appui long pour tester",
-                        style = MaterialTheme.typography.labelSmall,
-                        color = MaterialTheme.colorScheme.onSurfaceVariant,
-                    )
-                }
+                Text("Ambiances de lecture", style = MaterialTheme.typography.titleMedium)
             }
             items(state.ambiances.chunked(2)) { row ->
                 ThemeCardRow(
                     themes = row,
-                    activeId = state.displayedActiveId,
+                    activeId = state.activeThemeId,
                     onTap = { viewModel.onIntent(ThemeGalleryIntent.SelectTheme(it)) },
-                    onLongPressStart = { viewModel.onIntent(ThemeGalleryIntent.StartPreview(it)) },
-                    onLongPressEnd = { viewModel.onIntent(ThemeGalleryIntent.EndPreview) },
                 )
             }
 
@@ -141,7 +133,7 @@ fun ThemeGalleryScreen(
                         } else {
                             ThemeMiniPreviewCard(
                                 theme = theme,
-                                isActive = theme.id == state.displayedActiveId,
+                                isActive = theme.id == state.activeThemeId,
                                 modifier = Modifier.weight(1f),
                                 trailingIcon = {
                                     IconButton(
@@ -152,8 +144,6 @@ fun ThemeGalleryScreen(
                                     }
                                 },
                                 onClick = { viewModel.onIntent(ThemeGalleryIntent.SelectTheme(theme.id)) },
-                                onLongPressStart = { viewModel.onIntent(ThemeGalleryIntent.StartPreview(theme.id)) },
-                                onLongPressEnd = { viewModel.onIntent(ThemeGalleryIntent.EndPreview) },
                             )
                         }
                     }
@@ -165,13 +155,6 @@ fun ThemeGalleryScreen(
         }
     }
 
-    // Appui long — prévisualisation en contexte réel sans validation
-    // (Tâche 9.4). Écart déclaré : recouvrement plein écran DANS la
-    // Galerie (mockup agrandi), pas une poussée en direct dans un Reader
-    // déjà ouvert (voir ThemeGalleryUiState, KDoc de previewThemeId).
-    state.previewedTheme?.let { theme ->
-        ThemePreviewOverlay(theme)
-    }
 }
 
 @Composable
@@ -179,8 +162,6 @@ private fun ThemeCardRow(
     themes: List<ReadingTheme>,
     activeId: String,
     onTap: (String) -> Unit,
-    onLongPressStart: (String) -> Unit,
-    onLongPressEnd: () -> Unit,
 ) {
     Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
         themes.forEach { theme ->
@@ -189,8 +170,6 @@ private fun ThemeCardRow(
                 isActive = theme.id == activeId,
                 modifier = Modifier.weight(1f),
                 onClick = { onTap(theme.id) },
-                onLongPressStart = { onLongPressStart(theme.id) },
-                onLongPressEnd = onLongPressEnd,
             )
         }
         if (themes.size == 1) Spacer(Modifier.weight(1f))
@@ -210,24 +189,13 @@ private fun ThemeMiniPreviewCard(
     modifier: Modifier = Modifier,
     trailingIcon: (@Composable BoxScope.() -> Unit)? = null,
     onClick: () -> Unit,
-    onLongPressStart: () -> Unit,
-    onLongPressEnd: () -> Unit,
 ) {
     Box(
         modifier = modifier
             .aspectRatio(0.72f)
             .clip(RoundedCornerShape(12.dp))
             .background(theme.backgroundColorHex.toColor())
-            .pointerInput(theme.id) {
-                detectTapGestures(
-                    onTap = { onClick() },
-                    onLongPress = { onLongPressStart() },
-                    onPress = {
-                        tryAwaitRelease()
-                        onLongPressEnd()
-                    },
-                )
-            },
+            .selectable(selected = isActive, role = Role.RadioButton, onClick = onClick),
     ) {
         Column(Modifier.fillMaxSize().padding(10.dp)) {
             Text(
@@ -300,11 +268,14 @@ private fun AccessibilityRow(theme: ReadingTheme, isActive: Boolean, onClick: ()
         ReadingTheme.NOIR_ABSOLU_AMOLED.id -> "Contraste maximal et économie d'énergie"
         else -> null
     }
+    // Ligne entière sélectionnable : un chevron disait « ouvrir », pas « appliquer » (audit UI P2-15).
     Row(
         modifier = Modifier
             .fillMaxWidth()
             .clip(RoundedCornerShape(12.dp))
             .then(if (isActive) Modifier.background(MaterialTheme.colorScheme.primaryContainer.copy(alpha = 0.3f)) else Modifier)
+            .selectable(selected = isActive, role = Role.RadioButton, onClick = onClick)
+            .heightIn(min = 56.dp)
             .padding(vertical = 8.dp),
         verticalAlignment = Alignment.CenterVertically,
     ) {
@@ -326,47 +297,9 @@ private fun AccessibilityRow(theme: ReadingTheme, isActive: Boolean, onClick: ()
             Text(theme.displayName, style = MaterialTheme.typography.bodyMedium)
             subtitle?.let { Text(it, style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.onSurfaceVariant) }
         }
-        IconButton(onClick = onClick) {
-            AppIcon(AppSymbol.ChevronRight, contentDescription = "Appliquer « ${theme.displayName} »")
+        if (isActive) {
+            AppIcon(AppSymbol.Success, contentDescription = null, tint = MaterialTheme.colorScheme.primary, modifier = Modifier.padding(end = 12.dp))
         }
     }
 }
 
-/** Recouvrement plein écran de l'appui long — voir écart déclaré dans ThemeGalleryUiState. */
-@Composable
-private fun ThemePreviewOverlay(theme: ReadingTheme) {
-    Box(
-        Modifier
-            .fillMaxSize()
-            .background(theme.backgroundColorHex.toColor()),
-    ) {
-        Column(Modifier.fillMaxSize().padding(32.dp)) {
-            Text(
-                theme.displayName,
-                style = MaterialTheme.typography.headlineSmall,
-                color = theme.textColorHex.toColor(),
-                fontFamily = theme.fontFamily.toComposeFontFamily(),
-            )
-            Spacer(Modifier.height(16.dp))
-            Text(
-                "$PREVIEW_EXCERPT $PREVIEW_EXCERPT",
-                style = MaterialTheme.typography.bodyLarge,
-                color = theme.textColorHex.toColor(),
-                fontFamily = theme.fontFamily.toComposeFontFamily(),
-                modifier = Modifier.weight(1f),
-            )
-            LinearProgressIndicator(
-                progress = { 0.42f },
-                modifier = Modifier.fillMaxWidth(),
-                color = theme.accentColorHex.toColor(),
-                trackColor = theme.accentColorHex.toColor().copy(alpha = 0.2f),
-            )
-            Spacer(Modifier.height(8.dp))
-            Text(
-                "42\u202F% · Page 12",
-                style = MaterialTheme.typography.labelMedium,
-                color = theme.textColorHex.toColor().copy(alpha = 0.7f),
-            )
-        }
-    }
-}

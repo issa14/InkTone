@@ -265,7 +265,7 @@ private fun StudioLivePreview(state: ThemeStudioUiState) {
 
 /**
  * Badge WCAG calculé en direct — informatif, JAMAIS bloquant (Tâche 9.5,
- * décision actée à la lettre) : le bouton Sauvegarder reste actif quel
+ * décision actée à la lettre) : le bouton Enregistrer reste actif quel
  * que soit le ratio, ce badge ne fait qu'avertir sous le seuil.
  */
 @Composable

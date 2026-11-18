@@ -52,7 +52,6 @@ class ThemeGalleryViewModelTest {
         dispatcher.scheduler.advanceUntilIdle()
 
         assertEquals(ReadingTheme.OBSIDIENNE.id, vm.state.value.activeThemeId)
-        assertEquals(ReadingTheme.OBSIDIENNE.id, vm.state.value.displayedActiveId)
     }
 
     @Test
@@ -66,23 +65,6 @@ class ThemeGalleryViewModelTest {
 
         assertEquals(ReadingTheme.SEPIA_VINTAGE.id, preferencesRepository.get().theme)
         assertEquals(ReadingTheme.SEPIA_VINTAGE.id, vm.state.value.activeThemeId)
-    }
-
-    @Test
-    fun l_appui_long_previsualise_sans_valider_et_relacher_revient_au_theme_courant() = runTest {
-        val preferencesRepository = FakePreferencesRepository()
-        preferencesRepository.update(UserPreferences(theme = ReadingTheme.PAPIER_CLAIR.id))
-        val vm = viewModel(FakeThemeRepository(), preferencesRepository)
-        dispatcher.scheduler.advanceUntilIdle()
-
-        vm.onIntent(ThemeGalleryIntent.StartPreview(ReadingTheme.OBSIDIENNE.id))
-        assertEquals(ReadingTheme.OBSIDIENNE.id, vm.state.value.displayedActiveId)
-        // La preference persistee ne bouge JAMAIS pendant l'apercu.
-        assertEquals(ReadingTheme.PAPIER_CLAIR.id, preferencesRepository.get().theme)
-
-        vm.onIntent(ThemeGalleryIntent.EndPreview)
-        assertEquals(ReadingTheme.PAPIER_CLAIR.id, vm.state.value.displayedActiveId)
-        assertEquals(ReadingTheme.PAPIER_CLAIR.id, preferencesRepository.get().theme)
     }
 
     @Test

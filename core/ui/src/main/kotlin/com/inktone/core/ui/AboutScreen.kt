@@ -3,10 +3,8 @@ package com.inktone.core.ui
 import android.content.Intent
 import android.net.Uri
 import androidx.compose.foundation.BorderStroke
-import androidx.compose.foundation.ExperimentalFoundationApi
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
-import androidx.compose.foundation.combinedClickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -35,6 +33,7 @@ import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.material3.TextButton
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.LocalClipboardManager
@@ -93,16 +92,19 @@ fun AboutScreen(
             Spacer(Modifier.height(12.dp))
             Text("InkTone", color = MaterialTheme.colorScheme.onSurface, style = MaterialTheme.typography.headlineMedium)
             Spacer(Modifier.height(6.dp))
-            VersionBadge(
-                versionName = versionName,
+            VersionBadge(versionName = versionName)
+            // Un bouton visible plutôt qu'un appui long sur la version, que
+            // seul un message au toucher révélait (audit UI P2-15).
+            TextButton(
                 onClick = {
-                    scope.launch { snackbarHostState.showSnackbar("Appui long pour copier les informations de diagnostic") }
-                },
-                onLongClick = {
                     clipboardManager.setText(AnnotatedString(buildDiagnostics(versionName, ttsEngineLabel)))
                     scope.launch { snackbarHostState.showSnackbar("Informations de diagnostic copiées") }
                 },
-            )
+            ) {
+                AppIcon(AppSymbol.Copy, contentDescription = null, modifier = Modifier.size(18.dp))
+                Spacer(Modifier.width(8.dp))
+                Text("Copier les informations de diagnostic")
+            }
 
             Spacer(Modifier.height(20.dp))
 
@@ -150,7 +152,7 @@ fun AboutScreen(
     }
 }
 
-/** Diagnostics système copiés au presse-papier (clic long sur le badge de version). */
+/** Diagnostics système copiés au presse-papier, ou joints au signalement d'un problème. */
 private fun buildDiagnostics(versionName: String, ttsEngineLabel: String): String = buildString {
     appendLine("Version : $versionName")
     appendLine("Modèle : ${android.os.Build.MODEL}")
@@ -158,13 +160,8 @@ private fun buildDiagnostics(versionName: String, ttsEngineLabel: String): Strin
     appendLine("Moteur TTS : $ttsEngineLabel")
 }
 
-@OptIn(ExperimentalFoundationApi::class)
 @Composable
-private fun VersionBadge(
-    versionName: String,
-    onClick: () -> Unit,
-    onLongClick: () -> Unit,
-) {
+private fun VersionBadge(versionName: String) {
     Card(
         colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.primaryContainer),
         shape = RoundedCornerShape(50),
@@ -173,9 +170,7 @@ private fun VersionBadge(
             "v$versionName",
             color = MaterialTheme.colorScheme.onPrimaryContainer,
             style = MaterialTheme.typography.bodySmall,
-            modifier = Modifier
-                .combinedClickable(onClick = onClick, onLongClick = onLongClick)
-                .padding(horizontal = 14.dp, vertical = 6.dp),
+            modifier = Modifier.padding(horizontal = 14.dp, vertical = 6.dp),
         )
     }
 }
