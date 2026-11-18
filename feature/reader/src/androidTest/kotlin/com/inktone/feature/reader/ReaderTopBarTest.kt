@@ -1,5 +1,6 @@
 package com.inktone.feature.reader
 
+import androidx.compose.runtime.mutableStateOf
 import androidx.compose.ui.test.junit4.createComposeRule
 import androidx.compose.ui.test.onNodeWithContentDescription
 import androidx.compose.ui.test.onNodeWithText
@@ -33,5 +34,25 @@ class ReaderTopBarTest {
 
         composeTestRule.onNodeWithText("Les Misérables").assertExists()
         composeTestRule.onNodeWithText("Victor Hugo").assertExists()
+    }
+
+    /** Audit UI P2-9 : marquer la page en un geste, l'état annoncé par TalkBack. */
+    @Test
+    fun le_signet_de_la_barre_bascule_et_annonce_son_etat() {
+        // État observé, comme `uiState` en production : sa lecture recompose la barre.
+        val toggled = mutableStateOf(false)
+        composeTestRule.setContent {
+            ReaderTopBar(
+                title = "Les Misérables",
+                author = "Victor Hugo",
+                onBack = {},
+                isPageBookmarked = { toggled.value },
+                onToggleBookmark = { toggled.value = !toggled.value },
+            )
+        }
+
+        composeTestRule.onNodeWithContentDescription("Marquer cette page").performClick()
+        assertTrue(toggled.value)
+        composeTestRule.onNodeWithContentDescription("Retirer le signet de cette page").assertExists()
     }
 }

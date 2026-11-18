@@ -669,34 +669,6 @@ fun ReaderScreen(
             sliceChapterText(chapterSentences, freeRange.first, freeRange.last + 1)
         }
 
-        // 3b.5 — barre du haut : appartient au HUD, apparaît/disparaît
-        // avec le panneau, jamais indépendamment (même gate isHudVisible).
-        // Overlay pur (`align(TopCenter)`) : ne modifie plus jamais les
-        // bornes de la zone de lecture (voir commentaire de tête ci-dessus).
-        // Lot 14 — masquée dès le lancement TTS (lecture immersive) ; ne
-        // revient que via l'overlay panneau complet (showFullPanelOverlay),
-        // qui conserve l'accès au bouton retour pendant la lecture.
-        if (chrome.isHudVisible && (!state.isPlaying || chrome.showFullPanelOverlay)) {
-            // Bug réel trouvé sur appareil : déclarée avant la zone de
-            // lecture (Box.fillMaxSize() plus bas dans ce même Box), la
-            // topbar se retrouvait dessous dans l'ordre d'empilement de
-            // Compose (un enfant déclaré plus tard est peint ET intercepte
-            // les taps AU-DESSUS des précédents, sans zIndex) — la flèche
-            // retour ne recevait donc jamais le tap, absorbé par
-            // onClick = handleReadingAreaTap() du bloc/pager en dessous.
-            // zIndex la remonte au-dessus sans changer sa position.
-            ReaderTopBar(
-                title = state.title,
-                author = state.author,
-                onBack = onBack,
-                modifier = Modifier
-                    .align(Alignment.TopCenter)
-                    .zIndex(1f),
-                surfaceColor = ThemeColors.barSurface(state.resolvedTheme),
-                contentColor = ThemeColors.barContent(state.resolvedTheme),
-            )
-        }
-
         // 3b.1 — état de pagination hissé au-dessus du choix de mode :
         // sert la ligne de statut (3b.4, tous modes) ET PagedChapterContent
         // (mode pagé), un seul calcul. Mesuré au même endroit de
@@ -771,6 +743,54 @@ fun ReaderScreen(
             // seulement du rendu.
             justified = state.isTextJustified,
         )
+
+        // Phrases de la page affichée, pour reconnaître un signet posé n'importe
+        // où sur elle (audit UX D51). Mesure partielle : null, la phrase seule.
+        // Lue à l'appel, jamais pendant la composition de l'écran.
+        val currentPageSentences: () -> IntRange? = {
+            state.currentChapter
+                ?.takeIf { pagination.isMeasurementComplete(it) }
+                ?.let { chapter ->
+                    pagination.sentenceRangeOf(
+                        chapter.index, pagination.pageIndexAt(chapter.index, uiState.value.currentSentenceIndex),
+                    )
+                }
+        }
+
+        // 3b.5 — barre du haut : appartient au HUD, apparaît/disparaît
+        // avec le panneau, jamais indépendamment (même gate isHudVisible).
+        // Overlay pur (`align(TopCenter)`) : ne modifie plus jamais les
+        // bornes de la zone de lecture (voir commentaire de tête ci-dessus).
+        // Lot 14 — masquée dès le lancement TTS (lecture immersive) ; ne
+        // revient que via l'overlay panneau complet (showFullPanelOverlay),
+        // qui conserve l'accès au bouton retour pendant la lecture.
+        if (chrome.isHudVisible && (!state.isPlaying || chrome.showFullPanelOverlay)) {
+            // Bug réel trouvé sur appareil : déclarée avant la zone de
+            // lecture (Box.fillMaxSize() plus bas dans ce même Box), la
+            // topbar se retrouvait dessous dans l'ordre d'empilement de
+            // Compose (un enfant déclaré plus tard est peint ET intercepte
+            // les taps AU-DESSUS des précédents, sans zIndex) — la flèche
+            // retour ne recevait donc jamais le tap, absorbé par
+            // onClick = handleReadingAreaTap() du bloc/pager en dessous.
+            // zIndex la remonte au-dessus sans changer sa position.
+            ReaderTopBar(
+                title = state.title,
+                author = state.author,
+                onBack = onBack,
+                modifier = Modifier
+                    .align(Alignment.TopCenter)
+                    .zIndex(1f),
+                surfaceColor = ThemeColors.barSurface(state.resolvedTheme),
+                contentColor = ThemeColors.barContent(state.resolvedTheme),
+                // Action la plus fréquente d'un lecteur, à un geste (audit UI P2-9).
+                isPageBookmarked = { uiState.value.bookmarkOnCurrentPage(currentPageSentences()) != null },
+                onToggleBookmark = {
+                    chrome.keepHudVisible()
+                    haptics.confirm()
+                    viewModel.onIntent(ReaderIntent.ToggleBookmarkOnPage(currentPageSentences()))
+                },
+            )
+        }
 
         // Lot 21, tâche 9 — auto-scroll visuel (mode SCROLL uniquement),
         // corrigé (revue post-lot 21) : la boucle vit directement dans le
@@ -1739,13 +1759,7 @@ SelectionActionPopup(
                 // Page virtuelle de la phrase courante : un signet posé n'importe
                 // où sur elle compte (audit UX D51). Mesure partielle : la phrase
                 // seule, jamais une plage fausse.
-                val bookmarkPageSentences = state.currentChapter
-                    ?.takeIf { pagination.isMeasurementComplete(it) }
-                    ?.let { chapter ->
-                        pagination.sentenceRangeOf(
-                            chapter.index, pagination.pageIndexAt(chapter.index, uiState.value.currentSentenceIndex),
-                        )
-                    }
+                val bookmarkPageSentences = currentPageSentences()
                 BookmarkPanel(
                     bookmarks = state.bookmarks,
                     annotations = state.annotations,

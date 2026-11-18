@@ -45,6 +45,9 @@ fun ReaderTopBar(
     // ne servent qu'aux previews/tests qui n'ont pas de ReadingTheme.
     surfaceColor: Color = MaterialTheme.colorScheme.surface,
     contentColor: Color = MaterialTheme.colorScheme.onSurface,
+    // Lambda : l'état suit la page affichée, lu ici pour ne recomposer que la barre.
+    isPageBookmarked: () -> Boolean = { false },
+    onToggleBookmark: (() -> Unit)? = null,
 ) {
     Surface(
         modifier = modifier.fillMaxWidth(),
@@ -76,7 +79,7 @@ fun ReaderTopBar(
                 AppIcon(AppSymbol.Back, contentDescription = "Retour", tint = contentColor)
             }
             Spacer(Modifier.width(4.dp))
-            Column(modifier = Modifier.padding(end = 16.dp)) {
+            Column(modifier = Modifier.weight(1f).padding(end = 8.dp)) {
                 Text(
                     text = title ?: "",
                     style = MaterialTheme.typography.titleSmall,
@@ -91,6 +94,17 @@ fun ReaderTopBar(
                         color = contentColor.copy(alpha = 0.75f),
                         maxLines = 1,
                         overflow = TextOverflow.Ellipsis,
+                    )
+                }
+            }
+            if (onToggleBookmark != null) {
+                val bookmarked = isPageBookmarked()
+                IconButton(onClick = onToggleBookmark) {
+                    AppIcon(
+                        AppSymbol.Bookmark,
+                        contentDescription = if (bookmarked) "Retirer le signet de cette page" else "Marquer cette page",
+                        selected = bookmarked,
+                        tint = contentColor,
                     )
                 }
             }
