@@ -1,5 +1,7 @@
 package com.inktone.feature.reader
 
+import com.inktone.core.designsystem.HudTopShape
+
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.ExperimentalLayoutApi
@@ -10,7 +12,6 @@ import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.width
-import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
@@ -49,7 +50,7 @@ fun ReaderTopBar(
         modifier = modifier.fillMaxWidth(),
         color = surfaceColor,
         contentColor = contentColor,
-        shape = RoundedCornerShape(bottomStart = 20.dp, bottomEnd = 20.dp),
+        shape = HudTopShape,
     ) {
         Row(
             modifier = Modifier

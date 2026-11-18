@@ -1,5 +1,7 @@
 package com.inktone.feature.reader
 
+import com.inktone.core.designsystem.HudBottomShape
+
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.defaultMinSize
@@ -93,7 +95,7 @@ fun UnifiedControlPanel(
     Surface(
         modifier = Modifier.fillMaxWidth(),
         color = surfaceColor,
-        shape = RoundedCornerShape(topStart = 20.dp, topEnd = 20.dp),
+        shape = HudBottomShape,
     ) {
         Column(
             modifier = Modifier.fillMaxWidth().padding(horizontal = 20.dp, vertical = 12.dp),

@@ -16,17 +16,10 @@ val InkToneShapes = Shapes(
     extraLarge = RoundedCornerShape(24.dp),
 )
 
-/** Formes des cartes (livres, sections). */
-val CardShape = RoundedCornerShape(12.dp)
-
-/** Formes des Bottom Sheets (panneau TTS, réglages lecture). */
-val BottomSheetShape = RoundedCornerShape(topStart = 20.dp, topEnd = 20.dp)
-
-/** Formes des FAB (bouton d'action flottant). */
-val FabShape = RoundedCornerShape(16.dp)
-
-/** Formes des chips (filtres, tags, voix). */
-val ChipShape = RoundedCornerShape(8.dp)
-
-/** Formes des dialogues (alertes, sélecteurs). */
-val DialogShape = RoundedCornerShape(28.dp)
+/**
+ * Barres du Lecteur, arrondies du seul côté de la page : la barre du haut
+ * en bas, le panneau de commandes en haut. Les autres formes passent par
+ * `MaterialTheme.shapes` (audit UI P2-2).
+ */
+val HudTopShape = RoundedCornerShape(bottomStart = 20.dp, bottomEnd = 20.dp)
+val HudBottomShape = RoundedCornerShape(topStart = 20.dp, topEnd = 20.dp)
