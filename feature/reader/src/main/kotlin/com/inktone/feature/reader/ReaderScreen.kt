@@ -1432,44 +1432,41 @@ SelectionActionPopup(
                             }
                         }
                     } else {
-                        WithLiveValue({ uiState.value.bookProgression }) { live ->
-                            UnifiedControlPanel(
-                                isPlaying = state.isPlaying,
-                                sleepTimerActive = isSleepTimerArmed,
-                                bookProgression = live,
-                                onPlayPause = {
-                                    chrome.keepHudVisible()
-                                    togglePlayback()
-                                },
-                                onSleepTimerClick = { chrome.keepHudVisible(); chrome.showSleepTimerPanel = true },
-                                onSearchClick = { chrome.keepHudVisible(); onSearchClick() },
-                                onBookmarksClick = { chrome.keepHudVisible(); viewModel.onIntent(ReaderIntent.ToggleBookmarkList) },
-                                onTocClick = {
-                                    chrome.keepHudVisible()
-                                    if (isPdf) showGoToPage = true else viewModel.onIntent(ReaderIntent.ToggleToc)
-                                },
-                                onThemeCycle = {
-                                    chrome.keepHudVisible()
-                                    viewModel.onIntent(ReaderIntent.SetReadingTheme(nextReadingTheme(state.effectiveSettings.theme)))
-                                },
-                                onAaClick = { chrome.keepHudVisible(); chrome.showSettingsPanel = true },
-                                onTtsClick = { chrome.keepHudVisible(); chrome.showTtsPanel = true },
-                                onReadingModeClick = { chrome.keepHudVisible(); viewModel.onIntent(ReaderIntent.ToggleReadingMode) },
-                                // Indicateur du mode courant (lot HUD) : l'icône
-                                // « Mode » doit refléter le mode ACTIF, pas un
-                                // glyphe figé.
-                                readingMode = state.readingMode,
-                                showTtsControls = state.supportsTts,
-                                showReadingModeToggle = !isPdf,
-                                // Audit v1.0.0 (M6) : pas de sommaire pour PDF/TXT.
-                                showToc = state.publicationFormat == PublicationFormat.EPUB || isPdf,
-                                tocContentDescription = if (isPdf) "Aller à une page" else "Sommaire",
-                                surfaceColor = ThemeColors.barSurface(state.resolvedTheme),
-                                accentColor = ThemeColors.accent(state.resolvedTheme),
-                                contentColor = ThemeColors.barContent(state.resolvedTheme),
-                                onAccentColor = ThemeColors.onAccent(state.resolvedTheme),
-                            )
-                        }
+                        UnifiedControlPanel(
+                            isPlaying = state.isPlaying,
+                            sleepTimerActive = isSleepTimerArmed,
+                            onPlayPause = {
+                                chrome.keepHudVisible()
+                                togglePlayback()
+                            },
+                            onSleepTimerClick = { chrome.keepHudVisible(); chrome.showSleepTimerPanel = true },
+                            onSearchClick = { chrome.keepHudVisible(); onSearchClick() },
+                            onBookmarksClick = { chrome.keepHudVisible(); viewModel.onIntent(ReaderIntent.ToggleBookmarkList) },
+                            onTocClick = {
+                                chrome.keepHudVisible()
+                                if (isPdf) showGoToPage = true else viewModel.onIntent(ReaderIntent.ToggleToc)
+                            },
+                            onThemeCycle = {
+                                chrome.keepHudVisible()
+                                viewModel.onIntent(ReaderIntent.SetReadingTheme(nextReadingTheme(state.effectiveSettings.theme)))
+                            },
+                            onAaClick = { chrome.keepHudVisible(); chrome.showSettingsPanel = true },
+                            onTtsClick = { chrome.keepHudVisible(); chrome.showTtsPanel = true },
+                            onReadingModeClick = { chrome.keepHudVisible(); viewModel.onIntent(ReaderIntent.ToggleReadingMode) },
+                            // Indicateur du mode courant (lot HUD) : l'icône
+                            // « Mode » doit refléter le mode ACTIF, pas un
+                            // glyphe figé.
+                            readingMode = state.readingMode,
+                            showTtsControls = state.supportsTts,
+                            showReadingModeToggle = !isPdf,
+                            // Audit v1.0.0 (M6) : pas de sommaire pour PDF/TXT.
+                            showToc = state.publicationFormat == PublicationFormat.EPUB || isPdf,
+                            tocContentDescription = if (isPdf) "Aller à une page" else "Sommaire",
+                            surfaceColor = ThemeColors.barSurface(state.resolvedTheme),
+                            accentColor = ThemeColors.accent(state.resolvedTheme),
+                            contentColor = ThemeColors.barContent(state.resolvedTheme),
+                            onAccentColor = ThemeColors.onAccent(state.resolvedTheme),
+                        )
                     }
                 }
 

@@ -31,7 +31,6 @@ class UnifiedControlPanelTest {
             UnifiedControlPanel(
                 isPlaying = false,
                 sleepTimerActive = false,
-                bookProgression = 0.5f,
                 readingMode = ReadingMode.PAGED,
                 onPlayPause = { clicked += "PlayPause" },
                 onSleepTimerClick = { clicked += "Minuteur" },
@@ -66,7 +65,6 @@ class UnifiedControlPanelTest {
             UnifiedControlPanel(
                 isPlaying = false,
                 sleepTimerActive = false,
-                bookProgression = 0.5f,
                 onPlayPause = {},
                 onSleepTimerClick = {},
                 onSearchClick = {},
@@ -90,7 +88,6 @@ class UnifiedControlPanelTest {
             UnifiedControlPanel(
                 isPlaying = false,
                 sleepTimerActive = false,
-                bookProgression = 0.5f,
                 onPlayPause = {},
                 onSleepTimerClick = {},
                 onSearchClick = {},

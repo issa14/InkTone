@@ -28,13 +28,12 @@ import com.inktone.core.designsystem.NarrationPlayButton
 import com.inktone.core.designsystem.AppSymbol
 
 /**
- * Tâche 3b.6 — panneau de contrôle unifié, trois rangées :
- * 1. Barre de progression du livre (déplacée depuis le haut de l'écran —
- *    elle cesse d'être persistante, c'est `StatusLineBar` (3b.4) qui
- *    porte désormais l'information permanente).
- * 2. 5 icônes, Play central proéminent : Sommaire · Marque-pages · Play ·
+ * Tâche 3b.6 — panneau de contrôle unifié, deux rangées d'icônes. La barre
+ * de progression du livre en est retirée : elle répétait le pourcentage de
+ * la ligne de statut, juste en dessous (audit UI P2-8).
+ * 1. 5 icônes, Play central proéminent : Sommaire · Marque-pages · Play ·
  *    Thème · TT.
- * 3. 4 icônes : Minuteur · Haut-parleur · Mode · Recherche. La
+ * 2. 4 icônes : Minuteur · Haut-parleur · Mode · Recherche. La
  *    Luminosité est rangée dans « Réglages du texte » (audit UI P1-6).
  *
  * Navigation par chapitre retirée de ce panneau (chevrons précédent/
@@ -48,7 +47,6 @@ import com.inktone.core.designsystem.AppSymbol
 fun UnifiedControlPanel(
     isPlaying: Boolean,
     sleepTimerActive: Boolean,
-    bookProgression: Float?,
     onPlayPause: () -> Unit,
     onSleepTimerClick: () -> Unit,
     onSearchClick: () -> Unit,
@@ -101,13 +99,6 @@ fun UnifiedControlPanel(
             modifier = Modifier.fillMaxWidth().padding(horizontal = 20.dp, vertical = 12.dp),
             horizontalAlignment = Alignment.CenterHorizontally,
         ) {
-            // Progression inconnue (longueurs pas encore calculées) : pas de
-            // barre plutôt qu'une barre fausse.
-            if (bookProgression != null) {
-                BookProgressBar(progression = bookProgression)
-                Spacer(Modifier.height(12.dp))
-            }
-
             // Bug réel trouvé sur appareil (lot 3b) : Arrangement.SpaceEvenly
             // répartit l'espace ENTRE les bords des enfants, pas par largeur
             // égale — "Marque-pages" (libellé plus long que les autres)

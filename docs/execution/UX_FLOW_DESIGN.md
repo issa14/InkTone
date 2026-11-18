@@ -364,7 +364,7 @@ Flèche de retour, puis titre du livre (plus grand) et nom de l'auteur en dessou
 
 ### Panneau unifié, 3 rangées
 
-- **Rangée 1 :** barre fine de progression du livre entier (répète l'information de la ligne de statut, mais visible uniquement avec le HUD).
+- **Rangée 1 :** barre fine de progression du livre entier (répète l'information de la ligne de statut, mais visible uniquement avec le HUD). **Retirée (audit UI P2-8, 2026-11-18)** : elle doublait le pourcentage de la ligne de statut affichée juste en dessous ; elle ne reviendrait qu'en curseur « Aller à … % », qui demande une navigation par pourcentage encore inexistante.
 - **Rangée 2** (5 icônes) : Sommaire · Marque-pages (affiche marque-pages et notes) · **Play** — pour lancer le TTS, bouton central, visuellement mis en avant (plus grand, rempli, couleur d'accent, distinct des autres icônes de la rangée) · Thème du lecteur · Taille et espacement du texte (« TT », glyphe provisoire — une vraie icône reste à trouver pour l'implémentation).
 - **Rangée 3** (4 icônes) : Minuteur de sommeil · **Haut-parleur** — options TTS (voix, volume, vitesse) · Mode de défilement (continu/paginé — redevient un vrai choix fonctionnel suite à la décision révisée ci-dessus) · Luminosité.
 
