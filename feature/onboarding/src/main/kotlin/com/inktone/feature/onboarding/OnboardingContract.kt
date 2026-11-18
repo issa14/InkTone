@@ -7,9 +7,17 @@ package com.inktone.feature.onboarding
  * intent : terminer et poser l'indicateur persisté
  * (`UserPreferences.hasSeenOnboarding`).
  */
-data class OnboardingUiState(val hasCompleted: Boolean = false)
+data class OnboardingUiState(
+    val hasCompleted: Boolean = false,
+    /** Terminé par « Importer un livre » : la Bibliothèque ouvre aussitôt le sélecteur. */
+    val importFirstBook: Boolean = false,
+)
 
 sealed interface OnboardingIntent {
-    /** Envoyé par « Passer » (cartes 1/2) et « Commencer » (carte 3) — les deux terminent l'onboarding. */
-    data object Complete : OnboardingIntent
+    /**
+     * Termine l'onboarding : « Passer », « Plus tard », ou « Importer un livre »
+     * avec [importFirstBook] (audit UI P1-15 : sans détour par une
+     * bibliothèque vide qui redemande d'importer).
+     */
+    data class Complete(val importFirstBook: Boolean = false) : OnboardingIntent
 }

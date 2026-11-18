@@ -6,7 +6,6 @@ import androidx.compose.foundation.Image
 import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
-import androidx.compose.foundation.isSystemInDarkTheme
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -37,6 +36,15 @@ import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.compose.runtime.getValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.semantics.contentDescription
+import androidx.compose.ui.semantics.clearAndSetSemantics
+import androidx.compose.ui.platform.LocalDensity
+import androidx.compose.ui.graphics.luminance
+import androidx.compose.foundation.verticalScroll
+import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.layout.heightIn
+import androidx.compose.foundation.layout.ColumnScope
+import androidx.compose.foundation.layout.BoxWithConstraints
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.geometry.Size
@@ -72,8 +80,12 @@ import com.inktone.core.designsystem.NarrativeAccentFamily
 val InkToneViolet = Color(0xFF2C1E67)
 val InkToneVioletLight = Color(0xFFA698E1)
 
+/** Thème réellement appliqué, pas celui du système : l'app peut forcer le clair ou le sombre. */
 @Composable
-private fun accentColor(): Color = if (isSystemInDarkTheme()) InkToneVioletLight else InkToneViolet
+private fun isAppInDarkTheme(): Boolean = MaterialTheme.colorScheme.background.luminance() < 0.5f
+
+@Composable
+private fun accentColor(): Color = if (isAppInDarkTheme()) InkToneVioletLight else InkToneViolet
 
 /**
  * Lot 10, Tâche 10.2 — `HorizontalPager` à trois cartes. Retour Issa
@@ -84,20 +96,23 @@ private fun accentColor(): Color = if (isSystemInDarkTheme()) InkToneVioletLight
  * sombre pour rester lisible.
  */
 @Composable
-fun OnboardingScreen(viewModel: OnboardingViewModel = hiltViewModel(), onDone: () -> Unit = {}) {
+fun OnboardingScreen(
+    viewModel: OnboardingViewModel = hiltViewModel(),
+    onDone: (importFirstBook: Boolean) -> Unit = {},
+) {
     val state by viewModel.state.collectAsStateWithLifecycle()
     val pagerState = rememberPagerState(pageCount = { 3 })
     val scope = androidx.compose.runtime.rememberCoroutineScope()
     val accent = accentColor()
 
     LaunchedEffect(state.hasCompleted) {
-        if (state.hasCompleted) onDone()
+        if (state.hasCompleted) onDone(state.importFirstBook)
     }
 
     Scaffold { innerPadding ->
-        Box(Modifier.fillMaxSize().padding(innerPadding)) {
-            HorizontalPager(state = pagerState, modifier = Modifier.fillMaxSize()) { page ->
-                Box(Modifier.fillMaxSize().padding(horizontal = 24.dp, vertical = 16.dp)) {
+        Column(Modifier.fillMaxSize().padding(innerPadding)) {
+            HorizontalPager(state = pagerState, modifier = Modifier.fillMaxWidth().weight(1f)) { page ->
+                Box(Modifier.fillMaxSize().padding(start = 24.dp, end = 24.dp, top = 16.dp)) {
                     Card(
                         modifier = Modifier.fillMaxSize(),
                         shape = RoundedCornerShape(24.dp),
@@ -107,37 +122,70 @@ fun OnboardingScreen(viewModel: OnboardingViewModel = hiltViewModel(), onDone: (
                         when (page) {
                             0 -> WelcomeCard(accent)
                             1 -> FeaturesCard(accent)
-                            else -> ReadyCard(accent, onStart = { viewModel.onIntent(OnboardingIntent.Complete) })
+                            else -> ReadyCard(
+                                accent,
+                                onImport = { viewModel.onIntent(OnboardingIntent.Complete(importFirstBook = true)) },
+                                onLater = { viewModel.onIntent(OnboardingIntent.Complete()) },
+                            )
                         }
                     }
                 }
             }
 
-            if (pagerState.currentPage < 2) {
-                TextButton(
-                    onClick = { viewModel.onIntent(OnboardingIntent.Complete) },
-                    modifier = Modifier.align(Alignment.TopEnd).padding(24.dp),
-                ) {
-                    Text("Passer", color = accent)
+            // Barre basse hors de la carte : posés dessus, ces boutons
+            // chevauchaient le texte dès qu'il s'allongeait (audit UI P1-15).
+            Row(
+                modifier = Modifier.fillMaxWidth().heightIn(min = 64.dp).padding(horizontal = 16.dp, vertical = 8.dp),
+                verticalAlignment = Alignment.CenterVertically,
+            ) {
+                Box(Modifier.weight(1f), contentAlignment = Alignment.CenterStart) {
+                    if (pagerState.currentPage < 2) {
+                        TextButton(onClick = { viewModel.onIntent(OnboardingIntent.Complete()) }) {
+                            Text("Passer", color = accent)
+                        }
+                    }
                 }
-                // Le balayage seul n'était pas découvrable (audit UX C12).
-                TextButton(
-                    onClick = { scope.launch { pagerState.animateScrollToPage(pagerState.currentPage + 1) } },
-                    modifier = Modifier.align(Alignment.BottomEnd).padding(24.dp),
-                ) {
-                    Text("Suivant", color = accent)
+                PageIndicators(pageCount = 3, currentPage = pagerState.currentPage, accent = accent)
+                Box(Modifier.weight(1f), contentAlignment = Alignment.CenterEnd) {
+                    // Le balayage seul n'était pas découvrable (audit UX C12).
+                    if (pagerState.currentPage < 2) {
+                        TextButton(onClick = { scope.launch { pagerState.animateScrollToPage(pagerState.currentPage + 1) } }) {
+                            Text("Suivant", color = accent)
+                        }
+                    }
                 }
             }
-
-            PageIndicators(
-                pageCount = 3,
-                currentPage = pagerState.currentPage,
-                accent = accent,
-                modifier = Modifier.align(Alignment.BottomCenter).padding(bottom = 32.dp),
-            )
         }
     }
 }
+
+/**
+ * Contenu d'une carte, centré quand il tient et défilable sinon : à grande
+ * police, le bouton de la dernière carte sortait de l'écran (audit UI P1-15).
+ */
+@Composable
+private fun OnboardingPage(
+    horizontalPadding: Dp = 24.dp,
+    horizontalAlignment: Alignment.Horizontal = Alignment.CenterHorizontally,
+    content: @Composable ColumnScope.() -> Unit,
+) {
+    BoxWithConstraints(Modifier.fillMaxSize()) {
+        Column(
+            modifier = Modifier
+                .fillMaxWidth()
+                .verticalScroll(rememberScrollState())
+                .heightIn(min = maxHeight)
+                .padding(horizontal = horizontalPadding, vertical = 24.dp),
+            horizontalAlignment = horizontalAlignment,
+            verticalArrangement = Arrangement.Center,
+            content = content,
+        )
+    }
+}
+
+/** Illustrations réduites à grande police, pour laisser la place au texte. */
+@Composable
+private fun isLargeFontScale(): Boolean = LocalDensity.current.fontScale > 1.3f
 
 /**
  * Sous-lot 2a — l'icône de l'application (cacatoès + livre) remplace
@@ -147,15 +195,11 @@ fun OnboardingScreen(viewModel: OnboardingViewModel = hiltViewModel(), onDone: (
  */
 @Composable
 private fun WelcomeCard(accent: Color) {
-    Column(
-        modifier = Modifier.fillMaxSize().padding(horizontal = 24.dp),
-        horizontalAlignment = Alignment.CenterHorizontally,
-        verticalArrangement = Arrangement.Center,
-    ) {
+    OnboardingPage {
         Image(
             painter = painterResource(com.inktone.core.designsystem.R.drawable.app_icon_monochrome),
             contentDescription = null,
-            modifier = Modifier.size(180.dp),
+            modifier = Modifier.size(if (isLargeFontScale()) 120.dp else 180.dp),
             contentScale = ContentScale.Fit,
             colorFilter = ColorFilter.tint(accent),
         )
@@ -174,10 +218,7 @@ private fun WelcomeCard(accent: Color) {
  */
 @Composable
 private fun FeaturesCard(accent: Color) {
-    Column(
-        modifier = Modifier.fillMaxSize().padding(horizontal = 32.dp),
-        verticalArrangement = Arrangement.Center,
-    ) {
+    OnboardingPage(horizontalPadding = 32.dp, horizontalAlignment = Alignment.Start) {
         Text(
             "Lire et écouter",
             style = MaterialTheme.typography.headlineMedium.emphasized(),
@@ -227,26 +268,22 @@ private fun FeatureRow(accent: Color, icon: AppSymbol, title: String, body: Stri
 }
 
 @Composable
-private fun ReadyCard(accent: Color, onStart: () -> Unit) {
-    Column(
-        modifier = Modifier.fillMaxSize().padding(horizontal = 24.dp),
-        horizontalAlignment = Alignment.CenterHorizontally,
-        verticalArrangement = Arrangement.Center,
-    ) {
+private fun ReadyCard(accent: Color, onImport: () -> Unit, onLater: () -> Unit) {
+    OnboardingPage {
         // Carte 3 volontairement différenciée de la carte 1 (retour Issa) :
         // icône livre AU CENTRE EXACT de cercles concentriques, pas la
         // même composition que l'accueil.
         // Alpha des bordures dépendant du thème (retour Issa, V2206) : à
         // alpha fixe, les cercles s'effacent sur le fond quasi noir du
-        // thème sombre — un alpha fixe appliqué à une couleur déjà proche
-        // du fond passe sous le seuil de perception.
-        val isDark = isSystemInDarkTheme()
+        // thème sombre.
+        val isDark = isAppInDarkTheme()
         val outerAlpha = if (isDark) 0.35f else 0.15f
         val innerAlpha = if (isDark) 0.55f else 0.3f
+        val scale = if (isLargeFontScale()) 0.75f else 1f
         Box(contentAlignment = Alignment.Center) {
-            Box(Modifier.size(140.dp).clip(CircleShape).border(1.dp, accent.copy(alpha = outerAlpha), CircleShape))
-            Box(Modifier.size(112.dp).clip(CircleShape).border(1.dp, accent.copy(alpha = innerAlpha), CircleShape))
-            BrandIcon(icon = AppSymbol.Reading, size = 88.dp, tint = accent)
+            Box(Modifier.size(140.dp * scale).clip(CircleShape).border(1.dp, accent.copy(alpha = outerAlpha), CircleShape))
+            Box(Modifier.size(112.dp * scale).clip(CircleShape).border(1.dp, accent.copy(alpha = innerAlpha), CircleShape))
+            BrandIcon(icon = AppSymbol.Reading, size = 88.dp * scale, tint = accent)
         }
         Spacer(Modifier.height(32.dp))
         Text(
@@ -258,18 +295,18 @@ private fun ReadyCard(accent: Color, onStart: () -> Unit) {
         Spacer(Modifier.height(12.dp))
         BodyText("EPUB, PDF ou TXT, depuis votre téléphone ou un catalogue en ligne.")
         Spacer(Modifier.height(32.dp))
-        // Contraste force explicitement (retour Issa) : le bouton plein
-        // reste sur le bordeaux standard (pas la variante claire) avec un
-        // texte blanc force, lisible en clair comme en sombre par son
-        // propre contraste, independamment de accentColor().
+        // Contraste forcé (retour Issa) : violet de marque et texte blanc,
+        // lisibles en clair comme en sombre, indépendamment de accentColor().
         Button(
-            onClick = onStart,
+            onClick = onImport,
             modifier = Modifier.fillMaxWidth(0.7f),
             colors = ButtonDefaults.buttonColors(containerColor = InkToneViolet, contentColor = Color.White),
         ) {
-            Text("Commencer")
+            Text("Importer un livre")
         }
-        Spacer(Modifier.height(32.dp))
+        TextButton(onClick = onLater) {
+            Text("Plus tard", color = accent)
+        }
     }
 }
 
@@ -283,7 +320,7 @@ private fun BrandIcon(icon: AppSymbol, size: Dp, tint: Color) {
 private fun BodyText(text: String) {
     Text(
         text,
-        style = MaterialTheme.typography.bodyLarge.copy(fontSize = 15.sp, lineHeight = 24.sp),
+        style = MaterialTheme.typography.bodyLarge,
         textAlign = TextAlign.Center,
         color = MaterialTheme.colorScheme.onSurfaceVariant,
         modifier = Modifier.padding(horizontal = 32.dp),
@@ -292,7 +329,10 @@ private fun BodyText(text: String) {
 
 @Composable
 private fun PageIndicators(pageCount: Int, currentPage: Int, accent: Color, modifier: Modifier = Modifier) {
-    Row(modifier, horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+    Row(
+        modifier.clearAndSetSemantics { contentDescription = "Page ${currentPage + 1} sur $pageCount" },
+        horizontalArrangement = Arrangement.spacedBy(8.dp),
+    ) {
         repeat(pageCount) { index ->
             val isActive = index == currentPage
             Box(

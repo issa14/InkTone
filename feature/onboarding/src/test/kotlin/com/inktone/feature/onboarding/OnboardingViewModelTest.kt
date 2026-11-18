@@ -16,7 +16,7 @@ import org.junit.Test
 /**
  * Lot 10, Tâche 10.7 — l'onboarding est redevenu une pure présentation
  * (Tâche 10.3) : `OnboardingIntent` ne porte plus que `Complete`, envoyé
- * aussi bien par « Passer » (cartes 1/2) que par « Commencer » (carte 3)
+ * aussi bien par « Passer » (cartes 1/2) que par « Plus tard » ou « Importer un livre » (carte 3)
  * dans `OnboardingScreen`. `SetCrashReporting`/`StartVoiceDownload`
  * n'existent plus — cette absence est déjà prouvée par la compilation de
  * ce fichier, pas seulement par ces tests.
@@ -44,7 +44,7 @@ class OnboardingViewModelTest {
         assertTrue(!preferencesRepository.get().hasSeenOnboarding)
         val viewModel = OnboardingViewModel(preferencesRepository)
 
-        viewModel.onIntent(OnboardingIntent.Complete)
+        viewModel.onIntent(OnboardingIntent.Complete())
         dispatcher.scheduler.advanceUntilIdle()
 
         assertTrue(preferencesRepository.get().hasSeenOnboarding)
@@ -57,11 +57,24 @@ class OnboardingViewModelTest {
         val before = preferencesRepository.get()
         val viewModel = OnboardingViewModel(preferencesRepository)
 
-        viewModel.onIntent(OnboardingIntent.Complete)
+        viewModel.onIntent(OnboardingIntent.Complete())
         dispatcher.scheduler.advanceUntilIdle()
 
         val after = preferencesRepository.get()
         assertEquals(before.crashReportingEnabled, after.crashReportingEnabled)
         assertEquals(before.theme, after.theme)
+    }
+
+    @Test
+    fun importer_un_livre_termine_et_demande_le_selecteur() = runTest {
+        val preferencesRepository = FakePreferencesRepository()
+        val viewModel = OnboardingViewModel(preferencesRepository)
+
+        viewModel.onIntent(OnboardingIntent.Complete(importFirstBook = true))
+        dispatcher.scheduler.advanceUntilIdle()
+
+        assertTrue(preferencesRepository.get().hasSeenOnboarding)
+        assertTrue(viewModel.state.value.hasCompleted)
+        assertTrue(viewModel.state.value.importFirstBook)
     }
 }

@@ -107,6 +107,9 @@ fun InkToneNavHost(navController: NavHostController = rememberNavController(), s
     val backStackEntry by navController.currentBackStackEntryAsState()
     val currentDestination = backStackEntry?.destination
     val drawerDestination = currentDestination?.toDrawerDestination()
+    // Demande de l'onboarding, consommée par la Bibliothèque à son arrivée :
+    // tenue ici, l'onboarding quittant la composition en naviguant.
+    var openImportPickerOnLibrary by remember { mutableStateOf(false) }
 
     /**
      * Navigue vers une destination principale du drawer : `launchSingleTop`
@@ -232,7 +235,8 @@ fun InkToneNavHost(navController: NavHostController = rememberNavController(), s
         ) {
         composable<OnboardingRoute> {
             OnboardingScreen(
-                onDone = {
+                onDone = { importFirstBook ->
+                    openImportPickerOnLibrary = importFirstBook
                     // Retire l'onboarding du back stack : un retour système
                     // depuis la Bibliothèque ne doit jamais y ramener
                     // (indicateur déjà posé, piège explicite du plan).
@@ -251,6 +255,14 @@ fun InkToneNavHost(navController: NavHostController = rememberNavController(), s
                     importViewModel.enqueueImport(uris.map { it.toString() })
                 }
             }
+            // « Importer un livre » de l'onboarding : le sélecteur s'ouvre à
+            // l'arrivée, avec le lanceur de cet écran (audit UI P1-15).
+            LaunchedEffect(openImportPickerOnLibrary) {
+                if (openImportPickerOnLibrary) {
+                    openImportPickerOnLibrary = false
+                    importLauncher.launch(IMPORT_MIME_TYPES)
+                }
+            }
             LibraryScreen(
                 onNavigateToReader = { publicationId, autoStartTts ->
                     navController.navigate(ReaderRoute(publicationId, autoStartTts = autoStartTts))
@@ -258,7 +270,7 @@ fun InkToneNavHost(navController: NavHostController = rememberNavController(), s
                 onMenuClick = openDrawer,
                 onNavigateToSeriesDetail = { series -> navController.navigate(LibraryDetailRoute("series", series)) },
                 onNavigateToTagDetail = { tag -> navController.navigate(LibraryDetailRoute("tag", tag)) },
-                onImportClick = { importLauncher.launch(arrayOf("application/epub+zip", "text/plain", "application/pdf")) },
+                onImportClick = { importLauncher.launch(IMPORT_MIME_TYPES) },
                 // Lot 19 — « Synchroniser avec le cloud » non configuré
                 // bascule vers l'écran de configuration de la sync.
                 onOpenSync = { navigateToDrawerDestination(SyncRoute) },
@@ -653,3 +665,6 @@ private fun NavHostController.leaveReader() {
         navigate(LibraryRoute) { popUpTo(graph.id) { inclusive = true } }
     }
 }
+
+/** Formats proposés au sélecteur d'import (EPUB, TXT, PDF). */
+private val IMPORT_MIME_TYPES = arrayOf("application/epub+zip", "text/plain", "application/pdf")

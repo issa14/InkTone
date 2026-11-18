@@ -30,14 +30,14 @@ class OnboardingViewModel @Inject constructor(
 
     fun onIntent(intent: OnboardingIntent) {
         when (intent) {
-            is OnboardingIntent.Complete -> complete()
+            is OnboardingIntent.Complete -> complete(intent.importFirstBook)
         }
     }
 
-    private fun complete() {
+    private fun complete(importFirstBook: Boolean) {
         viewModelScope.launch {
             preferencesRepository.update { it.copy(hasSeenOnboarding = true) }
-            _state.value = _state.value.copy(hasCompleted = true)
+            _state.value = _state.value.copy(hasCompleted = true, importFirstBook = importFirstBook)
         }
     }
 }

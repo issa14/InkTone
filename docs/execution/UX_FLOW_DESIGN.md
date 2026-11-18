@@ -66,6 +66,7 @@ Premier lancement → Onboarding → Bibliothèque (centre de navigation)
 - **Titre (validé, lot 10) :** « Votre prochaine histoire vous attend »
 - **Sous-texte (validé, lot 10) :** « Importez vos livres et commencez l'expérience InkTone. »
 - **Bouton :** « Commencer » (mène à la Bibliothèque)
+- **Écart (audit UI P1-15, 2026-11-18) :** « Commencer » devient **« Importer un livre »**, qui termine l'onboarding et ouvre le sélecteur à l'arrivée sur la Bibliothèque, plus un bouton texte **« Plus tard »**. Passer, l'indicateur de pages (annoncé « Page N sur 3 ») et Suivant forment une barre basse **hors** de la carte ; chaque carte défile quand son contenu ne tient pas, illustrations réduites au-delà d'une police à 130 %. Les textes des cartes sont ceux du code (« Ajoutez votre premier livre »…), qui priment sur les brouillons ci-dessus.
 
 ### Points ouverts — résolus au lot 10
 
