@@ -1,6 +1,5 @@
 package com.inktone.feature.library
 
-import androidx.compose.material3.LocalTextStyle
 import com.inktone.core.designsystem.emphasized
 import android.net.Uri
 import androidx.compose.foundation.background
@@ -23,6 +22,8 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.foundation.layout.defaultMinSize
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.draw.shadow
 import androidx.compose.ui.graphics.Brush
@@ -35,7 +36,6 @@ import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
-import androidx.compose.ui.unit.sp
 import coil.compose.AsyncImage
 import coil.request.ImageRequest
 import com.inktone.core.designsystem.AppIcon
@@ -160,26 +160,27 @@ fun BookCover(
                 modifier = Modifier
                     .align(Alignment.BottomEnd)
                     .padding(6.dp)
-                    .size(32.dp)
-                    .clip(CircleShape)
+                    // Pastille qui s'élargit avec son texte : un disque fixe de 32 dp
+                    // laissait déborder « 100 % » à grande police (audit UI P2-6).
+                    .defaultMinSize(minWidth = 32.dp, minHeight = 24.dp)
+                    .clip(RoundedCornerShape(50))
                     .background(Color.Black.copy(alpha = 0.55f))
+                    .padding(horizontal = 6.dp)
                     .semantics { contentDescription = "Progression ${formatPercent(progressPercent)}" },
                 contentAlignment = Alignment.Center,
             ) {
                 Text(
                     text = formatPercent(progressPercent),
                     color = Color.White,
-                    fontSize = 10.sp,
-                    style = LocalTextStyle.current.emphasized(),
+                    style = MaterialTheme.typography.labelSmall.emphasized(),
                     textAlign = TextAlign.Center,
                 )
             }
         }
 
-        // Menu 3-points — coin inférieur gauche, ouvre le popup d'actions
-        // (lot 2b.3 : remplace les points décoratifs sans logique).
-        // Retour UX : plus de fond circulaire — icône blanche seule,
-        // une shadow légère assure le contraste sur couverture claire.
+        // Menu 3-points — coin inférieur gauche, ouvre le popup d'actions.
+        // Disque sombre sous l'icône : une ombre seule laissait le glyphe blanc
+        // invisible sur une couverture claire (audit UI P2-6).
         if (showOverlays) {
             // Zone tactile de 48 dp (audit UX C3), mais icône calée dans le coin :
             // centrée dans la zone, le glyphe fin flottait à 24 dp du bord.
@@ -195,19 +196,20 @@ fun BookCover(
                         onClick = { showActionsSheet = true },
                     ),
             ) {
-                AppIcon(
-                    AppSymbol.MoreActions,
-                    contentDescription = "Actions sur « ${publication.title} »",
-                    tint = Color.White,
+                Box(
+                    contentAlignment = Alignment.Center,
                     modifier = Modifier
-                        .padding(start = 2.dp, bottom = 4.dp)
-                        .shadow(
-                            elevation = 6.dp,
-                            shape = CircleShape,
-                            clip = false,
-                            spotColor = Color.Black.copy(alpha = 0.7f),
-                        ),
-                )
+                        .padding(start = 4.dp, bottom = 4.dp)
+                        .size(32.dp)
+                        .background(Color.Black.copy(alpha = 0.45f), CircleShape),
+                ) {
+                    AppIcon(
+                        AppSymbol.MoreActions,
+                        contentDescription = "Actions sur « ${publication.title} »",
+                        tint = Color.White,
+                        modifier = Modifier.size(20.dp),
+                    )
+                }
             }
         }
 
@@ -308,17 +310,19 @@ private fun CoverPlaceholder(title: String, showTitle: Boolean) {
     Box(
         modifier = Modifier
             .fillMaxSize()
-            .background(brush = gradient),
+            .background(brush = gradient)
+            // Voile vers le bas : le titre blanc reste lisible sur les teintes claires (audit UI P2-6).
+            .background(brush = PlaceholderVeil),
         contentAlignment = Alignment.Center,
     ) {
         if (showTitle) {
             Text(
                 text = title,
                 modifier = Modifier.padding(8.dp),
-                color = Color.White.copy(alpha = 0.7f),
+                color = Color.White,
                 maxLines = 5,
                 overflow = TextOverflow.Ellipsis,
-                style = MaterialTheme.typography.bodySmall,
+                style = MaterialTheme.typography.labelLarge,
                 textAlign = TextAlign.Center,
             )
         }
@@ -331,13 +335,15 @@ private fun CoverPlaceholder(title: String, showTitle: Boolean) {
 private val CoverGradientPalette = listOf(
     Color(0xFF1565C0) to Color(0xFF1E88E5), // Bleu
     Color(0xFF6A1B9A) to Color(0xFF8E24AA), // Violet
-    Color(0xFF2E7D32) to Color(0xFF43A047), // Vert
-    Color(0xFFE65100) to Color(0xFFF57C00), // Orange
+    Color(0xFF1B5E20) to Color(0xFF2E7D32), // Vert
+    Color(0xFFBF360C) to Color(0xFFE65100), // Orange
     Color(0xFFC62828) to Color(0xFFE53935), // Rouge
     Color(0xFF00695C) to Color(0xFF00897B), // Teal
     Color(0xFF283593) to Color(0xFF3949AB), // Indigo
     Color(0xFF4E342E) to Color(0xFF6D4C41), // Brun
 )
+
+private val PlaceholderVeil = Brush.verticalGradient(listOf(Color.Transparent, Color.Black.copy(alpha = 0.35f)))
 
 /**
  * Dégradé déterministe basé sur le hash du titre — 3 couleurs parmi
