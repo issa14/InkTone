@@ -295,21 +295,6 @@ class SettingsViewModelTest {
     }
 
     @Test
-    fun `l intervalle de repos oculaire reste modifiable independamment du rappel`() = runTest {
-        val preferencesRepository = FakePreferencesRepository()
-        val vm = viewModel(preferencesRepository)
-        dispatcher.scheduler.advanceUntilIdle()
-
-        vm.onIntent(SettingsIntent.SetEyeRestReminderEnabled(false))
-        vm.onIntent(SettingsIntent.SetEyeRestReminderIntervalMinutes(30))
-        dispatcher.scheduler.advanceUntilIdle()
-
-        val prefs = preferencesRepository.get()
-        assertEquals(false, prefs.eyeRestReminderEnabled)
-        assertEquals(30, prefs.eyeRestReminderIntervalMinutes)
-    }
-
-    @Test
     fun `l objectif quotidien se met a jour`() = runTest {
         val preferencesRepository = FakePreferencesRepository()
         val vm = viewModel(preferencesRepository)

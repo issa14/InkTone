@@ -1,5 +1,9 @@
 package com.inktone.feature.reader
 
+import androidx.compose.foundation.verticalScroll
+
+import androidx.compose.foundation.rememberScrollState
+
 import com.inktone.core.designsystem.NARROW_NBSP
 
 import androidx.compose.material3.LocalTextStyle
@@ -84,6 +88,8 @@ fun SleepTimerPanel(
         Column(
             modifier = Modifier
                 .fillMaxWidth()
+                // Puces, roue et repos oculaire ne tiennent pas à grande police (audit UI P2-16).
+                .verticalScroll(rememberScrollState())
                 .padding(horizontal = 24.dp, vertical = 16.dp),
         ) {
             if (showSleepTimer) {

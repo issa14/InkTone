@@ -178,10 +178,6 @@ class SettingsViewModel @Inject constructor(
                 // Lot 6 — objectif quotidien et bien-être
                 is SettingsIntent.SetDailyGoalMinutes ->
                     preferencesRepository.update { it.copy(dailyGoalMinutes = intent.minutes) }
-                is SettingsIntent.SetEyeRestReminderEnabled ->
-                    preferencesRepository.update { it.copy(eyeRestReminderEnabled = intent.enabled) }
-                is SettingsIntent.SetEyeRestReminderIntervalMinutes ->
-                    preferencesRepository.update { it.copy(eyeRestReminderIntervalMinutes = intent.minutes) }
                 // Audit v1.0.0 (B1) — « Écouter un extrait » ré-implémenté :
                 // bascule lecture/arrêt d'une phrase d'exemple.
                 is SettingsIntent.PlayPreview -> togglePreview()

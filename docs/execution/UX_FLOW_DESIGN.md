@@ -571,7 +571,7 @@ Deux volets : la carte liste, et le dialogue modal d'ajout/édition.
 Ajoutée après coup à l'écran Réglages (initialement conçu avec 5 cartes). Regroupe objectifs de lecture personnels et suivi de la santé visuelle.
 
 - **Objectif quotidien de lecture** : ligne affichant la cible actuelle (**30 min par défaut**), ouvre un **dialogue avec curseur continu** au clic (plage 10 min à 120 min) — cohérent avec le pattern déjà utilisé pour Vitesse/Gain/Pitch (carte Lecture). Alimente directement la jauge de progression et le calcul du streak dans l'écran Statistiques (§ Section 1 — KPIs & Objectifs).
-- **Rappel de repos oculaire** : toggle, réutilise **exactement** le mécanisme déjà spécifié dans le sous-écran Minuteur du panneau unifié (§ Minuteur — deux fonctions distinctes) — désactivé par défaut (opt-in, audit UX A5), déclenché après 1h fixe par défaut.
+- **Rappel de repos oculaire** : toggle, réutilise **exactement** le mécanisme déjà spécifié dans le sous-écran Minuteur du panneau unifié (§ Minuteur — deux fonctions distinctes) — désactivé par défaut (opt-in, audit UX A5), déclenché après 1h fixe par défaut. **Retiré des Réglages (audit UI P2-16, 2026-11-18)** : le rappel et son intervalle ne se règlent plus qu'au Lecteur, panneau Minuteur.
 - **Intervalle de pause** : visible/actif seulement si le rappel est activé, même **stepper (−/+) par pas de 15 min** que dans le sous-écran Minuteur — pas un nouveau mécanisme, le même réglage exposé à un second endroit (cohérent avec le pattern déjà vu pour la règle de prononciation, accessible à la fois en accès rapide et en gestion complète).
 
 Mockup validé sans correction.

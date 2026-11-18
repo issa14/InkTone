@@ -365,21 +365,8 @@ internal fun SettingsContent(
                 value = "${preferences.dailyGoalMinutes} min",
                 onClick = { showGoalPicker = true },
             )
-            ToggleSetting(
-                label = "Rappel de repos oculaire",
-                checked = preferences.eyeRestReminderEnabled,
-                onCheckedChange = { onIntent(SettingsIntent.SetEyeRestReminderEnabled(it)) },
-            )
-            // Stepper désactivé visuellement quand le rappel est éteint.
-            StepperSetting(
-                label = "Intervalle du rappel",
-                value = preferences.eyeRestReminderIntervalMinutes,
-                step = 15,
-                range = UserPreferences.EYE_REST_INTERVAL_RANGE,
-                enabled = preferences.eyeRestReminderEnabled,
-                displayFormatter = { "$it min" },
-                onValueChange = { onIntent(SettingsIntent.SetEyeRestReminderIntervalMinutes(it)) },
-            )
+            // Le repos oculaire se règle au seul Lecteur, panneau Minuteur, là
+            // où l'on en a besoin : deux endroits, deux libellés (audit UI P2-16).
         }
 
         // ── Données ──
@@ -755,44 +742,6 @@ private fun ToggleSetting(label: String, checked: Boolean, onCheckedChange: (Boo
         trailingContent = { Switch(checked = checked, onCheckedChange = null) },
         colors = settingsItemColors(),
         modifier = Modifier.toggleable(value = checked, onValueChange = onCheckedChange, role = Role.Switch),
-    )
-}
-
-/** Stepper −/+ par pas, grisé quand [enabled] est faux. */
-@Composable
-private fun StepperSetting(
-    label: String,
-    value: Int,
-    step: Int,
-    range: IntRange,
-    enabled: Boolean,
-    displayFormatter: (Int) -> String,
-    onValueChange: (Int) -> Unit,
-) {
-    val contentColor = if (enabled) MaterialTheme.colorScheme.onSurface
-    else MaterialTheme.colorScheme.onSurface.copy(alpha = 0.38f)
-
-    ListItem(
-        headlineContent = { Text(label, color = contentColor) },
-        // Le stepper ne prend que sa largeur : le libellé garde le reste.
-        trailingContent = {
-            Row(verticalAlignment = Alignment.CenterVertically) {
-                IconButton(
-                    onClick = { onValueChange((value - step).coerceIn(range)) },
-                    enabled = enabled && value > range.first,
-                ) { AppIcon(AppSymbol.Remove, contentDescription = "Diminuer $label") }
-                Text(
-                    text = displayFormatter(value),
-                    style = MaterialTheme.typography.bodyMedium,
-                    color = contentColor,
-                )
-                IconButton(
-                    onClick = { onValueChange((value + step).coerceIn(range)) },
-                    enabled = enabled && value < range.last,
-                ) { AppIcon(AppSymbol.Add, contentDescription = "Augmenter $label") }
-            }
-        },
-        colors = settingsItemColors(),
     )
 }
 
