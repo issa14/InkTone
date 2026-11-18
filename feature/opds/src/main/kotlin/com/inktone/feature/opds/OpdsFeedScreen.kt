@@ -203,7 +203,7 @@ private fun DirectoryCard(
     Card(onClick = { onOpenNavigation(item) }) {
         ListItem(
             headlineContent = { Text(item.title, maxLines = 2, overflow = TextOverflow.Ellipsis) },
-            leadingContent = { AppIcon(AppSymbol.Article, contentDescription = null) },
+            leadingContent = { AppIcon(AppSymbol.Folder, contentDescription = null) },
             trailingContent = { AppIcon(AppSymbol.ChevronRight, contentDescription = null) },
             colors = ListItemDefaults.colors(containerColor = Color.Transparent),
         )
@@ -238,7 +238,7 @@ private fun BookCard(
                     Modifier.fillMaxWidth().aspectRatio(2f / 3f),
                     contentAlignment = Alignment.Center,
                 ) {
-                    AppIcon(AppSymbol.Article, contentDescription = null)
+                    AppIcon(AppSymbol.CoverOnly, contentDescription = null)
                 }
             }
             Column(Modifier.padding(12.dp)) {

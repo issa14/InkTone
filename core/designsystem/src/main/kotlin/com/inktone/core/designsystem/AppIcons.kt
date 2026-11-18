@@ -135,6 +135,7 @@ enum class AppSymbol(
     Download(R.drawable.ic_symbol_download),
     ChevronRight(R.drawable.ic_symbol_chevron_right),
     Article(R.drawable.ic_symbol_article),
+    Folder(R.drawable.ic_symbol_folder),
     Speed(R.drawable.ic_symbol_speed),
     ArrowForward(R.drawable.ic_symbol_arrow_forward),
     VolumeDown(R.drawable.ic_symbol_volume_down),

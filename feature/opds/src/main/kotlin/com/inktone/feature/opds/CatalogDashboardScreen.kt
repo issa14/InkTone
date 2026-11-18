@@ -17,6 +17,8 @@ import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Card
+import androidx.compose.material3.DropdownMenuItem
+import androidx.compose.material3.DropdownMenu
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.FloatingActionButton
@@ -299,6 +301,7 @@ private fun CatalogCard(
     onRemove: () -> Unit,
 ) {
     var confirmRemove by remember { mutableStateOf(false) }
+    var menuOpen by remember { mutableStateOf(false) }
 
     Card(onClick = onClick) {
         Column(Modifier.fillMaxWidth().padding(16.dp)) {
@@ -312,11 +315,24 @@ private fun CatalogCard(
                     overflow = TextOverflow.Ellipsis,
                     modifier = Modifier.weight(1f),
                 )
-                IconButton(onClick = onEdit) {
-                    AppIcon(AppSymbol.Edit, contentDescription = "Modifier ${catalog.name}")
-                }
-                IconButton(onClick = { confirmRemove = true }) {
-                    AppIcon(AppSymbol.Delete, contentDescription = "Supprimer ${catalog.name}")
+                // Un menu plutôt que Modifier et Supprimer côte à côte : l'action
+                // destructive n'est plus à un doigt de l'édition (audit UI P2-10).
+                Box {
+                    IconButton(onClick = { menuOpen = true }) {
+                        AppIcon(AppSymbol.MoreActions, contentDescription = "Actions sur ${catalog.name}")
+                    }
+                    DropdownMenu(expanded = menuOpen, onDismissRequest = { menuOpen = false }) {
+                        DropdownMenuItem(
+                            text = { Text("Modifier") },
+                            leadingIcon = { AppIcon(AppSymbol.Edit, contentDescription = null) },
+                            onClick = { menuOpen = false; onEdit() },
+                        )
+                        DropdownMenuItem(
+                            text = { Text("Supprimer") },
+                            leadingIcon = { AppIcon(AppSymbol.Delete, contentDescription = null) },
+                            onClick = { menuOpen = false; confirmRemove = true },
+                        )
+                    }
                 }
             }
             Text(
