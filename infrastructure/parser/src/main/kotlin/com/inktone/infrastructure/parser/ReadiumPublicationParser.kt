@@ -288,16 +288,21 @@ class ReadiumPublicationParser @Inject constructor(
             ?: return@withContext null
 
         val coverFile = coverStorage.coverFileFor(fileUri)
+        // Réduite à l'enregistrement : décodée à chaque vignette, une image en
+        // pleine résolution coûtait 200 ms à plus d'une seconde par couverture
+        // pendant le défilement de la Bibliothèque (mesuré sur appareil).
+        val stored = bitmap.scaledToMaxHeight(MAX_STORED_COVER_HEIGHT_PX)
 
         try {
             FileOutputStream(coverFile).use { out ->
-                bitmap.compress(Bitmap.CompressFormat.JPEG, 85, out)
+                stored.compress(Bitmap.CompressFormat.JPEG, 85, out)
             }
             coverFile.absolutePath
         } catch (e: Exception) {
             android.util.Log.w("ReadiumParser", "Échec sauvegarde couverture pour $fileUri", e)
             null
         } finally {
+            if (stored !== bitmap) stored.recycle()
             bitmap.recycle()
         }
     }
@@ -374,3 +379,12 @@ class ReadiumPublicationParser @Inject constructor(
 /** Vrai pour une adresse de page de livre (XHTML, HTML), faux pour une image ou tout autre fichier. */
 private fun String.isPageHref(): Boolean =
     substringBefore('#').substringBefore('?').lowercase().let { it.endsWith(".xhtml") || it.endsWith(".html") || it.endsWith(".htm") }
+
+/** Hauteur des couvertures enregistrées : la plus grande vue (fiche du livre) n'en demande pas plus. */
+private const val MAX_STORED_COVER_HEIGHT_PX = 900
+
+private fun Bitmap.scaledToMaxHeight(maxHeight: Int): Bitmap {
+    if (height <= maxHeight) return this
+    val width = (width.toLong() * maxHeight / height).toInt().coerceAtLeast(1)
+    return Bitmap.createScaledBitmap(this, width, maxHeight, true)
+}
