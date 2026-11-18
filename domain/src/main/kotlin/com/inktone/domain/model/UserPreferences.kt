@@ -130,6 +130,8 @@ data class UserPreferences(
     val volumeKeysTurnPages: Boolean = false,
     /** État d'avant le préréglage Accessibilité ; `null` quand il n'est pas actif (audit UX A11). */
     val accessibilityPresetBackup: AccessibilityPresetBackup? = null,
+    /** L'heure s'affiche dans la ligne de statut du Lecteur ; activé par défaut (audit UI P2-4). */
+    val statusLineShowsClock: Boolean = true,
 ) {
     init {
         require(fontSize > 0) { "fontSize doit être strictement positif" }

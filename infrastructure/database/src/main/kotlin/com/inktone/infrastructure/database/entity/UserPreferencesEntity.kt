@@ -56,4 +56,6 @@ data class UserPreferencesEntity(
     val accessibilityPresetBackup: String? = null,
     // Audit UX D75 (MIGRATION_36_37) — touches de volume = tourner la page, opt-in.
     val volumeKeysTurnPages: Boolean = false,
+    // Audit UI P2-4 (MIGRATION_41_42) — heure dans la ligne de statut, affichée par défaut.
+    val statusLineShowsClock: Boolean = true,
 )

@@ -461,6 +461,9 @@ class ReaderViewModel @Inject constructor(
             is ReaderIntent.SetVolumeKeysTurnPages -> viewModelScope.launch {
                 preferencesRepository.update { it.copy(volumeKeysTurnPages = intent.enabled) }
             }
+            is ReaderIntent.SetStatusLineShowsClock -> viewModelScope.launch {
+                preferencesRepository.update { it.copy(statusLineShowsClock = intent.enabled) }
+            }
             is ReaderIntent.SetFontFamily -> setFontFamily(intent.fontFamily)
             is ReaderIntent.SetKeepScreenOn -> setKeepScreenOn(intent.enabled)
             is ReaderIntent.SetAutoScrollSpeed -> setAutoScrollSpeed(intent.speed)
@@ -2272,6 +2275,7 @@ class ReaderViewModel @Inject constructor(
     private fun ReaderUiState.withGlobalPreferences(preferences: UserPreferences): ReaderUiState = copy(
         isReadingRulerEnabled = preferences.readingRulerEnabled,
         volumeKeysTurnPages = preferences.volumeKeysTurnPages,
+        statusLineShowsClock = preferences.statusLineShowsClock,
         lineHeightMultiplier = preferences.lineHeightMultiplier,
         readerMarginStep = preferences.readerMarginStep,
         isTextJustified = preferences.textJustified,

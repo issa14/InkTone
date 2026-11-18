@@ -1554,8 +1554,12 @@ SelectionActionPopup(
                             showPageCounter = values.showPageCounter,
                             sectionTitle = values.sectionTitle,
                             isFixedPage = isPdf,
-                            contentColor = ThemeColors.barContent(state.resolvedTheme),
-                            backgroundColor = ThemeColors.barSurface(state.resolvedTheme),
+                            // Hors HUD, la page continue sous des chiffres atténués plutôt
+                            // que sous un aplat teinté jamais masqué (audit UI P2-4).
+                            contentColor = ThemeColors.barContent(state.resolvedTheme)
+                                .copy(alpha = if (chrome.isHudVisible) 1f else 0.6f),
+                            backgroundColor = if (chrome.isHudVisible) ThemeColors.barSurface(state.resolvedTheme) else Color.Transparent,
+                            showClock = state.statusLineShowsClock,
                             onBandHeightChanged = { statusLineHeightPx = it },
                         )
                     }
@@ -1620,6 +1624,8 @@ SelectionActionPopup(
                 onReadingRulerChange = { enabled -> viewModel.onIntent(ReaderIntent.SetReadingRulerEnabled(enabled)) },
                 volumeKeysTurnPages = state.volumeKeysTurnPages,
                 onVolumeKeysChange = { enabled -> viewModel.onIntent(ReaderIntent.SetVolumeKeysTurnPages(enabled)) },
+                statusLineShowsClock = state.statusLineShowsClock,
+                onStatusLineShowsClockChange = { enabled -> viewModel.onIntent(ReaderIntent.SetStatusLineShowsClock(enabled)) },
                 brightness = state.readerBrightness,
                 onBrightnessChange = { value -> viewModel.onIntent(ReaderIntent.SetReaderBrightness(value)) },
                 showPdfInversion = isPdf,

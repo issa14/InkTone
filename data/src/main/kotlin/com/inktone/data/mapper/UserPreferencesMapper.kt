@@ -42,6 +42,7 @@ fun UserPreferences.toEntity(): UserPreferencesEntity = UserPreferencesEntity(
     darkModePresetBackup = darkModePresetBackup?.encode(),
     accessibilityPresetBackup = accessibilityPresetBackup?.encode(),
     volumeKeysTurnPages = volumeKeysTurnPages,
+    statusLineShowsClock = statusLineShowsClock,
 )
 
 fun UserPreferencesEntity.toDomain(): UserPreferences = UserPreferences(
@@ -84,4 +85,5 @@ fun UserPreferencesEntity.toDomain(): UserPreferences = UserPreferences(
     darkModePresetBackup = DarkModePresetBackup.decode(darkModePresetBackup),
     accessibilityPresetBackup = AccessibilityPresetBackup.decode(accessibilityPresetBackup),
     volumeKeysTurnPages = volumeKeysTurnPages,
+    statusLineShowsClock = statusLineShowsClock,
 )

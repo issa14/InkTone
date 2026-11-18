@@ -96,6 +96,8 @@ data class ReaderUiState(
     val isReadingRulerEnabled: Boolean = false,
     /** Les touches de volume tournent la page en mode paginé (audit UX D75). */
     val volumeKeysTurnPages: Boolean = false,
+    /** L'heure s'affiche dans la ligne de statut (audit UI P2-4). */
+    val statusLineShowsClock: Boolean = true,
     // A.3 — Message d'erreur surfacé quand le parsing ou l'ouverture
     // échoue. null = pas d'erreur, l'écran affiche le contenu normal.
     val errorMessage: String? = null,
@@ -560,6 +562,7 @@ sealed interface ReaderIntent {
 
     /** Touches de volume pour tourner la page, réglage global désactivé par défaut. */
     data class SetVolumeKeysTurnPages(val enabled: Boolean) : ReaderIntent
+    data class SetStatusLineShowsClock(val enabled: Boolean) : ReaderIntent
 
     /**
      * Correctif Lot 21 — jusqu'ici aucun écran ne permettait de choisir

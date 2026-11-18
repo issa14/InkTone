@@ -1654,6 +1654,38 @@ class DatabaseMigrationTest {
         v41.close()
     }
 
+    // Heure de la ligne de statut (MIGRATION_41_42, audit UI P2-4) : affichée
+    // pour les préférences existantes, sans toucher aux autres réglages.
+    @Test
+    fun migration_41_vers_42_garde_l_heure_affichee_dans_la_ligne_de_statut() {
+        val v41 = helper.createDatabase(TEST_DB_NAME, 41)
+        v41.execSQL(
+            "INSERT INTO user_preferences (id, theme, fontSize, defaultTtsEngine, crashReportingEnabled, language, fontFamily, reduceMotion, dynamicColorEnabled, readingRulerEnabled, dailyGoalMinutes, readingMode, audioGain, useSystemFontScale, lineHeightMultiplier, eyeRestReminderEnabled, eyeRestReminderIntervalMinutes, appTheme, libraryLayoutMode, hasSeenOnboarding, hasPromptedVoiceDownload, syncLastAutoSyncFailed, syncAutoEnabled, syncWifiOnly, readerMarginStep, paragraphSpacingStep, textJustified, keepScreenOn, autoScrollSpeed, recentAnnotationColors, volumeKeysTurnPages) " +
+                "VALUES (0, 'sepia_vintage', 21, 'SHERPA_ONNX', 0, 'fr', 'DEFAULT', 0, 0, 0, 30, 'SCROLL', 1.0, 0, 1.4, 0, 60, " +
+                "'SYSTEM', 'GRID_DETAILED', 0, 0, 0, 0, 0, 1, 1, 0, 0, 0, '', 1)",
+        )
+        v41.close()
+
+        val v42 = helper.runMigrationsAndValidate(
+            TEST_DB_NAME, 42, true,
+            MIGRATION_1_2, MIGRATION_2_3, MIGRATION_3_4, MIGRATION_4_5, MIGRATION_5_6, MIGRATION_6_7,
+            MIGRATION_7_8, MIGRATION_8_9, MIGRATION_9_10, MIGRATION_10_11, MIGRATION_11_12, MIGRATION_12_13,
+            MIGRATION_13_14, MIGRATION_14_15, MIGRATION_15_16, MIGRATION_16_17, MIGRATION_17_18, MIGRATION_18_19,
+            MIGRATION_19_20, MIGRATION_20_21, MIGRATION_21_22, MIGRATION_22_23, MIGRATION_23_24, MIGRATION_24_25,
+            MIGRATION_25_26, MIGRATION_26_27, MIGRATION_27_28, MIGRATION_28_29, MIGRATION_29_30, MIGRATION_30_31,
+            MIGRATION_31_32, MIGRATION_32_33, MIGRATION_33_34, MIGRATION_34_35, MIGRATION_35_36, MIGRATION_36_37,
+            MIGRATION_37_38, MIGRATION_38_39, MIGRATION_39_40, MIGRATION_40_41, MIGRATION_41_42,
+        )
+
+        v42.query("SELECT theme, volumeKeysTurnPages, statusLineShowsClock FROM user_preferences WHERE id = 0").use { cursor ->
+            assertEquals(true, cursor.moveToFirst())
+            assertEquals("sepia_vintage", cursor.getString(0))
+            assertEquals(1, cursor.getInt(1))
+            assertEquals(1, cursor.getInt(2))
+        }
+        v42.close()
+    }
+
     companion object {
         private const val TEST_DB_NAME = "migration-test"
     }

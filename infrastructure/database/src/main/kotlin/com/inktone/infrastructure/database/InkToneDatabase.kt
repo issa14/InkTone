@@ -44,7 +44,7 @@ import com.inktone.infrastructure.database.entity.VoiceProfileEntity
         CatalogEntity::class, SyncTombstoneEntity::class,
     ],
     views = [LibraryItemView::class],
-    version = 41, // Mots lus à l'écran séparés des mots narrés (MIGRATION_40_41, D29)
+    version = 42, // Heure de la ligne de statut réglable (MIGRATION_41_42, audit UI P2-4)
     exportSchema = true, // condition du harnais de migration — Tâche 2.4
 )
 @TypeConverters(StringListConverter::class)

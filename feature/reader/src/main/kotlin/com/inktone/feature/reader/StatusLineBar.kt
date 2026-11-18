@@ -63,8 +63,8 @@ fun StatusLineBar(
     // Hauteur de la bande hors barre de navigation : le Lecteur la retire de
     // la zone de lecture (audit UI P1-4).
     onBandHeightChanged: (Int) -> Unit = {},
+    showClock: Boolean = true,
 ) {
-    val timeText by rememberAlignedClockText()
 
     Row(
         modifier = modifier
@@ -83,11 +83,14 @@ fun StatusLineBar(
         horizontalArrangement = Arrangement.SpaceBetween,
         verticalAlignment = Alignment.CenterVertically,
     ) {
-        Text(timeText, style = MaterialTheme.typography.labelSmall, color = contentColor)
+        if (showClock) {
+            val timeText by rememberAlignedClockText()
+            Text(timeText, style = MaterialTheme.typography.labelMedium, color = contentColor)
+        }
         Text(
             if (isFixedPage) fixedPageCounterText(chapterNumber, pageCountInChapter)
             else chapterCounterText(chapterNumber, pageInChapter, pageCountInChapter, showPageCounter, sectionTitle),
-            style = MaterialTheme.typography.labelSmall,
+            style = MaterialTheme.typography.labelMedium,
             color = contentColor,
             // Le titre d'une section peut être long : il se tronque, jamais les chiffres voisins.
             maxLines = 1,
@@ -96,7 +99,7 @@ fun StatusLineBar(
             modifier = Modifier.weight(1f).padding(horizontal = 12.dp),
         )
         // Progression inconnue : emplacement vide, jamais un chiffre estimé.
-        Text(bookProgression?.let(::formatProgressionFr).orEmpty(), style = MaterialTheme.typography.labelSmall, color = contentColor)
+        Text(bookProgression?.let(::formatProgressionFr).orEmpty(), style = MaterialTheme.typography.labelMedium, color = contentColor)
     }
 }
 

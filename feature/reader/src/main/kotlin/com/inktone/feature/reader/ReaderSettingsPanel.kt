@@ -100,6 +100,9 @@ fun ReaderSettingsPanel(
     // Audit UX D75 — touches de volume pour tourner la page, mode paginé.
     volumeKeysTurnPages: Boolean = false,
     onVolumeKeysChange: (Boolean) -> Unit = {},
+    // Audit UI P2-4 — l'heure système est masquée par le mode immersif ; la doubler est un choix.
+    statusLineShowsClock: Boolean = true,
+    onStatusLineShowsClockChange: (Boolean) -> Unit = {},
     // Luminosité du lecteur, `null` = celle du système (audit UI P1-6).
     brightness: Float? = null,
     onBrightnessChange: (Float?) -> Unit = {},
@@ -262,6 +265,15 @@ fun ReaderSettingsPanel(
                 supporting = "Tournent la page en mode paginé",
                 checked = volumeKeysTurnPages,
                 onCheckedChange = onVolumeKeysChange,
+            )
+
+            Spacer(Modifier.height(8.dp))
+
+            SettingSwitchRow(
+                label = "Afficher l'heure",
+                supporting = "Dans la ligne de statut, en bas de la page",
+                checked = statusLineShowsClock,
+                onCheckedChange = onStatusLineShowsClockChange,
             )
 
             if (showPdfInversion) {

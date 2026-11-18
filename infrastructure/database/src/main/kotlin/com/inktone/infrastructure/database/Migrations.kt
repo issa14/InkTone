@@ -666,3 +666,10 @@ val MIGRATION_40_41 = object : Migration(40, 41) {
         db.execSQL("UPDATE reading_sessions SET visualWordsRead = wordsRead WHERE ttsDurationMs = 0")
     }
 }
+
+/** Heure de la ligne de statut du Lecteur (audit UI P2-4) : affichée pour les préférences existantes, comme avant. */
+val MIGRATION_41_42 = object : Migration(41, 42) {
+    override fun migrate(db: SupportSQLiteDatabase) {
+        db.execSQL("ALTER TABLE user_preferences ADD COLUMN statusLineShowsClock INTEGER NOT NULL DEFAULT 1")
+    }
+}
