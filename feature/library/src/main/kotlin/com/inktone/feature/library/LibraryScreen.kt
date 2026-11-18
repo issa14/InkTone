@@ -25,6 +25,7 @@ import androidx.compose.foundation.lazy.items as listItems
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.material3.ElevatedCard
 import androidx.compose.material3.CardDefaults
+import androidx.compose.material3.Card
 import androidx.compose.material3.Surface
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.HorizontalDivider
@@ -896,26 +897,19 @@ private fun ResumeReadingCard(
     isNarrating: Boolean,
     onTogglePlayback: () -> Unit,
 ) {
-    ElevatedCard(
+    // Surface pleine sans élévation : sur un fond transparent, l'ombre d'une
+    // ElevatedCard transparaissait à travers le dégradé (audit UI P2-5).
+    Card(
         onClick = onClick,
         modifier = Modifier
             .fillMaxWidth()
             .padding(8.dp),
         shape = InkToneShapes.large,
-        colors = CardDefaults.elevatedCardColors(
-            containerColor = Color.Transparent
-        )
+        colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceContainerLow),
     ) {
-        val gradient = Brush.horizontalGradient(
-            colors = listOf(
-                MaterialTheme.colorScheme.primaryContainer.copy(alpha = 0.25f),
-                MaterialTheme.colorScheme.surface
-            )
-        )
         Row(
             modifier = Modifier
                 .fillMaxWidth()
-                .background(brush = gradient)
                 .padding(16.dp),
             verticalAlignment = Alignment.CenterVertically,
         ) {
@@ -940,19 +934,13 @@ private fun ResumeReadingCard(
             Spacer(Modifier.width(16.dp))
 
             Column(modifier = Modifier.weight(1f)) {
-                // Badge de statut
-                Surface(
-                    color = MaterialTheme.colorScheme.primaryContainer,
-                    shape = InkToneShapes.small,
-                    modifier = Modifier.padding(bottom = 6.dp)
-                ) {
-                    Text(
-                        text = "Reprendre la lecture",
-                        style = MaterialTheme.typography.labelMedium,
-                        color = MaterialTheme.colorScheme.onPrimaryContainer,
-                        modifier = Modifier.padding(horizontal = 8.dp, vertical = 4.dp)
-                    )
-                }
+                // Simple libellé : une pastille pesait plus que le titre du livre.
+                Text(
+                    text = "Reprendre",
+                    style = MaterialTheme.typography.labelMedium,
+                    color = MaterialTheme.colorScheme.primary,
+                    modifier = Modifier.padding(bottom = 4.dp),
+                )
 
                 // Titre — nettoyage des artefacts EPUB (tiret, espaces en tête)
                 Text(
