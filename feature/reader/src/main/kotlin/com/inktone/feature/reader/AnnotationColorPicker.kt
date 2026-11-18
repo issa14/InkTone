@@ -28,6 +28,9 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.semantics.Role
+import androidx.compose.foundation.selection.selectableGroup
+import androidx.compose.foundation.selection.selectable
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.semantics
@@ -132,8 +135,10 @@ fun AnnotationColorPicker(
         // sur un écran étroit (couleurs récentes + préréglages + pastille
         // « Personnaliser »).
         Row(
-            modifier = Modifier.fillMaxWidth().horizontalScroll(rememberScrollState()),
-            horizontalArrangement = Arrangement.spacedBy(8.dp, Alignment.CenterHorizontally),
+            // Un seul choix parmi les pastilles : TalkBack annonce « 2 sur 7 ».
+            // Zones de 48 dp jointives, disques de 36 dp : 12 dp d'écart visible.
+            modifier = Modifier.fillMaxWidth().horizontalScroll(rememberScrollState()).selectableGroup(),
+            horizontalArrangement = Arrangement.Center,
         ) {
             orderedColors.forEach { color ->
                 ColorSwatch(color = color, isSelected = color == selected, onClick = { onApply(color) })
@@ -164,14 +169,20 @@ fun AnnotationColorPicker(
 private fun CustomColorSwatch(onClick: () -> Unit) {
     Box(
         modifier = Modifier
-            .size(36.dp)
-            .clip(CircleShape)
-            .background(MaterialTheme.colorScheme.surfaceVariant)
-            .clickable(onClick = onClick)
+            .size(48.dp)
+            .clickable(role = Role.Button, onClick = onClick)
             .semantics { contentDescription = "Personnaliser la couleur" },
         contentAlignment = Alignment.Center,
     ) {
-        AppIcon(AppSymbol.Add, contentDescription = null)
+        Box(
+            modifier = Modifier
+                .size(36.dp)
+                .clip(CircleShape)
+                .background(MaterialTheme.colorScheme.surfaceVariant),
+            contentAlignment = Alignment.Center,
+        ) {
+            AppIcon(AppSymbol.Add, contentDescription = null)
+        }
     }
 }
 
@@ -275,22 +286,30 @@ internal fun hexRgbToAnnotationColor(hex: String): AnnotationColor =
 @Composable
 private fun ColorSwatch(color: AnnotationColor, isSelected: Boolean, onClick: () -> Unit) {
     val label = color.label()
+    // Zone tactile de 48 dp autour d'un disque de 36 dp, annoncée comme un
+    // choix sélectionné ou non (audit UI P2-13).
     Box(
         modifier = Modifier
-            .size(36.dp)
-            .clip(CircleShape)
-            .then(
-                if (isSelected) {
-                    Modifier.background(MaterialTheme.colorScheme.primary, CircleShape).padding(3.dp)
-                } else {
-                    Modifier
-                },
-            )
-            .clip(CircleShape)
-            .background(color.toComposeColor())
-            .clickable(onClick = onClick)
+            .size(48.dp)
+            .selectable(selected = isSelected, role = Role.RadioButton, onClick = onClick)
             .semantics { contentDescription = "Couleur $label" },
-    )
+        contentAlignment = Alignment.Center,
+    ) {
+        Box(
+            modifier = Modifier
+                .size(36.dp)
+                .clip(CircleShape)
+                .then(
+                    if (isSelected) {
+                        Modifier.background(MaterialTheme.colorScheme.primary, CircleShape).padding(3.dp)
+                    } else {
+                        Modifier
+                    },
+                )
+                .clip(CircleShape)
+                .background(color.toComposeColor()),
+        )
+    }
 }
 
 @Composable

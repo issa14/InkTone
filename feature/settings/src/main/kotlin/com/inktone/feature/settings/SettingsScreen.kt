@@ -28,6 +28,8 @@ import androidx.compose.ui.layout.onGloballyPositioned
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.foundation.selection.toggleable
+import androidx.compose.foundation.selection.selectableGroup
+import androidx.compose.foundation.selection.selectable
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
@@ -1000,16 +1002,17 @@ private fun <T> PickerDialog(
         onDismissRequest = onDismiss,
         title = { Text(title) },
         text = {
-            Column {
+            // Groupe à choix unique : TalkBack dit « sélectionné » et « 1 sur 3 » (audit UI P2-13).
+            Column(Modifier.selectableGroup()) {
                 options.forEach { option ->
                     Row(
                         modifier = Modifier
                             .fillMaxWidth()
-                            .clickable { onSelect(option) }
-                            .padding(vertical = 6.dp),
+                            .heightIn(min = 48.dp)
+                            .selectable(selected = option == selected, role = Role.RadioButton, onClick = { onSelect(option) }),
                         verticalAlignment = Alignment.CenterVertically,
                     ) {
-                        RadioButton(selected = option == selected, onClick = { onSelect(option) })
+                        RadioButton(selected = option == selected, onClick = null)
                         Text(label(option), modifier = Modifier.padding(start = 8.dp))
                     }
                 }
