@@ -26,13 +26,11 @@ import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.pager.HorizontalPager
 import androidx.compose.foundation.pager.rememberPagerState
-import androidx.compose.material3.Button
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
-import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Tab
 import androidx.compose.material3.TabRow
@@ -69,8 +67,9 @@ import com.inktone.domain.valueobject.positionLabel
  *
  * Trois onglets : Notes / Surlignages / Marque-pages — tous dérivés de
  * l'état déjà présent (`bookmarks`, `annotations`), aucune nouvelle
- * source de données. Le toggle « Marquer cette page » reste visible quel
- * que soit l'onglet actif (cible confirmée), indépendant du filtre.
+ * source de données. Le signet de la page se pose depuis la barre du haut
+ * du Lecteur ; le bouton qui le doublait ici est retiré (retour Issa,
+ * vérification P2-9).
  */
 private enum class BookmarkPanelTab(val label: String) {
     NOTES("Notes"),
@@ -86,10 +85,8 @@ private enum class BookmarkPanelTab(val label: String) {
 fun BookmarkPanel(
     bookmarks: List<Bookmark>,
     annotations: List<Annotation>,
-    isCurrentPageBookmarked: Boolean,
     onBookmarkClick: (Bookmark) -> Unit,
     onAnnotationClick: (Annotation) -> Unit,
-    onToggleBookmark: () -> Unit,
     onClose: () -> Unit,
     // Lot 22, tâche 11 — édition de note et suppression depuis ce panneau
     // (jusqu'ici en lecture seule). `onEditAnnotationNote` ne concerne que
@@ -212,25 +209,6 @@ fun BookmarkPanel(
                         }
                     }
 
-                    // Toggle « Marquer cette page » — déplacé tout en bas
-                    // (demande UX), visible quel que soit l'onglet actif.
-                    Row(modifier = Modifier.fillMaxWidth().padding(horizontal = InkToneSpacing.lg, vertical = InkToneSpacing.md)) {
-                        if (isCurrentPageBookmarked) {
-                            Button(
-                                onClick = onToggleBookmark,
-                                modifier = Modifier.fillMaxWidth(),
-                                colors = ButtonDefaults.buttonColors(containerColor = MaterialTheme.colorScheme.primary),
-                            ) {
-                                AppIcon(AppSymbol.Pin,  contentDescription = null, modifier = Modifier.padding(end = InkToneSpacing.sm))
-                                Text("Retirer le signet")
-                            }
-                        } else {
-                            OutlinedButton(onClick = onToggleBookmark, modifier = Modifier.fillMaxWidth()) {
-                                AppIcon(AppSymbol.Pin,  contentDescription = null, modifier = Modifier.padding(end = InkToneSpacing.sm))
-                                Text("Ajouter un signet")
-                            }
-                        }
-                    }
                 }
             }
         }

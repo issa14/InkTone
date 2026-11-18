@@ -395,7 +395,7 @@ Apparaît uniquement après sélection d'un passage. Un seul bloc, positionné a
 | Icône | Comportement |
 |---|---|
 | **Sommaire** | Ouvre un bottomsheet, libellé « Table des matières » — voir détail ci-dessous |
-| **Marque-pages** | Ouvre un écran latéral (≈85% de la largeur), **s'ouvre depuis la gauche**. Affiche notes, surlignages ET marque-pages (pas seulement deux catégories comme supposé au départ) — filtre en bas de l'écran à trois catégories : Notes / Surlignages / Marque-pages. Sous ce filtre, un bouton pour marquer la page actuelle — **toggle** (retire le signet s'il existe déjà sur cette page, jamais de doublon) |
+| **Marque-pages** | Ouvre un écran latéral (≈85% de la largeur), **s'ouvre depuis la gauche**. Affiche notes, surlignages ET marque-pages (pas seulement deux catégories comme supposé au départ) — filtre en bas de l'écran à trois catégories : Notes / Surlignages / Marque-pages. Sous ce filtre, un bouton pour marquer la page actuelle — **toggle** (retire le signet s'il existe déjà sur cette page, jamais de doublon). **Déplacé (audit UI P2-9, 2026-11-18)** : ce toggle vit dans la barre du haut du Lecteur ; le bouton du panneau, devenu doublon, est retiré. |
 | **Play** | N'ouvre rien — déclenche directement le TTS |
 | **Thème** | Bascule **cyclique** (pas un panneau) : Clair → Sombre → Sépia → Clair... |
 | **TT** | Petit bottomsheet, ligne 1 taille du texte, ligne 2 interligne |

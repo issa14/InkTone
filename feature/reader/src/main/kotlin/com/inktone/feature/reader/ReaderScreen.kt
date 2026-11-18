@@ -1769,22 +1769,11 @@ SelectionActionPopup(
                     decorFitsSystemWindows = false,
                 ),
             ) {
-                // Page virtuelle de la phrase courante : un signet posé n'importe
-                // où sur elle compte (audit UX D51). Mesure partielle : la phrase
-                // seule, jamais une plage fausse.
-                val bookmarkPageSentences = currentPageSentences()
                 BookmarkPanel(
                     bookmarks = state.bookmarks,
                     annotations = state.annotations,
-                    isCurrentPageBookmarked = uiState.value.bookmarkOnCurrentPage(bookmarkPageSentences) != null,
                     onBookmarkClick = { bookmark -> viewModel.onIntent(ReaderIntent.NavigateToLocator(bookmark.locator)) },
                     onAnnotationClick = { annotation -> viewModel.onIntent(ReaderIntent.NavigateToLocator(annotation.startLocator)) },
-                    onToggleBookmark = {
-                        // P5 — confirmation tactile d'une action qui aboutit,
-                        // distincte du simple cran de page (`tick`).
-                        haptics.confirm()
-                        viewModel.onIntent(ReaderIntent.ToggleBookmarkOnPage(bookmarkPageSentences))
-                    },
                     onClose = { viewModel.onIntent(ReaderIntent.ToggleBookmarkList) },
                     onDeleteAnnotation = { annotation -> viewModel.onIntent(ReaderIntent.DeleteAnnotation(annotation.id)) },
                     onEditAnnotationNote = { annotation -> chrome.editingAnnotation = annotation },

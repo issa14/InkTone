@@ -53,10 +53,8 @@ class BookmarkPanelTest {
             BookmarkPanel(
                 bookmarks = listOf(oneBookmark()),
                 annotations = listOf(highlightWithNote(), highlightWithoutNote()),
-                isCurrentPageBookmarked = false,
                 onBookmarkClick = {},
                 onAnnotationClick = {},
-                onToggleBookmark = {},
                 onClose = {},
                 onDeleteAnnotation = {},
                 onEditAnnotationNote = {},
@@ -83,10 +81,8 @@ class BookmarkPanelTest {
             BookmarkPanel(
                 bookmarks = listOf(oneBookmark()),
                 annotations = listOf(highlightWithNote(), highlightWithoutNote()),
-                isCurrentPageBookmarked = false,
                 onBookmarkClick = {},
                 onAnnotationClick = {},
-                onToggleBookmark = {},
                 onClose = {},
                 onDeleteAnnotation = {},
                 onEditAnnotationNote = {},
@@ -116,10 +112,8 @@ class BookmarkPanelTest {
             BookmarkPanel(
                 bookmarks = listOf(oneBookmark()),
                 annotations = listOf(highlightWithNote(), highlightWithoutNote()),
-                isCurrentPageBookmarked = false,
                 onBookmarkClick = {},
                 onAnnotationClick = {},
-                onToggleBookmark = {},
                 onClose = {},
                 onDeleteAnnotation = {},
                 onEditAnnotationNote = {},
@@ -138,63 +132,14 @@ class BookmarkPanelTest {
     }
 
     @Test
-    fun toggle_ajoute_et_retire_selon_isCurrentPageBookmarked() {
-        var toggled = false
-
-        composeTestRule.setContent {
-            BookmarkPanel(
-                bookmarks = emptyList(),
-                annotations = emptyList(),
-                isCurrentPageBookmarked = false,
-                onBookmarkClick = {},
-                onAnnotationClick = {},
-                onToggleBookmark = { toggled = true },
-                onClose = {},
-                onDeleteAnnotation = {},
-                onEditAnnotationNote = {},
-                onDeleteBookmark = {},
-                onEditBookmarkNote = {},
-            )
-        }
-
-        composeTestRule.onNodeWithText("Ajouter un signet").assertExists()
-        composeTestRule.onNodeWithText("Ajouter un signet").performClick()
-        assertEquals(true, toggled)
-    }
-
-    @Test
-    fun toggle_actif_propose_de_retirer_le_signet() {
-        composeTestRule.setContent {
-            BookmarkPanel(
-                bookmarks = listOf(oneBookmark()),
-                annotations = emptyList(),
-                isCurrentPageBookmarked = true,
-                onBookmarkClick = {},
-                onAnnotationClick = {},
-                onToggleBookmark = {},
-                onClose = {},
-                onDeleteAnnotation = {},
-                onEditAnnotationNote = {},
-                onDeleteBookmark = {},
-                onEditBookmarkNote = {},
-            )
-        }
-
-        composeTestRule.onNodeWithText("Retirer le signet").assertExists()
-        composeTestRule.onNodeWithText("Ajouter un signet").assertDoesNotExist()
-    }
-
-    @Test
     fun fermer_declenche_onClose() {
         var closed = false
         composeTestRule.setContent {
             BookmarkPanel(
                 bookmarks = emptyList(),
                 annotations = emptyList(),
-                isCurrentPageBookmarked = false,
                 onBookmarkClick = {},
                 onAnnotationClick = {},
-                onToggleBookmark = {},
                 onClose = { closed = true },
                 onDeleteAnnotation = {},
                 onEditAnnotationNote = {},
@@ -215,10 +160,8 @@ class BookmarkPanelTest {
             BookmarkPanel(
                 bookmarks = emptyList(),
                 annotations = listOf(highlightWithNote()),
-                isCurrentPageBookmarked = false,
                 onBookmarkClick = {},
                 onAnnotationClick = {},
-                onToggleBookmark = {},
                 onClose = {},
                 onDeleteAnnotation = { deletedId = it.id },
                 onEditAnnotationNote = {},
@@ -242,10 +185,8 @@ class BookmarkPanelTest {
             BookmarkPanel(
                 bookmarks = emptyList(),
                 annotations = listOf(highlightWithNote()),
-                isCurrentPageBookmarked = false,
                 onBookmarkClick = {},
                 onAnnotationClick = {},
-                onToggleBookmark = {},
                 onClose = {},
                 onDeleteAnnotation = {},
                 onEditAnnotationNote = { editedId = it.id },
@@ -265,10 +206,8 @@ class BookmarkPanelTest {
             BookmarkPanel(
                 bookmarks = emptyList(),
                 annotations = listOf(highlightWithoutNote()),
-                isCurrentPageBookmarked = false,
                 onBookmarkClick = {},
                 onAnnotationClick = {},
-                onToggleBookmark = {},
                 onClose = {},
                 onDeleteAnnotation = { deletedId = it.id },
                 onEditAnnotationNote = {},
@@ -292,10 +231,8 @@ class BookmarkPanelTest {
             BookmarkPanel(
                 bookmarks = listOf(oneBookmark()),
                 annotations = emptyList(),
-                isCurrentPageBookmarked = false,
                 onBookmarkClick = {},
                 onAnnotationClick = {},
-                onToggleBookmark = {},
                 onClose = {},
                 onDeleteAnnotation = {},
                 onEditAnnotationNote = {},
@@ -319,10 +256,8 @@ class BookmarkPanelTest {
             BookmarkPanel(
                 bookmarks = listOf(oneBookmark()),
                 annotations = emptyList(),
-                isCurrentPageBookmarked = false,
                 onBookmarkClick = {},
                 onAnnotationClick = {},
-                onToggleBookmark = {},
                 onClose = {},
                 onDeleteAnnotation = {},
                 onEditAnnotationNote = {},
@@ -343,10 +278,8 @@ class BookmarkPanelTest {
             BookmarkPanel(
                 bookmarks = emptyList(),
                 annotations = listOf(highlightWithNote()),
-                isCurrentPageBookmarked = false,
                 onBookmarkClick = {},
                 onAnnotationClick = {},
-                onToggleBookmark = {},
                 onClose = {},
                 onDeleteAnnotation = { deletedId = it.id },
                 onEditAnnotationNote = {},
