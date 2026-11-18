@@ -1,5 +1,11 @@
 package com.inktone.feature.statistics
 
+import androidx.compose.ui.graphics.drawscope.clipRect
+
+import androidx.compose.ui.graphics.drawscope.DrawScope
+
+import com.inktone.core.designsystem.chartColors
+
 import com.inktone.core.designsystem.emphasized
 import android.content.Intent
 import android.net.Uri
@@ -348,10 +354,9 @@ private fun Section2Charts(activity: com.inktone.domain.usecase.ActivityChartSta
                     )
                     Spacer(Modifier.width(6.dp))
                     val isPositive = activity.variationPercent.startsWith("+")
-                    val positiveGreen = if (isAppThemeDark()) Color(0xFF81C784) else Color(0xFF2E7D32)
                     val varColor = when {
                         activity.variationPercent == "—" -> MaterialTheme.colorScheme.onSurfaceVariant
-                        isPositive -> positiveGreen
+                        isPositive -> chartColors().positive
                         else -> MaterialTheme.colorScheme.error
                     }
                     Text(activity.variationPercent, style = MaterialTheme.typography.labelLarge, color = varColor)
@@ -524,9 +529,13 @@ private fun HistogramChart(dailyStats: List<DailyReadingStats>, isMonthView: Boo
     // distingue les deux modes par une couleur dédiée (vert lecture
     // visuelle, violet écoute TTS), contrairement à la heatmap — un seul
     // mode confondu, qui garde l'accent dynamique du thème.
-    val isDark = isAppThemeDark()
-    val visualColor = if (isDark) Color(0xFF81C784) else Color(0xFF2E7D32)
-    val ttsColor = if (isDark) Color(0xFFCE93D8) else Color(0xFF8E24AA)
+    val colors = chartColors()
+    val visualColor = colors.visual
+    val ttsColor = colors.tts
+    // Hachures de l'écoute, à la couleur de la carte : la part d'écoute se
+    // distingue sans dépendre du vert et du violet, proches en luminance
+    // pour une deutéranopie (audit UI P2-3).
+    val hatchColor = MaterialTheme.colorScheme.surfaceContainerLow.copy(alpha = 0.55f)
     val markerColor = MaterialTheme.colorScheme.primary
     // Couleur de schéma : un gris fixe quasi noir disparaissait sur fond sombre (1,04:1).
     val baselineColor = MaterialTheme.colorScheme.outlineVariant
@@ -626,7 +635,7 @@ private fun HistogramChart(dailyStats: List<DailyReadingStats>, isMonthView: Boo
                     // Empilement vertical : TTS en bas, visuel posé dessus.
                     // Le Y du visuel est dicté par la hauteur TTS en dessous.
                     if (ttsH > 1f) {
-                        drawRect(ttsColor, Offset(x, barAreaHeight - ttsH), Size(barW, ttsH))
+                        drawHatchedRect(ttsColor, hatchColor, Offset(x, barAreaHeight - ttsH), Size(barW, ttsH))
                     }
                     if (visualH > 1f) {
                         drawRect(visualColor, Offset(x, barAreaHeight - totalH), Size(barW, visualH))
@@ -648,16 +657,34 @@ private fun HistogramChart(dailyStats: List<DailyReadingStats>, isMonthView: Boo
             // Légende en pied
             Row(horizontalArrangement = Arrangement.spacedBy(16.dp)) {
                 Row(verticalAlignment = Alignment.CenterVertically) {
-                    Canvas(Modifier.size(10.dp)) { drawRect(visualColor) }
+                    Canvas(Modifier.size(12.dp)) { drawRect(visualColor) }
                     Spacer(Modifier.width(4.dp))
                     Text("Lecture", style = MaterialTheme.typography.labelSmall)
                 }
                 Row(verticalAlignment = Alignment.CenterVertically) {
-                    Canvas(Modifier.size(10.dp)) { drawRect(ttsColor) }
+                    Canvas(Modifier.size(12.dp)) { drawHatchedRect(ttsColor, hatchColor, Offset.Zero, size) }
                     Spacer(Modifier.width(4.dp))
                     Text("Écoute", style = MaterialTheme.typography.labelSmall)
                 }
             }
+        }
+    }
+}
+
+/** Rectangle plein barré de hachures diagonales : motif de l'écoute, en plus de sa couleur. */
+private fun DrawScope.drawHatchedRect(color: Color, hatch: Color, topLeft: Offset, size: Size) {
+    drawRect(color, topLeft, size)
+    val spacing = 4.dp.toPx()
+    clipRect(topLeft.x, topLeft.y, topLeft.x + size.width, topLeft.y + size.height) {
+        var offset = -size.height
+        while (offset < size.width) {
+            drawLine(
+                color = hatch,
+                start = Offset(topLeft.x + offset, topLeft.y + size.height),
+                end = Offset(topLeft.x + offset + size.height, topLeft.y),
+                strokeWidth = 1.5.dp.toPx(),
+            )
+            offset += spacing
         }
     }
 }
@@ -836,10 +863,3 @@ internal fun isStatisticsEmpty(kpi: com.inktone.domain.usecase.KpiState, current
         kpi.totalVisualTimeFormatted == EMPTY_DURATION && kpi.totalTtsTimeFormatted == EMPTY_DURATION
 
 private val EMPTY_DURATION = formatDurationMinutes(0)
-
-/**
- * Le thème de l'app, pas celui du système : l'app peut être forcée en clair
- * ou en sombre (`AppThemeMode`), et `isSystemInDarkTheme()` l'ignorait.
- */
-@Composable
-private fun isAppThemeDark(): Boolean = MaterialTheme.colorScheme.surface.luminance() < 0.5f
