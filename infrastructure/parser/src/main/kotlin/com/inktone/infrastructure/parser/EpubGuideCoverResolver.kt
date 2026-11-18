@@ -91,15 +91,17 @@ internal object EpubGuideCoverResolver {
     }
 
     /**
-     * Dernier repli : l'image de la PREMIÈRE page du livre, quand l'OPF ne
-     * déclare aucune couverture (ni métadonnée, ni `<guide>`). Cas réel des
-     * EPUB2 faits avec Sigil (« Sauve-moi », G. Musso) : la page
-     * `Couverture.xhtml` ouvre le spine mais rien ne la désigne.
+     * Dernier repli : l'image qui ouvre la PREMIÈRE page du livre, quand l'OPF
+     * ne déclare aucune couverture (ni métadonnée, ni `<guide>`). Cas réels
+     * (19 livres sur 533 d'une bibliothèque) : pages `Couverture.xhtml` de
+     * Sigil, portrait de l'auteur des éditions Ebooks libres et gratuits
+     * (« La Guerre des mondes », 223 × 261), couverture en tête d'un livre
+     * d'un seul fichier — l'image que le livre montre en premier, celle
+     * qu'affichent les autres liseuses.
      *
-     * Retenue seulement si la page est quasi vide de texte et que l'image a
-     * un format de couverture : une page de titre ornée d'un portrait ou d'un
-     * logo (« La Guerre des mondes » : portrait de 223 × 261 px) n'est pas
-     * une couverture, et un dégradé de repli vaut mieux qu'une fausse.
+     * Retenue si presque aucun texte ne la précède et si elle est en
+     * portrait et pas minuscule : un logo d'éditeur en bandeau (Feedbooks)
+     * ou une illustration après la page de titre ne sont pas une couverture.
      */
     fun findFirstPageCoverImageBytes(context: Context, fileUri: String): ByteArray? {
         return try {
@@ -109,8 +111,8 @@ internal object EpubGuideCoverResolver {
             val opfText = EpubZipAccess.readEntryBytes(context, fileUri, opfPath)?.decodeToString() ?: return null
             val firstPageHref = resolveRelative(opfPath, extractFirstSpineHref(opfText) ?: return null)
             val pageText = readEntry(context, fileUri, firstPageHref)?.decodeToString() ?: return null
-            val doc = Jsoup.parse(pageText, "", Parser.xmlParser())
-            if (!isCoverLikePage(doc.text())) return null
+            val leadingText = textBeforeFirstImage(pageText) ?: return null
+            if (leadingText.length > MAX_TEXT_BEFORE_COVER) return null
             val imageHref = resolveRelative(firstPageHref, extractFirstImageHref(pageText) ?: return null)
             val bytes = readEntry(context, fileUri, imageHref) ?: return null
             val bounds = BitmapFactory.Options().apply { inJustDecodeBounds = true }
@@ -121,10 +123,17 @@ internal object EpubGuideCoverResolver {
         }
     }
 
-    /** Une page de couverture porte une image et au plus une légende (« Page titre »). */
-    internal fun isCoverLikePage(text: String): Boolean = text.trim().length <= MAX_COVER_PAGE_TEXT
+    /**
+     * Texte visible avant la première image de la page (`<img>` ou `<svg><image>`),
+     * `null` si la page n'a pas d'image. L'en-tête HTML n'est pas du texte visible.
+     */
+    internal fun textBeforeFirstImage(page: String): String? {
+        val body = page.replace(Regex("(?is)<(head|style|script)\\b.*?</\\1>"), "")
+        val imageStart = Regex("(?i)<(img|image)\\b").find(body)?.range?.first ?: return null
+        return Jsoup.parse(body.substring(0, imageStart)).text().trim()
+    }
 
-    /** Format de couverture : portrait, assez grand pour ne pas être un logo ou une vignette. */
+    /** Format de couverture : portrait, et pas une icône. */
     internal fun isCoverLikeImage(width: Int, height: Int): Boolean =
         width > 0 && height >= MIN_COVER_HEIGHT_PX && height >= width
 
@@ -208,6 +217,6 @@ internal object EpubGuideCoverResolver {
     // ci-dessus extrait justement ce bitmap.
     private val IMAGE_EXTENSIONS = listOf(".jpg", ".jpeg", ".png", ".gif", ".webp")
 
-    private const val MAX_COVER_PAGE_TEXT = 40
-    private const val MIN_COVER_HEIGHT_PX = 400
+    private const val MAX_TEXT_BEFORE_COVER = 40
+    private const val MIN_COVER_HEIGHT_PX = 150
 }
