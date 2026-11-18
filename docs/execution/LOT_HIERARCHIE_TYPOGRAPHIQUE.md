@@ -27,6 +27,8 @@ ne déclare pas le lot terminé.
 | `titleSmall` | 14 / 20 Medium | 14 / 20 |
 | `titleLarge` | **20 / 28** | 22 / 28 |
 | `headlineSmall` | **20 / 28** | 24 / 32 |
+| `headlineMedium` | **24 / 32** | 28 / 36 |
+| `headlineLarge` | **28 / 36** | 32 / 40 |
 
 Cause : l'échelle de corps du chrome a été recopiée de l'échelle de lecture
 (serif 18/16/14, Phase 9bis, `89fc7ef4`) ; P1-9 a ramené `bodyLarge` à 16 sp
@@ -52,7 +54,15 @@ Le vérifier quand même (T.5, point 4).
 ## Tâche T.1 — Rétablir l'échelle M3 du chrome
 
 `Type.kt` : `bodyMedium` 14/20 (0.25 sp), `bodySmall` 12/16 (0.4 sp),
-`titleLarge` 22/28, `headlineSmall` 24/32. Rien d'autre.
+`titleLarge` 22/28, et toute la famille headline aux valeurs M3 (32/40,
+28/36, 24/32). Rien d'autre.
+
+La famille headline monte entière : `headlineSmall` doit passer au-dessus de
+`titleLarge` (22), donc à 24, ce qui imposerait l'égalité avec
+`headlineMedium` (24 aujourd'hui) sans le décalage de toute la famille.
+Effet visible : `headlineMedium` (titres d'onboarding, chiffre clé des
+Statistiques, « InkTone » d'À propos) passe de 24 à 28 sp ; à vérifier sur
+petit écran et en grande police.
 
 Ajouter à `TypographyBrandTest` (ou un `TypographyScaleTest`) l'invariant
 qui aurait évité le défaut : tailles **strictement décroissantes** à
@@ -68,8 +78,9 @@ visible du lot ; vérifier écran par écran (T.5).
 
 ## Tâche T.2 — Écrire la règle des rôles
 
-Document court `docs/design/TYPOGRAPHIE_ROLES.md` (ou section de
-`UX_FLOW_DESIGN.md`, au choix d'Issa), une ligne par élément :
+Règle écrite dans `docs/design/IDENTITE_INKTONE.md` § 3.3, sous-section
+« Hiérarchie du texte d'interface » (choix d'Issa, 2026-11-18), statut
+« proposé » jusqu'à la validation du lot sur appareil. Résumé :
 
 | Élément | Rôle | Couleur |
 |---|---|---|
@@ -88,7 +99,9 @@ Le texte secondaire s'atténue par `onSurfaceVariant`, jamais par un alpha —
 sauf sur les couleurs du thème de lecture (chrome du Lecteur), qui n'ont pas
 de rôle `onSurfaceVariant` propre.
 
-`Documente la correspondance entre éléments d'interface et rôles typographiques`
+Fait au moment de la planification ; T.2 se réduit à passer la sous-section
+et sa ligne du registre des décisions à « validé » en fin de lot, et à
+retirer les mentions « cible / aujourd'hui » une fois T.1 livrée.
 
 ---
 
@@ -167,8 +180,8 @@ passe en police système maximale.
 
 ---
 
-## Écarts et décisions à confirmer par Issa avant T.2
+## Écarts et décisions à confirmer par Issa
 
-- Emplacement de la règle : nouveau document ou section de `UX_FLOW_DESIGN.md`.
+- ~~Emplacement de la règle~~ : `IDENTITE_INKTONE.md` § 3.3 (tranché par Issa).
 - Titre de la feuille d'actions d'un livre : `titleLarge` (règle) ou garder
   un en-tête plus discret, la feuille étant courte.

@@ -134,6 +134,58 @@ Classement argumenté des 5 candidats évalués (Work Sans, Literata, Source San
 
 **Police de lecture** — hors charte, reste entièrement configurable par l'utilisateur dans les réglages de lecture.
 
+#### Hiérarchie du texte d'interface — proposé, à valider (18/11/2026)
+
+Chaque élément d'interface prend un **rôle** de l'échelle (`InkToneTypography`,
+`Type.kt`), jamais une taille ou un poids posés écran par écran. Le rôle dit
+la place de l'élément dans la hiérarchie ; deux éléments de même nature
+portent le même rôle sur tous les écrans.
+
+**Échelle du chrome** — celle de Material 3, tailles strictement
+décroissantes dans chaque famille (vérifié par test) :
+
+| Rôle | Taille / interligne | Poids |
+|---|---|---|
+| `headlineLarge` | **cible 32 / 40** (aujourd'hui 28) | SemiBold |
+| `headlineMedium` | **cible 28 / 36** (aujourd'hui 24) | SemiBold |
+| `headlineSmall` | **cible 24 / 32** (aujourd'hui 20) | SemiBold |
+| `titleLarge` | **cible 22 / 28** (aujourd'hui 20) | Medium |
+| `titleMedium` | 16 / 24 | Medium |
+| `titleSmall` | 14 / 20 | Medium |
+| `bodyLarge` | 16 / 24 | Normal |
+| `bodyMedium` | **cible 14 / 20** (aujourd'hui 16) | Normal |
+| `bodySmall` | **cible 12 / 16** (aujourd'hui 14) | Normal |
+| `labelLarge` | 14 / 20 | Medium |
+| `labelMedium` | 12 / 16 | Medium |
+| `labelSmall` | 11 / 16 | Medium |
+
+**Rôle par élément** :
+
+| Élément | Rôle | Couleur |
+|---|---|---|
+| Titre d'écran (barre d'application) | `titleLarge` | défaut |
+| Titre de feuille, de panneau | `titleLarge` | défaut |
+| Titre de section | `InkToneSectionHeader` (`titleSmall`) | `primary` |
+| Titre de carte | `titleMedium` | défaut |
+| Titre d'une ligne de liste (livre, réglage) | `titleSmall`, ou `bodyLarge` dans un `ListItem` | défaut |
+| Texte courant, corps de dialogue | `bodyMedium` | défaut |
+| Texte secondaire, métadonnée (auteur, date, position) | `bodySmall` | `onSurfaceVariant` |
+| Libellé au-dessus d'un contrôle | `labelLarge` | défaut |
+| Badge, pastille, axe de graphique, chiffre compact | `labelSmall` / `labelMedium` | selon le badge |
+| Chiffre clé (statistiques) | `headlineMedium` | défaut |
+| Accent narratif (onboarding, fin de livre) | `headlineMedium` en Literata | accent |
+
+**Mise en relief** : le seul écart permis à l'échelle est
+`TextStyle.emphasized()` (chiffres clés, élément courant, valeur choisie) ;
+aucun `fontWeight =` dans les écrans (vérifié en CI).
+
+**Atténuation** : un texte secondaire s'atténue par `onSurfaceVariant`,
+jamais par un alpha — sauf sur les couleurs du thème de lecture (chrome du
+Lecteur), qui n'ont pas de rôle `onSurfaceVariant` propre.
+
+**Hors charte** : le texte des livres suit l'échelle de lecture et les
+réglages de l'utilisateur, jamais ce tableau.
+
 ### 3.4 Iconographie — validé (10/08/2026)
 
 **Décision** : Material Symbols, variante **Rounded**.
@@ -170,6 +222,7 @@ Consolidation des principes établis au fil du projet :
 | Typographie chrome + accent narratif (§3.3) | Validé | 10/08/2026 | Work Sans (chrome), Literata (accent narratif ponctuel) — licences OFL 1.1 vérifiées à la source |
 | Iconographie chrome (§3.4) | Validé | 10/08/2026 | Material Symbols Rounded, contour/plein pour l'état inactif/actif |
 | D0 = C — violet par défaut, Material You en option | Validé | 11/08/2026 | Défaut `dynamicColorEnabled` inversé à false ; installs neuves démarrent en violet de marque, Material You disponible en opt-in dans les réglages |
+| Hiérarchie du texte d'interface : échelle M3, rôle par élément (§3.3) | Proposé | 18/11/2026 | Échelle de corps écrasée (bodyMedium = bodyLarge, bodySmall = titleSmall) héritée de l'échelle de lecture ; rôles divergents d'un écran à l'autre (lot Hiérarchie typographique) |
 
 ---
 
