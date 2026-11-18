@@ -286,12 +286,16 @@ fun ReaderScreen(
     }
 
     // Audit UX D15 — après un renvoi interne, « Retour » ramène à l'endroit quitté.
+    // Message neutre : le lien mène aussi bien à une note qu'à un chapitre.
+    // Reste affiché jusqu'à « Retour », la croix ou un toucher de la page,
+    // plutôt qu'une durée imposée (retour Issa, vérification P2).
     LaunchedEffect(state.linkReturn) {
         if (state.linkReturn == null) return@LaunchedEffect
         val result = snackbarHostState.showSnackbar(
-            message = "Note de bas de page ouverte",
+            message = "Lien suivi",
             actionLabel = "Retour",
-            duration = SnackbarDuration.Long,
+            withDismissAction = true,
+            duration = SnackbarDuration.Indefinite,
         )
         viewModel.onIntent(
             if (result == SnackbarResult.ActionPerformed) ReaderIntent.ReturnFromLink else ReaderIntent.DismissLinkReturn,
@@ -308,6 +312,13 @@ fun ReaderScreen(
 
     LaunchedEffect(state.isPlaying) {
         if (!state.isPlaying) chrome.onPlaybackStopped()
+    }
+
+    // Un toucher de la page ferme d'abord un message affiché, sans basculer
+    // le HUD dans le même geste.
+    val onReadingAreaTap = {
+        val shown = snackbarHostState.currentSnackbarData
+        if (shown != null) shown.dismiss() else chrome.onReadingAreaTap(state.isPlaying)
     }
 
     ImmersiveReaderChrome(
@@ -386,7 +397,7 @@ fun ReaderScreen(
             .clickable(
                 interactionSource = remember { MutableInteractionSource() },
                 indication = null,
-            ) { chrome.onReadingAreaTap(state.isPlaying) },
+            ) { onReadingAreaTap() },
     ) {
         // A.3 — État d'erreur : affiché quand le parsing ou l'ouverture
         // échoue. Audit v1.0.0 (AUDIT_CONSOLIDATION_V1.md, B3) : deux
@@ -1201,7 +1212,7 @@ fun ReaderScreen(
                                             viewModel.onIntent(ReaderIntent.SetFreeSelection(anchor, focus))
                                         },
                                         onFreeSelectionCleared = { clearSelectionAndPopup() },
-                                        onClick = { chrome.onReadingAreaTap(state.isPlaying) },
+                                        onClick = { onReadingAreaTap() },
                                         onAnnotationTapped = { annotation, bounds ->
                                             if (bounds != null) chrome.showAnnotationMenu(annotation, bounds)
                                         },
@@ -1261,7 +1272,7 @@ fun ReaderScreen(
                             isReadingRulerEnabled = state.isReadingRulerEnabled,
                             contentPadding = readerMargin,
                             publicationId = state.publicationId.takeIf { state.epubResourceResolver != null },
-                            onClick = { chrome.onReadingAreaTap(state.isPlaying) },
+                            onClick = { onReadingAreaTap() },
                             onNextChapter = { viewModel.onIntent(ReaderIntent.NextChapter) },
                             onPreviousChapter = { viewModel.onIntent(ReaderIntent.PreviousChapter) },
                             hasPreviousChapter = state.hasPreviousChapter,
@@ -1867,6 +1878,7 @@ AnnotationTapPopup(
                 containerColor = ThemeColors.barContent(state.resolvedTheme),
                 contentColor = ThemeColors.barSurface(state.resolvedTheme),
                 actionColor = ThemeColors.barSurface(state.resolvedTheme),
+                dismissActionContentColor = ThemeColors.barSurface(state.resolvedTheme),
             )
         }
 
