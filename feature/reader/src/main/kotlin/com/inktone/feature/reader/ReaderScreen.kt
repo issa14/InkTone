@@ -52,6 +52,7 @@ import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.SnackbarDuration
 import androidx.compose.material3.SnackbarHost
+import androidx.compose.material3.Snackbar
 import androidx.compose.material3.SnackbarHostState
 import androidx.compose.material3.SnackbarResult
 import androidx.compose.material3.Text
@@ -78,6 +79,7 @@ import com.inktone.core.designsystem.rememberAppHaptics
 import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.layout.LayoutCoordinates
 import androidx.compose.ui.layout.onGloballyPositioned
+import androidx.compose.ui.layout.onSizeChanged
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.platform.LocalLifecycleOwner
@@ -726,6 +728,9 @@ fun ReaderScreen(
         // de lecture pour que la dernière ligne d'une page ne passe pas
         // dessous (audit UI P1-4).
         var statusLineHeightPx by remember { mutableIntStateOf(0) }
+        // Hauteur de toute la pile basse (panneau ou pilule, ligne de statut) :
+        // le snackbar se pose au-dessus au lieu de la recouvrir (audit UI P2-7).
+        var hudBottomHeightPx by remember { mutableIntStateOf(0) }
         val frozenAreaSize = remember(isForeground) { if (isForeground) null else measuredAreaSize }
         val readingAreaSize = frozenAreaSize ?: measuredAreaSize
         // P4 — marge latérale réglable. UNE seule valeur, consommée à la fois
@@ -1330,19 +1335,16 @@ SelectionActionPopup(
 }
         }
 
-        // Pile basse du HUD (panneau/pilule TTS, barre de luminosité, ligne
-        // de statut) : overlay pur (`align(BottomCenter)`), plus jamais un
-        // enchaînement de siblings dans la Column de lecture (voir
-        // commentaire de tête ci-dessus). Ordre visuel préservé à
-        // l'identique (panneau/pilule au-dessus de la barre de luminosité,
-        // elle-même au-dessus de la ligne de statut) via une simple Column
-        // interne.
+        // Pile basse du HUD (panneau/pilule TTS, ligne de statut) : overlay pur
+        // (`align(BottomCenter)`), plus jamais un enchaînement de siblings dans
+        // la Column de lecture (voir commentaire de tête ci-dessus) ; le
+        // panneau ou la pilule au-dessus de la ligne de statut.
         Box(
             modifier = Modifier
                 .align(Alignment.BottomCenter)
                 .fillMaxWidth(),
         ) {
-            Column(modifier = Modifier.fillMaxWidth()) {
+            Column(modifier = Modifier.fillMaxWidth().onSizeChanged { hudBottomHeightPx = it.height }) {
                 if (chrome.isHudVisible) {
                     // 3e.1 — pendant le TTS, la barre pilule remplace le panneau
                     // unifié (navigation par chapitre, retirée du panneau au lot
@@ -1839,10 +1841,21 @@ AnnotationTapPopup(
         }
         }
 
+        // Couleurs inversées des barres du thème de lecture, pas celles de
+        // l'interface : un snackbar violet sur une page sépia (audit UI P2-7).
         SnackbarHost(
             hostState = snackbarHostState,
-            modifier = Modifier.align(Alignment.BottomCenter),
-        )
+            modifier = Modifier
+                .align(Alignment.BottomCenter)
+                .padding(bottom = with(density) { hudBottomHeightPx.toDp() }),
+        ) { data ->
+            Snackbar(
+                snackbarData = data,
+                containerColor = ThemeColors.barContent(state.resolvedTheme),
+                contentColor = ThemeColors.barSurface(state.resolvedTheme),
+                actionColor = ThemeColors.barSurface(state.resolvedTheme),
+            )
+        }
 
         // Lot 10 (restauré au Lot 20) — proposition proactive de la voix
         // neuronale au premier usage réel du TTS. « Télécharger » ouvre
