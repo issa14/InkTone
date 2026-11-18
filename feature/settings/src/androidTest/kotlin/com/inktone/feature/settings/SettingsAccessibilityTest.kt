@@ -8,11 +8,13 @@ import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableFloatStateOf
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.semantics.SemanticsProperties
+import androidx.compose.ui.semantics.getOrNull
 import androidx.compose.ui.test.SemanticsMatcher
 import androidx.compose.ui.test.assertAll
 import androidx.compose.ui.test.hasClickAction
 import androidx.compose.ui.test.junit4.createAndroidComposeRule
 import androidx.compose.ui.test.onAllNodesWithText
+import androidx.compose.ui.test.performScrollTo
 import androidx.compose.ui.unit.Density
 import androidx.compose.ui.unit.dp
 import com.inktone.domain.model.UserPreferences
@@ -56,13 +58,17 @@ class SettingsAccessibilityTest {
             }
         }
 
-        composeTestRule.onAllNodes(hasClickAction()).fetchSemanticsNodes().forEach { node ->
-            val heightDp = with(composeTestRule.density) { node.boundsInRoot.height.toDp() }
-            assertTrue(
-                "cible sous 48dp trouvee : $heightDp",
-                heightDp >= 48.dp,
-            )
+        // Zone tactile réelle (agrandie à 48 dp par minimumInteractiveComponentSize
+        // pour les composants M3), chaque cible amenée à l'écran : hors de la vue,
+        // ses bornes sont rognées à 0. Tous les fautifs sont nommés d'un coup.
+        val targets = composeTestRule.onAllNodes(hasClickAction())
+        val tooSmall = (0 until targets.fetchSemanticsNodes().size).mapNotNull { index ->
+            val node = targets[index].performScrollTo().fetchSemanticsNode()
+            val heightDp = with(composeTestRule.density) { node.touchBoundsInRoot.height.toDp() }
+            val label = node.config.getOrNull(SemanticsProperties.Text) ?: node.config.getOrNull(SemanticsProperties.ContentDescription)
+            if (heightDp < 48.dp) "$label : $heightDp" else null
         }
+        assertTrue("cibles sous 48dp : $tooSmall", tooSmall.isEmpty())
     }
 
     @Test
