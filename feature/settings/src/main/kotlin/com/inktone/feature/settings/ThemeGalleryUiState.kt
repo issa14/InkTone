@@ -27,7 +27,7 @@ data class ThemeGalleryUiState(
     val activeThemeId: String = ReadingTheme.DEFAULT.id,
     val previewThemeId: String? = null,
 ) {
-    /** Ce que la carte doit afficher comme "ACTIF" — la prévisualisation prime visuellement, sans jamais être persistée. */
+    /** Ce que la carte doit afficher comme « Actif » — la prévisualisation prime visuellement, sans jamais être persistée. */
     val displayedActiveId: String get() = previewThemeId ?: activeThemeId
     val previewedTheme: ReadingTheme?
         get() = previewThemeId?.let { id -> (ambiances + accessibility + customThemes).firstOrNull { it.id == id } }

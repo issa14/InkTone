@@ -1,5 +1,7 @@
 package com.inktone.feature.reader
 
+import com.inktone.core.designsystem.NARROW_NBSP
+
 import androidx.compose.ui.test.junit4.createComposeRule
 import androidx.compose.ui.test.onNodeWithContentDescription
 import androidx.compose.ui.test.onNodeWithText
@@ -146,7 +148,7 @@ class SleepTimerPanelTest {
             )
         }
 
-        composeTestRule.onNodeWithText("1h").assertExists()
+        composeTestRule.onNodeWithText("1${NARROW_NBSP}h").assertExists()
         composeTestRule.onNodeWithContentDescription("Augmenter l'intervalle").performClick()
 
         assertEquals(75, received)

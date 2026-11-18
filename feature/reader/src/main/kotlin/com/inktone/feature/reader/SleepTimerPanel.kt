@@ -1,5 +1,7 @@
 package com.inktone.feature.reader
 
+import com.inktone.core.designsystem.NARROW_NBSP
+
 import androidx.compose.material3.LocalTextStyle
 import com.inktone.core.designsystem.emphasized
 import com.inktone.core.designsystem.InkToneSectionHeader
@@ -187,14 +189,14 @@ internal fun formatSleepTimerRemaining(remainingMs: Long): String {
     }
 }
 
-/** 3d.5 — format `1h30`, pas seulement des heures rondes (UX_FLOW_DESIGN.md §Minuteur). */
-private fun formatEyeRestInterval(totalMinutes: Int): String {
+/** 3d.5 — « 1 h 30 », « 1 h », « 45 min » ; espaces fines insécables comme partout (audit UI P2-11). */
+internal fun formatEyeRestInterval(totalMinutes: Int): String {
     val hours = totalMinutes / 60
     val minutes = totalMinutes % 60
     return when {
-        hours == 0 -> "${minutes}min"
-        minutes == 0 -> "${hours}h"
-        else -> "${hours}h$minutes"
+        hours == 0 -> "$minutes${NARROW_NBSP}min"
+        minutes == 0 -> "$hours${NARROW_NBSP}h"
+        else -> "$hours${NARROW_NBSP}h${NARROW_NBSP}${minutes.toString().padStart(2, '0')}"
     }
 }
 

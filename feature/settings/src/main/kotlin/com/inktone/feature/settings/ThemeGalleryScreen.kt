@@ -200,7 +200,7 @@ private fun ThemeCardRow(
 /**
  * Carte-aperçu vivant (Section 1/3) : mini-page réelle rendue avec la
  * vraie police et les vraies couleurs du thème, pas une pastille de
- * couleur. Badge « ACTIF » plein (pas un contour) pour éviter la
+ * couleur. Badge « Actif » plein (pas un contour) pour éviter la
  * confusion avec un survol.
  */
 @Composable
@@ -259,8 +259,9 @@ private fun ThemeMiniPreviewCard(
                 shape = RoundedCornerShape(bottomStart = 8.dp, topEnd = 12.dp),
                 modifier = Modifier.align(Alignment.TopEnd),
             ) {
+                // Casse normale : des capitales sont épelées par TalkBack (audit UI P2-11).
                 Text(
-                    "ACTIF",
+                    "Actif",
                     style = MaterialTheme.typography.labelSmall,
                     color = MaterialTheme.colorScheme.onPrimary,
                     modifier = Modifier.padding(horizontal = 8.dp, vertical = 3.dp),
