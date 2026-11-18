@@ -24,6 +24,8 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import com.inktone.core.designsystem.rememberAppHaptics
+import androidx.compose.foundation.combinedClickable
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.layout.defaultMinSize
 import androidx.compose.ui.draw.clip
@@ -88,6 +90,7 @@ fun BookCover(
     onDelete: () -> Unit = {},
 ) {
     var showActionsSheet by remember { mutableStateOf(false) }
+    val haptics = rememberAppHaptics()
     var showDetailsSheet by remember { mutableStateOf(false) }
     var showDeleteConfirm by remember { mutableStateOf(false) }
 
@@ -129,7 +132,23 @@ fun BookCover(
         modifier = modifier
             .aspectRatio(0.7f)
             .semantics { contentDescription = a11yLabel }
-            .then(if (onClick != null) Modifier.clickable(onClick = onClick) else Modifier),
+            .then(
+                if (onClick != null) {
+                    // Appui long : même menu d'actions que le ⋮, geste courant
+                    // des bibliothèques (retour Issa, vérification P2-6).
+                    Modifier.combinedClickable(
+                        onClick = onClick,
+                        onLongClick = if (showOverlays) {
+                            { haptics.longPress(); showActionsSheet = true }
+                        } else {
+                            null
+                        },
+                        onLongClickLabel = if (showOverlays) "Actions" else null,
+                    )
+                } else {
+                    Modifier
+                },
+            ),
     ) {
         if (coverModel != null) {
             // AUDIT_REACTIVITE_UX §4.7 — `SubcomposeAsyncImage` subcompose
@@ -203,7 +222,9 @@ fun BookCover(
                     modifier = Modifier
                         .padding(start = InkToneSpacing.xs, bottom = InkToneSpacing.xs)
                         .size(32.dp)
-                        .background(Color.Black.copy(alpha = 0.45f), CircleShape),
+                        // Voile léger : assez pour détacher le glyphe d'une couverture
+                        // claire, sans tache sombre sur chaque vignette (retour Issa).
+                        .background(Color.Black.copy(alpha = 0.28f), CircleShape),
                 ) {
                     AppIcon(
                         AppSymbol.MoreActions,
