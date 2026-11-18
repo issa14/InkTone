@@ -280,8 +280,10 @@ class ReadiumPublicationParser @Inject constructor(
         // editions Calibre, tous les tomes de Harry Potter compris. Le
         // repli [EpubGuideCoverResolver.findCoverImageBytes] lit alors
         // l'image directement dans l'archive ; voir son KDoc.
+        // Dernier repli : la première page, quand rien ne désigne la couverture.
         val bitmap = publication.cover()
-            ?: EpubGuideCoverResolver.findCoverImageBytes(context, fileUri)
+            ?: (EpubGuideCoverResolver.findCoverImageBytes(context, fileUri)
+                ?: EpubGuideCoverResolver.findFirstPageCoverImageBytes(context, fileUri))
                 ?.let { bytes -> BitmapFactory.decodeByteArray(bytes, 0, bytes.size) }
             ?: return@withContext null
 
