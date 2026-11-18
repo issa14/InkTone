@@ -86,7 +86,7 @@ class SleepTimerPanelTest {
         }
 
         // Valeurs par défaut de la roue : 0h30 (voir CustomDurationWheel).
-        composeTestRule.onNodeWithText("Valider").performClick()
+        composeTestRule.onNodeWithText("Démarrer").performClick()
 
         assertEquals(30, received)
     }
@@ -122,7 +122,7 @@ class SleepTimerPanelTest {
 
         composeTestRule.onNodeWithTag(WHEEL_MINUTES_TAG).performTouchInput { swipeUp() }
         composeTestRule.waitForIdle()
-        composeTestRule.onNodeWithText("Valider").performClick()
+        composeTestRule.onNodeWithText("Démarrer").performClick()
 
         assertNotNull("la roue doit avoir émis une durée", received)
         assertNotEquals(
