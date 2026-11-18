@@ -494,6 +494,8 @@ Barre horizontale fine (cohérente avec tous les autres sliders de ce document),
 
 Écran dense en 5 cartes : Présets rapides, Lecture, Appareil, Données, Prononciation. Traité carte par carte (méthode habituelle, jamais deux cartes en parallèle).
 
+**État d'implémentation (audit UI P1-12, 2026-11-18).** Cinq sections dont le titre dit le contenu : **Narration** (type de voix, voix, voix naturelle, vitesse, intonation, extrait, et une ligne « Règles de prononciation » qui ouvre leur écran dédié, plus de carte inline) · **Apparence** (thème de l'interface, couleurs dynamiques, interrupteur « Profil Accessibilité », réduire les animations) · **Habitudes de lecture** · **Données** · **Confidentialité**. Lignes en `ListItem` M3. Le préréglage **Mode sombre** est retiré (doublon de « Thème de l'interface : Sombre » + bouton Thème du Lecteur) ; le champ persistant `darkModePresetBackup` reste en base, sa suppression demandant une migration. Les cartes « À propos » et « Dossier des modèles » décrites ci-dessous n'existent déjà plus. Le profil Accessibilité reste un interrupteur, pas le bouton proposé par l'audit : à trancher.
+
 ### Carte 1 — Présets rapides
 
 Deux cartes-boutons **empilées verticalement** (pas côte à côte), chacune avec icône, titre, description courte du preset sous le titre, et un **vrai interrupteur (toggle) visuel** à droite — pas un chevron.

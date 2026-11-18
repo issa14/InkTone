@@ -130,20 +130,6 @@ class SettingsViewModelTest {
     }
 
     @Test
-    fun `le preset Mode sombre applique le theme systeme et le theme de lecture`() = runTest {
-        val preferencesRepository = FakePreferencesRepository()
-        val vm = viewModel(preferencesRepository)
-        dispatcher.scheduler.advanceUntilIdle()
-
-        vm.onIntent(SettingsIntent.SetDarkModePreset(true))
-        dispatcher.scheduler.advanceUntilIdle()
-
-        val prefs = preferencesRepository.get()
-        assertEquals(AppTheme.DARK, prefs.appTheme)
-        assertEquals(ReadingTheme.OBSIDIENNE.id, prefs.theme)
-    }
-
-    @Test
     fun `changer de moteur synchronise le VoiceProfile actif - defaut prealable n2`() = runTest {
         val preferencesRepository = FakePreferencesRepository()
         val voiceProfileRepository = FakeVoiceProfileRepository()
@@ -180,22 +166,6 @@ class SettingsViewModelTest {
         val prefs = preferencesRepository.get()
         val activeProfile = voiceProfileRepository.getById(prefs.activeVoiceProfileId!!)
         assertEquals("fr-FR-HenriNeural", activeProfile!!.voice)
-    }
-
-    @Test
-    fun `desactiver le preset Mode sombre revient aux valeurs par defaut`() = runTest {
-        val preferencesRepository = FakePreferencesRepository()
-        val vm = viewModel(preferencesRepository)
-        dispatcher.scheduler.advanceUntilIdle()
-
-        vm.onIntent(SettingsIntent.SetDarkModePreset(true))
-        dispatcher.scheduler.advanceUntilIdle()
-        vm.onIntent(SettingsIntent.SetDarkModePreset(false))
-        dispatcher.scheduler.advanceUntilIdle()
-
-        val prefs = preferencesRepository.get()
-        assertEquals(AppTheme.SYSTEM, prefs.appTheme)
-        assertEquals(ReadingTheme.DEFAULT.id, prefs.theme)
     }
 
     @Test
@@ -256,23 +226,6 @@ class SettingsViewModelTest {
         dispatcher.scheduler.advanceUntilIdle()
         assertEquals(24, preferencesRepository.get().fontSize)
         vm.onIntent(SettingsIntent.SetAccessibilityPreset(false))
-        dispatcher.scheduler.advanceUntilIdle()
-
-        assertEquals(before, preferencesRepository.get())
-    }
-
-    @Test
-    fun `desactiver le preset Mode sombre restaure le theme d avant, interface claire comprise`() = runTest {
-        val preferencesRepository = FakePreferencesRepository()
-        preferencesRepository.update(UserPreferences(theme = "sepia_vintage", appTheme = AppTheme.LIGHT))
-        val before = preferencesRepository.get()
-        val vm = viewModel(preferencesRepository)
-        dispatcher.scheduler.advanceUntilIdle()
-
-        vm.onIntent(SettingsIntent.SetDarkModePreset(true))
-        dispatcher.scheduler.advanceUntilIdle()
-        assertEquals(AppTheme.DARK, preferencesRepository.get().appTheme)
-        vm.onIntent(SettingsIntent.SetDarkModePreset(false))
         dispatcher.scheduler.advanceUntilIdle()
 
         assertEquals(before, preferencesRepository.get())

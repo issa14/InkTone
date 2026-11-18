@@ -15,7 +15,6 @@ import com.inktone.domain.model.UserPreferences
 import com.inktone.domain.model.VoiceProfile
 import com.inktone.domain.model.defaultVoiceFor
 import com.inktone.domain.model.AccessibilityPresetBackup
-import com.inktone.domain.model.DarkModePresetBackup
 import com.inktone.domain.repository.PreferencesRepository
 import com.inktone.domain.repository.PronunciationRuleRepository
 import com.inktone.domain.repository.VoiceProfileRepository
@@ -190,7 +189,6 @@ class SettingsViewModel @Inject constructor(
                 is SettingsIntent.SetVoiceSpeed -> updateActiveVoiceProfile { it.copy(speed = intent.speed) }
                 is SettingsIntent.SetVoicePitch -> updateActiveVoiceProfile { it.copy(pitch = intent.pitch) }
                 // Lot 6 — présets réversibles (désapplication vers les valeurs par défaut)
-                is SettingsIntent.SetDarkModePreset -> applyDarkModePreset(intent.enabled)
                 is SettingsIntent.SetAccessibilityPreset -> applyAccessibilityPresetToggle(intent.enabled)
                 // Compat — remplacé par SetAccessibilityPreset mais conservé pour les tests existants
                 is SettingsIntent.ApplyAccessibilityPreset -> applyAccessibilityPreset()
@@ -400,34 +398,6 @@ class SettingsViewModel @Inject constructor(
         }
     }
 
-
-    /**
-     * Lot 6/9 — Préset Mode sombre.
-     * ON : ReadingTheme.OBSIDIENNE (Lot 9 — id du thème intégré remplaçant
-     * l'ancien `ReadingTheme.DARK`) + AppTheme.DARK.
-     * OFF : retour à l'état d'avant l'activation (audit UX A11).
-     */
-    private suspend fun applyDarkModePreset(enabled: Boolean) {
-        if (enabled) {
-            // L'état d'avant est mémorisé à chaque activation : le préréglage
-            // n'était pas actif, il vient d'être demandé (audit UX A11).
-            preferencesRepository.update {
-                it.copy(
-                    theme = ReadingTheme.OBSIDIENNE.id,
-                    appTheme = AppTheme.DARK,
-                    darkModePresetBackup = DarkModePresetBackup(it.theme, it.appTheme),
-                )
-            }
-        } else {
-            // Retour à l'état d'avant ; les valeurs par défaut seulement si
-            // aucun n'est mémorisé (préréglage activé avant A11).
-            preferencesRepository.update {
-                val previous = it.darkModePresetBackup
-                    ?: DarkModePresetBackup(UserPreferences().theme, AppTheme.SYSTEM)
-                it.copy(theme = previous.theme, appTheme = previous.appTheme, darkModePresetBackup = null)
-            }
-        }
-    }
 
     /**
      * Lot 6/9 — Préset Accessibilité (toggle réversible).

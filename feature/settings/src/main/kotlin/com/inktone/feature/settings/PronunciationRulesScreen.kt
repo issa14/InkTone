@@ -12,7 +12,8 @@ import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 
 /**
- * Règles de prononciation, ouvertes depuis le panneau Voix du Lecteur. Même
+ * Règles de prononciation, ouvertes depuis le panneau Voix du Lecteur et la
+ * section Narration des Réglages. Même
  * carte que les Réglages (audit UX B8) ; le titre est porté par la barre de
  * l'écran (InkToneNavHost), pas répété ici.
  */

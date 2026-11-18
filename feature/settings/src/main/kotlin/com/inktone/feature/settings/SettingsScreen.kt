@@ -41,6 +41,9 @@ import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.TopAppBar
 import androidx.compose.material3.MaterialTheme
+import androidx.compose.ui.graphics.Color
+import androidx.compose.material3.ListItemDefaults
+import androidx.compose.material3.ListItem
 import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.RadioButton
@@ -78,20 +81,11 @@ import com.inktone.domain.model.voiceLabel
 /**
  * Écran Réglages (Tâche 8.1).
  *
- * Lot 6 — restructuré en 6 cartes :
- *   1. Présets rapides (Mode sombre, Accessibilité) — toggles réversibles
- *   2. Lecture (moteur, voix, vitesse, gain, intonation, extrait)
- *   3. Appareil (thème système, couleurs dynamiques, accessibilité, langue, confidentialité)
- *   4. Données (Palier B — export/import de sauvegarde, cache, réinitialisation)
- *   5. Performance & Bien-être (objectif, repos oculaire)
- *   6. Prononciation (Palier B — carte inline, plus un écran séparé)
- *   7. À propos
- *
- * Refonte UI/UX (standards Material 3) : titres de section en
- * `titleSmall`/sentence case (fini le ALL_CAPS), `ElevatedCard`, plus de
- * sous-titres majuscules internes (séparation par `HorizontalDivider`),
- * padding standardisé 20dp horizontal / 12dp vertical sur chaque ligne
- * interactive.
+ * Cinq sections (audit UI P1-12) : Narration (règles de prononciation
+ * comprises, en une ligne vers leur écran) · Apparence (profil
+ * Accessibilité compris) · Habitudes de lecture · Données · Confidentialité.
+ * Lignes en `ListItem` M3 : hauteurs et marges de 16 dp fixées par le
+ * composant, plus par chaque ligne maison.
  *
  * Palier B — carte Données : `BackupManager` vit dans `:data`, invisible
  * depuis `feature/settings` (Blueprint §12.4 — feature ne dépend que de
@@ -111,6 +105,7 @@ fun SettingsScreen(
     onDismissDataOperationResult: () -> Unit = {},
     onExportData: () -> Unit = {},
     onImportData: () -> Unit = {},
+    onOpenPronunciationRules: () -> Unit = {},
 ) {
     val state by viewModel.state.collectAsStateWithLifecycle()
 
@@ -144,6 +139,7 @@ fun SettingsScreen(
                 onDismissDataOperationResult = onDismissDataOperationResult,
                 onExportData = onExportData,
                 onImportData = onImportData,
+                onOpenPronunciationRules = onOpenPronunciationRules,
             )
         }
     }
@@ -172,6 +168,7 @@ internal fun SettingsContent(
     onDismissDataOperationResult: () -> Unit = {},
     onExportData: () -> Unit = {},
     onImportData: () -> Unit = {},
+    onOpenPronunciationRules: () -> Unit = {},
 ) {
     val scrollState = rememberScrollState()
     // Arrivée depuis la proposition du Lecteur : la page défile jusqu'à la voix
@@ -191,35 +188,14 @@ internal fun SettingsContent(
             .onGloballyPositioned { scrolledContent[0] = it },
     ) {
 
-        // ── Carte 1 : Présets rapides ──────────────────────────────────────────
-        // Le toggle reflète l'état réel : si un réglage du préset est modifié
-        // manuellement, le toggle se désactive automatiquement.
-        val isDarkPresetActive = preferences.appTheme == AppTheme.DARK &&
-            preferences.theme == ReadingTheme.OBSIDIENNE.id
+        // Reflète l'état réel : il se désactive dès qu'un des réglages du profil change.
         val isAccessibilityPresetActive = preferences.fontFamily == FontFamily.OPEN_DYSLEXIC &&
             preferences.fontSize == 24 &&
             preferences.theme == ReadingTheme.PAPIER_CLAIR.id &&
             preferences.reduceMotion &&
             preferences.libraryLayoutMode == "LIST"
 
-        SectionGroup("Préréglages") {
-            PresetRow(
-                icon = { AppIcon(AppSymbol.DarkMode, contentDescription = null) },
-                title = "Mode sombre",
-                checked = isDarkPresetActive,
-                onCheckedChange = { onIntent(SettingsIntent.SetDarkModePreset(it)) },
-            )
-            HorizontalDivider(modifier = Modifier.padding(horizontal = 20.dp))
-            PresetRow(
-                icon = { AppIcon(AppSymbol.Accessibility, contentDescription = null) },
-                title = "Accessibilité",
-                description = "Police pour la dyslexie, grand texte, animations réduites, vue en liste",
-                checked = isAccessibilityPresetActive,
-                onCheckedChange = { onIntent(SettingsIntent.SetAccessibilityPreset(it)) },
-            )
-        }
-
-        // ── Carte 2 : Lecture ──────────────────────────────────────────────────
+        // ── Narration ──
         var showEnginePicker by remember { mutableStateOf(false) }
         var showVoicePicker by remember { mutableStateOf(false) }
 
@@ -244,7 +220,7 @@ internal fun SettingsContent(
                 text = ttsEngineDescription(preferences.defaultTtsEngine),
                 style = MaterialTheme.typography.bodySmall,
                 color = MaterialTheme.colorScheme.onSurfaceVariant,
-                modifier = Modifier.padding(horizontal = 20.dp),
+                modifier = Modifier.padding(horizontal = 16.dp),
             )
             // Passage du cycle au dialogue : avec plusieurs profils, cycler devient impraticable.
             SettingRow(
@@ -266,7 +242,7 @@ internal fun SettingsContent(
             }
             // Lot 6 — vitesse : même cible VoiceProfile.speed que le panneau Voix du lecteur (Tâche 3d).
             InkToneSlider(
-                modifier = Modifier.padding(horizontal = 20.dp, vertical = 12.dp),
+                modifier = Modifier.padding(horizontal = 16.dp, vertical = 12.dp),
                 label = "Vitesse d'élocution",
                 value = activeSpeed.coerceIn(VoiceProfile.SPEED_RANGE),
                 range = VoiceProfile.SPEED_RANGE,
@@ -283,7 +259,7 @@ internal fun SettingsContent(
             // système et Edge). Sherpa-ONNX (VITS) ne règle que la durée.
             if (selectedEngine in pitchEngines) {
                 InkToneSlider(
-                    modifier = Modifier.padding(horizontal = 20.dp, vertical = 12.dp),
+                    modifier = Modifier.padding(horizontal = 16.dp, vertical = 12.dp),
                     label = "Intonation",
                     value = activePitch.coerceIn(VoiceProfile.PITCH_RANGE),
                     range = VoiceProfile.PITCH_RANGE,
@@ -293,6 +269,12 @@ internal fun SettingsContent(
                     onValueChange = { onIntent(SettingsIntent.SetVoicePitch(it)) },
                 )
             }
+            // Une ligne vers l'écran dédié plutôt qu'une carte de plus (audit UI P1-12).
+            SettingRow(
+                label = "Règles de prononciation",
+                value = pronunciationRuleCountText(pronunciationRules.size),
+                onClick = onOpenPronunciationRules,
+            )
             // Lot 6 — Écouter un extrait. Audit v1.0.0 (AUDIT_CONSOLIDATION_V1.md,
             // B1) : RÉ-IMPLÉMENTÉ — le bouton avait été retiré (l'intent était
             // un no-op) puis recâblé sur une vraie synthèse + lecture
@@ -302,7 +284,7 @@ internal fun SettingsContent(
                 onClick = { onIntent(SettingsIntent.PlayPreview) },
                 modifier = Modifier
                     .fillMaxWidth()
-                    .padding(horizontal = 20.dp, vertical = 8.dp),
+                    .padding(horizontal = 16.dp, vertical = 8.dp),
             ) {
                 AppIcon(
                     if (isPreviewing) AppSymbol.Pause else AppSymbol.Play,
@@ -316,12 +298,12 @@ internal fun SettingsContent(
                     text = previewError,
                     style = MaterialTheme.typography.bodySmall,
                     color = MaterialTheme.colorScheme.error,
-                    modifier = Modifier.padding(horizontal = 20.dp),
+                    modifier = Modifier.padding(horizontal = 16.dp),
                 )
             }
         }
 
-        // ── Carte 3 : Appareil ─────────────────────────────────────────────────
+        // ── Apparence ──
         var showAppThemePicker by remember { mutableStateOf(false) }
 
         SectionGroup("Apparence") {
@@ -352,9 +334,15 @@ internal fun SettingsContent(
                 )
             }
 
-            HorizontalDivider(modifier = Modifier.padding(horizontal = 20.dp))
+            HorizontalDivider(modifier = Modifier.padding(horizontal = 16.dp))
 
             // ─ Accessibilité ─
+            ToggleSetting(
+                label = "Profil Accessibilité",
+                description = "Police pour la dyslexie, grand texte, animations réduites, vue en liste",
+                checked = isAccessibilityPresetActive,
+                onCheckedChange = { onIntent(SettingsIntent.SetAccessibilityPreset(it)) },
+            )
             ToggleSetting(
                 label = "Réduire les animations",
                 checked = preferences.reduceMotion,
@@ -366,105 +354,7 @@ internal fun SettingsContent(
 
         }
 
-        SectionGroup("Confidentialité") {
-            // Audit UX A1 — ligne « Langue de l'interface » retirée : aucune
-            // traduction n'existe (libellés français en dur), et la valeur
-            // choisie devenait la langue des profils vocaux créés ensuite.
-            // Elle reviendra avec l'internationalisation.
-            // Lot 10, Tâche 10.5 — formulation honnête exigée par ADR-014
-            // (« avec une explication honnête de son contenu »). Seul
-            // point de consentement restant depuis le retrait de l'étape
-            // d'onboarding CrashConsent (Tâche 10.3) : cette description
-            // doit porter l'explication à elle seule.
-            ToggleSetting(
-                label = "Rapports de plantage",
-                description = "Envoie uniquement la trace d'erreur, la version de l'app et le modèle d'appareil. " +
-                    "Jamais le contenu de vos livres ni vos annotations.",
-                checked = preferences.crashReportingEnabled,
-                onCheckedChange = { onIntent(SettingsIntent.SetCrashReportingEnabled(it)) },
-            )
-        }
-
-        // ── Carte 4 : Données (Palier B) ──────────────────────────────────────
-        var showImportWarning by remember { mutableStateOf(false) }
-        var showClearCacheConfirm by remember { mutableStateOf(false) }
-        var showResetConfirm by remember { mutableStateOf(false) }
-        var showRestoreCoversConfirm by remember { mutableStateOf(false) }
-
-        SectionGroup("Données") {
-            // Action directe, sans confirmation — n'écrase rien de local.
-            ActionRow(
-                icon = AppSymbol.Upload,
-                title = "Exporter les données",
-                subtitle = "Signets, notes, positions, statistiques et thèmes, sans les livres.",
-                onClick = onExportData,
-            )
-            // Avertissement préalable — l'import écrase la configuration courante.
-            ActionRow(
-                icon = AppSymbol.Download,
-                title = "Importer une sauvegarde",
-                subtitle = "Ajoute les données d'un fichier de sauvegarde.",
-                onClick = { showImportWarning = true },
-            )
-
-            HorizontalDivider(modifier = Modifier.padding(horizontal = 20.dp))
-
-            // Taille réelle calculée (Context.cacheDir), pas estimée.
-            Row(
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .heightIn(min = 48.dp)
-                    .padding(horizontal = 20.dp, vertical = 12.dp),
-                horizontalArrangement = Arrangement.SpaceBetween,
-                verticalAlignment = Alignment.CenterVertically,
-            ) {
-                Column(Modifier.weight(1f)) {
-                    Text("Vider le cache")
-                    Text(
-                        text = "${formatBytes(cacheSizeBytes)} occupés",
-                        style = MaterialTheme.typography.bodySmall,
-                        color = MaterialTheme.colorScheme.onSurfaceVariant,
-                    )
-                }
-                TextButton(onClick = { showClearCacheConfirm = true }, enabled = cacheSizeBytes > 0) {
-                    AppIcon(AppSymbol.DeleteSweep, contentDescription = null)
-                    Spacer(Modifier.width(4.dp))
-                    Text("Vider")
-                }
-            }
-
-            HorizontalDivider(modifier = Modifier.padding(horizontal = 20.dp))
-
-            // Maintenance des couvertures : opérations rares, rangées ici plutôt
-            // qu'au même rang qu'« Importer » dans la Bibliothèque (P1-17).
-            ActionRow(
-                icon = AppSymbol.Refresh,
-                title = "Régénérer les couvertures",
-                subtitle = coverRegeneration?.let { "En cours… ${it.processed} sur ${it.total}" }
-                    ?: coverStatus
-                    ?: "Extrait de nouveau la couverture de chaque livre.",
-                onClick = { if (coverRegeneration == null) onIntent(SettingsIntent.RegenerateCovers) },
-            )
-            ActionRow(
-                icon = AppSymbol.CoverOnly,
-                title = "Rétablir les couvertures d'origine",
-                subtitle = "Remplace les couvertures par leur version par défaut.",
-                onClick = { showRestoreCoversConfirm = true },
-            )
-
-            HorizontalDivider(modifier = Modifier.padding(horizontal = 20.dp))
-
-            // Couleur d'alerte + icône triangle : signale le côté destructif.
-            ActionRow(
-                icon = AppSymbol.WarningAmber,
-                title = "Réinitialiser les réglages",
-                subtitle = "Vos livres et vos données ne sont pas touchés.",
-                tint = MaterialTheme.colorScheme.error,
-                onClick = { showResetConfirm = true },
-            )
-        }
-
-        // ── Carte 5 : Performance & Bien-être ─────────────────────────────────
+        // ── Habitudes de lecture ──
         var showGoalPicker by remember { mutableStateOf(false) }
 
         SectionGroup("Habitudes de lecture") {
@@ -490,8 +380,94 @@ internal fun SettingsContent(
             )
         }
 
-        // ── Carte 6 : Prononciation ──────────────────────────────────────────
-        PronunciationRulesSection(rules = pronunciationRules, onIntent = onIntent)
+        // ── Données ──
+        var showImportWarning by remember { mutableStateOf(false) }
+        var showClearCacheConfirm by remember { mutableStateOf(false) }
+        var showResetConfirm by remember { mutableStateOf(false) }
+        var showRestoreCoversConfirm by remember { mutableStateOf(false) }
+
+        SectionGroup("Données") {
+            // Action directe, sans confirmation — n'écrase rien de local.
+            ActionRow(
+                icon = AppSymbol.Upload,
+                title = "Exporter les données",
+                subtitle = "Signets, notes, positions, statistiques et thèmes, sans les livres.",
+                onClick = onExportData,
+            )
+            // Avertissement préalable — l'import écrase la configuration courante.
+            ActionRow(
+                icon = AppSymbol.Download,
+                title = "Importer une sauvegarde",
+                subtitle = "Ajoute les données d'un fichier de sauvegarde.",
+                onClick = { showImportWarning = true },
+            )
+
+            HorizontalDivider(modifier = Modifier.padding(horizontal = 16.dp))
+
+            // Taille réelle calculée (Context.cacheDir), pas estimée.
+            ListItem(
+                headlineContent = { Text("Vider le cache") },
+                supportingContent = { Text("${formatBytes(cacheSizeBytes)} occupés") },
+                trailingContent = {
+                    TextButton(onClick = { showClearCacheConfirm = true }, enabled = cacheSizeBytes > 0) {
+                        AppIcon(AppSymbol.DeleteSweep, contentDescription = null)
+                        Spacer(Modifier.width(4.dp))
+                        Text("Vider")
+                    }
+                },
+                colors = settingsItemColors(),
+            )
+
+            HorizontalDivider(modifier = Modifier.padding(horizontal = 16.dp))
+
+            // Maintenance des couvertures : opérations rares, rangées ici plutôt
+            // qu'au même rang qu'« Importer » dans la Bibliothèque (P1-17).
+            ActionRow(
+                icon = AppSymbol.Refresh,
+                title = "Régénérer les couvertures",
+                subtitle = coverRegeneration?.let { "En cours… ${it.processed} sur ${it.total}" }
+                    ?: coverStatus
+                    ?: "Extrait de nouveau la couverture de chaque livre.",
+                onClick = { if (coverRegeneration == null) onIntent(SettingsIntent.RegenerateCovers) },
+            )
+            ActionRow(
+                icon = AppSymbol.CoverOnly,
+                title = "Rétablir les couvertures d'origine",
+                subtitle = "Remplace les couvertures par leur version par défaut.",
+                onClick = { showRestoreCoversConfirm = true },
+            )
+
+            HorizontalDivider(modifier = Modifier.padding(horizontal = 16.dp))
+
+            // Couleur d'alerte + icône triangle : signale le côté destructif.
+            ActionRow(
+                icon = AppSymbol.WarningAmber,
+                title = "Réinitialiser les réglages",
+                subtitle = "Vos livres et vos données ne sont pas touchés.",
+                tint = MaterialTheme.colorScheme.error,
+                onClick = { showResetConfirm = true },
+            )
+        }
+
+        SectionGroup("Confidentialité") {
+            // Audit UX A1 — ligne « Langue de l'interface » retirée : aucune
+            // traduction n'existe (libellés français en dur), et la valeur
+            // choisie devenait la langue des profils vocaux créés ensuite.
+            // Elle reviendra avec l'internationalisation.
+            // Lot 10, Tâche 10.5 — formulation honnête exigée par ADR-014
+            // (« avec une explication honnête de son contenu »). Seul
+            // point de consentement restant depuis le retrait de l'étape
+            // d'onboarding CrashConsent (Tâche 10.3) : cette description
+            // doit porter l'explication à elle seule.
+            ToggleSetting(
+                label = "Rapports de plantage",
+                description = "Envoie uniquement la trace d'erreur, la version de l'app et le modèle d'appareil. " +
+                    "Jamais le contenu de vos livres ni vos annotations.",
+                checked = preferences.crashReportingEnabled,
+                onCheckedChange = { onIntent(SettingsIntent.SetCrashReportingEnabled(it)) },
+            )
+        }
+
 
         // ── Dialogues ──────────────────────────────────────────────────────────
         if (showEnginePicker) {
@@ -647,97 +623,40 @@ private fun SectionGroup(title: String, content: @Composable ColumnScope.() -> U
     }
 }
 
+/** Fond de la carte sous chaque ligne : `ListItem` peindrait sinon sa propre surface. */
+@Composable
+private fun settingsItemColors() = ListItemDefaults.colors(containerColor = Color.Transparent)
+
+/** Réglage à choix : la valeur courante en sous-titre, le choix dans un dialogue. */
 @Composable
 private fun SettingRow(label: String, value: String, onClick: () -> Unit) {
-    Row(
-        modifier = Modifier
-            .fillMaxWidth()
-            .heightIn(min = 48.dp)
-            .clickable(onClick = onClick)
-            .padding(horizontal = 20.dp, vertical = 12.dp),
-        horizontalArrangement = Arrangement.SpaceBetween,
-        verticalAlignment = Alignment.CenterVertically,
-    ) {
-        Text(label, modifier = Modifier.weight(1f))
-        Text(
-            text = value,
-            style = MaterialTheme.typography.bodyMedium,
-            color = MaterialTheme.colorScheme.primary,
-        )
-    }
+    ListItem(
+        headlineContent = { Text(label) },
+        supportingContent = { Text(value) },
+        colors = settingsItemColors(),
+        modifier = Modifier.clickable(onClick = onClick),
+    )
 }
 
 /**
- * Lot 6, Palier B — ligne d'action avec icône, titre et sous-texte
- * optionnel (ex. Exporter/Importer/Réinitialiser dans la carte Données).
- * `tint` par défaut neutre ; passer `colorScheme.error` pour une action
- * destructive (Réinitialiser).
+ * Ligne d'action avec icône, titre et sous-texte optionnel (carte Données).
+ * `tint` : `colorScheme.error` pour une action destructive.
  */
 @Composable
 private fun ActionRow(
     icon: AppSymbol,
     title: String,
     subtitle: String? = null,
-    tint: androidx.compose.ui.graphics.Color = MaterialTheme.colorScheme.onSurface,
+    tint: Color = MaterialTheme.colorScheme.onSurface,
     onClick: () -> Unit,
 ) {
-    Row(
-        modifier = Modifier
-            .fillMaxWidth()
-            .heightIn(min = 48.dp)
-            .clickable(onClick = onClick)
-            .padding(horizontal = 20.dp, vertical = 12.dp),
-        verticalAlignment = Alignment.CenterVertically,
-        horizontalArrangement = Arrangement.spacedBy(12.dp),
-    ) {
-        AppIcon(icon, contentDescription = null, tint = tint)
-        Column(Modifier.weight(1f)) {
-            Text(title, color = tint)
-            if (subtitle != null) {
-                Text(subtitle, style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
-            }
-        }
-    }
-}
-
-/**
- * Lot 6 — Ligne de préset avec icône, titre, description et toggle réversible.
- * Tâche 9.1.1 — Modifier.toggleable pour que TalkBack annonce correctement.
- * Refonte — l'icône s'aligne en haut avec la première ligne de texte
- * (`Alignment.Top` sur la Row) plutôt que d'être centrée sur tout le bloc
- * quand la description passe sur plusieurs lignes ; le Switch, lui, reste
- * centré verticalement (`align` explicite, puisque le défaut de la Row a changé).
- */
-@Composable
-private fun PresetRow(
-    icon: @Composable () -> Unit,
-    title: String,
-    description: String? = null,
-    checked: Boolean,
-    onCheckedChange: (Boolean) -> Unit,
-) {
-    Row(
-        modifier = Modifier
-            .fillMaxWidth()
-            .heightIn(min = 56.dp)
-            .toggleable(value = checked, onValueChange = onCheckedChange, role = Role.Switch)
-            .padding(horizontal = 20.dp, vertical = 12.dp),
-        verticalAlignment = Alignment.Top,
-        horizontalArrangement = Arrangement.spacedBy(12.dp),
-    ) {
-        icon()
-        Column(modifier = Modifier.weight(1f)) {
-            Text(title, style = MaterialTheme.typography.bodyLarge)
-            if (description != null) {
-                Text(
-                    description,
-                    style = MaterialTheme.typography.bodySmall,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant,
-                )
-            }
-        }
-        Switch(checked = checked, onCheckedChange = null, modifier = Modifier.align(Alignment.CenterVertically))
-    }
+    ListItem(
+        headlineContent = { Text(title, color = tint) },
+        supportingContent = subtitle?.let { { Text(it) } },
+        leadingContent = { AppIcon(icon, contentDescription = null, tint = tint) },
+        colors = settingsItemColors(),
+        modifier = Modifier.clickable(onClick = onClick),
+    )
 }
 
 /**
@@ -760,7 +679,7 @@ private fun VoiceDownloadRow(
 ) {
     var showConfirmDialog by remember { mutableStateOf(false) }
 
-    Column(Modifier.fillMaxWidth().padding(horizontal = 20.dp, vertical = 8.dp)) {
+    Column(Modifier.fillMaxWidth().padding(horizontal = 16.dp, vertical = 8.dp)) {
         Text(
             when (progress) {
                 is com.inktone.domain.service.VoiceDownloadProgress.InProgress ->
@@ -812,46 +731,32 @@ private fun VoiceDownloadRow(
     }
 }
 
+/** Nombre de règles de prononciation, sous la ligne qui ouvre leur écran. */
+internal fun pronunciationRuleCountText(count: Int): String = when (count) {
+    0 -> "Aucune règle"
+    1 -> "1 règle"
+    else -> "$count règles"
+}
+
 /** Retour Issa : Mo lisibles plutôt que des octets bruts ("345566/132111222"). */
 private fun formatMegabytes(bytes: Long): String = "%.1f Mo".format(bytes / 1_000_000.0)
 
 /**
- * Tâche 9.1.1 — Row entière rendue accessible via Modifier.toggleable
- * (role Switch, label fusionné) plutôt que le seul Switch isolé :
- * TalkBack annonce "Rapports de crash, interrupteur, désactivé".
+ * Ligne entière basculable (rôle Switch, libellé fusionné) plutôt que le
+ * seul Switch : TalkBack annonce « Rapports de plantage, interrupteur ».
  */
 @Composable
 private fun ToggleSetting(label: String, checked: Boolean, onCheckedChange: (Boolean) -> Unit, description: String? = null) {
-    Row(
-        modifier = Modifier
-            .fillMaxWidth()
-            .heightIn(min = 48.dp)
-            .toggleable(value = checked, onValueChange = onCheckedChange, role = Role.Switch)
-            .padding(horizontal = 20.dp, vertical = 12.dp),
-        horizontalArrangement = Arrangement.SpaceBetween,
-        verticalAlignment = Alignment.CenterVertically,
-    ) {
-        Column(Modifier.weight(1f)) {
-            Text(label)
-            description?.let {
-                Text(it, style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
-            }
-        }
-        Switch(checked = checked, onCheckedChange = null)
-    }
+    ListItem(
+        headlineContent = { Text(label) },
+        supportingContent = description?.let { { Text(it) } },
+        trailingContent = { Switch(checked = checked, onCheckedChange = null) },
+        colors = settingsItemColors(),
+        modifier = Modifier.toggleable(value = checked, onValueChange = onCheckedChange, role = Role.Switch),
+    )
 }
 
-/**
- * Lot 6 — Stepper −/+ par pas, désactivé visuellement quand enabled=false.
- * Refonte — de vrais `IconButton` (48x48dp, `AppSymbol.Remove`/`Add`)
- * remplacent les boutons texte "−"/"+" ; la valeur est encadrée par les deux.
- * Correctif — le libellé porte `Modifier.weight(1f)` pour prendre tout
- * l'espace disponible et repousser le stepper à droite ; le stepper ne
- * porte lui aucune largeur minimale forcée (`wrapContentWidth`, sa taille
- * suit son propre contenu) — l'ancien `widthIn(min = 152.dp)` sur le
- * stepper entrait en conflit avec le `weight(1f)` du libellé sur les
- * écrans étroits et écrasait le texte caractère par caractère.
- */
+/** Stepper −/+ par pas, grisé quand [enabled] est faux. */
 @Composable
 private fun StepperSetting(
     label: String,
@@ -865,40 +770,28 @@ private fun StepperSetting(
     val contentColor = if (enabled) MaterialTheme.colorScheme.onSurface
     else MaterialTheme.colorScheme.onSurface.copy(alpha = 0.38f)
 
-    Row(
-        modifier = Modifier
-            .fillMaxWidth()
-            .padding(horizontal = 20.dp, vertical = 12.dp),
-        verticalAlignment = Alignment.CenterVertically,
-    ) {
-        // Le titre prend l'espace disponible et pousse le stepper à droite.
-        Text(
-            text = label,
-            style = MaterialTheme.typography.bodyLarge,
-            color = contentColor,
-            modifier = Modifier.weight(1f),
-        )
-        // Le stepper ne prend que la largeur dont il a besoin.
-        Row(
-            verticalAlignment = Alignment.CenterVertically,
-            modifier = Modifier.wrapContentWidth(),
-        ) {
-            IconButton(
-                onClick = { onValueChange((value - step).coerceIn(range)) },
-                enabled = enabled && value > range.first,
-            ) { AppIcon(AppSymbol.Remove, contentDescription = "Diminuer $label") }
-            Text(
-                text = displayFormatter(value),
-                style = MaterialTheme.typography.bodyMedium,
-                color = contentColor,
-                modifier = Modifier.padding(horizontal = 8.dp),
-            )
-            IconButton(
-                onClick = { onValueChange((value + step).coerceIn(range)) },
-                enabled = enabled && value < range.last,
-            ) { AppIcon(AppSymbol.Add, contentDescription = "Augmenter $label") }
-        }
-    }
+    ListItem(
+        headlineContent = { Text(label, color = contentColor) },
+        // Le stepper ne prend que sa largeur : le libellé garde le reste.
+        trailingContent = {
+            Row(verticalAlignment = Alignment.CenterVertically) {
+                IconButton(
+                    onClick = { onValueChange((value - step).coerceIn(range)) },
+                    enabled = enabled && value > range.first,
+                ) { AppIcon(AppSymbol.Remove, contentDescription = "Diminuer $label") }
+                Text(
+                    text = displayFormatter(value),
+                    style = MaterialTheme.typography.bodyMedium,
+                    color = contentColor,
+                )
+                IconButton(
+                    onClick = { onValueChange((value + step).coerceIn(range)) },
+                    enabled = enabled && value < range.last,
+                ) { AppIcon(AppSymbol.Add, contentDescription = "Augmenter $label") }
+            }
+        },
+        colors = settingsItemColors(),
+    )
 }
 
 /**
@@ -1209,7 +1102,7 @@ internal fun PronunciationRulesSection(rules: List<PronunciationRule>, onIntent:
                     onDelete = { ruleToDelete = rule },
                 )
                 if (index != rules.lastIndex) {
-                    HorizontalDivider(modifier = Modifier.padding(horizontal = 20.dp))
+                    HorizontalDivider(modifier = Modifier.padding(horizontal = 16.dp))
                 }
             }
         }

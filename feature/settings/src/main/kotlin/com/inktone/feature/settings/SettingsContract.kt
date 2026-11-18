@@ -81,8 +81,7 @@ sealed interface SettingsIntent {
     data class SetEyeRestReminderEnabled(val enabled: Boolean) : SettingsIntent
     // Lot 6 — intervalle repos oculaire (par pas de 15 min)
     data class SetEyeRestReminderIntervalMinutes(val minutes: Int) : SettingsIntent
-    // Lot 6 — présets rapides (toggle réversible, désapplication vers les valeurs par défaut)
-    data class SetDarkModePreset(val enabled: Boolean) : SettingsIntent
+    // Lot 6 — préréglage Accessibilité (réversible, retour à l'état d'avant)
     data class SetAccessibilityPreset(val enabled: Boolean) : SettingsIntent
     // Lot 6 — écouter un extrait. Audit v1.0.0 (AUDIT_CONSOLIDATION_V1.md,
     // B1) : RÉ-IMPLÉMENTÉ — le bouton avait été retiré parce que l'intent

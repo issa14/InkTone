@@ -399,6 +399,7 @@ fun InkToneNavHost(navController: NavHostController = rememberNavController(), s
                 onImportData = {
                     importBackupLauncher.launch(arrayOf("application/octet-stream", "application/json", "*/*"))
                 },
+                onOpenPronunciationRules = { navController.navigate(PronunciationRulesRoute) },
             )
 
             if (isExportPasswordDialogVisible) {
