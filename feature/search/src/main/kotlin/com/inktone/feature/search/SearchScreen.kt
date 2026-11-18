@@ -1,5 +1,7 @@
 package com.inktone.feature.search
 
+import com.inktone.core.designsystem.InkToneSpacing
+
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Spacer
@@ -72,7 +74,7 @@ fun SearchScreen(
         if (state.query.isEmpty()) focusRequester.requestFocus()
     }
 
-    Column(Modifier.fillMaxSize().padding(16.dp)) {
+    Column(Modifier.fillMaxSize().padding(InkToneSpacing.lg)) {
         // D.6 / E.2 — champ de recherche avec bouton effacer et label accessible
         TextField(
             value = state.query,
@@ -107,7 +109,7 @@ fun SearchScreen(
                 horizontalAlignment = Alignment.CenterHorizontally,
             ) {
                 AppIcon(AppSymbol.SearchOff, contentDescription = null, tint = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.4f))
-                Spacer(Modifier.height(12.dp))
+                Spacer(Modifier.height(InkToneSpacing.md))
                 Text(
                     "Aucun résultat pour « ${state.query} »",
                     style = MaterialTheme.typography.bodyMedium,
@@ -122,7 +124,7 @@ fun SearchScreen(
                 style = MaterialTheme.typography.labelLarge,
                 color = MaterialTheme.colorScheme.onSurfaceVariant,
                 modifier = Modifier
-                    .padding(top = 16.dp, bottom = 4.dp)
+                    .padding(top = InkToneSpacing.lg, bottom = InkToneSpacing.xs)
                     .semantics { liveRegion = LiveRegionMode.Polite },
             )
         }

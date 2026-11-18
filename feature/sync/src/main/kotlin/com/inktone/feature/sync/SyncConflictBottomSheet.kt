@@ -1,5 +1,7 @@
 package com.inktone.feature.sync
 
+import com.inktone.core.designsystem.InkToneSpacing
+
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
@@ -54,12 +56,12 @@ fun SyncConflictBottomSheet(
 
     ModalBottomSheet(onDismissRequest = { /* pas de rejet silencieux : un conflit doit être tranché, pas escamoté */ }, sheetState = sheetState) {
         Column(
-            modifier = Modifier.padding(horizontal = 24.dp, vertical = 8.dp),
-            verticalArrangement = Arrangement.spacedBy(16.dp),
+            modifier = Modifier.padding(horizontal = InkToneSpacing.xl, vertical = InkToneSpacing.sm),
+            verticalArrangement = Arrangement.spacedBy(InkToneSpacing.lg),
         ) {
             Row(verticalAlignment = Alignment.CenterVertically) {
                 AppIcon(AppSymbol.Warning, contentDescription = null, tint = MaterialTheme.colorScheme.error)
-                Row(Modifier.padding(start = 8.dp)) {
+                Row(Modifier.padding(start = InkToneSpacing.sm)) {
                     Text("Conflit de synchronisation", style = MaterialTheme.typography.titleLarge)
                 }
             }
@@ -92,7 +94,7 @@ private fun PositionOption(originLabel: String, snapshot: ReadingPositionSnapsho
     // (tâche 11.10) : la fraîcheur n'est qu'une information de contexte
     // parmi d'autres, pas un choix par défaut.
     Card(colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.4f))) {
-        Column(Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(4.dp)) {
+        Column(Modifier.padding(InkToneSpacing.lg), verticalArrangement = Arrangement.spacedBy(InkToneSpacing.xs)) {
             Text(originLabel, style = MaterialTheme.typography.titleSmall)
             Text(
                 DateUtils.getRelativeTimeSpanString(snapshot.at, System.currentTimeMillis(), DateUtils.MINUTE_IN_MILLIS).toString(),
@@ -103,7 +105,7 @@ private fun PositionOption(originLabel: String, snapshot: ReadingPositionSnapsho
                 "${snapshot.locator.positionLabel()}, ${formatPercent(snapshot.progressFraction)}",
                 style = MaterialTheme.typography.bodyMedium,
             )
-            Button(onClick = onChoose, modifier = Modifier.fillMaxWidth().padding(top = 8.dp)) {
+            Button(onClick = onChoose, modifier = Modifier.fillMaxWidth().padding(top = InkToneSpacing.sm)) {
                 Text(actionLabel)
             }
         }

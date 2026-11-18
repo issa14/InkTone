@@ -1,5 +1,7 @@
 package com.inktone.feature.library
 
+import com.inktone.core.designsystem.InkToneSpacing
+
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
@@ -52,7 +54,7 @@ fun LibraryTitleFlyout(
 
     DropdownMenu(expanded = expanded, onDismissRequest = onDismiss) {
         Row {
-            Column(Modifier.width(140.dp).padding(vertical = 4.dp)) {
+            Column(Modifier.width(140.dp).padding(vertical = InkToneSpacing.xs)) {
                 FlyoutCategoryRow("Tous") { onSelectAll(); onDismiss() }
                 FlyoutCategoryRow("Favoris") { onSelectFavorites(); onDismiss() }
                 FlyoutCategoryRow(
@@ -67,7 +69,7 @@ fun LibraryTitleFlyout(
 
             if (activeCategory != null) {
                 HorizontalDivider(
-                    modifier = Modifier.width(1.dp).padding(vertical = 4.dp),
+                    modifier = Modifier.width(1.dp).padding(vertical = InkToneSpacing.xs),
                 )
                 val entries = when (activeCategory) {
                     FlyoutCategory.SERIES -> series.map { it to (seriesCounts[it] ?: 0) }
@@ -87,7 +89,7 @@ fun LibraryTitleFlyout(
                         .width(180.dp)
                         .heightIn(max = 280.dp)
                         .verticalScroll(rememberScrollState())
-                        .padding(vertical = 4.dp),
+                        .padding(vertical = InkToneSpacing.xs),
                 ) {
                     entries.forEach { (name, count) ->
                         FlyoutCategoryRow("$name ($count)") { onNavigate(name); onDismiss() }
@@ -106,6 +108,6 @@ private fun FlyoutCategoryRow(label: String, selected: Boolean = false, onClick:
         style = MaterialTheme.typography.bodyLarge,
         modifier = Modifier
             .clickable(onClick = onClick)
-            .padding(horizontal = 16.dp, vertical = 12.dp),
+            .padding(horizontal = InkToneSpacing.lg, vertical = InkToneSpacing.md),
     )
 }

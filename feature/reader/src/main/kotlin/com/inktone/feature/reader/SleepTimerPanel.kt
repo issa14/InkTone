@@ -1,5 +1,7 @@
 package com.inktone.feature.reader
 
+import com.inktone.core.designsystem.InkToneSpacing
+
 import androidx.compose.foundation.verticalScroll
 
 import androidx.compose.foundation.rememberScrollState
@@ -90,14 +92,14 @@ fun SleepTimerPanel(
                 .fillMaxWidth()
                 // Puces, roue et repos oculaire ne tiennent pas à grande police (audit UI P2-16).
                 .verticalScroll(rememberScrollState())
-                .padding(horizontal = 24.dp, vertical = 16.dp),
+                .padding(horizontal = InkToneSpacing.xl, vertical = InkToneSpacing.lg),
         ) {
             if (showSleepTimer) {
                 Text(
                     "Minuteur de sommeil",
                     style = MaterialTheme.typography.titleMedium,
                 )
-                Spacer(Modifier.height(4.dp))
+                Spacer(Modifier.height(InkToneSpacing.xs))
 
                 if (remainingMs != null) {
                     Text(
@@ -108,9 +110,9 @@ fun SleepTimerPanel(
                     TextButton(onClick = { onSetSleepTimer(null) }) { Text("Annuler") }
                 }
 
-                Spacer(Modifier.height(12.dp))
+                Spacer(Modifier.height(InkToneSpacing.md))
 
-                Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                Row(horizontalArrangement = Arrangement.spacedBy(InkToneSpacing.sm)) {
                     SLEEP_TIMER_CHIP_MINUTES.forEach { minutes ->
                         FilterChip(
                             // Comparée à la durée ARMÉE, pas au temps restant :
@@ -125,12 +127,12 @@ fun SleepTimerPanel(
 
                 Spacer(Modifier.height(20.dp))
                 Text("Durée personnalisée", style = MaterialTheme.typography.labelLarge)
-                Spacer(Modifier.height(8.dp))
+                Spacer(Modifier.height(InkToneSpacing.sm))
                 CustomDurationWheel(onConfirm = { totalMinutes -> onSetSleepTimer(totalMinutes) })
 
-                Spacer(Modifier.height(24.dp))
+                Spacer(Modifier.height(InkToneSpacing.xl))
                 HorizontalDivider()
-                Spacer(Modifier.height(16.dp))
+                Spacer(Modifier.height(InkToneSpacing.lg))
             }
 
             // ── Section 2 — Repos oculaire, indépendant du TTS (3d.5) ──
@@ -143,9 +145,9 @@ fun SleepTimerPanel(
             }
 
             if (eyeRestReminderEnabled) {
-                Spacer(Modifier.height(12.dp))
+                Spacer(Modifier.height(InkToneSpacing.md))
                 Text("Intervalle", style = MaterialTheme.typography.labelLarge)
-                Spacer(Modifier.height(4.dp))
+                Spacer(Modifier.height(InkToneSpacing.xs))
                 Row(verticalAlignment = Alignment.CenterVertically) {
                     IconButton(
                         onClick = {
@@ -166,7 +168,7 @@ fun SleepTimerPanel(
                 }
             }
 
-            Spacer(Modifier.height(16.dp))
+            Spacer(Modifier.height(InkToneSpacing.lg))
         }
     }
 }
@@ -236,7 +238,7 @@ private fun CustomDurationWheel(onConfirm: (totalMinutes: Int) -> Unit) {
             modifier = Modifier.width(56.dp).testTag(WHEEL_HOURS_TAG),
         )
         Text("h", style = MaterialTheme.typography.bodyMedium)
-        Spacer(Modifier.width(12.dp))
+        Spacer(Modifier.width(InkToneSpacing.md))
         WheelColumn(
             range = 0..59,
             selected = minutes,
@@ -244,7 +246,7 @@ private fun CustomDurationWheel(onConfirm: (totalMinutes: Int) -> Unit) {
             modifier = Modifier.width(56.dp).testTag(WHEEL_MINUTES_TAG),
         )
         Text("min", style = MaterialTheme.typography.bodyMedium)
-        Spacer(Modifier.width(16.dp))
+        Spacer(Modifier.width(InkToneSpacing.lg))
         TextButton(
             onClick = { onConfirm((hours * 60 + minutes).coerceAtLeast(1)) },
             enabled = hours > 0 || minutes > 0,

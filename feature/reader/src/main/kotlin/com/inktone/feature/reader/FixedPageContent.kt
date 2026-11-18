@@ -1,5 +1,7 @@
 package com.inktone.feature.reader
 
+import com.inktone.core.designsystem.InkToneSpacing
+
 import android.graphics.Bitmap
 import android.util.Log
 import android.util.LruCache
@@ -403,7 +405,7 @@ private fun FixedPage(
                     "Cette page du document ne peut pas être affichée.",
                     color = placeholderTextColor.copy(alpha = 0.7f),
                     style = MaterialTheme.typography.bodySmall,
-                    modifier = Modifier.padding(top = 8.dp),
+                    modifier = Modifier.padding(top = InkToneSpacing.sm),
                 )
             }
         }

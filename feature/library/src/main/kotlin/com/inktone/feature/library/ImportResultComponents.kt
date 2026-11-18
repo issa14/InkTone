@@ -1,5 +1,7 @@
 package com.inktone.feature.library
 
+import com.inktone.core.designsystem.InkToneSpacing
+
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
@@ -50,11 +52,11 @@ fun ImportResultSummary(
     val unsupportedCount = results.count { it.resultType == "unsupported_format" }
 
     Card(
-        modifier = modifier.fillMaxWidth().padding(horizontal = 8.dp, vertical = 4.dp),
+        modifier = modifier.fillMaxWidth().padding(horizontal = InkToneSpacing.sm, vertical = InkToneSpacing.xs),
         colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.secondaryContainer),
     ) {
         Row(
-            modifier = Modifier.padding(12.dp),
+            modifier = Modifier.padding(InkToneSpacing.md),
             verticalAlignment = Alignment.CenterVertically,
         ) {
             Column(modifier = Modifier.weight(1f)) {
@@ -71,7 +73,7 @@ fun ImportResultSummary(
                 )
             }
 
-            Spacer(Modifier.width(8.dp))
+            Spacer(Modifier.width(InkToneSpacing.sm))
 
             if (showDetailsButton) {
                 TextButton(onClick = onDetailsClick) {
@@ -104,7 +106,7 @@ fun ImportResultDetail(
     onDismiss: () -> Unit,
     modifier: Modifier = Modifier,
 ) {
-    Column(modifier = modifier.fillMaxWidth().padding(horizontal = 8.dp, vertical = 4.dp)) {
+    Column(modifier = modifier.fillMaxWidth().padding(horizontal = InkToneSpacing.sm, vertical = InkToneSpacing.xs)) {
         // Résumé en-tête
         // En-tête de la vue détaillée : le bouton « Détails » y restait
         // affiché et ne faisait rien.
@@ -115,13 +117,13 @@ fun ImportResultDetail(
             showDetailsButton = false,
         )
 
-        Spacer(Modifier.height(4.dp))
+        Spacer(Modifier.height(InkToneSpacing.xs))
 
         Card(
             modifier = Modifier.fillMaxWidth(),
             colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceContainerHigh),
         ) {
-            LazyColumn(modifier = Modifier.padding(8.dp)) {
+            LazyColumn(modifier = Modifier.padding(InkToneSpacing.sm)) {
                 // Pas de clé dérivée du contenu : deux fichiers de même nom et
                 // de même issue dans un lot (deux « livre.epub » de dossiers
                 // différents, tous deux en doublon) produisaient la même clé,
@@ -169,7 +171,7 @@ private fun ImportResultRow(
             },
         )
 
-        Spacer(Modifier.width(8.dp))
+        Spacer(Modifier.width(InkToneSpacing.sm))
 
         Column(modifier = Modifier.weight(1f)) {
             Text(

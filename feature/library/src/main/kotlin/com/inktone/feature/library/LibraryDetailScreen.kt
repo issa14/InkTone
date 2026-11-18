@@ -1,5 +1,7 @@
 package com.inktone.feature.library
 
+import com.inktone.core.designsystem.InkToneSpacing
+
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.PaddingValues
@@ -146,7 +148,7 @@ fun LibraryDetailScreen(
                         color = MaterialTheme.colorScheme.onSurfaceVariant,
                     )
                 }
-                else -> LazyColumn(contentPadding = PaddingValues(8.dp)) {
+                else -> LazyColumn(contentPadding = PaddingValues(InkToneSpacing.sm)) {
                     items(state.displayedPublications, key = { it.id }) { publication ->
                         PublicationListRow(
                             publication = publication,

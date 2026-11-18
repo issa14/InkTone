@@ -1,5 +1,7 @@
 package com.inktone.feature.reader
 
+import com.inktone.core.designsystem.InkToneSpacing
+
 import androidx.compose.foundation.background
 import androidx.compose.foundation.gestures.detectVerticalDragGestures
 import androidx.compose.foundation.layout.Arrangement
@@ -74,7 +76,7 @@ fun TtsPillBar(
     Surface(
         modifier = modifier
             .testTag("TtsPillBar")
-            .padding(horizontal = 32.dp)
+            .padding(horizontal = InkToneSpacing.xxl)
             .pointerInput(onSwipeDown) {
                 var accumulatedDrag = 0f
                 detectVerticalDragGestures(
@@ -93,7 +95,7 @@ fun TtsPillBar(
         tonalElevation = 3.dp,
     ) {
         Row(
-            modifier = Modifier.padding(horizontal = 8.dp, vertical = 8.dp),
+            modifier = Modifier.padding(horizontal = InkToneSpacing.sm, vertical = InkToneSpacing.sm),
             verticalAlignment = Alignment.CenterVertically,
         ) {
             PillAction(
@@ -110,7 +112,7 @@ fun TtsPillBar(
                 tint = contentColor,
                 onClick = onPreviousSentence,
             )
-            Box(Modifier.padding(horizontal = 4.dp)) {
+            Box(Modifier.padding(horizontal = InkToneSpacing.xs)) {
                 NarrationPlayButton(
                     isPlaying = isPlaying,
                     onClick = onPlayPause,
@@ -132,7 +134,7 @@ fun TtsPillBar(
                 tint = contentColor,
                 onClick = onNextChapter,
             )
-            Box(Modifier.padding(start = 4.dp), contentAlignment = Alignment.Center) {
+            Box(Modifier.padding(start = InkToneSpacing.xs), contentAlignment = Alignment.Center) {
                 TtsSoundWave(isActive = isAudioActive, tint = accentColor)
             }
         }

@@ -1,5 +1,7 @@
 package com.inktone.feature.settings
 
+import com.inktone.core.designsystem.InkToneSpacing
+
 import com.inktone.core.designsystem.InkToneSectionHeader
 import android.os.Build
 import com.inktone.core.designsystem.formatMultiplier
@@ -185,7 +187,7 @@ internal fun SettingsContent(
     }
     Column(
         modifier = Modifier
-            .padding(horizontal = 16.dp)
+            .padding(horizontal = InkToneSpacing.lg)
             .verticalScroll(scrollState)
             .onGloballyPositioned { scrolledContent[0] = it },
     ) {
@@ -222,7 +224,7 @@ internal fun SettingsContent(
                 text = ttsEngineDescription(preferences.defaultTtsEngine),
                 style = MaterialTheme.typography.bodySmall,
                 color = MaterialTheme.colorScheme.onSurfaceVariant,
-                modifier = Modifier.padding(horizontal = 16.dp),
+                modifier = Modifier.padding(horizontal = InkToneSpacing.lg),
             )
             // Passage du cycle au dialogue : avec plusieurs profils, cycler devient impraticable.
             SettingRow(
@@ -244,7 +246,7 @@ internal fun SettingsContent(
             }
             // Lot 6 — vitesse : même cible VoiceProfile.speed que le panneau Voix du lecteur (Tâche 3d).
             InkToneSlider(
-                modifier = Modifier.padding(horizontal = 16.dp, vertical = 12.dp),
+                modifier = Modifier.padding(horizontal = InkToneSpacing.lg, vertical = InkToneSpacing.md),
                 label = "Vitesse d'élocution",
                 value = activeSpeed.coerceIn(VoiceProfile.SPEED_RANGE),
                 range = VoiceProfile.SPEED_RANGE,
@@ -261,7 +263,7 @@ internal fun SettingsContent(
             // système et Edge). Sherpa-ONNX (VITS) ne règle que la durée.
             if (selectedEngine in pitchEngines) {
                 InkToneSlider(
-                    modifier = Modifier.padding(horizontal = 16.dp, vertical = 12.dp),
+                    modifier = Modifier.padding(horizontal = InkToneSpacing.lg, vertical = InkToneSpacing.md),
                     label = "Intonation",
                     value = activePitch.coerceIn(VoiceProfile.PITCH_RANGE),
                     range = VoiceProfile.PITCH_RANGE,
@@ -286,13 +288,13 @@ internal fun SettingsContent(
                 onClick = { onIntent(SettingsIntent.PlayPreview) },
                 modifier = Modifier
                     .fillMaxWidth()
-                    .padding(horizontal = 16.dp, vertical = 8.dp),
+                    .padding(horizontal = InkToneSpacing.lg, vertical = InkToneSpacing.sm),
             ) {
                 AppIcon(
                     if (isPreviewing) AppSymbol.Pause else AppSymbol.Play,
                     contentDescription = null,
                 )
-                Spacer(Modifier.width(8.dp))
+                Spacer(Modifier.width(InkToneSpacing.sm))
                 Text(if (isPreviewing) "Arrêter l'extrait" else "Écouter un extrait")
             }
             if (previewError != null) {
@@ -300,7 +302,7 @@ internal fun SettingsContent(
                     text = previewError,
                     style = MaterialTheme.typography.bodySmall,
                     color = MaterialTheme.colorScheme.error,
-                    modifier = Modifier.padding(horizontal = 16.dp),
+                    modifier = Modifier.padding(horizontal = InkToneSpacing.lg),
                 )
             }
         }
@@ -336,7 +338,7 @@ internal fun SettingsContent(
                 )
             }
 
-            HorizontalDivider(modifier = Modifier.padding(horizontal = 16.dp))
+            HorizontalDivider(modifier = Modifier.padding(horizontal = InkToneSpacing.lg))
 
             // ─ Accessibilité ─
             ToggleSetting(
@@ -391,7 +393,7 @@ internal fun SettingsContent(
                 onClick = { showImportWarning = true },
             )
 
-            HorizontalDivider(modifier = Modifier.padding(horizontal = 16.dp))
+            HorizontalDivider(modifier = Modifier.padding(horizontal = InkToneSpacing.lg))
 
             // Taille réelle calculée (Context.cacheDir), pas estimée.
             ListItem(
@@ -400,14 +402,14 @@ internal fun SettingsContent(
                 trailingContent = {
                     TextButton(onClick = { showClearCacheConfirm = true }, enabled = cacheSizeBytes > 0) {
                         AppIcon(AppSymbol.DeleteSweep, contentDescription = null)
-                        Spacer(Modifier.width(4.dp))
+                        Spacer(Modifier.width(InkToneSpacing.xs))
                         Text("Vider")
                     }
                 },
                 colors = settingsItemColors(),
             )
 
-            HorizontalDivider(modifier = Modifier.padding(horizontal = 16.dp))
+            HorizontalDivider(modifier = Modifier.padding(horizontal = InkToneSpacing.lg))
 
             // Maintenance des couvertures : opérations rares, rangées ici plutôt
             // qu'au même rang qu'« Importer » dans la Bibliothèque (P1-17).
@@ -426,7 +428,7 @@ internal fun SettingsContent(
                 onClick = { showRestoreCoversConfirm = true },
             )
 
-            HorizontalDivider(modifier = Modifier.padding(horizontal = 16.dp))
+            HorizontalDivider(modifier = Modifier.padding(horizontal = InkToneSpacing.lg))
 
             // Couleur d'alerte + icône triangle : signale le côté destructif.
             ActionRow(
@@ -601,13 +603,13 @@ private fun formatBytes(bytes: Long): String = when {
  */
 @Composable
 private fun SectionGroup(title: String, content: @Composable ColumnScope.() -> Unit) {
-    Column(modifier = Modifier.fillMaxWidth().padding(vertical = 8.dp)) {
+    Column(modifier = Modifier.fillMaxWidth().padding(vertical = InkToneSpacing.sm)) {
         InkToneSectionHeader(title)
         ElevatedCard(
             shape = RoundedCornerShape(16.dp),
             modifier = Modifier.fillMaxWidth(),
         ) {
-            Column(modifier = Modifier.padding(vertical = 8.dp), content = content)
+            Column(modifier = Modifier.padding(vertical = InkToneSpacing.sm), content = content)
         }
     }
 }
@@ -668,7 +670,7 @@ private fun VoiceDownloadRow(
 ) {
     var showConfirmDialog by remember { mutableStateOf(false) }
 
-    Column(Modifier.fillMaxWidth().padding(horizontal = 16.dp, vertical = 8.dp)) {
+    Column(Modifier.fillMaxWidth().padding(horizontal = InkToneSpacing.lg, vertical = InkToneSpacing.sm)) {
         Text(
             when (progress) {
                 is com.inktone.domain.service.VoiceDownloadProgress.InProgress ->
@@ -680,7 +682,7 @@ private fun VoiceDownloadRow(
             style = MaterialTheme.typography.bodySmall,
             color = MaterialTheme.colorScheme.onSurfaceVariant,
         )
-        Spacer(Modifier.height(8.dp))
+        Spacer(Modifier.height(InkToneSpacing.sm))
         // Lot 20 — une fois installée, plus de bouton : re-télécharger une
         // voix déjà prête n'a pas de sens (le flux émettrait Complete
         // immédiatement de toute façon).
@@ -694,7 +696,7 @@ private fun VoiceDownloadRow(
             null, is com.inktone.domain.service.VoiceDownloadProgress.Failed ->
                 OutlinedButton(onClick = { showConfirmDialog = true }) {
                     AppIcon(AppSymbol.Download, contentDescription = null)
-                    Spacer(Modifier.width(8.dp))
+                    Spacer(Modifier.width(InkToneSpacing.sm))
                     Text("Télécharger la voix naturelle")
                 }
         }
@@ -755,9 +757,9 @@ private fun PronunciationCard(
     onAddClick: () -> Unit,
     content: @Composable ColumnScope.() -> Unit,
 ) {
-    Column(modifier = Modifier.fillMaxWidth().padding(vertical = 8.dp)) {
+    Column(modifier = Modifier.fillMaxWidth().padding(vertical = InkToneSpacing.sm)) {
         Row(
-            modifier = Modifier.fillMaxWidth().padding(start = 4.dp, top = 8.dp, bottom = 8.dp),
+            modifier = Modifier.fillMaxWidth().padding(start = InkToneSpacing.xs, top = InkToneSpacing.sm, bottom = InkToneSpacing.sm),
             horizontalArrangement = Arrangement.SpaceBetween,
             verticalAlignment = Alignment.CenterVertically,
         ) {
@@ -771,7 +773,7 @@ private fun PronunciationCard(
             }
         }
         ElevatedCard(shape = RoundedCornerShape(16.dp), modifier = Modifier.fillMaxWidth()) {
-            Column(modifier = Modifier.padding(vertical = 8.dp), content = content)
+            Column(modifier = Modifier.padding(vertical = InkToneSpacing.sm), content = content)
         }
     }
 }
@@ -789,9 +791,9 @@ private fun PronunciationRuleRow(
             .fillMaxWidth()
             .heightIn(min = 48.dp)
             .clickable(onClick = onClick)
-            .padding(horizontal = 20.dp, vertical = 12.dp),
+            .padding(horizontal = 20.dp, vertical = InkToneSpacing.md),
         verticalAlignment = Alignment.CenterVertically,
-        horizontalArrangement = Arrangement.spacedBy(8.dp),
+        horizontalArrangement = Arrangement.spacedBy(InkToneSpacing.sm),
     ) {
         Row(
             modifier = Modifier.weight(1f),
@@ -844,7 +846,7 @@ private fun PronunciationRuleDialog(
         onDismissRequest = onDismiss,
         title = { Text(if (editing == null) "Ajouter une règle" else "Modifier la règle") },
         text = {
-            Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
+            Column(verticalArrangement = Arrangement.spacedBy(InkToneSpacing.md)) {
                 OutlinedTextField(
                     value = originalText,
                     onValueChange = { originalText = it },
@@ -866,7 +868,7 @@ private fun PronunciationRuleDialog(
                     verticalAlignment = Alignment.CenterVertically,
                 ) {
                     Checkbox(checked = isRegex, onCheckedChange = null)
-                    Spacer(Modifier.width(8.dp))
+                    Spacer(Modifier.width(InkToneSpacing.sm))
                     Text("Expression régulière")
                 }
                 if (problemMessage != null) {
@@ -962,7 +964,7 @@ private fun <T> PickerDialog(
                         verticalAlignment = Alignment.CenterVertically,
                     ) {
                         RadioButton(selected = option == selected, onClick = null)
-                        Text(label(option), modifier = Modifier.padding(start = 8.dp))
+                        Text(label(option), modifier = Modifier.padding(start = InkToneSpacing.sm))
                     }
                 }
             }
@@ -1043,7 +1045,7 @@ internal fun PronunciationRulesSection(rules: List<PronunciationRule>, onIntent:
                 "Aucune règle. Exemple : « M. » prononcé « Monsieur ».",
                 style = MaterialTheme.typography.bodyMedium,
                 color = MaterialTheme.colorScheme.onSurfaceVariant,
-                modifier = Modifier.padding(horizontal = 20.dp, vertical = 12.dp),
+                modifier = Modifier.padding(horizontal = 20.dp, vertical = InkToneSpacing.md),
             )
         } else {
             rules.forEachIndexed { index, rule ->
@@ -1054,7 +1056,7 @@ internal fun PronunciationRulesSection(rules: List<PronunciationRule>, onIntent:
                     onDelete = { ruleToDelete = rule },
                 )
                 if (index != rules.lastIndex) {
-                    HorizontalDivider(modifier = Modifier.padding(horizontal = 16.dp))
+                    HorizontalDivider(modifier = Modifier.padding(horizontal = InkToneSpacing.lg))
                 }
             }
         }

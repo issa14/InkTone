@@ -1,5 +1,7 @@
 package com.inktone.feature.reader
 
+import com.inktone.core.designsystem.InkToneSpacing
+
 import android.content.Context
 import android.content.Intent
 import android.widget.Toast
@@ -172,7 +174,7 @@ fun SelectionActionPopup(
                     if (onExtend != null) {
                         PopupActionButton(icon = AppSymbol.Highlight, label = "Étendre la sélection jusqu'ici", onClick = onExtend)
                     }
-                    Row(modifier = Modifier.padding(4.dp)) {
+                    Row(modifier = Modifier.padding(InkToneSpacing.xs)) {
                         PopupActionButton(icon = AppSymbol.Copy, label = "Copier") {
                             clipboardManager.setText(AnnotatedString(selectedText))
                             Toast.makeText(context, "Texte copié", Toast.LENGTH_SHORT).show()
@@ -215,9 +217,9 @@ fun SelectionActionPopup(
                     )
                     // Le sélecteur ne se fermait qu'en touchant ailleurs et ne
                     // permettait pas de revenir à « Note » (audit UX D52).
-                    Row(modifier = Modifier.padding(horizontal = 4.dp)) {
+                    Row(modifier = Modifier.padding(horizontal = InkToneSpacing.xs)) {
                         TextButton(onClick = { mode = SelectionPopupMode.ACTIONS }) {
-                            AppIcon(AppSymbol.Back, contentDescription = null, modifier = Modifier.padding(end = 4.dp))
+                            AppIcon(AppSymbol.Back, contentDescription = null, modifier = Modifier.padding(end = InkToneSpacing.xs))
                             Text("Retour")
                         }
                         TextButton(onClick = onDismiss) { Text("Terminé") }
@@ -229,18 +231,18 @@ fun SelectionActionPopup(
                 // reste non-focusable ici (mode sans clavier) — la gestion
                 // conditionnelle de `focusable` est INCHANGÉE (bug device
                 // documenté : ne pas voler le focus à la zone de lecture).
-                SelectionPopupMode.MORE -> Column(modifier = Modifier.padding(4.dp)) {
+                SelectionPopupMode.MORE -> Column(modifier = Modifier.padding(InkToneSpacing.xs)) {
                     PopupActionButton(icon = AppSymbol.Share, label = "Partager") {
                         shareSelection(context, selectedText, shareContext)
                         onDismiss()
                     }
                     TextButton(onClick = { mode = SelectionPopupMode.ACTIONS }) {
-                        AppIcon(AppSymbol.Back, contentDescription = null, modifier = Modifier.padding(end = 4.dp))
+                        AppIcon(AppSymbol.Back, contentDescription = null, modifier = Modifier.padding(end = InkToneSpacing.xs))
                         Text("Retour")
                     }
                 }
 
-                SelectionPopupMode.NOTE_INPUT -> Column(modifier = Modifier.padding(12.dp).width(260.dp)) {
+                SelectionPopupMode.NOTE_INPUT -> Column(modifier = Modifier.padding(InkToneSpacing.md).width(260.dp)) {
                     // Couleur et type de la note choisis ici, sans rien créer avant
                     // « Enregistrer » ; seul « Surligner » applique à chaque tap (audit UX D52).
                     AnnotationColorPicker(
@@ -260,7 +262,7 @@ fun SelectionActionPopup(
                             if (noteText.isNotBlank()) onSaveNote(noteText, pendingColor, pendingKind)
                         }),
                     )
-                    Row(modifier = Modifier.padding(top = 8.dp)) {
+                    Row(modifier = Modifier.padding(top = InkToneSpacing.sm)) {
                         TextButton(onClick = onDismiss) { Text("Annuler") }
                         Button(
                             onClick = { if (noteText.isNotBlank()) onSaveNote(noteText, pendingColor, pendingKind) },
@@ -277,7 +279,7 @@ fun SelectionActionPopup(
 @Composable
 private fun PopupActionButton(icon: AppSymbol, label: String, onClick: () -> Unit) {
     TextButton(onClick = onClick) {
-        AppIcon(icon, contentDescription = null, modifier = Modifier.padding(end = 4.dp))
+        AppIcon(icon, contentDescription = null, modifier = Modifier.padding(end = InkToneSpacing.xs))
         Text(label)
     }
 }

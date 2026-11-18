@@ -1,4 +1,6 @@
 package com.inktone.feature.settings
+
+import com.inktone.core.designsystem.InkToneSpacing
 import com.inktone.core.designsystem.AppIcon
 import com.inktone.core.designsystem.AppSymbol
 
@@ -101,9 +103,9 @@ fun ThemeStudioScreen(
             StudioLivePreview(state)
 
             LazyColumn(
-                modifier = Modifier.weight(1f).padding(horizontal = 16.dp),
-                verticalArrangement = Arrangement.spacedBy(16.dp),
-                contentPadding = androidx.compose.foundation.layout.PaddingValues(vertical = 16.dp),
+                modifier = Modifier.weight(1f).padding(horizontal = InkToneSpacing.lg),
+                verticalArrangement = Arrangement.spacedBy(InkToneSpacing.lg),
+                contentPadding = androidx.compose.foundation.layout.PaddingValues(vertical = InkToneSpacing.lg),
             ) {
                 item {
                     OutlinedTextField(
@@ -129,8 +131,8 @@ fun ThemeStudioScreen(
                 item {
                     Column {
                         Text("Palette de départ", style = MaterialTheme.typography.labelLarge)
-                        Spacer(Modifier.height(8.dp))
-                        LazyRow(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                        Spacer(Modifier.height(InkToneSpacing.sm))
+                        LazyRow(horizontalArrangement = Arrangement.spacedBy(InkToneSpacing.sm)) {
                             items(StarterPalette.entries) { palette ->
                                 FilterChip(
                                     selected = false,
@@ -144,10 +146,10 @@ fun ThemeStudioScreen(
                 if (state.editingThemeId != null) {
                     item {
                         Column {
-                            HorizontalDivider(Modifier.padding(vertical = 8.dp))
+                            HorizontalDivider(Modifier.padding(vertical = InkToneSpacing.sm))
                             TextButton(onClick = { showDeleteConfirm = true }) {
                                 AppIcon(AppSymbol.Delete,  contentDescription = null, tint = MaterialTheme.colorScheme.error)
-                                Spacer(Modifier.width(8.dp))
+                                Spacer(Modifier.width(InkToneSpacing.sm))
                                 Text("Supprimer ce thème", color = MaterialTheme.colorScheme.error)
                             }
                         }
@@ -217,17 +219,17 @@ private fun StudioLivePreview(state: ThemeStudioUiState) {
         Modifier
             .fillMaxWidth()
             .background(state.backgroundColorHex.toColor())
-            .padding(16.dp),
+            .padding(InkToneSpacing.lg),
     ) {
         WcagBadge(state)
-        Spacer(Modifier.height(12.dp))
+        Spacer(Modifier.height(InkToneSpacing.md))
         Text(
             "Chapitre 3 — L'Arrivée",
             style = MaterialTheme.typography.titleMedium,
             fontWeight = FontWeight.Bold, // texte du livre : aperçu d'un titre de chapitre
             color = state.textColorHex.toColor(),
         )
-        Spacer(Modifier.height(8.dp))
+        Spacer(Modifier.height(InkToneSpacing.sm))
         Column {
             Text(
                 "La lumière filtrait doucement à travers les persiennes, dessinant des",
@@ -247,14 +249,14 @@ private fun StudioLivePreview(state: ThemeStudioUiState) {
                 Text(", immobile.", style = MaterialTheme.typography.bodyMedium, color = state.textColorHex.toColor())
             }
         }
-        Spacer(Modifier.height(16.dp))
+        Spacer(Modifier.height(InkToneSpacing.lg))
         androidx.compose.material3.LinearProgressIndicator(
             progress = { 0.35f },
             modifier = Modifier.fillMaxWidth(),
             color = state.accentColorHex.toColor(),
             trackColor = state.accentColorHex.toColor().copy(alpha = 0.2f),
         )
-        Spacer(Modifier.height(4.dp))
+        Spacer(Modifier.height(InkToneSpacing.xs))
         Text(
             "35\u202F% · Page 42",
             style = MaterialTheme.typography.labelSmall,
@@ -287,7 +289,7 @@ private fun WcagBadge(state: ThemeStudioUiState) {
             "Ce thème peut être difficile à lire pour certaines personnes — vous pouvez tout de même l'enregistrer.",
             style = MaterialTheme.typography.labelSmall,
             color = state.textColorHex.toColor().copy(alpha = 0.8f),
-            modifier = Modifier.padding(top = 4.dp),
+            modifier = Modifier.padding(top = InkToneSpacing.xs),
         )
     }
 }
@@ -297,7 +299,7 @@ private val Color4Ok = androidx.compose.ui.graphics.Color(0xFF2E7D32)
 @Composable
 private fun ColorSelectorRow(label: String, hex: String, onClick: () -> Unit) {
     Row(
-        Modifier.fillMaxWidth().clip(RoundedCornerShape(8.dp)).background(MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.3f)).padding(12.dp),
+        Modifier.fillMaxWidth().clip(RoundedCornerShape(8.dp)).background(MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.3f)).padding(InkToneSpacing.md),
         verticalAlignment = Alignment.CenterVertically,
     ) {
         Column(Modifier.weight(1f)) {
@@ -310,7 +312,7 @@ private fun ColorSelectorRow(label: String, hex: String, onClick: () -> Unit) {
                 .clip(CircleShape)
                 .background(hex.toColor()),
         )
-        Spacer(Modifier.width(4.dp))
+        Spacer(Modifier.width(InkToneSpacing.xs))
         IconButton(onClick = onClick) {
             AppIcon(AppSymbol.Edit,  contentDescription = "Modifier $label")
         }
@@ -331,7 +333,7 @@ private fun ColorPickerDialog(initialHex: String, onDismiss: () -> Unit, onConfi
         title = { Text("Choisir une couleur") },
         text = {
             Column {
-                LazyRow(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                LazyRow(horizontalArrangement = Arrangement.spacedBy(InkToneSpacing.sm)) {
                     items(PRESET_SWATCHES) { swatch ->
                         val isSelected = swatch.equals(draft, ignoreCase = true)
                         Box(
@@ -351,7 +353,7 @@ private fun ColorPickerDialog(initialHex: String, onDismiss: () -> Unit, onConfi
                         )
                     }
                 }
-                Spacer(Modifier.height(16.dp))
+                Spacer(Modifier.height(InkToneSpacing.lg))
                 TextField(
                     value = draft,
                     onValueChange = { draft = it },

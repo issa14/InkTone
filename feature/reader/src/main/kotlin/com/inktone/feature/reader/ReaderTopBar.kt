@@ -1,5 +1,7 @@
 package com.inktone.feature.reader
 
+import com.inktone.core.designsystem.InkToneSpacing
+
 import com.inktone.core.designsystem.HudTopShape
 
 import androidx.compose.foundation.layout.Column
@@ -72,14 +74,14 @@ fun ReaderTopBar(
                 // variante `IgnoringVisibility` réserve la place que la barre
                 // OCCUPERAIT, masquée ou non.
                 .windowInsetsPadding(WindowInsets.statusBarsIgnoringVisibility)
-                .padding(horizontal = 4.dp, vertical = 8.dp),
+                .padding(horizontal = InkToneSpacing.xs, vertical = InkToneSpacing.sm),
             verticalAlignment = Alignment.CenterVertically,
         ) {
             IconButton(onClick = onBack) {
                 AppIcon(AppSymbol.Back, contentDescription = "Retour", tint = contentColor)
             }
-            Spacer(Modifier.width(4.dp))
-            Column(modifier = Modifier.weight(1f).padding(end = 8.dp)) {
+            Spacer(Modifier.width(InkToneSpacing.xs))
+            Column(modifier = Modifier.weight(1f).padding(end = InkToneSpacing.sm)) {
                 Text(
                     text = title ?: "",
                     style = MaterialTheme.typography.titleSmall,

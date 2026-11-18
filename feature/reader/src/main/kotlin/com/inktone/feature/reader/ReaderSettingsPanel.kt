@@ -1,5 +1,7 @@
 package com.inktone.feature.reader
 
+import com.inktone.core.designsystem.InkToneSpacing
+
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Column
@@ -124,13 +126,13 @@ fun ReaderSettingsPanel(
                 // scroll vertical ne gêne ni les Sliders (drag horizontal)
                 // ni les segments de choix.
                 .verticalScroll(rememberScrollState())
-                .padding(horizontal = 24.dp, vertical = 16.dp),
+                .padding(horizontal = InkToneSpacing.xl, vertical = InkToneSpacing.lg),
         ) {
             Text(
                 "Réglages du texte",
                 style = MaterialTheme.typography.titleMedium,
             )
-            Spacer(Modifier.height(16.dp))
+            Spacer(Modifier.height(InkToneSpacing.lg))
 
             // ── Aperçu en direct — le vrai texte du chapitre en cours ──
             Text(
@@ -138,7 +140,7 @@ fun ReaderSettingsPanel(
                 modifier = Modifier
                     .fillMaxWidth()
                     .background(previewBackgroundColor, RoundedCornerShape(12.dp))
-                    .padding(16.dp),
+                    .padding(InkToneSpacing.lg),
                 color = previewTextColor,
                 fontSize = fontSizeDraft.sp,
                 lineHeight = (fontSizeDraft * lineHeightDraft).sp,
@@ -149,14 +151,14 @@ fun ReaderSettingsPanel(
                 maxLines = 5,
             )
 
-            Spacer(Modifier.height(16.dp))
+            Spacer(Modifier.height(InkToneSpacing.lg))
 
             // En tête : le seul réglage qu'on retouche au fil de la lumière ambiante.
             Text("Luminosité", style = MaterialTheme.typography.labelLarge)
-            Spacer(Modifier.height(4.dp))
+            Spacer(Modifier.height(InkToneSpacing.xs))
             ReaderBrightnessControl(value = brightness, onValueChange = onBrightnessChange)
 
-            Spacer(Modifier.height(16.dp))
+            Spacer(Modifier.height(InkToneSpacing.lg))
 
             SettingSwitchRow(
                 label = "Pour ce livre uniquement",
@@ -166,7 +168,7 @@ fun ReaderSettingsPanel(
                 onCheckedChange = onBookSpecificChange,
             )
 
-            Spacer(Modifier.height(16.dp))
+            Spacer(Modifier.height(InkToneSpacing.lg))
 
             // ── Taille du texte — curseur continu (3d.2 : plus de paliers) ──
             // `onValueChangeFinished` conservé : appliquer chaque valeur
@@ -214,7 +216,7 @@ fun ReaderSettingsPanel(
                 "Marges (${readerMarginLabel(currentMarginStep).lowercase()})",
                 style = MaterialTheme.typography.labelLarge,
             )
-            Spacer(Modifier.height(8.dp))
+            Spacer(Modifier.height(InkToneSpacing.sm))
             SingleChoiceSegmentedButtonRow(modifier = Modifier.fillMaxWidth()) {
                 UserPreferences.MARGIN_STEP_RANGE.forEachIndexed { index, step ->
                     SegmentedButton(
@@ -240,7 +242,7 @@ fun ReaderSettingsPanel(
                 onCheckedChange = onTextJustifiedChange,
             )
 
-            Spacer(Modifier.height(8.dp))
+            Spacer(Modifier.height(InkToneSpacing.sm))
 
             SettingSwitchRow(
                 label = "Garder l'écran allumé",
@@ -249,7 +251,7 @@ fun ReaderSettingsPanel(
                 onCheckedChange = onKeepScreenOnChange,
             )
 
-            Spacer(Modifier.height(8.dp))
+            Spacer(Modifier.height(InkToneSpacing.sm))
 
             SettingSwitchRow(
                 label = "Réglette de lecture",
@@ -258,7 +260,7 @@ fun ReaderSettingsPanel(
                 onCheckedChange = onReadingRulerChange,
             )
 
-            Spacer(Modifier.height(8.dp))
+            Spacer(Modifier.height(InkToneSpacing.sm))
 
             SettingSwitchRow(
                 label = "Touches de volume",
@@ -267,7 +269,7 @@ fun ReaderSettingsPanel(
                 onCheckedChange = onVolumeKeysChange,
             )
 
-            Spacer(Modifier.height(8.dp))
+            Spacer(Modifier.height(InkToneSpacing.sm))
 
             SettingSwitchRow(
                 label = "Afficher l'heure",
@@ -277,7 +279,7 @@ fun ReaderSettingsPanel(
             )
 
             if (showPdfInversion) {
-                Spacer(Modifier.height(8.dp))
+                Spacer(Modifier.height(InkToneSpacing.sm))
                 SettingSwitchRow(
                     label = "Inverser les pages scannées",
                     supporting = "Pour lire un PDF scanné en thème sombre",
@@ -295,7 +297,7 @@ fun ReaderSettingsPanel(
                 "Défilement automatique",
                 style = MaterialTheme.typography.labelLarge,
             )
-            Spacer(Modifier.height(4.dp))
+            Spacer(Modifier.height(InkToneSpacing.xs))
             Text(
                 when {
                     !isScrollMode -> "Disponible en mode défilement uniquement"
@@ -305,7 +307,7 @@ fun ReaderSettingsPanel(
                 style = MaterialTheme.typography.bodySmall,
                 color = MaterialTheme.colorScheme.onSurfaceVariant,
             )
-            Spacer(Modifier.height(8.dp))
+            Spacer(Modifier.height(InkToneSpacing.sm))
             SettingsDropdown(
                 label = "Vitesse",
                 current = autoScrollSpeed,
@@ -315,7 +317,7 @@ fun ReaderSettingsPanel(
                 enabled = isScrollMode && !reduceMotion,
             )
 
-            Spacer(Modifier.height(32.dp))
+            Spacer(Modifier.height(InkToneSpacing.xxl))
         }
     }
 }
@@ -375,7 +377,7 @@ private fun <T> SettingsDropdown(
                 .fillMaxWidth()
                 .menuAnchor()
                 .clickable(enabled = enabled) { expanded = true }
-                .padding(vertical = 12.dp),
+                .padding(vertical = InkToneSpacing.md),
             verticalAlignment = Alignment.CenterVertically,
         ) {
             Text(
@@ -392,7 +394,7 @@ private fun <T> SettingsDropdown(
                     MaterialTheme.colorScheme.onSurfaceVariant
                 },
             )
-            Spacer(Modifier.width(4.dp))
+            Spacer(Modifier.width(InkToneSpacing.xs))
             ExposedDropdownMenuDefaults.TrailingIcon(expanded = expanded)
         }
         ExposedDropdownMenu(expanded = expanded, onDismissRequest = { expanded = false }) {
@@ -425,7 +427,7 @@ private fun SettingSwitchRow(
                 onValueChange = onCheckedChange,
                 role = Role.Switch,
             )
-            .padding(vertical = 8.dp),
+            .padding(vertical = InkToneSpacing.sm),
         verticalAlignment = Alignment.CenterVertically,
     ) {
         Column(modifier = Modifier.weight(1f)) {

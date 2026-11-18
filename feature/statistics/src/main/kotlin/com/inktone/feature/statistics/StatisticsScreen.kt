@@ -269,7 +269,7 @@ private fun DailyGoalGauge(kpi: com.inktone.domain.usecase.KpiState) {
             horizontalAlignment = Alignment.CenterHorizontally,
         ) {
             Text("Objectif du jour", style = MaterialTheme.typography.titleMedium)
-            Spacer(Modifier.height(12.dp))
+            Spacer(Modifier.height(InkToneSpacing.md))
             Box(contentAlignment = Alignment.Center, modifier = Modifier.size(120.dp)) {
                 CircularProgressIndicator(
                     progress = { 1f },
@@ -304,12 +304,12 @@ private fun DailyGoalGauge(kpi: com.inktone.domain.usecase.KpiState) {
                     )
                 }
             }
-            Spacer(Modifier.height(16.dp))
+            Spacer(Modifier.height(InkToneSpacing.lg))
             Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceEvenly) {
                 GoalStreakItem(icon = AppSymbol.Streak, label = "Série", value = "${kpi.currentStreakDays} j")
                 GoalStreakItem(icon = AppSymbol.TrendingUp, label = "Record", value = "${kpi.maxStreakDays} j")
             }
-            Spacer(Modifier.height(8.dp))
+            Spacer(Modifier.height(InkToneSpacing.sm))
             Text(
                 kpi.regularityLabel,
                 style = MaterialTheme.typography.labelSmall,
@@ -433,7 +433,7 @@ private fun HeatmapChart(slots: List<com.inktone.domain.usecase.HeatmapSlot>, pe
                     Text(peakLabel, style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.primary)
                 }
             }
-            Spacer(Modifier.height(8.dp))
+            Spacer(Modifier.height(InkToneSpacing.sm))
 
             val accent = MaterialTheme.colorScheme.primary
 
@@ -447,7 +447,7 @@ private fun HeatmapChart(slots: List<com.inktone.domain.usecase.HeatmapSlot>, pe
                         }
                     }
                 }
-                Spacer(Modifier.width(4.dp))
+                Spacer(Modifier.width(InkToneSpacing.xs))
                 Column(modifier = Modifier.weight(1f)) {
                     Canvas(
                         modifier = Modifier
@@ -481,7 +481,7 @@ private fun HeatmapChart(slots: List<com.inktone.domain.usecase.HeatmapSlot>, pe
                             }
                         }
                     }
-                    Spacer(Modifier.height(4.dp))
+                    Spacer(Modifier.height(InkToneSpacing.xs))
                     Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceEvenly) {
                         DAY_LABELS.forEach { day ->
                             Text(day, style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.onSurfaceVariant, textAlign = TextAlign.Center, modifier = Modifier.weight(1f))
@@ -489,18 +489,18 @@ private fun HeatmapChart(slots: List<com.inktone.domain.usecase.HeatmapSlot>, pe
                     }
                 }
             }
-            Spacer(Modifier.height(8.dp))
+            Spacer(Modifier.height(InkToneSpacing.sm))
             // Légende d'intensité
             Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.Center, verticalAlignment = Alignment.CenterVertically) {
                 Text("Inactif", style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
-                Spacer(Modifier.width(4.dp))
+                Spacer(Modifier.width(InkToneSpacing.xs))
                 for (i in 0 until HEATMAP_LEGEND_STEPS) {
                     Canvas(Modifier.size(10.dp)) {
                         drawRoundRect(accent.copy(alpha = (i + 1) * HEATMAP_INACTIVE_ALPHA), cornerRadius = CornerRadius(2.dp.toPx()))
                     }
                     if (i < HEATMAP_LEGEND_STEPS - 1) Spacer(Modifier.width(2.dp))
                 }
-                Spacer(Modifier.width(4.dp))
+                Spacer(Modifier.width(InkToneSpacing.xs))
                 Text("Très actif", style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
             }
         }
@@ -653,17 +653,17 @@ private fun HistogramChart(dailyStats: List<DailyReadingStats>, isMonthView: Boo
                 }
             }
 
-            Spacer(Modifier.height(8.dp))
+            Spacer(Modifier.height(InkToneSpacing.sm))
             // Légende en pied
-            Row(horizontalArrangement = Arrangement.spacedBy(16.dp)) {
+            Row(horizontalArrangement = Arrangement.spacedBy(InkToneSpacing.lg)) {
                 Row(verticalAlignment = Alignment.CenterVertically) {
                     Canvas(Modifier.size(12.dp)) { drawRect(visualColor) }
-                    Spacer(Modifier.width(4.dp))
+                    Spacer(Modifier.width(InkToneSpacing.xs))
                     Text("Lecture", style = MaterialTheme.typography.labelSmall)
                 }
                 Row(verticalAlignment = Alignment.CenterVertically) {
                     Canvas(Modifier.size(12.dp)) { drawHatchedRect(ttsColor, hatchColor, Offset.Zero, size) }
-                    Spacer(Modifier.width(4.dp))
+                    Spacer(Modifier.width(InkToneSpacing.xs))
                     Text("Écoute", style = MaterialTheme.typography.labelSmall)
                 }
             }
@@ -729,7 +729,7 @@ private fun Section3CurrentBook(book: com.inktone.domain.usecase.CurrentBookStat
                 verticalAlignment = Alignment.CenterVertically,
             ) {
                 CurrentBookCoverThumbnail(book.coverUri)
-                Spacer(Modifier.width(12.dp))
+                Spacer(Modifier.width(InkToneSpacing.md))
                 Column(Modifier.weight(1f)) {
                     Text(book.title.cleanedForDisplay(), style = MaterialTheme.typography.titleSmall, maxLines = 1)
                     Spacer(Modifier.height(6.dp))
@@ -806,7 +806,7 @@ private fun ExportButton(viewModel: StatisticsViewModel) {
         modifier = Modifier.fillMaxWidth(),
     ) {
         AppIcon(AppSymbol.Download, contentDescription = null, modifier = Modifier.size(18.dp))
-        Spacer(Modifier.width(8.dp))
+        Spacer(Modifier.width(InkToneSpacing.sm))
         Text("Exporter les statistiques")
     }
 
@@ -815,7 +815,7 @@ private fun ExportButton(viewModel: StatisticsViewModel) {
             Text(
                 "Format d'export",
                 style = MaterialTheme.typography.titleMedium,
-                modifier = Modifier.padding(horizontal = InkToneSpacing.screenHorizontal, vertical = 12.dp),
+                modifier = Modifier.padding(horizontal = InkToneSpacing.screenHorizontal, vertical = InkToneSpacing.md),
             )
             ListItem(
                 headlineContent = { Text("Tableur (CSV)") },
@@ -835,7 +835,7 @@ private fun ExportButton(viewModel: StatisticsViewModel) {
                     viewModel.export(ExportFormat.JSON)
                 },
             )
-            Spacer(Modifier.height(32.dp))
+            Spacer(Modifier.height(InkToneSpacing.xxl))
         }
     }
 }
@@ -846,11 +846,11 @@ private fun ExportButton(viewModel: StatisticsViewModel) {
 private fun StatCard(icon: AppSymbol, label: String, value: String, modifier: Modifier = Modifier) {
     ElevatedCard(shape = RoundedCornerShape(12.dp), modifier = modifier) {
         Column(
-            modifier = Modifier.padding(12.dp).fillMaxWidth(),
+            modifier = Modifier.padding(InkToneSpacing.md).fillMaxWidth(),
             horizontalAlignment = Alignment.CenterHorizontally,
         ) {
             AppIcon(icon, contentDescription = null, tint = MaterialTheme.colorScheme.primary, modifier = Modifier.size(20.dp))
-            Spacer(Modifier.height(4.dp))
+            Spacer(Modifier.height(InkToneSpacing.xs))
             Text(value, style = MaterialTheme.typography.titleMedium.emphasized(), textAlign = TextAlign.Center)
             Text(label, style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.onSurfaceVariant, textAlign = TextAlign.Center)
         }

@@ -1,5 +1,7 @@
 package com.inktone.feature.reader
 
+import com.inktone.core.designsystem.InkToneSpacing
+
 import com.inktone.core.designsystem.formatPercent
 import com.inktone.domain.model.progressionPercent
 import androidx.compose.foundation.background
@@ -79,7 +81,7 @@ fun StatusLineBar(
             // Mesurée sous les insets : la barre de navigation, qui n'apparaît
             // que le temps d'un balayage, ne doit pas relancer la pagination.
             .onSizeChanged { onBandHeightChanged(it.height) }
-            .padding(horizontal = 16.dp, vertical = 6.dp),
+            .padding(horizontal = InkToneSpacing.lg, vertical = 6.dp),
         horizontalArrangement = Arrangement.SpaceBetween,
         verticalAlignment = Alignment.CenterVertically,
     ) {
@@ -96,7 +98,7 @@ fun StatusLineBar(
             maxLines = 1,
             overflow = androidx.compose.ui.text.style.TextOverflow.Ellipsis,
             textAlign = androidx.compose.ui.text.style.TextAlign.Center,
-            modifier = Modifier.weight(1f).padding(horizontal = 12.dp),
+            modifier = Modifier.weight(1f).padding(horizontal = InkToneSpacing.md),
         )
         // Progression inconnue : emplacement vide, jamais un chiffre estimé.
         Text(bookProgression?.let(::formatProgressionFr).orEmpty(), style = MaterialTheme.typography.labelMedium, color = contentColor)

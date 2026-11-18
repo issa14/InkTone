@@ -1,5 +1,7 @@
 package com.inktone.feature.library
 
+import com.inktone.core.designsystem.InkToneSpacing
+
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
@@ -58,11 +60,11 @@ fun BookActionsSheet(
 ) {
     val sheetState = rememberModalBottomSheetState()
     ModalBottomSheet(onDismissRequest = onDismiss, sheetState = sheetState) {
-        Column(Modifier.padding(bottom = 32.dp)) {
+        Column(Modifier.padding(bottom = InkToneSpacing.xxl)) {
             Text(
                 publication.title,
                 style = MaterialTheme.typography.labelLarge,
-                modifier = Modifier.padding(horizontal = 24.dp, vertical = 8.dp),
+                modifier = Modifier.padding(horizontal = InkToneSpacing.xl, vertical = InkToneSpacing.sm),
                 maxLines = 1,
             )
             // Retour UX : le favori (cœur) a été retiré de la couverture et
@@ -95,10 +97,10 @@ fun BookActionsSheet(
 @Composable
 private fun BookActionItem(label: String, icon: AppSymbol, onClick: () -> Unit) {
     Row(
-        modifier = Modifier.fillMaxWidth().clickable(onClick = onClick).padding(horizontal = 24.dp, vertical = 14.dp),
+        modifier = Modifier.fillMaxWidth().clickable(onClick = onClick).padding(horizontal = InkToneSpacing.xl, vertical = 14.dp),
         verticalAlignment = Alignment.CenterVertically,
     ) {
-        AppIcon(icon, contentDescription = null, modifier = Modifier.padding(end = 16.dp))
+        AppIcon(icon, contentDescription = null, modifier = Modifier.padding(end = InkToneSpacing.lg))
         Text(label, style = MaterialTheme.typography.bodyLarge)
     }
 }
@@ -147,15 +149,15 @@ fun BookDetailsSheet(publication: Publication, onDismiss: () -> Unit) {
     ModalBottomSheet(onDismissRequest = onDismiss, sheetState = sheetState) {
         Column(
             Modifier
-                .padding(horizontal = 24.dp)
-                .padding(bottom = 32.dp)
+                .padding(horizontal = InkToneSpacing.xl)
+                .padding(bottom = InkToneSpacing.xxl)
                 .verticalScroll(rememberScrollState()),
         ) {
             Text(publication.title.cleanedForDisplay(), style = MaterialTheme.typography.titleLarge)
             if (!publication.subtitle.isNullOrBlank()) {
                 Text(publication.subtitle!!, style = MaterialTheme.typography.titleSmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
             }
-            Spacer(Modifier.height(8.dp))
+            Spacer(Modifier.height(InkToneSpacing.sm))
             if (publication.authors.isNotEmpty()) DetailRow("Auteurs", publication.authors.cleanedAuthorsForDisplay())
             publication.publisher?.let { DetailRow("Éditeur", it) }
             publication.language?.let { DetailRow("Langue", languageDisplayName(it)) }
@@ -176,7 +178,7 @@ fun BookDetailsSheet(publication: Publication, onDismiss: () -> Unit) {
             if (publication.subjects.isNotEmpty()) DetailRow("Sujets", publication.subjects.joinToString())
             DetailRow("Importé le", DateFormat.getDateInstance().format(Date(publication.importDate)))
             if (!publication.description.isNullOrBlank()) {
-                Spacer(Modifier.height(8.dp))
+                Spacer(Modifier.height(InkToneSpacing.sm))
                 val description = publication.description!!
                 Text(
                     remember(description) { descriptionForDisplay(description) },

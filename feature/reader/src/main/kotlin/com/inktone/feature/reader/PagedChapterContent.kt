@@ -1,5 +1,7 @@
 package com.inktone.feature.reader
 
+import com.inktone.core.designsystem.InkToneSpacing
+
 import android.os.SystemClock
 import androidx.compose.animation.core.Animatable
 import androidx.compose.foundation.ExperimentalFoundationApi
@@ -569,7 +571,7 @@ fun PagedChapterContent(
                         if (transitionDirection == ChapterTransitionDirection.PREVIOUS)
                             Alignment.CenterStart else Alignment.CenterEnd
                     )
-                    .padding(horizontal = 8.dp),
+                    .padding(horizontal = InkToneSpacing.sm),
             )
         }
     }

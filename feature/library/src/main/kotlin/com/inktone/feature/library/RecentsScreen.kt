@@ -1,5 +1,7 @@
 package com.inktone.feature.library
 
+import com.inktone.core.designsystem.InkToneSpacing
+
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.fillMaxSize
@@ -70,7 +72,7 @@ fun RecentsScreen(
             if (!state.isLoading && state.displayedPublications.isEmpty()) {
                 RecentsEmptyState()
             } else {
-                LazyColumn(contentPadding = PaddingValues(8.dp)) {
+                LazyColumn(contentPadding = PaddingValues(InkToneSpacing.sm)) {
                     items(state.displayedPublications, key = { it.id }) { publication ->
                         PublicationListRow(
                             publication = publication,

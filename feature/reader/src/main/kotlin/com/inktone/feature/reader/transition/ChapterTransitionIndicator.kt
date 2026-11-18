@@ -1,5 +1,7 @@
 package com.inktone.feature.reader.transition
 
+import com.inktone.core.designsystem.InkToneSpacing
+
 import androidx.compose.animation.core.LinearEasing
 import androidx.compose.animation.core.RepeatMode
 import androidx.compose.animation.core.animateFloat
@@ -53,9 +55,9 @@ fun ChapterTransitionIndicator(
         modifier = modifier
             .alpha(alpha)
             .background(surfaceColor, RoundedCornerShape(16.dp))
-            .padding(horizontal = 12.dp, vertical = 6.dp),
+            .padding(horizontal = InkToneSpacing.md, vertical = 6.dp),
         verticalAlignment = Alignment.CenterVertically,
-        horizontalArrangement = Arrangement.spacedBy(8.dp),
+        horizontalArrangement = Arrangement.spacedBy(InkToneSpacing.sm),
     ) {
         CircleProgress(
             fraction = fraction,

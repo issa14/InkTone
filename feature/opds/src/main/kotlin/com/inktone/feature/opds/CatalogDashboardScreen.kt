@@ -1,5 +1,7 @@
 package com.inktone.feature.opds
 
+import com.inktone.core.designsystem.InkToneSpacing
+
 import androidx.activity.compose.BackHandler
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
@@ -239,7 +241,7 @@ private fun CatalogDashboardContent(
                 url = DefaultCatalogs.EBOOKS_GRATUITS.second,
                 onAdd = onAddDefault,
             )
-            Spacer(Modifier.height(8.dp))
+            Spacer(Modifier.height(InkToneSpacing.sm))
             DefaultCatalogSuggestion(
                 label = DefaultCatalogs.UNGLUE_IT.first,
                 url = DefaultCatalogs.UNGLUE_IT.second,
@@ -250,8 +252,8 @@ private fun CatalogDashboardContent(
             // contentPadding et non padding : les cartes défilent jusqu'au bord
             // au lieu d'être coupées 12 dp avant.
             modifier = Modifier.fillMaxSize(),
-            contentPadding = PaddingValues(12.dp),
-            verticalArrangement = Arrangement.spacedBy(12.dp),
+            contentPadding = PaddingValues(InkToneSpacing.md),
+            verticalArrangement = Arrangement.spacedBy(InkToneSpacing.md),
         ) {
             items(state.catalogs, key = { it.id }) { catalog ->
                 CatalogCard(
@@ -273,10 +275,10 @@ private fun DefaultCatalogSuggestion(
     onAdd: (String, String) -> Unit,
 ) {
     Card(onClick = { onAdd(label, url) }) {
-        Column(Modifier.fillMaxWidth().padding(16.dp)) {
+        Column(Modifier.fillMaxWidth().padding(InkToneSpacing.lg)) {
             Row(verticalAlignment = Alignment.CenterVertically) {
                 AppIcon(AppSymbol.AddCircle, contentDescription = null)
-                Spacer(Modifier.width(8.dp))
+                Spacer(Modifier.width(InkToneSpacing.sm))
                 Text(
                     label,
                     style = MaterialTheme.typography.titleMedium,
@@ -304,10 +306,10 @@ private fun CatalogCard(
     var menuOpen by remember { mutableStateOf(false) }
 
     Card(onClick = onClick) {
-        Column(Modifier.fillMaxWidth().padding(16.dp)) {
+        Column(Modifier.fillMaxWidth().padding(InkToneSpacing.lg)) {
             Row(verticalAlignment = Alignment.CenterVertically) {
                 AppIcon(AppSymbol.Article, contentDescription = null)
-                Spacer(Modifier.width(8.dp))
+                Spacer(Modifier.width(InkToneSpacing.sm))
                 Text(
                     catalog.name,
                     style = MaterialTheme.typography.titleMedium,
@@ -343,7 +345,7 @@ private fun CatalogCard(
                 overflow = TextOverflow.Ellipsis,
             )
             if (catalog.hasCredentials) {
-                Spacer(Modifier.height(8.dp))
+                Spacer(Modifier.height(InkToneSpacing.sm))
                 Row(verticalAlignment = Alignment.CenterVertically) {
                     AppIcon(
                         AppSymbol.Lock,
@@ -351,7 +353,7 @@ private fun CatalogCard(
                         tint = MaterialTheme.colorScheme.primary,
                         modifier = Modifier.size(16.dp),
                     )
-                    Spacer(Modifier.width(4.dp))
+                    Spacer(Modifier.width(InkToneSpacing.xs))
                     Text(
                         "Protégé",
                         style = MaterialTheme.typography.labelMedium,
@@ -403,8 +405,8 @@ private fun AddCatalogBottomSheet(
 
     ModalBottomSheet(onDismissRequest = onDismiss, sheetState = sheetState) {
         Column(
-            Modifier.fillMaxWidth().padding(horizontal = 24.dp).padding(bottom = 32.dp),
-            verticalArrangement = Arrangement.spacedBy(12.dp),
+            Modifier.fillMaxWidth().padding(horizontal = InkToneSpacing.xl).padding(bottom = InkToneSpacing.xxl),
+            verticalArrangement = Arrangement.spacedBy(InkToneSpacing.md),
         ) {
             Text(
                 if (isEdit) "Modifier le catalogue" else "Ajouter un catalogue",
@@ -414,7 +416,7 @@ private fun AddCatalogBottomSheet(
             if (!isEdit) {
                 // Catalogues par défaut : pré-remplissage du formulaire
                 // (décision actée §1.4), uniquement en mode ajout.
-                Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                Row(horizontalArrangement = Arrangement.spacedBy(InkToneSpacing.sm)) {
                     OutlinedButton(onClick = {
                         name = DefaultCatalogs.EBOOKS_GRATUITS.first
                         rootUrl = DefaultCatalogs.EBOOKS_GRATUITS.second

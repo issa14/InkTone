@@ -1,5 +1,7 @@
 package com.inktone.feature.library
 
+import com.inktone.core.designsystem.InkToneSpacing
+
 import com.inktone.core.designsystem.emphasized
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
@@ -323,7 +325,7 @@ fun LibraryDrawerContent(
         Row(
             modifier = Modifier
                 .fillMaxWidth()
-                .padding(start = 24.dp, end = 24.dp, top = 28.dp, bottom = 20.dp),
+                .padding(start = InkToneSpacing.xl, end = InkToneSpacing.xl, top = 28.dp, bottom = 20.dp),
             verticalAlignment = Alignment.CenterVertically,
         ) {
             InkToneBrandMark(modifier = Modifier.size(44.dp))
@@ -339,7 +341,7 @@ fun LibraryDrawerContent(
         // Symétrique du séparateur qui coiffe déjà le pied de drawer : sans
         // elle, la liste de navigation est bornée en bas et pas en haut.
         HorizontalDivider()
-        Column(Modifier.weight(1f).padding(16.dp)) {
+        Column(Modifier.weight(1f).padding(InkToneSpacing.lg)) {
         // Récents — Lot 8, en première position des destinations (cible
         // UX). Destination à part entière qui navigue vers un écran
         // dédié : ne JAMAIS reproduire le défaut de l'item mort supprimé
@@ -402,7 +404,7 @@ fun LibraryDrawerContent(
         Spacer(Modifier.weight(1f))
         HorizontalDivider()
         Row(
-            modifier = Modifier.fillMaxWidth().padding(vertical = 12.dp),
+            modifier = Modifier.fillMaxWidth().padding(vertical = InkToneSpacing.md),
             horizontalArrangement = Arrangement.SpaceEvenly,
         ) {
             DrawerFooterItem("Réglages", AppSymbol.Settings) { onOpenSettings() }
@@ -419,7 +421,7 @@ fun LibraryDrawerContent(
 private fun DrawerFooterItem(label: String, icon: AppSymbol, onClick: () -> Unit) {
     Column(
         horizontalAlignment = Alignment.CenterHorizontally,
-        modifier = Modifier.clickable(onClick = onClick).padding(8.dp),
+        modifier = Modifier.clickable(onClick = onClick).padding(InkToneSpacing.sm),
     ) {
         AppIcon(icon, contentDescription = label, modifier = Modifier.size(18.dp), tint = MaterialTheme.colorScheme.onSurfaceVariant)
         Text(label, style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
@@ -586,9 +588,9 @@ internal fun LibraryTopBar(
             onDismissRequest = { showActionsSheet = false },
             sheetState = sheetState,
         ) {
-            Column(Modifier.padding(bottom = 32.dp)) {
+            Column(Modifier.padding(bottom = InkToneSpacing.xxl)) {
                 Text("Bibliothèque", style = MaterialTheme.typography.labelLarge,
-                    modifier = Modifier.padding(horizontal = 24.dp, vertical = 8.dp))
+                    modifier = Modifier.padding(horizontal = InkToneSpacing.xl, vertical = InkToneSpacing.sm))
                 ActionSheetItem("Rechercher dans les livres", AppSymbol.Search) { showActionsSheet = false; onOpenTextSearch() }
                 ActionSheetItem("Ouvrir un livre au hasard", AppSymbol.Reading) { showActionsSheet = false; onOpenRandomBook() }
                 ActionSheetItem("Synchroniser avec le cloud", AppSymbol.Sync) { showActionsSheet = false; onSyncNow() }
@@ -600,11 +602,11 @@ internal fun LibraryTopBar(
 @Composable
 private fun ActionSheetItem(label: String, icon: AppSymbol, onClick: () -> Unit) {
     Row(
-        modifier = Modifier.fillMaxWidth().clickable(onClick = onClick).padding(horizontal = 24.dp, vertical = 14.dp),
+        modifier = Modifier.fillMaxWidth().clickable(onClick = onClick).padding(horizontal = InkToneSpacing.xl, vertical = 14.dp),
         verticalAlignment = Alignment.CenterVertically,
     ) {
         AppIcon(icon, contentDescription = null, modifier = Modifier.size(22.dp))
-        Spacer(Modifier.width(16.dp))
+        Spacer(Modifier.width(InkToneSpacing.lg))
         Text(label, style = MaterialTheme.typography.bodyLarge)
     }
 }
@@ -629,7 +631,7 @@ internal fun LibrarySortOrder.label() = when (this) {
 }
 
 /** Marge basse : le dernier rang défile au-dessus du bouton flottant Importer. */
-private val LibraryListPadding = PaddingValues(start = 8.dp, top = 8.dp, end = 8.dp, bottom = 88.dp)
+private val LibraryListPadding = PaddingValues(start = InkToneSpacing.sm, top = InkToneSpacing.sm, end = InkToneSpacing.sm, bottom = 88.dp)
 
 @Composable
 private fun LibraryContent(
@@ -650,7 +652,7 @@ private fun LibraryContent(
                         publication = publication,
                         onClick = { onOpen(publication.id) },
                         onToggleFavorite = { onToggleFavorite(publication.id, !publication.isFavorite) },
-                        modifier = Modifier.padding(8.dp),
+                        modifier = Modifier.padding(InkToneSpacing.sm),
                         showTitle = false,
                         progressPercent = state.progressMap[publication.id] ?: 0,
                         isStarted = publication.id in state.startedPublicationIds,
@@ -675,7 +677,7 @@ private fun LibraryContent(
                         isStarted = publication.id in state.startedPublicationIds,
                         onTogglePin = { onTogglePin(publication.id, !publication.isPinned) },
                         onDelete = { onDelete(publication.id) },
-                        modifier = Modifier.padding(8.dp),
+                        modifier = Modifier.padding(InkToneSpacing.sm),
                     )
                 }
             }
@@ -798,7 +800,7 @@ internal fun PublicationListRow(
         modifier = Modifier
             .fillMaxWidth()
             .clickable(onClick = onClick)
-            .padding(horizontal = 12.dp, vertical = 9.dp),
+            .padding(horizontal = InkToneSpacing.md, vertical = 9.dp),
     ) {
         // Alignement en haut, pas au centre : la couverture (102dp) est plus
         // haute que le bloc titre/auteur/cœur/3-points depuis
@@ -819,7 +821,7 @@ internal fun PublicationListRow(
             Column(
                 modifier = Modifier
                     .weight(1f)
-                    .padding(horizontal = 12.dp),
+                    .padding(horizontal = InkToneSpacing.md),
             ) {
                 Text(
                     publication.title.cleanedForDisplay(),
@@ -849,7 +851,7 @@ internal fun PublicationListRow(
         }
         if (progressPercent > 0) {
             Row(
-                modifier = Modifier.fillMaxWidth().padding(top = 4.dp),
+                modifier = Modifier.fillMaxWidth().padding(top = InkToneSpacing.xs),
                 verticalAlignment = Alignment.CenterVertically,
             ) {
                 LinearProgressIndicator(
@@ -860,7 +862,7 @@ internal fun PublicationListRow(
                     formatPercent(progressPercent),
                     style = MaterialTheme.typography.labelSmall,
                     color = MaterialTheme.colorScheme.onSurfaceVariant,
-                    modifier = Modifier.padding(start = 8.dp),
+                    modifier = Modifier.padding(start = InkToneSpacing.sm),
                 )
             }
         }
@@ -903,14 +905,14 @@ private fun ResumeReadingCard(
         onClick = onClick,
         modifier = Modifier
             .fillMaxWidth()
-            .padding(8.dp),
+            .padding(InkToneSpacing.sm),
         shape = InkToneShapes.large,
         colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceContainerLow),
     ) {
         Row(
             modifier = Modifier
                 .fillMaxWidth()
-                .padding(16.dp),
+                .padding(InkToneSpacing.lg),
             verticalAlignment = Alignment.CenterVertically,
         ) {
             // Couverture miniature
@@ -931,7 +933,7 @@ private fun ResumeReadingCard(
                 )
             }
 
-            Spacer(Modifier.width(16.dp))
+            Spacer(Modifier.width(InkToneSpacing.lg))
 
             Column(modifier = Modifier.weight(1f)) {
                 // Simple libellé : une pastille pesait plus que le titre du livre.
@@ -939,7 +941,7 @@ private fun ResumeReadingCard(
                     text = "Reprendre",
                     style = MaterialTheme.typography.labelMedium,
                     color = MaterialTheme.colorScheme.primary,
-                    modifier = Modifier.padding(bottom = 4.dp),
+                    modifier = Modifier.padding(bottom = InkToneSpacing.xs),
                 )
 
                 // Titre — nettoyage des artefacts EPUB (tiret, espaces en tête)
@@ -958,7 +960,7 @@ private fun ResumeReadingCard(
                         color = MaterialTheme.colorScheme.onSurfaceVariant,
                         maxLines = 1,
                         overflow = TextOverflow.Ellipsis,
-                        modifier = Modifier.padding(bottom = 8.dp)
+                        modifier = Modifier.padding(bottom = InkToneSpacing.sm)
                     )
                 }
 
@@ -974,7 +976,7 @@ private fun ResumeReadingCard(
                             .height(6.dp)
                             .clip(CircleShape),
                     )
-                    Spacer(Modifier.width(8.dp))
+                    Spacer(Modifier.width(InkToneSpacing.sm))
                     Text(
                         text = formatPercent(progressPercent),
                         style = MaterialTheme.typography.labelSmall.emphasized(),
@@ -983,7 +985,7 @@ private fun ResumeReadingCard(
                 }
             }
 
-            Spacer(Modifier.width(8.dp))
+            Spacer(Modifier.width(InkToneSpacing.sm))
 
             // Bouton Lecture/Pause — pilote la NARRATION seule, sans ouvrir
             // le Lecteur : écouter n'oblige plus à quitter la Bibliothèque.
@@ -1021,7 +1023,7 @@ private fun FilterMode.label() = when (this) {
 private fun ImportProgressBanner(progress: ImportProgress) {
     if (!progress.isActive) return
 
-    Column(Modifier.fillMaxWidth().padding(horizontal = 8.dp, vertical = 4.dp)) {
+    Column(Modifier.fillMaxWidth().padding(horizontal = InkToneSpacing.sm, vertical = InkToneSpacing.xs)) {
         if (progress.total > 0) {
             LinearProgressIndicator(
                 progress = { progress.current.toFloat() / progress.total },

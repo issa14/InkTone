@@ -1,5 +1,7 @@
 package com.inktone.feature.library
 
+import com.inktone.core.designsystem.InkToneSpacing
+
 import com.inktone.core.designsystem.emphasized
 import android.net.Uri
 import androidx.compose.foundation.background
@@ -199,7 +201,7 @@ fun BookCover(
                 Box(
                     contentAlignment = Alignment.Center,
                     modifier = Modifier
-                        .padding(start = 4.dp, bottom = 4.dp)
+                        .padding(start = InkToneSpacing.xs, bottom = InkToneSpacing.xs)
                         .size(32.dp)
                         .background(Color.Black.copy(alpha = 0.45f), CircleShape),
                 ) {
@@ -264,7 +266,7 @@ fun BookCover(
                 text = publication.title,
                 modifier = Modifier
                     .align(Alignment.BottomStart)
-                    .padding(8.dp),
+                    .padding(InkToneSpacing.sm),
                 color = Color.White,
                 maxLines = 3,
                 overflow = TextOverflow.Ellipsis,
@@ -318,7 +320,7 @@ private fun CoverPlaceholder(title: String, showTitle: Boolean) {
         if (showTitle) {
             Text(
                 text = title,
-                modifier = Modifier.padding(8.dp),
+                modifier = Modifier.padding(InkToneSpacing.sm),
                 color = Color.White,
                 maxLines = 5,
                 overflow = TextOverflow.Ellipsis,

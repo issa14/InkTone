@@ -1,5 +1,7 @@
 package com.inktone.feature.opds
 
+import com.inktone.core.designsystem.InkToneSpacing
+
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.rememberScrollState
@@ -137,9 +139,9 @@ private fun FeedGrid(
         columns = GridCells.Adaptive(minSize = 120.dp),
         state = gridState,
         modifier = Modifier.fillMaxSize(),
-        contentPadding = PaddingValues(12.dp),
-        verticalArrangement = Arrangement.spacedBy(12.dp),
-        horizontalArrangement = Arrangement.spacedBy(12.dp),
+        contentPadding = PaddingValues(InkToneSpacing.md),
+        verticalArrangement = Arrangement.spacedBy(InkToneSpacing.md),
+        horizontalArrangement = Arrangement.spacedBy(InkToneSpacing.md),
     ) {
         itemsIndexed(
             state.items,
@@ -155,7 +157,7 @@ private fun FeedGrid(
         }
         if (state.isLoadingMore) {
             item(span = { GridItemSpan(maxLineSpan) }) {
-                Box(Modifier.fillMaxWidth().padding(16.dp), contentAlignment = Alignment.Center) {
+                Box(Modifier.fillMaxWidth().padding(InkToneSpacing.lg), contentAlignment = Alignment.Center) {
                     CircularProgressIndicator()
                 }
             }
@@ -164,7 +166,7 @@ private fun FeedGrid(
         if (state.error != null && nextPageUrl != null && !state.isLoadingMore) {
             item(span = { GridItemSpan(maxLineSpan) }) {
                 Column(
-                    Modifier.fillMaxWidth().padding(16.dp),
+                    Modifier.fillMaxWidth().padding(InkToneSpacing.lg),
                     horizontalAlignment = Alignment.CenterHorizontally,
                 ) {
                     Text(
@@ -241,7 +243,7 @@ private fun BookCard(
                     AppIcon(AppSymbol.CoverOnly, contentDescription = null)
                 }
             }
-            Column(Modifier.padding(12.dp)) {
+            Column(Modifier.padding(InkToneSpacing.md)) {
                 // Hauteurs fixes en lignes : les cartes d'une rangée restent alignées
                 // quels que soient la longueur du titre et l'état du téléchargement.
                 Text(
@@ -276,7 +278,7 @@ private fun DownloadControl(
     when (download) {
                     OpdsBookDownload.IN_PROGRESS -> Row(
                         verticalAlignment = Alignment.CenterVertically,
-                        horizontalArrangement = Arrangement.spacedBy(8.dp),
+                        horizontalArrangement = Arrangement.spacedBy(InkToneSpacing.sm),
                     ) {
                         CircularProgressIndicator(modifier = Modifier.size(18.dp), strokeWidth = 2.dp)
                         Text("Téléchargement…", style = MaterialTheme.typography.bodySmall)
@@ -304,10 +306,10 @@ private fun BookDetailSheet(
 ) {
     ModalBottomSheet(onDismissRequest = onDismiss) {
         Column(
-            modifier = Modifier.fillMaxWidth().verticalScroll(rememberScrollState()).padding(horizontal = 24.dp, vertical = 8.dp),
-            verticalArrangement = Arrangement.spacedBy(12.dp),
+            modifier = Modifier.fillMaxWidth().verticalScroll(rememberScrollState()).padding(horizontal = InkToneSpacing.xl, vertical = InkToneSpacing.sm),
+            verticalArrangement = Arrangement.spacedBy(InkToneSpacing.md),
         ) {
-            Row(horizontalArrangement = Arrangement.spacedBy(16.dp)) {
+            Row(horizontalArrangement = Arrangement.spacedBy(InkToneSpacing.lg)) {
                 item.coverUrl?.let { url ->
                     AsyncImage(
                         model = OpdsCoverKey(url, catalogId),
@@ -316,7 +318,7 @@ private fun BookDetailSheet(
                         modifier = Modifier.size(width = 96.dp, height = 144.dp),
                     )
                 }
-                Column(verticalArrangement = Arrangement.spacedBy(4.dp)) {
+                Column(verticalArrangement = Arrangement.spacedBy(InkToneSpacing.xs)) {
                     Text(item.title, style = MaterialTheme.typography.titleMedium)
                     if (item.authors.isNotEmpty()) {
                         Text(
@@ -335,7 +337,7 @@ private fun BookDetailSheet(
                 item.summary ?: "Aucune description fournie par le catalogue.",
                 style = MaterialTheme.typography.bodyMedium,
             )
-            Spacer(Modifier.height(24.dp))
+            Spacer(Modifier.height(InkToneSpacing.xl))
         }
     }
 }

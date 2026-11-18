@@ -1,5 +1,7 @@
 package com.inktone.feature.reader
 
+import com.inktone.core.designsystem.InkToneSpacing
+
 import com.inktone.core.designsystem.formatMultiplier
 import com.inktone.core.designsystem.AppSymbol
 import androidx.compose.foundation.layout.Column
@@ -65,18 +67,18 @@ fun ReaderTtsPanel(
                 .fillMaxWidth()
                 // Grande police sur petit écran : le lien des règles sortait de la feuille.
                 .verticalScroll(rememberScrollState())
-                .padding(horizontal = 24.dp, vertical = 16.dp),
+                .padding(horizontal = InkToneSpacing.xl, vertical = InkToneSpacing.lg),
         ) {
             Text(
                 "Narration",
                 style = MaterialTheme.typography.titleMedium,
             )
-            Spacer(Modifier.height(16.dp))
+            Spacer(Modifier.height(InkToneSpacing.lg))
 
             // ── Voix — choisie dans les Réglages (décision D74) : ce bouton
             // listait des enregistrements de profil, pas les voix des moteurs.
             Text("Voix", style = MaterialTheme.typography.labelLarge)
-            Spacer(Modifier.height(4.dp))
+            Spacer(Modifier.height(InkToneSpacing.xs))
             Text(activeVoiceProfile?.let(::voiceDisplayName) ?: "Voix par défaut", style = MaterialTheme.typography.bodyLarge)
             TextButton(onClick = onOpenVoiceSettings) {
                 Text("Changer de voix dans les Réglages")
@@ -101,13 +103,13 @@ fun ReaderTtsPanel(
                 displayFormatter = ::formatMultiplier,
             )
 
-            Spacer(Modifier.height(12.dp))
+            Spacer(Modifier.height(InkToneSpacing.md))
 
             TextButton(onClick = onOpenPronunciationRules, modifier = Modifier.fillMaxWidth()) {
                 Text("Ajouter une règle de prononciation")
             }
 
-            Spacer(Modifier.height(24.dp))
+            Spacer(Modifier.height(InkToneSpacing.xl))
         }
     }
 

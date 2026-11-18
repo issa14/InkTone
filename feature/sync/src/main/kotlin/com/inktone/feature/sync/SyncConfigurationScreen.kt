@@ -1,5 +1,7 @@
 package com.inktone.feature.sync
 
+import com.inktone.core.designsystem.InkToneSpacing
+
 import com.inktone.core.designsystem.InkToneSectionHeader
 
 import com.inktone.core.designsystem.AppIcon
@@ -170,12 +172,12 @@ fun SyncConfigurationScreen(
 @Composable
 private fun AuthenticatingContent() {
     Column(
-        modifier = Modifier.fillMaxSize().padding(24.dp),
+        modifier = Modifier.fillMaxSize().padding(InkToneSpacing.xl),
         horizontalAlignment = Alignment.CenterHorizontally,
         verticalArrangement = Arrangement.Center,
     ) {
         CircularProgressIndicator()
-        Spacer(Modifier.height(16.dp))
+        Spacer(Modifier.height(InkToneSpacing.lg))
         Text("Connexion…")
     }
 }
@@ -203,7 +205,7 @@ private fun SyncConfigurationContent(
         modifier = Modifier
             .verticalScroll(rememberScrollState())
             .imePadding()
-            .padding(start = 16.dp, end = 16.dp, bottom = 12.dp),
+            .padding(start = InkToneSpacing.lg, end = InkToneSpacing.lg, bottom = InkToneSpacing.md),
     ) {
         // Sans OAuth dans ce build, Google Drive est une fonction absente, pas
         // un message à montrer à chaque visite : la carte n'est pas composée
@@ -260,7 +262,7 @@ private fun GoogleDriveCard(
         },
         border = if (isActive && !isOtherProviderActive) BorderStroke(1.dp, MaterialTheme.colorScheme.primary) else null,
     ) {
-        Column(Modifier.padding(16.dp)) {
+        Column(Modifier.padding(InkToneSpacing.lg)) {
             if (isActive && account != null) {
                 Row(verticalAlignment = Alignment.CenterVertically) {
                     Box(
@@ -269,7 +271,7 @@ private fun GoogleDriveCard(
                     ) {
                         AppIcon(AppSymbol.CloudConnected, contentDescription = null, tint = MaterialTheme.colorScheme.onPrimaryContainer)
                     }
-                    Spacer(Modifier.width(8.dp))
+                    Spacer(Modifier.width(InkToneSpacing.sm))
                     Column {
                         // Portée volontairement limitée à drive.appdata (décision
                         // actée) : aucune adresse e-mail réelle n'est disponible
@@ -283,7 +285,7 @@ private fun GoogleDriveCard(
                         )
                     }
                 }
-                Spacer(Modifier.height(12.dp))
+                Spacer(Modifier.height(InkToneSpacing.md))
                 OutlinedButton(onClick = { showDisconnectConfirm = true }, modifier = Modifier.fillMaxWidth()) {
                     Text("Déconnecter")
                 }
@@ -297,7 +299,7 @@ private fun GoogleDriveCard(
                         style = MaterialTheme.typography.bodySmall,
                         color = MaterialTheme.colorScheme.onSurfaceVariant,
                     )
-                    Spacer(Modifier.height(8.dp))
+                    Spacer(Modifier.height(InkToneSpacing.sm))
                 }
                 Button(
                     onClick = onConnect,
@@ -306,7 +308,7 @@ private fun GoogleDriveCard(
                 ) {
                     if (isAuthenticating) {
                         CircularProgressIndicator(modifier = Modifier.size(18.dp), strokeWidth = 2.dp)
-                        Spacer(Modifier.width(4.dp))
+                        Spacer(Modifier.width(InkToneSpacing.xs))
                     }
                     Text("Se connecter avec Google")
                 }
@@ -361,29 +363,29 @@ private fun WebDavCard(
         },
         border = if (isActive && !isOtherProviderActive) BorderStroke(1.dp, MaterialTheme.colorScheme.primary) else null,
     ) {
-        Column(Modifier.padding(16.dp)) {
+        Column(Modifier.padding(InkToneSpacing.lg)) {
             if (isActive) {
                 // Le mot de passe persisté n'est jamais ré-affiché (secret,
                 // même discipline que le jeton OAuth) : l'état actif montre
                 // l'hôte lié + « Connecté », pas les champs d'édition.
-                Spacer(Modifier.height(8.dp))
+                Spacer(Modifier.height(InkToneSpacing.sm))
                 Text("Connecté", style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.primary)
                 host?.let {
                     Text(it, style = MaterialTheme.typography.bodyMedium, color = MaterialTheme.colorScheme.onSurfaceVariant)
                 }
-                Spacer(Modifier.height(12.dp))
+                Spacer(Modifier.height(InkToneSpacing.md))
                 OutlinedButton(onClick = { showDisconnectConfirm = true }, modifier = Modifier.fillMaxWidth()) {
                     Text("Déconnecter")
                 }
             } else {
-                Spacer(Modifier.height(12.dp))
+                Spacer(Modifier.height(InkToneSpacing.md))
                 if (isOtherProviderActive) {
                     Text(
                         "Désactivez Google Drive pour connecter WebDAV.",
                         style = MaterialTheme.typography.bodySmall,
                         color = MaterialTheme.colorScheme.onSurfaceVariant,
                     )
-                    Spacer(Modifier.height(8.dp))
+                    Spacer(Modifier.height(InkToneSpacing.sm))
                 }
                 OutlinedTextField(
                     value = url,
@@ -394,7 +396,7 @@ private fun WebDavCard(
                     enabled = !isOtherProviderActive,
                     modifier = Modifier.fillMaxWidth(),
                 )
-                Spacer(Modifier.height(8.dp))
+                Spacer(Modifier.height(InkToneSpacing.sm))
                 OutlinedTextField(
                     value = username,
                     onValueChange = { username = it },
@@ -403,7 +405,7 @@ private fun WebDavCard(
                     enabled = !isOtherProviderActive,
                     modifier = Modifier.fillMaxWidth(),
                 )
-                Spacer(Modifier.height(8.dp))
+                Spacer(Modifier.height(InkToneSpacing.sm))
                 OutlinedTextField(
                     value = password,
                     onValueChange = { password = it },
@@ -413,7 +415,7 @@ private fun WebDavCard(
                     enabled = !isOtherProviderActive,
                     modifier = Modifier.fillMaxWidth(),
                 )
-                Spacer(Modifier.height(12.dp))
+                Spacer(Modifier.height(InkToneSpacing.md))
                 Button(
                     onClick = { onConnect(url.trim(), username, password) },
                     enabled = !isConnecting && !isOtherProviderActive && url.isNotBlank() && username.isNotBlank() && password.isNotBlank(),
@@ -421,7 +423,7 @@ private fun WebDavCard(
                 ) {
                     if (isConnecting) {
                         CircularProgressIndicator(modifier = Modifier.size(18.dp), strokeWidth = 2.dp)
-                        Spacer(Modifier.width(4.dp))
+                        Spacer(Modifier.width(InkToneSpacing.xs))
                     }
                     Text("Tester et connecter")
                 }
@@ -450,13 +452,13 @@ private fun WebDavCard(
 @Composable
 private fun LocalBackupCard(onOpenLocalBackup: () -> Unit) {
     Card {
-        Column(Modifier.padding(16.dp)) {
+        Column(Modifier.padding(InkToneSpacing.lg)) {
             Text(
                 "Sauvegarde chiffrée dans un fichier, sans compte en ligne.",
                 style = MaterialTheme.typography.bodyMedium,
                 color = MaterialTheme.colorScheme.onSurfaceVariant,
             )
-            Spacer(Modifier.height(12.dp))
+            Spacer(Modifier.height(InkToneSpacing.md))
             OutlinedButton(onClick = onOpenLocalBackup, modifier = Modifier.fillMaxWidth()) { Text("Ouvrir dans les Réglages") }
         }
     }
@@ -480,8 +482,8 @@ private fun SyncOperationalContent(state: SyncScreenState, onIntent: (SyncIntent
     val isSyncing = state.syncUiState is SyncUiState.Syncing
 
     LazyColumn(
-        modifier = Modifier.fillMaxSize().padding(horizontal = 16.dp, vertical = 12.dp),
-        verticalArrangement = Arrangement.spacedBy(16.dp),
+        modifier = Modifier.fillMaxSize().padding(horizontal = InkToneSpacing.lg, vertical = InkToneSpacing.md),
+        verticalArrangement = Arrangement.spacedBy(InkToneSpacing.lg),
     ) {
         if (account.lastAutoSyncFailed) {
             item { AutoSyncFailedBanner(onRetry = { onIntent(SyncIntent.SynchronizeNow) }) }
@@ -516,9 +518,9 @@ private fun SyncOperationalContent(state: SyncScreenState, onIntent: (SyncIntent
 @Composable
 private fun AutoSyncFailedBanner(onRetry: () -> Unit) {
     Card(colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.errorContainer)) {
-        Row(Modifier.padding(start = 16.dp, top = 8.dp, end = 8.dp, bottom = 8.dp), verticalAlignment = Alignment.CenterVertically) {
+        Row(Modifier.padding(start = InkToneSpacing.lg, top = InkToneSpacing.sm, end = InkToneSpacing.sm, bottom = InkToneSpacing.sm), verticalAlignment = Alignment.CenterVertically) {
             AppIcon(AppSymbol.Error, contentDescription = null, tint = MaterialTheme.colorScheme.onErrorContainer)
-            Spacer(Modifier.width(12.dp))
+            Spacer(Modifier.width(InkToneSpacing.md))
             Text(
                 "La synchronisation automatique a échoué.",
                 style = MaterialTheme.typography.bodyMedium,
@@ -548,7 +550,7 @@ private fun ProfileHeader(account: SyncAccount) {
         ) {
             AppIcon(AppSymbol.CloudConnected, contentDescription = null, tint = MaterialTheme.colorScheme.onPrimaryContainer)
         }
-        Spacer(Modifier.width(12.dp))
+        Spacer(Modifier.width(InkToneSpacing.md))
         Column {
             Text(providerName, style = MaterialTheme.typography.titleMedium)
             Text(
@@ -568,14 +570,14 @@ private fun QuickSyncAction(lastSyncAt: Long?, isSyncing: Boolean, onSynchronize
             style = MaterialTheme.typography.bodySmall,
             color = MaterialTheme.colorScheme.onSurfaceVariant,
         )
-        Spacer(Modifier.height(8.dp))
+        Spacer(Modifier.height(InkToneSpacing.sm))
         // Tâche 11.9, point 6 — le bouton se désactive dès que l'état
         // reflète une synchro en cours (SyncUiState.Syncing), qu'elle ait
         // été déclenchée ici ou par le Worker automatique.
         Button(onClick = onSynchronizeNow, enabled = !isSyncing, modifier = Modifier.fillMaxWidth()) {
             if (isSyncing) {
                 CircularProgressIndicator(modifier = Modifier.size(18.dp), strokeWidth = 2.dp)
-                Spacer(Modifier.width(8.dp))
+                Spacer(Modifier.width(InkToneSpacing.sm))
                 Text("Synchronisation…")
             } else {
                 Text("Synchroniser maintenant")
@@ -590,7 +592,7 @@ private fun DeviceFleetCard(fleet: List<DeviceFleetEntry>, currentDeviceId: Stri
     Column {
         InkToneSectionHeader("Appareils (${fleet.size})")
         Card {
-            Column(Modifier.padding(16.dp)) {
+            Column(Modifier.padding(InkToneSpacing.lg)) {
                 if (fleet.isEmpty()) {
                     Text(
                         "Aucun appareil synchronisé pour l'instant.",
@@ -619,7 +621,7 @@ private fun DeviceRow(entry: DeviceFleetEntry, isCurrent: Boolean, onRemove: () 
         verticalAlignment = Alignment.CenterVertically,
     ) {
         AppIcon(AppSymbol.Device, contentDescription = null, tint = MaterialTheme.colorScheme.onSurfaceVariant)
-        Spacer(Modifier.width(12.dp))
+        Spacer(Modifier.width(InkToneSpacing.md))
         Column(Modifier.weight(1f)) {
             Row(verticalAlignment = Alignment.CenterVertically) {
                 Text(entry.displayName, style = MaterialTheme.typography.bodyMedium)
@@ -645,7 +647,7 @@ private fun DeviceRow(entry: DeviceFleetEntry, isCurrent: Boolean, onRemove: () 
         // Retirer l'appareil courant n'aurait aucun sens : il réapparaîtrait
         // à la prochaine synchronisation.
         if (!isCurrent) {
-            Spacer(Modifier.width(8.dp))
+            Spacer(Modifier.width(InkToneSpacing.sm))
             IconButton(onClick = { showRemoveConfirm = true }) {
                 AppIcon(AppSymbol.Delete, contentDescription = "Retirer ${entry.displayName} de la liste")
             }
@@ -676,7 +678,7 @@ private fun DeviceRow(entry: DeviceFleetEntry, isCurrent: Boolean, onRemove: () 
 @Composable
 private fun SyncTogglesCard(autoEnabled: Boolean, wifiOnly: Boolean, onSetAutoEnabled: (Boolean) -> Unit, onSetWifiOnly: (Boolean) -> Unit) {
     Card {
-        Column(Modifier.padding(vertical = 8.dp)) {
+        Column(Modifier.padding(vertical = InkToneSpacing.sm)) {
             ToggleRow(
                 label = "Synchronisation automatique",
                 checked = autoEnabled,
@@ -703,7 +705,7 @@ private fun ToggleRow(label: String, checked: Boolean, enabled: Boolean, onCheck
         modifier = Modifier
             .fillMaxWidth()
             .toggleable(value = checked, enabled = enabled, onValueChange = onCheckedChange, role = Role.Switch)
-            .padding(horizontal = 16.dp, vertical = 12.dp),
+            .padding(horizontal = InkToneSpacing.lg, vertical = InkToneSpacing.md),
         horizontalArrangement = Arrangement.SpaceBetween,
         verticalAlignment = Alignment.CenterVertically,
     ) {
@@ -718,7 +720,7 @@ private fun ActivityLogCard(events: List<SyncActivityEvent>) {
     Column {
         InkToneSectionHeader("Journal d'activité")
         Card {
-            Column(Modifier.padding(16.dp)) {
+            Column(Modifier.padding(InkToneSpacing.lg)) {
                 if (events.isEmpty()) {
                     Text(
                         "Aucun événement pour l'instant.",
@@ -745,11 +747,11 @@ private fun ActivityRow(event: SyncActivityEvent) {
         SyncActivityEventType.MANUAL_SYNC -> AppSymbol.Refresh to MaterialTheme.colorScheme.onSurfaceVariant
     }
     Row(
-        modifier = Modifier.fillMaxWidth().padding(vertical = 8.dp),
+        modifier = Modifier.fillMaxWidth().padding(vertical = InkToneSpacing.sm),
         verticalAlignment = Alignment.CenterVertically,
     ) {
         AppIcon(icon, contentDescription = null, tint = tint, modifier = Modifier.size(20.dp))
-        Spacer(Modifier.width(12.dp))
+        Spacer(Modifier.width(InkToneSpacing.md))
         Text(event.message, style = MaterialTheme.typography.bodyMedium, modifier = Modifier.weight(1f))
         Text(relativeTime(event.occurredAt), style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
     }

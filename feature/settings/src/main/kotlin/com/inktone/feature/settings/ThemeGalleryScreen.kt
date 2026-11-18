@@ -1,4 +1,6 @@
 package com.inktone.feature.settings
+
+import com.inktone.core.designsystem.InkToneSpacing
 import com.inktone.core.designsystem.AppIcon
 import com.inktone.core.designsystem.AppSymbol
 
@@ -86,8 +88,8 @@ fun ThemeGalleryScreen(
         },
     ) { innerPadding ->
         LazyColumn(
-            modifier = Modifier.fillMaxSize().padding(innerPadding).padding(horizontal = 16.dp),
-            verticalArrangement = Arrangement.spacedBy(8.dp),
+            modifier = Modifier.fillMaxSize().padding(innerPadding).padding(horizontal = InkToneSpacing.lg),
+            verticalArrangement = Arrangement.spacedBy(InkToneSpacing.sm),
         ) {
             item {
                 Text("Ambiances de lecture", style = MaterialTheme.typography.titleMedium)
@@ -104,7 +106,7 @@ fun ThemeGalleryScreen(
                 Text(
                     "Confort et accessibilité",
                     style = MaterialTheme.typography.titleMedium,
-                    modifier = Modifier.padding(top = 16.dp),
+                    modifier = Modifier.padding(top = InkToneSpacing.lg),
                 )
             }
             items(state.accessibility, key = { it.id }) { theme ->
@@ -119,11 +121,11 @@ fun ThemeGalleryScreen(
                 Text(
                     "Mes thèmes personnalisés",
                     style = MaterialTheme.typography.titleMedium,
-                    modifier = Modifier.padding(top = 16.dp),
+                    modifier = Modifier.padding(top = InkToneSpacing.lg),
                 )
             }
             items((listOf<ReadingTheme?>(null) + state.customThemes).chunked(2)) { row ->
-                Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(InkToneSpacing.sm)) {
                     row.forEach { theme ->
                         if (theme == null) {
                             CreateThemeCard(
@@ -151,7 +153,7 @@ fun ThemeGalleryScreen(
                 }
             }
 
-            item { Spacer(Modifier.height(24.dp)) }
+            item { Spacer(Modifier.height(InkToneSpacing.xl)) }
         }
     }
 
@@ -163,7 +165,7 @@ private fun ThemeCardRow(
     activeId: String,
     onTap: (String) -> Unit,
 ) {
-    Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+    Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(InkToneSpacing.sm)) {
         themes.forEach { theme ->
             ThemeMiniPreviewCard(
                 theme = theme,
@@ -232,7 +234,7 @@ private fun ThemeMiniPreviewCard(
                     "Actif",
                     style = MaterialTheme.typography.labelSmall,
                     color = MaterialTheme.colorScheme.onPrimary,
-                    modifier = Modifier.padding(horizontal = 8.dp, vertical = 3.dp),
+                    modifier = Modifier.padding(horizontal = InkToneSpacing.sm, vertical = 3.dp),
                 )
             }
         }
@@ -253,7 +255,7 @@ private fun CreateThemeCard(modifier: Modifier = Modifier, onClick: () -> Unit) 
             verticalArrangement = Arrangement.Center,
         ) {
             AppIcon(AppSymbol.AddCircle,  contentDescription = null, tint = MaterialTheme.colorScheme.primary, modifier = Modifier.size(32.dp))
-            Spacer(Modifier.height(8.dp))
+            Spacer(Modifier.height(InkToneSpacing.sm))
             Text("Créer un thème", style = MaterialTheme.typography.labelMedium)
             Text("Studio de création", style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
         }
@@ -276,7 +278,7 @@ private fun AccessibilityRow(theme: ReadingTheme, isActive: Boolean, onClick: ()
             .then(if (isActive) Modifier.background(MaterialTheme.colorScheme.primaryContainer.copy(alpha = 0.3f)) else Modifier)
             .selectable(selected = isActive, role = Role.RadioButton, onClick = onClick)
             .heightIn(min = 56.dp)
-            .padding(vertical = 8.dp),
+            .padding(vertical = InkToneSpacing.sm),
         verticalAlignment = Alignment.CenterVertically,
     ) {
         Box(
@@ -293,12 +295,12 @@ private fun AccessibilityRow(theme: ReadingTheme, isActive: Boolean, onClick: ()
                 fontFamily = theme.fontFamily.toComposeFontFamily(),
             )
         }
-        Column(Modifier.weight(1f).padding(horizontal = 12.dp)) {
+        Column(Modifier.weight(1f).padding(horizontal = InkToneSpacing.md)) {
             Text(theme.displayName, style = MaterialTheme.typography.bodyMedium)
             subtitle?.let { Text(it, style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.onSurfaceVariant) }
         }
         if (isActive) {
-            AppIcon(AppSymbol.Success, contentDescription = null, tint = MaterialTheme.colorScheme.primary, modifier = Modifier.padding(end = 12.dp))
+            AppIcon(AppSymbol.Success, contentDescription = null, tint = MaterialTheme.colorScheme.primary, modifier = Modifier.padding(end = InkToneSpacing.md))
         }
     }
 }

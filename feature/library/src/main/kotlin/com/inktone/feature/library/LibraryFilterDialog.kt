@@ -1,5 +1,7 @@
 package com.inktone.feature.library
 
+import com.inktone.core.designsystem.InkToneSpacing
+
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
@@ -84,7 +86,7 @@ fun LibraryFilterDialog(
             color = MaterialTheme.colorScheme.surface,
             modifier = Modifier
                 .fillMaxWidth()
-                .padding(horizontal = 16.dp)
+                .padding(horizontal = InkToneSpacing.lg)
                 .widthIn(max = 480.dp),
         ) {
             Column(
@@ -93,7 +95,7 @@ fun LibraryFilterDialog(
                     .padding(20.dp),
             ) {
                 // ── Ligne 1 : deux colonnes (memes 4 options chacune) ──
-                Row(horizontalArrangement = Arrangement.spacedBy(12.dp)) {
+                Row(horizontalArrangement = Arrangement.spacedBy(InkToneSpacing.md)) {
                     Column(Modifier.weight(1f)) {
                         FilterSectionTitle("Trier par")
                         Column(Modifier.selectableGroup()) {
@@ -124,7 +126,7 @@ fun LibraryFilterDialog(
 
                 // ── Ligne 2 : type de fichier, en puces horizontales ──
                 FilterSectionTitle("Type de fichier")
-                FlowRow(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                FlowRow(horizontalArrangement = Arrangement.spacedBy(InkToneSpacing.sm)) {
                     // « Tous » n'est pas un format : c'est l'absence de
                     // filtre, donc l'ensemble vide — d'ou un clic qui efface
                     // au lieu de basculer.
@@ -149,7 +151,7 @@ fun LibraryFilterDialog(
                 if (showLayoutSection) {
                     FilterSectionTitle("Mise en page")
                     Row(
-                        horizontalArrangement = Arrangement.spacedBy(8.dp),
+                        horizontalArrangement = Arrangement.spacedBy(InkToneSpacing.sm),
                         modifier = Modifier.fillMaxWidth(),
                     ) {
                         LibraryLayoutMode.entries.forEach { mode ->
@@ -199,9 +201,9 @@ private fun LayoutModeCell(
                 },
                 shape = RoundedCornerShape(12.dp),
             )
-            .padding(vertical = 10.dp, horizontal = 4.dp),
+            .padding(vertical = 10.dp, horizontal = InkToneSpacing.xs),
         horizontalAlignment = Alignment.CenterHorizontally,
-        verticalArrangement = Arrangement.spacedBy(4.dp),
+        verticalArrangement = Arrangement.spacedBy(InkToneSpacing.xs),
     ) {
         AppIcon(
             mode.icon(),
@@ -232,7 +234,7 @@ private fun FilterSectionTitle(text: String) {
         text,
         style = MaterialTheme.typography.titleSmall,
         color = MaterialTheme.colorScheme.primary,
-        modifier = Modifier.padding(top = 16.dp, bottom = 4.dp),
+        modifier = Modifier.padding(top = InkToneSpacing.lg, bottom = InkToneSpacing.xs),
     )
 }
 
@@ -246,6 +248,6 @@ private fun FilterRadioRow(label: String, selected: Boolean, onClick: () -> Unit
         verticalAlignment = Alignment.CenterVertically,
     ) {
         RadioButton(selected = selected, onClick = null)
-        Text(label, modifier = Modifier.padding(start = 8.dp))
+        Text(label, modifier = Modifier.padding(start = InkToneSpacing.sm))
     }
 }

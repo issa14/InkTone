@@ -1,5 +1,7 @@
 package com.inktone.feature.library
 
+import com.inktone.core.designsystem.InkToneSpacing
+
 import androidx.compose.animation.core.RepeatMode
 import androidx.compose.animation.core.animateFloat
 import androidx.compose.animation.core.infiniteRepeatable
@@ -35,7 +37,7 @@ fun BookCoverShimmer() {
     )
     Box(
         Modifier
-            .padding(8.dp)
+            .padding(InkToneSpacing.sm)
             .aspectRatio(0.7f)
             .fillMaxWidth()
             .background(MaterialTheme.colorScheme.surfaceVariant.copy(alpha = shimmerAlpha)),

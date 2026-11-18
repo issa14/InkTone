@@ -1,5 +1,7 @@
 package com.inktone.feature.library
 
+import com.inktone.core.designsystem.InkToneSpacing
+
 import com.inktone.core.designsystem.annotationMarkerColor
 
 import androidx.compose.foundation.ExperimentalFoundationApi
@@ -182,7 +184,7 @@ fun LibraryItemsScreen(
                         }
                     }
 
-                    LazyColumn(Modifier.fillMaxSize().padding(horizontal = 8.dp), state = listState) {
+                    LazyColumn(Modifier.fillMaxSize().padding(horizontal = InkToneSpacing.sm), state = listState) {
                         items(state.items, key = { it.id }) { item ->
                             LibraryItemRow(
                                 item = item,
@@ -227,7 +229,7 @@ private fun FilterChipsRow(selected: LibraryItemFilter, onSelected: (LibraryItem
     // retrouvait coupé — « Surlignages » est à lui seul deux fois plus large
     // que « Tous ».
     Row(
-        modifier = Modifier.fillMaxWidth().padding(horizontal = 12.dp, vertical = 8.dp),
+        modifier = Modifier.fillMaxWidth().padding(horizontal = InkToneSpacing.md, vertical = InkToneSpacing.sm),
         horizontalArrangement = Arrangement.spacedBy(6.dp),
     ) {
         val entries = listOf(
@@ -297,7 +299,7 @@ private fun LibraryItemRow(
 
     SwipeToDismissBox(
         state = dismissState,
-        modifier = Modifier.padding(vertical = 4.dp).clip(cardShape),
+        modifier = Modifier.padding(vertical = InkToneSpacing.xs).clip(cardShape),
         backgroundContent = {
             // Transparent tant que la carte est au repos : sinon le
             // rectangle rouge reste visible en permanence sous la carte,
@@ -341,13 +343,13 @@ private fun LibraryItemRow(
             shape = cardShape,
             colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceVariant),
         ) {
-            Row(Modifier.padding(12.dp), verticalAlignment = Alignment.Top) {
+            Row(Modifier.padding(InkToneSpacing.md), verticalAlignment = Alignment.Top) {
                 AppIcon(
                     iconFor(item),
                     contentDescription = null,
                     tint = colorFor(item) ?: MaterialTheme.colorScheme.primary,
                 )
-                Column(Modifier.weight(1f).padding(start = 12.dp)) {
+                Column(Modifier.weight(1f).padding(start = InkToneSpacing.md)) {
                     // Ligne 1 — extrait / note : le contenu, prioritaire.
                     item.excerpt?.let { excerpt ->
                         Text(excerpt, style = MaterialTheme.typography.bodyMedium, maxLines = 4, overflow = TextOverflow.Ellipsis)
@@ -369,7 +371,7 @@ private fun LibraryItemRow(
                         color = MaterialTheme.colorScheme.onSurfaceVariant,
                         maxLines = 1,
                         overflow = TextOverflow.Ellipsis,
-                        modifier = Modifier.padding(top = 4.dp),
+                        modifier = Modifier.padding(top = InkToneSpacing.xs),
                     )
                     // Ligne 3 — chapitre + date, toujours entièrement visibles
                     // (jamais concaténés avec le titre, qui peut être long).

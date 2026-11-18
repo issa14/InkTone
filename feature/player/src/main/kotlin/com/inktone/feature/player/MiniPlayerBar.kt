@@ -1,5 +1,7 @@
 package com.inktone.feature.player
 
+import com.inktone.core.designsystem.InkToneSpacing
+
 import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.animation.core.tween
 import androidx.compose.animation.fadeIn
@@ -129,7 +131,7 @@ internal fun MiniPlayerContent(
                     .clickable(enabled = state.publicationId != null) {
                         state.publicationId?.let(onOpenReader)
                     }
-                    .padding(start = 16.dp, end = 4.dp, top = 8.dp, bottom = 8.dp),
+                    .padding(start = InkToneSpacing.lg, end = InkToneSpacing.xs, top = InkToneSpacing.sm, bottom = InkToneSpacing.sm),
             ) {
                 Column(modifier = Modifier.weight(1f)) {
                     Text(

@@ -1,5 +1,7 @@
 package com.inktone.feature.settings
 
+import com.inktone.core.designsystem.InkToneSpacing
+
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.rememberScrollState
@@ -20,7 +22,7 @@ import androidx.lifecycle.compose.collectAsStateWithLifecycle
 @Composable
 fun PronunciationRulesScreen(viewModel: SettingsViewModel = hiltViewModel()) {
     val state by viewModel.state.collectAsStateWithLifecycle()
-    Column(modifier = Modifier.padding(horizontal = 16.dp).verticalScroll(rememberScrollState())) {
+    Column(modifier = Modifier.padding(horizontal = InkToneSpacing.lg).verticalScroll(rememberScrollState())) {
         PronunciationRulesSection(rules = state.pronunciationRules, onIntent = viewModel::onIntent)
     }
 }

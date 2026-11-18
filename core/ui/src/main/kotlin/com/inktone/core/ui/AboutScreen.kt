@@ -1,5 +1,7 @@
 package com.inktone.core.ui
 
+import com.inktone.core.designsystem.InkToneSpacing
+
 import android.content.Intent
 import android.net.Uri
 import androidx.compose.foundation.BorderStroke
@@ -77,7 +79,7 @@ fun AboutScreen(
             modifier = Modifier
                 .fillMaxSize()
                 .verticalScroll(rememberScrollState())
-                .padding(horizontal = 20.dp, vertical = 16.dp),
+                .padding(horizontal = 20.dp, vertical = InkToneSpacing.lg),
             horizontalAlignment = Alignment.CenterHorizontally,
         ) {
             Spacer(Modifier.height(20.dp))
@@ -89,7 +91,7 @@ fun AboutScreen(
                 tint = MaterialTheme.colorScheme.primary,
                 modifier = Modifier.size(64.dp),
             )
-            Spacer(Modifier.height(12.dp))
+            Spacer(Modifier.height(InkToneSpacing.md))
             Text("InkTone", color = MaterialTheme.colorScheme.onSurface, style = MaterialTheme.typography.headlineMedium)
             Spacer(Modifier.height(6.dp))
             VersionBadge(versionName = versionName)
@@ -102,7 +104,7 @@ fun AboutScreen(
                 },
             ) {
                 AppIcon(AppSymbol.Copy, contentDescription = null, modifier = Modifier.size(18.dp))
-                Spacer(Modifier.width(8.dp))
+                Spacer(Modifier.width(InkToneSpacing.sm))
                 Text("Copier les informations de diagnostic")
             }
 
@@ -113,15 +115,15 @@ fun AboutScreen(
                     "La synchronisation, les catalogues en ligne et la voix en ligne sont facultatifs.",
             )
 
-            Spacer(Modifier.height(16.dp))
+            Spacer(Modifier.height(InkToneSpacing.lg))
             EngagementsGrid()
 
-            Spacer(Modifier.height(12.dp))
+            Spacer(Modifier.height(InkToneSpacing.md))
             SectionHeader("Aide et ressources")
             PrivacyPolicyCard()
-            Spacer(Modifier.height(8.dp))
+            Spacer(Modifier.height(InkToneSpacing.sm))
             GitHubCard()
-            Spacer(Modifier.height(8.dp))
+            Spacer(Modifier.height(InkToneSpacing.sm))
             ReportProblemCard(
                 onClick = {
                     val intent = Intent(Intent.ACTION_SENDTO).apply {
@@ -137,12 +139,12 @@ fun AboutScreen(
                 },
             )
 
-            Spacer(Modifier.height(12.dp))
+            Spacer(Modifier.height(InkToneSpacing.md))
             ArchitectureAccordion()
 
-            Spacer(Modifier.height(16.dp))
+            Spacer(Modifier.height(InkToneSpacing.lg))
             Text("© ${java.time.Year.now().value} InkTone.", color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.6f), style = MaterialTheme.typography.labelSmall, textAlign = TextAlign.Center)
-            Spacer(Modifier.height(32.dp))
+            Spacer(Modifier.height(InkToneSpacing.xxl))
         }
 
         SnackbarHost(
@@ -179,7 +181,7 @@ private fun VersionBadge(versionName: String) {
 private fun EngagementsGrid() {
     Row(
         modifier = Modifier.fillMaxWidth(),
-        horizontalArrangement = Arrangement.spacedBy(8.dp),
+        horizontalArrangement = Arrangement.spacedBy(InkToneSpacing.sm),
     ) {
         EngagementPillar(
             icon = AppSymbol.Device,
@@ -210,7 +212,7 @@ private fun EngagementPillar(icon: AppSymbol, title: String, subtitle: String, m
         modifier = modifier,
     ) {
         Column(
-            modifier = Modifier.fillMaxWidth().padding(horizontal = 8.dp, vertical = 12.dp),
+            modifier = Modifier.fillMaxWidth().padding(horizontal = InkToneSpacing.sm, vertical = InkToneSpacing.md),
             horizontalAlignment = Alignment.CenterHorizontally,
         ) {
             AppIcon(icon, null, tint = MaterialTheme.colorScheme.primary, modifier = Modifier.size(22.dp))
@@ -239,11 +241,11 @@ private fun PrivacyPolicyCard() {
         modifier = Modifier.fillMaxWidth(),
     ) {
         Row(
-            modifier = Modifier.fillMaxWidth().padding(16.dp),
+            modifier = Modifier.fillMaxWidth().padding(InkToneSpacing.lg),
             verticalAlignment = Alignment.CenterVertically,
         ) {
             AppIcon(AppSymbol.Lock, null, tint = MaterialTheme.colorScheme.onSurfaceVariant, modifier = Modifier.size(22.dp))
-            Spacer(Modifier.width(12.dp))
+            Spacer(Modifier.width(InkToneSpacing.md))
             Column(Modifier.weight(1f)) {
                 Text("Politique de confidentialité", color = MaterialTheme.colorScheme.onSurface, style = MaterialTheme.typography.titleSmall)
                 Text("Ce qui reste sur l'appareil, et ce qui en sort", color = MaterialTheme.colorScheme.onSurfaceVariant, style = MaterialTheme.typography.bodySmall)
@@ -262,11 +264,11 @@ private fun GitHubCard() {
         modifier = Modifier.fillMaxWidth(),
     ) {
         Row(
-            modifier = Modifier.fillMaxWidth().padding(16.dp),
+            modifier = Modifier.fillMaxWidth().padding(InkToneSpacing.lg),
             verticalAlignment = Alignment.CenterVertically,
         ) {
             AppIcon(AppSymbol.Article, null, tint = MaterialTheme.colorScheme.onSurfaceVariant, modifier = Modifier.size(22.dp))
-            Spacer(Modifier.width(12.dp))
+            Spacer(Modifier.width(InkToneSpacing.md))
             Column(Modifier.weight(1f)) {
                 Text("Dépôt GitHub officiel", color = MaterialTheme.colorScheme.onSurface, style = MaterialTheme.typography.titleSmall)
                 Text("github.com/issa14/InkTone", color = MaterialTheme.colorScheme.onSurfaceVariant, style = MaterialTheme.typography.bodySmall)
@@ -285,11 +287,11 @@ private fun ReportProblemCard(onClick: () -> Unit) {
         modifier = Modifier.fillMaxWidth(),
     ) {
         Row(
-            modifier = Modifier.fillMaxWidth().padding(16.dp),
+            modifier = Modifier.fillMaxWidth().padding(InkToneSpacing.lg),
             verticalAlignment = Alignment.CenterVertically,
         ) {
             AppIcon(AppSymbol.WarningAmber, null, tint = MaterialTheme.colorScheme.primary, modifier = Modifier.size(22.dp))
-            Spacer(Modifier.width(12.dp))
+            Spacer(Modifier.width(InkToneSpacing.md))
             Column(Modifier.weight(1f)) {
                 Text("Signaler un problème", color = MaterialTheme.colorScheme.onSurface, style = MaterialTheme.typography.titleSmall)
                 Text("E-mail prérempli avec les informations de diagnostic", color = MaterialTheme.colorScheme.onSurfaceVariant, style = MaterialTheme.typography.bodySmall)
@@ -320,7 +322,7 @@ private fun ArchitectureAccordion() {
                 onClick = { expanded = !expanded },
             )
             if (expanded) {
-                Column(Modifier.padding(start = 20.dp, end = 20.dp, bottom = 12.dp)) {
+                Column(Modifier.padding(start = 20.dp, end = 20.dp, bottom = InkToneSpacing.md)) {
                     LicenseRow("InkTone (code source)", "MIT", Color(0xFF1565C0))
                     LicenseRow("Readium (parseur EPUB)", "BSD-3-Clause", Color(0xFF00695C))
                     LicenseRow("Pdfium (rendu PDF)", "BSD-3-Clause", Color(0xFF00695C))
@@ -374,12 +376,12 @@ private fun InfoCard(text: String) {
 private fun LicenseRow(label: String, license: String, badgeColor: Color) {
     Row(modifier = Modifier.fillMaxWidth().padding(vertical = 6.dp), verticalAlignment = Alignment.CenterVertically) {
         Text(label, color = MaterialTheme.colorScheme.onSurface, style = MaterialTheme.typography.bodySmall, modifier = Modifier.weight(1f))
-        Spacer(Modifier.width(8.dp))
+        Spacer(Modifier.width(InkToneSpacing.sm))
         Box(
             modifier = Modifier
                 .clip(RoundedCornerShape(50))
                 .background(badgeColor)
-                .padding(horizontal = 8.dp, vertical = 3.dp),
+                .padding(horizontal = InkToneSpacing.sm, vertical = 3.dp),
         ) {
             Text(license, color = Color.White, style = MaterialTheme.typography.labelSmall)
         }

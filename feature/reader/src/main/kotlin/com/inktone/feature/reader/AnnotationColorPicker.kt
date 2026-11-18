@@ -1,5 +1,7 @@
 package com.inktone.feature.reader
 
+import com.inktone.core.designsystem.InkToneSpacing
+
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.horizontalScroll
@@ -116,12 +118,12 @@ fun AnnotationColorPicker(
     // annulation, aucune raison de la faire remonter dans ReaderUiState.
     var showCustomColorDialog by remember { mutableStateOf(false) }
 
-    Column(verticalArrangement = Arrangement.spacedBy(4.dp)) {
+    Column(verticalArrangement = Arrangement.spacedBy(InkToneSpacing.xs)) {
         // Centrée pour rester cohérente avec la rangée de couleurs
         // juste en dessous (voir son commentaire, retour device Lot 24).
         Row(
             modifier = Modifier.fillMaxWidth(),
-            horizontalArrangement = Arrangement.spacedBy(4.dp, Alignment.CenterHorizontally),
+            horizontalArrangement = Arrangement.spacedBy(InkToneSpacing.xs, Alignment.CenterHorizontally),
         ) {
             AnnotationKindOption(AnnotationKind.HIGHLIGHT, AppSymbol.Highlight, "Surlignage", selectedKind, onSelectKind)
             AnnotationKindOption(AnnotationKind.UNDERLINE, AppSymbol.Underline, "Souligné", selectedKind, onSelectKind)
@@ -229,7 +231,7 @@ private fun CustomColorDialog(onConfirm: (AnnotationColor) -> Unit, onDismiss: (
                     value = red,
                     range = 0f..255f,
                     onValueChange = { red = it },
-                    modifier = Modifier.padding(top = 12.dp),
+                    modifier = Modifier.padding(top = InkToneSpacing.md),
                 )
                 InkToneSlider(label = "Vert", value = green, range = 0f..255f, onValueChange = { green = it })
                 InkToneSlider(label = "Bleu", value = blue, range = 0f..255f, onValueChange = { blue = it })
@@ -250,7 +252,7 @@ private fun CustomColorDialog(onConfirm: (AnnotationColor) -> Unit, onDismiss: (
                     label = { Text("Ou saisir un code hexadécimal") },
                     placeholder = { Text("#RRGGBB") },
                     singleLine = true,
-                    modifier = Modifier.padding(top = 12.dp),
+                    modifier = Modifier.padding(top = InkToneSpacing.md),
                 )
             }
         },

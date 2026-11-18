@@ -1,5 +1,7 @@
 package com.inktone.feature.reader
 
+import com.inktone.core.designsystem.InkToneSpacing
+
 import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.animation.core.tween
 import androidx.compose.animation.fadeIn
@@ -169,7 +171,7 @@ fun BookmarkPanel(
                         .navigationBarsPadding(),
                 ) {
                     Row(
-                        modifier = Modifier.fillMaxWidth().padding(8.dp),
+                        modifier = Modifier.fillMaxWidth().padding(InkToneSpacing.sm),
                         verticalAlignment = Alignment.CenterVertically,
                     ) {
                         IconButton(onClick = onClose) {
@@ -212,19 +214,19 @@ fun BookmarkPanel(
 
                     // Toggle « Marquer cette page » — déplacé tout en bas
                     // (demande UX), visible quel que soit l'onglet actif.
-                    Row(modifier = Modifier.fillMaxWidth().padding(horizontal = 16.dp, vertical = 12.dp)) {
+                    Row(modifier = Modifier.fillMaxWidth().padding(horizontal = InkToneSpacing.lg, vertical = InkToneSpacing.md)) {
                         if (isCurrentPageBookmarked) {
                             Button(
                                 onClick = onToggleBookmark,
                                 modifier = Modifier.fillMaxWidth(),
                                 colors = ButtonDefaults.buttonColors(containerColor = MaterialTheme.colorScheme.primary),
                             ) {
-                                AppIcon(AppSymbol.Pin,  contentDescription = null, modifier = Modifier.padding(end = 8.dp))
+                                AppIcon(AppSymbol.Pin,  contentDescription = null, modifier = Modifier.padding(end = InkToneSpacing.sm))
                                 Text("Retirer le signet")
                             }
                         } else {
                             OutlinedButton(onClick = onToggleBookmark, modifier = Modifier.fillMaxWidth()) {
-                                AppIcon(AppSymbol.Pin,  contentDescription = null, modifier = Modifier.padding(end = 8.dp))
+                                AppIcon(AppSymbol.Pin,  contentDescription = null, modifier = Modifier.padding(end = InkToneSpacing.sm))
                                 Text("Ajouter un signet")
                             }
                         }
@@ -252,7 +254,7 @@ private fun NotesTab(
                 modifier = Modifier
                     .fillMaxWidth()
                     .clickable { onClick(annotation) }
-                    .padding(start = 16.dp, top = 12.dp, bottom = 12.dp),
+                    .padding(start = InkToneSpacing.lg, top = InkToneSpacing.md, bottom = InkToneSpacing.md),
                 verticalAlignment = Alignment.CenterVertically,
             ) {
                 Column(modifier = Modifier.weight(1f)) {
@@ -261,7 +263,7 @@ private fun NotesTab(
                         style = MaterialTheme.typography.bodyMedium,
                     )
                     annotation.excerpt?.takeIf { it.isNotBlank() }?.let { excerpt ->
-                        Spacer(Modifier.height(4.dp))
+                        Spacer(Modifier.height(InkToneSpacing.xs))
                         Text(
                             excerpt,
                             style = MaterialTheme.typography.bodySmall,
@@ -270,7 +272,7 @@ private fun NotesTab(
                             overflow = TextOverflow.Ellipsis,
                         )
                     }
-                    Spacer(Modifier.height(4.dp))
+                    Spacer(Modifier.height(InkToneSpacing.xs))
                     Text(
                         "${annotation.startLocator.positionLabel()} · ${formatAnnotationDate(annotation.createdAt)}",
                         style = MaterialTheme.typography.labelSmall,
@@ -300,7 +302,7 @@ private fun HighlightsTab(highlights: List<Annotation>, onClick: (Annotation) ->
                 modifier = Modifier
                     .fillMaxWidth()
                     .clickable { onClick(annotation) }
-                    .padding(start = 16.dp, top = 12.dp, bottom = 12.dp),
+                    .padding(start = InkToneSpacing.lg, top = InkToneSpacing.md, bottom = InkToneSpacing.md),
                 verticalAlignment = Alignment.CenterVertically,
             ) {
                 // Barre de couleur verticale (cible confirmée) — hauteur
@@ -313,7 +315,7 @@ private fun HighlightsTab(highlights: List<Annotation>, onClick: (Annotation) ->
                         .fillMaxHeight()
                         .background(annotation.color.toComposeColor()),
                 )
-                Spacer(Modifier.width(12.dp))
+                Spacer(Modifier.width(InkToneSpacing.md))
                 Column(modifier = Modifier.weight(1f)) {
                     Text(
                         annotation.excerpt?.takeIf { it.isNotBlank() }
@@ -322,7 +324,7 @@ private fun HighlightsTab(highlights: List<Annotation>, onClick: (Annotation) ->
                         maxLines = 2,
                         overflow = TextOverflow.Ellipsis,
                     )
-                    Spacer(Modifier.height(4.dp))
+                    Spacer(Modifier.height(InkToneSpacing.xs))
                     Text(
                         "${annotation.startLocator.positionLabel()} · ${formatAnnotationDate(annotation.createdAt)}",
                         style = MaterialTheme.typography.labelSmall,
@@ -354,11 +356,11 @@ private fun BookmarksTab(
                 modifier = Modifier
                     .fillMaxWidth()
                     .clickable { onClick(bookmark) }
-                    .padding(start = 16.dp, top = 12.dp, bottom = 12.dp),
+                    .padding(start = InkToneSpacing.lg, top = InkToneSpacing.md, bottom = InkToneSpacing.md),
                 verticalAlignment = Alignment.CenterVertically,
             ) {
                 AppIcon(AppSymbol.Bookmark,  contentDescription = null, tint = MaterialTheme.colorScheme.primary)
-                Spacer(Modifier.width(12.dp))
+                Spacer(Modifier.width(InkToneSpacing.md))
                 Column(modifier = Modifier.weight(1f)) {
                     Text(
                         bookmark.title?.takeIf { it.isNotBlank() } ?: bookmark.locator.positionLabel(),
@@ -379,7 +381,7 @@ private fun BookmarksTab(
                     // Lot 21, tâche 5 — la note du signet est visible dans
                     // le panneau (saisie optionnelle à la création).
                     bookmark.note?.takeIf { it.isNotBlank() }?.let { note ->
-                        Spacer(Modifier.height(4.dp))
+                        Spacer(Modifier.height(InkToneSpacing.xs))
                         Text(
                             note,
                             style = MaterialTheme.typography.bodySmall,
@@ -388,7 +390,7 @@ private fun BookmarksTab(
                             overflow = TextOverflow.Ellipsis,
                         )
                     }
-                    Spacer(Modifier.height(4.dp))
+                    Spacer(Modifier.height(InkToneSpacing.xs))
                     Text(
                         formatAnnotationDate(bookmark.createdAt),
                         style = MaterialTheme.typography.labelSmall,

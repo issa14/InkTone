@@ -1,5 +1,7 @@
 package com.inktone.feature.reader
 
+import com.inktone.core.designsystem.InkToneSpacing
+
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.shape.RoundedCornerShape
@@ -60,12 +62,12 @@ fun AnnotationTapPopup(
             color = MaterialTheme.colorScheme.surfaceContainerHigh,
             shadowElevation = 6.dp,
         ) {
-            Row(modifier = Modifier.padding(4.dp), verticalAlignment = Alignment.CenterVertically) {
+            Row(modifier = Modifier.padding(InkToneSpacing.xs), verticalAlignment = Alignment.CenterVertically) {
                 if (confirmingDeletion) {
                     Text(
                         "Supprimer ?",
                         style = MaterialTheme.typography.bodyMedium,
-                        modifier = Modifier.padding(horizontal = 12.dp),
+                        modifier = Modifier.padding(horizontal = InkToneSpacing.md),
                     )
                     TextButton(onClick = { confirmingDeletion = false }) { Text("Annuler") }
                     TextButton(
@@ -74,11 +76,11 @@ fun AnnotationTapPopup(
                     ) { Text("Supprimer") }
                 } else {
                     TextButton(onClick = onEdit) {
-                        AppIcon(AppSymbol.Edit, contentDescription = null, modifier = Modifier.padding(end = 4.dp))
+                        AppIcon(AppSymbol.Edit, contentDescription = null, modifier = Modifier.padding(end = InkToneSpacing.xs))
                         Text("Modifier")
                     }
                     TextButton(onClick = { confirmingDeletion = true }) {
-                        AppIcon(AppSymbol.Delete, contentDescription = null, modifier = Modifier.padding(end = 4.dp))
+                        AppIcon(AppSymbol.Delete, contentDescription = null, modifier = Modifier.padding(end = InkToneSpacing.xs))
                         Text("Supprimer")
                     }
                 }

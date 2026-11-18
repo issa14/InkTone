@@ -126,7 +126,7 @@ fun BookStatisticsScreen(
                     item {
                         InkToneSectionHeader(
                             "Historique des sessions",
-                            modifier = Modifier.padding(top = 8.dp),
+                            modifier = Modifier.padding(top = InkToneSpacing.sm),
                         )
                     }
                     // Pas de clé dérivée de l'affichage : deux sessions du même
@@ -156,7 +156,7 @@ private fun BookSelectorTitle(
 
     ExposedDropdownMenuBox(expanded = expanded, onExpandedChange = { expanded = it }) {
         Row(
-            modifier = Modifier.menuAnchor().padding(horizontal = 4.dp),
+            modifier = Modifier.menuAnchor().padding(horizontal = InkToneSpacing.xs),
             verticalAlignment = Alignment.CenterVertically,
         ) {
             Text(
@@ -166,7 +166,7 @@ private fun BookSelectorTitle(
                 overflow = TextOverflow.Ellipsis,
                 modifier = Modifier.weight(1f, fill = false),
             )
-            Spacer(Modifier.width(4.dp))
+            Spacer(Modifier.width(InkToneSpacing.xs))
             ExposedDropdownMenuDefaults.TrailingIcon(expanded = expanded)
         }
 
@@ -195,11 +195,11 @@ private fun KpiCard(
 ) {
     ElevatedCard(shape = RoundedCornerShape(12.dp), modifier = modifier) {
         Column(
-            modifier = Modifier.padding(12.dp),
+            modifier = Modifier.padding(InkToneSpacing.md),
             horizontalAlignment = Alignment.CenterHorizontally,
         ) {
             AppIcon(icon, contentDescription = null, tint = MaterialTheme.colorScheme.primary, modifier = Modifier.size(20.dp))
-            Spacer(Modifier.height(4.dp))
+            Spacer(Modifier.height(InkToneSpacing.xs))
             Text(value, style = MaterialTheme.typography.titleMedium.emphasized())
             Text(label, style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
         }
@@ -220,7 +220,7 @@ private fun SessionHistoryRow(item: SessionHistoryItem) {
             if (item.isMixed) {
                 Row {
                     AppIcon(AppSymbol.VisualReading,  contentDescription = null, tint = MaterialTheme.colorScheme.primary)
-                    Spacer(Modifier.width(4.dp))
+                    Spacer(Modifier.width(InkToneSpacing.xs))
                     AppIcon(AppSymbol.TtsListening,  contentDescription = null, tint = MaterialTheme.colorScheme.tertiary)
                 }
             } else if (item.isVisual) {

@@ -1,5 +1,7 @@
 package com.inktone.feature.reader
 
+import com.inktone.core.designsystem.InkToneSpacing
+
 import com.inktone.core.designsystem.HudBottomShape
 
 import androidx.compose.foundation.clickable
@@ -96,7 +98,7 @@ fun UnifiedControlPanel(
         shape = HudBottomShape,
     ) {
         Column(
-            modifier = Modifier.fillMaxWidth().padding(horizontal = 20.dp, vertical = 12.dp),
+            modifier = Modifier.fillMaxWidth().padding(horizontal = 20.dp, vertical = InkToneSpacing.md),
             horizontalAlignment = Alignment.CenterHorizontally,
         ) {
             // Bug réel trouvé sur appareil (lot 3b) : Arrangement.SpaceEvenly
@@ -136,9 +138,9 @@ fun UnifiedControlPanel(
                 }
             }
 
-            Spacer(Modifier.height(8.dp))
+            Spacer(Modifier.height(InkToneSpacing.sm))
             HorizontalDivider(color = accentColor.copy(alpha = 0.08f), thickness = 0.5.dp)
-            Spacer(Modifier.height(8.dp))
+            Spacer(Modifier.height(InkToneSpacing.sm))
 
             Row(
                 modifier = Modifier.fillMaxWidth(),

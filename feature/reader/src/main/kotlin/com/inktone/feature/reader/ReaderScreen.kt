@@ -1,5 +1,7 @@
 package com.inktone.feature.reader
 
+import com.inktone.core.designsystem.InkToneSpacing
+
 import android.os.SystemClock
 import androidx.compose.animation.core.Animatable
 import androidx.compose.animation.core.animateFloatAsState
@@ -1238,7 +1240,7 @@ fun ReaderScreen(
                                         if (transitionDirection == ChapterTransitionDirection.PREVIOUS)
                                             Alignment.TopCenter else Alignment.BottomCenter
                                     )
-                                    .padding(vertical = 8.dp),
+                                    .padding(vertical = InkToneSpacing.sm),
                             )
                         }
                     }
@@ -2045,7 +2047,7 @@ private fun BookmarkNoteDialog(
                 OutlinedTextField(
                     value = note,
                     onValueChange = { note = it },
-                    modifier = Modifier.fillMaxWidth().padding(top = 12.dp),
+                    modifier = Modifier.fillMaxWidth().padding(top = InkToneSpacing.md),
                     placeholder = { Text("Ex. : passage à relire") },
                 )
             }

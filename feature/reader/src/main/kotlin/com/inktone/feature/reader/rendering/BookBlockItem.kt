@@ -1,5 +1,7 @@
 package com.inktone.feature.reader.rendering
 
+import com.inktone.core.designsystem.InkToneSpacing
+
 import androidx.compose.foundation.gestures.detectTapGestures
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.aspectRatio
@@ -147,7 +149,7 @@ fun BookBlockItem(
                 style = textStyle,
                 modifier = modifier
                     .fillMaxWidth()
-                    .padding(top = 12.dp, bottom = 4.dp)
+                    .padding(top = InkToneSpacing.md, bottom = InkToneSpacing.xs)
                     .semantics { heading() },
             )
         }
@@ -205,7 +207,7 @@ fun BookBlockItem(
             HorizontalDivider(
                 modifier = modifier
                     .fillMaxWidth()
-                    .padding(vertical = 8.dp)
+                    .padding(vertical = InkToneSpacing.sm)
                     .semantics { invisibleToUser() },
                 color = Color.Gray.copy(alpha = 0.3f),
             )

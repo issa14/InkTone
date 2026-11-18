@@ -50,6 +50,9 @@ jobs:
       - name: Vérifier que le poids du texte vient de l'échelle typographique
         run: bash scripts/check-no-font-weight.sh
 
+      - name: Vérifier que les espacements de la grille passent par InkToneSpacing
+        run: bash scripts/check-no-spacing-literal.sh
+
       - name: Vérifier l'unicité de la famille d'icônes
         run: bash scripts/check-icon-family.sh
 

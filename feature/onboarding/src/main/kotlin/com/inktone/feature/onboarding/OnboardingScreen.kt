@@ -1,5 +1,7 @@
 package com.inktone.feature.onboarding
 
+import com.inktone.core.designsystem.InkToneSpacing
+
 import com.inktone.core.designsystem.emphasized
 import kotlinx.coroutines.launch
 import androidx.compose.foundation.Image
@@ -112,7 +114,7 @@ fun OnboardingScreen(
     Scaffold { innerPadding ->
         Column(Modifier.fillMaxSize().padding(innerPadding)) {
             HorizontalPager(state = pagerState, modifier = Modifier.fillMaxWidth().weight(1f)) { page ->
-                Box(Modifier.fillMaxSize().padding(start = 24.dp, end = 24.dp, top = 16.dp)) {
+                Box(Modifier.fillMaxSize().padding(start = InkToneSpacing.xl, end = InkToneSpacing.xl, top = InkToneSpacing.lg)) {
                     Card(
                         modifier = Modifier.fillMaxSize(),
                         shape = RoundedCornerShape(24.dp),
@@ -135,7 +137,7 @@ fun OnboardingScreen(
             // Barre basse hors de la carte : posés dessus, ces boutons
             // chevauchaient le texte dès qu'il s'allongeait (audit UI P1-15).
             Row(
-                modifier = Modifier.fillMaxWidth().heightIn(min = 64.dp).padding(horizontal = 16.dp, vertical = 8.dp),
+                modifier = Modifier.fillMaxWidth().heightIn(min = 64.dp).padding(horizontal = InkToneSpacing.lg, vertical = InkToneSpacing.sm),
                 verticalAlignment = Alignment.CenterVertically,
             ) {
                 Box(Modifier.weight(1f), contentAlignment = Alignment.CenterStart) {
@@ -175,7 +177,7 @@ private fun OnboardingPage(
                 .fillMaxWidth()
                 .verticalScroll(rememberScrollState())
                 .heightIn(min = maxHeight)
-                .padding(horizontal = horizontalPadding, vertical = 24.dp),
+                .padding(horizontal = horizontalPadding, vertical = InkToneSpacing.xl),
             horizontalAlignment = horizontalAlignment,
             verticalArrangement = Arrangement.Center,
             content = content,
@@ -203,9 +205,9 @@ private fun WelcomeCard(accent: Color) {
             contentScale = ContentScale.Fit,
             colorFilter = ColorFilter.tint(accent),
         )
-        Spacer(Modifier.height(32.dp))
+        Spacer(Modifier.height(InkToneSpacing.xxl))
         Text("Bienvenue sur InkTone", style = MaterialTheme.typography.headlineMedium.emphasized(), fontFamily = NarrativeAccentFamily, textAlign = TextAlign.Center)
-        Spacer(Modifier.height(16.dp))
+        Spacer(Modifier.height(InkToneSpacing.lg))
         BodyText("Lisez vos livres ou écoutez-les : la voix reprend là où vous en étiez.")
     }
 }
@@ -227,7 +229,7 @@ private fun FeaturesCard(accent: Color) {
             modifier = Modifier.fillMaxWidth(),
         )
         Spacer(Modifier.height(40.dp))
-        Column(verticalArrangement = Arrangement.spacedBy(24.dp)) {
+        Column(verticalArrangement = Arrangement.spacedBy(InkToneSpacing.xl)) {
             FeatureRow(
                 accent = accent,
                 icon = AppSymbol.Reading,
@@ -254,10 +256,10 @@ private fun FeatureRow(accent: Color, icon: AppSymbol, title: String, body: Stri
         ) {
             AppIcon(icon, contentDescription = null, tint = accent, modifier = Modifier.size(24.dp))
         }
-        Spacer(Modifier.width(12.dp))
+        Spacer(Modifier.width(InkToneSpacing.md))
         Column(Modifier.weight(1f)) {
             Text(title, style = MaterialTheme.typography.titleMedium)
-            Spacer(Modifier.height(4.dp))
+            Spacer(Modifier.height(InkToneSpacing.xs))
             Text(
                 body,
                 style = MaterialTheme.typography.bodyMedium.copy(lineHeight = 20.sp),
@@ -285,16 +287,16 @@ private fun ReadyCard(accent: Color, onImport: () -> Unit, onLater: () -> Unit) 
             Box(Modifier.size(112.dp * scale).clip(CircleShape).border(1.dp, accent.copy(alpha = innerAlpha), CircleShape))
             BrandIcon(icon = AppSymbol.Reading, size = 88.dp * scale, tint = accent)
         }
-        Spacer(Modifier.height(32.dp))
+        Spacer(Modifier.height(InkToneSpacing.xxl))
         Text(
             "Ajoutez votre premier livre",
             style = MaterialTheme.typography.headlineMedium.emphasized(),
             fontFamily = NarrativeAccentFamily,
             textAlign = TextAlign.Center,
         )
-        Spacer(Modifier.height(12.dp))
+        Spacer(Modifier.height(InkToneSpacing.md))
         BodyText("EPUB, PDF ou TXT, depuis votre téléphone ou un catalogue en ligne.")
-        Spacer(Modifier.height(32.dp))
+        Spacer(Modifier.height(InkToneSpacing.xxl))
         // Contraste forcé (retour Issa) : violet de marque et texte blanc,
         // lisibles en clair comme en sombre, indépendamment de accentColor().
         Button(
@@ -323,7 +325,7 @@ private fun BodyText(text: String) {
         style = MaterialTheme.typography.bodyLarge,
         textAlign = TextAlign.Center,
         color = MaterialTheme.colorScheme.onSurfaceVariant,
-        modifier = Modifier.padding(horizontal = 32.dp),
+        modifier = Modifier.padding(horizontal = InkToneSpacing.xxl),
     )
 }
 
@@ -331,7 +333,7 @@ private fun BodyText(text: String) {
 private fun PageIndicators(pageCount: Int, currentPage: Int, accent: Color, modifier: Modifier = Modifier) {
     Row(
         modifier.clearAndSetSemantics { contentDescription = "Page ${currentPage + 1} sur $pageCount" },
-        horizontalArrangement = Arrangement.spacedBy(8.dp),
+        horizontalArrangement = Arrangement.spacedBy(InkToneSpacing.sm),
     ) {
         repeat(pageCount) { index ->
             val isActive = index == currentPage

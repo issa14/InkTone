@@ -1,5 +1,7 @@
 package com.inktone.feature.reader
 
+import com.inktone.core.designsystem.InkToneSpacing
+
 import com.inktone.core.designsystem.AppIcon
 import com.inktone.core.designsystem.AppSymbol
 import android.app.Activity
@@ -109,9 +111,9 @@ fun ReaderBrightnessControl(value: Float?, onValueChange: (Float?) -> Unit, modi
                     if (live == null) MaterialTheme.colorScheme.primary.copy(alpha = 0.15f) else Color.Transparent,
                     RoundedCornerShape(8.dp),
                 )
-                .padding(horizontal = 8.dp, vertical = 6.dp),
+                .padding(horizontal = InkToneSpacing.sm, vertical = 6.dp),
         )
-        Spacer(Modifier.width(8.dp))
+        Spacer(Modifier.width(InkToneSpacing.sm))
         // Rail sans pouce plutôt qu'un curseur : ce réglage se manipule au
         // pouce, en pleine page et souvent dans le noir — une cible pleine
         // largeur se trouve sans regarder, et le chiffre exact n'apprend
@@ -125,7 +127,7 @@ fun ReaderBrightnessControl(value: Float?, onValueChange: (Float?) -> Unit, modi
             contentDescription = "Luminosité",
             modifier = Modifier.weight(1f),
         )
-        Spacer(Modifier.width(8.dp))
+        Spacer(Modifier.width(InkToneSpacing.sm))
         AppIcon(
             AppSymbol.Brightness,
             contentDescription = "Luminosité maximale",

@@ -1,5 +1,7 @@
 package com.inktone.feature.reader
 
+import com.inktone.core.designsystem.InkToneSpacing
+
 import androidx.compose.material3.LocalTextStyle
 import com.inktone.core.designsystem.emphasized
 import androidx.compose.foundation.background
@@ -100,7 +102,7 @@ private fun TableOfContentsSheetContent(
     }
 
     Row(
-        modifier = Modifier.fillMaxWidth().padding(8.dp),
+        modifier = Modifier.fillMaxWidth().padding(InkToneSpacing.sm),
         verticalAlignment = Alignment.CenterVertically,
     ) {
         IconButton(onClick = onClose) {
