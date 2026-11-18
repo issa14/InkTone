@@ -253,7 +253,7 @@ private fun NotesTab(
                     Spacer(Modifier.height(InkToneSpacing.xs))
                     Text(
                         "${annotation.startLocator.positionLabel()} · ${formatAnnotationDate(annotation.createdAt)}",
-                        style = MaterialTheme.typography.labelSmall,
+                        style = MaterialTheme.typography.bodySmall,
                         color = MaterialTheme.colorScheme.onSurfaceVariant,
                     )
                 }
@@ -305,7 +305,7 @@ private fun HighlightsTab(highlights: List<Annotation>, onClick: (Annotation) ->
                     Spacer(Modifier.height(InkToneSpacing.xs))
                     Text(
                         "${annotation.startLocator.positionLabel()} · ${formatAnnotationDate(annotation.createdAt)}",
-                        style = MaterialTheme.typography.labelSmall,
+                        style = MaterialTheme.typography.bodySmall,
                         color = MaterialTheme.colorScheme.onSurfaceVariant,
                     )
                 }
@@ -353,7 +353,7 @@ private fun BookmarksTab(
                     // Ligne dédiée, toujours affichée.
                     Text(
                         bookmark.locator.positionLabel(),
-                        style = MaterialTheme.typography.labelSmall,
+                        style = MaterialTheme.typography.bodySmall,
                         color = MaterialTheme.colorScheme.onSurfaceVariant,
                     )
                     // Lot 21, tâche 5 — la note du signet est visible dans
@@ -371,7 +371,7 @@ private fun BookmarksTab(
                     Spacer(Modifier.height(InkToneSpacing.xs))
                     Text(
                         formatAnnotationDate(bookmark.createdAt),
-                        style = MaterialTheme.typography.labelSmall,
+                        style = MaterialTheme.typography.bodySmall,
                         color = MaterialTheme.colorScheme.onSurfaceVariant,
                     )
                 }

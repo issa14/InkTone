@@ -377,7 +377,7 @@ private fun LibraryItemRow(
                     // (jamais concaténés avec le titre, qui peut être long).
                     Text(
                         "${item.startLocator.positionLabel()} · ${formatItemDate(item.createdAt)}",
-                        style = MaterialTheme.typography.labelSmall,
+                        style = MaterialTheme.typography.bodySmall,
                         color = MaterialTheme.colorScheme.onSurfaceVariant,
                     )
                 }

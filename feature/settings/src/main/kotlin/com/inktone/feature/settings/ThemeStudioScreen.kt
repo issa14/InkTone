@@ -230,23 +230,25 @@ private fun StudioLivePreview(state: ThemeStudioUiState) {
             color = state.textColorHex.toColor(),
         )
         Spacer(Modifier.height(InkToneSpacing.sm))
+        // Texte du livre simulé : bodyLarge (16 sp), proche de la lecture, que
+        // le corps de l'interface (bodyMedium, 14 sp) ferait paraître trop petit.
         Column {
             Text(
                 "La lumière filtrait doucement à travers les persiennes, dessinant des",
-                style = MaterialTheme.typography.bodyMedium,
+                style = MaterialTheme.typography.bodyLarge,
                 color = state.textColorHex.toColor(),
             )
             Row {
-                Text("rayures d'or sur le ", style = MaterialTheme.typography.bodyMedium, color = state.textColorHex.toColor())
+                Text("rayures d'or sur le ", style = MaterialTheme.typography.bodyLarge, color = state.textColorHex.toColor())
                 Text(
                     "parquet ancien",
-                    style = MaterialTheme.typography.bodyMedium,
+                    style = MaterialTheme.typography.bodyLarge,
                     color = state.textColorHex.toColor(),
                     modifier = Modifier
                         .background(state.highlightColorHex.toColor().copy(alpha = 0.55f), RoundedCornerShape(2.dp))
                         .padding(horizontal = 2.dp),
                 )
-                Text(", immobile.", style = MaterialTheme.typography.bodyMedium, color = state.textColorHex.toColor())
+                Text(", immobile.", style = MaterialTheme.typography.bodyLarge, color = state.textColorHex.toColor())
             }
         }
         Spacer(Modifier.height(InkToneSpacing.lg))
@@ -287,7 +289,7 @@ private fun WcagBadge(state: ThemeStudioUiState) {
     if (state.wcagLevel == WcagLevel.BELOW_THRESHOLD) {
         Text(
             "Ce thème peut être difficile à lire pour certaines personnes — vous pouvez tout de même l'enregistrer.",
-            style = MaterialTheme.typography.labelSmall,
+            style = MaterialTheme.typography.bodySmall,
             color = state.textColorHex.toColor().copy(alpha = 0.8f),
             modifier = Modifier.padding(top = InkToneSpacing.xs),
         )

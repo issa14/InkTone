@@ -280,7 +280,7 @@ private fun GoogleDriveCard(
                         Text(account.accountLabel, style = MaterialTheme.typography.bodyMedium)
                         Text(
                             "Connecté",
-                            style = MaterialTheme.typography.labelSmall,
+                            style = MaterialTheme.typography.bodySmall,
                             color = MaterialTheme.colorScheme.primary,
                         )
                     }
@@ -369,7 +369,7 @@ private fun WebDavCard(
                 // même discipline que le jeton OAuth) : l'état actif montre
                 // l'hôte lié + « Connecté », pas les champs d'édition.
                 Spacer(Modifier.height(InkToneSpacing.sm))
-                Text("Connecté", style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.primary)
+                Text("Connecté", style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.primary)
                 host?.let {
                     Text(it, style = MaterialTheme.typography.bodyMedium, color = MaterialTheme.colorScheme.onSurfaceVariant)
                 }
@@ -629,7 +629,7 @@ private fun DeviceRow(entry: DeviceFleetEntry, isCurrent: Boolean, onRemove: () 
                     Spacer(Modifier.width(6.dp))
                     Text(
                         "(Cet appareil)",
-                        style = MaterialTheme.typography.labelSmall,
+                        style = MaterialTheme.typography.bodySmall,
                         color = MaterialTheme.colorScheme.primary,
                     )
                 }
@@ -753,7 +753,7 @@ private fun ActivityRow(event: SyncActivityEvent) {
         AppIcon(icon, contentDescription = null, tint = tint, modifier = Modifier.size(20.dp))
         Spacer(Modifier.width(InkToneSpacing.md))
         Text(event.message, style = MaterialTheme.typography.bodyMedium, modifier = Modifier.weight(1f))
-        Text(relativeTime(event.occurredAt), style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+        Text(relativeTime(event.occurredAt), style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
     }
 }
 

@@ -129,7 +129,7 @@ fun AboutScreen(
             ArchitectureAccordion()
 
             Spacer(Modifier.height(InkToneSpacing.lg))
-            Text("© ${java.time.Year.now().value} InkTone.", color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.6f), style = MaterialTheme.typography.labelSmall, textAlign = TextAlign.Center)
+            Text("© ${java.time.Year.now().value} InkTone.", color = MaterialTheme.colorScheme.onSurfaceVariant, style = MaterialTheme.typography.bodySmall, textAlign = TextAlign.Center)
             Spacer(Modifier.height(InkToneSpacing.xxl))
         }
 
@@ -204,7 +204,7 @@ private fun EngagementPillar(icon: AppSymbol, title: String, subtitle: String, m
             AppIcon(icon, null, tint = MaterialTheme.colorScheme.primary, modifier = Modifier.size(22.dp))
             Spacer(Modifier.height(6.dp))
             Text(title, color = MaterialTheme.colorScheme.onSurface, style = MaterialTheme.typography.labelLarge, textAlign = TextAlign.Center)
-            Text(subtitle, color = MaterialTheme.colorScheme.onSurfaceVariant, style = MaterialTheme.typography.labelSmall, textAlign = TextAlign.Center)
+            Text(subtitle, color = MaterialTheme.colorScheme.onSurfaceVariant, style = MaterialTheme.typography.bodySmall, textAlign = TextAlign.Center)
         }
     }
 }

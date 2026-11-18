@@ -292,7 +292,7 @@ private fun AccessibilityRow(theme: ReadingTheme, isActive: Boolean, onClick: ()
         }
         Column(Modifier.weight(1f).padding(horizontal = InkToneSpacing.md)) {
             Text(theme.displayName, style = MaterialTheme.typography.bodyMedium)
-            subtitle?.let { Text(it, style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.onSurfaceVariant) }
+            subtitle?.let { Text(it, style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant) }
         }
         if (isActive) {
             AppIcon(AppSymbol.Success, contentDescription = null, tint = MaterialTheme.colorScheme.primary, modifier = Modifier.padding(end = InkToneSpacing.md))
