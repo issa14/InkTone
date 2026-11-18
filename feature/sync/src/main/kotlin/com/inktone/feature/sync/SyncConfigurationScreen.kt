@@ -1,5 +1,7 @@
 package com.inktone.feature.sync
 
+import com.inktone.core.designsystem.InkToneSectionHeader
+
 import com.inktone.core.designsystem.AppIcon
 import com.inktone.core.designsystem.AppSymbol
 import com.inktone.core.designsystem.InkToneTopBar
@@ -201,17 +203,22 @@ private fun SyncConfigurationContent(
         modifier = Modifier
             .verticalScroll(rememberScrollState())
             .imePadding()
-            .padding(horizontal = 16.dp, vertical = 12.dp),
-        verticalArrangement = Arrangement.spacedBy(16.dp),
+            .padding(start = 16.dp, end = 16.dp, bottom = 12.dp),
     ) {
-        GoogleDriveCard(
-            syncUiState = state.syncUiState,
-            isAuthenticating = isGoogleAuthenticating,
-            isConfigured = isGoogleConfigured,
-            isOtherProviderActive = isWebDavActive,
-            onConnect = onConnectGoogle,
-            onDisconnect = onDisconnectGoogle,
-        )
+        // Sans OAuth dans ce build, Google Drive est une fonction absente, pas
+        // un message à montrer à chaque visite : la carte n'est pas composée
+        // (audit UI P2-14). Un compte déjà connecté reste visible.
+        if (isGoogleConfigured || isGoogleActive) {
+            InkToneSectionHeader("Google Drive")
+            GoogleDriveCard(
+                syncUiState = state.syncUiState,
+                isAuthenticating = isGoogleAuthenticating,
+                isOtherProviderActive = isWebDavActive,
+                onConnect = onConnectGoogle,
+                onDisconnect = onDisconnectGoogle,
+            )
+        }
+        InkToneSectionHeader("WebDAV")
         WebDavCard(
             isActive = isWebDavActive,
             isOtherProviderActive = isGoogleActive,
@@ -220,6 +227,7 @@ private fun SyncConfigurationContent(
             onConnect = onConnectWebDav,
             onDisconnect = onDisconnectWebDav,
         )
+        InkToneSectionHeader("Fichier local")
         LocalBackupCard(onOpenLocalBackup)
     }
 }
@@ -228,7 +236,6 @@ private fun SyncConfigurationContent(
 private fun GoogleDriveCard(
     syncUiState: SyncUiState,
     isAuthenticating: Boolean,
-    isConfigured: Boolean,
     isOtherProviderActive: Boolean,
     onConnect: () -> Unit,
     onDisconnect: () -> Unit,
@@ -254,17 +261,7 @@ private fun GoogleDriveCard(
         border = if (isActive && !isOtherProviderActive) BorderStroke(1.dp, MaterialTheme.colorScheme.primary) else null,
     ) {
         Column(Modifier.padding(16.dp)) {
-            Row(verticalAlignment = Alignment.CenterVertically) {
-                AppIcon(
-                    if (isActive) AppSymbol.CloudConnected else AppSymbol.CloudDisconnected,
-                    contentDescription = null,
-                    tint = if (isActive) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurfaceVariant,
-                )
-                Spacer(Modifier.width(6.dp))
-                Text("Google Drive", style = MaterialTheme.typography.titleMedium)
-            }
             if (isActive && account != null) {
-                Spacer(Modifier.height(12.dp))
                 Row(verticalAlignment = Alignment.CenterVertically) {
                     Box(
                         Modifier.size(40.dp).clip(CircleShape).background(MaterialTheme.colorScheme.primaryContainer),
@@ -291,7 +288,6 @@ private fun GoogleDriveCard(
                     Text("Déconnecter")
                 }
             } else {
-                Spacer(Modifier.height(12.dp))
                 if (isOtherProviderActive) {
                     // Lot 19 — exclusivité mutuelle WebDAV/Google Drive
                     // (décision actée) : la carte est grisée, pas un
@@ -303,21 +299,9 @@ private fun GoogleDriveCard(
                     )
                     Spacer(Modifier.height(8.dp))
                 }
-                if (!isConfigured && !isOtherProviderActive) {
-                    // Absence de configuration OAuth rendue explicite plutôt
-                    // que silencieuse (tâche 11.4) : clientId/redirectScheme
-                    // sont un prérequis hors périmètre de Claude Code, pris
-                    // en charge par Issa (docs/execution/LOT_11_SYNCHRONISATION.md).
-                    Text(
-                        "Google Drive n'est pas disponible dans cette version.",
-                        style = MaterialTheme.typography.bodySmall,
-                        color = MaterialTheme.colorScheme.onSurfaceVariant,
-                    )
-                    Spacer(Modifier.height(8.dp))
-                }
                 Button(
                     onClick = onConnect,
-                    enabled = !isAuthenticating && isConfigured && !isOtherProviderActive,
+                    enabled = !isAuthenticating && !isOtherProviderActive,
                     modifier = Modifier.fillMaxWidth(),
                 ) {
                     if (isAuthenticating) {
@@ -378,10 +362,6 @@ private fun WebDavCard(
         border = if (isActive && !isOtherProviderActive) BorderStroke(1.dp, MaterialTheme.colorScheme.primary) else null,
     ) {
         Column(Modifier.padding(16.dp)) {
-            Row(verticalAlignment = Alignment.CenterVertically) {
-                Text("WebDAV", style = MaterialTheme.typography.titleMedium)
-            }
-
             if (isActive) {
                 // Le mot de passe persisté n'est jamais ré-affiché (secret,
                 // même discipline que le jeton OAuth) : l'état actif montre
@@ -471,10 +451,6 @@ private fun WebDavCard(
 private fun LocalBackupCard(onOpenLocalBackup: () -> Unit) {
     Card {
         Column(Modifier.padding(16.dp)) {
-            Row(verticalAlignment = Alignment.CenterVertically) {
-                Text("Fichier local", style = MaterialTheme.typography.titleMedium)
-            }
-            Spacer(Modifier.height(4.dp))
             Text(
                 "Sauvegarde chiffrée dans un fichier, sans compte en ligne.",
                 style = MaterialTheme.typography.bodyMedium,
@@ -610,23 +586,22 @@ private fun QuickSyncAction(lastSyncAt: Long?, isSyncing: Boolean, onSynchronize
 
 @Composable
 private fun DeviceFleetCard(fleet: List<DeviceFleetEntry>, currentDeviceId: String?, onRemoveDevice: (String) -> Unit) {
-    Card {
-        Column(Modifier.padding(16.dp)) {
-            Text(
-                "Appareils (${fleet.size})",
-                style = MaterialTheme.typography.titleMedium,
-            )
-            Spacer(Modifier.height(8.dp))
-            if (fleet.isEmpty()) {
-                Text(
-                    "Aucun appareil synchronisé pour l'instant.",
-                    style = MaterialTheme.typography.bodySmall,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant,
-                )
-            }
-            fleet.forEachIndexed { index, entry ->
-                if (index > 0) HorizontalDivider()
-                DeviceRow(entry, isCurrent = entry.deviceId == currentDeviceId, onRemove = { onRemoveDevice(entry.deviceId) })
+    // En-tête et carte empilés : un item de LazyColumn superposerait ses enfants.
+    Column {
+        InkToneSectionHeader("Appareils (${fleet.size})")
+        Card {
+            Column(Modifier.padding(16.dp)) {
+                if (fleet.isEmpty()) {
+                    Text(
+                        "Aucun appareil synchronisé pour l'instant.",
+                        style = MaterialTheme.typography.bodySmall,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    )
+                }
+                fleet.forEachIndexed { index, entry ->
+                    if (index > 0) HorizontalDivider()
+                    DeviceRow(entry, isCurrent = entry.deviceId == currentDeviceId, onRemove = { onRemoveDevice(entry.deviceId) })
+                }
             }
         }
     }
@@ -739,20 +714,22 @@ private fun ToggleRow(label: String, checked: Boolean, enabled: Boolean, onCheck
 
 @Composable
 private fun ActivityLogCard(events: List<SyncActivityEvent>) {
-    Card {
-        Column(Modifier.padding(16.dp)) {
-            Text("Journal d'activité", style = MaterialTheme.typography.titleMedium)
-            Spacer(Modifier.height(8.dp))
-            if (events.isEmpty()) {
-                Text(
-                    "Aucun événement pour l'instant.",
-                    style = MaterialTheme.typography.bodySmall,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant,
-                )
-            }
-            events.forEachIndexed { index, event ->
-                if (index > 0) HorizontalDivider()
-                ActivityRow(event)
+    // En-tête et carte empilés : un item de LazyColumn superposerait ses enfants.
+    Column {
+        InkToneSectionHeader("Journal d'activité")
+        Card {
+            Column(Modifier.padding(16.dp)) {
+                if (events.isEmpty()) {
+                    Text(
+                        "Aucun événement pour l'instant.",
+                        style = MaterialTheme.typography.bodySmall,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    )
+                }
+                events.forEachIndexed { index, event ->
+                    if (index > 0) HorizontalDivider()
+                    ActivityRow(event)
+                }
             }
         }
     }
