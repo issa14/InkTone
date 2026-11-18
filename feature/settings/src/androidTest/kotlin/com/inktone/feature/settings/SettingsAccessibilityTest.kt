@@ -92,14 +92,15 @@ class SettingsAccessibilityTest {
             }
         }
 
-        val nodesAtScale1 = composeTestRule.onAllNodesWithText("Taille du texte (18)", useUnmergedTree = true).fetchSemanticsNodes()
+        // Première ligne de l'écran : visible aux deux échelles, ses bornes ne sont pas rognées.
+        val nodesAtScale1 = composeTestRule.onAllNodesWithText("Type de voix", useUnmergedTree = true).fetchSemanticsNodes()
         val boundsAtScale1 = nodesAtScale1.first().boundsInRoot
         val heightAtScale1 = boundsAtScale1.bottom - boundsAtScale1.top
 
         composeTestRule.runOnIdle { fontScaleState.floatValue = 2f }
         composeTestRule.waitForIdle()
 
-        val nodesAtScale2 = composeTestRule.onAllNodesWithText("Taille du texte (18)", useUnmergedTree = true).fetchSemanticsNodes()
+        val nodesAtScale2 = composeTestRule.onAllNodesWithText("Type de voix", useUnmergedTree = true).fetchSemanticsNodes()
         check(nodesAtScale2.size == nodesAtScale1.size) {
             "nombre de noeuds different apres changement d'echelle : ${nodesAtScale1.size} -> ${nodesAtScale2.size}, " +
                 "bounds: ${nodesAtScale2.map { it.boundsInRoot }}"
