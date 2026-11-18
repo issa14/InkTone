@@ -35,13 +35,10 @@ import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.material3.TextButton
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
-import androidx.compose.ui.platform.LocalClipboardManager
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalUriHandler
-import androidx.compose.ui.text.AnnotatedString
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import com.inktone.core.designsystem.AppIcon
@@ -70,7 +67,6 @@ fun AboutScreen(
     ttsEngineLabel: String = "Non déterminé",
 ) {
     val context = LocalContext.current
-    val clipboardManager = LocalClipboardManager.current
     val snackbarHostState = remember { SnackbarHostState() }
     val scope = rememberCoroutineScope()
 
@@ -94,19 +90,9 @@ fun AboutScreen(
             Spacer(Modifier.height(InkToneSpacing.md))
             Text("InkTone", color = MaterialTheme.colorScheme.onSurface, style = MaterialTheme.typography.headlineMedium)
             Spacer(Modifier.height(6.dp))
+            // Pas de copie du diagnostic : « Signaler un problème » le joint
+            // déjà à l'e-mail, seul usage qu'on en ait (retour Issa, P2-15).
             VersionBadge(versionName = versionName)
-            // Un bouton visible plutôt qu'un appui long sur la version, que
-            // seul un message au toucher révélait (audit UI P2-15).
-            TextButton(
-                onClick = {
-                    clipboardManager.setText(AnnotatedString(buildDiagnostics(versionName, ttsEngineLabel)))
-                    scope.launch { snackbarHostState.showSnackbar("Informations de diagnostic copiées") }
-                },
-            ) {
-                AppIcon(AppSymbol.Copy, contentDescription = null, modifier = Modifier.size(18.dp))
-                Spacer(Modifier.width(InkToneSpacing.sm))
-                Text("Copier les informations de diagnostic")
-            }
 
             Spacer(Modifier.height(20.dp))
 
@@ -154,7 +140,7 @@ fun AboutScreen(
     }
 }
 
-/** Diagnostics système copiés au presse-papier, ou joints au signalement d'un problème. */
+/** Diagnostics système joints à l'e-mail de signalement d'un problème. */
 private fun buildDiagnostics(versionName: String, ttsEngineLabel: String): String = buildString {
     appendLine("Version : $versionName")
     appendLine("Modèle : ${android.os.Build.MODEL}")
