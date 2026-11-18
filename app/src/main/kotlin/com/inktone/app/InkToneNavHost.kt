@@ -360,7 +360,7 @@ fun InkToneNavHost(navController: NavHostController = rememberNavController(), s
             // Lot 6, Palier B — carte Données : BackupManager vit dans :data,
             // invisible depuis feature/settings (Blueprint §12.4). Ce
             // ViewModel et les deux lanceurs SAF (CreateDocument/OpenDocument,
-            // meme pattern que ImportPickerButton) restent donc ici, dans app.
+            // même patron que l'import de la Bibliothèque) restent donc ici, dans app.
             val backupViewModel: BackupViewModel = hiltViewModel()
             val dataOperationResult by backupViewModel.lastResult.collectAsStateWithLifecycle()
             // Lot 11, tâche 11.1 — le fichier est désormais chiffré E2EE.

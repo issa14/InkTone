@@ -110,7 +110,7 @@ Onboarding câblé au premier lancement (`OnboardingRoute`, `startDestination` d
 - Ligne 2 — Type de fichier : cases à cocher, **Tous / EPUB / TXT** (PDF mentionné à l'origine à titre indicatif seulement, pas retenu — cohérent avec ADR-017, qui différe le PDF à une v1.x ultérieure)
 
 **Bottom sheet du menu 3-points (icône a4) :**
-- Importer des livres
+- ~~Importer des livres~~ — **devient le bouton flottant « Importer »** de la Bibliothèque peuplée, replié en icône pendant un défilement vers le bas (audit UI 2026-11-18, P1-11) : l'action principale de l'écran n'est plus à deux gestes. Bibliothèque vide : le bouton de l'état vide, sans bouton flottant.
 - ~~Couverture par défaut~~ / ~~Reconstruire les couvertures~~ — **déplacées dans Réglages › Données** (« Rétablir les couvertures d'origine », « Régénérer les couvertures ») : opérations de maintenance rares, pas au rang de l'import (audit UI 2026-11-16, P1-17)
 - Ouvrir un livre au hasard
 - Synchroniser avec le cloud — **action ponctuelle, fonctionne uniquement si un service de sync est déjà configuré** — **tranché plus loin** (§ Bottom sheet du menu 3-points) : si non configuré, le tap déclenche directement l'écran de configuration, pas un bouton désactivé.
@@ -291,7 +291,7 @@ Tous les éléments décrits initialement sont maintenant conçus et consignés 
 
 ## Écran : Import — progression et retours
 
-**Déclencheur :** le sélecteur de fichiers du système (SAF) — rien à concevoir de notre côté, ouvert à la fois depuis le CTA de la bibliothèque vide et depuis « Importer des livres » du bottom sheet 3-points.
+**Déclencheur :** le sélecteur de fichiers du système (SAF) — rien à concevoir de notre côté, ouvert à la fois depuis le CTA de la bibliothèque vide et depuis le bouton flottant « Importer » de la bibliothèque peuplée (audit UI P1-11 ; auparavant « Importer des livres » du bottom sheet 3-points).
 
 **Ce qui reste notre UI, en revanche :**
 

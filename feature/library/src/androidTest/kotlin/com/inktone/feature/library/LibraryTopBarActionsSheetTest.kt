@@ -37,14 +37,14 @@ class LibraryTopBarActionsSheetTest {
                     selectedFormats = emptySet<PublicationFormat>(),
                     onToggleFormat = {},
                     onClearFormats = {},
-                    onImportClick = {},
                 )
             }
         }
 
         composeTestRule.onNodeWithContentDescription("Actions").performClick()
 
-        composeTestRule.onNodeWithText("Importer").assertExists()
+        // Importer est le bouton flottant de l'écran (audit UI P1-11).
+        composeTestRule.onNodeWithText("Importer").assertDoesNotExist()
         composeTestRule.onNodeWithText("Rechercher dans les livres").assertExists()
         composeTestRule.onNodeWithText("Ouvrir un livre au hasard").assertExists()
         composeTestRule.onNodeWithText("Synchroniser avec le cloud").assertExists()

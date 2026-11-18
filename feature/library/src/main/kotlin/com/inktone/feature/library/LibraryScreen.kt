@@ -35,6 +35,11 @@ import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.ModalBottomSheet
 import androidx.compose.material3.NavigationDrawerItem
 import androidx.compose.material3.Scaffold
+import androidx.compose.ui.input.nestedscroll.nestedScroll
+import androidx.compose.ui.input.nestedscroll.NestedScrollSource
+import androidx.compose.ui.input.nestedscroll.NestedScrollConnection
+import androidx.compose.ui.geometry.Offset
+import androidx.compose.material3.ExtendedFloatingActionButton
 import androidx.compose.material3.SnackbarDuration
 import androidx.compose.material3.SnackbarHost
 import androidx.compose.material3.SnackbarHostState
@@ -154,8 +159,36 @@ fun LibraryScreen(
         viewModel.onIntent(LibraryIntent.SetSearchActive(false))
     }
 
+    // Importer est l'action principale de l'écran (audit UI P1-11) : bouton
+    // flottant dès que la bibliothèque montre des livres. Vide, l'état vide
+    // porte déjà « Importer votre premier livre ».
+    val showImportFab = !state.isLoading && state.errorMessage == null && !state.isSearchActive &&
+        !state.showImportDetails && state.displayedPublications.isNotEmpty()
+    // Replié en icône seule pendant un défilement vers le bas, où le libellé
+    // masquerait des couvertures ; déplié à la remontée.
+    var isImportFabExpanded by remember { mutableStateOf(true) }
+    val fabScrollConnection = remember {
+        object : NestedScrollConnection {
+            override fun onPreScroll(available: Offset, source: NestedScrollSource): Offset {
+                if (available.y < -1f) isImportFabExpanded = false
+                if (available.y > 1f) isImportFabExpanded = true
+                return Offset.Zero
+            }
+        }
+    }
+
     Scaffold(
         snackbarHost = { SnackbarHost(snackbarHostState) },
+        floatingActionButton = {
+            if (showImportFab) {
+                ExtendedFloatingActionButton(
+                    text = { Text("Importer") },
+                    icon = { AppIcon(AppSymbol.Add, contentDescription = null) },
+                    onClick = onImportClick,
+                    expanded = isImportFabExpanded,
+                )
+            }
+        },
         topBar = {
             LibraryTopBar(
                 searchQuery = state.searchQuery,
@@ -169,7 +202,6 @@ fun LibraryScreen(
                 selectedFormats = state.selectedFormats,
                 onToggleFormat = { viewModel.onIntent(LibraryIntent.ToggleFileFormat(it)) },
                 onClearFormats = { viewModel.onIntent(LibraryIntent.ClearFileFormats) },
-                onImportClick = onImportClick,
                 activeFilter = state.activeFilter,
                 filterValue = state.filterValue,
                 onSelectFilter = { filter, value -> viewModel.onIntent(LibraryIntent.ChangeFilter(filter, value)) },
@@ -187,7 +219,7 @@ fun LibraryScreen(
             )
         },
     ) { innerPadding ->
-        Column(Modifier.fillMaxSize().padding(innerPadding)) {
+        Column(Modifier.fillMaxSize().padding(innerPadding).nestedScroll(fabScrollConnection)) {
             // Lot 5 — résumé de fin d'import ou bannière de progression.
             // Pas de résumé ici quand les détails sont ouverts :
             // ImportResultDetail affiche déjà son propre en-tête résumé
@@ -410,7 +442,6 @@ internal fun LibraryTopBar(
     selectedFormats: Set<com.inktone.domain.model.PublicationFormat>,
     onToggleFormat: (com.inktone.domain.model.PublicationFormat) -> Unit,
     onClearFormats: () -> Unit,
-    onImportClick: () -> Unit,
     // C.4 — filtre actif pour le titre cliquable
     activeFilter: FilterMode = FilterMode.ALL,
     filterValue: String? = null,
@@ -557,7 +588,6 @@ internal fun LibraryTopBar(
             Column(Modifier.padding(bottom = 32.dp)) {
                 Text("Bibliothèque", style = MaterialTheme.typography.labelLarge,
                     modifier = Modifier.padding(horizontal = 24.dp, vertical = 8.dp))
-                ActionSheetItem("Importer", AppSymbol.Data) { showActionsSheet = false; onImportClick() }
                 ActionSheetItem("Rechercher dans les livres", AppSymbol.Search) { showActionsSheet = false; onOpenTextSearch() }
                 ActionSheetItem("Ouvrir un livre au hasard", AppSymbol.Reading) { showActionsSheet = false; onOpenRandomBook() }
                 ActionSheetItem("Synchroniser avec le cloud", AppSymbol.Sync) { showActionsSheet = false; onSyncNow() }
@@ -597,6 +627,9 @@ internal fun LibrarySortOrder.label() = when (this) {
     LibrarySortOrder.RECENTLY_OPENED -> "Récents"
 }
 
+/** Marge basse : le dernier rang défile au-dessus du bouton flottant Importer. */
+private val LibraryListPadding = PaddingValues(start = 8.dp, top = 8.dp, end = 8.dp, bottom = 88.dp)
+
 @Composable
 private fun LibraryContent(
     state: LibraryUiState,
@@ -609,7 +642,7 @@ private fun LibraryContent(
         LibraryLayoutMode.GRID_COVERS -> {
             LazyVerticalGrid(
                 columns = GridCells.Adaptive(minSize = 120.dp),
-                contentPadding = PaddingValues(8.dp),
+                contentPadding = LibraryListPadding,
             ) {
                 gridItems(state.displayedPublications, key = { it.id }) { publication ->
                     BookCover(
@@ -630,7 +663,7 @@ private fun LibraryContent(
         LibraryLayoutMode.GRID_DETAILED -> {
             LazyVerticalGrid(
                 columns = GridCells.Adaptive(minSize = 120.dp),
-                contentPadding = PaddingValues(8.dp),
+                contentPadding = LibraryListPadding,
             ) {
                 gridItems(state.displayedPublications, key = { it.id }) { publication ->
                     BookGridCell(
@@ -648,7 +681,7 @@ private fun LibraryContent(
         }
 
         LibraryLayoutMode.LIST -> {
-            LazyColumn(contentPadding = PaddingValues(8.dp)) {
+            LazyColumn(contentPadding = LibraryListPadding) {
                 listItems(state.displayedPublications, key = { it.id }) { publication ->
                     PublicationListRow(
                         publication = publication,
