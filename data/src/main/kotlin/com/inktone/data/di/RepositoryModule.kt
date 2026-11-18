@@ -13,6 +13,9 @@ import com.inktone.data.repository.RoomLibraryItemRepository
 import com.inktone.data.repository.RoomOpdsCatalogRepository
 import com.inktone.data.repository.RoomPreferencesRepository
 import com.inktone.data.repository.RoomPronunciationRuleRepository
+import com.inktone.data.repository.SharedPrefsStartupCache
+import com.inktone.data.repository.StartupPrefsWriter
+import com.inktone.domain.repository.StartupPrefsReader
 import com.inktone.data.repository.RemoteDeviceFleetRepository
 import com.inktone.data.repository.RemoteSyncActivityLogRepository
 import com.inktone.data.repository.RoomConflictQueueRepository
@@ -67,6 +70,8 @@ abstract class RepositoryModule {
     @Binds @Singleton abstract fun bindAnnotationRepository(impl: RoomAnnotationRepository): AnnotationRepository
     @Binds @Singleton abstract fun bindVoiceProfileRepository(impl: RoomVoiceProfileRepository): VoiceProfileRepository
     @Binds @Singleton abstract fun bindPreferencesRepository(impl: RoomPreferencesRepository): PreferencesRepository
+    @Binds @Singleton abstract fun bindStartupPrefsReader(impl: SharedPrefsStartupCache): StartupPrefsReader
+    @Binds @Singleton abstract fun bindStartupPrefsWriter(impl: SharedPrefsStartupCache): StartupPrefsWriter
     @Binds @Singleton abstract fun bindPronunciationRuleRepository(impl: RoomPronunciationRuleRepository): PronunciationRuleRepository
     @Binds @Singleton abstract fun bindLibraryItemRepository(impl: RoomLibraryItemRepository): LibraryItemRepository
     @Binds @Singleton abstract fun bindThemeRepository(impl: RoomThemeRepository): ThemeRepository

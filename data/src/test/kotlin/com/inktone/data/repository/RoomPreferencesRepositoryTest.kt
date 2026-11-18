@@ -36,7 +36,10 @@ class RoomPreferencesRepositoryTest {
 
     @Test
     fun `des mises a jour concurrentes de champs differents se cumulent toutes`() = runBlocking {
-        val repository = RoomPreferencesRepository(SlowDao(UserPreferences(fontSize = 10, autoScrollSpeed = 0).toEntity()))
+        val repository = RoomPreferencesRepository(
+            SlowDao(UserPreferences(fontSize = 10, autoScrollSpeed = 0).toEntity()),
+            startupCache = object : StartupPrefsWriter { override fun write(preferences: UserPreferences) = Unit },
+        )
 
         (0 until 20).map { i ->
             async(Dispatchers.Default) {

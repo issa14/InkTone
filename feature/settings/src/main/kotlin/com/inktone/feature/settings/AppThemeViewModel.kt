@@ -5,6 +5,7 @@ import androidx.lifecycle.viewModelScope
 import com.inktone.core.designsystem.AppThemeMode
 import com.inktone.domain.model.AppTheme
 import com.inktone.domain.repository.PreferencesRepository
+import com.inktone.domain.repository.StartupPrefsReader
 import dagger.hilt.android.lifecycle.HiltViewModel
 import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.StateFlow
@@ -20,16 +21,18 @@ import javax.inject.Inject
  * donc avant tout `hiltViewModel()` scope a une destination de nav — ce
  * ViewModel separe de `SettingsViewModel` reste minimal expres, pas
  * besoin du reste de `UserPreferences` a cet endroit.
+ *
+ * Valeurs initiales lues dans [StartupPrefsReader] : le premier frame
+ * n'attend pas l'ouverture de Room (démarrage à froid).
  */
 @HiltViewModel
 class AppThemeViewModel @Inject constructor(
     preferencesRepository: PreferencesRepository,
+    startupPrefsReader: StartupPrefsReader,
 ) : ViewModel() {
     val useDynamicColor: StateFlow<Boolean> = preferencesRepository.observe()
         .map { it.dynamicColorEnabled }
-        // Valeur initiale = celle d'une nouvelle installation
-        // (UserPreferences.dynamicColorEnabled = false), pas l'inverse.
-        .stateIn(viewModelScope, SharingStarted.Eagerly, false)
+        .stateIn(viewModelScope, SharingStarted.Eagerly, startupPrefsReader.readDynamicColorEnabled())
 
     /**
      * Lot 6 — thème système Système/Clair/Sombre, exposé à MainActivity en
@@ -38,25 +41,25 @@ class AppThemeViewModel @Inject constructor(
      * §12.4 — `app` ne peut dépendre ni de `domain` ni directement de ce mapping).
      */
     val appTheme: StateFlow<AppThemeMode> = preferencesRepository.observe()
-        .map {
-            when (it.appTheme) {
-                AppTheme.SYSTEM -> AppThemeMode.SYSTEM
-                AppTheme.LIGHT -> AppThemeMode.LIGHT
-                AppTheme.DARK -> AppThemeMode.DARK
-            }
-        }
-        .stateIn(viewModelScope, SharingStarted.Eagerly, AppThemeMode.SYSTEM)
+        .map { it.appTheme.toMode() }
+        .stateIn(viewModelScope, SharingStarted.Eagerly, startupPrefsReader.readAppTheme().toMode())
 
     /**
      * Lot 10 — pilote le `startDestination` de `InkToneNavHost` depuis
      * `MainActivity` (même contrainte Blueprint §12.4 qu'au-dessus :
      * `app` ne voit jamais `PreferencesRepository`/`UserPreferences`
-     * directement). `null` = valeur pas encore chargée depuis Room —
-     * distinct de `false`, pour que `MainActivity` puisse retarder
-     * l'affichage d'un seul frame plutôt que de risquer un flash sur
-     * `LibraryRoute` avant de rediriger vers l'onboarding.
+     * directement). `null` = valeur encore inconnue (première installation,
+     * cache de démarrage vide) — distinct de `false`, pour que `MainActivity`
+     * garde le splash plutôt que de risquer un flash sur `LibraryRoute`
+     * avant de rediriger vers l'onboarding.
      */
     val hasSeenOnboarding: StateFlow<Boolean?> = preferencesRepository.observe()
         .map { it.hasSeenOnboarding }
-        .stateIn(viewModelScope, SharingStarted.Eagerly, null)
+        .stateIn(viewModelScope, SharingStarted.Eagerly, startupPrefsReader.readHasSeenOnboarding())
+
+    private fun AppTheme.toMode(): AppThemeMode = when (this) {
+        AppTheme.SYSTEM -> AppThemeMode.SYSTEM
+        AppTheme.LIGHT -> AppThemeMode.LIGHT
+        AppTheme.DARK -> AppThemeMode.DARK
+    }
 }
