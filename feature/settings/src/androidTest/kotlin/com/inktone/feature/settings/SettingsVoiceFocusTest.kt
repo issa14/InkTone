@@ -38,10 +38,16 @@ class SettingsVoiceFocusTest {
         assertTrue("carte de la voix en haut de page, trouvée à $top", top < 200.dp)
     }
 
-    /** Témoin : sans la demande, la page reste en haut et la carte bien plus bas. */
+    /**
+     * Témoin : sans la demande, la page n'a pas défilé — le premier titre de
+     * section reste en tête. Mesurer la carte de la voix supposait une mise
+     * en page figée, que le regroupement des Réglages (P1-12) a remontée.
+     */
     @Test
     fun ouverture_ordinaire_laisse_la_page_en_haut() {
-        val top = voiceRowTop(focusVoiceDownload = false)
-        assertTrue("page laissée en haut, carte trouvée à $top", top > 400.dp)
+        voiceRowTop(focusVoiceDownload = false)
+        val firstSectionTop = composeTestRule.onNodeWithText("Narration").getUnclippedBoundsInRoot().top
+        // Négatif si la page avait défilé : borne basse comprise.
+        assertTrue("page laissée en haut, premier titre trouvé à $firstSectionTop", firstSectionTop >= 0.dp && firstSectionTop < 48.dp)
     }
 }
