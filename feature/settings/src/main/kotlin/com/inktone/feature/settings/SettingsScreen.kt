@@ -391,7 +391,7 @@ internal fun SettingsContent(
             ActionRow(
                 icon = AppSymbol.Upload,
                 title = "Exporter les données",
-                subtitle = "Signets, notes, positions, statistiques et thèmes, sans les livres.",
+                subtitle = "Vos données de lecture, sans les livres.",
                 onClick = onExportData,
             )
             // Avertissement préalable — l'import écrase la configuration courante.

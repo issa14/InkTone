@@ -508,7 +508,7 @@ private fun SyncOperationalContent(state: SyncScreenState, onIntent: (SyncIntent
         verticalArrangement = Arrangement.spacedBy(16.dp),
     ) {
         if (account.lastAutoSyncFailed) {
-            item { AutoSyncFailedBanner() }
+            item { AutoSyncFailedBanner(onRetry = { onIntent(SyncIntent.SynchronizeNow) }) }
         }
         item { ProfileHeader(account) }
         item {
@@ -538,16 +538,21 @@ private fun SyncOperationalContent(state: SyncScreenState, onIntent: (SyncIntent
 }
 
 @Composable
-private fun AutoSyncFailedBanner() {
+private fun AutoSyncFailedBanner(onRetry: () -> Unit) {
     Card(colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.errorContainer)) {
-        Row(Modifier.padding(16.dp), verticalAlignment = Alignment.CenterVertically) {
+        Row(Modifier.padding(start = 16.dp, top = 8.dp, end = 8.dp, bottom = 8.dp), verticalAlignment = Alignment.CenterVertically) {
             AppIcon(AppSymbol.Error, contentDescription = null, tint = MaterialTheme.colorScheme.onErrorContainer)
             Spacer(Modifier.width(12.dp))
             Text(
                 "La synchronisation automatique a échoué.",
                 style = MaterialTheme.typography.bodyMedium,
                 color = MaterialTheme.colorScheme.onErrorContainer,
+                modifier = Modifier.weight(1f),
             )
+            // La relance dans le bandeau même, plutôt qu'un renvoi « ci-dessous » (audit UI P2-12).
+            TextButton(onClick = onRetry) {
+                Text("Réessayer", color = MaterialTheme.colorScheme.onErrorContainer)
+            }
         }
     }
 }
