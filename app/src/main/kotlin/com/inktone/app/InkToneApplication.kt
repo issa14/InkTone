@@ -4,6 +4,7 @@ import android.app.Application
 import androidx.hilt.work.HiltWorkerFactory
 import androidx.work.Configuration
 import com.inktone.infrastructure.crashreporting.CrashReportingConsentObserver
+import com.inktone.infrastructure.database.DatabaseWarmup
 import com.inktone.infrastructure.media.PlaybackServiceLauncher
 import com.inktone.infrastructure.parser.CoverStorageMigration
 import com.inktone.infrastructure.worker.PreAnalysisRefreshOnStartup
@@ -26,6 +27,9 @@ import javax.inject.Inject
 class InkToneApplication : Application(), Configuration.Provider {
 
     @Inject lateinit var workerFactory: HiltWorkerFactory
+
+    // Ouverture de la base en parallèle du splash (voir DatabaseWarmup).
+    @Inject lateinit var databaseWarmup: DatabaseWarmup
 
     // K10/ADR-014 — `app` n'a pas le droit de dépendre de `domain`
     // directement (Blueprint §12.4, checkArchitectureRules) : la logique
@@ -62,6 +66,7 @@ class InkToneApplication : Application(), Configuration.Provider {
 
     override fun onCreate() {
         super.onCreate()
+        databaseWarmup.start(CoroutineScope(SupervisorJob() + Dispatchers.IO))
 
         // Observation continue, pas un chargement ponctuel au démarrage :
         // un changement du toggle dans les Réglages
