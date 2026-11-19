@@ -47,4 +47,25 @@ class MetadataDisplayTest {
             listOf("-Joe Abercrombie", " - ", "Albert Camus ").cleanedAuthorsForDisplay(),
         )
     }
+
+    @Test
+    fun une_forme_de_tri_collee_est_remise_dans_l_ordre_prenom_nom() {
+        assertEquals("Brian Aldiss", "Aldiss,Brian".authorForDisplay())
+        assertEquals("Philip K. Dick", "Dick,Philip K.".authorForDisplay())
+        assertEquals("Antoine de Saint-Exupéry", "Saint-Exupéry,Antoine de".authorForDisplay())
+    }
+
+    @Test
+    fun une_virgule_suivie_d_une_espace_ou_plusieurs_virgules_ne_sont_pas_inversees() {
+        assertEquals("Dupont, Durand", "Dupont, Durand".authorForDisplay())
+        assertEquals("A,B,C", "A,B,C".authorForDisplay())
+        assertEquals("Aldiss,", "Aldiss,".authorForDisplay())
+        assertEquals(",Brian", ",Brian".authorForDisplay())
+        assertEquals("Brian Aldiss", "Brian Aldiss".authorForDisplay())
+    }
+
+    @Test
+    fun la_liste_d_auteurs_applique_l_inversion_a_chaque_entree() {
+        assertEquals("Brian Aldiss, Philip K. Dick", listOf("Aldiss,Brian", "Dick,Philip K.").cleanedAuthorsForDisplay())
+    }
 }

@@ -5,6 +5,7 @@ import androidx.lifecycle.SavedStateHandle
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.inktone.domain.model.ReadingSession
+import com.inktone.domain.model.authorForDisplay
 import com.inktone.domain.repository.PublicationRepository
 import com.inktone.domain.repository.ReadingSessionRepository
 import com.inktone.domain.repository.ReadingStateRepository
@@ -161,7 +162,7 @@ class BookStatisticsViewModel @Inject constructor(
         emit(
             BookDetailUiState.Ready(
                 bookTitle = publication?.title ?: bookId,
-                bookAuthor = publication?.authors?.firstOrNull() ?: "",
+                bookAuthor = publication?.authors?.firstOrNull()?.authorForDisplay() ?: "",
                 availableBooks = availableBooks,
                 wpmFormatted = "$wpm WPM",
                 remainingTimeFormatted = remainingFormatted,

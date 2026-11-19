@@ -17,10 +17,26 @@ package com.inktone.domain.model
  * guillemets, réordonner « Nom, Prénom ») mutilerait des titres légitimes,
  * et le coût d'un faux positif est plus élevé ici que celui d'un artefact
  * résiduel : l'utilisateur ne peut pas corriger ce qu'il ne voit plus.
+ * Seule exception, pour les auteurs : [authorForDisplay].
  */
 fun String.cleanedForDisplay(): String =
     trim().trim('-', '–', '—').trim()
 
 /** Auteurs nettoyés puis assemblés ; les entrées devenues vides disparaissent. */
 fun List<String>.cleanedAuthorsForDisplay(): String =
-    map { it.cleanedForDisplay() }.filter { it.isNotBlank() }.joinToString(", ")
+    map { it.authorForDisplay() }.filter { it.isNotBlank() }.joinToString(", ")
+
+/**
+ * Auteur nettoyé, et remis dans l'ordre « Prénom Nom » quand le `dc:creator`
+ * porte une forme de tri collée (« Aldiss,Brian »). Seulement sans espace
+ * après l'unique virgule : « Dupont, Durand » peut être deux co-auteurs.
+ * La valeur stockée, qui sert au tri par auteur, reste intacte.
+ */
+fun String.authorForDisplay(): String {
+    val cleaned = cleanedForDisplay()
+    val match = SORT_FORM.matchEntire(cleaned) ?: return cleaned
+    val (lastName, firstName) = match.destructured
+    return "$firstName $lastName"
+}
+
+private val SORT_FORM = Regex("""([^,]*[^,\s]),([^,\s][^,]*)""")
