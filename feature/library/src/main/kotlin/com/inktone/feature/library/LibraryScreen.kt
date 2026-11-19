@@ -212,16 +212,8 @@ fun LibraryScreen(
                 selectedFormats = state.selectedFormats,
                 onToggleFormat = { viewModel.onIntent(LibraryIntent.ToggleFileFormat(it)) },
                 onClearFormats = { viewModel.onIntent(LibraryIntent.ClearFileFormats) },
-                activeFilter = state.activeFilter,
                 filterValue = state.filterValue,
-                onSelectFilter = { filter, value -> viewModel.onIntent(LibraryIntent.ChangeFilter(filter, value)) },
                 onMenuClick = onMenuClick,
-                availableSeries = state.availableSeries,
-                seriesCounts = state.seriesCounts,
-                availableTags = state.availableTags,
-                tagCounts = state.tagCounts,
-                onNavigateToSeriesDetail = onNavigateToSeriesDetail,
-                onNavigateToTagDetail = onNavigateToTagDetail,
                 // Lot 19 — actions du menu 3-points
                 onOpenRandomBook = { viewModel.onIntent(LibraryIntent.OpenRandomBook) },
                 onOpenTextSearch = onOpenTextSearch,
@@ -245,6 +237,21 @@ fun LibraryScreen(
             // fermé : un nouvel import lancé entre-temps progressait sans
             // aucun signe à l'écran. Se masque d'elle-même hors import.
             ImportProgressBanner(state.importProgress)
+
+            // Fixes sous la barre : le filtre actif reste visible et modifiable
+            // pendant le défilement, même quand il ne renvoie aucun livre.
+            if (!state.showImportDetails && !(state.isLoading && state.publications.isEmpty())) {
+                LibraryFilterChips(
+                    activeFilter = state.activeFilter,
+                    onSelectFilter = { viewModel.onIntent(LibraryIntent.ChangeFilter(it)) },
+                    series = state.availableSeries,
+                    seriesCounts = state.seriesCounts,
+                    tags = state.availableTags,
+                    tagCounts = state.tagCounts,
+                    onNavigateToSeriesDetail = onNavigateToSeriesDetail,
+                    onNavigateToTagDetail = onNavigateToTagDetail,
+                )
+            }
 
             // Lot 5 — détail des résultats d'import
             if (state.showImportDetails && state.importResults.isNotEmpty()) {
@@ -455,17 +462,7 @@ internal fun LibraryTopBar(
     selectedFormats: Set<com.inktone.domain.model.PublicationFormat>,
     onToggleFormat: (com.inktone.domain.model.PublicationFormat) -> Unit,
     onClearFormats: () -> Unit,
-    // C.4 — filtre actif pour le titre cliquable
-    activeFilter: FilterMode = FilterMode.ALL,
     filterValue: String? = null,
-    onSelectFilter: (FilterMode, String?) -> Unit = { _, _ -> },
-    // Lot 2a.3 — flyout du titre à deux colonnes
-    availableSeries: List<String> = emptyList(),
-    seriesCounts: Map<String, Int> = emptyMap(),
-    availableTags: List<String> = emptyList(),
-    tagCounts: Map<String, Int> = emptyMap(),
-    onNavigateToSeriesDetail: (String) -> Unit = {},
-    onNavigateToTagDetail: (String) -> Unit = {},
     // Lot 19 — actions du menu 3-points
     onOpenRandomBook: () -> Unit = {},
     onOpenTextSearch: () -> Unit = {},
@@ -473,7 +470,6 @@ internal fun LibraryTopBar(
 ) {
     var showFilterDialog by remember { mutableStateOf(false) }
     var showActionsSheet by remember { mutableStateOf(false) }
-    var showNavPopup by remember { mutableStateOf(false) }
 
     if (isSearchActive) {
         // Clavier ouvert à l'ouverture de la recherche, pas quand la barre
@@ -504,59 +500,10 @@ internal fun LibraryTopBar(
             colors = InkToneTopBar.colors(),
         )
     } else {
-        // C.4 — Titre cliquable avec le filtre actif
         TopAppBar(
-            title = {
-                Box {
-                    Row(
-                        modifier = Modifier.clickable { showNavPopup = true },
-                        verticalAlignment = Alignment.CenterVertically,
-                    ) {
-                        Text(
-                            // UX §Menu déroulant du titre : le titre adaptatif
-                            // affiche "Bibliothèque" à la racine (ALL sans
-                            // valeur), pas "Tous" — ce dernier reste le libellé
-                            // du filtre lui-même dans le flyout (2a.3).
-                            filterValue ?: if (activeFilter == FilterMode.ALL) "Bibliothèque" else activeFilter.label(),
-                            // `titleLarge` comme les autres destinations : elles
-                            // laissent `TopAppBar` appliquer son style par
-                            // défaut, cet écran forçait `titleMedium` et son
-                            // titre paraissait d'un quart plus petit (16 sp
-                            // contre 20) alors qu'il est de même rang.
-                            style = MaterialTheme.typography.titleLarge,
-                            color = InkToneTopBar.contentColor(),
-                        )
-                        // Unique indice que le titre ouvre un menu : il doit se
-                        // voir. Un chevron à 16 dp et 50 % d'opacité se
-                        // réduisait à un filet à côté d'un titre semi-gras. Le
-                        // défaut n'était PAS le contraste — mesuré à 4,58:1,
-                        // au-dessus du seuil WCAG de 3:1 pour un élément
-                        // d'interface — mais le POIDS visuel : un trait `wght
-                        // 400` rapetissé ne tient pas à côté des jambages du
-                        // texte. Un triangle plein garde sa masse quelle que
-                        // soit la taille, et c'est l'affordance attendue d'un
-                        // déroulant.
-                        AppIcon(
-                            AppSymbol.ArrowDropDown,
-                            contentDescription = "Changer de vue",
-                            tint = InkToneTopBar.contentColor(),
-                            modifier = Modifier.size(24.dp),
-                        )
-                    }
-                    LibraryTitleFlyout(
-                        expanded = showNavPopup,
-                        onDismiss = { showNavPopup = false },
-                        series = availableSeries,
-                        seriesCounts = seriesCounts,
-                        tags = availableTags,
-                        tagCounts = tagCounts,
-                        onSelectAll = { onSelectFilter(FilterMode.ALL, null) },
-                        onSelectFavorites = { onSelectFilter(FilterMode.FAVORITES, null) },
-                        onNavigateToSeriesDetail = onNavigateToSeriesDetail,
-                        onNavigateToTagDetail = onNavigateToTagDetail,
-                    )
-                }
-            },
+            // Le filtre se choisit désormais dans la rangée de puces, sous la
+            // carte « Reprendre » : le titre n'est plus un menu.
+            title = { Text(filterValue ?: "Bibliothèque") },
             navigationIcon = {
                 IconButton(onClick = onMenuClick) {
                     AppIcon(AppSymbol.Menu, contentDescription = "Menu")
@@ -582,8 +529,8 @@ internal fun LibraryTopBar(
         LibraryFilterDialog(
             sortOrder = sortOrder,
             onSortOrderChange = onSortOrderChange,
-            statusFilter = activeFilter,
-            onStatusFilterChange = { onSelectFilter(it, null) },
+            // Statut : rangée de puces de l'écran, pas de doublon ici.
+            showStatusFilter = false,
             layoutMode = layoutMode,
             onLayoutModeChange = onLayoutModeChange,
             selectedFormats = selectedFormats,
