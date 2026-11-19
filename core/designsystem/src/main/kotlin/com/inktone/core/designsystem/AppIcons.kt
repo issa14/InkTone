@@ -123,6 +123,8 @@ enum class AppSymbol(
     Data(R.drawable.ic_symbol_data),
     Presets(R.drawable.ic_symbol_presets),
     Note(R.drawable.ic_symbol_note),
+    // Liste des signets et notes : distincte de [Bookmark], qui en pose un.
+    Bookmarks(R.drawable.ic_symbol_bookmarks),
     // Lot 21, tâche 7 — partage du texte sélectionné (ACTION_SEND).
     Share(R.drawable.ic_symbol_share),
     Accessibility(R.drawable.ic_symbol_accessibility),
