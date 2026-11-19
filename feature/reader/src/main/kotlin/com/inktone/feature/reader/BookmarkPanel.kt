@@ -1,5 +1,6 @@
 package com.inktone.feature.reader
 
+import com.inktone.domain.model.excerptForDisplay
 import com.inktone.core.designsystem.InkToneSpacing
 
 import androidx.compose.animation.AnimatedVisibility
@@ -243,7 +244,7 @@ private fun NotesTab(
                     annotation.excerpt?.takeIf { it.isNotBlank() }?.let { excerpt ->
                         Spacer(Modifier.height(InkToneSpacing.xs))
                         Text(
-                            excerpt,
+                            excerpt.excerptForDisplay(),
                             style = MaterialTheme.typography.bodySmall,
                             color = MaterialTheme.colorScheme.onSurfaceVariant,
                             maxLines = 2,
@@ -296,7 +297,7 @@ private fun HighlightsTab(highlights: List<Annotation>, onClick: (Annotation) ->
                 Spacer(Modifier.width(InkToneSpacing.md))
                 Column(modifier = Modifier.weight(1f)) {
                     Text(
-                        annotation.excerpt?.takeIf { it.isNotBlank() }
+                        annotation.excerpt?.takeIf { it.isNotBlank() }?.excerptForDisplay()
                             ?: annotation.startLocator.positionLabel(),
                         style = MaterialTheme.typography.bodyMedium,
                         maxLines = 2,
@@ -341,7 +342,7 @@ private fun BookmarksTab(
                 Spacer(Modifier.width(InkToneSpacing.md))
                 Column(modifier = Modifier.weight(1f)) {
                     Text(
-                        bookmark.title?.takeIf { it.isNotBlank() } ?: bookmark.locator.positionLabel(),
+                        bookmark.title?.takeIf { it.isNotBlank() }?.excerptForDisplay() ?: bookmark.locator.positionLabel(),
                         style = MaterialTheme.typography.bodyMedium,
                         maxLines = 2,
                         overflow = TextOverflow.Ellipsis,

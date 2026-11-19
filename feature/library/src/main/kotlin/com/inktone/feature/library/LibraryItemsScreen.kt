@@ -1,5 +1,6 @@
 package com.inktone.feature.library
 
+import com.inktone.domain.model.excerptForDisplay
 import com.inktone.core.designsystem.InkToneSpacing
 
 import com.inktone.core.designsystem.InkToneTextField
@@ -355,7 +356,7 @@ private fun LibraryItemRow(
                 Column(Modifier.weight(1f).padding(start = InkToneSpacing.md)) {
                     // Ligne 1 — extrait / note : le contenu, prioritaire.
                     item.excerpt?.let { excerpt ->
-                        Text(excerpt, style = MaterialTheme.typography.bodyMedium, maxLines = 4, overflow = TextOverflow.Ellipsis)
+                        Text(excerpt.excerptForDisplay(), style = MaterialTheme.typography.bodyMedium, maxLines = 4, overflow = TextOverflow.Ellipsis)
                     }
                     item.note?.let { note ->
                         Text(
