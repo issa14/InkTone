@@ -1,6 +1,5 @@
 package com.inktone.feature.reader.rendering
 
-import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.text.SpanStyle
 import androidx.compose.ui.text.TextStyle
 import androidx.compose.ui.text.buildAnnotatedString
@@ -32,9 +31,6 @@ import com.inktone.domain.model.StyledText
  */
 object BookBlockStyleMapper {
 
-    /** Couleur des liens (Material You Primary). */
-    private val LinkColor = Color(0xFF3366CC)
-
     // ---- Mapping SpanStyles → SpanStyle ----
 
     /**
@@ -52,7 +48,8 @@ object BookBlockStyleMapper {
             textDecoration = buildTextDecoration(styles),
             baselineShift = buildBaselineShift(styles),
             fontSize = buildFontSize(styles),
-            color = if (SpanStyles.REFERENCE in styles) LinkColor else Color.Unspecified,
+            // Lien : couleur du texte du thème, signalé par le soulignement. Un bleu
+            // fixe sortait de la charte et perdait en contraste sur les thèmes sombres.
         )
     }
 
