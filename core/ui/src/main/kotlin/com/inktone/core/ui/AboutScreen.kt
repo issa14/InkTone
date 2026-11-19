@@ -36,7 +36,6 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
-import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalUriHandler
 import androidx.compose.ui.text.style.TextAlign
@@ -309,17 +308,17 @@ private fun ArchitectureAccordion() {
             )
             if (expanded) {
                 Column(Modifier.padding(start = 20.dp, end = 20.dp, bottom = InkToneSpacing.md)) {
-                    LicenseRow("InkTone (code source)", "MIT", Color(0xFF1565C0))
-                    LicenseRow("Readium (parseur EPUB)", "BSD-3-Clause", Color(0xFF00695C))
-                    LicenseRow("Pdfium (rendu PDF)", "BSD-3-Clause", Color(0xFF00695C))
-                    LicenseRow("Voix UPMC upmc-medium, Piper VITS (Jessica & Pierre)", "CC-BY-SA-4.0", Color(0xFF2E7D32))
+                    LicenseRow("InkTone (code source)", "MIT")
+                    LicenseRow("Readium (parseur EPUB)", "BSD-3-Clause")
+                    LicenseRow("Pdfium (rendu PDF)", "BSD-3-Clause")
+                    LicenseRow("Voix UPMC upmc-medium, Piper VITS (Jessica & Pierre)", "CC-BY-SA-4.0")
                     // Attribution obligatoire : le modele d'alignement force est sous
                     // CC-BY-4.0, qui impose de crediter l'auteur dans l'application
                     // distribuee, pas seulement dans le depot (THIRD_PARTY_NOTICES.md).
-                    LicenseRow("NeMo FastConformer CTC, NVIDIA (alignement mot à mot)", "CC-BY-4.0", Color(0xFF6A1B9A))
-                    LicenseRow("ONNX Runtime (inférence)", "MIT", Color(0xFF1565C0))
-                    LicenseRow("Jetpack Compose, Room, Hilt, Media3, WorkManager", "Apache-2.0", Color(0xFF2E7D32))
-                    LicenseRow("Polices Literata, Work Sans, OpenDyslexic, Source Serif 4", "SIL Open Font License 1.1", Color(0xFFE65100))
+                    LicenseRow("NeMo FastConformer CTC, NVIDIA (alignement mot à mot)", "CC-BY-4.0")
+                    LicenseRow("ONNX Runtime (inférence)", "MIT")
+                    LicenseRow("Jetpack Compose, Room, Hilt, Media3, WorkManager", "Apache-2.0")
+                    LicenseRow("Polices Literata, Work Sans, OpenDyslexic, Source Serif 4", "SIL Open Font License 1.1")
                 }
             }
         }
@@ -359,17 +358,18 @@ private fun InfoCard(text: String) {
 }
 
 @Composable
-private fun LicenseRow(label: String, license: String, badgeColor: Color) {
+private fun LicenseRow(label: String, license: String) {
     Row(modifier = Modifier.fillMaxWidth().padding(vertical = 6.dp), verticalAlignment = Alignment.CenterVertically) {
         Text(label, color = MaterialTheme.colorScheme.onSurface, style = MaterialTheme.typography.bodySmall, modifier = Modifier.weight(1f))
         Spacer(Modifier.width(InkToneSpacing.sm))
         Box(
             modifier = Modifier
                 .clip(RoundedCornerShape(50))
-                .background(badgeColor)
+                // Une seule couleur : la licence est une information, pas une catégorie.
+                .background(MaterialTheme.colorScheme.secondaryContainer)
                 .padding(horizontal = InkToneSpacing.sm, vertical = 3.dp),
         ) {
-            Text(license, color = Color.White, style = MaterialTheme.typography.labelSmall)
+            Text(license, color = MaterialTheme.colorScheme.onSecondaryContainer, style = MaterialTheme.typography.labelSmall)
         }
     }
 }
