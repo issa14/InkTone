@@ -126,8 +126,14 @@ fun LibraryScreen(
     onOpenSync: () -> Unit = {},
     // Audit UX A3 — recherche dans le texte de tous les livres.
     onOpenTextSearch: () -> Unit = {},
+    // Signale le premier chargement terminé : le splash attend la grille
+    // remplie plutôt que de découvrir un écran vide (audit UX P0-7).
+    onContentReady: () -> Unit = {},
 ) {
     val state by viewModel.state.collectAsStateWithLifecycle()
+    LaunchedEffect(state.isLoading) {
+        if (!state.isLoading) onContentReady()
+    }
     val snackbarHostState = remember { SnackbarHostState() }
     val scope = rememberCoroutineScope()
 
@@ -250,7 +256,10 @@ fun LibraryScreen(
                     onDismiss = { viewModel.onIntent(LibraryIntent.DismissImportResults) },
                 )
             } else when {
-                state.isLoading -> LibraryShimmerGrid()
+                // Premier chargement : rien plutôt qu'un squelette, le splash le
+                // couvre. Changement de filtre : l'ancienne grille reste affichée
+                // jusqu'à l'arrivée de la nouvelle.
+                state.isLoading && state.publications.isEmpty() -> Unit
                 state.errorMessage != null -> ErrorState(
                     message = state.errorMessage!!,
                     onRetry = { viewModel.onIntent(LibraryIntent.Refresh) },

@@ -97,7 +97,11 @@ import kotlinx.coroutines.launch
  * distinguer du retour système, contrairement à un pager ou un drawer).
  */
 @Composable
-fun InkToneNavHost(navController: NavHostController = rememberNavController(), startDestination: Any = LibraryRoute) {
+fun InkToneNavHost(
+    navController: NavHostController = rememberNavController(),
+    startDestination: Any = LibraryRoute,
+    onLibraryContentReady: () -> Unit = {},
+) {
     // Lot 18 — un seul drawer, hoisté ici plutôt que local à
     // `LibraryScreen` : les 6 destinations principales le partagent et
     // l'ouvrent par leur hamburger, au lieu d'y accéder uniquement depuis
@@ -275,6 +279,7 @@ fun InkToneNavHost(navController: NavHostController = rememberNavController(), s
                 // bascule vers l'écran de configuration de la sync.
                 onOpenSync = { navigateToDrawerDestination(SyncRoute) },
                 onOpenTextSearch = { navController.navigate(SearchRoute()) },
+                onContentReady = onLibraryContentReady,
             )
             // Lot 11, tâche 11.10 — présenté à la prochaine ouverture de
             // l'app (Bibliothèque = première destination réelle après

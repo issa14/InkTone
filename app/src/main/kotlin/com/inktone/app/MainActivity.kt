@@ -1,5 +1,7 @@
 package com.inktone.app
 
+import kotlinx.coroutines.delay
+import androidx.compose.runtime.remember
 import android.graphics.Color
 import android.os.Bundle
 import androidx.activity.ComponentActivity
@@ -92,8 +94,18 @@ class MainActivity : ComponentActivity() {
                 // qu'un flash sur LibraryRoute avant redirection vers
                 // l'onboarding (piège explicite du plan, Tâche 10.4).
                 val hasSeenOnboarding by appThemeViewModel.hasSeenOnboarding.collectAsStateWithLifecycle()
-                LaunchedEffect(hasSeenOnboarding) {
-                    if (hasSeenOnboarding != null) isReady = true
+                // Bibliothèque : le splash attend ses livres, plafonné pour qu'une
+                // base lente ne bloque jamais l'ouverture (audit UX P0-7).
+                var libraryContentReady by remember { mutableStateOf(false) }
+                LaunchedEffect(hasSeenOnboarding, libraryContentReady) {
+                    when (hasSeenOnboarding) {
+                        null -> Unit
+                        false -> isReady = true
+                        true -> {
+                            if (!libraryContentReady) delay(SPLASH_LIBRARY_WAIT_MAX_MS)
+                            isReady = true
+                        }
+                    }
                 }
                 InkToneTheme(useDynamicColor = useDynamicColor, appTheme = appTheme) {
                     Surface {
@@ -101,6 +113,7 @@ class MainActivity : ComponentActivity() {
 
                         InkToneNavHost(
                             startDestination = if (hasSeenOnboarding == true) LibraryRoute else OnboardingRoute,
+                            onLibraryContentReady = { libraryContentReady = true },
                         )
                     }
                 }
@@ -108,3 +121,5 @@ class MainActivity : ComponentActivity() {
         }
     }
 }
+
+private const val SPLASH_LIBRARY_WAIT_MAX_MS = 1_000L
