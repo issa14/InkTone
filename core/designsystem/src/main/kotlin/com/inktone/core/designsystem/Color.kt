@@ -99,3 +99,16 @@ val InkToneDarkColorScheme = darkColorScheme(
 
 /** Couleur de fond pour les cartes en surélévation légère. */
 val ColorScheme.cardBackground: Color get() = this.surfaceVariant
+
+/**
+ * Violet de marque, fixe : pour les écrans d'identité (onboarding) où la
+ * couleur dynamique, si l'utilisateur l'active, ne garantirait plus la marque.
+ * Ailleurs, lire `MaterialTheme.colorScheme`.
+ */
+object InkToneBrand {
+    /** Accent700 — `primary` du thème clair. */
+    val violet = Color(0xFF2C1E67)
+
+    /** Cont.300 — accent lisible en texte sur fond sombre (7,23:1). */
+    val violetLight = Color(0xFFA698E1)
+}

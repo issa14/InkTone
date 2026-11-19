@@ -1,5 +1,6 @@
 package com.inktone.feature.onboarding
 
+import com.inktone.core.designsystem.InkToneBrand
 import com.inktone.core.designsystem.InkToneSpacing
 
 import com.inktone.core.designsystem.emphasized
@@ -66,28 +67,15 @@ import com.inktone.core.designsystem.AppIcon
 import com.inktone.core.designsystem.AppSymbol
 import com.inktone.core.designsystem.NarrativeAccentFamily
 
-/**
- * Couleur signature InkTone — utilisée volontairement en littéral sur cet
- * écran de marque (retour Issa, vérification device) : la couleur
- * dynamique (Material You) ne garantit pas le violet de marque à cet
- * endroit précis, alors que l'onboarding est le premier contact avec
- * l'identité visuelle. Sous-lot 2a — remplace le bordeaux legacy
- * (#7A1F3D) par le violet Deadly Depths.
- *
- * [InkToneVioletLight] — variante claire pour le mode sombre :
- * `AccentContainer300 #A698E1` (7.23:1 sur fond sombre), lisible en
- * icône et en dessin vectoriel, contrairement à `primary` sombre
- * (#7661D1) qui est sous le seuil WCAG AA texte.
- */
-val InkToneViolet = Color(0xFF2C1E67)
-val InkToneVioletLight = Color(0xFFA698E1)
+// Couleur de marque fixe sur cet écran d'identité (retour Issa, vérification
+// device) : la couleur dynamique ne garantirait pas le violet InkTone ici.
 
 /** Thème réellement appliqué, pas celui du système : l'app peut forcer le clair ou le sombre. */
 @Composable
 private fun isAppInDarkTheme(): Boolean = MaterialTheme.colorScheme.background.luminance() < 0.5f
 
 @Composable
-private fun accentColor(): Color = if (isAppInDarkTheme()) InkToneVioletLight else InkToneViolet
+private fun accentColor(): Color = if (isAppInDarkTheme()) InkToneBrand.violetLight else InkToneBrand.violet
 
 /**
  * Lot 10, Tâche 10.2 — `HorizontalPager` à trois cartes. Retour Issa
@@ -302,7 +290,7 @@ private fun ReadyCard(accent: Color, onImport: () -> Unit, onLater: () -> Unit) 
         Button(
             onClick = onImport,
             modifier = Modifier.fillMaxWidth(0.7f),
-            colors = ButtonDefaults.buttonColors(containerColor = InkToneViolet, contentColor = Color.White),
+            colors = ButtonDefaults.buttonColors(containerColor = InkToneBrand.violet, contentColor = Color.White),
         ) {
             Text("Importer un livre")
         }
