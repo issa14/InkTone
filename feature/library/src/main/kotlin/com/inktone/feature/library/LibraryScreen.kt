@@ -22,6 +22,7 @@ import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.grid.GridCells
+import androidx.compose.foundation.lazy.grid.GridItemSpan
 import androidx.compose.foundation.lazy.grid.LazyVerticalGrid
 import androidx.compose.foundation.lazy.grid.items as gridItems
 import androidx.compose.foundation.lazy.items as listItems
@@ -283,20 +284,21 @@ fun LibraryScreen(
                     },
                 )
                 else -> {
-                    // Carte « Reprendre la lecture » fixe au-dessus de la liste :
-                    // reste visible en permanence, seule la bibliothèque défile
-                    // dessous (au lieu d'un premier item qui disparaissait au scroll).
-                    state.resumeReadingPublication?.let { resume ->
-                        ResumeReadingCard(
-                            publication = resume,
-                            progressPercent = state.progressMap[resume.id], // inconnue : aucun chiffre plutôt que « 0% » (audit UX A19)
-                            onClick = { viewModel.onIntent(LibraryIntent.OpenPublication(resume.id)) },
-                            isNarrating = state.isResumeNarrationPlaying,
-                            onTogglePlayback = { viewModel.onIntent(LibraryIntent.ToggleResumeNarration(resume.id)) },
-                        )
-                    }
                     LibraryContent(
                         state = state,
+                        // En-tête qui défile avec les livres : la carte fixe
+                        // occupait ≈ 15 % de l'écran en permanence (audit UX P1).
+                        header = {
+                            state.resumeReadingPublication?.let { resume ->
+                                ResumeReadingCard(
+                                    publication = resume,
+                                    progressPercent = state.progressMap[resume.id], // inconnue : aucun chiffre plutôt que « 0% » (audit UX A19)
+                                    onClick = { viewModel.onIntent(LibraryIntent.OpenPublication(resume.id)) },
+                                    isNarrating = state.isResumeNarrationPlaying,
+                                    onTogglePlayback = { viewModel.onIntent(LibraryIntent.ToggleResumeNarration(resume.id)) },
+                                )
+                            }
+                        },
                         onOpen = { id -> viewModel.onIntent(LibraryIntent.OpenPublication(id)) },
                         onToggleFavorite = { id, isFavorite -> viewModel.onIntent(LibraryIntent.ToggleFavorite(id, isFavorite)) },
                         onTogglePin = { id, isPinned -> viewModel.onIntent(LibraryIntent.TogglePin(id, isPinned)) },
@@ -595,6 +597,7 @@ private val LibraryListPadding = PaddingValues(start = InkToneSpacing.sm, top = 
 @Composable
 private fun LibraryContent(
     state: LibraryUiState,
+    header: @Composable () -> Unit,
     onOpen: (String) -> Unit,
     onToggleFavorite: (String, Boolean) -> Unit,
     onTogglePin: (String, Boolean) -> Unit,
@@ -606,6 +609,7 @@ private fun LibraryContent(
                 columns = GridCells.Adaptive(minSize = 120.dp),
                 contentPadding = LibraryListPadding,
             ) {
+                item(key = "header", span = { GridItemSpan(maxLineSpan) }, contentType = "header") { header() }
                 gridItems(state.displayedPublications, key = { it.id }) { publication ->
                     BookCover(
                         publication = publication,
@@ -627,6 +631,7 @@ private fun LibraryContent(
                 columns = GridCells.Adaptive(minSize = 120.dp),
                 contentPadding = LibraryListPadding,
             ) {
+                item(key = "header", span = { GridItemSpan(maxLineSpan) }, contentType = "header") { header() }
                 gridItems(state.displayedPublications, key = { it.id }) { publication ->
                     BookGridCell(
                         publication = publication,
@@ -644,6 +649,7 @@ private fun LibraryContent(
 
         LibraryLayoutMode.LIST -> {
             LazyColumn(contentPadding = LibraryListPadding) {
+                item(key = "header", contentType = "header") { header() }
                 listItems(state.displayedPublications, key = { it.id }) { publication ->
                     PublicationListRow(
                         publication = publication,
