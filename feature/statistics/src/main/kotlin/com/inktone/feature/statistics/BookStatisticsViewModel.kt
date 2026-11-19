@@ -169,7 +169,7 @@ class BookStatisticsViewModel @Inject constructor(
                 bookTitle = publication?.title ?: bookId,
                 bookAuthor = publication?.authors?.firstOrNull()?.authorForDisplay() ?: "",
                 availableBooks = availableBooks,
-                wpmFormatted = "$wpm WPM",
+                wpmFormatted = "$wpm mots/min",
                 remainingTimeFormatted = remainingFormatted,
                 history = history,
             )

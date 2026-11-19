@@ -55,7 +55,7 @@ import com.inktone.core.designsystem.InkToneSpacing
  * Écran de détail par ouvrage (Lot Statistiques Palier 4).
  *
  * Affiche l'historique temporel des sessions d'un livre, ses KPIs
- * (WPM, temps restant), et un sélecteur d'ouvrage dans la TopBar.
+ * (vitesse en mots/min, temps restant), et un sélecteur d'ouvrage dans la TopBar.
  */
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
