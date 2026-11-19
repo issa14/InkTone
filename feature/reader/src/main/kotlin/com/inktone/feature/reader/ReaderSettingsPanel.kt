@@ -1,5 +1,6 @@
 package com.inktone.feature.reader
 
+import com.inktone.core.designsystem.formatDecimal
 import com.inktone.core.designsystem.InkToneSpacing
 
 import androidx.compose.foundation.background
@@ -190,7 +191,7 @@ fun ReaderSettingsPanel(
                 range = 1.0f..2.0f,
                 onValueChange = { lineHeightDraft = it },
                 onValueChangeFinished = { onLineHeightChange(lineHeightDraft) },
-                displayFormatter = { "%.1f×".format(it) },
+                displayFormatter = { "${formatDecimal(it.toDouble(), 1)}×" },
             )
 
             Spacer(Modifier.height(20.dp))

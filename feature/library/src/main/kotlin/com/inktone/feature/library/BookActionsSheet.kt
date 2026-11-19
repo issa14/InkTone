@@ -1,5 +1,6 @@
 package com.inktone.feature.library
 
+import com.inktone.core.designsystem.formatFileSize
 import com.inktone.core.designsystem.InkToneSpacing
 
 import androidx.compose.foundation.clickable
@@ -40,8 +41,6 @@ import com.inktone.domain.model.PublicationFormat
 import java.text.DateFormat
 import java.util.Date
 import java.util.Locale
-import kotlin.math.log10
-import kotlin.math.pow
 
 /**
  * Popup d'actions par livre (UX §Bibliothèque état peuplé) — remplace
@@ -237,10 +236,3 @@ private fun languageDisplayName(code: String): String {
     else name.replaceFirstChar { it.titlecase(Locale.FRENCH) }
 }
 
-private fun formatFileSize(bytes: Long): String {
-    if (bytes <= 0) return "0 o"
-    val units = arrayOf("o", "Ko", "Mo", "Go")
-    val digitGroups = (log10(bytes.toDouble()) / log10(1024.0)).toInt().coerceIn(0, units.size - 1)
-    val value = bytes / 1024.0.pow(digitGroups)
-    return "%.1f %s".format(value, units[digitGroups])
-}

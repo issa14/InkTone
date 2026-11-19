@@ -18,4 +18,20 @@ class FrenchTypographyTest {
         assertEquals("1\u202Fh\u202F05", formatDurationMinutes(65))
         assertEquals("2\u202Fh\u202F00", formatDurationMinutes(120))
     }
+
+    @Test
+    fun les_decimales_prennent_la_virgule_quelle_que_soit_la_locale_du_systeme() {
+        val previous = java.util.Locale.getDefault()
+        java.util.Locale.setDefault(java.util.Locale.US)
+        try {
+            assertEquals("1,59", formatDecimal(1.594, 2))
+            assertEquals("1,59\u202FGo", formatFileSize(1_707_000_000L))
+            assertEquals("183,0\u202FMo", formatFileSize(191_889_408L))
+            assertEquals("12\u202FKo", formatFileSize(12_288L))
+            assertEquals("512\u202Fo", formatFileSize(512L))
+            assertEquals("0,75×", formatMultiplier(0.75f))
+        } finally {
+            java.util.Locale.setDefault(previous)
+        }
+    }
 }

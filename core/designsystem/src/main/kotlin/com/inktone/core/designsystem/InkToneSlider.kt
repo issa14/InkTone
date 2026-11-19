@@ -176,5 +176,5 @@ private val TOUCH_TARGET = 48.dp
  */
 fun formatMultiplier(value: Float): String {
     val hundredths = kotlin.math.round(value * 100).toInt()
-    return if (hundredths % 10 == 0) "%.1f×".format(value) else "%.2f×".format(value)
+    return "${formatDecimal(value.toDouble(), if (hundredths % 10 == 0) 1 else 2)}×"
 }

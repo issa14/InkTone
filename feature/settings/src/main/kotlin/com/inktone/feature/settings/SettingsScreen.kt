@@ -1,5 +1,8 @@
 package com.inktone.feature.settings
 
+import com.inktone.core.designsystem.NARROW_NBSP
+import com.inktone.core.designsystem.formatDecimal
+import com.inktone.core.designsystem.formatFileSize
 import com.inktone.core.designsystem.InkToneSpacing
 
 import com.inktone.core.designsystem.InkToneSectionHeader
@@ -399,7 +402,7 @@ internal fun SettingsContent(
             // Taille réelle calculée (Context.cacheDir), pas estimée.
             ListItem(
                 headlineContent = { Text("Vider le cache") },
-                supportingContent = { Text("${formatBytes(cacheSizeBytes)} occupés") },
+                supportingContent = { Text("${formatFileSize(cacheSizeBytes)} occupés") },
                 trailingContent = {
                     TextButton(onClick = { showClearCacheConfirm = true }, enabled = cacheSizeBytes > 0) {
                         AppIcon(AppSymbol.DeleteSweep, contentDescription = null)
@@ -525,7 +528,7 @@ internal fun SettingsContent(
         if (showClearCacheConfirm) {
             ConfirmDialog(
                 title = "Vider le cache",
-                message = "${formatBytes(cacheSizeBytes)} de fichiers temporaires seront supprimés. " +
+                message = "${formatFileSize(cacheSizeBytes)} de fichiers temporaires seront supprimés. " +
                     "Vos livres, signets et réglages ne sont pas concernés.",
                 confirmLabel = "Vider",
                 destructive = true,
@@ -584,13 +587,6 @@ private fun dataOperationResultText(result: DataOperationResult): Pair<String, S
     is DataOperationResult.ImportFailed -> "Échec de l'import" to result.message
 }
 
-/** Lot 6, Palier B — taille lisible, calculée réellement, jamais affichée en octets bruts. */
-private fun formatBytes(bytes: Long): String = when {
-    bytes < 1024 -> "$bytes o"
-    bytes < 1024 * 1024 -> "%.0f Ko".format(bytes / 1024.0)
-    bytes < 1024 * 1024 * 1024 -> "%.1f Mo".format(bytes / (1024.0 * 1024.0))
-    else -> "%.2f Go".format(bytes / (1024.0 * 1024.0 * 1024.0))
-}
 
 // ─── Composants partagés ────────────────────────────────────────────────────
 
@@ -731,7 +727,7 @@ internal fun pronunciationRuleCountText(count: Int): String = when (count) {
 }
 
 /** Retour Issa : Mo lisibles plutôt que des octets bruts ("345566/132111222"). */
-private fun formatMegabytes(bytes: Long): String = "%.1f Mo".format(bytes / 1_000_000.0)
+private fun formatMegabytes(bytes: Long): String = "${formatDecimal(bytes / 1_000_000.0, 1)}${NARROW_NBSP}Mo"
 
 /**
  * Ligne entière basculable (rôle Switch, libellé fusionné) plutôt que le
