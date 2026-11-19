@@ -31,4 +31,10 @@ class MatchRangesTest {
         assertEquals(listOf(0..1, 6..7), matchRanges("Ou et Où", "ou"))
         assertEquals(emptyList<IntRange>(), matchRanges("abc", "a"))
     }
+
+    @Test
+    fun une_apostrophe_droite_surligne_l_apostrophe_typographique() {
+        assertEquals(listOf(0..11), matchRanges("N\u2019est-ce pas assez", "n'est-ce pas"))
+        assertEquals(listOf(0..7), matchRanges("n'est-ce", "N\u2019est-ce"))
+    }
 }

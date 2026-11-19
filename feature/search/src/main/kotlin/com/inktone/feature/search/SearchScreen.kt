@@ -221,5 +221,10 @@ internal fun matchRanges(text: String, query: String): List<IntRange> {
 
 private val combiningMarks = Regex("\\p{Mn}+")
 
+// Le clavier tape « ' », les livres impriment « ’ » : même apostrophe pour la recherche.
+private val apostrophes = Regex("[\u2019\u2018\u02BC]")
+
 private fun foldForMatch(value: String): String =
-    combiningMarks.replace(Normalizer.normalize(value, Normalizer.Form.NFD), "").lowercase(Locale.FRENCH)
+    combiningMarks.replace(Normalizer.normalize(value, Normalizer.Form.NFD), "")
+        .replace(apostrophes, "'")
+        .lowercase(Locale.FRENCH)
