@@ -121,4 +121,13 @@ class ThemeColorTest {
             assertTrue("${theme.id} icône Lecture", calculateContrastRatio(ThemeColors.onAccent(theme), accent) >= 3.0)
         }
     }
+
+    /** Chapitre en cours de la table des matières : texte du thème sur le conteneur sélectionné. */
+    @Test
+    fun le_texte_reste_lisible_sur_le_conteneur_selectionne_de_chaque_theme() {
+        ReadingTheme.BUILT_IN.forEach { theme ->
+            val ratio = calculateContrastRatio(ThemeColors.selectedContainer(theme), ThemeColors.barContent(theme))
+            assertTrue("${theme.id} : $ratio < 4.5", ratio >= 4.5)
+        }
+    }
 }

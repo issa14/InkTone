@@ -124,7 +124,7 @@ private fun TableOfContentsSheetContent(
             Text(
                 text = flat.entry.title,
                 style = if (isCurrent) LocalTextStyle.current.emphasized() else LocalTextStyle.current,
-                color = if (isCurrent) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurface,
+                color = if (isCurrent) MaterialTheme.colorScheme.onPrimaryContainer else MaterialTheme.colorScheme.onSurface,
                 modifier = Modifier
                     .fillMaxWidth()
                     .background(if (isCurrent) MaterialTheme.colorScheme.primaryContainer else MaterialTheme.colorScheme.surface)

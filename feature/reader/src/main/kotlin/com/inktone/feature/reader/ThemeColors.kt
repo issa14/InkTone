@@ -68,6 +68,16 @@ object ThemeColors {
     fun barContent(theme: ReadingTheme): Color = text(theme)
 
     /**
+     * Fond d'un élément sélectionné (chapitre en cours, puce) dans les panneaux
+     * du Lecteur : teinté de l'accent, assez léger pour que le texte du thème
+     * y reste lisible. Sans lui, le conteneur venait du thème de l'APP.
+     */
+    fun selectedContainer(theme: ReadingTheme): Color =
+        androidx.compose.ui.graphics.lerp(barSurface(theme), accent(theme), SELECTED_CONTAINER_ACCENT)
+
+    internal const val SELECTED_CONTAINER_ACCENT = 0.22f
+
+    /**
      * Icône posée sur un bouton plein de couleur [accent] (Lecture/Pause) :
      * la surface de barre tant qu'elle reste lisible (3:1, élément
      * d'interface), sinon le texte du thème.
@@ -135,8 +145,16 @@ internal fun ReadingThemeScope(
         onBackground = text,
         primary = ThemeColors.accent(theme),
         onPrimary = ThemeColors.background(theme),
-        secondaryContainer = androidx.compose.ui.graphics.lerp(surface, ThemeColors.accent(theme), 0.3f),
+        primaryContainer = ThemeColors.selectedContainer(theme),
+        onPrimaryContainer = text,
+        secondary = ThemeColors.accent(theme),
+        onSecondary = ThemeColors.background(theme),
+        secondaryContainer = ThemeColors.selectedContainer(theme),
         onSecondaryContainer = text,
+        tertiary = ThemeColors.accent(theme),
+        onTertiary = ThemeColors.background(theme),
+        outline = text.copy(alpha = 0.5f),
+        outlineVariant = text.copy(alpha = 0.2f),
     )
     androidx.compose.material3.MaterialTheme(
         colorScheme = scheme,
