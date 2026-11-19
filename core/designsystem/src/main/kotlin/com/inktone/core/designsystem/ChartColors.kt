@@ -14,15 +14,18 @@ import androidx.compose.ui.graphics.luminance
 @Immutable
 data class InkToneChartColors(val visual: Color, val tts: Color, val positive: Color)
 
-private val LightChartColors = InkToneChartColors(
-    visual = Color(0xFF2E7D32),
-    tts = Color(0xFF8E24AA),
+// Séries de la palette violette : chacune ≥ 3:1 sur les surfaces (élément non
+// textuel) et ≥ 2:1 entre elles, pour rester distinctes une fois empilées.
+// `positive` reste vert : c'est un sens (hausse), pas une série.
+internal val LightChartColors = InkToneChartColors(
+    visual = Color(0xFF3F2C9E),
+    tts = Color(0xFFB8669A),
     positive = Color(0xFF2E7D32),
 )
 
-private val DarkChartColors = InkToneChartColors(
-    visual = Color(0xFF81C784),
-    tts = Color(0xFFCE93D8),
+internal val DarkChartColors = InkToneChartColors(
+    visual = Color(0xFF8C7BD9),
+    tts = Color(0xFFF2C6DE),
     positive = Color(0xFF81C784),
 )
 
