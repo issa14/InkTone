@@ -63,7 +63,7 @@ class StatisticsViewModel @Inject constructor(
     // Tache 7.4 — sélection Semaine/Mois de la carte "Activité", pilotée
     // par un intent explicite (onPeriodSelected), combinée dans l'état
     // unique du tableau de bord.
-    private val selectedPeriod = MutableStateFlow(StatsPeriod.MONTH)
+    private val selectedPeriod = MutableStateFlow(StatsPeriod.WEEK)
 
     val state: StateFlow<StatisticsUiState> = combine(
         getStatistics(),

@@ -352,11 +352,12 @@ class StatisticsViewModelTest {
             clock = clock,
         )
 
-        val monthState = vm.state.first { it is StatisticsUiState.Ready } as StatisticsUiState.Ready
-        assertEquals(StatsPeriod.MONTH, monthState.activity.period)
+        // Semaine par défaut : la période la plus parlante au quotidien.
+        val weekState = vm.state.first { it is StatisticsUiState.Ready } as StatisticsUiState.Ready
+        assertEquals(StatsPeriod.WEEK, weekState.activity.period)
 
-        vm.onPeriodSelected(StatsPeriod.WEEK)
-        val weekState = vm.state.first { (it as? StatisticsUiState.Ready)?.activity?.period == StatsPeriod.WEEK } as StatisticsUiState.Ready
+        vm.onPeriodSelected(StatsPeriod.MONTH)
+        val monthState = vm.state.first { (it as? StatisticsUiState.Ready)?.activity?.period == StatsPeriod.MONTH } as StatisticsUiState.Ready
 
         // Le mois (20 jours d'activité) cumule strictement plus que la semaine (7 jours).
         assertNotEquals(monthState.activity.periodTotalFormatted, weekState.activity.periodTotalFormatted)
