@@ -394,6 +394,10 @@ private fun Section2Charts(activity: com.inktone.domain.usecase.ActivityChartSta
 }
 
 @OptIn(ExperimentalMaterial3Api::class)
+// Sélecteur secondaire de la carte : compact, sans coche, il ne doit pas
+// peser plus que le titre « Activité » à côté duquel il se trouve.
+private val PeriodButtonHeight = 32.dp
+
 @Composable
 private fun PeriodSelector(selected: StatsPeriod, onSelected: (StatsPeriod) -> Unit) {
     SingleChoiceSegmentedButtonRow {
@@ -401,13 +405,17 @@ private fun PeriodSelector(selected: StatsPeriod, onSelected: (StatsPeriod) -> U
             selected = selected == StatsPeriod.WEEK,
             onClick = { onSelected(StatsPeriod.WEEK) },
             shape = SegmentedButtonDefaults.itemShape(index = 0, count = 2),
-            label = { Text("Semaine") },
+            icon = {},
+            modifier = Modifier.height(PeriodButtonHeight),
+            label = { Text("Semaine", style = MaterialTheme.typography.labelMedium) },
         )
         SegmentedButton(
             selected = selected == StatsPeriod.MONTH,
             onClick = { onSelected(StatsPeriod.MONTH) },
             shape = SegmentedButtonDefaults.itemShape(index = 1, count = 2),
-            label = { Text("Mois") },
+            icon = {},
+            modifier = Modifier.height(PeriodButtonHeight),
+            label = { Text("Mois", style = MaterialTheme.typography.labelMedium) },
         )
     }
 }
