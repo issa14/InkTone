@@ -142,7 +142,7 @@ object BookBlockStyleMapper {
      */
     internal fun buildAnnotatedString(richText: StyledText): androidx.compose.ui.text.AnnotatedString =
         buildAnnotatedString {
-            val plainText = richText.plainText
+            val plainText = richText.plainText.withUnbreakableElisions()
             val spans = richText.spans
             var lastEnd = 0
             for (span in spans) {

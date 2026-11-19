@@ -1,5 +1,6 @@
 package com.inktone.feature.reader.pagination
 
+import com.inktone.feature.reader.rendering.withUnbreakableElisions
 import androidx.compose.ui.text.AnnotatedString
 import androidx.compose.ui.text.ParagraphStyle
 import androidx.compose.ui.text.SpanStyle
@@ -384,7 +385,7 @@ class ChapterTextMeasurer(private val textMeasurer: TextMeasurer) {
                 }
 
                 val appendRichText = {
-                    val plainText = richText.plainText
+                    val plainText = richText.plainText.withUnbreakableElisions()
                     var lastEnd = 0
                     for (span in richText.spans) {
                         if (span.start > lastEnd) {

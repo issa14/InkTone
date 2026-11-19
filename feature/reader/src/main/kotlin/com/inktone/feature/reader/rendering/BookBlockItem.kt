@@ -145,7 +145,7 @@ fun BookBlockItem(
         is BookBlock.HeadingBlock -> {
             val textStyle = BookBlockStyleMapper.textStyleFor(block, baseTextStyle)
             Text(
-                text = block.richText.plainText,
+                text = block.richText.plainText.withUnbreakableElisions(),
                 style = textStyle,
                 modifier = modifier
                     .fillMaxWidth()
