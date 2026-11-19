@@ -257,6 +257,7 @@ private fun Section1Kpis(kpi: com.inktone.domain.usecase.KpiState) {
 @Composable
 private fun DailyGoalGauge(kpi: com.inktone.domain.usecase.KpiState) {
     val progress = (kpi.todayReadingMinutes.toFloat() / kpi.dailyGoalMinutes).coerceIn(0f, 1f)
+    val goalReached = kpi.dailyGoalMinutes > 0 && kpi.todayReadingMinutes >= kpi.dailyGoalMinutes
     val progressColor = if (progress >= 1f) MaterialTheme.colorScheme.primary
     else MaterialTheme.colorScheme.tertiary
 
@@ -290,19 +291,36 @@ private fun DailyGoalGauge(kpi: com.inktone.domain.usecase.KpiState) {
                 // la jauge et mordait sur son anneau. Empilé, il tient — et se
                 // lit mieux : le temps atteint devient le chiffre principal,
                 // l'objectif passe en second rang, ce qu'il est.
-                Column(horizontalAlignment = Alignment.CenterHorizontally) {
-                    Text(
-                        "${kpi.todayReadingMinutes}",
-                        style = MaterialTheme.typography.headlineMedium.emphasized(),
-                        maxLines = 1,
-                    )
-                    Text(
-                        "/ ${kpi.dailyGoalMinutes} min",
-                        style = MaterialTheme.typography.labelMedium,
-                        color = MaterialTheme.colorScheme.onSurfaceVariant,
-                        maxLines = 1,
-                    )
+                // Objectif atteint : « 117 / 10 min » ne disait rien de plus
+                // qu'une jauge pleine ; le temps réel passe sous la jauge.
+                if (goalReached) {
+                    Column(horizontalAlignment = Alignment.CenterHorizontally) {
+                        AppIcon(AppSymbol.Success, contentDescription = null, tint = progressColor, modifier = Modifier.size(32.dp))
+                        Text("Atteint", style = MaterialTheme.typography.titleSmall, maxLines = 1)
+                    }
+                } else {
+                    Column(horizontalAlignment = Alignment.CenterHorizontally) {
+                        Text(
+                            "${kpi.todayReadingMinutes}",
+                            style = MaterialTheme.typography.headlineMedium.emphasized(),
+                            maxLines = 1,
+                        )
+                        Text(
+                            "/ ${kpi.dailyGoalMinutes} min",
+                            style = MaterialTheme.typography.labelMedium,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant,
+                            maxLines = 1,
+                        )
+                    }
                 }
+            }
+            if (goalReached) {
+                Spacer(Modifier.height(InkToneSpacing.sm))
+                Text(
+                    "${formatDurationMinutes(kpi.todayReadingMinutes)} aujourd'hui · objectif ${formatDurationMinutes(kpi.dailyGoalMinutes.toLong())}",
+                    style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                )
             }
             Spacer(Modifier.height(InkToneSpacing.lg))
             Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceEvenly) {
