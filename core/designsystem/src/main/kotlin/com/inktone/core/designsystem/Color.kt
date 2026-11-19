@@ -19,14 +19,16 @@ val InkToneLightColorScheme = lightColorScheme(
     onPrimary = Color.White,
     primaryContainer = Color(0xFFE4DFF6),
     onPrimaryContainer = Color(0xFF19113B),
-    secondary = Color(0xFFC04000),
+    // Violet désaturé : lu par défaut par les puces, onglets, tiroir et pistes
+    // de progression, il doit rester dans la famille de `primary`.
+    secondary = Color(0xFF5E5878),
     onSecondary = Color.White,
-    secondaryContainer = Color(0xFFFFDBD1),
-    onSecondaryContainer = Color(0xFF3A0A00),
-    tertiary = Color(0xFF006B5E),
+    secondaryContainer = Color(0xFFE6E0F2),
+    onSecondaryContainer = Color(0xFF1C1830),
+    tertiary = Color(0xFF7A4D69),
     onTertiary = Color.White,
-    tertiaryContainer = Color(0xFF7FF8E3),
-    onTertiaryContainer = Color(0xFF00201B),
+    tertiaryContainer = Color(0xFFF7D9EA),
+    onTertiaryContainer = Color(0xFF2F1123),
     error = Color(0xFFBA1A1A),
     onError = Color.White,
     errorContainer = Color(0xFFFFDAD6),
@@ -61,14 +63,14 @@ val InkToneDarkColorScheme = darkColorScheme(
     primaryContainer = Color(0xFF2C1E67),
     // Blanc : le lavande (#A698E1) paraissait terne sur le violet profond.
     onPrimaryContainer = Color.White,
-    secondary = Color(0xFFFF8C5A),
-    onSecondary = Color(0xFF3D0D00),
-    secondaryContainer = Color(0xFF5C1A00),
-    onSecondaryContainer = Color(0xFFFFDBD1),
-    tertiary = Color(0xFF4DDBBF),
-    onTertiary = Color(0xFF00382F),
-    tertiaryContainer = Color(0xFF005045),
-    onTertiaryContainer = Color(0xFF7FF8E3),
+    secondary = Color(0xFFCAC3DE),
+    onSecondary = Color(0xFF322D45),
+    secondaryContainer = Color(0xFF3A3452),
+    onSecondaryContainer = Color(0xFFE6E0F8),
+    tertiary = Color(0xFFECB8D6),
+    onTertiary = Color(0xFF47213A),
+    tertiaryContainer = Color(0xFF603651),
+    onTertiaryContainer = Color(0xFFFFD8EC),
     error = Color(0xFFFFB4AB),
     onError = Color(0xFF690005),
     errorContainer = Color(0xFF93000A),
@@ -94,12 +96,6 @@ val InkToneDarkColorScheme = darkColorScheme(
     inversePrimary = Color(0xFF7661D1),
     scrim = Color.Black,
 )
-
-/** Couleur associée au TTS actif (bouton, badge, indicateur). */
-val ColorScheme.ttsActive: Color get() = this.secondary
-
-/** Couleur de succès / confirmation (import, sauvegarde). */
-val ColorScheme.success: Color get() = this.tertiary
 
 /** Couleur de fond pour les cartes en surélévation légère. */
 val ColorScheme.cardBackground: Color get() = this.surfaceVariant
