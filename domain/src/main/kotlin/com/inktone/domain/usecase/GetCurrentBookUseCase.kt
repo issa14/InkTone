@@ -39,6 +39,7 @@ class GetCurrentBookUseCase(
             coverUri = publication.coverUri,
             progressPercent = readingState?.let { publication.progressionAt(it.locator) },
             totalBookTimeMs = totalBookTimeMs,
+            totalChars = publication.chapterLengths?.total,
             remainingTimeFormatted = null,
         )
     }

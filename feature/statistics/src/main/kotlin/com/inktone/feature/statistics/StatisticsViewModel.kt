@@ -74,7 +74,7 @@ class StatisticsViewModel @Inject constructor(
         StatisticsUiState.Ready(
             kpi = rawStats.toKpiState(prefs.dailyGoalMinutes),
             activity = rawStats.toActivityState(period),
-            currentBook = book?.withRemainingTime(),
+            currentBook = book?.withRemainingTime(rawStats.averageWpm),
         )
     }.flowOn(Dispatchers.Default)
         .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), StatisticsUiState.Loading)
@@ -163,19 +163,9 @@ class StatisticsViewModel @Inject constructor(
 
     // ───── Livre en cours (formatage, pas de query) ─────
 
-    /**
-     * Estime le temps restant pour ce livre à partir du temps déjà passé
-     * dessus et de la progression atteinte.
-     *
-     * Formule (cible UX) : temps restant ≈ tempsTotal / progression * (1 - progression).
-     *
-     * Volontairement indépendante du WPM : le rythme réel de CE livre est déjà
-     * contenu dans son temps cumulé, et une moyenne tous livres confondus n'y
-     * ajouterait que du bruit.
-     */
-    private fun CurrentBookState.withRemainingTime(): CurrentBookState {
-        if ((progressPercent ?: 0f) <= 0f || totalBookTimeMs <= 0L) return this
-        val remainingMs = estimatedRemainingReadingMs(totalBookTimeMs, progressPercent)
+    /** Temps restant estimé — règle et seuils dans `estimatedRemainingReadingMs`. */
+    private fun CurrentBookState.withRemainingTime(averageWpm: Int): CurrentBookState {
+        val remainingMs = estimatedRemainingReadingMs(totalBookTimeMs, progressPercent, totalChars, averageWpm)
         return copy(remainingTimeFormatted = remainingMs?.let(::formatDuration))
     }
 

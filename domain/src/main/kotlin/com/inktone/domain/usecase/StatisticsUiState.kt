@@ -77,5 +77,7 @@ data class CurrentBookState(
     /** Progression 0..1 (`Publication.progressionAt`), `null` si inconnue. */
     val progressPercent: Float?,
     val totalBookTimeMs: Long = 0,
+    /** Longueur du livre en caractères (`ChapterLengths.total`), `null` si inconnue. */
+    val totalChars: Int? = null,
     val remainingTimeFormatted: String?,
 )

@@ -120,7 +120,12 @@ class BookStatisticsViewModel @Inject constructor(
         val progression = publication?.let { pub ->
             readingStateRepository.get(pub.id)?.locator?.let(pub::progressionAt)
         }
-        val remainingFormatted = estimatedRemainingReadingMs(sessions.sumOf { it.durationMs }, progression)
+        val remainingFormatted = estimatedRemainingReadingMs(
+            timeSpentMs = sessions.sumOf { it.durationMs },
+            progression = progression,
+            totalChars = publication?.chapterLengths?.total,
+            averageWpm = wpm,
+        )
             ?.let(::formatDuration) ?: "—"
 
         // Historique — DateTimeFormatter (thread-safe, API 26+)

@@ -83,18 +83,38 @@ fun Publication.progressionAt(locator: Locator): Float? = when (format) {
 }
 
 /**
- * Temps de lecture restant estimé pour un livre : le temps déjà passé dessus,
- * rapporté à sa progression ([progression] 0..1). `null` sans progression
- * connue ni temps passé — aucune estimation plutôt qu'un chiffre inventé.
+ * Temps de lecture restant estimé pour un livre ([progression] 0..1). `null`
+ * quand rien ne permet une estimation honnête — jamais un chiffre inventé.
  *
- * Le rythme réel de CE livre est contenu dans son temps cumulé : une moyenne
- * tous livres confondus n'y ajouterait que du bruit.
+ * Passé [EXTRAPOLATION_MIN_PROGRESSION], le rythme réel de CE livre (temps
+ * cumulé rapporté à la progression) est le meilleur indicateur. En deçà, cette
+ * extrapolation diverge (26 min à 0,3 % → 146 h) : on estime alors le texte
+ * restant ([totalChars], en caractères) à la vitesse mesurée [averageWpm].
  */
-fun estimatedRemainingReadingMs(timeSpentMs: Long, progression: Float?): Long? {
-    if (progression == null || progression <= 0f || timeSpentMs <= 0L) return null
-    val remaining = (timeSpentMs / progression).toLong() - timeSpentMs
+fun estimatedRemainingReadingMs(
+    timeSpentMs: Long,
+    progression: Float?,
+    totalChars: Int? = null,
+    averageWpm: Int = 0,
+): Long? {
+    if (progression == null) return null
+    val remaining = when {
+        progression >= EXTRAPOLATION_MIN_PROGRESSION && timeSpentMs > 0L ->
+            (timeSpentMs / progression).toLong() - timeSpentMs
+        totalChars != null && totalChars > 0 && averageWpm > 0 -> {
+            val remainingWords = totalChars * (1.0 - progression.coerceIn(0f, 1f)) / CHARS_PER_WORD
+            (remainingWords / averageWpm * 60_000.0).toLong()
+        }
+        else -> return null
+    }
     return remaining.takeIf { it > 0 }
 }
+
+/** Progression à partir de laquelle le rythme propre au livre est fiable. */
+const val EXTRAPOLATION_MIN_PROGRESSION = 0.10f
+
+/** Longueur moyenne d'un mot français, espace comprise (à calibrer sur un EPUB réel). */
+const val CHARS_PER_WORD = 6.0
 
 /**
  * Progression à partir de laquelle un livre reflowable est « terminé » : la
