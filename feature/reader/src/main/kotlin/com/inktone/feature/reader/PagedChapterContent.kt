@@ -911,7 +911,7 @@ private fun PageBlock(
                         highlightedRange.value?.let { absoluteRangePath(l, pageOffsetRange, it) }
                     }
                     onDrawBehind {
-                        selectionPath?.let { drawPath(it, SelectionHighlightColor) }
+                        selectionPath?.let { drawPath(it, selectionColors.backgroundColor) }
                         wordPath?.let { drawPath(it, wordHighlightColor) }
                     }
                 },
@@ -959,8 +959,6 @@ internal fun DrawScope.drawAbsoluteRangeHighlight(path: Path?, color: Color) {
     if (path == null) return
     drawPath(path, color = color)
 }
-
-internal val SelectionHighlightColor = Color(0x664FC3F7)
 
 internal fun buildPageAnnotatedString(
     full: AnnotatedString,

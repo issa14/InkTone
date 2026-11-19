@@ -70,7 +70,7 @@ private const val MAX_RECENT_ANNOTATION_COLORS = 3
  * tâche 10). Trois canaux visuels restent séparés — jamais mélangés :
  * - l'annotation : fond (surlignage) ou décoration de texte (souligné/barré) ;
  * - le surlignage TTS : `ThemeColors.wordHighlight` ;
- * - la sélection : [SelectionHighlightColor].
+ * - la sélection : `ThemeColors.selectionBackground`.
  */
 fun annotationSpanStyle(kind: AnnotationKind, color: AnnotationColor): SpanStyle = when (kind) {
     AnnotationKind.HIGHLIGHT -> SpanStyle(background = color.toComposeColor())

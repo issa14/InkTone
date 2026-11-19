@@ -1,5 +1,6 @@
 package com.inktone.feature.reader.rendering
 
+import androidx.compose.foundation.text.selection.LocalTextSelectionColors
 import com.inktone.core.designsystem.InkToneSpacing
 
 import androidx.compose.foundation.gestures.detectTapGestures
@@ -47,7 +48,6 @@ import coil.compose.AsyncImage
 import com.inktone.domain.model.Annotation
 import com.inktone.domain.model.BookBlock
 import com.inktone.domain.service.EpubResourceResolver
-import com.inktone.feature.reader.SelectionHighlightColor
 import com.inktone.feature.reader.absoluteRangePath
 import com.inktone.feature.reader.annotationSpanStyle
 import com.inktone.feature.reader.rangeBoundsInWindow
@@ -76,7 +76,7 @@ import com.inktone.feature.reader.toComposeColor
  * Tous les paragraphes rendent par `Text` ([ParagraphBlockText]) : la
  * sélection est une plage absolue du chapitre, dessinée dans chaque bloc
  * qu'elle touche. Fonctions partagées avec `PageBlock` (`PagedChapterContent.kt`) :
- * [rangeBoundsInWindow], [absoluteRangePath], [SelectionHighlightColor].
+ * [rangeBoundsInWindow], [absoluteRangePath], `LocalTextSelectionColors`.
  *
  * @param block Le bloc à rendre.
  * @param baseTextStyle Style de texte de base (taille, police, couleur du thème).
@@ -291,6 +291,7 @@ private fun ParagraphBlockText(
 ) {
     val onLinkTapped = LocalLinkTapHandler.current
     var textLayoutResult by remember(blockOffsetRange) { mutableStateOf<TextLayoutResult?>(null) }
+    val selectionColor = LocalTextSelectionColors.current.backgroundColor
     var textCoordinates by remember(blockOffsetRange) { mutableStateOf<LayoutCoordinates?>(null) }
     val density = LocalDensity.current
     val registry = LocalVisibleTextRegistry.current
@@ -397,7 +398,7 @@ private fun ParagraphBlockText(
                     highlightedRange.value?.let { absoluteRangePath(l, blockOffsetRange, it) }
                 }
                 onDrawBehind {
-                    selectionPath?.let { drawPath(it, SelectionHighlightColor) }
+                    selectionPath?.let { drawPath(it, selectionColor) }
                     wordPath?.let { drawPath(it, wordHighlightColor) }
                 }
             },

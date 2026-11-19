@@ -130,4 +130,15 @@ class ThemeColorTest {
             assertTrue("${theme.id} : $ratio < 4.5", ratio >= 4.5)
         }
     }
+
+    /** Texte sélectionné : lisible sur le fond de sélection de chaque thème intégré. */
+    @Test
+    fun le_texte_reste_lisible_sous_la_selection_de_chaque_theme() {
+        ReadingTheme.BUILT_IN.forEach { theme ->
+            val selection = ThemeColors.selectionBackground(theme)
+            val composed = androidx.compose.ui.graphics.lerp(ThemeColors.background(theme), selection.copy(alpha = 1f), selection.alpha)
+            val ratio = calculateContrastRatio(composed, ThemeColors.text(theme))
+            assertTrue("${theme.id} : $ratio < 4.5", ratio >= 4.5)
+        }
+    }
 }

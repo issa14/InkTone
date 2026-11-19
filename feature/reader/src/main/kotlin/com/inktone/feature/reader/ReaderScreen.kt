@@ -948,6 +948,11 @@ fun ReaderScreen(
         CompositionLocalProvider(
             LocalImageLoader provides (epubImageLoader ?: LocalImageLoader.current),
             LocalLinkTapHandler provides onLinkTapped,
+            // Sélection et poignées à l'accent du thème de LECTURE, pas de l'app.
+            LocalTextSelectionColors provides TextSelectionColors(
+                handleColor = ThemeColors.accent(state.resolvedTheme),
+                backgroundColor = ThemeColors.selectionBackground(state.resolvedTheme),
+            ),
         ) {
         // Colonne bornée et centrée sur écran large (audit UI P1-5). La borne
         // s'applique à la zone mesurée elle-même : pagination et rendu en

@@ -78,6 +78,15 @@ object ThemeColors {
     internal const val SELECTED_CONTAINER_ACCENT = 0.22f
 
     /**
+     * Fond de la sélection de texte : l'accent du thème, translucide. Un cyan
+     * fixe sortait de la charte ; l'accent reste distinct des couleurs
+     * d'annotation et du surlignage TTS, qui ont chacun leur canal.
+     */
+    fun selectionBackground(theme: ReadingTheme): Color = accent(theme).copy(alpha = SELECTION_ALPHA)
+
+    internal const val SELECTION_ALPHA = 0.35f
+
+    /**
      * Icône posée sur un bouton plein de couleur [accent] (Lecture/Pause) :
      * la surface de barre tant qu'elle reste lisible (3:1, élément
      * d'interface), sinon le texte du thème.
