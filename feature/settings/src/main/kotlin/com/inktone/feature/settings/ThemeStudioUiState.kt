@@ -18,7 +18,7 @@ data class ThemeStudioUiState(
     val name: String = "",
     val backgroundColorHex: String = "#FFFFFF",
     val textColorHex: String = "#000000",
-    val accentColorHex: String = "#1976D2",
+    val accentColorHex: String = "#5B47C2",
     val highlightColorHex: String = "#FFEB3B",
 ) {
     /** Badge WCAG en direct (Tâche 9.5) — informatif, ne bloque jamais Sauvegarder. */

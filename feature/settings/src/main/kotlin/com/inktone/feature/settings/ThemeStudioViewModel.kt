@@ -115,8 +115,8 @@ class ThemeStudioViewModel @Inject constructor(
             if (backgroundHex.toColor().luminance() > 0.5f) FontFamily.SERIF else FontFamily.SANS_SERIF
 
         private val STARTER_PALETTES = mapOf(
-            StarterPalette.SOMBRE to ThemeStudioUiState(backgroundColorHex = "#121212", textColorHex = "#E0E0E0", accentColorHex = "#82B1FF", highlightColorHex = "#FFD54F"),
-            StarterPalette.CLAIR to ThemeStudioUiState(backgroundColorHex = "#FFFFFF", textColorHex = "#212121", accentColorHex = "#1976D2", highlightColorHex = "#FFEB3B"),
+            StarterPalette.SOMBRE to ThemeStudioUiState(backgroundColorHex = "#121212", textColorHex = "#E0E0E0", accentColorHex = "#A698E1", highlightColorHex = "#FFD54F"),
+            StarterPalette.CLAIR to ThemeStudioUiState(backgroundColorHex = "#FFFFFF", textColorHex = "#212121", accentColorHex = "#5B47C2", highlightColorHex = "#FFEB3B"),
             StarterPalette.CHAUD to ThemeStudioUiState(backgroundColorHex = "#FFF3E0", textColorHex = "#4E342E", accentColorHex = "#E64A19", highlightColorHex = "#FFAB40"),
             StarterPalette.NEON to ThemeStudioUiState(backgroundColorHex = "#0D0221", textColorHex = "#F5F5F5", accentColorHex = "#00E5FF", highlightColorHex = "#FF00E5"),
         )

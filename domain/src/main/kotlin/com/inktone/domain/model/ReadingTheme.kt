@@ -39,7 +39,7 @@ data class ReadingTheme(
             id = "papier_clair", displayName = "Papier Clair", isBuiltIn = true,
             // Ni blanc ni noir purs (≈ 17:1) : 21:1 fatigue en lecture longue.
             backgroundColorHex = "#FBFAF7", textColorHex = "#1C1B1A",
-            accentColorHex = "#1976D2", highlightColorHex = "#FFEB3B",
+            accentColorHex = "#5B47C2", highlightColorHex = "#FFEB3B",
             fontFamily = FontFamily.SERIF,
         )
         val OBSIDIENNE = ReadingTheme(
@@ -47,7 +47,7 @@ data class ReadingTheme(
             // Texte cassé (≈ 16:1) : le blanc pur sur noir pur bave sur OLED.
             // Noir Absolu AMOLED reste le choix du contraste maximal.
             backgroundColorHex = "#000000", textColorHex = "#E6E3DE",
-            accentColorHex = "#90CAF9", highlightColorHex = "#FFD54F",
+            accentColorHex = "#A698E1", highlightColorHex = "#FFD54F",
             fontFamily = FontFamily.SANS_SERIF,
         )
         val SEPIA_VINTAGE = ReadingTheme(
@@ -75,13 +75,13 @@ data class ReadingTheme(
         val OPEN_DYSLEXIC_ESPACEMENT = ReadingTheme(
             id = "open_dyslexic_espacement", displayName = "OpenDyslexic & Espacement", isBuiltIn = true,
             backgroundColorHex = "#FFFFFF", textColorHex = "#000000",
-            accentColorHex = "#1976D2", highlightColorHex = "#FFEB3B",
+            accentColorHex = "#5B47C2", highlightColorHex = "#FFEB3B",
             fontFamily = FontFamily.OPEN_DYSLEXIC,
         )
         val NOIR_ABSOLU_AMOLED = ReadingTheme(
             id = "noir_absolu_amoled", displayName = "Noir Absolu AMOLED", isBuiltIn = true,
             backgroundColorHex = "#000000", textColorHex = "#E0E0E0",
-            accentColorHex = "#64B5F6", highlightColorHex = "#FFD54F",
+            accentColorHex = "#A698E1", highlightColorHex = "#FFD54F",
             fontFamily = FontFamily.SANS_SERIF,
         )
 
