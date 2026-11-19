@@ -40,11 +40,7 @@ import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.ModalBottomSheet
 import androidx.compose.material3.NavigationDrawerItem
 import androidx.compose.material3.Scaffold
-import androidx.compose.ui.input.nestedscroll.nestedScroll
-import androidx.compose.ui.input.nestedscroll.NestedScrollSource
-import androidx.compose.ui.input.nestedscroll.NestedScrollConnection
-import androidx.compose.ui.geometry.Offset
-import androidx.compose.material3.ExtendedFloatingActionButton
+import androidx.compose.material3.FloatingActionButton
 import androidx.compose.material3.SnackbarDuration
 import androidx.compose.material3.SnackbarHost
 import androidx.compose.material3.SnackbarHostState
@@ -175,29 +171,16 @@ fun LibraryScreen(
     // porte déjà « Importer votre premier livre ».
     val showImportFab = !state.isLoading && state.errorMessage == null && !state.isSearchActive &&
         !state.showImportDetails && state.displayedPublications.isNotEmpty()
-    // Replié en icône seule pendant un défilement vers le bas, où le libellé
-    // masquerait des couvertures ; déplié à la remontée.
-    var isImportFabExpanded by remember { mutableStateOf(true) }
-    val fabScrollConnection = remember {
-        object : NestedScrollConnection {
-            override fun onPreScroll(available: Offset, source: NestedScrollSource): Offset {
-                if (available.y < -1f) isImportFabExpanded = false
-                if (available.y > 1f) isImportFabExpanded = true
-                return Offset.Zero
-            }
-        }
-    }
 
     Scaffold(
         snackbarHost = { SnackbarHost(snackbarHostState) },
         floatingActionButton = {
             if (showImportFab) {
-                ExtendedFloatingActionButton(
-                    text = { Text("Importer") },
-                    icon = { AppIcon(AppSymbol.Add, contentDescription = null) },
-                    onClick = onImportClick,
-                    expanded = isImportFabExpanded,
-                )
+                // Icône seule : le libellé recouvrait la dernière colonne de
+                // couvertures (audit UX P0-4). L'état vide garde le sien.
+                FloatingActionButton(onClick = onImportClick) {
+                    AppIcon(AppSymbol.Add, contentDescription = "Importer")
+                }
             }
         },
         topBar = {
@@ -222,7 +205,7 @@ fun LibraryScreen(
             )
         },
     ) { innerPadding ->
-        Column(Modifier.fillMaxSize().padding(innerPadding).nestedScroll(fabScrollConnection)) {
+        Column(Modifier.fillMaxSize().padding(innerPadding)) {
             // Lot 5 — résumé de fin d'import ou bannière de progression.
             // Pas de résumé ici quand les détails sont ouverts :
             // ImportResultDetail affiche déjà son propre en-tête résumé
